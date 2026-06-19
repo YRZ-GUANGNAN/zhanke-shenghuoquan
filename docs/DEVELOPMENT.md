@@ -1,0 +1,35 @@
+# Development Guide
+
+## 固定开发路径
+
+```text
+miniapp page -> services/a-user|b-community|c-trade|d-navigation|e-im -> /api/v1
+admin page   -> services/f-admin -> /api/v1/admin
+HTTP handler -> domain service -> domain repository -> domain-owned tables
+```
+
+handler 不得持有 `*gorm.DB`。跨域访问只能调用对方 service 暴露的窄接口，禁止查询或更新对方表。
+
+## 本地运行
+
+```powershell
+npm run dev:infra
+npm run db:seed
+npm run dev:backend
+npm run dev:admin
+npm run dev:miniapp
+```
+
+`db:seed` 按顺序执行所有 SQL。旧原型数据库会由 `003_domain_convergence.sql` 迁移到 A–F 模型；重要环境执行前仍应备份。
+
+## 验证
+
+```powershell
+npm run typecheck
+npm run test:backend
+npm run check:boundaries
+npm run build:miniapp
+npm run build:admin
+```
+
+新增代码前先在 [ARCHITECTURE.md](ARCHITECTURE.md) 确认归属。无法归属 A–F 的需求不进入当前系统。

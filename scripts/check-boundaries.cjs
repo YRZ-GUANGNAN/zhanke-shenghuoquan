@@ -1,0 +1,42 @@
+const fs = require('node:fs')
+const path = require('node:path')
+
+const root = path.resolve(__dirname, '..')
+const moduleRoot = path.join(root, 'backend', 'internal', 'module')
+const allowedDomains = new Set(['user', 'community', 'trade', 'navigation', 'im', 'admin'])
+const failures = []
+
+for (const entry of fs.readdirSync(moduleRoot, { withFileTypes: true })) {
+  if (entry.isDirectory() && !allowedDomains.has(entry.name)) failures.push(`unclassified backend module: ${entry.name}`)
+}
+
+function files(dir) {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const target = path.join(dir, entry.name)
+    return entry.isDirectory() ? files(target) : [target]
+  })
+}
+
+for (const file of files(moduleRoot).filter((file) => file.endsWith('.go'))) {
+  const source = fs.readFileSync(file, 'utf8')
+  const name = path.basename(file)
+  if ((source.includes('*gorm.DB') || source.includes('.WithContext(')) && name !== 'repository.go') {
+    failures.push(`database access outside repository: ${path.relative(root, file)}`)
+  }
+}
+
+const navigationSource = files(path.join(moduleRoot, 'navigation')).map((file) => fs.readFileSync(file, 'utf8')).join('\n')
+if (/internal\/module\/(user|community|trade|im|admin)/.test(navigationSource)) failures.push('domain D imports another business domain')
+
+const imSource = files(path.join(moduleRoot, 'im')).map((file) => fs.readFileSync(file, 'utf8')).join('\n')
+if (/type\s+Message\b|message_content|messages\b/.test(imSource)) failures.push('domain E contains message storage')
+
+const forbiddenFrontend = ['content.ts', 'mock.ts']
+for (const name of forbiddenFrontend) if (fs.existsSync(path.join(root, 'apps', 'miniapp', 'src', 'services', name))) failures.push(`mixed frontend service exists: ${name}`)
+
+if (failures.length) {
+  console.error(failures.map((item) => `boundary error: ${item}`).join('\n'))
+  process.exitCode = 1
+} else {
+  console.log('ok A-F module boundaries')
+}

@@ -1,0 +1,37 @@
+{
+  "name": "@campus-circle/miniapp",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev:weapp": "set NODE_ENV=production&& set TARO_APP_MODE=development&& taro build --type weapp --watch",
+    "build:weapp": "taro build --type weapp",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tarojs/components": "4.2.0",
+    "@tarojs/helper": "4.2.0",
+    "@tarojs/plugin-framework-react": "4.2.0",
+    "@tarojs/plugin-platform-weapp": "4.2.0",
+    "@tarojs/react": "4.2.0",
+    "@tarojs/runtime": "4.2.0",
+    "@tarojs/shared": "4.2.0",
+    "@tarojs/taro": "4.2.0",
+    "@tarojs/webpack5-runner": "4.2.0",
+    "@tencentcloud/chat": "^3.6.6",
+    "cos-wx-sdk-v5": "1.7.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "zustand": "5.0.14"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.24.0",
+    "@babel/preset-react": "7.24.1",
+    "@tarojs/binding": "4.2.0",
+    "@tarojs/cli": "4.2.0",
+    "@tarojs/plugin-doctor": "0.0.13",
+    "@types/react": "^18.2.66",
+    "@types/react-dom": "^18.2.22",
+    "babel-preset-taro": "4.2.0",
+    "typescript": "^5.4.5"
+  }
+}

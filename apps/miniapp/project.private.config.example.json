@@ -1,0 +1,14 @@
+{
+  "appid": "wx27a4c1be22695ed6",
+  "projectname": "campus-circle",
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true,
+    "useApiHook": false,
+    "compileHotReLoad": false
+  },
+  "libVersion": "3.15.2"
+}
