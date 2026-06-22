@@ -13,13 +13,20 @@ import (
 type Purpose string
 
 const (
-	PurposePost    Purpose = "post"
-	PurposeProduct Purpose = "product"
-	PurposeAvatar  Purpose = "avatar"
+	PurposePost         Purpose = "post"
+	PurposeProduct      Purpose = "product"
+	PurposeAvatar       Purpose = "avatar"
+	PurposeDish         Purpose = "dish"
+	PurposeMerchantLogo Purpose = "merchant_logo"
 )
 
 func (v Purpose) Valid() bool {
-	return v == PurposePost || v == PurposeProduct || v == PurposeAvatar
+	switch v {
+	case PurposePost, PurposeProduct, PurposeAvatar, PurposeDish, PurposeMerchantLogo:
+		return true
+	default:
+		return false
+	}
 }
 
 type StorageStage string
