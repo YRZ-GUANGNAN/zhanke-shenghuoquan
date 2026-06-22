@@ -3,7 +3,7 @@ const path = require('node:path')
 
 const root = path.resolve(__dirname, '..')
 const moduleRoot = path.join(root, 'backend', 'internal', 'module')
-const allowedDomains = new Set(['user', 'community', 'trade', 'navigation', 'im', 'admin', 'media'])
+const allowedDomains = new Set(['user', 'community', 'trade', 'navigation', 'im', 'admin', 'media', 'takeout'])
 const failures = []
 
 for (const entry of fs.readdirSync(moduleRoot, { withFileTypes: true })) {
@@ -33,6 +33,14 @@ if (/internal\/module\/(user|community|trade|im|admin)/.test(navigationSource)) 
 const imSource = files(path.join(moduleRoot, 'im')).map((file) => fs.readFileSync(file, 'utf8')).join('\n')
 if (/type\s+Message\b|message_content|messages\b/.test(imSource)) failures.push('domain E contains message storage')
 
+const takeoutSource = files(path.join(moduleRoot, 'takeout'))
+  .filter((file) => file.endsWith('.go') && !file.endsWith('_test.go'))
+  .map((file) => fs.readFileSync(file, 'utf8'))
+  .join('\n')
+if (/internal\/module\/(user|community|trade|navigation|im|admin|media)|github\.com\/gin-gonic\/gin|"net\/http"/.test(takeoutSource)) {
+  failures.push('domain G core imports HTTP or another business domain')
+}
+
 const forbiddenFrontend = ['content.ts', 'mock.ts']
 for (const name of forbiddenFrontend) if (fs.existsSync(path.join(root, 'apps', 'miniapp', 'src', 'services', name))) failures.push(`mixed frontend service exists: ${name}`)
 
@@ -40,5 +48,5 @@ if (failures.length) {
   console.error(failures.map((item) => `boundary error: ${item}`).join('\n'))
   process.exitCode = 1
 } else {
-  console.log('ok A-F boundaries plus isolated P0-4 media domain')
+  console.log('ok A-G boundaries plus isolated P0-4 media domain')
 }
