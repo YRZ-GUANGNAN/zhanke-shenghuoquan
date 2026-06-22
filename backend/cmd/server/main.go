@@ -40,7 +40,9 @@ func main() {
 		&navigation.Category{}, &navigation.Item{},
 		&im.UserMapping{}, &im.Conversation{},
 		&review.Task{}, &admin.Report{},
-		&legacymedia.Asset{}, &legacymedia.AssetAudit{},
+		// media_assets is migration-owned (007-015). Registering the legacy
+		// Asset model here reintroduces the pre-v1.1 schema on every startup.
+		&legacymedia.AssetAudit{},
 	); err != nil {
 		log.Fatalf("auto migrate: %v", err)
 	}

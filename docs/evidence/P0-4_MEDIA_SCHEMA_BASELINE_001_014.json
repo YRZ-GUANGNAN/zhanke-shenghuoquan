@@ -1,0 +1,3997 @@
+[
+  {
+    "kind": "column",
+    "table": "comments",
+    "name": "id",
+    "position": 1,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "extra": "auto_increment"
+  },
+  {
+    "kind": "column",
+    "table": "comments",
+    "name": "post_id",
+    "position": 2,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "comments",
+    "name": "user_id",
+    "position": 3,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "comments",
+    "name": "content",
+    "position": 4,
+    "column_type": "text",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "comments",
+    "name": "review_status",
+    "position": 5,
+    "column_type": "varchar(24)",
+    "nullable": "NO",
+    "default": "submitted"
+  },
+  {
+    "kind": "column",
+    "table": "comments",
+    "name": "created_at",
+    "position": 6,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "comments",
+    "name": "updated_at",
+    "position": 7,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "im_conversations",
+    "name": "id",
+    "position": 1,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "extra": "auto_increment"
+  },
+  {
+    "kind": "column",
+    "table": "im_conversations",
+    "name": "conversation_id",
+    "position": 2,
+    "column_type": "varchar(128)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "im_conversations",
+    "name": "buyer_id",
+    "position": 3,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "im_conversations",
+    "name": "seller_id",
+    "position": 4,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "im_conversations",
+    "name": "reference_type",
+    "position": 5,
+    "column_type": "varchar(32)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "im_conversations",
+    "name": "reference_id",
+    "position": 6,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "im_conversations",
+    "name": "created_at",
+    "position": 7,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "im_conversations",
+    "name": "updated_at",
+    "position": 8,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "im_user_mappings",
+    "name": "id",
+    "position": 1,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "extra": "auto_increment"
+  },
+  {
+    "kind": "column",
+    "table": "im_user_mappings",
+    "name": "user_id",
+    "position": 2,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "im_user_mappings",
+    "name": "im_user_id",
+    "position": 3,
+    "column_type": "varchar(64)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "im_user_mappings",
+    "name": "created_at",
+    "position": 4,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "im_user_mappings",
+    "name": "updated_at",
+    "position": 5,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_asset_audits",
+    "name": "id",
+    "position": 1,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "extra": "auto_increment"
+  },
+  {
+    "kind": "column",
+    "table": "media_asset_audits",
+    "name": "asset_id",
+    "position": 2,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_asset_audits",
+    "name": "from_status",
+    "position": 3,
+    "column_type": "varchar(24)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_asset_audits",
+    "name": "to_status",
+    "position": 4,
+    "column_type": "varchar(24)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_asset_audits",
+    "name": "action",
+    "position": 5,
+    "column_type": "varchar(48)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_asset_audits",
+    "name": "actor_type",
+    "position": 6,
+    "column_type": "varchar(24)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_asset_audits",
+    "name": "actor_id",
+    "position": 7,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "media_asset_audits",
+    "name": "detail",
+    "position": 8,
+    "column_type": "varchar(240)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "media_asset_audits",
+    "name": "created_at",
+    "position": 9,
+    "column_type": "datetime(3)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_asset_references",
+    "name": "id",
+    "position": 1,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "extra": "auto_increment"
+  },
+  {
+    "kind": "column",
+    "table": "media_asset_references",
+    "name": "asset_id",
+    "position": 2,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_asset_references",
+    "name": "reference_type",
+    "position": 3,
+    "column_type": "varchar(16)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_asset_references",
+    "name": "reference_id",
+    "position": 4,
+    "column_type": "varchar(64)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_asset_references",
+    "name": "slot",
+    "position": 5,
+    "column_type": "smallint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_asset_references",
+    "name": "status",
+    "position": 6,
+    "column_type": "varchar(16)",
+    "nullable": "NO",
+    "default": "pending"
+  },
+  {
+    "kind": "column",
+    "table": "media_asset_references",
+    "name": "parent_visibility",
+    "position": 7,
+    "column_type": "varchar(16)",
+    "nullable": "NO",
+    "default": "hidden"
+  },
+  {
+    "kind": "column",
+    "table": "media_asset_references",
+    "name": "aggregate_version",
+    "position": 8,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "media_asset_references",
+    "name": "operation_id",
+    "position": 9,
+    "column_type": "char(26)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_asset_references",
+    "name": "revocation_fence",
+    "position": 10,
+    "column_type": "char(26)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_asset_references",
+    "name": "fence_expires_at",
+    "position": 11,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_asset_references",
+    "name": "row_version",
+    "position": 12,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "default": "1"
+  },
+  {
+    "kind": "column",
+    "table": "media_asset_references",
+    "name": "created_at",
+    "position": 13,
+    "column_type": "datetime(3)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_asset_references",
+    "name": "updated_at",
+    "position": 14,
+    "column_type": "datetime(3)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "id",
+    "position": 1,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "extra": "auto_increment"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "asset_public_id",
+    "position": 2,
+    "column_type": "char(26)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "owner_id",
+    "position": 3,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "public_id",
+    "position": 4,
+    "column_type": "char(32)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "owner_user_id",
+    "position": 5,
+    "column_type": "bigint unsigned",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "purpose",
+    "position": 6,
+    "column_type": "varchar(32)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "storage_stage",
+    "position": 7,
+    "column_type": "varchar(16)",
+    "nullable": "NO",
+    "default": "staging"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "review_status",
+    "position": 8,
+    "column_type": "varchar(16)",
+    "nullable": "NO",
+    "default": "pending"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "technical_status",
+    "position": 9,
+    "column_type": "varchar(24)",
+    "nullable": "NO",
+    "default": "pending_upload"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "trusted_sha256",
+    "position": 10,
+    "column_type": "char(64)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "object_key",
+    "position": 11,
+    "column_type": "varchar(512)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "declared_mime",
+    "position": 12,
+    "column_type": "varchar(64)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "verified_mime",
+    "position": 13,
+    "column_type": "varchar(64)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "byte_size",
+    "position": 14,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "declared_size",
+    "position": 15,
+    "column_type": "bigint",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "verified_size",
+    "position": 16,
+    "column_type": "bigint",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "width",
+    "position": 17,
+    "column_type": "bigint",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "height",
+    "position": 18,
+    "column_type": "bigint",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "staging_key",
+    "position": 19,
+    "column_type": "varchar(512)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "staging_version_id",
+    "position": 20,
+    "column_type": "varchar(128)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "final_key",
+    "position": 21,
+    "column_type": "varchar(512)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "final_version_id",
+    "position": 22,
+    "column_type": "varchar(128)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "status",
+    "position": 23,
+    "column_type": "varchar(24)",
+    "nullable": "NO",
+    "default": "pending_upload"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "review_task_id",
+    "position": 24,
+    "column_type": "bigint unsigned",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "applied_decision_version",
+    "position": 25,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "projected_decision",
+    "position": 26,
+    "column_type": "varchar(16)",
+    "nullable": "NO",
+    "default": "pending"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "projected_decided_at",
+    "position": 27,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "active_ref_count",
+    "position": 28,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "wechat_open_id",
+    "position": 29,
+    "column_type": "varchar(96)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "review_trace_id",
+    "position": 30,
+    "column_type": "varchar(128)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "review_suggest",
+    "position": 31,
+    "column_type": "varchar(24)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "review_label",
+    "position": 32,
+    "column_type": "bigint",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "reference_type",
+    "position": 33,
+    "column_type": "varchar(24)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "reference_id",
+    "position": 34,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "reference_sort",
+    "position": 35,
+    "column_type": "bigint",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "reservation_token",
+    "position": 36,
+    "column_type": "char(32)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "reservation_expires_at",
+    "position": 37,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "idempotency_key",
+    "position": 38,
+    "column_type": "varchar(96)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "upload_expires_at",
+    "position": 39,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "review_deadline_at",
+    "position": 40,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "review_attempts",
+    "position": 41,
+    "column_type": "bigint",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "review_available_at",
+    "position": 42,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "last_error",
+    "position": 43,
+    "column_type": "varchar(512)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "delete_requested_at",
+    "position": 44,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "storage_deleted_at",
+    "position": 45,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "deleted_at",
+    "position": 46,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "row_version",
+    "position": 47,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "default": "1"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "created_at",
+    "position": 48,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_assets",
+    "name": "updated_at",
+    "position": 49,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_consumer_checkpoints",
+    "name": "aggregate_id",
+    "position": 1,
+    "column_type": "char(26)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_consumer_checkpoints",
+    "name": "last_event_id",
+    "position": 2,
+    "column_type": "char(26)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "media_consumer_checkpoints",
+    "name": "last_aggregate_version",
+    "position": 3,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_consumer_checkpoints",
+    "name": "last_operation",
+    "position": 4,
+    "column_type": "varchar(48)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "media_consumer_checkpoints",
+    "name": "last_payload_hash",
+    "position": 5,
+    "column_type": "char(64)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "media_consumer_checkpoints",
+    "name": "active_event_id",
+    "position": 6,
+    "column_type": "char(26)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_consumer_checkpoints",
+    "name": "lease_token",
+    "position": 7,
+    "column_type": "char(26)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_consumer_checkpoints",
+    "name": "lease_expires_at",
+    "position": 8,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_consumer_checkpoints",
+    "name": "row_version",
+    "position": 9,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "default": "1"
+  },
+  {
+    "kind": "column",
+    "table": "media_consumer_checkpoints",
+    "name": "created_at",
+    "position": 10,
+    "column_type": "datetime(3)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_consumer_checkpoints",
+    "name": "updated_at",
+    "position": 11,
+    "column_type": "datetime(3)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_event_inbox",
+    "name": "event_id",
+    "position": 1,
+    "column_type": "char(26)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_event_inbox",
+    "name": "aggregate_id",
+    "position": 2,
+    "column_type": "char(26)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_event_inbox",
+    "name": "aggregate_version",
+    "position": 3,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_event_inbox",
+    "name": "operation",
+    "position": 4,
+    "column_type": "varchar(48)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_event_inbox",
+    "name": "payload_hash",
+    "position": 5,
+    "column_type": "char(64)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_event_inbox",
+    "name": "status",
+    "position": 6,
+    "column_type": "varchar(24)",
+    "nullable": "NO",
+    "default": "pending"
+  },
+  {
+    "kind": "column",
+    "table": "media_event_inbox",
+    "name": "lease_token",
+    "position": 7,
+    "column_type": "char(26)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_event_inbox",
+    "name": "lease_expires_at",
+    "position": 8,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_event_inbox",
+    "name": "attempt_count",
+    "position": 9,
+    "column_type": "int unsigned",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "media_event_inbox",
+    "name": "next_attempt_at",
+    "position": 10,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_event_inbox",
+    "name": "last_error_code",
+    "position": 11,
+    "column_type": "varchar(64)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "media_event_inbox",
+    "name": "processed_at",
+    "position": 12,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_event_inbox",
+    "name": "row_version",
+    "position": 13,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "default": "1"
+  },
+  {
+    "kind": "column",
+    "table": "media_event_inbox",
+    "name": "created_at",
+    "position": 14,
+    "column_type": "datetime(3)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_event_inbox",
+    "name": "updated_at",
+    "position": 15,
+    "column_type": "datetime(3)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_gc_auxiliary_jobs",
+    "name": "job_id",
+    "position": 1,
+    "column_type": "char(26)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_gc_auxiliary_jobs",
+    "name": "asset_id",
+    "position": 2,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_gc_auxiliary_jobs",
+    "name": "status",
+    "position": 3,
+    "column_type": "varchar(24)",
+    "nullable": "NO",
+    "default": "pending"
+  },
+  {
+    "kind": "column",
+    "table": "media_gc_auxiliary_jobs",
+    "name": "lease_token",
+    "position": 4,
+    "column_type": "char(26)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_gc_auxiliary_jobs",
+    "name": "lease_expires_at",
+    "position": 5,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_gc_auxiliary_jobs",
+    "name": "attempt_count",
+    "position": 6,
+    "column_type": "int unsigned",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "media_gc_auxiliary_jobs",
+    "name": "last_error_code",
+    "position": 7,
+    "column_type": "varchar(64)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "media_gc_auxiliary_jobs",
+    "name": "purged_at",
+    "position": 8,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_gc_auxiliary_jobs",
+    "name": "row_version",
+    "position": 9,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "default": "1"
+  },
+  {
+    "kind": "column",
+    "table": "media_gc_auxiliary_jobs",
+    "name": "created_at",
+    "position": 10,
+    "column_type": "datetime(3)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_gc_auxiliary_jobs",
+    "name": "updated_at",
+    "position": 11,
+    "column_type": "datetime(3)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_gc_jobs",
+    "name": "job_id",
+    "position": 1,
+    "column_type": "char(26)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_gc_jobs",
+    "name": "asset_id",
+    "position": 2,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_gc_jobs",
+    "name": "object_stage",
+    "position": 3,
+    "column_type": "varchar(16)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_gc_jobs",
+    "name": "object_key",
+    "position": 4,
+    "column_type": "varchar(512)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_gc_jobs",
+    "name": "object_version_id",
+    "position": 5,
+    "column_type": "varchar(128)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_gc_jobs",
+    "name": "status",
+    "position": 6,
+    "column_type": "varchar(24)",
+    "nullable": "NO",
+    "default": "pending"
+  },
+  {
+    "kind": "column",
+    "table": "media_gc_jobs",
+    "name": "lease_token",
+    "position": 7,
+    "column_type": "char(26)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_gc_jobs",
+    "name": "lease_expires_at",
+    "position": 8,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_gc_jobs",
+    "name": "attempt_count",
+    "position": 9,
+    "column_type": "int unsigned",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "media_gc_jobs",
+    "name": "next_attempt_at",
+    "position": 10,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_gc_jobs",
+    "name": "last_error_code",
+    "position": 11,
+    "column_type": "varchar(64)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "media_gc_jobs",
+    "name": "provider_request_id",
+    "position": 12,
+    "column_type": "varchar(128)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "media_gc_jobs",
+    "name": "deleted_at",
+    "position": 13,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_gc_jobs",
+    "name": "row_version",
+    "position": 14,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "default": "1"
+  },
+  {
+    "kind": "column",
+    "table": "media_gc_jobs",
+    "name": "created_at",
+    "position": 15,
+    "column_type": "datetime(3)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_gc_jobs",
+    "name": "updated_at",
+    "position": 16,
+    "column_type": "datetime(3)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_outbox",
+    "name": "event_id",
+    "position": 1,
+    "column_type": "char(26)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_outbox",
+    "name": "aggregate_id",
+    "position": 2,
+    "column_type": "char(26)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_outbox",
+    "name": "aggregate_version",
+    "position": 3,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_outbox",
+    "name": "operation",
+    "position": 4,
+    "column_type": "varchar(48)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_outbox",
+    "name": "payload",
+    "position": 5,
+    "column_type": "json",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_outbox",
+    "name": "processed_at",
+    "position": 6,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_outbox",
+    "name": "row_version",
+    "position": 7,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "default": "1"
+  },
+  {
+    "kind": "column",
+    "table": "media_outbox",
+    "name": "created_at",
+    "position": 8,
+    "column_type": "datetime(3)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_outbox",
+    "name": "updated_at",
+    "position": 9,
+    "column_type": "datetime(3)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_quota_reservations",
+    "name": "reservation_id",
+    "position": 1,
+    "column_type": "char(26)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_quota_reservations",
+    "name": "owner_id",
+    "position": 2,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_quota_reservations",
+    "name": "bytes_reserved",
+    "position": 3,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_quota_reservations",
+    "name": "count_reserved",
+    "position": 4,
+    "column_type": "int unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_quota_reservations",
+    "name": "status",
+    "position": 5,
+    "column_type": "varchar(16)",
+    "nullable": "NO",
+    "default": "active"
+  },
+  {
+    "kind": "column",
+    "table": "media_quota_reservations",
+    "name": "ticket_id",
+    "position": 6,
+    "column_type": "char(26)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_quota_reservations",
+    "name": "row_version",
+    "position": 7,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "default": "1"
+  },
+  {
+    "kind": "column",
+    "table": "media_quota_reservations",
+    "name": "created_at",
+    "position": 8,
+    "column_type": "datetime(3)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_quota_reservations",
+    "name": "updated_at",
+    "position": 9,
+    "column_type": "datetime(3)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_review_decisions",
+    "name": "id",
+    "position": 1,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "extra": "auto_increment"
+  },
+  {
+    "kind": "column",
+    "table": "media_review_decisions",
+    "name": "projection_id",
+    "position": 2,
+    "column_type": "char(26)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_review_decisions",
+    "name": "review_task_id",
+    "position": 3,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_review_decisions",
+    "name": "decision_version",
+    "position": 4,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_review_decisions",
+    "name": "decision",
+    "position": 5,
+    "column_type": "varchar(24)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_review_decisions",
+    "name": "payload_hash",
+    "position": 6,
+    "column_type": "char(64)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_review_decisions",
+    "name": "result_code",
+    "position": 7,
+    "column_type": "varchar(64)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "media_review_decisions",
+    "name": "received_at",
+    "position": 8,
+    "column_type": "datetime(3)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_review_projections",
+    "name": "projection_id",
+    "position": 1,
+    "column_type": "char(26)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_review_projections",
+    "name": "asset_id",
+    "position": 2,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_review_projections",
+    "name": "review_task_id",
+    "position": 3,
+    "column_type": "bigint unsigned",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_review_projections",
+    "name": "status",
+    "position": 4,
+    "column_type": "varchar(24)",
+    "nullable": "NO",
+    "default": "pending"
+  },
+  {
+    "kind": "column",
+    "table": "media_review_projections",
+    "name": "applied_decision_version",
+    "position": 5,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "media_review_projections",
+    "name": "last_decision_hash",
+    "position": 6,
+    "column_type": "char(64)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_review_projections",
+    "name": "failure_code",
+    "position": 7,
+    "column_type": "varchar(64)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "media_review_projections",
+    "name": "submitted_at",
+    "position": 8,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_review_projections",
+    "name": "reviewing_at",
+    "position": 9,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_review_projections",
+    "name": "decided_at",
+    "position": 10,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_review_projections",
+    "name": "row_version",
+    "position": 11,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "default": "1"
+  },
+  {
+    "kind": "column",
+    "table": "media_review_projections",
+    "name": "created_at",
+    "position": 12,
+    "column_type": "datetime(3)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_review_projections",
+    "name": "updated_at",
+    "position": 13,
+    "column_type": "datetime(3)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_completions",
+    "name": "ticket_id",
+    "position": 1,
+    "column_type": "char(26)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_completions",
+    "name": "asset_id",
+    "position": 2,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_completions",
+    "name": "phase",
+    "position": 3,
+    "column_type": "varchar(24)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_completions",
+    "name": "staging_version_id",
+    "position": 4,
+    "column_type": "varchar(128)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_completions",
+    "name": "staging_etag",
+    "position": 5,
+    "column_type": "varchar(128)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_completions",
+    "name": "staging_last_modified",
+    "position": 6,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_completions",
+    "name": "trusted_sha256",
+    "position": 7,
+    "column_type": "char(64)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_completions",
+    "name": "verified_mime",
+    "position": 8,
+    "column_type": "varchar(64)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_completions",
+    "name": "verified_size",
+    "position": 9,
+    "column_type": "bigint unsigned",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_completions",
+    "name": "verified_width",
+    "position": 10,
+    "column_type": "int unsigned",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_completions",
+    "name": "verified_height",
+    "position": 11,
+    "column_type": "int unsigned",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_completions",
+    "name": "final_key",
+    "position": 12,
+    "column_type": "varchar(512)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_completions",
+    "name": "final_version_id",
+    "position": 13,
+    "column_type": "varchar(128)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_completions",
+    "name": "final_etag",
+    "position": 14,
+    "column_type": "varchar(128)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_completions",
+    "name": "final_crc64",
+    "position": 15,
+    "column_type": "varchar(64)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_completions",
+    "name": "lease_token",
+    "position": 16,
+    "column_type": "char(26)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_completions",
+    "name": "lease_expires_at",
+    "position": 17,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_completions",
+    "name": "processing_deadline_at",
+    "position": 18,
+    "column_type": "datetime(3)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_completions",
+    "name": "validation_attempts",
+    "position": 19,
+    "column_type": "int unsigned",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_completions",
+    "name": "promote_attempts",
+    "position": 20,
+    "column_type": "int unsigned",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_completions",
+    "name": "last_error_code",
+    "position": 21,
+    "column_type": "varchar(64)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_completions",
+    "name": "completed_at",
+    "position": 22,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_completions",
+    "name": "row_version",
+    "position": 23,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "default": "1"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_completions",
+    "name": "created_at",
+    "position": 24,
+    "column_type": "datetime(3)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_completions",
+    "name": "updated_at",
+    "position": 25,
+    "column_type": "datetime(3)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_tickets",
+    "name": "ticket_id",
+    "position": 1,
+    "column_type": "char(26)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_tickets",
+    "name": "asset_id",
+    "position": 2,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_tickets",
+    "name": "owner_id",
+    "position": 3,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_tickets",
+    "name": "expected_size",
+    "position": 4,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_tickets",
+    "name": "expected_md5",
+    "position": 5,
+    "column_type": "char(24)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_tickets",
+    "name": "expected_content_type",
+    "position": 6,
+    "column_type": "varchar(64)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_tickets",
+    "name": "status",
+    "position": 7,
+    "column_type": "varchar(24)",
+    "nullable": "NO",
+    "default": "created"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_tickets",
+    "name": "credential_issue_count",
+    "position": 8,
+    "column_type": "tinyint unsigned",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_tickets",
+    "name": "expires_at",
+    "position": 9,
+    "column_type": "datetime(3)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_tickets",
+    "name": "row_version",
+    "position": 10,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "default": "1"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_tickets",
+    "name": "created_at",
+    "position": 11,
+    "column_type": "datetime(3)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "media_upload_tickets",
+    "name": "updated_at",
+    "position": 12,
+    "column_type": "datetime(3)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "navigation_categories",
+    "name": "id",
+    "position": 1,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "extra": "auto_increment"
+  },
+  {
+    "kind": "column",
+    "table": "navigation_categories",
+    "name": "name",
+    "position": 2,
+    "column_type": "varchar(64)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "navigation_categories",
+    "name": "sort",
+    "position": 3,
+    "column_type": "bigint",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "navigation_categories",
+    "name": "enabled",
+    "position": 4,
+    "column_type": "tinyint(1)",
+    "nullable": "NO",
+    "default": "1"
+  },
+  {
+    "kind": "column",
+    "table": "navigation_categories",
+    "name": "created_at",
+    "position": 5,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "navigation_categories",
+    "name": "updated_at",
+    "position": 6,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "navigation_items",
+    "name": "id",
+    "position": 1,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "extra": "auto_increment"
+  },
+  {
+    "kind": "column",
+    "table": "navigation_items",
+    "name": "category_id",
+    "position": 2,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "navigation_items",
+    "name": "title",
+    "position": 3,
+    "column_type": "varchar(64)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "navigation_items",
+    "name": "subtitle",
+    "position": 4,
+    "column_type": "varchar(120)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "navigation_items",
+    "name": "icon_text",
+    "position": 5,
+    "column_type": "varchar(12)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "navigation_items",
+    "name": "app_id",
+    "position": 6,
+    "column_type": "varchar(80)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "navigation_items",
+    "name": "path",
+    "position": 7,
+    "column_type": "varchar(240)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "navigation_items",
+    "name": "color",
+    "position": 8,
+    "column_type": "varchar(24)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "navigation_items",
+    "name": "sort",
+    "position": 9,
+    "column_type": "bigint",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "navigation_items",
+    "name": "enabled",
+    "position": 10,
+    "column_type": "tinyint(1)",
+    "nullable": "NO",
+    "default": "1"
+  },
+  {
+    "kind": "column",
+    "table": "navigation_items",
+    "name": "created_at",
+    "position": 11,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "navigation_items",
+    "name": "updated_at",
+    "position": 12,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "notifications",
+    "name": "id",
+    "position": 1,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "extra": "auto_increment"
+  },
+  {
+    "kind": "column",
+    "table": "notifications",
+    "name": "recipient_id",
+    "position": 2,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "notifications",
+    "name": "actor_id",
+    "position": 3,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "notifications",
+    "name": "type",
+    "position": 4,
+    "column_type": "varchar(32)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "notifications",
+    "name": "post_id",
+    "position": 5,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "notifications",
+    "name": "comment_id",
+    "position": 6,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "notifications",
+    "name": "read_at",
+    "position": 7,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "notifications",
+    "name": "created_at",
+    "position": 8,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "post_favorites",
+    "name": "post_id",
+    "position": 1,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "post_favorites",
+    "name": "user_id",
+    "position": 2,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "post_favorites",
+    "name": "created_at",
+    "position": 3,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "post_images",
+    "name": "id",
+    "position": 1,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "extra": "auto_increment"
+  },
+  {
+    "kind": "column",
+    "table": "post_images",
+    "name": "post_id",
+    "position": 2,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "post_images",
+    "name": "asset_id",
+    "position": 3,
+    "column_type": "bigint unsigned",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "post_images",
+    "name": "url",
+    "position": 4,
+    "column_type": "varchar(512)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "post_images",
+    "name": "sort",
+    "position": 5,
+    "column_type": "bigint",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "post_images",
+    "name": "created_at",
+    "position": 6,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "post_likes",
+    "name": "post_id",
+    "position": 1,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "post_likes",
+    "name": "user_id",
+    "position": 2,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "post_likes",
+    "name": "created_at",
+    "position": 3,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "posts",
+    "name": "id",
+    "position": 1,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "extra": "auto_increment"
+  },
+  {
+    "kind": "column",
+    "table": "posts",
+    "name": "user_id",
+    "position": 2,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "posts",
+    "name": "topic",
+    "position": 3,
+    "column_type": "varchar(64)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "posts",
+    "name": "title",
+    "position": 4,
+    "column_type": "varchar(120)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "posts",
+    "name": "content",
+    "position": 5,
+    "column_type": "text",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "posts",
+    "name": "review_status",
+    "position": 6,
+    "column_type": "varchar(24)",
+    "nullable": "NO",
+    "default": "submitted"
+  },
+  {
+    "kind": "column",
+    "table": "posts",
+    "name": "pinned",
+    "position": 7,
+    "column_type": "tinyint(1)",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "posts",
+    "name": "liked_count",
+    "position": 8,
+    "column_type": "bigint",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "posts",
+    "name": "comment_count",
+    "position": 9,
+    "column_type": "bigint",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "posts",
+    "name": "favorite_count",
+    "position": 10,
+    "column_type": "bigint",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "posts",
+    "name": "created_at",
+    "position": 11,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "posts",
+    "name": "updated_at",
+    "position": 12,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "posts",
+    "name": "deleted_at",
+    "position": 13,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "product_favorites",
+    "name": "product_id",
+    "position": 1,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "product_favorites",
+    "name": "user_id",
+    "position": 2,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "product_favorites",
+    "name": "created_at",
+    "position": 3,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "product_images",
+    "name": "id",
+    "position": 1,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "extra": "auto_increment"
+  },
+  {
+    "kind": "column",
+    "table": "product_images",
+    "name": "product_id",
+    "position": 2,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "product_images",
+    "name": "asset_id",
+    "position": 3,
+    "column_type": "bigint unsigned",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "product_images",
+    "name": "url",
+    "position": 4,
+    "column_type": "varchar(512)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "product_images",
+    "name": "sort",
+    "position": 5,
+    "column_type": "bigint",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "product_images",
+    "name": "created_at",
+    "position": 6,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "products",
+    "name": "id",
+    "position": 1,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "extra": "auto_increment"
+  },
+  {
+    "kind": "column",
+    "table": "products",
+    "name": "seller_id",
+    "position": 2,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "products",
+    "name": "title",
+    "position": 3,
+    "column_type": "varchar(160)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "products",
+    "name": "description",
+    "position": 4,
+    "column_type": "text",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "products",
+    "name": "category",
+    "position": 5,
+    "column_type": "varchar(64)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "products",
+    "name": "price",
+    "position": 6,
+    "column_type": "bigint",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "products",
+    "name": "original_price",
+    "position": 7,
+    "column_type": "bigint",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "products",
+    "name": "condition_label",
+    "position": 8,
+    "column_type": "varchar(64)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "products",
+    "name": "campus",
+    "position": 9,
+    "column_type": "varchar(80)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "products",
+    "name": "status",
+    "position": 10,
+    "column_type": "varchar(24)",
+    "nullable": "NO",
+    "default": "selling"
+  },
+  {
+    "kind": "column",
+    "table": "products",
+    "name": "review_status",
+    "position": 11,
+    "column_type": "varchar(24)",
+    "nullable": "NO",
+    "default": "submitted"
+  },
+  {
+    "kind": "column",
+    "table": "products",
+    "name": "favorite_count",
+    "position": 12,
+    "column_type": "bigint",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "products",
+    "name": "created_at",
+    "position": 13,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "products",
+    "name": "updated_at",
+    "position": 14,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "products",
+    "name": "deleted_at",
+    "position": 15,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "reports",
+    "name": "id",
+    "position": 1,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "extra": "auto_increment"
+  },
+  {
+    "kind": "column",
+    "table": "reports",
+    "name": "reporter_id",
+    "position": 2,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "reports",
+    "name": "target_type",
+    "position": 3,
+    "column_type": "varchar(32)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "reports",
+    "name": "target_id",
+    "position": 4,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "reports",
+    "name": "reason",
+    "position": 5,
+    "column_type": "varchar(240)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "reports",
+    "name": "detail",
+    "position": 6,
+    "column_type": "text",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "reports",
+    "name": "review_status",
+    "position": 7,
+    "column_type": "varchar(24)",
+    "nullable": "NO",
+    "default": "submitted"
+  },
+  {
+    "kind": "column",
+    "table": "reports",
+    "name": "created_at",
+    "position": 8,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "reports",
+    "name": "updated_at",
+    "position": 9,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "review_tasks",
+    "name": "id",
+    "position": 1,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "extra": "auto_increment"
+  },
+  {
+    "kind": "column",
+    "table": "review_tasks",
+    "name": "object_type",
+    "position": 2,
+    "column_type": "varchar(32)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "review_tasks",
+    "name": "object_id",
+    "position": 3,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "review_tasks",
+    "name": "submitter_id",
+    "position": 4,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "review_tasks",
+    "name": "risk",
+    "position": 5,
+    "column_type": "varchar(240)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "review_tasks",
+    "name": "status",
+    "position": 6,
+    "column_type": "varchar(24)",
+    "nullable": "NO",
+    "default": "submitted"
+  },
+  {
+    "kind": "column",
+    "table": "review_tasks",
+    "name": "reason",
+    "position": 7,
+    "column_type": "varchar(240)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "review_tasks",
+    "name": "operator_id",
+    "position": 8,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "review_tasks",
+    "name": "created_at",
+    "position": 9,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "review_tasks",
+    "name": "updated_at",
+    "position": 10,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "trade_search_outbox",
+    "name": "id",
+    "position": 1,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "extra": "auto_increment"
+  },
+  {
+    "kind": "column",
+    "table": "trade_search_outbox",
+    "name": "product_id",
+    "position": 2,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "trade_search_outbox",
+    "name": "operation",
+    "position": 3,
+    "column_type": "varchar(16)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "trade_search_outbox",
+    "name": "attempts",
+    "position": 4,
+    "column_type": "bigint",
+    "nullable": "NO",
+    "default": "0"
+  },
+  {
+    "kind": "column",
+    "table": "trade_search_outbox",
+    "name": "available_at",
+    "position": 5,
+    "column_type": "datetime(3)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "trade_search_outbox",
+    "name": "processed_at",
+    "position": 6,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "trade_search_outbox",
+    "name": "last_error",
+    "position": 7,
+    "column_type": "varchar(512)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "trade_search_outbox",
+    "name": "created_at",
+    "position": 8,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "trade_search_outbox",
+    "name": "updated_at",
+    "position": 9,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "user_follows",
+    "name": "follower_id",
+    "position": 1,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "user_follows",
+    "name": "followee_id",
+    "position": 2,
+    "column_type": "bigint unsigned",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "user_follows",
+    "name": "created_at",
+    "position": 3,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "users",
+    "name": "id",
+    "position": 1,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "extra": "auto_increment"
+  },
+  {
+    "kind": "column",
+    "table": "users",
+    "name": "open_id",
+    "position": 2,
+    "column_type": "varchar(96)",
+    "nullable": "NO"
+  },
+  {
+    "kind": "column",
+    "table": "users",
+    "name": "nickname",
+    "position": 3,
+    "column_type": "varchar(64)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "users",
+    "name": "avatar",
+    "position": 4,
+    "column_type": "varchar(512)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "users",
+    "name": "avatar_asset_id",
+    "position": 5,
+    "column_type": "bigint unsigned",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "users",
+    "name": "school",
+    "position": 6,
+    "column_type": "varchar(80)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "users",
+    "name": "campus",
+    "position": 7,
+    "column_type": "varchar(80)",
+    "nullable": "NO",
+    "default": ""
+  },
+  {
+    "kind": "column",
+    "table": "users",
+    "name": "role",
+    "position": 8,
+    "column_type": "varchar(24)",
+    "nullable": "NO",
+    "default": "user"
+  },
+  {
+    "kind": "column",
+    "table": "users",
+    "name": "status",
+    "position": 9,
+    "column_type": "varchar(24)",
+    "nullable": "NO",
+    "default": "active"
+  },
+  {
+    "kind": "column",
+    "table": "users",
+    "name": "token_version",
+    "position": 10,
+    "column_type": "bigint unsigned",
+    "nullable": "NO",
+    "default": "1"
+  },
+  {
+    "kind": "column",
+    "table": "users",
+    "name": "created_at",
+    "position": 11,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "users",
+    "name": "updated_at",
+    "position": 12,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "column",
+    "table": "users",
+    "name": "deleted_at",
+    "position": 13,
+    "column_type": "datetime(3)",
+    "nullable": "YES"
+  },
+  {
+    "kind": "index",
+    "table": "comments",
+    "name": "idx_comments_post_id",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "post_id"
+  },
+  {
+    "kind": "index",
+    "table": "comments",
+    "name": "idx_comments_review_status",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "review_status"
+  },
+  {
+    "kind": "index",
+    "table": "comments",
+    "name": "idx_comments_user_id",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "user_id"
+  },
+  {
+    "kind": "index",
+    "table": "comments",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "id"
+  },
+  {
+    "kind": "index",
+    "table": "im_conversations",
+    "name": "idx_conversations_buyer_updated",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "buyer_id,updated_at,id"
+  },
+  {
+    "kind": "index",
+    "table": "im_conversations",
+    "name": "idx_conversations_conversation_id",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "conversation_id"
+  },
+  {
+    "kind": "index",
+    "table": "im_conversations",
+    "name": "idx_conversations_seller_updated",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "seller_id,updated_at,id"
+  },
+  {
+    "kind": "index",
+    "table": "im_conversations",
+    "name": "idx_im_relation",
+    "index_type": "BTREE",
+    "columns": "buyer_id,seller_id,reference_type,reference_id"
+  },
+  {
+    "kind": "index",
+    "table": "im_conversations",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "id"
+  },
+  {
+    "kind": "index",
+    "table": "im_user_mappings",
+    "name": "im_user_id",
+    "index_type": "BTREE",
+    "columns": "im_user_id"
+  },
+  {
+    "kind": "index",
+    "table": "im_user_mappings",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "id"
+  },
+  {
+    "kind": "index",
+    "table": "im_user_mappings",
+    "name": "user_id",
+    "index_type": "BTREE",
+    "columns": "user_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_asset_audits",
+    "name": "idx_media_audit_action",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "action,created_at"
+  },
+  {
+    "kind": "index",
+    "table": "media_asset_audits",
+    "name": "idx_media_audit_asset",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "asset_id,created_at"
+  },
+  {
+    "kind": "index",
+    "table": "media_asset_audits",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "id"
+  },
+  {
+    "kind": "index",
+    "table": "media_asset_references",
+    "name": "idx_media_reference_asset_status",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "asset_id,status"
+  },
+  {
+    "kind": "index",
+    "table": "media_asset_references",
+    "name": "idx_media_reference_operation",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "operation_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_asset_references",
+    "name": "idx_media_reference_parent_status",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "reference_type,reference_id,status"
+  },
+  {
+    "kind": "index",
+    "table": "media_asset_references",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "id"
+  },
+  {
+    "kind": "index",
+    "table": "media_asset_references",
+    "name": "uq_media_reference_asset_slot",
+    "index_type": "BTREE",
+    "columns": "asset_id,reference_type,reference_id,slot"
+  },
+  {
+    "kind": "index",
+    "table": "media_asset_references",
+    "name": "uq_media_reference_slot",
+    "index_type": "BTREE",
+    "columns": "reference_type,reference_id,slot"
+  },
+  {
+    "kind": "index",
+    "table": "media_assets",
+    "name": "idx_media_delete_pending",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "delete_requested_at,storage_deleted_at,id"
+  },
+  {
+    "kind": "index",
+    "table": "media_assets",
+    "name": "idx_media_delete_status_v11",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "technical_status,delete_requested_at,id"
+  },
+  {
+    "kind": "index",
+    "table": "media_assets",
+    "name": "idx_media_object_key",
+    "index_type": "BTREE",
+    "columns": "object_key"
+  },
+  {
+    "kind": "index",
+    "table": "media_assets",
+    "name": "idx_media_owner_created",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "owner_user_id,created_at"
+  },
+  {
+    "kind": "index",
+    "table": "media_assets",
+    "name": "idx_media_owner_idempotency",
+    "index_type": "BTREE",
+    "columns": "owner_user_id,idempotency_key"
+  },
+  {
+    "kind": "index",
+    "table": "media_assets",
+    "name": "idx_media_public_id",
+    "index_type": "BTREE",
+    "columns": "public_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_assets",
+    "name": "idx_media_reference",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "reference_type,reference_id,reference_sort"
+  },
+  {
+    "kind": "index",
+    "table": "media_assets",
+    "name": "idx_media_reservation",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "reservation_token"
+  },
+  {
+    "kind": "index",
+    "table": "media_assets",
+    "name": "idx_media_review_deadline_v11",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "technical_status,review_deadline_at,id"
+  },
+  {
+    "kind": "index",
+    "table": "media_assets",
+    "name": "idx_media_review_pending",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "status,review_available_at,id"
+  },
+  {
+    "kind": "index",
+    "table": "media_assets",
+    "name": "idx_media_review_task",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "review_task_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_assets",
+    "name": "idx_media_review_trace",
+    "index_type": "BTREE",
+    "columns": "review_trace_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_assets",
+    "name": "idx_media_technical_upload_v11",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "technical_status,upload_expires_at,id"
+  },
+  {
+    "kind": "index",
+    "table": "media_assets",
+    "name": "idx_media_upload_expires",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "upload_expires_at"
+  },
+  {
+    "kind": "index",
+    "table": "media_assets",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "id"
+  },
+  {
+    "kind": "index",
+    "table": "media_assets",
+    "name": "uq_media_asset_public_id_v11",
+    "index_type": "BTREE",
+    "columns": "asset_public_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_assets",
+    "name": "uq_media_final_key_v11",
+    "index_type": "BTREE",
+    "columns": "final_key"
+  },
+  {
+    "kind": "index",
+    "table": "media_assets",
+    "name": "uq_media_owner_idempotency_v11",
+    "index_type": "BTREE",
+    "columns": "owner_id,idempotency_key"
+  },
+  {
+    "kind": "index",
+    "table": "media_assets",
+    "name": "uq_media_review_task_v11",
+    "index_type": "BTREE",
+    "columns": "review_task_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_assets",
+    "name": "uq_media_staging_key_v11",
+    "index_type": "BTREE",
+    "columns": "staging_key"
+  },
+  {
+    "kind": "index",
+    "table": "media_consumer_checkpoints",
+    "name": "idx_media_consumer_checkpoint_event",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "last_event_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_consumer_checkpoints",
+    "name": "idx_media_consumer_checkpoint_lease",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "lease_expires_at,active_event_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_consumer_checkpoints",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "aggregate_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_event_inbox",
+    "name": "idx_media_event_inbox_aggregate",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "aggregate_id,aggregate_version,event_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_event_inbox",
+    "name": "idx_media_event_inbox_claim",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "status,next_attempt_at,lease_expires_at,event_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_event_inbox",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "event_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_gc_auxiliary_jobs",
+    "name": "idx_media_gc_aux_claim",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "status,lease_expires_at,job_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_gc_auxiliary_jobs",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "job_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_gc_auxiliary_jobs",
+    "name": "uq_media_gc_aux_asset",
+    "index_type": "BTREE",
+    "columns": "asset_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_gc_jobs",
+    "name": "idx_media_gc_asset_status",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "asset_id,status,object_stage"
+  },
+  {
+    "kind": "index",
+    "table": "media_gc_jobs",
+    "name": "idx_media_gc_claim",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "status,next_attempt_at,lease_expires_at,job_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_gc_jobs",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "job_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_gc_jobs",
+    "name": "uq_media_gc_object_identity",
+    "index_type": "BTREE",
+    "columns": "asset_id,object_stage,object_key,object_version_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_outbox",
+    "name": "idx_media_outbox_pending",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "processed_at,created_at,event_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_outbox",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "event_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_outbox",
+    "name": "uq_media_outbox_aggregate_operation",
+    "index_type": "BTREE",
+    "columns": "aggregate_id,aggregate_version,operation"
+  },
+  {
+    "kind": "index",
+    "table": "media_quota_reservations",
+    "name": "idx_media_quota_owner_created",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "owner_id,created_at,status"
+  },
+  {
+    "kind": "index",
+    "table": "media_quota_reservations",
+    "name": "idx_media_quota_owner_status",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "owner_id,status"
+  },
+  {
+    "kind": "index",
+    "table": "media_quota_reservations",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "reservation_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_quota_reservations",
+    "name": "uq_media_quota_ticket",
+    "index_type": "BTREE",
+    "columns": "ticket_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_review_decisions",
+    "name": "idx_media_review_decision_received",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "received_at,id"
+  },
+  {
+    "kind": "index",
+    "table": "media_review_decisions",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "id"
+  },
+  {
+    "kind": "index",
+    "table": "media_review_decisions",
+    "name": "uq_media_review_decision_projection_version",
+    "index_type": "BTREE",
+    "columns": "projection_id,decision_version"
+  },
+  {
+    "kind": "index",
+    "table": "media_review_decisions",
+    "name": "uq_media_review_decision_task_version",
+    "index_type": "BTREE",
+    "columns": "review_task_id,decision_version"
+  },
+  {
+    "kind": "index",
+    "table": "media_review_projections",
+    "name": "idx_media_review_projection_status",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "status,updated_at,projection_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_review_projections",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "projection_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_review_projections",
+    "name": "uq_media_review_projection_asset",
+    "index_type": "BTREE",
+    "columns": "asset_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_review_projections",
+    "name": "uq_media_review_projection_task",
+    "index_type": "BTREE",
+    "columns": "review_task_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_upload_completions",
+    "name": "idx_media_completion_deadline",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "phase,processing_deadline_at,asset_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_upload_completions",
+    "name": "idx_media_completion_lease",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "phase,lease_expires_at,asset_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_upload_completions",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "ticket_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_upload_completions",
+    "name": "uq_media_completion_asset",
+    "index_type": "BTREE",
+    "columns": "asset_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_upload_tickets",
+    "name": "idx_media_ticket_expiry",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "status,expires_at"
+  },
+  {
+    "kind": "index",
+    "table": "media_upload_tickets",
+    "name": "idx_media_ticket_expiry_scan",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "status,expires_at,ticket_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_upload_tickets",
+    "name": "idx_media_ticket_owner_status",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "owner_id,status,expires_at"
+  },
+  {
+    "kind": "index",
+    "table": "media_upload_tickets",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "ticket_id"
+  },
+  {
+    "kind": "index",
+    "table": "media_upload_tickets",
+    "name": "uq_media_ticket_asset",
+    "index_type": "BTREE",
+    "columns": "asset_id"
+  },
+  {
+    "kind": "index",
+    "table": "navigation_categories",
+    "name": "idx_navigation_categories_sort",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "sort"
+  },
+  {
+    "kind": "index",
+    "table": "navigation_categories",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "id"
+  },
+  {
+    "kind": "index",
+    "table": "navigation_items",
+    "name": "idx_navigation_items_category_id",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "category_id"
+  },
+  {
+    "kind": "index",
+    "table": "navigation_items",
+    "name": "idx_navigation_items_sort",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "sort"
+  },
+  {
+    "kind": "index",
+    "table": "navigation_items",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "id"
+  },
+  {
+    "kind": "index",
+    "table": "notifications",
+    "name": "idx_notification_event",
+    "index_type": "BTREE",
+    "columns": "recipient_id,actor_id,type,post_id,comment_id"
+  },
+  {
+    "kind": "index",
+    "table": "notifications",
+    "name": "idx_notifications_actor",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "actor_id"
+  },
+  {
+    "kind": "index",
+    "table": "notifications",
+    "name": "idx_notifications_post",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "post_id"
+  },
+  {
+    "kind": "index",
+    "table": "notifications",
+    "name": "idx_notifications_recipient_read_created",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "recipient_id,read_at,created_at"
+  },
+  {
+    "kind": "index",
+    "table": "notifications",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "id"
+  },
+  {
+    "kind": "index",
+    "table": "post_favorites",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "post_id,user_id"
+  },
+  {
+    "kind": "index",
+    "table": "post_images",
+    "name": "idx_post_image_sort",
+    "index_type": "BTREE",
+    "columns": "post_id,sort"
+  },
+  {
+    "kind": "index",
+    "table": "post_images",
+    "name": "idx_post_images_asset_id",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "asset_id"
+  },
+  {
+    "kind": "index",
+    "table": "post_images",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "id"
+  },
+  {
+    "kind": "index",
+    "table": "post_likes",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "post_id,user_id"
+  },
+  {
+    "kind": "index",
+    "table": "posts",
+    "name": "idx_posts_deleted_at",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "deleted_at"
+  },
+  {
+    "kind": "index",
+    "table": "posts",
+    "name": "idx_posts_review_status",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "review_status"
+  },
+  {
+    "kind": "index",
+    "table": "posts",
+    "name": "idx_posts_topic",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "topic"
+  },
+  {
+    "kind": "index",
+    "table": "posts",
+    "name": "idx_posts_user_id",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "user_id"
+  },
+  {
+    "kind": "index",
+    "table": "posts",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "id"
+  },
+  {
+    "kind": "index",
+    "table": "product_favorites",
+    "name": "idx_product_favorites_user",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "user_id,created_at"
+  },
+  {
+    "kind": "index",
+    "table": "product_favorites",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "product_id,user_id"
+  },
+  {
+    "kind": "index",
+    "table": "product_images",
+    "name": "idx_product_image_sort",
+    "index_type": "BTREE",
+    "columns": "product_id,sort"
+  },
+  {
+    "kind": "index",
+    "table": "product_images",
+    "name": "idx_product_images_asset_id",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "asset_id"
+  },
+  {
+    "kind": "index",
+    "table": "product_images",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "id"
+  },
+  {
+    "kind": "index",
+    "table": "products",
+    "name": "idx_products_category",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "category"
+  },
+  {
+    "kind": "index",
+    "table": "products",
+    "name": "idx_products_deleted_at",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "deleted_at"
+  },
+  {
+    "kind": "index",
+    "table": "products",
+    "name": "idx_products_public_status_created",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "review_status,status,deleted_at,created_at,id"
+  },
+  {
+    "kind": "index",
+    "table": "products",
+    "name": "idx_products_review_status",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "review_status"
+  },
+  {
+    "kind": "index",
+    "table": "products",
+    "name": "idx_products_seller_id",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "seller_id"
+  },
+  {
+    "kind": "index",
+    "table": "products",
+    "name": "idx_products_status",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "status"
+  },
+  {
+    "kind": "index",
+    "table": "products",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "id"
+  },
+  {
+    "kind": "index",
+    "table": "reports",
+    "name": "idx_reports_reporter_id",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "reporter_id"
+  },
+  {
+    "kind": "index",
+    "table": "reports",
+    "name": "idx_reports_review_status",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "review_status"
+  },
+  {
+    "kind": "index",
+    "table": "reports",
+    "name": "idx_reports_target_id",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "target_id"
+  },
+  {
+    "kind": "index",
+    "table": "reports",
+    "name": "idx_reports_target_type",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "target_type"
+  },
+  {
+    "kind": "index",
+    "table": "reports",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "id"
+  },
+  {
+    "kind": "index",
+    "table": "review_tasks",
+    "name": "idx_review_object",
+    "index_type": "BTREE",
+    "columns": "object_type,object_id"
+  },
+  {
+    "kind": "index",
+    "table": "review_tasks",
+    "name": "idx_review_tasks_status",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "status"
+  },
+  {
+    "kind": "index",
+    "table": "review_tasks",
+    "name": "idx_review_tasks_submitter_id",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "submitter_id"
+  },
+  {
+    "kind": "index",
+    "table": "review_tasks",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "id"
+  },
+  {
+    "kind": "index",
+    "table": "trade_search_outbox",
+    "name": "idx_trade_search_outbox_pending",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "processed_at,available_at,id"
+  },
+  {
+    "kind": "index",
+    "table": "trade_search_outbox",
+    "name": "idx_trade_search_outbox_product",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "product_id"
+  },
+  {
+    "kind": "index",
+    "table": "trade_search_outbox",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "id"
+  },
+  {
+    "kind": "index",
+    "table": "user_follows",
+    "name": "idx_user_follows_followee",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "followee_id,created_at"
+  },
+  {
+    "kind": "index",
+    "table": "user_follows",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "follower_id,followee_id"
+  },
+  {
+    "kind": "index",
+    "table": "users",
+    "name": "idx_users_avatar_asset_id",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "avatar_asset_id"
+  },
+  {
+    "kind": "index",
+    "table": "users",
+    "name": "idx_users_deleted_at",
+    "index_type": "BTREE",
+    "non_unique": 1,
+    "columns": "deleted_at"
+  },
+  {
+    "kind": "index",
+    "table": "users",
+    "name": "open_id",
+    "index_type": "BTREE",
+    "columns": "open_id"
+  },
+  {
+    "kind": "index",
+    "table": "users",
+    "name": "PRIMARY",
+    "index_type": "BTREE",
+    "columns": "id"
+  },
+  {
+    "kind": "foreign_key",
+    "table": "media_asset_references",
+    "name": "fk_media_reference_asset",
+    "columns": "asset_id",
+    "referenced_table": "media_assets",
+    "referenced_columns": "id",
+    "update_rule": "RESTRICT",
+    "delete_rule": "RESTRICT"
+  },
+  {
+    "kind": "foreign_key",
+    "table": "media_event_inbox",
+    "name": "fk_media_event_inbox_outbox",
+    "columns": "event_id",
+    "referenced_table": "media_outbox",
+    "referenced_columns": "event_id",
+    "update_rule": "RESTRICT",
+    "delete_rule": "RESTRICT"
+  },
+  {
+    "kind": "foreign_key",
+    "table": "media_gc_auxiliary_jobs",
+    "name": "fk_media_gc_aux_job_asset",
+    "columns": "asset_id",
+    "referenced_table": "media_assets",
+    "referenced_columns": "id",
+    "update_rule": "RESTRICT",
+    "delete_rule": "RESTRICT"
+  },
+  {
+    "kind": "foreign_key",
+    "table": "media_gc_jobs",
+    "name": "fk_media_gc_job_asset",
+    "columns": "asset_id",
+    "referenced_table": "media_assets",
+    "referenced_columns": "id",
+    "update_rule": "RESTRICT",
+    "delete_rule": "RESTRICT"
+  },
+  {
+    "kind": "foreign_key",
+    "table": "media_quota_reservations",
+    "name": "fk_media_quota_ticket",
+    "columns": "ticket_id",
+    "referenced_table": "media_upload_tickets",
+    "referenced_columns": "ticket_id",
+    "update_rule": "RESTRICT",
+    "delete_rule": "RESTRICT"
+  },
+  {
+    "kind": "foreign_key",
+    "table": "media_review_decisions",
+    "name": "fk_media_review_decision_projection",
+    "columns": "projection_id",
+    "referenced_table": "media_review_projections",
+    "referenced_columns": "projection_id",
+    "update_rule": "RESTRICT",
+    "delete_rule": "RESTRICT"
+  },
+  {
+    "kind": "foreign_key",
+    "table": "media_review_projections",
+    "name": "fk_media_review_projection_asset",
+    "columns": "asset_id",
+    "referenced_table": "media_assets",
+    "referenced_columns": "id",
+    "update_rule": "RESTRICT",
+    "delete_rule": "RESTRICT"
+  },
+  {
+    "kind": "foreign_key",
+    "table": "media_upload_completions",
+    "name": "fk_media_completion_asset",
+    "columns": "asset_id",
+    "referenced_table": "media_assets",
+    "referenced_columns": "id",
+    "update_rule": "RESTRICT",
+    "delete_rule": "RESTRICT"
+  },
+  {
+    "kind": "foreign_key",
+    "table": "media_upload_completions",
+    "name": "fk_media_completion_ticket",
+    "columns": "ticket_id",
+    "referenced_table": "media_upload_tickets",
+    "referenced_columns": "ticket_id",
+    "update_rule": "RESTRICT",
+    "delete_rule": "RESTRICT"
+  },
+  {
+    "kind": "foreign_key",
+    "table": "media_upload_tickets",
+    "name": "fk_media_ticket_asset",
+    "columns": "asset_id",
+    "referenced_table": "media_assets",
+    "referenced_columns": "id",
+    "update_rule": "RESTRICT",
+    "delete_rule": "RESTRICT"
+  },
+  {
+    "kind": "check",
+    "table": "media_asset_references",
+    "name": "chk_media_parent_visibility",
+    "check_clause": "(`parent_visibility` in (_utf8mb4\\'hidden\\',_utf8mb4\\'visible\\'))"
+  },
+  {
+    "kind": "check",
+    "table": "media_asset_references",
+    "name": "chk_media_reference_status",
+    "check_clause": "(`status` in (_utf8mb4\\'pending\\',_utf8mb4\\'active\\',_utf8mb4\\'revoking\\',_utf8mb4\\'revoked\\'))"
+  },
+  {
+    "kind": "check",
+    "table": "media_asset_references",
+    "name": "chk_media_reference_type",
+    "check_clause": "(`reference_type` in (_utf8mb4\\'post\\',_utf8mb4\\'product\\',_utf8mb4\\'avatar\\'))"
+  },
+  {
+    "kind": "check",
+    "table": "media_event_inbox",
+    "name": "chk_media_event_inbox_status",
+    "check_clause": "(`status` in (_utf8mb4\\'pending\\',_utf8mb4\\'processing\\',_utf8mb4\\'retry_wait\\',_utf8mb4\\'succeeded\\',_utf8mb4\\'deadletter\\'))"
+  },
+  {
+    "kind": "check",
+    "table": "media_gc_auxiliary_jobs",
+    "name": "chk_media_gc_aux_job_status",
+    "check_clause": "(`status` in (_utf8mb4\\'pending\\',_utf8mb4\\'processing\\',_utf8mb4\\'succeeded\\',_utf8mb4\\'deadletter\\'))"
+  },
+  {
+    "kind": "check",
+    "table": "media_gc_jobs",
+    "name": "chk_media_gc_fixed_identity",
+    "check_clause": "((char_length(`object_key`) \u003e 0) and (char_length(`object_version_id`) \u003e 0))"
+  },
+  {
+    "kind": "check",
+    "table": "media_gc_jobs",
+    "name": "chk_media_gc_job_stage",
+    "check_clause": "(`object_stage` in (_utf8mb4\\'staging\\',_utf8mb4\\'final\\'))"
+  },
+  {
+    "kind": "check",
+    "table": "media_gc_jobs",
+    "name": "chk_media_gc_job_status",
+    "check_clause": "(`status` in (_utf8mb4\\'pending\\',_utf8mb4\\'processing\\',_utf8mb4\\'retry_wait\\',_utf8mb4\\'succeeded\\',_utf8mb4\\'deadletter\\'))"
+  },
+  {
+    "kind": "check",
+    "table": "media_quota_reservations",
+    "name": "chk_media_quota_status",
+    "check_clause": "(`status` in (_utf8mb4\\'active\\',_utf8mb4\\'committed\\',_utf8mb4\\'released\\'))"
+  },
+  {
+    "kind": "check",
+    "table": "media_review_decisions",
+    "name": "chk_media_review_decision_status",
+    "check_clause": "(`decision` in (_utf8mb4\\'approved\\',_utf8mb4\\'rejected\\',_utf8mb4\\'review_failed\\'))"
+  },
+  {
+    "kind": "check",
+    "table": "media_review_projections",
+    "name": "chk_media_review_projection_status",
+    "check_clause": "(`status` in (_utf8mb4\\'pending\\',_utf8mb4\\'submitted\\',_utf8mb4\\'reviewing\\',_utf8mb4\\'approved\\',_utf8mb4\\'rejected\\',_utf8mb4\\'review_failed\\'))"
+  },
+  {
+    "kind": "check",
+    "table": "media_upload_completions",
+    "name": "chk_media_completion_phase",
+    "check_clause": "(`phase` in (_utf8mb4\\'validating\\',_utf8mb4\\'promoting\\',_utf8mb4\\'final_ready\\',_utf8mb4\\'validation_failed\\'))"
+  },
+  {
+    "kind": "check",
+    "table": "media_upload_tickets",
+    "name": "chk_media_ticket_credential_count",
+    "check_clause": "(`credential_issue_count` \u003c= 1)"
+  },
+  {
+    "kind": "check",
+    "table": "media_upload_tickets",
+    "name": "chk_media_ticket_status",
+    "check_clause": "(`status` in (_utf8mb4\\'created\\',_utf8mb4\\'authorization_issued\\',_utf8mb4\\'uploaded\\',_utf8mb4\\'consumed\\',_utf8mb4\\'expired\\',_utf8mb4\\'cancelled\\'))"
+  }
+]

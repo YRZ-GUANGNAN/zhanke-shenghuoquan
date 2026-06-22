@@ -1,0 +1,230 @@
+{
+  "generated_at": "2026-06-22",
+  "environment": "disposable MySQL 8.4 baseline after migrations 001-014 plus 015-equivalent schema",
+  "action": "gorm AutoMigrate on legacy internal/pkg/media.Asset",
+  "difference_count": 13,
+  "differences": [
+    {
+      "key": "column|media_assets|declared_mime",
+      "after_legacy_automigrate": {
+        "kind": "column",
+        "table": "media_assets",
+        "name": "declared_mime",
+        "column_type": "varchar(64)",
+        "nullable": "NO"
+      },
+      "baseline": {
+        "kind": "column",
+        "table": "media_assets",
+        "name": "declared_mime",
+        "column_type": "varchar(64)",
+        "nullable": "NO",
+        "default": ""
+      }
+    },
+    {
+      "key": "column|media_assets|declared_size",
+      "after_legacy_automigrate": {
+        "kind": "column",
+        "table": "media_assets",
+        "name": "declared_size",
+        "column_type": "bigint",
+        "nullable": "NO"
+      },
+      "baseline": {
+        "kind": "column",
+        "table": "media_assets",
+        "name": "declared_size",
+        "column_type": "bigint",
+        "nullable": "NO",
+        "default": "0"
+      }
+    },
+    {
+      "key": "column|media_assets|object_key",
+      "after_legacy_automigrate": {
+        "kind": "column",
+        "table": "media_assets",
+        "name": "object_key",
+        "column_type": "varchar(512)",
+        "nullable": "NO"
+      },
+      "baseline": {
+        "kind": "column",
+        "table": "media_assets",
+        "name": "object_key",
+        "column_type": "varchar(512)",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|media_assets|owner_user_id",
+      "after_legacy_automigrate": {
+        "kind": "column",
+        "table": "media_assets",
+        "name": "owner_user_id",
+        "column_type": "bigint unsigned",
+        "nullable": "NO"
+      },
+      "baseline": {
+        "kind": "column",
+        "table": "media_assets",
+        "name": "owner_user_id",
+        "column_type": "bigint unsigned",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|media_assets|public_id",
+      "after_legacy_automigrate": {
+        "kind": "column",
+        "table": "media_assets",
+        "name": "public_id",
+        "column_type": "varchar(32)",
+        "nullable": "NO"
+      },
+      "baseline": {
+        "kind": "column",
+        "table": "media_assets",
+        "name": "public_id",
+        "column_type": "char(32)",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|media_assets|reference_id",
+      "after_legacy_automigrate": {
+        "kind": "column",
+        "table": "media_assets",
+        "name": "reference_id",
+        "column_type": "bigint unsigned",
+        "nullable": "YES"
+      },
+      "baseline": {
+        "kind": "column",
+        "table": "media_assets",
+        "name": "reference_id",
+        "column_type": "bigint unsigned",
+        "nullable": "NO",
+        "default": "0"
+      }
+    },
+    {
+      "key": "column|media_assets|reference_sort",
+      "after_legacy_automigrate": {
+        "kind": "column",
+        "table": "media_assets",
+        "name": "reference_sort",
+        "column_type": "bigint",
+        "nullable": "YES"
+      },
+      "baseline": {
+        "kind": "column",
+        "table": "media_assets",
+        "name": "reference_sort",
+        "column_type": "bigint",
+        "nullable": "NO",
+        "default": "0"
+      }
+    },
+    {
+      "key": "column|media_assets|reference_type",
+      "after_legacy_automigrate": {
+        "kind": "column",
+        "table": "media_assets",
+        "name": "reference_type",
+        "column_type": "varchar(24)",
+        "nullable": "YES"
+      },
+      "baseline": {
+        "kind": "column",
+        "table": "media_assets",
+        "name": "reference_type",
+        "column_type": "varchar(24)",
+        "nullable": "NO",
+        "default": ""
+      }
+    },
+    {
+      "key": "column|media_assets|reservation_token",
+      "after_legacy_automigrate": {
+        "kind": "column",
+        "table": "media_assets",
+        "name": "reservation_token",
+        "column_type": "varchar(32)",
+        "nullable": "YES"
+      },
+      "baseline": {
+        "kind": "column",
+        "table": "media_assets",
+        "name": "reservation_token",
+        "column_type": "char(32)",
+        "nullable": "NO",
+        "default": ""
+      }
+    },
+    {
+      "key": "column|media_assets|review_available_at",
+      "after_legacy_automigrate": {
+        "kind": "column",
+        "table": "media_assets",
+        "name": "review_available_at",
+        "column_type": "datetime(3)",
+        "nullable": "NO"
+      },
+      "baseline": {
+        "kind": "column",
+        "table": "media_assets",
+        "name": "review_available_at",
+        "column_type": "datetime(3)",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|media_assets|status",
+      "after_legacy_automigrate": {
+        "kind": "column",
+        "table": "media_assets",
+        "name": "status",
+        "column_type": "varchar(24)",
+        "nullable": "NO"
+      },
+      "baseline": {
+        "kind": "column",
+        "table": "media_assets",
+        "name": "status",
+        "column_type": "varchar(24)",
+        "nullable": "NO",
+        "default": "pending_upload"
+      }
+    },
+    {
+      "key": "column|media_assets|upload_expires_at",
+      "after_legacy_automigrate": {
+        "kind": "column",
+        "table": "media_assets",
+        "name": "upload_expires_at",
+        "column_type": "datetime(3)",
+        "nullable": "NO"
+      },
+      "baseline": {
+        "kind": "column",
+        "table": "media_assets",
+        "name": "upload_expires_at",
+        "column_type": "datetime(3)",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "index|media_assets|uq_media_review_task_v11",
+      "after_legacy_automigrate": null,
+      "baseline": {
+        "kind": "index",
+        "table": "media_assets",
+        "name": "uq_media_review_task_v11",
+        "index_type": "BTREE",
+        "columns": "review_task_id"
+      }
+    }
+  ]
+}
