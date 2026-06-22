@@ -2,6 +2,8 @@
 
 > 建议存放路径：`docs/DEVELOPMENT_DISCIPLINE.md`
 
+> v1.1 相对 v1.0：新增「九、提交与冻结落痕」「十、合并与集成」两节（根因来自基础设施阶段的真实事故：模块声称冻结却停在未提交工作区、master 被特性 worktree 占用导致合并错位、特性分支基于旧 master 分叉）。
+
 本文件固化项目既有的开发与验收纪律，作为**常设治理基线**。其效力高于任何单次模块授权；单次授权与本文件冲突时，以本文件为准。每次模块授权应将本文件作为前置约束引用。
 
 ---
@@ -9,7 +11,7 @@
 ## 一、归属与冻结
 
 1. 一次授权只做一个明确模块；无法归属到已登记业务域的需求不进入系统（见 `ARCHITECTURE.md`）。新增或重开业务域须先有 ADR（见 `docs/adr/`）。
-2. 已冻结：媒体子系统 Module ②~⑩、迁移 `001~014`（含 `rollback/`）、A~F 各域数据库契约 / 状态机 / Repository 行为 / 已通过验收测试。冻结对象一律不得修改。
+2. 已冻结：媒体子系统 Module ②~⑩、迁移 `001~018`（含 `rollback/`）、A~F 各域数据库契约 / 状态机 / Repository 行为 / 已通过验收测试。冻结对象一律不得修改。
 3. 模块生命周期：开发 → 真实环境验收 → PASS → 冻结；完成即停止，等待下一次专项授权，不得自行进入下一模块。
 4. 新增或重开业务域，必须先有明示的架构决策记录（ADR）并据此修订 `ARCHITECTURE.md` / `DEVELOPMENT.md` / `README.md`，经 owner 接受后方可开发；禁止用与现行架构矛盾的模块绕过登记。
 
@@ -18,24 +20,20 @@
 5. 固定链路：`handler → domain service → domain repository → 域自有表`。handler 不得持有 `*gorm.DB`。
 6. Repository 是唯一数据库边界，仅所属域可访问其表；跨域只能调用对方 service 暴露的窄接口，禁止查询或更新对方表，禁止跨域外键。
 7. 状态机、权限归属、审核规则一律在 service。
-8. 复用而非重建：
-   - 身份与权限走 **A**；不自建 token / 权限。
-   - 图片资产走**媒体子系统**：通过 `media_asset_references` 引用、展示经 **MediaGateway**（仅 `final + approved`），不另造媒体逻辑。
-   - 审核提交 **F** 统一审核流（`review_tasks`：`submitted → reviewing → approved/rejected`），F 经注册领域服务回写、不直接访问业务表。
-   - 会话走 **E** 的 `ConversationGateway`，E 不读业务表、不存消息内容。
+8. 复用而非重建：身份走 **A**；图片资产走**媒体子系统**（`media_asset_references` 引用、展示经 **MediaGateway**，仅 `final + approved`），不另造媒体逻辑；审核提交 **F** 统一审核流（`review_tasks`：`submitted → reviewing → approved/rejected`），F 经注册领域服务回写、不直接访问业务表；会话走 **E** 的 `ConversationGateway`，E 不读业务表、不存消息内容。
 
 ## 三、实现范式
 
 9. 所有状态推进使用 `expected_status + row_version` 的 CAS；stale write 一律拒绝。
 10. 副作用（审核、上传、跨模块通知、支付回调等）走 **Outbox → Consumer**，**Inbox 去重**，保证幂等、防重复、防乱序；崩溃可恢复；死信 / 终态明确。
 11. 全程 **fail-closed**：任一条件未知或不满足，按不可见 / 不放行处理。
-12. 迁移编号续接现有最大号（当前 `014`，下一条 `015`…），每条迁移必须配 `rollback/`；不得修改已冻结迁移。
+12. 迁移编号续接现有最大号（当前 `018`，下一条 `019`…）；新增业务域模块从其登记区间取号且全局唯一，并行任务必须预先锚定各自迁移号避免抢号；每条迁移必须配 `rollback/`；不得修改已冻结迁移。
 
 ## 四、验收闸门（必须真实，禁止构造）
 
 13. 验收针对项目【真实、当前】环境：真实 MySQL 8.4、真实 STS/COS，全链路无 Mock。
 14. **反规避（硬性）**：严禁为通过验收而新建合成库 / 干净实例 / 临时库并在其上验收；验收库必须是真实库。
-    - 前例：真实库 `media_assets.public_id` 与冻结迁移基线漂移（真实 `varchar(32) NOT NULL`，迁移意图 `CHAR(32) NULL`），曾被“全新迁移库 PASS”掩盖——此类一律禁止。
+    - 前例：真实库 `media_assets.public_id` 与冻结迁移基线漂移，曾被"全新迁移库 PASS"掩盖——此类一律禁止。
 15. 真实环境与冻结迁移出现漂移（字段、约束、缺表等），必须**停止并上报为阻断项**，申请单独授权去协调；禁止换库或绕过校验规避。
 16. 残留为零：数据库残留 = 0，COS Version / DeleteMarker 残留 = 0，临时文件清理干净。
 17. 闸门命令全过，缺一不可：
@@ -54,16 +52,34 @@
 
 18. 接口返回 `{code, message, data}`；分页 `items / page / pageSize / total`；路由根与域一一对应。
 19. 不得修改既有上传协议、审核协议、状态机与 CAS 语义。
+20. 金额一律以整数（分 / cents）存储与计算，禁止浮点。
 
 ## 六、诚实与上报
 
-20. 报告必须反映真实失败阶段与根因；PASS 必须代表真实目标环境通过——不接受构造环境得到的 PASS，不接受把未达标包装成 CONDITIONAL PASS 来推进。
-21. 遇到超出授权范围的阻断，停止并请示，禁止自行扩大范围或绕行。
+21. 报告必须反映真实失败阶段与根因；PASS 必须代表真实目标环境通过——不接受构造环境得到的 PASS，不接受把未达标包装成 CONDITIONAL PASS 来推进。
+22. 遇到超出授权范围的阻断，停止并请示，禁止自行扩大范围或绕行。
 
 ## 七、安全
 
-22. 禁止提交或泄露任何凭证（`.env`、AppSecret、STS/COS Secret、DB 口令、token、私钥、签名 URL）；报告与导出一律脱敏。
+23. 禁止提交或泄露任何凭证（`.env`、AppSecret、STS/COS Secret、DB 口令、token、私钥、签名 URL）；报告与导出一律脱敏。
 
 ## 八、每模块交付物
 
 `Development Report`、`Acceptance Report`、`Acceptance Evidence`；有问题附 `Root Cause Analysis` 与 `Residue Report`。
+
+## 九、提交与冻结落痕（v1.1 新增）
+
+24. **冻结即提交 + 打标签。** 一个模块声明 PASS / 冻结，其全部产物必须是 git 中已提交的状态，并打基线标签（如 `g1-merchant-baseline`）。不接受"报告声明已完成、代码却停在工作区 / 暂存区"的状态。
+    - 根因前例：整套媒体子系统一度只存在于工作区未提交改动，靠报告声明"已冻结"；后续验收因此与真实 git 状态不符。
+25. **完成即提交，不留游离暂存。** 任务收尾时 worktree 必须 `working tree clean`、暂存区为空；交付报告须附最终 commit hash。不得以"已 add 但未 commit"作为完成态。
+26. **真实环境 schema 权威 = 迁移文件，不得用 GORM AutoMigrate 改写迁移管理的表。** 模块冻结验收须在"已起服务的真实运行态"下确认（启动不得改写 schema）。
+27. **生产库形状约束：** 生产库当前为形状 Y，与迁移 001–018（形状 X）存在已登记的跨域漂移；在"漂移对齐"专项被接受前，禁止仅用迁移重建生产库，备份/恢复只针对真实库本身。
+
+## 十、合并与集成（v1.1 新增）
+
+28. **固定集成点。** 向 `master` 合并只在主仓库目录进行；禁止在特性 worktree 内 `checkout master`、禁止让特性 worktree 长期占用 master。特性 worktree 只管自己的分支，合并完成即 `git worktree remove`。
+    - 根因前例：G-① 在自己的 worktree 检出 master 合并后未归位，导致 master 被占用、后续合并必须钻进该 worktree，并引发 ADR 基于旧 master 分叉。
+29. **合并串行化。** 多分支待合时逐个串行合入，不并发推进 master；每次合并前确认上一次已落定。
+30. **合并前先同步基线。** 任何特性分支合并前必须基于当前 master；若已分叉，先 `git rebase master`（仅重放本分支提交、与目标无重叠时零冲突），再 `git merge --ff-only`，保持线性主线。
+31. **合并一律 `--ff-only`；** 出现非快进即停下报告，不强解、不 `-D`、不 `--force`。删除分支仅用 `-d`（仅删已合并）。
+32. **并行 agent 隔离：** 每个 agent 独立 worktree + 独立分支 + 预锚定迁移号 + 不相交文件集；合并由集成点统一串行执行。
