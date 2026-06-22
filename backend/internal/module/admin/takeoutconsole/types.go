@@ -1,0 +1,164 @@
+package takeoutconsole
+
+import (
+	"time"
+
+	"campus-circle/backend/internal/module/takeout"
+)
+
+type Page[T any] struct {
+	Items    []T   `json:"items"`
+	Page     int   `json:"page"`
+	PageSize int   `json:"pageSize"`
+	Total    int64 `json:"total"`
+}
+
+type MerchantView struct {
+	MerchantPublicID  string                 `json:"merchantPublicId"`
+	OwnerUserID       uint64                 `json:"ownerUserId"`
+	Name              string                 `json:"name"`
+	ContactPhone      string                 `json:"contactPhone"`
+	Location          string                 `json:"location"`
+	BusinessHours     string                 `json:"businessHours"`
+	LogoAssetPublicID *string                `json:"logoAssetPublicId,omitempty"`
+	Status            takeout.MerchantStatus `json:"status"`
+	RowVersion        uint64                 `json:"rowVersion"`
+	CreatedAt         time.Time              `json:"createdAt"`
+	UpdatedAt         time.Time              `json:"updatedAt"`
+}
+
+type CategoryView struct {
+	CategoryPublicID string    `json:"categoryPublicId"`
+	MerchantPublicID string    `json:"merchantPublicId"`
+	Name             string    `json:"name"`
+	SortOrder        int32     `json:"sortOrder"`
+	RowVersion       uint64    `json:"rowVersion"`
+	CreatedAt        time.Time `json:"createdAt"`
+	UpdatedAt        time.Time `json:"updatedAt"`
+}
+
+type DishView struct {
+	DishPublicID       string             `json:"dishPublicId"`
+	MerchantPublicID   string             `json:"merchantPublicId"`
+	CategoryPublicID   *string            `json:"categoryPublicId,omitempty"`
+	Name               string             `json:"name"`
+	Description        string             `json:"description"`
+	PriceCents         uint64             `json:"priceCents"`
+	ImageAssetPublicID *string            `json:"imageAssetPublicId,omitempty"`
+	Status             takeout.DishStatus `json:"status"`
+	SortOrder          int32              `json:"sortOrder"`
+	RowVersion         uint64             `json:"rowVersion"`
+	CreatedAt          time.Time          `json:"createdAt"`
+	UpdatedAt          time.Time          `json:"updatedAt"`
+}
+
+type OrderView struct {
+	OrderPublicID    string              `json:"orderPublicId"`
+	BuyerUserID      uint64              `json:"buyerUserId"`
+	MerchantPublicID string              `json:"merchantPublicId"`
+	RiderUserID      *uint64             `json:"riderUserId,omitempty"`
+	Status           takeout.OrderStatus `json:"status"`
+	ItemsAmountCents uint64              `json:"itemsAmountCents"`
+	DeliveryFeeCents uint64              `json:"deliveryFeeCents"`
+	TotalAmountCents uint64              `json:"totalAmountCents"`
+	ContactName      string              `json:"contactName"`
+	ContactPhone     string              `json:"contactPhone"`
+	AddressBuilding  string              `json:"addressBuilding"`
+	AddressRoom      string              `json:"addressRoom"`
+	Remark           string              `json:"remark"`
+	PayNo            *string             `json:"payNo,omitempty"`
+	RowVersion       uint64              `json:"rowVersion"`
+	CreatedAt        time.Time           `json:"createdAt"`
+	UpdatedAt        time.Time           `json:"updatedAt"`
+}
+
+type OrderItemView struct {
+	DishPublicID           string `json:"dishPublicId"`
+	DishNameSnapshot       string `json:"dishNameSnapshot"`
+	UnitPriceCentsSnapshot uint64 `json:"unitPriceCentsSnapshot"`
+	Quantity               uint32 `json:"quantity"`
+	LineAmountCents        uint64 `json:"lineAmountCents"`
+}
+
+type OrderDetailView struct {
+	Order OrderView       `json:"order"`
+	Items []OrderItemView `json:"items"`
+}
+
+type RiderView struct {
+	RiderUserID uint64              `json:"riderUserId"`
+	Status      takeout.RiderStatus `json:"status"`
+	RealName    string              `json:"realName"`
+	Phone       string              `json:"phone"`
+	RowVersion  uint64              `json:"rowVersion"`
+	CreatedAt   time.Time           `json:"createdAt"`
+	UpdatedAt   time.Time           `json:"updatedAt"`
+}
+
+type FeeConfigView struct {
+	RiderFeeCents    uint64    `json:"riderFeeCents"`
+	PlatformCutCents uint64    `json:"platformCutCents"`
+	RowVersion       uint64    `json:"rowVersion"`
+	UpdatedAt        time.Time `json:"updatedAt"`
+}
+
+type RiderConfigView struct {
+	MaxInFlightPerRider uint32    `json:"maxInFlightPerRider"`
+	RowVersion          uint64    `json:"rowVersion"`
+	UpdatedAt           time.Time `json:"updatedAt"`
+}
+
+type SettlementView struct {
+	RiderUserID      uint64 `json:"riderUserId"`
+	PendingCount     int64  `json:"pendingCount"`
+	RiderFeeCents    uint64 `json:"riderFeeCents"`
+	PlatformCutCents uint64 `json:"platformCutCents"`
+}
+
+type WithdrawView struct {
+	WithdrawPublicID string                 `json:"withdrawPublicId"`
+	RiderUserID      uint64                 `json:"riderUserId"`
+	AmountCents      uint64                 `json:"amountCents"`
+	Status           takeout.WithdrawStatus `json:"status"`
+	Note             string                 `json:"note"`
+	PaidAt           *time.Time             `json:"paidAt,omitempty"`
+	RowVersion       uint64                 `json:"rowVersion"`
+	CreatedAt        time.Time              `json:"createdAt"`
+	UpdatedAt        time.Time              `json:"updatedAt"`
+}
+
+func merchantView(v takeout.Merchant) MerchantView {
+	return MerchantView{v.MerchantPublicID, v.OwnerUserID, v.Name, v.ContactPhone, v.Location, v.BusinessHours, v.LogoAssetPublicID, v.Status, v.RowVersion, v.CreatedAt, v.UpdatedAt}
+}
+
+func categoryView(v takeout.DishCategory) CategoryView {
+	return CategoryView{v.CategoryPublicID, v.MerchantPublicID, v.Name, v.SortOrder, v.RowVersion, v.CreatedAt, v.UpdatedAt}
+}
+
+func dishView(v takeout.Dish) DishView {
+	return DishView{v.DishPublicID, v.MerchantPublicID, v.CategoryPublicID, v.Name, v.Description, v.PriceCents, v.ImageAssetPublicID, v.Status, v.SortOrder, v.RowVersion, v.CreatedAt, v.UpdatedAt}
+}
+
+func orderView(v takeout.Order) OrderView {
+	return OrderView{v.OrderPublicID, v.BuyerUserID, v.MerchantPublicID, v.RiderUserID, v.Status, v.ItemsAmountCents, v.DeliveryFeeCents, v.TotalAmountCents, v.ContactName, v.ContactPhone, v.AddressBuilding, v.AddressRoom, v.Remark, v.PayNo, v.RowVersion, v.CreatedAt, v.UpdatedAt}
+}
+
+func orderItemView(v takeout.OrderItem) OrderItemView {
+	return OrderItemView{v.DishPublicID, v.DishNameSnapshot, v.UnitPriceCentsSnapshot, v.Quantity, v.LineAmountCents}
+}
+
+func riderView(v takeout.Rider) RiderView {
+	return RiderView{v.RiderUserID, v.Status, v.RealName, v.Phone, v.RowVersion, v.CreatedAt, v.UpdatedAt}
+}
+
+func withdrawView(v takeout.WithdrawRequest) WithdrawView {
+	return WithdrawView{v.WithdrawPublicID, v.RiderUserID, v.AmountCents, v.Status, v.Note, v.PaidAt, v.RowVersion, v.CreatedAt, v.UpdatedAt}
+}
+
+func mapValues[A, B any](values []A, convert func(A) B) []B {
+	result := make([]B, 0, len(values))
+	for _, value := range values {
+		result = append(result, convert(value))
+	}
+	return result
+}

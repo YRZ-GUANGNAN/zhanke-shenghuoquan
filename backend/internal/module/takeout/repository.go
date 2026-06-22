@@ -835,3 +835,130 @@ func (r *GormRepository) FindFulfillmentByOrder(ctx context.Context, orderPublic
 	err := r.db.WithContext(ctx).Where("order_public_id = ?", orderPublicID).First(&value).Error
 	return value, normalizeNotFound(err)
 }
+
+func (r *GormRepository) CreateWithdrawRequest(ctx context.Context, value *WithdrawRequest) error {
+	return r.db.WithContext(ctx).Create(value).Error
+}
+
+func (r *GormRepository) FindWithdrawByID(ctx context.Context, publicID string) (WithdrawRequest, error) {
+	var value WithdrawRequest
+	err := r.db.WithContext(ctx).Where("withdraw_public_id = ?", publicID).First(&value).Error
+	return value, normalizeNotFound(err)
+}
+
+func (r *GormRepository) ListWithdrawRequests(
+	ctx context.Context,
+	status WithdrawStatus,
+	page, size int,
+) ([]WithdrawRequest, int64, error) {
+	query := r.db.WithContext(ctx).Model(&WithdrawRequest{})
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var values []WithdrawRequest
+	err := query.Order("created_at DESC, id DESC").Offset((page - 1) * size).Limit(size).Find(&values).Error
+	return values, total, err
+}
+
+func (r *GormRepository) MarkWithdrawPaid(
+	ctx context.Context,
+	publicID string,
+	expectedRowVersion uint64,
+	updatedAt time.Time,
+) (WithdrawRequest, error) {
+	var value WithdrawRequest
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("withdraw_public_id = ?", publicID).First(&value).Error; err != nil {
+			return normalizeNotFound(err)
+		}
+		if value.Status == WithdrawPaid {
+			return nil
+		}
+		if !CanTransitionWithdraw(value.Status, WithdrawPaid) {
+			return ErrInvalidTransition
+		}
+		result := tx.Model(&WithdrawRequest{}).
+			Where("id = ? AND row_version = ? AND status = ?", value.ID, expectedRowVersion, WithdrawPending).
+			Updates(map[string]any{
+				"status": WithdrawPaid, "paid_at": updatedAt, "updated_at": updatedAt,
+				"row_version": gorm.Expr("row_version + 1"),
+			})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return ErrConcurrentUpdate
+		}
+		var earnings []RiderEarningRecord
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("rider_user_id = ? AND settlement_status = ?", value.RiderUserID, SettlementPending).
+			Order("id ASC").Find(&earnings).Error; err != nil {
+			return err
+		}
+		for _, earning := range earnings {
+			settled := tx.Model(&RiderEarningRecord{}).
+				Where("id = ? AND row_version = ? AND settlement_status = ?", earning.ID, earning.RowVersion, SettlementPending).
+				Updates(map[string]any{
+					"settlement_status": SettlementSettled, "settled_at": updatedAt, "updated_at": updatedAt,
+					"row_version": gorm.Expr("row_version + 1"),
+				})
+			if settled.Error != nil {
+				return settled.Error
+			}
+			if settled.RowsAffected != 1 {
+				return ErrConcurrentUpdate
+			}
+		}
+		value.Status = WithdrawPaid
+		value.PaidAt = &updatedAt
+		value.RowVersion++
+		value.UpdatedAt = updatedAt
+		return nil
+	})
+	return value, err
+}
+
+func (r *GormRepository) RejectWithdraw(
+	ctx context.Context,
+	publicID string,
+	expectedRowVersion uint64,
+	note string,
+	updatedAt time.Time,
+) (WithdrawRequest, error) {
+	var value WithdrawRequest
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("withdraw_public_id = ?", publicID).First(&value).Error; err != nil {
+			return normalizeNotFound(err)
+		}
+		if value.Status == WithdrawRejected {
+			return nil
+		}
+		if !CanTransitionWithdraw(value.Status, WithdrawRejected) {
+			return ErrInvalidTransition
+		}
+		result := tx.Model(&WithdrawRequest{}).
+			Where("id = ? AND row_version = ? AND status = ?", value.ID, expectedRowVersion, WithdrawPending).
+			Updates(map[string]any{
+				"status": WithdrawRejected, "note": note, "updated_at": updatedAt,
+				"row_version": gorm.Expr("row_version + 1"),
+			})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return ErrConcurrentUpdate
+		}
+		value.Status = WithdrawRejected
+		value.Note = note
+		value.RowVersion++
+		value.UpdatedAt = updatedAt
+		return nil
+	})
+	return value, err
+}

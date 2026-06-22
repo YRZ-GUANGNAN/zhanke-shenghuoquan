@@ -13,11 +13,13 @@ import (
 	"campus-circle/backend/internal/module/admin"
 	"campus-circle/backend/internal/module/admin/mediaconsole"
 	"campus-circle/backend/internal/module/admin/review"
+	"campus-circle/backend/internal/module/admin/takeoutconsole"
 	"campus-circle/backend/internal/module/community"
 	"campus-circle/backend/internal/module/im"
 	coremedia "campus-circle/backend/internal/module/media"
 	"campus-circle/backend/internal/module/media/miniappflow"
 	"campus-circle/backend/internal/module/navigation"
+	"campus-circle/backend/internal/module/takeout"
 	"campus-circle/backend/internal/module/trade"
 	"campus-circle/backend/internal/module/user"
 	legacymedia "campus-circle/backend/internal/pkg/media"
@@ -121,6 +123,35 @@ func main() {
 	}()
 	navigationService := navigation.NewService(navigation.NewRepository(db))
 	adminService := admin.NewService(admin.NewRepository(db), reviewService)
+	takeoutRepository := takeout.NewRepository(db)
+	merchantService, err := takeout.NewMerchantService(takeoutRepository, nil)
+	if err != nil {
+		log.Fatalf("configure takeout merchant service: %v", err)
+	}
+	catalogService, err := takeout.NewCatalogService(takeoutRepository, nil)
+	if err != nil {
+		log.Fatalf("configure takeout catalog service: %v", err)
+	}
+	orderService, err := takeout.NewOrderService(takeoutRepository, takeoutRepository, nil)
+	if err != nil {
+		log.Fatalf("configure takeout order service: %v", err)
+	}
+	riderOrderOps, err := takeout.NewRiderOrderOps(takeoutRepository, nil)
+	if err != nil {
+		log.Fatalf("configure takeout rider order operations: %v", err)
+	}
+	riderService, err := takeout.NewRiderService(takeoutRepository, riderOrderOps, nil)
+	if err != nil {
+		log.Fatalf("configure takeout rider service: %v", err)
+	}
+	takeoutAdminQuery, err := takeout.NewAdminQueryService(takeoutRepository)
+	if err != nil {
+		log.Fatalf("configure takeout admin query: %v", err)
+	}
+	withdrawService, err := takeout.NewWithdrawService(takeoutRepository, nil)
+	if err != nil {
+		log.Fatalf("configure takeout withdrawal service: %v", err)
+	}
 	mediaAdminQuery, err := mediaconsole.NewQueryService(mediaconsole.NewQueryRepository(db))
 	if err != nil {
 		log.Fatalf("configure media admin console: %v", err)
@@ -159,6 +190,8 @@ func main() {
 	admin.NewHandler(adminService, reviewService, userService, communityService, tradeService, navigationService).Register(api)
 	mediaAdminRoutes := api.Group("/admin/media", userService.AuthRequired(), user.AdminRequired())
 	mediaconsole.NewHandler(mediaAdminQuery).Register(mediaAdminRoutes)
+	takeoutAdminRoutes := api.Group("/admin/takeout", userService.AuthRequired(), user.AdminRequired())
+	takeoutconsole.NewHandler(merchantService, catalogService, orderService, riderService, takeoutAdminQuery, withdrawService).Register(takeoutAdminRoutes)
 
 	if err := router.Run(cfg.HTTPAddr); err != nil {
 		log.Fatalf("run server: %v", err)
