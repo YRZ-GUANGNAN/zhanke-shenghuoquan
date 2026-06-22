@@ -31,7 +31,7 @@ func NewTencentCOS(secretID, secretKey, bucket, region, appID string) (*TencentC
 	}
 	credential := common.NewCredential(secretID, secretKey)
 	clientProfile := profile.NewClientProfile()
-	stsClient, err := sts.NewClient(credential, "", clientProfile)
+	stsClient, err := sts.NewClient(credential, region, clientProfile)
 	if err != nil {
 		return nil, err
 	}

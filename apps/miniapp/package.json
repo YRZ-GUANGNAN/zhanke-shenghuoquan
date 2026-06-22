@@ -18,7 +18,6 @@
     "@tarojs/taro": "4.2.0",
     "@tarojs/webpack5-runner": "4.2.0",
     "@tencentcloud/chat": "^3.6.6",
-    "cos-wx-sdk-v5": "1.7.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "zustand": "5.0.14"

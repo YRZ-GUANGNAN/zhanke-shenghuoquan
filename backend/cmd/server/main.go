@@ -11,13 +11,16 @@ import (
 	"campus-circle/backend/internal/database"
 	"campus-circle/backend/internal/middleware"
 	"campus-circle/backend/internal/module/admin"
+	"campus-circle/backend/internal/module/admin/mediaconsole"
 	"campus-circle/backend/internal/module/admin/review"
 	"campus-circle/backend/internal/module/community"
 	"campus-circle/backend/internal/module/im"
+	coremedia "campus-circle/backend/internal/module/media"
+	"campus-circle/backend/internal/module/media/miniappflow"
 	"campus-circle/backend/internal/module/navigation"
 	"campus-circle/backend/internal/module/trade"
 	"campus-circle/backend/internal/module/user"
-	"campus-circle/backend/internal/pkg/media"
+	legacymedia "campus-circle/backend/internal/pkg/media"
 	"campus-circle/backend/internal/pkg/response"
 )
 
@@ -37,7 +40,7 @@ func main() {
 		&navigation.Category{}, &navigation.Item{},
 		&im.UserMapping{}, &im.Conversation{},
 		&review.Task{}, &admin.Report{},
-		&media.Asset{}, &media.AssetAudit{},
+		&legacymedia.Asset{}, &legacymedia.AssetAudit{},
 	); err != nil {
 		log.Fatalf("auto migrate: %v", err)
 	}
@@ -45,16 +48,56 @@ func main() {
 	// Composition root: repositories are private to their domain; only services cross boundaries.
 	reviewService := review.NewService(review.NewRepository(db))
 	userService := user.NewService(user.NewRepository(db), cfg.JWTSecret, cfg.WechatAppID, cfg.WechatAppSecret, cfg.AllowMockWechat)
-	cosClient, err := media.NewTencentCOS(cfg.COSSecretID, cfg.COSSecretKey, cfg.COSBucket, cfg.COSRegion, cfg.COSAppID)
+	cosClient, err := legacymedia.NewTencentCOS(cfg.COSSecretID, cfg.COSSecretKey, cfg.COSBucket, cfg.COSRegion, cfg.COSAppID)
 	if err != nil {
 		log.Fatalf("configure Tencent COS: %v", err)
 	}
-	wechatMediaSafety, err := media.NewWechatSafety(cfg.WechatAppID, cfg.WechatAppSecret, cfg.WechatAPIBase)
+	wechatMediaSafety, err := legacymedia.NewWechatSafety(cfg.WechatAppID, cfg.WechatAppSecret, cfg.WechatAPIBase)
 	if err != nil {
 		log.Fatalf("configure WeChat media safety: %v", err)
 	}
-	mediaService := media.NewService(media.NewRepository(db), cosClient, cosClient, wechatMediaSafety, reviewService, cfg.COSBucket, cfg.COSRegion, cfg.MediaPublicBaseURL)
+	mediaService := legacymedia.NewService(legacymedia.NewRepository(db), cosClient, cosClient, wechatMediaSafety, reviewService, cfg.COSBucket, cfg.COSRegion, cfg.MediaPublicBaseURL)
 	reviewService.RegisterTarget(mediaService)
+	mediaRepository := coremedia.NewRepository(db)
+	uploadAuthorizer, err := coremedia.NewTencentUploadAuthorizer(coremedia.TencentUploadAuthorizerConfig{
+		SecretID: cfg.COSSecretID, SecretKey: cfg.COSSecretKey, Bucket: cfg.COSBucket,
+		Region: cfg.COSRegion, AppID: cfg.COSAppID, STSTTL: 15 * time.Minute,
+	})
+	if err != nil {
+		log.Fatalf("configure Module 10 upload authorizer: %v", err)
+	}
+	uploadTickets, err := coremedia.NewUploadTicketService(mediaRepository, uploadAuthorizer, coremedia.UploadTicketServiceConfig{
+		Environment: cfg.AppEnv, TicketTTL: 30 * time.Minute, AuthorizationTTL: 2 * time.Minute,
+		Quota: coremedia.DefaultQuotaPolicy(),
+	})
+	if err != nil {
+		log.Fatalf("configure Module 10 upload tickets: %v", err)
+	}
+	completionStore, err := coremedia.NewTencentCompletionStore(coremedia.TencentCompletionStoreConfig{
+		SecretID: cfg.COSSecretID, SecretKey: cfg.COSSecretKey, Bucket: cfg.COSBucket, Region: cfg.COSRegion,
+	})
+	if err != nil {
+		log.Fatalf("configure Module 10 completion store: %v", err)
+	}
+	completionService, err := coremedia.NewCompletionService(mediaRepository, completionStore, coremedia.CompletionServiceConfig{Environment: cfg.AppEnv})
+	if err != nil {
+		log.Fatalf("configure Module 10 completion service: %v", err)
+	}
+	projectionService, err := coremedia.NewReviewProjectionService(mediaRepository, nil)
+	if err != nil {
+		log.Fatalf("configure Module 10 review projection: %v", err)
+	}
+	mediaConsumer, err := coremedia.NewMediaConsumer(mediaRepository, projectionService, coremedia.MediaConsumerConfig{})
+	if err != nil {
+		log.Fatalf("configure Module 10 media consumer: %v", err)
+	}
+	miniappMedia, err := miniappflow.NewService(
+		uploadTickets, mediaRepository, completionService, coremedia.NewService(mediaRepository),
+		projectionService, mediaRepository, mediaConsumer, miniappflow.NewStatusRepository(db), nil,
+	)
+	if err != nil {
+		log.Fatalf("configure Module 10 miniapp flow: %v", err)
+	}
 	imImporter, err := im.NewTencentRESTClient(cfg.TencentIMSDKAppID, cfg.TencentIMSecret, cfg.TencentIMAdmin, cfg.TencentIMEndpoint)
 	if err != nil {
 		log.Fatalf("configure Tencent IM: %v", err)
@@ -90,6 +133,10 @@ func main() {
 	}()
 	navigationService := navigation.NewService(navigation.NewRepository(db))
 	adminService := admin.NewService(admin.NewRepository(db), reviewService)
+	mediaAdminQuery, err := mediaconsole.NewQueryService(mediaconsole.NewQueryRepository(db))
+	if err != nil {
+		log.Fatalf("configure media admin console: %v", err)
+	}
 	for _, target := range community.NewReviewTargets(communityService) {
 		reviewService.RegisterTarget(target)
 	}
@@ -108,16 +155,22 @@ func main() {
 
 	api := router.Group("/api/v1")
 	user.NewHandler(userService, mediaService).Register(api.Group("/auth"))
-	media.NewHandler(mediaService, cfg.WechatCallbackToken, userService.AuthRequired(), user.UnmutedRequired(), func(c *gin.Context) (uint, string) {
+	legacymedia.NewHandler(mediaService, cfg.WechatCallbackToken, userService.AuthRequired(), user.UnmutedRequired(), func(c *gin.Context) (uint, string) {
 		value := user.CurrentUser(c)
 		return value.ID, value.OpenID
 	}).Register(api.Group("/media"))
+	miniappMediaRoutes := api.Group("/miniapp/media", userService.AuthRequired(), user.UnmutedRequired())
+	miniappflow.NewHandler(miniappMedia, func(c *gin.Context) uint64 {
+		return uint64(user.CurrentUserID(c))
+	}).Register(miniappMediaRoutes)
 	safety := review.NewSafetyClient(cfg)
 	community.NewHandler(communityService, userService, safety).Register(api.Group("/community"))
 	trade.NewHandler(tradeService, userService, safety).Register(api.Group("/trade"))
 	navigation.NewHandler(navigationService).Register(api.Group("/navigation"))
 	im.NewHandler(imService, userService).Register(api.Group("/im"))
 	admin.NewHandler(adminService, reviewService, userService, communityService, tradeService, navigationService).Register(api)
+	mediaAdminRoutes := api.Group("/admin/media", userService.AuthRequired(), user.AdminRequired())
+	mediaconsole.NewHandler(mediaAdminQuery).Register(mediaAdminRoutes)
 
 	if err := router.Run(cfg.HTTPAddr); err != nil {
 		log.Fatalf("run server: %v", err)

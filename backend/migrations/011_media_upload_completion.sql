@@ -1,0 +1,36 @@
+-- P0-4 Module 4: durable Upload Completion processing state.
+-- This table belongs exclusively to the Media Domain and has no A/B/C foreign keys.
+
+CREATE TABLE IF NOT EXISTS media_upload_completions (
+  ticket_id CHAR(26) PRIMARY KEY,
+  asset_id BIGINT UNSIGNED NOT NULL,
+  phase VARCHAR(24) NOT NULL,
+  staging_version_id VARCHAR(128) NULL,
+  staging_etag VARCHAR(128) NULL,
+  staging_last_modified DATETIME(3) NULL,
+  trusted_sha256 CHAR(64) NULL,
+  verified_mime VARCHAR(64) NULL,
+  verified_size BIGINT UNSIGNED NULL,
+  verified_width INT UNSIGNED NULL,
+  verified_height INT UNSIGNED NULL,
+  final_key VARCHAR(512) NULL,
+  final_version_id VARCHAR(128) NULL,
+  final_etag VARCHAR(128) NULL,
+  final_crc64 VARCHAR(64) NULL,
+  lease_token CHAR(26) NULL,
+  lease_expires_at DATETIME(3) NULL,
+  processing_deadline_at DATETIME(3) NOT NULL,
+  validation_attempts INT UNSIGNED NOT NULL DEFAULT 0,
+  promote_attempts INT UNSIGNED NOT NULL DEFAULT 0,
+  last_error_code VARCHAR(64) NOT NULL DEFAULT '',
+  completed_at DATETIME(3) NULL,
+  row_version BIGINT UNSIGNED NOT NULL DEFAULT 1,
+  created_at DATETIME(3) NOT NULL,
+  updated_at DATETIME(3) NOT NULL,
+  CONSTRAINT fk_media_completion_ticket FOREIGN KEY (ticket_id) REFERENCES media_upload_tickets(ticket_id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+  CONSTRAINT fk_media_completion_asset FOREIGN KEY (asset_id) REFERENCES media_assets(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+  CONSTRAINT chk_media_completion_phase CHECK (phase IN ('validating','promoting','final_ready','validation_failed')),
+  UNIQUE INDEX uq_media_completion_asset (asset_id),
+  INDEX idx_media_completion_lease (phase, lease_expires_at, asset_id),
+  INDEX idx_media_completion_deadline (phase, processing_deadline_at, asset_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

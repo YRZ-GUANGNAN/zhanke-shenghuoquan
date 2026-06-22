@@ -1,0 +1,36 @@
+.media-history {
+  padding-bottom: 40px;
+}
+
+.media-history__head,
+.media-history__item {
+  margin-bottom: 16px;
+  padding: 20px;
+}
+
+.media-history__title {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.media-history__meta,
+.media-history__message {
+  display: block;
+  margin-top: 8px;
+  color: #667085;
+  font-size: 24px;
+  word-break: break-all;
+}
+
+.media-history__state {
+  color: #1677ff;
+  font-weight: 600;
+}
+
+.media-history__actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}

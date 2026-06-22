@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { adminAPI } from './services/f-admin'
 import { useAdminStore } from './store'
+import { MediaConsole } from './MediaConsole'
 import type { AdminSection, NavigationCategory, Page, PostRow, ProductRow, ReportRow, ReviewTask, Stats, UserRow } from './types'
 
 const nav:Array<{key:AdminSection;label:string;icon:string}>=[
+	{key:'media',label:'媒体运营',icon:'M'},
 	{key:'dashboard',label:'数据统计',icon:'D'},{key:'users',label:'用户管理',icon:'A'},
 	{key:'moderation',label:'统一审核',icon:'F'},{key:'community',label:'帖子管理',icon:'B'},
 	{key:'trade',label:'商品管理',icon:'C'},{key:'reports',label:'举报审核',icon:'R'},
@@ -27,6 +29,6 @@ function Reports(){const[data,setData]=useState<Page<ReportRow>|null>(null);cons
 
 function Navigation(){const[data,setData]=useState<NavigationCategory[]>([]);const[error,setError]=useState('');useEffect(()=>{adminAPI.navigation().then(setData).catch(e=>setError(String(e)))},[]);if(error)return <ErrorBox message={error}/>;return <Panel title="导航管理（仅 AppID + Path）">{data.map(category=><div key={category.id}><h3>{category.name}</h3><table><thead><tr><th>名称</th><th>AppID</th><th>Path</th><th>状态</th></tr></thead><tbody>{category.items.map(item=><tr key={item.id}><td>{item.title}</td><td>{item.appId}</td><td>{item.path}</td><td>{item.enabled?'enabled':'disabled'}</td></tr>)}</tbody></table></div>)}</Panel>}
 
-function Content(){const section=useAdminStore(s=>s.section);if(section==='dashboard')return <Dashboard/>;if(section==='users')return <Users/>;if(section==='moderation')return <Reviews/>;if(section==='community')return <Posts/>;if(section==='trade')return <Products/>;if(section==='reports')return <Reports/>;return <Navigation/>}
+function Content(){const section=useAdminStore(s=>s.section);if(section==='dashboard')return <Dashboard/>;if(section==='users')return <Users/>;if(section==='moderation')return <Reviews/>;if(section==='media')return <MediaConsole/>;if(section==='community')return <Posts/>;if(section==='trade')return <Products/>;if(section==='reports')return <Reports/>;return <Navigation/>}
 
 export default function App(){const section=useAdminStore(s=>s.section);const setSection=useAdminStore(s=>s.setSection);const active=nav.find(item=>item.key===section);return <div className="app-shell"><aside className="sidebar"><div className="brand"><div className="brand__logo">F</div><div><strong>校园系统</strong><span>收敛管理后台</span></div></div><nav>{nav.map(item=><button key={item.key} type="button" className={section===item.key?'active':''} onClick={()=>setSection(item.key)}><span>{item.icon}</span>{item.label}</button>)}</nav></aside><main className="main"><header className="topbar"><div><span className="eyebrow">业务域 F</span><h1>{active?.label}</h1></div></header><Content/></main></div>}

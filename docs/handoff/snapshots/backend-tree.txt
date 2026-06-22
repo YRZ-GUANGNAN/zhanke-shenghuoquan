@@ -1,0 +1,186 @@
+backend/
+|-- cmd/
+|   `-- server/
+|       `-- main.go
+|-- dumps/
+|-- internal/
+|   |-- app/
+|   |-- config/
+|   |   |-- config.go
+|   |   `-- config_test.go
+|   |-- database/
+|   |   `-- database.go
+|   |-- middleware/
+|   |   `-- cors.go
+|   |-- model/
+|   |-- module/
+|   |   |-- admin/
+|   |   |   |-- mediaconsole/
+|   |   |   |   |-- boundary_test.go
+|   |   |   |   |-- handler.go
+|   |   |   |   |-- handler_test.go
+|   |   |   |   |-- query_mysql_test.go
+|   |   |   |   |-- query_repository.go
+|   |   |   |   |-- query_service.go
+|   |   |   |   |-- query_service_test.go
+|   |   |   |   `-- types.go
+|   |   |   |-- review/
+|   |   |   |   |-- model.go
+|   |   |   |   |-- repository.go
+|   |   |   |   |-- safety.go
+|   |   |   |   |-- service.go
+|   |   |   |   `-- service_test.go
+|   |   |   |-- handler.go
+|   |   |   |-- model.go
+|   |   |   |-- repository.go
+|   |   |   `-- service.go
+|   |   |-- community/
+|   |   |   |-- handler.go
+|   |   |   |-- model.go
+|   |   |   |-- repository.go
+|   |   |   |-- service.go
+|   |   |   `-- service_test.go
+|   |   |-- im/
+|   |   |   |-- external_integration_test.go
+|   |   |   |-- handler.go
+|   |   |   |-- model.go
+|   |   |   |-- repository.go
+|   |   |   |-- service.go
+|   |   |   |-- service_test.go
+|   |   |   |-- tencent.go
+|   |   |   `-- usersig.go
+|   |   |-- media/
+|   |   |   |-- miniappflow/
+|   |   |   |   |-- boundary_test.go
+|   |   |   |   |-- cos_e2e_external_test.go
+|   |   |   |   |-- handler.go
+|   |   |   |   |-- mysql_external_test.go
+|   |   |   |   |-- service.go
+|   |   |   |   |-- service_test.go
+|   |   |   |   |-- status_repository.go
+|   |   |   |   |-- types.go
+|   |   |   |   `-- wechat_server_external_test.go
+|   |   |   |-- completion_cos_external_test.go
+|   |   |   |-- completion_cos_versioning_external_test.go
+|   |   |   |-- completion_mysql_test.go
+|   |   |   |-- completion_repository.go
+|   |   |   |-- completion_service.go
+|   |   |   |-- completion_test.go
+|   |   |   |-- completion_types.go
+|   |   |   |-- consumer_boundary_test.go
+|   |   |   |-- consumer_mysql_test.go
+|   |   |   |-- consumer_repository.go
+|   |   |   |-- consumer_service.go
+|   |   |   |-- consumer_service_test.go
+|   |   |   |-- consumer_state_machine.go
+|   |   |   |-- consumer_state_machine_test.go
+|   |   |   |-- consumer_types.go
+|   |   |   |-- controller.go
+|   |   |   |-- gateway_boundary_test.go
+|   |   |   |-- gateway_repository.go
+|   |   |   |-- gateway_repository_mysql_test.go
+|   |   |   |-- gateway_service.go
+|   |   |   |-- gateway_service_test.go
+|   |   |   |-- gateway_types.go
+|   |   |   |-- gc_boundary_test.go
+|   |   |   |-- gc_cos.go
+|   |   |   |-- gc_cos_external_test.go
+|   |   |   |-- gc_mysql_test.go
+|   |   |   |-- gc_repository.go
+|   |   |   |-- gc_service.go
+|   |   |   |-- gc_service_test.go
+|   |   |   |-- gc_state_machine.go
+|   |   |   |-- gc_state_machine_test.go
+|   |   |   |-- gc_types.go
+|   |   |   |-- model.go
+|   |   |   |-- repository.go
+|   |   |   |-- repository_external_test.go
+|   |   |   |-- review_projection_mysql_test.go
+|   |   |   |-- review_projection_repository.go
+|   |   |   |-- review_projection_service.go
+|   |   |   |-- review_projection_service_test.go
+|   |   |   |-- review_projection_state_machine.go
+|   |   |   |-- review_projection_state_machine_test.go
+|   |   |   |-- review_projection_types.go
+|   |   |   |-- service.go
+|   |   |   |-- service_test.go
+|   |   |   |-- state_machine.go
+|   |   |   |-- state_machine_test.go
+|   |   |   |-- ulid.go
+|   |   |   |-- ulid_test.go
+|   |   |   |-- upload_authorizer.go
+|   |   |   |-- upload_authorizer_external_test.go
+|   |   |   |-- upload_authorizer_test.go
+|   |   |   |-- upload_repository.go
+|   |   |   |-- upload_repository_external_test.go
+|   |   |   |-- upload_service.go
+|   |   |   |-- upload_service_test.go
+|   |   |   `-- upload_types.go
+|   |   |-- navigation/
+|   |   |   |-- handler.go
+|   |   |   |-- model.go
+|   |   |   |-- repository.go
+|   |   |   `-- service.go
+|   |   |-- trade/
+|   |   |   |-- external_integration_test.go
+|   |   |   |-- handler.go
+|   |   |   |-- model.go
+|   |   |   |-- repository.go
+|   |   |   |-- search.go
+|   |   |   |-- service.go
+|   |   |   `-- service_test.go
+|   |   `-- user/
+|   |       |-- handler.go
+|   |       |-- middleware.go
+|   |       |-- model.go
+|   |       |-- repository.go
+|   |       |-- service.go
+|   |       |-- service_test.go
+|   |       `-- token.go
+|   `-- pkg/
+|       |-- media/
+|       |   |-- cos.go
+|       |   |-- external_integration_test.go
+|       |   |-- gate0_cos_acceptance_strict_test.go
+|       |   |-- gate0_cos_acceptance_v11_test.go
+|       |   |-- gate0_cos_external_test.go
+|       |   |-- gate0_cos_multipart_complete_test.go
+|       |   |-- gate0_cos_overwrite_test.go
+|       |   |-- gate0_cos_rejection_test.go
+|       |   |-- handler.go
+|       |   |-- model.go
+|       |   |-- repository.go
+|       |   |-- service.go
+|       |   |-- service_test.go
+|       |   |-- signature.go
+|       |   `-- wechat.go
+|       `-- response/
+|           `-- response.go
+|-- migrations/
+|   |-- rollback/
+|   |   |-- 009_media_domain_v11.sql
+|   |   |-- 010_media_upload_ticket_service.sql
+|   |   |-- 011_media_upload_completion.sql
+|   |   |-- 012_media_review_projection.sql
+|   |   |-- 013_media_consumer.sql
+|   |   `-- 014_media_gc.sql
+|   |-- 001_init.sql
+|   |-- 002_seed_dev.sql
+|   |-- 003_domain_convergence.sql
+|   |-- 004_auth_hardening.sql
+|   |-- 005_community_loop.sql
+|   |-- 006_transaction_closure.sql
+|   |-- 007_media_pipeline.sql
+|   |-- 008_media_dimensions_and_audit.sql
+|   |-- 009_media_domain_v11.sql
+|   |-- 010_media_upload_ticket_service.sql
+|   |-- 011_media_upload_completion.sql
+|   |-- 012_media_review_projection.sql
+|   |-- 013_media_consumer.sql
+|   `-- 014_media_gc.sql
+|-- .env.example
+|-- Dockerfile
+|-- go.mod
+|-- go.sum
+|-- media
+`-- user

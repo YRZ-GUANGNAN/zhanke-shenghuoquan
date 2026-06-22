@@ -3,7 +3,7 @@ const path = require('node:path')
 
 const root = path.resolve(__dirname, '..')
 const moduleRoot = path.join(root, 'backend', 'internal', 'module')
-const allowedDomains = new Set(['user', 'community', 'trade', 'navigation', 'im', 'admin'])
+const allowedDomains = new Set(['user', 'community', 'trade', 'navigation', 'im', 'admin', 'media'])
 const failures = []
 
 for (const entry of fs.readdirSync(moduleRoot, { withFileTypes: true })) {
@@ -20,7 +20,9 @@ function files(dir) {
 for (const file of files(moduleRoot).filter((file) => file.endsWith('.go'))) {
   const source = fs.readFileSync(file, 'utf8')
   const name = path.basename(file)
-  if ((source.includes('*gorm.DB') || source.includes('.WithContext(')) && name !== 'repository.go') {
+  const repositoryFile = name === 'repository.go' || name.endsWith('_repository.go')
+  const testFile = name.endsWith('_test.go')
+  if ((source.includes('*gorm.DB') || source.includes('.WithContext(')) && !repositoryFile && !testFile) {
     failures.push(`database access outside repository: ${path.relative(root, file)}`)
   }
 }
@@ -38,5 +40,5 @@ if (failures.length) {
   console.error(failures.map((item) => `boundary error: ${item}`).join('\n'))
   process.exitCode = 1
 } else {
-  console.log('ok A-F module boundaries')
+  console.log('ok A-F boundaries plus isolated P0-4 media domain')
 }

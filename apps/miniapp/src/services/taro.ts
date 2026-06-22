@@ -37,6 +37,7 @@ interface TaroFacade {
   getImageInfo(options: { src: string }): Promise<{ width: number; height: number; type: string; path: string }>
   compressImage(options: { src: string; quality: number; compressedWidth?: number; compressedHeight?: number; format?: 'webp' }): Promise<{ tempFilePath: string }>
   getFileInfo(options: { filePath: string; digestAlgorithm?: 'md5' | 'sha1' }): Promise<{ size: number; digest: string }>
+  getFileSystemManager(): { readFileSync(filePath: string): ArrayBuffer | ArrayBufferView | string }
 }
 
 export default TaroRuntime as unknown as TaroFacade
