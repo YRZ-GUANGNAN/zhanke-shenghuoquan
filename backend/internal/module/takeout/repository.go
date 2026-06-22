@@ -537,3 +537,301 @@ func (r *GormRepository) MarkSettled(
 	})
 	return result, err
 }
+
+// G-5 Rider methods extend the same Repository boundary without changing any
+// G-1/G-2/G-3 method or behavior.
+func (r *GormRepository) CreateRider(ctx context.Context, value *Rider) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return tx.Create(value).Error
+	})
+}
+
+func (r *GormRepository) FindRider(ctx context.Context, riderUserID uint64) (Rider, error) {
+	var value Rider
+	err := r.db.WithContext(ctx).Where("rider_user_id = ?", riderUserID).First(&value).Error
+	return value, normalizeNotFound(err)
+}
+
+func (r *GormRepository) TransitionRiderStatus(
+	ctx context.Context,
+	riderUserID, expectedRowVersion uint64,
+	from, to RiderStatus,
+	updatedAt time.Time,
+) (Rider, error) {
+	var result Rider
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("rider_user_id = ?", riderUserID).First(&result).Error; err != nil {
+			return normalizeNotFound(err)
+		}
+		if result.Status == to {
+			return nil
+		}
+		update := tx.Model(&Rider{}).
+			Where("id = ? AND row_version = ? AND status = ?", result.ID, expectedRowVersion, from).
+			Updates(map[string]any{
+				"status": to, "updated_at": updatedAt,
+				"row_version": gorm.Expr("row_version + 1"),
+			})
+		if update.Error != nil {
+			return update.Error
+		}
+		if update.RowsAffected != 1 {
+			return ErrConcurrentUpdate
+		}
+		result.Status = to
+		result.RowVersion++
+		result.UpdatedAt = updatedAt
+		return nil
+	})
+	return result, err
+}
+
+func (r *GormRepository) GetRiderConfig(ctx context.Context) (RiderConfig, error) {
+	var value RiderConfig
+	err := r.db.WithContext(ctx).Where("config_scope = ?", "global").First(&value).Error
+	if err != nil {
+		return value, normalizeNotFound(err)
+	}
+	if !value.Valid() {
+		return RiderConfig{}, ErrInvalidRecord
+	}
+	return value, nil
+}
+
+func (r *GormRepository) UpdateRiderConfig(
+	ctx context.Context,
+	maxInFlight uint32,
+	expectedRowVersion uint64,
+	updatedAt time.Time,
+) (RiderConfig, error) {
+	var result RiderConfig
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("config_scope = ?", "global").First(&result).Error; err != nil {
+			return normalizeNotFound(err)
+		}
+		if result.MaxInFlightPerRider == maxInFlight {
+			return nil
+		}
+		update := tx.Model(&RiderConfig{}).
+			Where("id = ? AND config_scope = ? AND row_version = ?", result.ID, "global", expectedRowVersion).
+			Updates(map[string]any{
+				"max_in_flight_per_rider": maxInFlight, "updated_at": updatedAt,
+				"row_version": gorm.Expr("row_version + 1"),
+			})
+		if update.Error != nil {
+			return update.Error
+		}
+		if update.RowsAffected != 1 {
+			return ErrConcurrentUpdate
+		}
+		result.MaxInFlightPerRider = maxInFlight
+		result.RowVersion++
+		result.UpdatedAt = updatedAt
+		return nil
+	})
+	return result, err
+}
+
+func (r *GormRepository) ListOrdersByStatus(ctx context.Context, status OrderStatus) ([]Order, error) {
+	var values []Order
+	err := r.db.WithContext(ctx).Where("status = ?", status).Order("created_at ASC, id ASC").Find(&values).Error
+	return values, err
+}
+
+func (r *GormRepository) ClaimOrder(
+	ctx context.Context,
+	riderUserID uint64,
+	orderPublicID string,
+	expectedOrderRowVersion uint64,
+	fulfillmentPublicID string,
+	orderOps RiderOrderOps,
+	createdAt time.Time,
+) (Fulfillment, error) {
+	var result Fulfillment
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var rider Rider
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("rider_user_id = ?", riderUserID).First(&rider).Error; err != nil {
+			return normalizeNotFound(err)
+		}
+
+		var existing Fulfillment
+		existingErr := tx.Where("order_public_id = ?", orderPublicID).First(&existing).Error
+		switch {
+		case existingErr == nil:
+			if existing.RiderUserID != riderUserID {
+				return ErrOrderAlreadyClaimed
+			}
+			result = existing
+			return nil
+		case !errors.Is(existingErr, gorm.ErrRecordNotFound):
+			return existingErr
+		}
+		if rider.Status != RiderActive {
+			return ErrRiderUnavailable
+		}
+
+		var config RiderConfig
+		if err := tx.Where("config_scope = ?", "global").First(&config).Error; err != nil {
+			return normalizeNotFound(err)
+		}
+		if !config.Valid() {
+			return ErrInvalidRecord
+		}
+		var inFlight int64
+		if err := tx.Model(&Fulfillment{}).
+			Where("rider_user_id = ? AND status <> ?", riderUserID, FulfillmentDelivered).
+			Count(&inFlight).Error; err != nil {
+			return err
+		}
+		if uint64(inFlight) >= uint64(config.MaxInFlightPerRider) {
+			return ErrInFlightLimit
+		}
+
+		txRepository := NewRepository(tx)
+		if _, err := orderOps.StartDelivering(ctx, txRepository, orderPublicID, expectedOrderRowVersion, riderUserID); err != nil {
+			if errors.Is(err, ErrConcurrentUpdate) || errors.Is(err, ErrInvalidRecord) {
+				return ErrOrderAlreadyClaimed
+			}
+			return err
+		}
+		result = Fulfillment{
+			FulfillmentPublicID: fulfillmentPublicID, OrderPublicID: orderPublicID, RiderUserID: riderUserID,
+			Status: FulfillmentAssigned, AssignedAt: &createdAt, RowVersion: 1,
+			CreatedAt: createdAt, UpdatedAt: createdAt,
+		}
+		if err := result.ValidateNew(); err != nil {
+			return err
+		}
+		if err := tx.Create(&result).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	return result, err
+}
+
+func (r *GormRepository) TransitionFulfillmentStatus(
+	ctx context.Context,
+	fulfillmentPublicID string,
+	expectedRowVersion uint64,
+	from, to FulfillmentStatus,
+	updatedAt time.Time,
+) (Fulfillment, error) {
+	if !CanTransitionFulfillment(from, to) || to == FulfillmentDelivered {
+		return Fulfillment{}, ErrInvalidTransition
+	}
+	var result Fulfillment
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("fulfillment_public_id = ?", fulfillmentPublicID).First(&result).Error; err != nil {
+			return normalizeNotFound(err)
+		}
+		if result.Status == to {
+			return nil
+		}
+		updates, err := fulfillmentTransitionUpdates(to, updatedAt)
+		if err != nil {
+			return err
+		}
+		updates["status"] = to
+		updates["updated_at"] = updatedAt
+		updates["row_version"] = gorm.Expr("row_version + 1")
+		update := tx.Model(&Fulfillment{}).
+			Where("id = ? AND row_version = ? AND status = ?", result.ID, expectedRowVersion, from).
+			Updates(updates)
+		if update.Error != nil {
+			return update.Error
+		}
+		if update.RowsAffected != 1 {
+			return ErrConcurrentUpdate
+		}
+		applyFulfillmentTransition(&result, to, updatedAt)
+		result.RowVersion++
+		result.UpdatedAt = updatedAt
+		return nil
+	})
+	return result, err
+}
+
+func fulfillmentTransitionUpdates(to FulfillmentStatus, at time.Time) (map[string]any, error) {
+	switch to {
+	case FulfillmentToStore:
+		return map[string]any{"to_store_at": at}, nil
+	case FulfillmentPicked:
+		return map[string]any{"picked_at": at}, nil
+	case FulfillmentToUser:
+		return map[string]any{"to_user_at": at}, nil
+	case FulfillmentDelivered:
+		return map[string]any{"delivered_at": at}, nil
+	default:
+		return nil, ErrInvalidTransition
+	}
+}
+
+func applyFulfillmentTransition(value *Fulfillment, to FulfillmentStatus, at time.Time) {
+	value.Status = to
+	switch to {
+	case FulfillmentToStore:
+		value.ToStoreAt = &at
+	case FulfillmentPicked:
+		value.PickedAt = &at
+	case FulfillmentToUser:
+		value.ToUserAt = &at
+	case FulfillmentDelivered:
+		value.DeliveredAt = &at
+	}
+}
+
+func (r *GormRepository) CompleteFulfillment(
+	ctx context.Context,
+	fulfillmentPublicID string,
+	expectedRowVersion uint64,
+	orderOps RiderOrderOps,
+	updatedAt time.Time,
+) (Fulfillment, error) {
+	var result Fulfillment
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("fulfillment_public_id = ?", fulfillmentPublicID).First(&result).Error; err != nil {
+			return normalizeNotFound(err)
+		}
+		txRepository := NewRepository(tx)
+		if result.Status == FulfillmentDelivered {
+			_, err := orderOps.CompleteDelivery(ctx, txRepository, result.OrderPublicID)
+			return err
+		}
+		updates, err := fulfillmentTransitionUpdates(FulfillmentDelivered, updatedAt)
+		if err != nil {
+			return err
+		}
+		updates["status"] = FulfillmentDelivered
+		updates["updated_at"] = updatedAt
+		updates["row_version"] = gorm.Expr("row_version + 1")
+		update := tx.Model(&Fulfillment{}).
+			Where("id = ? AND row_version = ? AND status = ?", result.ID, expectedRowVersion, FulfillmentToUser).
+			Updates(updates)
+		if update.Error != nil {
+			return update.Error
+		}
+		if update.RowsAffected != 1 {
+			return ErrConcurrentUpdate
+		}
+		if _, err := orderOps.CompleteDelivery(ctx, txRepository, result.OrderPublicID); err != nil {
+			return err
+		}
+		applyFulfillmentTransition(&result, FulfillmentDelivered, updatedAt)
+		result.RowVersion++
+		result.UpdatedAt = updatedAt
+		return nil
+	})
+	return result, err
+}
+
+func (r *GormRepository) FindFulfillmentByOrder(ctx context.Context, orderPublicID string) (Fulfillment, error) {
+	var value Fulfillment
+	err := r.db.WithContext(ctx).Where("order_public_id = ?", orderPublicID).First(&value).Error
+	return value, normalizeNotFound(err)
+}
