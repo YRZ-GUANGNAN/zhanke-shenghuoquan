@@ -1,0 +1,1087 @@
+{
+  "generated_at": "2026-06-22",
+  "migrated_shape": "fresh MySQL 8.4 with migrations 001-015",
+  "production_shape": "current real MySQL 8.4 after 015",
+  "difference_count": 68,
+  "differences": [
+    {
+      "key": "column|comments|post_id",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "comments",
+        "name": "post_id",
+        "column_type": "bigint unsigned",
+        "nullable": "NO"
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "comments",
+        "name": "post_id",
+        "column_type": "bigint unsigned",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|comments|user_id",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "comments",
+        "name": "user_id",
+        "column_type": "bigint unsigned",
+        "nullable": "NO"
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "comments",
+        "name": "user_id",
+        "column_type": "bigint unsigned",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|navigation_categories|name",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "navigation_categories",
+        "name": "name",
+        "column_type": "varchar(64)",
+        "nullable": "NO",
+        "default": ""
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "navigation_categories",
+        "name": "name",
+        "column_type": "varchar(64)",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|navigation_categories|sort",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "navigation_categories",
+        "name": "sort",
+        "column_type": "bigint",
+        "nullable": "NO",
+        "default": "0"
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "navigation_categories",
+        "name": "sort",
+        "column_type": "bigint",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|navigation_items|color",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "navigation_items",
+        "name": "color",
+        "column_type": "varchar(24)",
+        "nullable": "NO",
+        "default": ""
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "navigation_items",
+        "name": "color",
+        "column_type": "varchar(24)",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|navigation_items|icon_text",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "navigation_items",
+        "name": "icon_text",
+        "column_type": "varchar(12)",
+        "nullable": "NO",
+        "default": ""
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "navigation_items",
+        "name": "icon_text",
+        "column_type": "varchar(12)",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|navigation_items|sort",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "navigation_items",
+        "name": "sort",
+        "column_type": "bigint",
+        "nullable": "NO",
+        "default": "0"
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "navigation_items",
+        "name": "sort",
+        "column_type": "bigint",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|navigation_items|subtitle",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "navigation_items",
+        "name": "subtitle",
+        "column_type": "varchar(120)",
+        "nullable": "NO",
+        "default": ""
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "navigation_items",
+        "name": "subtitle",
+        "column_type": "varchar(120)",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|navigation_items|title",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "navigation_items",
+        "name": "title",
+        "column_type": "varchar(64)",
+        "nullable": "NO",
+        "default": ""
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "navigation_items",
+        "name": "title",
+        "column_type": "varchar(64)",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|notifications|comment_id",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "notifications",
+        "name": "comment_id",
+        "column_type": "bigint unsigned",
+        "nullable": "NO",
+        "default": "0"
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "notifications",
+        "name": "comment_id",
+        "column_type": "bigint unsigned",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|notifications|post_id",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "notifications",
+        "name": "post_id",
+        "column_type": "bigint unsigned",
+        "nullable": "NO",
+        "default": "0"
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "notifications",
+        "name": "post_id",
+        "column_type": "bigint unsigned",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|post_images|sort",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "post_images",
+        "name": "sort",
+        "column_type": "bigint",
+        "nullable": "NO",
+        "default": "0"
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "post_images",
+        "name": "sort",
+        "column_type": "bigint",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|post_images|url",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "post_images",
+        "name": "url",
+        "column_type": "varchar(512)",
+        "nullable": "NO",
+        "default": ""
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "post_images",
+        "name": "url",
+        "column_type": "varchar(512)",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|posts|comment_count",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "posts",
+        "name": "comment_count",
+        "column_type": "bigint",
+        "nullable": "NO",
+        "default": "0"
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "posts",
+        "name": "comment_count",
+        "column_type": "bigint",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|posts|favorite_count",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "posts",
+        "name": "favorite_count",
+        "column_type": "bigint",
+        "nullable": "NO",
+        "default": "0"
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "posts",
+        "name": "favorite_count",
+        "column_type": "bigint",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|posts|liked_count",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "posts",
+        "name": "liked_count",
+        "column_type": "bigint",
+        "nullable": "NO",
+        "default": "0"
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "posts",
+        "name": "liked_count",
+        "column_type": "bigint",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|posts|pinned",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "posts",
+        "name": "pinned",
+        "column_type": "tinyint(1)",
+        "nullable": "NO",
+        "default": "0"
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "posts",
+        "name": "pinned",
+        "column_type": "tinyint(1)",
+        "nullable": "YES",
+        "default": "0"
+      }
+    },
+    {
+      "key": "column|posts|title",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "posts",
+        "name": "title",
+        "column_type": "varchar(120)",
+        "nullable": "NO",
+        "default": ""
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "posts",
+        "name": "title",
+        "column_type": "varchar(120)",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|posts|topic",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "posts",
+        "name": "topic",
+        "column_type": "varchar(64)",
+        "nullable": "NO",
+        "default": ""
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "posts",
+        "name": "topic",
+        "column_type": "varchar(64)",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|posts|user_id",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "posts",
+        "name": "user_id",
+        "column_type": "bigint unsigned",
+        "nullable": "NO"
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "posts",
+        "name": "user_id",
+        "column_type": "bigint unsigned",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|product_images|sort",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "product_images",
+        "name": "sort",
+        "column_type": "bigint",
+        "nullable": "NO",
+        "default": "0"
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "product_images",
+        "name": "sort",
+        "column_type": "bigint",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|product_images|url",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "product_images",
+        "name": "url",
+        "column_type": "varchar(512)",
+        "nullable": "NO",
+        "default": ""
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "product_images",
+        "name": "url",
+        "column_type": "varchar(512)",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|products|campus",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "products",
+        "name": "campus",
+        "column_type": "varchar(80)",
+        "nullable": "NO",
+        "default": ""
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "products",
+        "name": "campus",
+        "column_type": "varchar(80)",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|products|category",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "products",
+        "name": "category",
+        "column_type": "varchar(64)",
+        "nullable": "NO",
+        "default": ""
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "products",
+        "name": "category",
+        "column_type": "varchar(64)",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|products|condition_label",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "products",
+        "name": "condition_label",
+        "column_type": "varchar(64)",
+        "nullable": "NO",
+        "default": ""
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "products",
+        "name": "condition_label",
+        "column_type": "varchar(64)",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|products|favorite_count",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "products",
+        "name": "favorite_count",
+        "column_type": "bigint",
+        "nullable": "NO",
+        "default": "0"
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "products",
+        "name": "favorite_count",
+        "column_type": "bigint",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|products|original_price",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "products",
+        "name": "original_price",
+        "column_type": "bigint",
+        "nullable": "NO",
+        "default": "0"
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "products",
+        "name": "original_price",
+        "column_type": "bigint",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|products|price",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "products",
+        "name": "price",
+        "column_type": "bigint",
+        "nullable": "NO",
+        "default": "0"
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "products",
+        "name": "price",
+        "column_type": "bigint",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|products|seller_id",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "products",
+        "name": "seller_id",
+        "column_type": "bigint unsigned",
+        "nullable": "NO"
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "products",
+        "name": "seller_id",
+        "column_type": "bigint unsigned",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|products|status",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "products",
+        "name": "status",
+        "column_type": "varchar(24)",
+        "nullable": "NO",
+        "default": "selling"
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "products",
+        "name": "status",
+        "column_type": "varchar(24)",
+        "nullable": "YES",
+        "default": "selling"
+      }
+    },
+    {
+      "key": "column|products|title",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "products",
+        "name": "title",
+        "column_type": "varchar(160)",
+        "nullable": "NO",
+        "default": ""
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "products",
+        "name": "title",
+        "column_type": "varchar(160)",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|review_tasks|operator_id",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "review_tasks",
+        "name": "operator_id",
+        "column_type": "bigint unsigned",
+        "nullable": "NO",
+        "default": "0"
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "review_tasks",
+        "name": "operator_id",
+        "column_type": "bigint unsigned",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|review_tasks|reason",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "review_tasks",
+        "name": "reason",
+        "column_type": "varchar(240)",
+        "nullable": "NO",
+        "default": ""
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "review_tasks",
+        "name": "reason",
+        "column_type": "varchar(240)",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|review_tasks|risk",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "review_tasks",
+        "name": "risk",
+        "column_type": "varchar(240)",
+        "nullable": "NO",
+        "default": ""
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "review_tasks",
+        "name": "risk",
+        "column_type": "varchar(240)",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|review_tasks|submitter_id",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "review_tasks",
+        "name": "submitter_id",
+        "column_type": "bigint unsigned",
+        "nullable": "NO",
+        "default": "0"
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "review_tasks",
+        "name": "submitter_id",
+        "column_type": "bigint unsigned",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|trade_search_outbox|last_error",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "trade_search_outbox",
+        "name": "last_error",
+        "column_type": "varchar(512)",
+        "nullable": "NO",
+        "default": ""
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "trade_search_outbox",
+        "name": "last_error",
+        "column_type": "varchar(512)",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|users|avatar",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "users",
+        "name": "avatar",
+        "column_type": "varchar(512)",
+        "nullable": "NO",
+        "default": ""
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "users",
+        "name": "avatar",
+        "column_type": "varchar(512)",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|users|campus",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "users",
+        "name": "campus",
+        "column_type": "varchar(80)",
+        "nullable": "NO",
+        "default": ""
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "users",
+        "name": "campus",
+        "column_type": "varchar(80)",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|users|nickname",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "users",
+        "name": "nickname",
+        "column_type": "varchar(64)",
+        "nullable": "NO",
+        "default": ""
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "users",
+        "name": "nickname",
+        "column_type": "varchar(64)",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|users|open_id",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "users",
+        "name": "open_id",
+        "column_type": "varchar(96)",
+        "nullable": "NO"
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "users",
+        "name": "open_id",
+        "column_type": "varchar(96)",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|users|role",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "users",
+        "name": "role",
+        "column_type": "varchar(24)",
+        "nullable": "NO",
+        "default": "user"
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "users",
+        "name": "role",
+        "column_type": "varchar(24)",
+        "nullable": "YES",
+        "default": "user"
+      }
+    },
+    {
+      "key": "column|users|school",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "users",
+        "name": "school",
+        "column_type": "varchar(80)",
+        "nullable": "NO",
+        "default": ""
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "users",
+        "name": "school",
+        "column_type": "varchar(80)",
+        "nullable": "YES"
+      }
+    },
+    {
+      "key": "column|users|status",
+      "migrated_shape_x": {
+        "kind": "column",
+        "table": "users",
+        "name": "status",
+        "column_type": "varchar(24)",
+        "nullable": "NO",
+        "default": "active"
+      },
+      "production_shape_y": {
+        "kind": "column",
+        "table": "users",
+        "name": "status",
+        "column_type": "varchar(24)",
+        "nullable": "YES",
+        "default": "active"
+      }
+    },
+    {
+      "key": "foreign_key|comments|fk_comments_user",
+      "migrated_shape_x": null,
+      "production_shape_y": {
+        "kind": "foreign_key",
+        "table": "comments",
+        "name": "fk_comments_user",
+        "columns": "user_id",
+        "referenced_table": "users",
+        "referenced_columns": "id",
+        "update_rule": "NO ACTION",
+        "delete_rule": "NO ACTION"
+      }
+    },
+    {
+      "key": "foreign_key|navigation_items|fk_navigation_categories_items",
+      "migrated_shape_x": null,
+      "production_shape_y": {
+        "kind": "foreign_key",
+        "table": "navigation_items",
+        "name": "fk_navigation_categories_items",
+        "columns": "category_id",
+        "referenced_table": "navigation_categories",
+        "referenced_columns": "id",
+        "update_rule": "NO ACTION",
+        "delete_rule": "NO ACTION"
+      }
+    },
+    {
+      "key": "foreign_key|post_images|fk_posts_images",
+      "migrated_shape_x": null,
+      "production_shape_y": {
+        "kind": "foreign_key",
+        "table": "post_images",
+        "name": "fk_posts_images",
+        "columns": "post_id",
+        "referenced_table": "posts",
+        "referenced_columns": "id",
+        "update_rule": "NO ACTION",
+        "delete_rule": "NO ACTION"
+      }
+    },
+    {
+      "key": "foreign_key|posts|fk_posts_user",
+      "migrated_shape_x": null,
+      "production_shape_y": {
+        "kind": "foreign_key",
+        "table": "posts",
+        "name": "fk_posts_user",
+        "columns": "user_id",
+        "referenced_table": "users",
+        "referenced_columns": "id",
+        "update_rule": "NO ACTION",
+        "delete_rule": "NO ACTION"
+      }
+    },
+    {
+      "key": "foreign_key|product_images|fk_products_images",
+      "migrated_shape_x": null,
+      "production_shape_y": {
+        "kind": "foreign_key",
+        "table": "product_images",
+        "name": "fk_products_images",
+        "columns": "product_id",
+        "referenced_table": "products",
+        "referenced_columns": "id",
+        "update_rule": "NO ACTION",
+        "delete_rule": "NO ACTION"
+      }
+    },
+    {
+      "key": "foreign_key|products|fk_products_seller",
+      "migrated_shape_x": null,
+      "production_shape_y": {
+        "kind": "foreign_key",
+        "table": "products",
+        "name": "fk_products_seller",
+        "columns": "seller_id",
+        "referenced_table": "users",
+        "referenced_columns": "id",
+        "update_rule": "NO ACTION",
+        "delete_rule": "NO ACTION"
+      }
+    },
+    {
+      "key": "index|im_conversations|idx_im_conversations_buyer_id",
+      "migrated_shape_x": null,
+      "production_shape_y": {
+        "kind": "index",
+        "table": "im_conversations",
+        "name": "idx_im_conversations_buyer_id",
+        "index_type": "BTREE",
+        "non_unique": 1,
+        "columns": "buyer_id"
+      }
+    },
+    {
+      "key": "index|im_conversations|idx_im_conversations_conversation_id",
+      "migrated_shape_x": null,
+      "production_shape_y": {
+        "kind": "index",
+        "table": "im_conversations",
+        "name": "idx_im_conversations_conversation_id",
+        "index_type": "BTREE",
+        "non_unique": 1,
+        "columns": "conversation_id"
+      }
+    },
+    {
+      "key": "index|im_conversations|idx_im_conversations_seller_id",
+      "migrated_shape_x": null,
+      "production_shape_y": {
+        "kind": "index",
+        "table": "im_conversations",
+        "name": "idx_im_conversations_seller_id",
+        "index_type": "BTREE",
+        "non_unique": 1,
+        "columns": "seller_id"
+      }
+    },
+    {
+      "key": "index|im_user_mappings|idx_im_user_mappings_im_user_id",
+      "migrated_shape_x": null,
+      "production_shape_y": {
+        "kind": "index",
+        "table": "im_user_mappings",
+        "name": "idx_im_user_mappings_im_user_id",
+        "index_type": "BTREE",
+        "columns": "im_user_id"
+      }
+    },
+    {
+      "key": "index|im_user_mappings|idx_im_user_mappings_user_id",
+      "migrated_shape_x": null,
+      "production_shape_y": {
+        "kind": "index",
+        "table": "im_user_mappings",
+        "name": "idx_im_user_mappings_user_id",
+        "index_type": "BTREE",
+        "columns": "user_id"
+      }
+    },
+    {
+      "key": "index|im_user_mappings|im_user_id",
+      "migrated_shape_x": {
+        "kind": "index",
+        "table": "im_user_mappings",
+        "name": "im_user_id",
+        "index_type": "BTREE",
+        "columns": "im_user_id"
+      },
+      "production_shape_y": null
+    },
+    {
+      "key": "index|im_user_mappings|user_id",
+      "migrated_shape_x": {
+        "kind": "index",
+        "table": "im_user_mappings",
+        "name": "user_id",
+        "index_type": "BTREE",
+        "columns": "user_id"
+      },
+      "production_shape_y": null
+    },
+    {
+      "key": "index|notifications|idx_notifications_actor_id",
+      "migrated_shape_x": null,
+      "production_shape_y": {
+        "kind": "index",
+        "table": "notifications",
+        "name": "idx_notifications_actor_id",
+        "index_type": "BTREE",
+        "non_unique": 1,
+        "columns": "actor_id"
+      }
+    },
+    {
+      "key": "index|notifications|idx_notifications_post_id",
+      "migrated_shape_x": null,
+      "production_shape_y": {
+        "kind": "index",
+        "table": "notifications",
+        "name": "idx_notifications_post_id",
+        "index_type": "BTREE",
+        "non_unique": 1,
+        "columns": "post_id"
+      }
+    },
+    {
+      "key": "index|notifications|idx_notifications_read_at",
+      "migrated_shape_x": null,
+      "production_shape_y": {
+        "kind": "index",
+        "table": "notifications",
+        "name": "idx_notifications_read_at",
+        "index_type": "BTREE",
+        "non_unique": 1,
+        "columns": "read_at"
+      }
+    },
+    {
+      "key": "index|notifications|idx_notifications_recipient_id",
+      "migrated_shape_x": null,
+      "production_shape_y": {
+        "kind": "index",
+        "table": "notifications",
+        "name": "idx_notifications_recipient_id",
+        "index_type": "BTREE",
+        "non_unique": 1,
+        "columns": "recipient_id"
+      }
+    },
+    {
+      "key": "index|notifications|idx_notifications_type",
+      "migrated_shape_x": null,
+      "production_shape_y": {
+        "kind": "index",
+        "table": "notifications",
+        "name": "idx_notifications_type",
+        "index_type": "BTREE",
+        "non_unique": 1,
+        "columns": "type"
+      }
+    },
+    {
+      "key": "index|products|idx_products_campus",
+      "migrated_shape_x": null,
+      "production_shape_y": {
+        "kind": "index",
+        "table": "products",
+        "name": "idx_products_campus",
+        "index_type": "BTREE",
+        "non_unique": 1,
+        "columns": "campus"
+      }
+    },
+    {
+      "key": "index|review_tasks|idx_review_tasks_operator_id",
+      "migrated_shape_x": null,
+      "production_shape_y": {
+        "kind": "index",
+        "table": "review_tasks",
+        "name": "idx_review_tasks_operator_id",
+        "index_type": "BTREE",
+        "non_unique": 1,
+        "columns": "operator_id"
+      }
+    },
+    {
+      "key": "index|trade_search_outbox|idx_trade_search_outbox_available_at",
+      "migrated_shape_x": null,
+      "production_shape_y": {
+        "kind": "index",
+        "table": "trade_search_outbox",
+        "name": "idx_trade_search_outbox_available_at",
+        "index_type": "BTREE",
+        "non_unique": 1,
+        "columns": "available_at"
+      }
+    },
+    {
+      "key": "index|trade_search_outbox|idx_trade_search_outbox_processed_at",
+      "migrated_shape_x": null,
+      "production_shape_y": {
+        "kind": "index",
+        "table": "trade_search_outbox",
+        "name": "idx_trade_search_outbox_processed_at",
+        "index_type": "BTREE",
+        "non_unique": 1,
+        "columns": "processed_at"
+      }
+    },
+    {
+      "key": "index|trade_search_outbox|idx_trade_search_outbox_product_id",
+      "migrated_shape_x": null,
+      "production_shape_y": {
+        "kind": "index",
+        "table": "trade_search_outbox",
+        "name": "idx_trade_search_outbox_product_id",
+        "index_type": "BTREE",
+        "non_unique": 1,
+        "columns": "product_id"
+      }
+    },
+    {
+      "key": "index|users|idx_users_open_id",
+      "migrated_shape_x": null,
+      "production_shape_y": {
+        "kind": "index",
+        "table": "users",
+        "name": "idx_users_open_id",
+        "index_type": "BTREE",
+        "columns": "open_id"
+      }
+    },
+    {
+      "key": "index|users|open_id",
+      "migrated_shape_x": {
+        "kind": "index",
+        "table": "users",
+        "name": "open_id",
+        "index_type": "BTREE",
+        "columns": "open_id"
+      },
+      "production_shape_y": null
+    }
+  ]
+}

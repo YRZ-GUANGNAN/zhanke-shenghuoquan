@@ -33,20 +33,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("open database: %v", err)
 	}
-	if err := db.AutoMigrate(
-		&user.User{},
-		&community.Post{}, &community.PostImage{}, &community.Comment{}, &community.PostLike{}, &community.PostFavorite{}, &community.UserFollow{}, &community.Notification{},
-		&trade.Product{}, &trade.ProductImage{}, &trade.ProductFavorite{}, &trade.SearchOutbox{},
-		&navigation.Category{}, &navigation.Item{},
-		&im.UserMapping{}, &im.Conversation{},
-		&review.Task{}, &admin.Report{},
-		// media_assets is migration-owned (007-015). Registering the legacy
-		// Asset model here reintroduces the pre-v1.1 schema on every startup.
-		&legacymedia.AssetAudit{},
-	); err != nil {
-		log.Fatalf("auto migrate: %v", err)
-	}
-
 	// Composition root: repositories are private to their domain; only services cross boundaries.
 	reviewService := review.NewService(review.NewRepository(db))
 	userService := user.NewService(user.NewRepository(db), cfg.JWTSecret, cfg.WechatAppID, cfg.WechatAppSecret, cfg.AllowMockWechat)
