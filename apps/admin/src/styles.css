@@ -579,3 +579,44 @@ td span {
 @media (max-width: 900px) {
   .media-summary, .detail-grid { grid-template-columns: 1fr 1fr; }
 }
+
+.takeout-console { display: grid; gap: 18px; }
+.takeout-tabs { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; }
+.takeout-tabs button, .takeout-subtabs button { padding: 9px 13px; border: 1px solid transparent; border-radius: 7px; background: #eef2f7; color: #526174; }
+.takeout-tabs button.active, .takeout-subtabs button.active { border-color: #1677ff; background: #edf5ff; color: #1677ff; font-weight: 700; }
+.takeout-panel { position: relative; overflow: hidden; }
+.takeout-header { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 16px; }
+.takeout-controls, .takeout-subtabs, .takeout-row-actions, .takeout-actions { display: flex; align-items: end; flex-wrap: wrap; gap: 9px; }
+.takeout-controls label, .takeout-form label { display: grid; gap: 5px; color: #64748b; font-size: 12px; }
+.takeout-controls input, .takeout-controls select, .takeout-form input { min-width: 150px; padding: 8px 10px; border: 1px solid #dbe3ee; border-radius: 7px; background: #fff; color: #243044; }
+.takeout-controls button, .takeout-row-actions button, .takeout-actions button, .takeout-form button, .takeout-notice button, .takeout-detail button { padding: 8px 12px; border: 0; border-radius: 7px; background: #1677ff; color: #fff; }
+.takeout-controls button.secondary, .takeout-form button.secondary, .takeout-detail header button { background: #eef2f7; color: #475569; }
+.takeout-row-actions button.danger, .takeout-actions button.danger { background: #fff1f1; color: #c2410c; }
+.takeout-controls button:disabled, .takeout-row-actions button:disabled, .takeout-actions button:disabled, .takeout-form button:disabled { cursor: not-allowed; opacity: .55; }
+.takeout-badge { display: inline-flex; padding: 4px 8px; border-radius: 999px; background: #eef2f7; color: #475569; font-size: 12px; font-weight: 700; }
+.takeout-badge--active, .takeout-badge--on_shelf, .takeout-badge--paid, .takeout-badge--completed { background: #e9f8f3; color: #087f5b; }
+.takeout-badge--pending_review, .takeout-badge--pending, .takeout-badge--pending_payment, .takeout-badge--preparing, .takeout-badge--ready_for_pickup { background: #fff8e5; color: #a16207; }
+.takeout-badge--rejected, .takeout-badge--suspended, .takeout-badge--refunded, .takeout-badge--cancelled, .takeout-badge--removed { background: #fff1f1; color: #c2410c; }
+.takeout-notice { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 14px; padding: 11px 13px; border-radius: 7px; background: #fff1f1; color: #c2410c; }
+.takeout-notice--conflict { background: #fff8e5; color: #92400e; }
+.takeout-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 16px; color: #64748b; font-size: 13px; }
+.takeout-pagination button { padding: 7px 12px; border: 1px solid #dbe3ee; border-radius: 7px; background: #fff; color: #475569; }
+.takeout-pagination button:disabled { cursor: not-allowed; opacity: .45; }
+.takeout-detail { margin-top: 20px; padding: 18px; border: 1px solid #dce5ef; border-radius: 9px; background: #fbfdff; }
+.takeout-detail header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.takeout-fact { min-width: 0; padding: 13px; border-radius: 8px; background: #f4f7fb; }
+.takeout-fact span { display: block; color: #718096; font-size: 12px; }
+.takeout-fact strong { display: block; margin-top: 6px; overflow-wrap: anywhere; color: #233046; font-size: 14px; }
+.takeout-description { margin: 14px 0; color: #526174; line-height: 1.65; }
+.takeout-detail h4 { margin: 20px 0 10px; color: #334155; }
+.takeout-timeline { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.takeout-timeline div { padding: 12px; border-left: 3px solid #18b6a4; border-radius: 5px; background: #f4f7fb; }
+.takeout-timeline span, .takeout-timeline strong { display: block; }
+.takeout-timeline span { color: #718096; font-size: 12px; }
+.takeout-timeline strong { margin-top: 5px; color: #233046; font-size: 13px; }
+.takeout-form { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); align-items: end; gap: 14px; max-width: 920px; }
+
+@media (max-width: 1240px) {
+  .takeout-header { align-items: stretch; flex-direction: column; }
+  .takeout-timeline { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

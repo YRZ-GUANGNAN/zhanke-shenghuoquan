@@ -1,5 +1,5 @@
 // Domain F presentation contracts. Admin never queries domain databases directly.
-export type AdminSection = 'dashboard' | 'users' | 'moderation' | 'media' | 'community' | 'trade' | 'reports' | 'navigation'
+export type AdminSection = 'dashboard' | 'users' | 'moderation' | 'media' | 'takeout' | 'community' | 'trade' | 'reports' | 'navigation'
 export interface Page<T>{items:T[];page:number;pageSize:number;total:number}
 export interface ReviewTask{id:number;objectType:'post'|'comment'|'product'|'report';objectId:number;risk:string;status:'submitted'|'reviewing'|'approved'|'rejected';reason:string;createdAt:string}
 export interface UserRow{id:number;nickname:string;school:string;campus:string;role:'user'|'admin'|'superadmin';status:'active'|'muted'|'banned'}
@@ -24,3 +24,22 @@ export interface MediaCheckpointRow{aggregateId:string;lastEventId:string;lastAg
 export interface MediaGCJobRow{kind:string;jobId:string;assetId:string;objectStage?:string;status:string;attemptCount:number;lastErrorCode:string;providerRequestId?:string;deletedAt?:string;createdAt:string;updatedAt:string}
 export interface MediaAssetDetail{asset:MediaAssetRow;references:MediaReferenceRow[];ticket?:MediaTicketRow;completion?:MediaCompletionRow;projection?:MediaProjectionRow;decisions:MediaDecisionRow[];events:MediaEventRow[];checkpoint?:MediaCheckpointRow;gcJobs:MediaGCJobRow[]}
 export interface MediaDeadletters{consumer:Page<MediaEventRow>;gc:Page<MediaGCJobRow>}
+
+export type MerchantStatus='pending_review'|'active'|'resting'|'rejected'|'suspended'
+export type DishStatus='draft'|'on_shelf'|'sold_out'|'off_shelf'|'removed'
+export type OrderStatus='pending_payment'|'paid'|'accepted'|'preparing'|'ready_for_pickup'|'delivering'|'completed'|'cancelled'|'refunded'
+export type RiderStatus='active'|'resting'|'suspended'
+export type WithdrawStatus='pending'|'paid'|'rejected'
+
+export interface TakeoutQuery{page?:number;pageSize?:number;status?:string;merchantId?:string;categoryId?:string}
+export interface MerchantRow{merchantPublicId:string;ownerUserId:number;name:string;contactPhone:string;location:string;businessHours:string;logoAssetPublicId?:string;status:MerchantStatus;rowVersion:number;createdAt:string;updatedAt:string}
+export interface DishCategoryRow{categoryPublicId:string;merchantPublicId:string;name:string;sortOrder:number;rowVersion:number;createdAt:string;updatedAt:string}
+export interface DishRow{dishPublicId:string;merchantPublicId:string;categoryPublicId?:string;name:string;description:string;priceCents:number;imageAssetPublicId?:string;status:DishStatus;sortOrder:number;rowVersion:number;createdAt:string;updatedAt:string}
+export interface OrderRow{orderPublicId:string;buyerUserId:number;merchantPublicId:string;riderUserId?:number;status:OrderStatus;itemsAmountCents:number;deliveryFeeCents:number;totalAmountCents:number;contactName:string;contactPhone:string;addressBuilding:string;addressRoom:string;remark:string;payNo?:string;paidAt?:string;acceptedAt?:string;preparingAt?:string;readyAt?:string;deliveringAt?:string;completedAt?:string;cancelledAt?:string;refundedAt?:string;rowVersion:number;createdAt:string;updatedAt:string}
+export interface OrderItemRow{dishPublicId:string;dishNameSnapshot:string;unitPriceCentsSnapshot:number;quantity:number;lineAmountCents:number}
+export interface OrderDetail{order:OrderRow;items:OrderItemRow[]}
+export interface RiderRow{riderUserId:number;status:RiderStatus;realName:string;phone:string;rowVersion:number;createdAt:string;updatedAt:string}
+export interface FeeConfigRow{riderFeeCents:number;platformCutCents:number;rowVersion:number;updatedAt:string}
+export interface RiderConfigRow{maxInFlightPerRider:number;rowVersion:number;updatedAt:string}
+export interface SettlementRow{riderUserId:number;pendingCount:number;riderFeeCents:number;platformCutCents:number}
+export interface WithdrawRow{withdrawPublicId:string;riderUserId:number;amountCents:number;status:WithdrawStatus;note:string;paidAt?:string;rowVersion:number;createdAt:string;updatedAt:string}
