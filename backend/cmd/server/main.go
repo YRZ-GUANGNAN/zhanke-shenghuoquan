@@ -14,6 +14,7 @@ import (
 	"campus-circle/backend/internal/module/admin/mediaconsole"
 	"campus-circle/backend/internal/module/admin/review"
 	"campus-circle/backend/internal/module/admin/takeoutconsole"
+	takeoutreview "campus-circle/backend/internal/module/admin/takeoutconsole/reviewtarget"
 	"campus-circle/backend/internal/module/community"
 	"campus-circle/backend/internal/module/im"
 	coremedia "campus-circle/backend/internal/module/media"
@@ -161,6 +162,9 @@ func main() {
 	}
 	reviewService.RegisterTarget(tradeService)
 	reviewService.RegisterTarget(adminService)
+	for _, target := range takeoutreview.NewTargets(merchantService, catalogService) {
+		reviewService.RegisterTarget(target)
+	}
 
 	if cfg.AppEnv == "prod" {
 		gin.SetMode(gin.ReleaseMode)
