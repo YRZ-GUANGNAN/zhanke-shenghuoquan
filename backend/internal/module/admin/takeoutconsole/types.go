@@ -67,6 +67,14 @@ type OrderView struct {
 	AddressRoom      string              `json:"addressRoom"`
 	Remark           string              `json:"remark"`
 	PayNo            *string             `json:"payNo,omitempty"`
+	PaidAt           *time.Time          `json:"paidAt,omitempty"`
+	AcceptedAt       *time.Time          `json:"acceptedAt,omitempty"`
+	PreparingAt      *time.Time          `json:"preparingAt,omitempty"`
+	ReadyAt          *time.Time          `json:"readyAt,omitempty"`
+	DeliveringAt     *time.Time          `json:"deliveringAt,omitempty"`
+	CompletedAt      *time.Time          `json:"completedAt,omitempty"`
+	CancelledAt      *time.Time          `json:"cancelledAt,omitempty"`
+	RefundedAt       *time.Time          `json:"refundedAt,omitempty"`
 	RowVersion       uint64              `json:"rowVersion"`
 	CreatedAt        time.Time           `json:"createdAt"`
 	UpdatedAt        time.Time           `json:"updatedAt"`
@@ -140,7 +148,16 @@ func dishView(v takeout.Dish) DishView {
 }
 
 func orderView(v takeout.Order) OrderView {
-	return OrderView{v.OrderPublicID, v.BuyerUserID, v.MerchantPublicID, v.RiderUserID, v.Status, v.ItemsAmountCents, v.DeliveryFeeCents, v.TotalAmountCents, v.ContactName, v.ContactPhone, v.AddressBuilding, v.AddressRoom, v.Remark, v.PayNo, v.RowVersion, v.CreatedAt, v.UpdatedAt}
+	return OrderView{
+		OrderPublicID: v.OrderPublicID, BuyerUserID: v.BuyerUserID, MerchantPublicID: v.MerchantPublicID,
+		RiderUserID: v.RiderUserID, Status: v.Status, ItemsAmountCents: v.ItemsAmountCents,
+		DeliveryFeeCents: v.DeliveryFeeCents, TotalAmountCents: v.TotalAmountCents,
+		ContactName: v.ContactName, ContactPhone: v.ContactPhone, AddressBuilding: v.AddressBuilding,
+		AddressRoom: v.AddressRoom, Remark: v.Remark, PayNo: v.PayNo,
+		PaidAt: v.PaidAt, AcceptedAt: v.AcceptedAt, PreparingAt: v.PreparingAt, ReadyAt: v.ReadyAt,
+		DeliveringAt: v.DeliveringAt, CompletedAt: v.CompletedAt, CancelledAt: v.CancelledAt,
+		RefundedAt: v.RefundedAt, RowVersion: v.RowVersion, CreatedAt: v.CreatedAt, UpdatedAt: v.UpdatedAt,
+	}
 }
 
 func orderItemView(v takeout.OrderItem) OrderItemView {

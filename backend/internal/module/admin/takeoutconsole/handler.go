@@ -114,7 +114,7 @@ func (h *Handler) listDishes(c *gin.Context) {
 	if !ok {
 		return
 	}
-	values, total, err := h.queries.Dishes(c.Request.Context(), c.Query("merchantId"), takeout.DishStatus(c.Query("status")), page, size)
+	values, total, err := h.queries.DishesFiltered(c.Request.Context(), c.Query("merchantId"), c.Query("categoryId"), takeout.DishStatus(c.Query("status")), page, size)
 	h.write(c, Page[DishView]{mapValues(values, dishView), page, size, total}, err)
 }
 
