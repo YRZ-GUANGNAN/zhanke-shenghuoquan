@@ -83,6 +83,20 @@ func (s *Service) TransitionReference(ctx context.Context, id, version uint64, f
 	return s.repository.CASReferenceStatus(ctx, id, version, from, to)
 }
 
+func (s *Service) TransitionReferenceVisibility(ctx context.Context, id, version uint64, from, to ParentVisibility) error {
+	if from != ParentHidden || to != ParentVisible {
+		return ErrInvalidTransition
+	}
+	value, err := s.repository.FindReference(ctx, id)
+	if err != nil {
+		return err
+	}
+	if value.ParentVisibility == to {
+		return nil
+	}
+	return s.repository.CASParentVisibility(ctx, id, version, from, to)
+}
+
 func (s *Service) RebuildActiveRefCount(ctx context.Context, assetID uint64) (uint64, error) {
 	if assetID == 0 {
 		return 0, ErrInvalidRecord

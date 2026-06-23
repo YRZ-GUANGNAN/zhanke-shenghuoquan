@@ -26,6 +26,7 @@ type Repository interface {
 	CreateReference(context.Context, *AssetReference) error
 	FindReference(context.Context, uint64) (AssetReference, error)
 	CASReferenceStatus(context.Context, uint64, uint64, ReferenceStatus, ReferenceStatus) error
+	CASParentVisibility(context.Context, uint64, uint64, ParentVisibility, ParentVisibility) error
 	RebuildActiveRefCount(context.Context, uint64) (uint64, error)
 
 	CreateUploadTicket(context.Context, *UploadTicket) error
@@ -91,6 +92,12 @@ func (r *GormRepository) CASReferenceStatus(ctx context.Context, id, version uin
 	return casUpdate(r.db.WithContext(ctx).Model(&AssetReference{}).
 		Where("id = ? AND row_version = ? AND status = ?", id, version, from).
 		Updates(map[string]any{"status": to, "row_version": gorm.Expr("row_version + 1")}))
+}
+
+func (r *GormRepository) CASParentVisibility(ctx context.Context, id, version uint64, from, to ParentVisibility) error {
+	return casUpdate(r.db.WithContext(ctx).Model(&AssetReference{}).
+		Where("id = ? AND row_version = ? AND parent_visibility = ?", id, version, from).
+		Updates(map[string]any{"parent_visibility": to, "updated_at": time.Now().UTC(), "row_version": gorm.Expr("row_version + 1")}))
 }
 
 // RebuildActiveRefCount derives the cache exclusively from reference facts.

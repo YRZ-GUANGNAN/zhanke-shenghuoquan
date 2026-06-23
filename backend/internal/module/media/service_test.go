@@ -9,7 +9,9 @@ import (
 type repositoryStub struct {
 	createdAsset       *Asset
 	technicalCalls     int
+	visibilityCalls    int
 	referenceCountCall int
+	reference          AssetReference
 }
 
 func (r *repositoryStub) CreateAsset(_ context.Context, value *Asset) error {
@@ -30,10 +32,14 @@ func (*repositoryStub) CASAssetReviewProjection(context.Context, uint64, uint64,
 	return nil
 }
 func (*repositoryStub) CreateReference(context.Context, *AssetReference) error { return nil }
-func (*repositoryStub) FindReference(context.Context, uint64) (AssetReference, error) {
-	return AssetReference{}, nil
+func (r *repositoryStub) FindReference(context.Context, uint64) (AssetReference, error) {
+	return r.reference, nil
 }
 func (*repositoryStub) CASReferenceStatus(context.Context, uint64, uint64, ReferenceStatus, ReferenceStatus) error {
+	return nil
+}
+func (r *repositoryStub) CASParentVisibility(context.Context, uint64, uint64, ParentVisibility, ParentVisibility) error {
+	r.visibilityCalls++
 	return nil
 }
 func (r *repositoryStub) RebuildActiveRefCount(context.Context, uint64) (uint64, error) {
@@ -85,6 +91,31 @@ func TestServiceRejectsIllegalTransitionBeforeRepository(t *testing.T) {
 	}
 	if repository.technicalCalls != 0 {
 		t.Fatal("repository was called for an illegal transition")
+	}
+}
+
+func TestReferenceVisibilityOnlyAllowsHiddenToVisible(t *testing.T) {
+	repository := &repositoryStub{reference: AssetReference{ParentVisibility: ParentHidden}}
+	service := NewService(repository)
+	if err := service.TransitionReferenceVisibility(context.Background(), 1, 1, ParentHidden, ParentVisible); err != nil {
+		t.Fatal(err)
+	}
+	if repository.visibilityCalls != 1 {
+		t.Fatalf("visibility CAS calls=%d", repository.visibilityCalls)
+	}
+	if err := service.TransitionReferenceVisibility(context.Background(), 1, 1, ParentVisible, ParentHidden); err != ErrInvalidTransition {
+		t.Fatalf("expected invalid visibility transition, got %v", err)
+	}
+}
+
+func TestReferenceVisibilityIsIdempotentWhenAlreadyVisible(t *testing.T) {
+	repository := &repositoryStub{reference: AssetReference{ParentVisibility: ParentVisible}}
+	service := NewService(repository)
+	if err := service.TransitionReferenceVisibility(context.Background(), 1, 1, ParentHidden, ParentVisible); err != nil {
+		t.Fatal(err)
+	}
+	if repository.visibilityCalls != 0 {
+		t.Fatalf("idempotent visibility transition called repository %d times", repository.visibilityCalls)
 	}
 }
 
