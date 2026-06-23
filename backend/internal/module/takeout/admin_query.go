@@ -17,6 +17,7 @@ type AdminQueryRepository interface {
 	ListCategories(context.Context, string, int, int) ([]DishCategory, int64, error)
 	ListDishes(context.Context, string, DishStatus, int, int) ([]Dish, int64, error)
 	ListOrders(context.Context, OrderStatus, int, int) ([]Order, int64, error)
+	ListOrdersByMerchant(context.Context, string, OrderStatus, int, int) ([]Order, int64, error)
 	ListRiders(context.Context, RiderStatus, int, int) ([]Rider, int64, error)
 	ListSettlementSummaries(context.Context, int, int) ([]SettlementSummary, int64, error)
 }
@@ -67,6 +68,18 @@ func (s *AdminQueryService) Orders(ctx context.Context, status OrderStatus, page
 	}
 	page, size = normalizeAdminPage(page, size)
 	return s.repository.ListOrders(ctx, status, page, size)
+}
+
+func (s *AdminQueryService) OrdersByMerchant(ctx context.Context, merchantPublicID string, status OrderStatus, page, size int) ([]Order, int64, error) {
+	merchantPublicID = strings.TrimSpace(merchantPublicID)
+	if !ValidULID(merchantPublicID) {
+		return nil, 0, ErrInvalidULID
+	}
+	if status != "" && !status.Valid() {
+		return nil, 0, ErrInvalidRecord
+	}
+	page, size = normalizeAdminPage(page, size)
+	return s.repository.ListOrdersByMerchant(ctx, merchantPublicID, status, page, size)
 }
 
 func (s *AdminQueryService) Riders(ctx context.Context, status RiderStatus, page, size int) ([]Rider, int64, error) {

@@ -63,6 +63,20 @@ func (r *GormRepository) ListOrders(ctx context.Context, status OrderStatus, pag
 	return values, total, err
 }
 
+func (r *GormRepository) ListOrdersByMerchant(ctx context.Context, merchantPublicID string, status OrderStatus, page, size int) ([]Order, int64, error) {
+	query := r.db.WithContext(ctx).Model(&Order{}).Where("merchant_public_id = ?", merchantPublicID)
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var values []Order
+	err := query.Order("created_at DESC, id DESC").Offset((page - 1) * size).Limit(size).Find(&values).Error
+	return values, total, err
+}
+
 func (r *GormRepository) ListRiders(ctx context.Context, status RiderStatus, page, size int) ([]Rider, int64, error) {
 	query := r.db.WithContext(ctx).Model(&Rider{})
 	if status != "" {

@@ -15,6 +15,7 @@ import (
 	"campus-circle/backend/internal/module/admin/review"
 	"campus-circle/backend/internal/module/admin/takeoutconsole"
 	takeoutreview "campus-circle/backend/internal/module/admin/takeoutconsole/reviewtarget"
+	"campus-circle/backend/internal/module/admin/takeoutmerchant"
 	"campus-circle/backend/internal/module/community"
 	"campus-circle/backend/internal/module/im"
 	coremedia "campus-circle/backend/internal/module/media"
@@ -82,8 +83,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("configure Module 10 media consumer: %v", err)
 	}
+	coreMediaService := coremedia.NewService(mediaRepository)
 	miniappMedia, err := miniappflow.NewService(
-		uploadTickets, mediaRepository, completionService, coremedia.NewService(mediaRepository),
+		uploadTickets, mediaRepository, completionService, coreMediaService,
 		projectionService, mediaRepository, mediaConsumer, miniappflow.NewStatusRepository(db), nil,
 	)
 	if err != nil {
@@ -128,6 +130,10 @@ func main() {
 	merchantService, err := takeout.NewMerchantService(takeoutRepository, nil)
 	if err != nil {
 		log.Fatalf("configure takeout merchant service: %v", err)
+	}
+	merchantIdentity, err := takeout.NewMerchantIdentityService(takeoutRepository)
+	if err != nil {
+		log.Fatalf("configure takeout merchant identity service: %v", err)
 	}
 	catalogService, err := takeout.NewCatalogService(takeoutRepository, nil)
 	if err != nil {
@@ -196,6 +202,10 @@ func main() {
 	mediaconsole.NewHandler(mediaAdminQuery).Register(mediaAdminRoutes)
 	takeoutAdminRoutes := api.Group("/admin/takeout", userService.AuthRequired(), user.AdminRequired())
 	takeoutconsole.NewHandler(merchantService, catalogService, orderService, riderService, takeoutAdminQuery, withdrawService).Register(takeoutAdminRoutes)
+	takeoutMerchantRoutes := api.Group("/takeout/merchant", userService.AuthRequired())
+	takeoutmerchant.NewHandler(merchantIdentity, merchantService, catalogService, orderService, takeoutAdminQuery, reviewService, coreMediaService, func(c *gin.Context) uint64 {
+		return uint64(user.CurrentUserID(c))
+	}).Register(takeoutMerchantRoutes)
 
 	if err := router.Run(cfg.HTTPAddr); err != nil {
 		log.Fatalf("run server: %v", err)
