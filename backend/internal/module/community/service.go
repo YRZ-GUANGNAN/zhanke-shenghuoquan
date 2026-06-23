@@ -3,6 +3,7 @@ package community
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"campus-circle/backend/internal/module/admin/review"
 	"campus-circle/backend/internal/module/user"
@@ -218,6 +219,14 @@ func (s *Service) AdminList(ctx context.Context, page, size int) (Page[PostView]
 	views, err := s.enrichPosts(ctx, values)
 	return Page[PostView]{Items: views, Page: page, PageSize: size, Total: total}, err
 }
+
+func (s *Service) AdminTakedown(ctx context.Context, postID, operatorID uint, reason string) error {
+	if postID == 0 || operatorID == 0 || strings.TrimSpace(reason) == "" {
+		return errors.New("post id, operator and takedown reason are required")
+	}
+	return s.repo.AdminTakedownPost(ctx, postID)
+}
+
 func (s *Service) Stats(ctx context.Context) (int64, int64, error) { return s.repo.Count(ctx) }
 func (s *Service) enrichPosts(ctx context.Context, values []Post) ([]PostView, error) {
 	ids := make([]uint, 0, len(values))

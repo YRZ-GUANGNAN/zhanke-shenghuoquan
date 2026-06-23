@@ -31,6 +31,7 @@ type Repository interface {
 	ListNotifications(context.Context, uint, int, int) ([]Notification, int64, int64, error)
 	MarkNotificationRead(context.Context, uint, uint) error
 	SetReviewStatus(context.Context, string, uint, review.Status) error
+	AdminTakedownPost(context.Context, uint) error
 	Count(context.Context) (int64, int64, error)
 }
 
@@ -283,6 +284,22 @@ func (r *GormRepository) SetReviewStatus(ctx context.Context, objectType string,
 		return nil
 	})
 }
+
+func (r *GormRepository) AdminTakedownPost(ctx context.Context, id uint) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var value Post
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&value, id).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrNotFound
+		} else if err != nil {
+			return err
+		}
+		if value.ReviewStatus == ReviewStatusTakenDown {
+			return nil
+		}
+		return tx.Model(&Post{}).Where("id = ?", id).Update("review_status", ReviewStatusTakenDown).Error
+	})
+}
+
 func (r *GormRepository) Count(ctx context.Context) (int64, int64, error) {
 	var total, today int64
 	if err := r.db.WithContext(ctx).Model(&Post{}).Count(&total).Error; err != nil {

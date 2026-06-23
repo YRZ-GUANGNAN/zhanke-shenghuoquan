@@ -65,6 +65,8 @@ type UserFollow struct {
 type NotificationType string
 
 const (
+	ReviewStatusTakenDown review.Status = "taken_down"
+
 	NotificationComment NotificationType = "post_commented"
 	NotificationLike    NotificationType = "post_liked"
 	NotificationFollow  NotificationType = "user_followed"

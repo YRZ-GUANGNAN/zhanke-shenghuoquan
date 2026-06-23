@@ -37,6 +37,7 @@ type Repository interface {
 	SetStatus(context.Context, uint, uint, ProductStatus, ProductStatus) error
 	ToggleFavorite(context.Context, uint, uint, bool) (bool, error)
 	SetReviewStatus(context.Context, uint, review.Status) error
+	AdminTakedown(context.Context, uint) error
 	QueueSearchRebuild(context.Context) error
 	PendingSearchEvents(context.Context, int) ([]SearchOutbox, error)
 	MarkSearchEventProcessed(context.Context, uint) error
@@ -270,6 +271,24 @@ func (r *GormRepository) SetReviewStatus(ctx context.Context, id uint, status re
 			operation = SearchUpsert
 		}
 		return enqueueSearch(tx, id, operation)
+	})
+}
+
+func (r *GormRepository) AdminTakedown(ctx context.Context, id uint) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var value Product
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&value, id).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrNotFound
+		} else if err != nil {
+			return err
+		}
+		if value.ReviewStatus == ReviewStatusTakenDown {
+			return nil
+		}
+		if err := tx.Model(&Product{}).Where("id = ?", id).Update("review_status", ReviewStatusTakenDown).Error; err != nil {
+			return err
+		}
+		return enqueueSearch(tx, id, SearchDelete)
 	})
 }
 

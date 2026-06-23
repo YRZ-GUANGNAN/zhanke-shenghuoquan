@@ -10,6 +10,8 @@ import (
 type ProductStatus string
 
 const (
+	ReviewStatusTakenDown review.Status = "taken_down"
+
 	StatusSelling  ProductStatus = "selling"
 	StatusReserved ProductStatus = "reserved"
 	StatusSold     ProductStatus = "sold"

@@ -39,7 +39,9 @@ func (h *Handler) Register(api *gin.RouterGroup) {
 	secured.PATCH("/users/:id/status", h.userStatus)
 	secured.PATCH("/users/:id/role", user.SuperAdminRequired(), h.userRole)
 	secured.GET("/posts", h.posts)
+	secured.PATCH("/community/posts/:id/takedown", h.takedownPost)
 	secured.GET("/products", h.products)
+	secured.PATCH("/trade/products/:id/takedown", h.takedownProduct)
 	secured.GET("/navigation", h.navigationTree)
 	secured.POST("/navigation/categories", h.createCategory)
 	secured.PUT("/navigation/categories/:id", h.updateCategory)
@@ -178,6 +180,39 @@ func (h *Handler) products(c *gin.Context) {
 	value, err := h.trade.AdminList(c, page, size)
 	write(c, value, err)
 }
+
+func (h *Handler) takedownPost(c *gin.Context) {
+	id, ok := paramID(c)
+	if !ok {
+		return
+	}
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	if c.ShouldBindJSON(&req) != nil {
+		response.Fail(c, http.StatusBadRequest, "invalid takedown request")
+		return
+	}
+	err := h.community.AdminTakedown(c, id, user.CurrentUserID(c), req.Reason)
+	writeTakedown(c, gin.H{"updated": err == nil}, err)
+}
+
+func (h *Handler) takedownProduct(c *gin.Context) {
+	id, ok := paramID(c)
+	if !ok {
+		return
+	}
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	if c.ShouldBindJSON(&req) != nil {
+		response.Fail(c, http.StatusBadRequest, "invalid takedown request")
+		return
+	}
+	err := h.trade.AdminTakedown(c, id, user.CurrentUserID(c), req.Reason)
+	writeTakedown(c, gin.H{"updated": err == nil}, err)
+}
+
 func (h *Handler) navigationTree(c *gin.Context) {
 	value, err := h.navigation.AdminTree(c)
 	write(c, value, err)
@@ -264,6 +299,22 @@ func paramID(c *gin.Context) (uint, bool) {
 func write(c *gin.Context, data any, err error) {
 	if errors.Is(err, user.ErrForbidden) || errors.Is(err, user.ErrCannotModifySelf) || errors.Is(err, user.ErrLastActiveSuperAdmin) {
 		response.Fail(c, http.StatusForbidden, err.Error())
+		return
+	}
+	if err != nil {
+		response.Fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	response.OK(c, data)
+}
+
+func writeTakedown(c *gin.Context, data any, err error) {
+	if errors.Is(err, community.ErrNotFound) || errors.Is(err, trade.ErrNotFound) {
+		response.Fail(c, http.StatusNotFound, err.Error())
+		return
+	}
+	if errors.Is(err, trade.ErrConflict) {
+		response.Fail(c, http.StatusConflict, err.Error())
 		return
 	}
 	if err != nil {

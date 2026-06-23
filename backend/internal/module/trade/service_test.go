@@ -130,6 +130,19 @@ func (r *tradeMemoryRepo) SetReviewStatus(_ context.Context, id uint, status rev
 	r.products[id] = v
 	return nil
 }
+func (r *tradeMemoryRepo) AdminTakedown(_ context.Context, id uint) error {
+	v, ok := r.products[id]
+	if !ok {
+		return ErrNotFound
+	}
+	if v.ReviewStatus == ReviewStatusTakenDown {
+		return nil
+	}
+	v.ReviewStatus = ReviewStatusTakenDown
+	r.products[id] = v
+	r.events = append(r.events, SearchOutbox{ProductID: id, Operation: SearchDelete})
+	return nil
+}
 func (r *tradeMemoryRepo) QueueSearchRebuild(context.Context) error { return nil }
 func (r *tradeMemoryRepo) PendingSearchEvents(_ context.Context, limit int) ([]SearchOutbox, error) {
 	if len(r.events) < limit {

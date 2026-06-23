@@ -78,6 +78,15 @@ func (r *communityMemoryRepo) MarkNotificationRead(_ context.Context, _ uint, id
 func (r *communityMemoryRepo) SetReviewStatus(context.Context, string, uint, review.Status) error {
 	return nil
 }
+func (r *communityMemoryRepo) AdminTakedownPost(_ context.Context, id uint) error {
+	value, ok := r.posts[id]
+	if !ok {
+		return ErrNotFound
+	}
+	value.ReviewStatus = ReviewStatusTakenDown
+	r.posts[id] = value
+	return nil
+}
 func (r *communityMemoryRepo) Count(context.Context) (int64, int64, error) { return 0, 0, nil }
 
 type profileDirectory map[uint]user.Profile

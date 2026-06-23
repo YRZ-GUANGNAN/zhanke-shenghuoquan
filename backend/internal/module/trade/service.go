@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"campus-circle/backend/internal/module/admin/review"
@@ -291,6 +292,13 @@ func (s *Service) AdminList(ctx context.Context, page, size int) (Page, error) {
 	}
 	views, err := s.enrich(ctx, values)
 	return Page{Items: views, Page: page, PageSize: size, Total: total}, err
+}
+
+func (s *Service) AdminTakedown(ctx context.Context, productID, operatorID uint, reason string) error {
+	if productID == 0 || operatorID == 0 || strings.TrimSpace(reason) == "" {
+		return errors.New("product id, operator and takedown reason are required")
+	}
+	return s.repo.AdminTakedown(ctx, productID)
 }
 
 func (s *Service) Stats(ctx context.Context) (int64, int64, error) { return s.repo.Count(ctx) }
