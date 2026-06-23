@@ -63,6 +63,9 @@ export default function ProfilePage() {
         <View className='settings__row' onClick={() => Taro.navigateTo({ url: '/pages/conversations/index' })}>
           <Text>交易会话</Text><Text className='settings__arrow'>›</Text>
         </View>
+        <View className='settings__row' onClick={() => Taro.navigateTo({ url: '/pages/takeout-merchant/index' })}>
+          <Text>Merchant Center</Text><Text className='settings__arrow'>{'>'}</Text>
+        </View>
         <View className='settings__row' onClick={() => Taro.navigateTo({ url: '/pages/notifications/index' })}>
           <Text>社区通知</Text><Text className='settings__arrow'>›</Text>
         </View>

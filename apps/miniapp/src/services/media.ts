@@ -1,7 +1,7 @@
 import Taro from './taro'
 import { request } from './api'
 
-export type MediaPurpose = 'post_image' | 'product_image' | 'avatar'
+export type MediaPurpose = 'post_image' | 'product_image' | 'avatar' | 'dish' | 'merchant_logo'
 export type MediaClientState =
   | 'waiting_upload'
   | 'processing'
@@ -16,7 +16,7 @@ export type MediaClientState =
 export interface MediaStatus {
   assetId: string
   ticketId: string
-  purpose: 'post' | 'product' | 'avatar'
+  purpose: 'post' | 'product' | 'avatar' | 'dish' | 'merchant_logo'
   state: MediaClientState
   technicalStatus: string
   reviewStatus: string
@@ -63,7 +63,7 @@ export interface UploadProgress {
   message: string
 }
 
-const MAX_EDGE: Record<MediaPurpose, number> = { post_image: 1920, product_image: 1920, avatar: 1024 }
+const MAX_EDGE: Record<MediaPurpose, number> = { post_image: 1920, product_image: 1920, avatar: 1024, dish: 1920, merchant_logo: 1024 }
 
 export async function chooseAndUploadImages(
   purpose: MediaPurpose,
@@ -189,9 +189,11 @@ function readFileBytes(path: string): ArrayBuffer {
   return copy.buffer
 }
 
-function domainPurpose(value: MediaPurpose): 'post' | 'product' | 'avatar' {
+function domainPurpose(value: MediaPurpose): 'post' | 'product' | 'avatar' | 'dish' | 'merchant_logo' {
   if (value === 'post_image') return 'post'
   if (value === 'product_image') return 'product'
+  if (value === 'dish') return 'dish'
+  if (value === 'merchant_logo') return 'merchant_logo'
   return 'avatar'
 }
 

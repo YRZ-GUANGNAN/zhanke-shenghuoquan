@@ -10,7 +10,8 @@ export default defineAppConfig({
     'pages/conversations/index',
     'pages/chat/index',
     'pages/publish/index',
-    'pages/media-history/index'
+    'pages/media-history/index',
+    'pages/takeout-merchant/index'
   ],
   window: {
     backgroundTextStyle: 'light',
