@@ -616,6 +616,10 @@ td span {
 .takeout-timeline strong { margin-top: 5px; color: #233046; font-size: 13px; }
 .takeout-form { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); align-items: end; gap: 14px; max-width: 920px; }
 
+.content-takedown-button { padding: 8px 12px; border: 0; border-radius: 7px; background: #fff1f1; color: #c2410c; font-weight: 700; }
+.content-takedown-button:disabled { cursor: not-allowed; opacity: .55; }
+.content-takedown-error { margin-bottom: 14px; padding: 11px 13px; border-radius: 7px; background: #fff1f1; color: #c2410c; font-weight: 700; }
+
 @media (max-width: 1240px) {
   .takeout-header { align-items: stretch; flex-direction: column; }
   .takeout-timeline { grid-template-columns: repeat(2, minmax(0, 1fr)); }
