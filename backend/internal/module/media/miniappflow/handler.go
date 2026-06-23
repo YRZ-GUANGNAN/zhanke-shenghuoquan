@@ -1,6 +1,7 @@
 package miniappflow
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -13,11 +14,20 @@ import (
 
 type Handler struct {
 	service       *Service
+	display       displayContentService
 	currentUserID func(*gin.Context) uint64
 }
 
-func NewHandler(service *Service, currentUserID func(*gin.Context) uint64) *Handler {
-	return &Handler{service: service, currentUserID: currentUserID}
+type displayContentService interface {
+	ContentURL(context.Context, coremedia.Purpose, string, uint16) (string, error)
+}
+
+func NewHandler(service *Service, currentUserID func(*gin.Context) uint64, display ...displayContentService) *Handler {
+	handler := &Handler{service: service, currentUserID: currentUserID}
+	if len(display) > 0 {
+		handler.display = display[0]
+	}
+	return handler
 }
 
 // Register exposes only the Module 10 mini-program orchestration contract.
@@ -27,6 +37,7 @@ func (h *Handler) Register(group *gin.RouterGroup) {
 	group.POST("/uploads/:ticketId/complete", h.completeUpload)
 	group.GET("/assets/:assetId", h.status)
 	group.GET("/uploads", h.history)
+	group.GET("/display/:referenceType/:referenceId/:slot/content", h.displayContent)
 }
 
 func (h *Handler) createUpload(c *gin.Context) {
@@ -90,6 +101,31 @@ func (h *Handler) history(c *gin.Context) {
 	response.OK(c, value)
 }
 
+func (h *Handler) displayContent(c *gin.Context) {
+	if h.display == nil {
+		response.Fail(c, http.StatusNotFound, "media content not found")
+		return
+	}
+	referenceType := coremedia.Purpose(c.Param("referenceType"))
+	if !referenceType.Valid() {
+		response.Fail(c, http.StatusBadRequest, "invalid media reference")
+		return
+	}
+	referenceID := strings.TrimSpace(c.Param("referenceId"))
+	slot, err := strconv.ParseUint(c.Param("slot"), 10, 16)
+	if err != nil {
+		response.Fail(c, http.StatusBadRequest, "invalid media reference")
+		return
+	}
+	value, err := h.display.ContentURL(c.Request.Context(), referenceType, referenceID, uint16(slot))
+	if err != nil {
+		h.writeDisplayError(c, err)
+		return
+	}
+	c.Header("Location", value)
+	c.Status(http.StatusFound)
+}
+
 func positivePage(raw string) (int, error) {
 	value, err := strconv.Atoi(raw)
 	if err != nil || value < 1 {
@@ -122,5 +158,17 @@ func (h *Handler) writeError(c *gin.Context, err error) {
 		response.Fail(c, http.StatusServiceUnavailable, "review submission is pending; retry completion")
 	default:
 		response.Fail(c, http.StatusInternalServerError, "media upload flow failed")
+	}
+}
+
+func (h *Handler) writeDisplayError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, coremedia.ErrInvalidRecord), errors.Is(err, coremedia.ErrInvalidULID):
+		response.Fail(c, http.StatusBadRequest, "invalid media reference")
+	case errors.Is(err, coremedia.ErrNotFound), errors.Is(err, coremedia.ErrMediaNotVisible),
+		errors.Is(err, coremedia.ErrReviewProjectionUnavailable), errors.Is(err, coremedia.ErrObjectNotFound):
+		response.Fail(c, http.StatusNotFound, "media content not found")
+	default:
+		response.Fail(c, http.StatusInternalServerError, "media content failed")
 	}
 }

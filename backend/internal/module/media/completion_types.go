@@ -118,8 +118,9 @@ type TencentCompletionStoreConfig struct {
 }
 
 type TencentCompletionStore struct {
-	bucket, region string
-	cosClient      *cos.Client
+	bucket, region      string
+	secretID, secretKey string
+	cosClient           *cos.Client
 }
 
 func NewTencentCompletionStore(config TencentCompletionStoreConfig) (*TencentCompletionStore, error) {
@@ -138,7 +139,28 @@ func NewTencentCompletionStore(config TencentCompletionStoreConfig) (*TencentCom
 		Timeout:   30 * time.Second,
 		Transport: &cos.AuthorizationTransport{SecretID: config.SecretID, SecretKey: config.SecretKey},
 	})
-	return &TencentCompletionStore{bucket: config.Bucket, region: config.Region, cosClient: client}, nil
+	return &TencentCompletionStore{
+		bucket: config.Bucket, region: config.Region,
+		secretID: config.SecretID, secretKey: config.SecretKey,
+		cosClient: client,
+	}, nil
+}
+
+type signedGetObjectOptions struct {
+	VersionID string `url:"versionId,omitempty" header:"-"`
+}
+
+func (s *TencentCompletionStore) SignedGetURL(ctx context.Context, key, versionID string, ttl time.Duration) (string, error) {
+	key = strings.TrimSpace(key)
+	versionID = strings.TrimSpace(versionID)
+	if key == "" || versionID == "" || ttl <= 0 {
+		return "", ErrCompletionInvariant
+	}
+	value, err := s.cosClient.Object.GetPresignedURL(ctx, http.MethodGet, key, s.secretID, s.secretKey, ttl, &signedGetObjectOptions{VersionID: versionID})
+	if err != nil {
+		return "", err
+	}
+	return value.String(), nil
 }
 
 func (s *TencentCompletionStore) HeadObject(ctx context.Context, key, versionID string) (CompletionObject, error) {

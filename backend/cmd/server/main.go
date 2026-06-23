@@ -84,6 +84,14 @@ func main() {
 		log.Fatalf("configure Module 10 media consumer: %v", err)
 	}
 	coreMediaService := coremedia.NewService(mediaRepository)
+	coreMediaGateway, err := coremedia.NewMediaGateway(mediaRepository)
+	if err != nil {
+		log.Fatalf("configure Module 10 media gateway: %v", err)
+	}
+	mediaDisplay, err := coremedia.NewMediaDisplayService(coreMediaGateway, mediaRepository, completionStore, coremedia.MediaDisplayURLTTL)
+	if err != nil {
+		log.Fatalf("configure Module 10 media display: %v", err)
+	}
 	miniappMedia, err := miniappflow.NewService(
 		uploadTickets, mediaRepository, completionService, coreMediaService,
 		projectionService, mediaRepository, mediaConsumer, miniappflow.NewStatusRepository(db), nil,
@@ -191,7 +199,7 @@ func main() {
 	miniappMediaRoutes := api.Group("/miniapp/media", userService.AuthRequired(), user.UnmutedRequired())
 	miniappflow.NewHandler(miniappMedia, func(c *gin.Context) uint64 {
 		return uint64(user.CurrentUserID(c))
-	}).Register(miniappMediaRoutes)
+	}, mediaDisplay).Register(miniappMediaRoutes)
 	safety := review.NewSafetyClient(cfg)
 	community.NewHandler(communityService, userService, safety).Register(api.Group("/community"))
 	trade.NewHandler(tradeService, userService, safety).Register(api.Group("/trade"))
