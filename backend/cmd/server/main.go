@@ -168,7 +168,7 @@ func main() {
 	}
 	reviewService.RegisterTarget(tradeService)
 	reviewService.RegisterTarget(adminService)
-	for _, target := range takeoutreview.NewTargets(merchantService, catalogService) {
+	for _, target := range takeoutreview.NewTargets(merchantService, catalogService, coreMediaService) {
 		reviewService.RegisterTarget(target)
 	}
 

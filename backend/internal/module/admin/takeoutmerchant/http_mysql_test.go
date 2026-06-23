@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -44,10 +45,10 @@ func TestTakeoutMerchantAPIRealHTTPMySQLAuthOnboardingOwnerScopeAndMediaBinding(
 	orders, _ := takeout.NewOrderService(repository, repository, func() time.Time { return now })
 	queries, _ := takeout.NewAdminQueryService(repository)
 	reviews := review.NewService(review.NewRepository(db))
-	for _, target := range takeoutreview.NewTargets(merchants, catalog) {
+	mediaService := coremedia.NewService(coremedia.NewRepository(db))
+	for _, target := range takeoutreview.NewTargets(merchants, catalog, mediaService) {
 		reviews.RegisterTarget(target)
 	}
-	mediaService := coremedia.NewService(coremedia.NewRepository(db))
 	auth := user.NewService(user.NewRepository(db), "g7b-test-secret-that-is-longer-than-thirty-two-characters", "", "", true)
 
 	merchantAUser, err := auth.WechatLogin(ctx, user.LoginInput{Code: "g7b-merchant-a", Nickname: "G7B Merchant A"})
@@ -75,6 +76,8 @@ func TestTakeoutMerchantAPIRealHTTPMySQLAuthOnboardingOwnerScopeAndMediaBinding(
 	if err != nil {
 		t.Fatal(err)
 	}
+	prepareMediaAssetForDisplay(t, db, logoAsset)
+	prepareMediaAssetForDisplay(t, db, dishAsset)
 	otherOwnerDishAsset, err := mediaService.CreateAssetRecord(ctx, coremedia.NewAsset{OwnerID: uint64(merchantBUser.User.ID), Purpose: coremedia.PurposeDish, IdempotencyKey: "g7b-dish-b"})
 	if err != nil {
 		t.Fatal(err)
@@ -126,6 +129,7 @@ func TestTakeoutMerchantAPIRealHTTPMySQLAuthOnboardingOwnerScopeAndMediaBinding(
 		t.Fatalf("duplicate onboarding status=%d want=409", status)
 	}
 	assertMediaReference(t, db, logoAsset.ID, coremedia.PurposeMerchantLogo, onboarded.Merchant.MerchantPublicID)
+	assertMediaNotVisible(t, db, coremedia.PurposeMerchantLogo, onboarded.Merchant.MerchantPublicID, logoAsset.AssetPublicID)
 
 	if _, err := reviews.Start(ctx, onboarded.Review.TaskID, adminUser.User.ID); err != nil {
 		t.Fatal(err)
@@ -137,6 +141,7 @@ func TestTakeoutMerchantAPIRealHTTPMySQLAuthOnboardingOwnerScopeAndMediaBinding(
 	if status != http.StatusOK || !strings.Contains(string(body.Data), `"status":"active"`) {
 		t.Fatalf("approved me status=%d body=%s", status, body.Data)
 	}
+	assertMediaVisible(t, db, coremedia.PurposeMerchantLogo, onboarded.Merchant.MerchantPublicID, logoAsset.AssetPublicID)
 
 	merchantB, err := merchants.CreateMerchant(ctx, takeout.CreateMerchantInput{OwnerUserID: uint64(merchantBUser.User.ID), Name: "G7B Merchant B"})
 	if err != nil {
@@ -158,6 +163,30 @@ func TestTakeoutMerchantAPIRealHTTPMySQLAuthOnboardingOwnerScopeAndMediaBinding(
 		t.Fatal(err)
 	}
 	status, body = httpJSON(t, server.Client(), http.MethodPost, server.URL+"/api/v1/takeout/merchant/dishes", merchantAUser.Token, map[string]any{
+		"categoryPublicId": category.CategoryPublicID,
+		"name":             "G7B Dish No Image",
+		"description":      "dish without image should still publish normally",
+		"priceCents":       900,
+		"sortOrder":        0,
+	})
+	if status != http.StatusCreated {
+		t.Fatalf("create no-image dish status=%d body=%+v", status, body)
+	}
+	var noImageDish DishView
+	if err := json.Unmarshal(body.Data, &noImageDish); err != nil {
+		t.Fatal(err)
+	}
+	if noImageDish.ImageAssetPublicID != nil {
+		t.Fatalf("no-image dish unexpectedly has image: %+v", noImageDish)
+	}
+	status, body = httpJSON(t, server.Client(), http.MethodPatch, server.URL+"/api/v1/takeout/merchant/dishes/"+noImageDish.DishPublicID+"/on-shelf", merchantAUser.Token, map[string]any{
+		"expectedStatus": "draft", "expectedRowVersion": noImageDish.RowVersion,
+	})
+	if status != http.StatusOK {
+		t.Fatalf("put no-image dish on shelf status=%d body=%+v", status, body)
+	}
+
+	status, body = httpJSON(t, server.Client(), http.MethodPost, server.URL+"/api/v1/takeout/merchant/dishes", merchantAUser.Token, map[string]any{
 		"categoryPublicId":   category.CategoryPublicID,
 		"name":               "G7B Dish A",
 		"description":        "merchant owned dish",
@@ -176,6 +205,7 @@ func TestTakeoutMerchantAPIRealHTTPMySQLAuthOnboardingOwnerScopeAndMediaBinding(
 		t.Fatalf("dish image not stored: %+v", dish)
 	}
 	assertMediaReference(t, db, dishAsset.ID, coremedia.PurposeDish, dish.DishPublicID)
+	assertMediaNotVisible(t, db, coremedia.PurposeDish, dish.DishPublicID, dishAsset.AssetPublicID)
 	status, _ = httpJSON(t, server.Client(), http.MethodPost, server.URL+"/api/v1/takeout/merchant/dishes", merchantAUser.Token, map[string]any{
 		"name": "G7B Forbidden Asset Dish", "priceCents": 100, "imageAssetPublicId": otherOwnerDishAsset.AssetPublicID,
 	})
@@ -199,6 +229,7 @@ func TestTakeoutMerchantAPIRealHTTPMySQLAuthOnboardingOwnerScopeAndMediaBinding(
 	if err := json.Unmarshal(body.Data, &dish); err != nil {
 		t.Fatal(err)
 	}
+	assertMediaVisible(t, db, coremedia.PurposeDish, dish.DishPublicID, dishAsset.AssetPublicID)
 	status, _ = httpJSON(t, server.Client(), http.MethodPatch, server.URL+"/api/v1/takeout/merchant/dishes/"+dish.DishPublicID+"/sold-out", merchantBUser.Token, map[string]any{
 		"expectedRowVersion": dish.RowVersion,
 	})
@@ -210,6 +241,36 @@ func TestTakeoutMerchantAPIRealHTTPMySQLAuthOnboardingOwnerScopeAndMediaBinding(
 	})
 	if status != http.StatusOK {
 		t.Fatalf("sold out status=%d", status)
+	}
+	if err := json.Unmarshal(body.Data, &dish); err != nil {
+		t.Fatal(err)
+	}
+	assertMediaVisible(t, db, coremedia.PurposeDish, dish.DishPublicID, dishAsset.AssetPublicID)
+	status, body = httpJSON(t, server.Client(), http.MethodPatch, server.URL+"/api/v1/takeout/merchant/dishes/"+dish.DishPublicID+"/off-shelf", merchantAUser.Token, map[string]any{
+		"expectedStatus": "sold_out", "expectedRowVersion": dish.RowVersion,
+	})
+	if status != http.StatusOK {
+		t.Fatalf("off shelf status=%d body=%+v", status, body)
+	}
+	if err := json.Unmarshal(body.Data, &dish); err != nil {
+		t.Fatal(err)
+	}
+	assertMediaVisible(t, db, coremedia.PurposeDish, dish.DishPublicID, dishAsset.AssetPublicID)
+	status, body = httpJSON(t, server.Client(), http.MethodPatch, server.URL+"/api/v1/takeout/merchant/dishes/"+dish.DishPublicID+"/on-shelf", merchantAUser.Token, map[string]any{
+		"expectedStatus": "off_shelf", "expectedRowVersion": dish.RowVersion,
+	})
+	if status != http.StatusOK {
+		t.Fatalf("repeat on shelf status=%d body=%+v", status, body)
+	}
+	if err := json.Unmarshal(body.Data, &dish); err != nil {
+		t.Fatal(err)
+	}
+	assertMediaVisible(t, db, coremedia.PurposeDish, dish.DishPublicID, dishAsset.AssetPublicID)
+	status, body = httpJSON(t, server.Client(), http.MethodPatch, server.URL+"/api/v1/takeout/merchant/dishes/"+dish.DishPublicID+"/sold-out", merchantAUser.Token, map[string]any{
+		"expectedRowVersion": dish.RowVersion,
+	})
+	if status != http.StatusOK {
+		t.Fatalf("second sold out status=%d", status)
 	}
 	if err := json.Unmarshal(body.Data, &dish); err != nil {
 		t.Fatal(err)
@@ -361,6 +422,76 @@ func assertMediaReference(t *testing.T, db *gorm.DB, assetID uint64, purpose cor
 	}
 }
 
+func prepareMediaAssetForDisplay(t *testing.T, db *gorm.DB, asset coremedia.Asset) {
+	t.Helper()
+	finalKey := "final/g7b/" + asset.AssetPublicID + ".webp"
+	finalVersion := "g7b-version-" + asset.AssetPublicID
+	if err := db.Model(&coremedia.Asset{}).Where("id = ?", asset.ID).Updates(map[string]any{
+		"storage_stage":      coremedia.StorageStageFinal,
+		"technical_status":   coremedia.TechnicalFinalReady,
+		"verified_mime":      "image/webp",
+		"byte_size":          2048,
+		"width":              640,
+		"height":             480,
+		"final_key":          finalKey,
+		"final_version_id":   finalVersion,
+		"projected_decision": coremedia.ReviewApproved,
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	projectionID, err := coremedia.NewULID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	if err := db.Create(&coremedia.ReviewProjection{
+		ProjectionID: projectionID, AssetID: asset.ID, Status: coremedia.ProjectionApproved,
+		AppliedDecisionVersion: 1, DecidedAt: &now, RowVersion: 1, CreatedAt: now, UpdatedAt: now,
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func assertMediaNotVisible(t *testing.T, db *gorm.DB, purpose coremedia.Purpose, referenceID, assetPublicID string) {
+	t.Helper()
+	gateway, err := coremedia.NewMediaGateway(coremedia.NewRepository(db))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := gateway.BuildDisplayView(context.Background(), purpose, referenceID, 0); !errors.Is(err, coremedia.ErrMediaNotVisible) {
+		t.Fatalf("media reference should be hidden before publish reference=%s err=%v", referenceID, err)
+	}
+	visibility, err := gateway.CheckVisibility(context.Background(), assetPublicID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if visibility.Visible {
+		t.Fatalf("asset should not be visible before publish: %+v", visibility)
+	}
+}
+
+func assertMediaVisible(t *testing.T, db *gorm.DB, purpose coremedia.Purpose, referenceID, assetPublicID string) {
+	t.Helper()
+	gateway, err := coremedia.NewMediaGateway(coremedia.NewRepository(db))
+	if err != nil {
+		t.Fatal(err)
+	}
+	view, err := gateway.BuildDisplayView(context.Background(), purpose, referenceID, 0)
+	if err != nil {
+		t.Fatalf("media reference should be visible reference=%s err=%v", referenceID, err)
+	}
+	if view.Media.MediaID != assetPublicID {
+		t.Fatalf("visible media=%s want=%s", view.Media.MediaID, assetPublicID)
+	}
+	visibility, err := gateway.CheckVisibility(context.Background(), assetPublicID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !visibility.Visible {
+		t.Fatalf("asset should be visible after publish: %+v", visibility)
+	}
+}
+
 func mustFindMerchantByOwner(t *testing.T, identity *takeout.MerchantIdentityService, ctx context.Context, ownerID uint64) takeout.Merchant {
 	t.Helper()
 	value, err := identity.FindByOwnerUserID(ctx, ownerID)
@@ -417,7 +548,13 @@ func cleanupG7B(t *testing.T, db *gorm.DB) {
 	var assetIDs []uint64
 	db.Model(&coremedia.Asset{}).Where("idempotency_key LIKE ?", "g7b-%").Pluck("id", &assetIDs)
 	if len(assetIDs) > 0 {
+		var projectionIDs []string
+		db.Model(&coremedia.ReviewProjection{}).Where("asset_id IN ?", assetIDs).Pluck("projection_id", &projectionIDs)
+		if len(projectionIDs) > 0 {
+			db.Where("projection_id IN ?", projectionIDs).Delete(&coremedia.ReviewDecision{})
+		}
 		db.Where("asset_id IN ?", assetIDs).Delete(&coremedia.AssetReference{})
+		db.Where("asset_id IN ?", assetIDs).Delete(&coremedia.ReviewProjection{})
 		db.Where("id IN ?", assetIDs).Delete(&coremedia.Asset{})
 	}
 	var merchantIDs []uint

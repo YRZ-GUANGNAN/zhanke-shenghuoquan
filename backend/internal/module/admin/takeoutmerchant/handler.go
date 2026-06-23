@@ -306,6 +306,9 @@ func (h *Handler) putDishOnShelf(c *gin.Context) {
 		return
 	}
 	value, err := h.catalog.PutOnShelf(c.Request.Context(), c.Param("id"), currentMerchant(c).MerchantPublicID, req.ExpectedStatus, req.ExpectedRowVersion)
+	if err == nil {
+		err = h.publishDishImage(c, value)
+	}
 	h.write(c, dishView(value), err)
 }
 
@@ -475,6 +478,13 @@ func (h *Handler) bindMediaReference(c *gin.Context, asset *coremedia.Asset, pur
 	return err
 }
 
+func (h *Handler) publishDishImage(c *gin.Context, value takeout.Dish) error {
+	if h.media == nil || value.ImageAssetPublicID == nil || strings.TrimSpace(*value.ImageAssetPublicID) == "" {
+		return nil
+	}
+	return h.media.PublishReference(c.Request.Context(), strings.TrimSpace(*value.ImageAssetPublicID), coremedia.PurposeDish, value.DishPublicID, 0)
+}
+
 type rowVersionRequest struct {
 	ExpectedRowVersion uint64 `json:"expectedRowVersion"`
 }
@@ -521,13 +531,15 @@ func (h *Handler) write(c *gin.Context, value any, err error) {
 		response.OK(c, value)
 	case errors.Is(err, takeout.ErrNotFound):
 		response.Fail(c, http.StatusNotFound, "takeout record not found")
+	case errors.Is(err, coremedia.ErrNotFound):
+		response.Fail(c, http.StatusNotFound, "media reference not found")
 	case errors.Is(err, ErrMerchantNotOnboarded):
 		response.Fail(c, http.StatusConflict, err.Error())
 	case errors.Is(err, ErrMerchantNotActive), errors.Is(err, ErrForbiddenAsset):
 		response.Fail(c, http.StatusForbidden, err.Error())
-	case errors.Is(err, takeout.ErrConcurrentUpdate), errors.Is(err, takeout.ErrInvalidTransition), errors.Is(err, takeout.ErrInFlightLimit), errors.Is(err, takeout.ErrOrderAlreadyClaimed):
+	case errors.Is(err, takeout.ErrConcurrentUpdate), errors.Is(err, takeout.ErrInvalidTransition), errors.Is(err, takeout.ErrInFlightLimit), errors.Is(err, takeout.ErrOrderAlreadyClaimed), errors.Is(err, coremedia.ErrConcurrentUpdate), errors.Is(err, coremedia.ErrInvalidTransition):
 		response.Fail(c, http.StatusConflict, err.Error())
-	case errors.Is(err, takeout.ErrInvalidRecord), errors.Is(err, takeout.ErrInvalidULID), errors.Is(err, takeout.ErrAmountOverflow), errors.Is(err, coremedia.ErrInvalidRecord):
+	case errors.Is(err, takeout.ErrInvalidRecord), errors.Is(err, takeout.ErrInvalidULID), errors.Is(err, takeout.ErrAmountOverflow), errors.Is(err, coremedia.ErrInvalidRecord), errors.Is(err, coremedia.ErrInvalidULID):
 		response.Fail(c, http.StatusBadRequest, err.Error())
 	default:
 		response.Fail(c, http.StatusInternalServerError, "takeout merchant operation failed")

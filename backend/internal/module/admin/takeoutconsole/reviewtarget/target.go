@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"campus-circle/backend/internal/module/admin/review"
+	coremedia "campus-circle/backend/internal/module/media"
 	"campus-circle/backend/internal/module/takeout"
 )
 
@@ -27,11 +29,14 @@ type CatalogService interface {
 	PutOnShelf(context.Context, string, string, takeout.DishStatus, uint64) (takeout.Dish, error)
 }
 
-type MerchantTarget struct{ service MerchantService }
+type MerchantTarget struct {
+	service MerchantService
+	media   *coremedia.Service
+}
 type DishTarget struct{ service CatalogService }
 
-func NewTargets(merchants MerchantService, catalog CatalogService) []review.Target {
-	return []review.Target{MerchantTarget{service: merchants}, DishTarget{service: catalog}}
+func NewTargets(merchants MerchantService, catalog CatalogService, media *coremedia.Service) []review.Target {
+	return []review.Target{MerchantTarget{service: merchants, media: media}, DishTarget{service: catalog}}
 }
 
 func (MerchantTarget) ObjectType() string { return MerchantObjectType }
@@ -48,7 +53,10 @@ func (t MerchantTarget) SetReviewStatus(ctx context.Context, objectID uint, stat
 		}
 		return nil
 	case review.StatusApproved:
-		_, err = t.service.Approve(ctx, value.MerchantPublicID, value.RowVersion)
+		value, err = t.service.Approve(ctx, value.MerchantPublicID, value.RowVersion)
+		if err == nil {
+			err = t.publishMerchantLogo(ctx, value)
+		}
 	case review.StatusRejected:
 		_, err = t.service.Reject(ctx, value.MerchantPublicID, value.RowVersion)
 	default:
@@ -58,6 +66,13 @@ func (t MerchantTarget) SetReviewStatus(ctx context.Context, objectID uint, stat
 		return fmt.Errorf("apply takeout merchant review decision: %w", err)
 	}
 	return nil
+}
+
+func (t MerchantTarget) publishMerchantLogo(ctx context.Context, value takeout.Merchant) error {
+	if t.media == nil || value.LogoAssetPublicID == nil || strings.TrimSpace(*value.LogoAssetPublicID) == "" {
+		return nil
+	}
+	return t.media.PublishReference(ctx, strings.TrimSpace(*value.LogoAssetPublicID), coremedia.PurposeMerchantLogo, value.MerchantPublicID, 0)
 }
 
 func (DishTarget) ObjectType() string { return DishObjectType }

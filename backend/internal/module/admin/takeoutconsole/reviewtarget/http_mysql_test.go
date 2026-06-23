@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -16,6 +17,7 @@ import (
 	"campus-circle/backend/internal/module/admin"
 	"campus-circle/backend/internal/module/admin/review"
 	"campus-circle/backend/internal/module/admin/takeoutconsole/reviewtarget"
+	coremedia "campus-circle/backend/internal/module/media"
 	"campus-circle/backend/internal/module/takeout"
 	"campus-circle/backend/internal/module/user"
 	"github.com/gin-gonic/gin"
@@ -98,6 +100,12 @@ func TestTakeoutReviewTargetsAgainstRealHTTPAndMySQL84(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	mediaRepository := coremedia.NewRepository(db)
+	mediaService := coremedia.NewService(mediaRepository)
+	mediaGateway, err := coremedia.NewMediaGateway(mediaRepository)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	auth := user.NewService(user.NewRepository(db), "g6a2-test-secret-that-is-longer-than-thirty-two-characters", "", "", true)
 	ordinary, err := auth.WechatLogin(ctx, user.LoginInput{Code: "g6a2-ordinary", Nickname: "G6A2 ordinary"})
@@ -112,7 +120,10 @@ func TestTakeoutReviewTargetsAgainstRealHTTPAndMySQL84(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	merchantApproved := createMerchant(t, ctx, merchants, uint64(administrator.User.ID), testMerchantPrefix+"Approved")
+	logoAsset := createApprovedMediaAsset(t, ctx, db, mediaService, uint64(administrator.User.ID), coremedia.PurposeMerchantLogo, "g6a2-logo-approved")
+	merchantApproved := createMerchant(t, ctx, merchants, uint64(administrator.User.ID), testMerchantPrefix+"Approved", logoAsset.AssetPublicID)
+	bindReviewTargetReference(t, ctx, mediaService, logoAsset, coremedia.PurposeMerchantLogo, merchantApproved.MerchantPublicID, merchantApproved.RowVersion)
+	assertReviewTargetMediaNotVisible(t, ctx, mediaGateway, coremedia.PurposeMerchantLogo, merchantApproved.MerchantPublicID, logoAsset.AssetPublicID)
 	merchantRejected := createMerchant(t, ctx, merchants, uint64(administrator.User.ID), testMerchantPrefix+"Rejected")
 	merchantRace := createMerchant(t, ctx, merchants, uint64(administrator.User.ID), testMerchantPrefix+"Race")
 	dishApproved := createDish(t, ctx, catalog, merchantApproved.MerchantPublicID, testDishPrefix+"Approved")
@@ -121,7 +132,7 @@ func TestTakeoutReviewTargetsAgainstRealHTTPAndMySQL84(t *testing.T) {
 	reviewRepository := review.NewRepository(db)
 	reviews := review.NewService(reviewRepository)
 	racingMerchants := &racingMerchantService{service: merchants, db: db, raceID: merchantRace.ID}
-	for _, target := range reviewtarget.NewTargets(racingMerchants, catalog) {
+	for _, target := range reviewtarget.NewTargets(racingMerchants, catalog, mediaService) {
 		reviews.RegisterTarget(target)
 	}
 
@@ -168,6 +179,7 @@ func TestTakeoutReviewTargetsAgainstRealHTTPAndMySQL84(t *testing.T) {
 	startAndDecide(t, server, administrator.Token, tasks["merchant-approved"], "approve", "merchant approved")
 	assertMerchantStatus(t, ctx, merchants, merchantApproved.MerchantPublicID, takeout.MerchantActive)
 	assertReviewTask(t, ctx, reviewRepository, tasks["merchant-approved"].ID, review.StatusApproved, "merchant approved")
+	assertReviewTargetMediaVisible(t, ctx, mediaGateway, coremedia.PurposeMerchantLogo, merchantApproved.MerchantPublicID, logoAsset.AssetPublicID)
 	startAndDecide(t, server, administrator.Token, tasks["merchant-rejected"], "reject", "merchant rejected")
 	assertMerchantStatus(t, ctx, merchants, merchantRejected.MerchantPublicID, takeout.MerchantRejected)
 	assertReviewTask(t, ctx, reviewRepository, tasks["merchant-rejected"].ID, review.StatusRejected, "merchant rejected")
@@ -202,18 +214,104 @@ func TestTakeoutReviewTargetsAgainstRealHTTPAndMySQL84(t *testing.T) {
 	}
 
 	t.Log("happy_path=PASS merchant approved/rejected; dish approved/rejected(draft retained)")
-	t.Logf("F_non_atomicity=EXPOSED http_status=%d target_error=%q task_status=%s merchant_status=%s", status, body.Message, raceTask.Status, raceMerchant.Status)
+	t.Logf("F_non_atomicity=EXPOSED http_status=%d target_error=%q task_status=%s merchant_status=%s logo_publish=GATEWAY_VISIBLE", status, body.Message, raceTask.Status, raceMerchant.Status)
 	cleanupG6A2(t, db)
 	assertG6A2Residue(t, db)
 }
 
-func createMerchant(t *testing.T, ctx context.Context, service *takeout.MerchantService, owner uint64, name string) takeout.Merchant {
+func createMerchant(t *testing.T, ctx context.Context, service *takeout.MerchantService, owner uint64, name string, logoAssetPublicID ...string) takeout.Merchant {
 	t.Helper()
-	value, err := service.CreateMerchant(ctx, takeout.CreateMerchantInput{OwnerUserID: owner, Name: name})
+	input := takeout.CreateMerchantInput{OwnerUserID: owner, Name: name}
+	if len(logoAssetPublicID) > 0 {
+		input.LogoAssetPublicID = &logoAssetPublicID[0]
+	}
+	value, err := service.CreateMerchant(ctx, input)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return value
+}
+
+func createApprovedMediaAsset(t *testing.T, ctx context.Context, db *gorm.DB, service *coremedia.Service, ownerID uint64, purpose coremedia.Purpose, idempotencyKey string) coremedia.Asset {
+	t.Helper()
+	asset, err := service.CreateAssetRecord(ctx, coremedia.NewAsset{OwnerID: ownerID, Purpose: purpose, IdempotencyKey: idempotencyKey})
+	if err != nil {
+		t.Fatal(err)
+	}
+	finalKey := "final/g6a2/" + asset.AssetPublicID + ".webp"
+	finalVersion := "g6a2-version-" + asset.AssetPublicID
+	if err := db.Model(&coremedia.Asset{}).Where("id = ?", asset.ID).Updates(map[string]any{
+		"storage_stage":      coremedia.StorageStageFinal,
+		"technical_status":   coremedia.TechnicalFinalReady,
+		"verified_mime":      "image/webp",
+		"byte_size":          2048,
+		"width":              640,
+		"height":             480,
+		"final_key":          finalKey,
+		"final_version_id":   finalVersion,
+		"projected_decision": coremedia.ReviewApproved,
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	projectionID, err := coremedia.NewULID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	if err := db.Create(&coremedia.ReviewProjection{
+		ProjectionID: projectionID, AssetID: asset.ID, Status: coremedia.ProjectionApproved,
+		AppliedDecisionVersion: 1, DecidedAt: &now, RowVersion: 1, CreatedAt: now, UpdatedAt: now,
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	return asset
+}
+
+func bindReviewTargetReference(t *testing.T, ctx context.Context, service *coremedia.Service, asset coremedia.Asset, purpose coremedia.Purpose, referenceID string, aggregateVersion uint64) {
+	t.Helper()
+	operationID, err := coremedia.NewULID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.CreateReferenceRecord(ctx, coremedia.AssetReference{
+		AssetID: asset.ID, ReferenceType: purpose, ReferenceID: referenceID, Slot: 0,
+		Status: coremedia.ReferencePending, ParentVisibility: coremedia.ParentHidden,
+		AggregateVersion: aggregateVersion, OperationID: operationID, RowVersion: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func assertReviewTargetMediaNotVisible(t *testing.T, ctx context.Context, gateway *coremedia.MediaGateway, purpose coremedia.Purpose, referenceID, assetPublicID string) {
+	t.Helper()
+	if _, err := gateway.BuildDisplayView(ctx, purpose, referenceID, 0); !errors.Is(err, coremedia.ErrMediaNotVisible) {
+		t.Fatalf("media reference should be hidden before review approval reference=%s err=%v", referenceID, err)
+	}
+	visibility, err := gateway.CheckVisibility(ctx, assetPublicID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if visibility.Visible {
+		t.Fatalf("asset should be hidden before review approval: %+v", visibility)
+	}
+}
+
+func assertReviewTargetMediaVisible(t *testing.T, ctx context.Context, gateway *coremedia.MediaGateway, purpose coremedia.Purpose, referenceID, assetPublicID string) {
+	t.Helper()
+	view, err := gateway.BuildDisplayView(ctx, purpose, referenceID, 0)
+	if err != nil {
+		t.Fatalf("media reference should be visible after review approval reference=%s err=%v", referenceID, err)
+	}
+	if view.Media.MediaID != assetPublicID {
+		t.Fatalf("visible media=%s want=%s", view.Media.MediaID, assetPublicID)
+	}
+	visibility, err := gateway.CheckVisibility(ctx, assetPublicID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !visibility.Visible {
+		t.Fatalf("asset should be visible after review approval: %+v", visibility)
+	}
 }
 
 func createDish(t *testing.T, ctx context.Context, service *takeout.CatalogService, merchantID, name string) takeout.Dish {
@@ -336,6 +434,30 @@ func assertG6A2Schema(t *testing.T, db *gorm.DB) {
 
 func cleanupG6A2(t *testing.T, db *gorm.DB) {
 	t.Helper()
+	var assetIDs []uint64
+	if err := db.Model(&coremedia.Asset{}).Where("idempotency_key LIKE ?", "g6a2-%").Pluck("id", &assetIDs).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(assetIDs) > 0 {
+		var projectionIDs []string
+		if err := db.Model(&coremedia.ReviewProjection{}).Where("asset_id IN ?", assetIDs).Pluck("projection_id", &projectionIDs).Error; err != nil {
+			t.Fatal(err)
+		}
+		if len(projectionIDs) > 0 {
+			if err := db.Where("projection_id IN ?", projectionIDs).Delete(&coremedia.ReviewDecision{}).Error; err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := db.Where("asset_id IN ?", assetIDs).Delete(&coremedia.AssetReference{}).Error; err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Where("asset_id IN ?", assetIDs).Delete(&coremedia.ReviewProjection{}).Error; err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Where("id IN ?", assetIDs).Delete(&coremedia.Asset{}).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
 	if err := db.Where("risk LIKE ?", "g6a2-%").Delete(&review.Task{}).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -362,6 +484,7 @@ func assertG6A2Residue(t *testing.T, db *gorm.DB) {
 		{name: "merchants", model: &takeout.Merchant{}, query: "name LIKE ?", arg: testMerchantPrefix + "%"},
 		{name: "dishes", model: &takeout.Dish{}, query: "name LIKE ?", arg: testDishPrefix + "%"},
 		{name: "users", model: &user.User{}, query: "open_id IN ?", arg: []string{"mock_openid_g6a2-ordinary", "mock_openid_g6a2-admin"}},
+		{name: "media_assets", model: &coremedia.Asset{}, query: "idempotency_key LIKE ?", arg: "g6a2-%"},
 	}
 	for _, check := range checks {
 		var count int64
@@ -372,5 +495,5 @@ func assertG6A2Residue(t *testing.T, db *gorm.DB) {
 			t.Errorf("%s residue=%d", check.name, count)
 		}
 	}
-	t.Log("residue review_tasks=0 merchants=0 dishes=0 users=0")
+	t.Log("residue review_tasks=0 merchants=0 dishes=0 users=0 media_assets=0")
 }
