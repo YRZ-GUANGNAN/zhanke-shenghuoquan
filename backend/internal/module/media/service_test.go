@@ -35,6 +35,9 @@ func (*repositoryStub) CreateReference(context.Context, *AssetReference) error {
 func (r *repositoryStub) FindReference(context.Context, uint64) (AssetReference, error) {
 	return r.reference, nil
 }
+func (r *repositoryStub) FindReferenceByCoordinates(context.Context, uint64, Purpose, string, uint16) (AssetReference, error) {
+	return r.reference, nil
+}
 func (*repositoryStub) CASReferenceStatus(context.Context, uint64, uint64, ReferenceStatus, ReferenceStatus) error {
 	return nil
 }

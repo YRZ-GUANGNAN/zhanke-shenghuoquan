@@ -25,6 +25,7 @@ type Repository interface {
 
 	CreateReference(context.Context, *AssetReference) error
 	FindReference(context.Context, uint64) (AssetReference, error)
+	FindReferenceByCoordinates(context.Context, uint64, Purpose, string, uint16) (AssetReference, error)
 	CASReferenceStatus(context.Context, uint64, uint64, ReferenceStatus, ReferenceStatus) error
 	CASParentVisibility(context.Context, uint64, uint64, ParentVisibility, ParentVisibility) error
 	RebuildActiveRefCount(context.Context, uint64) (uint64, error)
@@ -85,6 +86,14 @@ func (r *GormRepository) CreateReference(ctx context.Context, value *AssetRefere
 func (r *GormRepository) FindReference(ctx context.Context, id uint64) (AssetReference, error) {
 	var value AssetReference
 	err := r.db.WithContext(ctx).First(&value, id).Error
+	return value, normalizeNotFound(err)
+}
+
+func (r *GormRepository) FindReferenceByCoordinates(ctx context.Context, assetID uint64, referenceType Purpose, referenceID string, slot uint16) (AssetReference, error) {
+	var value AssetReference
+	err := r.db.WithContext(ctx).
+		Where("asset_id = ? AND reference_type = ? AND reference_id = ? AND slot = ?", assetID, referenceType, referenceID, slot).
+		First(&value).Error
 	return value, normalizeNotFound(err)
 }
 

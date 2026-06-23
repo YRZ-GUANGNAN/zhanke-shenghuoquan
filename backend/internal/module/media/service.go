@@ -97,6 +97,44 @@ func (s *Service) TransitionReferenceVisibility(ctx context.Context, id, version
 	return s.repository.CASParentVisibility(ctx, id, version, from, to)
 }
 
+func (s *Service) PublishReference(ctx context.Context, assetPublicID string, referenceType Purpose, referenceID string, slot uint16) error {
+	if !ValidULID(assetPublicID) {
+		return ErrInvalidULID
+	}
+	if !referenceType.Valid() || referenceID == "" {
+		return ErrInvalidRecord
+	}
+	asset, err := s.repository.FindAsset(ctx, assetPublicID)
+	if err != nil {
+		return err
+	}
+	reference, err := s.repository.FindReferenceByCoordinates(ctx, asset.ID, referenceType, referenceID, slot)
+	if err != nil {
+		return err
+	}
+	switch reference.Status {
+	case ReferencePending:
+		if err := s.TransitionReference(ctx, reference.ID, reference.RowVersion, ReferencePending, ReferenceActive); err != nil {
+			return err
+		}
+		reference, err = s.repository.FindReference(ctx, reference.ID)
+		if err != nil {
+			return err
+		}
+	case ReferenceActive:
+	default:
+		return ErrInvalidTransition
+	}
+	switch reference.ParentVisibility {
+	case ParentHidden:
+		return s.TransitionReferenceVisibility(ctx, reference.ID, reference.RowVersion, ParentHidden, ParentVisible)
+	case ParentVisible:
+		return nil
+	default:
+		return ErrInvalidTransition
+	}
+}
+
 func (s *Service) RebuildActiveRefCount(ctx context.Context, assetID uint64) (uint64, error) {
 	if assetID == 0 {
 		return 0, ErrInvalidRecord
