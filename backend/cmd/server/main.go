@@ -45,7 +45,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("configure Tencent COS: %v", err)
 	}
-	wechatMediaSafety, err := legacymedia.NewWechatSafety(cfg.WechatAppID, cfg.WechatAppSecret, cfg.WechatAPIBase)
+	wechatMediaSafety, err := newWechatMediaSafety(cfg)
 	if err != nil {
 		log.Fatalf("configure WeChat media safety: %v", err)
 	}
@@ -227,4 +227,11 @@ func main() {
 	if err := router.Run(cfg.HTTPAddr); err != nil {
 		log.Fatalf("run server: %v", err)
 	}
+}
+
+func newWechatMediaSafety(cfg config.Config) (legacymedia.SafetyChecker, error) {
+	if cfg.AppEnv != "prod" && cfg.AllowMockWechat && cfg.WechatAppID == "" && cfg.WechatAppSecret == "" {
+		return legacymedia.NewLocalNoopSafety(), nil
+	}
+	return legacymedia.NewWechatSafety(cfg.WechatAppID, cfg.WechatAppSecret, cfg.WechatAPIBase)
 }
