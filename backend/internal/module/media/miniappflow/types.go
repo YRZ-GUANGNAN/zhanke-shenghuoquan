@@ -78,6 +78,11 @@ type History struct {
 	Total    int64         `json:"total"`
 }
 
+type ResolvedDisplayURL struct {
+	URL              string `json:"url"`
+	ExpiresInSeconds int64  `json:"expiresInSeconds"`
+}
+
 type StatusFact struct {
 	AssetID         uint64
 	AssetPublicID   string

@@ -2,6 +2,7 @@ package miniappflow
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -54,6 +55,65 @@ func TestDisplayContentFailClosedNotFound(t *testing.T) {
 func TestDisplayContentRejectsInvalidRouteParams(t *testing.T) {
 	router := displayTestRouter(fakeDisplayContent{err: errors.New("must not call display service")})
 	for _, path := range []string{"/display/invalid/dish-1/0/content", "/display/dish/dish-1/not-a-slot/content"} {
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, path, nil)
+		router.ServeHTTP(recorder, request)
+		if recorder.Code != http.StatusBadRequest {
+			t.Fatalf("path=%s status=%d body=%s", path, recorder.Code, recorder.Body.String())
+		}
+	}
+}
+
+func TestResolveContentURLReturnsSignedURLJSON(t *testing.T) {
+	router := displayTestRouter(fakeDisplayContent{value: "https://signed.example.test/final.webp?q-signature=short"})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/resolve/dish/dish-1/0", nil)
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	var envelope struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Data    struct {
+			URL              string `json:"url"`
+			ExpiresInSeconds int64  `json:"expiresInSeconds"`
+			FinalKey         string `json:"finalKey"`
+			FinalVersionID   string `json:"finalVersionId"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &envelope); err != nil {
+		t.Fatal(err)
+	}
+	if envelope.Code != 0 || envelope.Message != "ok" {
+		t.Fatalf("unexpected envelope: %+v", envelope)
+	}
+	if envelope.Data.URL != "https://signed.example.test/final.webp?q-signature=short" {
+		t.Fatalf("url=%q", envelope.Data.URL)
+	}
+	if envelope.Data.ExpiresInSeconds != int64(coremedia.MediaDisplayURLTTL.Seconds()) {
+		t.Fatalf("ttl=%d", envelope.Data.ExpiresInSeconds)
+	}
+	if envelope.Data.FinalKey != "" || envelope.Data.FinalVersionID != "" {
+		t.Fatalf("storage identity leaked: %+v", envelope.Data)
+	}
+}
+
+func TestResolveContentURLFailClosedNotFound(t *testing.T) {
+	for _, err := range []error{coremedia.ErrNotFound, coremedia.ErrMediaNotVisible, coremedia.ErrReviewProjectionUnavailable} {
+		router := displayTestRouter(fakeDisplayContent{err: err})
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "/resolve/dish/dish-1/0", nil)
+		router.ServeHTTP(recorder, request)
+		if recorder.Code != http.StatusNotFound {
+			t.Fatalf("err=%v status=%d body=%s", err, recorder.Code, recorder.Body.String())
+		}
+	}
+}
+
+func TestResolveContentURLRejectsInvalidRouteParams(t *testing.T) {
+	router := displayTestRouter(fakeDisplayContent{err: errors.New("must not call display service")})
+	for _, path := range []string{"/resolve/invalid/dish-1/0", "/resolve/dish/dish-1/not-a-slot"} {
 		recorder := httptest.NewRecorder()
 		request := httptest.NewRequest(http.MethodGet, path, nil)
 		router.ServeHTTP(recorder, request)

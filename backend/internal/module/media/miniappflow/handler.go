@@ -38,6 +38,7 @@ func (h *Handler) Register(group *gin.RouterGroup) {
 	group.GET("/assets/:assetId", h.status)
 	group.GET("/uploads", h.history)
 	group.GET("/display/:referenceType/:referenceId/:slot/content", h.displayContent)
+	group.GET("/resolve/:referenceType/:referenceId/:slot", h.resolveContentURL)
 }
 
 func (h *Handler) createUpload(c *gin.Context) {
@@ -124,6 +125,33 @@ func (h *Handler) displayContent(c *gin.Context) {
 	}
 	c.Header("Location", value)
 	c.Status(http.StatusFound)
+}
+
+func (h *Handler) resolveContentURL(c *gin.Context) {
+	if h.display == nil {
+		response.Fail(c, http.StatusNotFound, "media content not found")
+		return
+	}
+	referenceType := coremedia.Purpose(c.Param("referenceType"))
+	if !referenceType.Valid() {
+		response.Fail(c, http.StatusBadRequest, "invalid media reference")
+		return
+	}
+	referenceID := strings.TrimSpace(c.Param("referenceId"))
+	slot, err := strconv.ParseUint(c.Param("slot"), 10, 16)
+	if err != nil {
+		response.Fail(c, http.StatusBadRequest, "invalid media reference")
+		return
+	}
+	value, err := h.display.ContentURL(c.Request.Context(), referenceType, referenceID, uint16(slot))
+	if err != nil {
+		h.writeDisplayError(c, err)
+		return
+	}
+	response.OK(c, ResolvedDisplayURL{
+		URL:              value,
+		ExpiresInSeconds: int64(coremedia.MediaDisplayURLTTL.Seconds()),
+	})
 }
 
 func positivePage(raw string) (int, error) {
