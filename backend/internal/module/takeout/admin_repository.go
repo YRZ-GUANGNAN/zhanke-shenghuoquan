@@ -109,3 +109,53 @@ func (r *GormRepository) ListSettlementSummaries(ctx context.Context, page, size
 }
 
 var _ AdminQueryRepository = (*GormRepository)(nil)
+
+func (r *GormRepository) ListActiveMerchants(ctx context.Context, page, size int) ([]Merchant, int64, error) {
+	query := r.db.WithContext(ctx).Model(&Merchant{}).Where("status = ?", MerchantActive)
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var values []Merchant
+	err := query.Order("created_at DESC, id DESC").Offset((page - 1) * size).Limit(size).Find(&values).Error
+	return values, total, err
+}
+
+func (r *GormRepository) FindActiveMerchant(ctx context.Context, merchantPublicID string) (Merchant, error) {
+	var value Merchant
+	err := r.db.WithContext(ctx).
+		Where("merchant_public_id = ? AND status = ?", merchantPublicID, MerchantActive).
+		First(&value).Error
+	return value, normalizeNotFound(err)
+}
+
+func (r *GormRepository) ListOnShelfDishesByMerchant(ctx context.Context, merchantPublicID string, page, size int) ([]Dish, int64, error) {
+	query := r.db.WithContext(ctx).
+		Model(&Dish{}).
+		Joins("JOIN takeout_merchants AS m ON m.merchant_public_id = takeout_dishes.merchant_public_id").
+		Where("takeout_dishes.merchant_public_id = ? AND takeout_dishes.status = ? AND m.status = ?", merchantPublicID, DishOnShelf, MerchantActive)
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var values []Dish
+	err := query.Order("takeout_dishes.sort_order ASC, takeout_dishes.created_at DESC, takeout_dishes.id DESC").
+		Offset((page - 1) * size).Limit(size).Find(&values).Error
+	return values, total, err
+}
+
+func (r *GormRepository) ListOrdersByBuyer(ctx context.Context, buyerUserID uint64, status OrderStatus, page, size int) ([]Order, int64, error) {
+	query := r.db.WithContext(ctx).Model(&Order{}).Where("buyer_user_id = ?", buyerUserID)
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var values []Order
+	err := query.Order("created_at DESC, id DESC").Offset((page - 1) * size).Limit(size).Find(&values).Error
+	return values, total, err
+}
+
+var _ BuyerQueryRepository = (*GormRepository)(nil)

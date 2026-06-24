@@ -107,3 +107,57 @@ func normalizeAdminPage(page, size int) (int, int) {
 	}
 	return page, size
 }
+
+type BuyerQueryRepository interface {
+	ListActiveMerchants(context.Context, int, int) ([]Merchant, int64, error)
+	FindActiveMerchant(context.Context, string) (Merchant, error)
+	ListOnShelfDishesByMerchant(context.Context, string, int, int) ([]Dish, int64, error)
+	ListOrdersByBuyer(context.Context, uint64, OrderStatus, int, int) ([]Order, int64, error)
+}
+
+var _ BuyerQueryRepository = (*GormRepository)(nil)
+
+type BuyerQueryService struct{ repository BuyerQueryRepository }
+
+func NewBuyerQueryService(repository BuyerQueryRepository) (*BuyerQueryService, error) {
+	if repository == nil {
+		return nil, ErrInvalidRecord
+	}
+	return &BuyerQueryService{repository: repository}, nil
+}
+
+func (s *BuyerQueryService) ActiveMerchants(ctx context.Context, page, size int) ([]Merchant, int64, error) {
+	page, size = normalizeAdminPage(page, size)
+	return s.repository.ListActiveMerchants(ctx, page, size)
+}
+
+func (s *BuyerQueryService) ActiveMerchant(ctx context.Context, merchantPublicID string) (Merchant, error) {
+	merchantPublicID = strings.TrimSpace(merchantPublicID)
+	if !ValidULID(merchantPublicID) {
+		return Merchant{}, ErrInvalidULID
+	}
+	return s.repository.FindActiveMerchant(ctx, merchantPublicID)
+}
+
+func (s *BuyerQueryService) OnShelfDishes(ctx context.Context, merchantPublicID string, page, size int) ([]Dish, int64, error) {
+	merchantPublicID = strings.TrimSpace(merchantPublicID)
+	if !ValidULID(merchantPublicID) {
+		return nil, 0, ErrInvalidULID
+	}
+	if _, err := s.repository.FindActiveMerchant(ctx, merchantPublicID); err != nil {
+		return nil, 0, err
+	}
+	page, size = normalizeAdminPage(page, size)
+	return s.repository.ListOnShelfDishesByMerchant(ctx, merchantPublicID, page, size)
+}
+
+func (s *BuyerQueryService) OrdersByBuyer(ctx context.Context, buyerUserID uint64, status OrderStatus, page, size int) ([]Order, int64, error) {
+	if buyerUserID == 0 {
+		return nil, 0, ErrInvalidRecord
+	}
+	if status != "" && !status.Valid() {
+		return nil, 0, ErrInvalidRecord
+	}
+	page, size = normalizeAdminPage(page, size)
+	return s.repository.ListOrdersByBuyer(ctx, buyerUserID, status, page, size)
+}
