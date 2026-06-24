@@ -1,0 +1,152 @@
+.takeout-page {
+  background: linear-gradient(180deg, #fff8e5 0, #f7fbff 360rpx, #f5f8fb 100%);
+}
+
+.takeout-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20rpx;
+  margin: 0 -24rpx 24rpx;
+  padding: 46rpx 24rpx 36rpx;
+  background: linear-gradient(135deg, #ffd55e, #ff934d);
+}
+
+.takeout-hero__title {
+  display: block;
+  color: #1f2937;
+  font-size: 48rpx;
+  font-weight: 900;
+}
+
+.takeout-hero__desc,
+.takeout-muted {
+  display: block;
+  color: #6b7280;
+  font-size: 24rpx;
+  line-height: 1.5;
+}
+
+.takeout-hero__desc {
+  max-width: 470rpx;
+  margin-top: 12rpx;
+  color: rgba(31, 41, 55, 0.78);
+  font-weight: 700;
+}
+
+.takeout-merchant-strip {
+  width: 100%;
+  margin-bottom: 22rpx;
+  white-space: nowrap;
+}
+
+.takeout-merchant-strip__inner {
+  display: inline-flex;
+  gap: 16rpx;
+}
+
+.takeout-merchant-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 12rpx;
+  min-height: 74rpx;
+  padding: 10rpx 18rpx;
+  border-radius: 999rpx;
+  background: #fff;
+  color: #38455a;
+  font-size: 25rpx;
+  font-weight: 800;
+  box-shadow: 0 8rpx 24rpx rgba(35, 58, 88, 0.08);
+}
+
+.takeout-merchant-chip--active {
+  background: #1677ff;
+  color: #fff;
+}
+
+.takeout-merchant-chip__logo {
+  width: 52rpx;
+  height: 52rpx;
+  overflow: hidden;
+  border-radius: 50%;
+}
+
+.takeout-card,
+.takeout-shop-card,
+.takeout-dish-card {
+  margin-bottom: 22rpx;
+  padding: 24rpx;
+}
+
+.takeout-shop-card,
+.takeout-dish-card {
+  display: flex;
+  gap: 18rpx;
+}
+
+.takeout-shop-card__logo {
+  flex: 0 0 auto;
+  width: 132rpx;
+  height: 132rpx;
+  overflow: hidden;
+  border-radius: 26rpx;
+}
+
+.takeout-shop-card__body,
+.takeout-dish-card__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.takeout-shop-card__name,
+.takeout-dish-card__name,
+.takeout-section-title {
+  display: block;
+  color: #203550;
+  font-size: 32rpx;
+  font-weight: 900;
+}
+
+.takeout-section-title {
+  margin: 30rpx 4rpx 18rpx;
+}
+
+.takeout-dish-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18rpx;
+}
+
+.takeout-dish-card__image {
+  flex: 0 0 auto;
+  width: 170rpx;
+  height: 170rpx;
+  overflow: hidden;
+  border-radius: 22rpx;
+}
+
+.takeout-dish-card__actions {
+  gap: 12rpx;
+  margin-top: 18rpx;
+}
+
+.takeout-price {
+  color: #ff6b35;
+  font-size: 34rpx;
+  font-weight: 900;
+}
+
+.takeout-cart-bar {
+  position: fixed;
+  right: 24rpx;
+  bottom: 132rpx;
+  left: 24rpx;
+  z-index: 21;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18rpx 20rpx;
+  color: #203550;
+  font-size: 30rpx;
+  font-weight: 900;
+}

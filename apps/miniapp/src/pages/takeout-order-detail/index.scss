@@ -1,0 +1,73 @@
+.takeout-order-detail-page {
+  background: #f5f8fb;
+}
+
+.detail-card {
+  margin-bottom: 22rpx;
+  padding: 24rpx;
+}
+
+.detail-title,
+.detail-section-title,
+.detail-item-name {
+  display: block;
+  color: #203550;
+  font-size: 32rpx;
+  font-weight: 900;
+}
+
+.detail-section-title,
+.detail-item-name {
+  font-size: 28rpx;
+}
+
+.detail-tip,
+.detail-warning {
+  display: block;
+  margin-top: 10rpx;
+  color: #7b8794;
+  font-size: 24rpx;
+  line-height: 1.5;
+}
+
+.detail-warning {
+  color: #b45309;
+  font-weight: 800;
+}
+
+.detail-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46rpx;
+  padding: 0 18rpx;
+  border-radius: 999rpx;
+  background: #fff4d8;
+  color: #9b6200;
+  font-size: 22rpx;
+  font-weight: 900;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 20rpx;
+  padding: 18rpx 0;
+  border-bottom: 1rpx solid #edf1f6;
+}
+
+.detail-price {
+  color: #ff6b35;
+  font-size: 28rpx;
+  font-weight: 900;
+}
+
+.detail-total {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+  align-items: flex-end;
+  margin-top: 18rpx;
+  color: #4b5563;
+  font-size: 25rpx;
+}
