@@ -8,7 +8,9 @@ Branch: `feat/media-resolve-url`
 
 Baseline: `813eb765 feat(G-7a): add buyer takeout backend API`
 
-Final commit: `TO_BE_FILLED`
+Implementation commit: `3833c15`
+
+Final branch HEAD: provided in the handoff output after the docs metadata commit.
 
 This controlled media patch adds one authenticated miniapp endpoint that resolves a visible media reference into a short-lived Tencent COS signed GET URL for use by miniapp `<Image>` components.
 

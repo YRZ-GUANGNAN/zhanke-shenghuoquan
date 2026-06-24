@@ -2,7 +2,9 @@
 
 Status: PASS
 
-Final commit: `TO_BE_FILLED`
+Implementation commit: `3833c15`
+
+Final branch HEAD: provided in the handoff output after the docs metadata commit.
 
 ## Database residue
 

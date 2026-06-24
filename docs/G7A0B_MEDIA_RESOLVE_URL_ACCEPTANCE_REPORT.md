@@ -8,7 +8,9 @@ Branch: `feat/media-resolve-url`
 
 Baseline: `813eb765 feat(G-7a): add buyer takeout backend API`
 
-Final commit: `TO_BE_FILLED`
+Implementation commit: `3833c15`
+
+Final branch HEAD: provided in the handoff output after the docs metadata commit.
 
 The authenticated resolve endpoint is implemented and verified. It lets the miniapp call with `Taro.request` and receive a short-lived COS signed URL that can be assigned to `<Image src>`.
 
