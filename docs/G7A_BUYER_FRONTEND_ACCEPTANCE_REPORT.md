@@ -10,7 +10,9 @@ Branch: `feat/g7a-ui-buyer`
 
 Baseline: `a2af8ba6 docs(G-7a): record media resolve URL acceptance evidence`
 
-Final commit: `TO_BE_FILLED`
+Implementation commit: `acc6d46`
+
+Final branch HEAD: provided in the handoff output after the docs metadata commit.
 
 ## Acceptance matrix
 
