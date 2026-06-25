@@ -10,6 +10,9 @@ func validConfig() Config {
 		MeiliHost: "http://meilisearch:7700", MeiliMasterKey: "meili-secret-that-is-long-enough", MeiliIndex: "products",
 		COSSecretID: "cos-id", COSSecretKey: "cos-key", COSBucket: "campus-1234567890", COSRegion: "ap-guangzhou", COSAppID: "1234567890",
 		MediaPublicBaseURL: "https://api.example.com", WechatCallbackToken: "wechat-callback-token-strong",
+		WechatPayMchID: "1900000001", WechatPayAPIv3Key: "pay-api-v3-key-32-bytes-long",
+		WechatPayMerchantSerialNo: "PAY-SERIAL-NO", WechatPayPrivateKeyPath: "testdata/apiclient_key.pem",
+		WechatPayNotifyURL: "https://api.example.com/api/v1/takeout/payments/wechat/notify",
 	}
 }
 
@@ -27,6 +30,8 @@ func TestProductionConfigurationRejectsUnsafeAuthentication(t *testing.T) {
 		{name: "missing cos", mutate: func(c *Config) { c.COSBucket = "" }},
 		{name: "unsafe media base", mutate: func(c *Config) { c.MediaPublicBaseURL = "http://api.example.com" }},
 		{name: "short callback token", mutate: func(c *Config) { c.WechatCallbackToken = "short" }},
+		{name: "mock payment enabled", mutate: func(c *Config) { c.AllowMockPayment = true }},
+		{name: "missing payment credential", mutate: func(c *Config) { c.WechatPayMchID = "" }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			cfg := validConfig()
@@ -35,6 +40,21 @@ func TestProductionConfigurationRejectsUnsafeAuthentication(t *testing.T) {
 				t.Fatal("unsafe production configuration was accepted")
 			}
 		})
+	}
+}
+
+func TestLocalMockPaymentIsolation(t *testing.T) {
+	cfg := Config{
+		AppEnv: "dev", JWTSecret: "local-secret-that-is-longer-than-thirty-two-characters",
+		WechatAppID: "", WechatAppSecret: "", AllowMockWechat: true, AllowMockPayment: true,
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("local mock payment should be allowed without real pay credentials: %v", err)
+	}
+
+	cfg.WechatPayMchID = "1900000001"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("mock payment with partial real credentials was accepted")
 	}
 }
 

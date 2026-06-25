@@ -17,6 +17,7 @@ import (
 	"campus-circle/backend/internal/module/admin/takeoutconsole"
 	takeoutreview "campus-circle/backend/internal/module/admin/takeoutconsole/reviewtarget"
 	"campus-circle/backend/internal/module/admin/takeoutmerchant"
+	"campus-circle/backend/internal/module/admin/takeoutpayment"
 	"campus-circle/backend/internal/module/admin/takeoutrider"
 	"campus-circle/backend/internal/module/community"
 	"campus-circle/backend/internal/module/im"
@@ -154,6 +155,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("configure takeout order service: %v", err)
 	}
+	paymentService, err := takeout.NewPaymentService(takeoutRepository, orderService, nil)
+	if err != nil {
+		log.Fatalf("configure takeout payment service: %v", err)
+	}
+	paymentProvider, err := takeoutpayment.NewProviderFromConfig(cfg)
+	if err != nil {
+		log.Fatalf("configure takeout payment provider: %v", err)
+	}
 	riderOrderOps, err := takeout.NewRiderOrderOps(takeoutRepository, nil)
 	if err != nil {
 		log.Fatalf("configure takeout rider order operations: %v", err)
@@ -229,6 +238,16 @@ func main() {
 	takeoutbuyer.NewHandler(takeoutBuyerQuery, orderService, func(c *gin.Context) uint64 {
 		return uint64(user.CurrentUserID(c))
 	}).Register(takeoutBuyerRoutes)
+	takeoutpayment.NewHandler(paymentService, paymentProvider, func(c *gin.Context) uint64 {
+		return uint64(user.CurrentUserID(c))
+	}, func(c *gin.Context) string {
+		return user.CurrentUser(c).OpenID
+	}).RegisterBuyer(takeoutBuyerRoutes)
+	takeoutpayment.NewHandler(paymentService, paymentProvider, func(c *gin.Context) uint64 {
+		return uint64(user.CurrentUserID(c))
+	}, func(c *gin.Context) string {
+		return user.CurrentUser(c).OpenID
+	}).RegisterWebhook(api.Group("/takeout/payments"))
 	takeoutRiderRoutes := api.Group("/takeout/rider", userService.AuthRequired())
 	takeoutrider.NewHandler(takeoutRiderService, func(c *gin.Context) uint64 {
 		return uint64(user.CurrentUserID(c))

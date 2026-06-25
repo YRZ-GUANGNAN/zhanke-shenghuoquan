@@ -84,6 +84,25 @@ export interface BuyerOrderDetail {
   items: BuyerOrderItem[]
 }
 
+export interface BuyerPaymentParameters {
+  timeStamp: string
+  nonceStr: string
+  package: string
+  signType: string
+  paySign: string
+}
+
+export interface BuyerPaymentResponse {
+  mode: 'mock' | 'wechat'
+  paymentPublicId: string
+  orderPublicId: string
+  amountCents: number
+  outTradeNo: string
+  status: 'created' | 'prepay_issued' | 'paid' | 'failed' | 'closed'
+  order: BuyerOrder
+  wechat?: BuyerPaymentParameters
+}
+
 export interface CreateBuyerOrderInput {
   merchantPublicId: string
   items: Array<{ dishPublicId: string; quantity: number }>
@@ -127,6 +146,10 @@ export function listBuyerOrders(status?: OrderStatus, page = 1, pageSize = 50): 
 
 export function getBuyerOrderDetail(orderPublicId: string): Promise<BuyerOrderDetail> {
   return request<BuyerOrderDetail>(`${BASE}/orders/${encodeURIComponent(orderPublicId)}`, { url: '', timeout: 10000 })
+}
+
+export function payBuyerOrder(orderPublicId: string): Promise<BuyerPaymentResponse> {
+  return request<BuyerPaymentResponse>(`${BASE}/orders/${encodeURIComponent(orderPublicId)}/pay`, { url: '', method: 'POST', timeout: 15000 })
 }
 
 export function resolveDisplayContentURL(contentUrl: string): Promise<ResolvedDisplayURL> {

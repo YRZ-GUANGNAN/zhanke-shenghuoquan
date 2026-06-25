@@ -37,6 +37,15 @@ type Config struct {
 	WechatAppID     string
 	WechatAppSecret string
 	AllowMockWechat bool
+
+	WechatPayMchID            string
+	WechatPayAPIv3Key         string
+	WechatPayMerchantSerialNo string
+	WechatPayPrivateKeyPath   string
+	WechatPayNotifyURL        string
+	WechatPayAPIBase          string
+	WechatPayPlatformKeyPath  string
+	AllowMockPayment          bool
 }
 
 func Load() (Config, error) {
@@ -69,6 +78,15 @@ func Load() (Config, error) {
 		WechatAppID:     env("WECHAT_APP_ID", ""),
 		WechatAppSecret: env("WECHAT_APP_SECRET", ""),
 		AllowMockWechat: envBool("ALLOW_MOCK_WECHAT_LOGIN", false),
+
+		WechatPayMchID:            env("WECHAT_PAY_MCH_ID", ""),
+		WechatPayAPIv3Key:         env("WECHAT_PAY_API_V3_KEY", ""),
+		WechatPayMerchantSerialNo: env("WECHAT_PAY_MERCHANT_SERIAL_NO", ""),
+		WechatPayPrivateKeyPath:   env("WECHAT_PAY_PRIVATE_KEY_PATH", ""),
+		WechatPayNotifyURL:        env("WECHAT_PAY_NOTIFY_URL", ""),
+		WechatPayAPIBase:          env("WECHAT_PAY_API_BASE", "https://api.mch.weixin.qq.com"),
+		WechatPayPlatformKeyPath:  env("WECHAT_PAY_PLATFORM_PUBLIC_KEY_PATH", ""),
+		AllowMockPayment:          envBool("ALLOW_MOCK_PAYMENT", false),
 	}
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err
@@ -83,12 +101,24 @@ func (c Config) Validate() error {
 	if (c.WechatAppID == "") != (c.WechatAppSecret == "") {
 		return errors.New("WECHAT_APP_ID and WECHAT_APP_SECRET must be configured together")
 	}
+	if c.WechatPayAnyCredentialSet() && !c.WechatPayConfigured() {
+		return errors.New("WeChat Pay credentials must be configured together")
+	}
+	if c.AllowMockPayment && c.WechatPayAnyCredentialSet() {
+		return errors.New("mock payment cannot be enabled with real WeChat Pay credentials")
+	}
 	if c.AppEnv == "prod" {
 		if c.WechatAppID == "" || c.WechatAppSecret == "" {
 			return errors.New("production requires WECHAT_APP_ID and WECHAT_APP_SECRET")
 		}
 		if c.AllowMockWechat {
 			return errors.New("mock WeChat login is forbidden in production")
+		}
+		if c.AllowMockPayment {
+			return errors.New("mock payment is forbidden in production")
+		}
+		if !c.WechatPayConfigured() {
+			return errors.New("production requires complete WeChat Pay credentials")
 		}
 		if c.TencentIMSDKAppID == "" || c.TencentIMSecret == "" || c.TencentIMAdmin == "" {
 			return errors.New("production requires Tencent IM SDKAppID, secret and administrator")
@@ -106,6 +136,16 @@ func (c Config) Validate() error {
 		return fmt.Errorf("WeChat credentials are missing; set ALLOW_MOCK_WECHAT_LOGIN=true only for local development")
 	}
 	return nil
+}
+
+func (c Config) WechatPayConfigured() bool {
+	return c.WechatPayMchID != "" && c.WechatPayAPIv3Key != "" && c.WechatPayMerchantSerialNo != "" &&
+		c.WechatPayPrivateKeyPath != "" && c.WechatPayNotifyURL != ""
+}
+
+func (c Config) WechatPayAnyCredentialSet() bool {
+	return c.WechatPayMchID != "" || c.WechatPayAPIv3Key != "" || c.WechatPayMerchantSerialNo != "" ||
+		c.WechatPayPrivateKeyPath != "" || c.WechatPayNotifyURL != "" || c.WechatPayPlatformKeyPath != ""
 }
 
 func env(key string, fallback string) string {

@@ -962,3 +962,224 @@ func (r *GormRepository) RejectWithdraw(
 	})
 	return value, err
 }
+
+// G-4 Payment methods extend the same Repository boundary without changing
+// any G-1/G-2/G-3/G-5/G-6 method or behavior.
+func (r *GormRepository) CreatePaymentAttempt(ctx context.Context, value *PaymentAttempt) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return tx.Create(value).Error
+	})
+}
+
+func (r *GormRepository) FindPaymentAttempt(ctx context.Context, publicID string) (PaymentAttempt, error) {
+	var value PaymentAttempt
+	err := r.db.WithContext(ctx).Where("payment_public_id = ?", publicID).First(&value).Error
+	return value, normalizeNotFound(err)
+}
+
+func (r *GormRepository) FindPaymentAttemptByOutTradeNo(ctx context.Context, outTradeNo string) (PaymentAttempt, error) {
+	var value PaymentAttempt
+	err := r.db.WithContext(ctx).Where("out_trade_no = ?", outTradeNo).First(&value).Error
+	return value, normalizeNotFound(err)
+}
+
+func (r *GormRepository) FindLatestPaymentAttemptByOrder(ctx context.Context, orderPublicID string, provider PaymentProvider) (PaymentAttempt, error) {
+	var value PaymentAttempt
+	err := r.db.WithContext(ctx).
+		Where("order_public_id = ? AND provider = ?", orderPublicID, provider).
+		Order("id DESC").First(&value).Error
+	return value, normalizeNotFound(err)
+}
+
+func (r *GormRepository) MarkPaymentAttemptPrepayIssued(
+	ctx context.Context,
+	paymentPublicID string,
+	expectedRowVersion uint64,
+	prepayID string,
+	updatedAt time.Time,
+) (PaymentAttempt, error) {
+	var result PaymentAttempt
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("payment_public_id = ?", paymentPublicID).First(&result).Error; err != nil {
+			return normalizeNotFound(err)
+		}
+		if result.Status == PaymentPrepayIssued {
+			if result.PrepayID == nil || *result.PrepayID != prepayID {
+				return ErrInvalidRecord
+			}
+			return nil
+		}
+		update := tx.Model(&PaymentAttempt{}).
+			Where("id = ? AND row_version = ? AND status = ?", result.ID, expectedRowVersion, PaymentCreated).
+			Updates(map[string]any{
+				"status": PaymentPrepayIssued, "prepay_id": prepayID,
+				"updated_at": updatedAt, "row_version": gorm.Expr("row_version + 1"),
+			})
+		if update.Error != nil {
+			return update.Error
+		}
+		if update.RowsAffected != 1 {
+			return ErrConcurrentUpdate
+		}
+		result.Status = PaymentPrepayIssued
+		result.PrepayID = &prepayID
+		result.RowVersion++
+		result.UpdatedAt = updatedAt
+		return nil
+	})
+	return result, err
+}
+
+func (r *GormRepository) CreatePaidPaymentAttemptAndMarkOrderPaid(
+	ctx context.Context,
+	attempt *PaymentAttempt,
+	expectedOrderRowVersion uint64,
+) (PaymentAttempt, Order, error) {
+	var order Order
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("order_public_id = ?", attempt.OrderPublicID).First(&order).Error; err != nil {
+			return normalizeNotFound(err)
+		}
+		if order.BuyerUserID != attempt.BuyerUserID {
+			return ErrPaymentForbidden
+		}
+		if order.TotalAmountCents != attempt.AmountCents {
+			return ErrPaymentAmount
+		}
+		if order.Status != OrderPendingPayment {
+			return ErrPaymentNotPending
+		}
+		if err := tx.Create(attempt).Error; err != nil {
+			return err
+		}
+		payNo := ""
+		if attempt.PayNo != nil {
+			payNo = *attempt.PayNo
+		}
+		updates, err := buildOrderTransitionUpdates(OrderPaid, &payNo, nil, *attempt.PaidAt)
+		if err != nil {
+			return err
+		}
+		updates["status"] = OrderPaid
+		updates["updated_at"] = *attempt.PaidAt
+		updates["row_version"] = gorm.Expr("row_version + 1")
+		update := tx.Model(&Order{}).
+			Where("id = ? AND row_version = ? AND status = ?", order.ID, expectedOrderRowVersion, OrderPendingPayment).
+			Updates(updates)
+		if update.Error != nil {
+			return update.Error
+		}
+		if update.RowsAffected != 1 {
+			return ErrConcurrentUpdate
+		}
+		applyOrderTransition(&order, OrderPaid, &payNo, nil, *attempt.PaidAt)
+		order.RowVersion++
+		order.UpdatedAt = *attempt.PaidAt
+		return nil
+	})
+	return *attempt, order, err
+}
+
+func (r *GormRepository) RecordPaymentNotificationAndMarkPaid(
+	ctx context.Context,
+	notification *PaymentNotification,
+	outTradeNo string,
+	transactionID string,
+	payNo string,
+	amountCents uint64,
+	paidAt time.Time,
+) (PaymentAttempt, Order, bool, error) {
+	var (
+		attempt   PaymentAttempt
+		order     Order
+		duplicate bool
+	)
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		createNotification := tx.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "body_sha256"}},
+			DoNothing: true,
+		}).Create(notification)
+		if createNotification.Error != nil {
+			return createNotification.Error
+		}
+		if createNotification.RowsAffected == 0 {
+			duplicate = true
+		}
+
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("out_trade_no = ?", outTradeNo).First(&attempt).Error; err != nil {
+			return normalizeNotFound(err)
+		}
+		if attempt.AmountCents != amountCents {
+			return ErrPaymentAmount
+		}
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("order_public_id = ?", attempt.OrderPublicID).First(&order).Error; err != nil {
+			return normalizeNotFound(err)
+		}
+		if order.TotalAmountCents != amountCents {
+			return ErrPaymentAmount
+		}
+		if attempt.Status == PaymentPaid {
+			if attempt.PayNo == nil || *attempt.PayNo != payNo ||
+				(attempt.WechatTransactionID != nil && *attempt.WechatTransactionID != transactionID) {
+				return ErrInvalidRecord
+			}
+			return nil
+		}
+		if attempt.Status != PaymentCreated && attempt.Status != PaymentPrepayIssued {
+			return ErrInvalidTransition
+		}
+		wechatTransactionID := transactionID
+		updateAttempt := tx.Model(&PaymentAttempt{}).
+			Where("id = ? AND row_version = ? AND status IN ?", attempt.ID, attempt.RowVersion, []PaymentStatus{PaymentCreated, PaymentPrepayIssued}).
+			Updates(map[string]any{
+				"status": PaymentPaid, "wechat_transaction_id": wechatTransactionID, "pay_no": payNo,
+				"paid_at": paidAt, "updated_at": paidAt, "row_version": gorm.Expr("row_version + 1"),
+			})
+		if updateAttempt.Error != nil {
+			return updateAttempt.Error
+		}
+		if updateAttempt.RowsAffected != 1 {
+			return ErrConcurrentUpdate
+		}
+		if order.Status == OrderPaid {
+			if order.PayNo == nil || *order.PayNo != payNo {
+				return ErrInvalidRecord
+			}
+		} else {
+			if order.Status != OrderPendingPayment {
+				return ErrPaymentNotPending
+			}
+			updates, err := buildOrderTransitionUpdates(OrderPaid, &payNo, nil, paidAt)
+			if err != nil {
+				return err
+			}
+			updates["status"] = OrderPaid
+			updates["updated_at"] = paidAt
+			updates["row_version"] = gorm.Expr("row_version + 1")
+			updateOrder := tx.Model(&Order{}).
+				Where("id = ? AND row_version = ? AND status = ?", order.ID, order.RowVersion, OrderPendingPayment).
+				Updates(updates)
+			if updateOrder.Error != nil {
+				return updateOrder.Error
+			}
+			if updateOrder.RowsAffected != 1 {
+				return ErrConcurrentUpdate
+			}
+			applyOrderTransition(&order, OrderPaid, &payNo, nil, paidAt)
+			order.RowVersion++
+			order.UpdatedAt = paidAt
+		}
+		attempt.Status = PaymentPaid
+		attempt.WechatTransactionID = &wechatTransactionID
+		attempt.PayNo = &payNo
+		attempt.PaidAt = &paidAt
+		attempt.RowVersion++
+		attempt.UpdatedAt = paidAt
+		return nil
+	})
+	return attempt, order, duplicate, err
+}

@@ -23,6 +23,14 @@ interface RequestResult<T = unknown> {
   data: T
 }
 
+interface RequestPaymentOptions {
+  timeStamp: string
+  nonceStr: string
+  package: string
+  signType: string
+  paySign: string
+}
+
 interface TaroFacade {
   navigateTo(options: NavigateOptions): Promise<unknown>
   redirectTo(options: NavigateOptions): Promise<unknown>
@@ -38,6 +46,7 @@ interface TaroFacade {
   compressImage(options: { src: string; quality: number; compressedWidth?: number; compressedHeight?: number; format?: 'webp' }): Promise<{ tempFilePath: string }>
   getFileInfo(options: { filePath: string; digestAlgorithm?: 'md5' | 'sha1' }): Promise<{ size: number; digest: string }>
   getFileSystemManager(): { readFileSync(filePath: string): ArrayBuffer | ArrayBufferView | string }
+  requestPayment(options: RequestPaymentOptions): Promise<unknown>
 }
 
 export default TaroRuntime as unknown as TaroFacade
