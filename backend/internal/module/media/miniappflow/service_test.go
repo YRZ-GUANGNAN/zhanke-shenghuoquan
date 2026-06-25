@@ -59,20 +59,34 @@ type projectionStub struct{ value coremedia.ReviewProjection }
 func (s *projectionStub) EnsureProjection(context.Context, string) (coremedia.ReviewProjection, bool, error) {
 	return s.value, true, nil
 }
+func (s *projectionStub) Find(context.Context, string) (coremedia.ReviewProjection, error) {
+	return s.value, nil
+}
 
-type outboxStub struct{ value *coremedia.OutboxEvent }
+type outboxStub struct{ values []*coremedia.OutboxEvent }
 
 func (s *outboxStub) AppendOutbox(_ context.Context, value *coremedia.OutboxEvent) error {
-	s.value = value
+	s.values = append(s.values, value)
 	return nil
 }
 
+func (s *outboxStub) last() *coremedia.OutboxEvent {
+	if len(s.values) == 0 {
+		return nil
+	}
+	return s.values[len(s.values)-1]
+}
+
 type consumerStub struct {
-	result coremedia.ConsumerBatchResult
-	err    error
+	result    coremedia.ConsumerBatchResult
+	err       error
+	onConsume func()
 }
 
 func (s *consumerStub) ConsumeBatch(context.Context, int) (coremedia.ConsumerBatchResult, error) {
+	if s.onConsume != nil {
+		s.onConsume()
+	}
 	return s.result, s.err
 }
 
@@ -156,12 +170,79 @@ func TestCompleteUploadUsesFrozenServicesAndEnqueuesReview(t *testing.T) {
 	if err != nil || value.State != StateReviewPending || value.CanUse || tickets.markCalls != 1 || assets.calls != 1 || completion.calls != 1 {
 		t.Fatalf("value=%#v marks=%d assets=%d completion=%d err=%v", value, tickets.markCalls, assets.calls, completion.calls, err)
 	}
-	if outbox.value == nil || outbox.value.Operation != coremedia.ConsumerOperationSubmit || outbox.value.AggregateID != projectionID {
-		t.Fatalf("review submission event missing: %#v", outbox.value)
+	submission := outbox.last()
+	if submission == nil || submission.Operation != coremedia.ConsumerOperationSubmit || submission.AggregateID != projectionID {
+		t.Fatalf("review submission event missing: %#v", submission)
 	}
 	var payload coremedia.ConsumerEventPayload
-	if err := json.Unmarshal(outbox.value.Payload, &payload); err != nil || payload.ReviewTaskID != 41 || payload.ExpectedRowVersion != 1 {
+	if err := json.Unmarshal(submission.Payload, &payload); err != nil || payload.ReviewTaskID != 41 || payload.ExpectedRowVersion != 1 {
 		t.Fatalf("payload=%#v err=%v", payload, err)
+	}
+}
+
+func TestCompleteUploadLocalMockAutoApprovesThroughProjectionEvents(t *testing.T) {
+	assetID, ticketID, projectionID := testULID(t), testULID(t), testULID(t)
+	now := time.Now().UTC()
+	bundle := coremedia.UploadBundle{
+		Asset:  coremedia.Asset{ID: 41, AssetPublicID: assetID, OwnerID: 7, StorageStage: coremedia.StorageStageStaging, TechnicalStatus: coremedia.TechnicalPendingUpload, RowVersion: 1},
+		Ticket: coremedia.UploadTicket{TicketID: ticketID, OwnerID: 7, Status: coremedia.TicketAuthorizationIssued, RowVersion: 2},
+	}
+	tickets := &ticketStub{bundle: bundle}
+	completion := &completionStub{asset: coremedia.Asset{
+		ID: 41, AssetPublicID: assetID, OwnerID: 7, StorageStage: coremedia.StorageStageFinal,
+		TechnicalStatus: coremedia.TechnicalFinalReady,
+	}}
+	projection := &projectionStub{value: coremedia.ReviewProjection{ProjectionID: projectionID, AssetID: 41, Status: coremedia.ProjectionPending, RowVersion: 1}}
+	outbox := &outboxStub{}
+	consumer := &consumerStub{result: coremedia.ConsumerBatchResult{Claimed: 1, Succeeded: 1}, onConsume: func() {
+		last := outbox.last()
+		if last == nil {
+			return
+		}
+		switch last.Operation {
+		case coremedia.ConsumerOperationSubmit:
+			projection.value.Status = coremedia.ProjectionSubmitted
+			projection.value.ReviewTaskID = pointer(uint64(41))
+			projection.value.RowVersion = 2
+		case coremedia.ConsumerOperationReviewing:
+			projection.value.Status = coremedia.ProjectionReviewing
+			projection.value.RowVersion = 3
+		case coremedia.ConsumerOperationDecision:
+			projection.value.Status = coremedia.ProjectionApproved
+			projection.value.AppliedDecisionVersion = 1
+			projection.value.RowVersion = 4
+		}
+	}}
+	statuses := &statusStub{fact: StatusFact{
+		AssetID: 41, AssetPublicID: assetID, OwnerID: 7, Purpose: coremedia.PurposeDish,
+		StorageStage: coremedia.StorageStageFinal, TechnicalStatus: coremedia.TechnicalFinalReady,
+		TicketStatus: coremedia.TicketConsumed, TicketID: ticketID, Projection: pointer(coremedia.ProjectionApproved), UpdatedAt: now,
+	}}
+	service, err := NewService(
+		tickets, &bundleStub{bundle: bundle}, completion, &assetStub{}, projection,
+		outbox, consumer, statuses, func() time.Time { return now }, WithLocalMockAutoApproval(true),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	value, err := service.CompleteUpload(context.Background(), 7, ticketID)
+	if err != nil || value.State != StateApproved || !value.CanUse {
+		t.Fatalf("value=%#v err=%v", value, err)
+	}
+	if len(outbox.values) != 3 {
+		t.Fatalf("expected submit+reviewing+decision events, got %d", len(outbox.values))
+	}
+	if outbox.values[1].Operation != coremedia.ConsumerOperationReviewing || outbox.values[1].AggregateVersion != 2 {
+		t.Fatalf("unexpected reviewing event: %#v", outbox.values[1])
+	}
+	var decision coremedia.ConsumerEventPayload
+	if err := json.Unmarshal(outbox.values[2].Payload, &decision); err != nil {
+		t.Fatal(err)
+	}
+	if outbox.values[2].Operation != coremedia.ConsumerOperationDecision || outbox.values[2].AggregateVersion != 3 ||
+		decision.ExpectedStatus != coremedia.ProjectionReviewing || decision.Decision != coremedia.ProjectionApproved ||
+		decision.DecisionVersion != 1 || !strings.EqualFold(decision.PayloadHash, localMockDecisionHash(projectionID, 41)) {
+		t.Fatalf("unexpected decision payload=%#v event=%#v", decision, outbox.values[2])
 	}
 }
 

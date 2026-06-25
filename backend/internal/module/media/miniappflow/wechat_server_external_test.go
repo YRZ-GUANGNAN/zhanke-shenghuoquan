@@ -78,11 +78,12 @@ func TestServeModule10ForWeChat(t *testing.T) {
 	application, err := NewService(
 		tickets, repository, completion, coremedia.NewService(repository), projections,
 		repository, consumer, NewStatusRepository(db), nil,
+		WithLocalMockAutoApproval(cfg.AppEnv != "prod" && cfg.AllowMockWechat && cfg.WechatAppID == "" && cfg.WechatAppSecret == ""),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	users := user.NewService(user.NewRepository(db), cfg.JWTSecret, cfg.WechatAppID, cfg.WechatAppSecret, cfg.AllowMockWechat)
+	users := user.NewService(user.NewRepository(db), cfg.JWTSecret, cfg.WechatAppID, cfg.WechatAppSecret, cfg.AllowMockWechat, user.WithAppEnv(cfg.AppEnv))
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	router.Use(gin.Recovery())

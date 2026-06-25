@@ -41,7 +41,7 @@ func main() {
 	}
 	// Composition root: repositories are private to their domain; only services cross boundaries.
 	reviewService := review.NewService(review.NewRepository(db))
-	userService := user.NewService(user.NewRepository(db), cfg.JWTSecret, cfg.WechatAppID, cfg.WechatAppSecret, cfg.AllowMockWechat)
+	userService := user.NewService(user.NewRepository(db), cfg.JWTSecret, cfg.WechatAppID, cfg.WechatAppSecret, cfg.AllowMockWechat, user.WithAppEnv(cfg.AppEnv))
 	cosClient, err := legacymedia.NewTencentCOS(cfg.COSSecretID, cfg.COSSecretKey, cfg.COSBucket, cfg.COSRegion, cfg.COSAppID)
 	if err != nil {
 		log.Fatalf("configure Tencent COS: %v", err)
@@ -97,6 +97,7 @@ func main() {
 	miniappMedia, err := miniappflow.NewService(
 		uploadTickets, mediaRepository, completionService, coreMediaService,
 		projectionService, mediaRepository, mediaConsumer, miniappflow.NewStatusRepository(db), nil,
+		miniappflow.WithLocalMockAutoApproval(localMockWechatMode(cfg)),
 	)
 	if err != nil {
 		log.Fatalf("configure Module 10 miniapp flow: %v", err)
@@ -239,8 +240,12 @@ func main() {
 }
 
 func newWechatMediaSafety(cfg config.Config) (legacymedia.SafetyChecker, error) {
-	if cfg.AppEnv != "prod" && cfg.AllowMockWechat && cfg.WechatAppID == "" && cfg.WechatAppSecret == "" {
+	if localMockWechatMode(cfg) {
 		return legacymedia.NewLocalNoopSafety(), nil
 	}
 	return legacymedia.NewWechatSafety(cfg.WechatAppID, cfg.WechatAppSecret, cfg.WechatAPIBase)
+}
+
+func localMockWechatMode(cfg config.Config) bool {
+	return cfg.AppEnv != "prod" && cfg.AllowMockWechat && cfg.WechatAppID == "" && cfg.WechatAppSecret == ""
 }

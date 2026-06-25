@@ -213,6 +213,33 @@ func TestMockWechatLoginMustBeExplicitAndCannotCreateAdmin(t *testing.T) {
 	}
 }
 
+func TestLocalMockWechatLoginUsesExtendedTokenTTLOnlyInDevNoCredentials(t *testing.T) {
+	repo := newMemoryRepository()
+	service := NewService(repo, testSecret, "", "", true, WithAppEnv("dev"))
+	result, err := service.WechatLogin(context.Background(), LoginInput{Code: "local-ttl"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	claims, err := parseToken(testSecret, result.Token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ttl := time.Duration(claims.ExpiresAt-claims.IssuedAt) * time.Second
+	if ttl != localMockTokenTTL {
+		t.Fatalf("local mock ttl=%s want=%s", ttl, localMockTokenTTL)
+	}
+
+	if got := NewService(repo, testSecret, "", "", true, WithAppEnv("prod")).accessTokenTTL(); got != accessTokenTTL {
+		t.Fatalf("prod ttl=%s want=%s", got, accessTokenTTL)
+	}
+	if got := NewService(repo, testSecret, "wx-real", "secret-real", true, WithAppEnv("dev")).accessTokenTTL(); got != accessTokenTTL {
+		t.Fatalf("credentialed dev ttl=%s want=%s", got, accessTokenTTL)
+	}
+	if got := NewService(repo, testSecret, "", "", false, WithAppEnv("dev")).accessTokenTTL(); got != accessTokenTTL {
+		t.Fatalf("non-mock dev ttl=%s want=%s", got, accessTokenTTL)
+	}
+}
+
 func TestAdministrativeAccountBoundariesAndImmediateRevocation(t *testing.T) {
 	repo := newMemoryRepository(
 		User{ID: 1, Role: RoleSuperAdmin, Status: StatusActive, TokenVersion: 1},

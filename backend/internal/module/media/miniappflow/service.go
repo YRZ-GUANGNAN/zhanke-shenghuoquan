@@ -2,8 +2,11 @@ package miniappflow
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	coremedia "campus-circle/backend/internal/module/media"
@@ -30,6 +33,7 @@ type assetCommands interface {
 
 type projectionCommands interface {
 	EnsureProjection(context.Context, string) (coremedia.ReviewProjection, bool, error)
+	Find(context.Context, string) (coremedia.ReviewProjection, error)
 }
 
 type outboxAppender interface {
@@ -41,15 +45,22 @@ type consumerCommands interface {
 }
 
 type Service struct {
-	tickets     ticketCommands
-	bundles     uploadBundleReader
-	completion  completionCommands
-	assets      assetCommands
-	projections projectionCommands
-	outbox      outboxAppender
-	consumer    consumerCommands
-	status      StatusRepository
-	now         func() time.Time
+	tickets              ticketCommands
+	bundles              uploadBundleReader
+	completion           completionCommands
+	assets               assetCommands
+	projections          projectionCommands
+	outbox               outboxAppender
+	consumer             consumerCommands
+	status               StatusRepository
+	now                  func() time.Time
+	localMockAutoApprove bool
+}
+
+type ServiceOption func(*Service)
+
+func WithLocalMockAutoApproval(enabled bool) ServiceOption {
+	return func(s *Service) { s.localMockAutoApprove = enabled }
 }
 
 func NewService(
@@ -62,6 +73,7 @@ func NewService(
 	consumer consumerCommands,
 	status StatusRepository,
 	now func() time.Time,
+	options ...ServiceOption,
 ) (*Service, error) {
 	if tickets == nil || bundles == nil || completion == nil || assets == nil || projections == nil || outbox == nil || consumer == nil || status == nil {
 		return nil, ErrInvalidRequest
@@ -69,10 +81,14 @@ func NewService(
 	if now == nil {
 		now = func() time.Time { return time.Now().UTC() }
 	}
-	return &Service{
+	service := &Service{
 		tickets: tickets, bundles: bundles, completion: completion, assets: assets,
 		projections: projections, outbox: outbox, consumer: consumer, status: status, now: now,
-	}, nil
+	}
+	for _, option := range options {
+		option(service)
+	}
+	return service, nil
 }
 
 func (s *Service) CreateUpload(ctx context.Context, input CreateUploadInput) (UploadSession, error) {
@@ -170,6 +186,11 @@ func (s *Service) CompleteUpload(ctx context.Context, ownerID uint64, ticketID s
 			return AssetStatus{}, errors.Join(ErrSubmissionPending, consumeErr)
 		}
 	}
+	if s.localMockAutoApprove {
+		if err := s.approveLocalMockProjection(ctx, projection.ProjectionID); err != nil {
+			return AssetStatus{}, err
+		}
+	}
 	return s.Status(ctx, ownerID, asset.AssetPublicID)
 }
 
@@ -215,6 +236,95 @@ func (s *Service) appendReviewSubmission(ctx context.Context, projection coremed
 		return nil
 	}
 	return err
+}
+
+func (s *Service) approveLocalMockProjection(ctx context.Context, projectionID string) error {
+	projection, err := s.projections.Find(ctx, projectionID)
+	if err != nil {
+		return err
+	}
+	switch projection.Status {
+	case coremedia.ProjectionApproved:
+		return nil
+	case coremedia.ProjectionSubmitted:
+		if err := s.appendReviewing(ctx, projection); err != nil {
+			return err
+		}
+		if err := s.consumeLocalMockEvent(ctx); err != nil {
+			return err
+		}
+		projection, err = s.projections.Find(ctx, projectionID)
+		if err != nil {
+			return err
+		}
+	case coremedia.ProjectionReviewing:
+	default:
+		return nil
+	}
+	if projection.Status != coremedia.ProjectionReviewing {
+		return nil
+	}
+	if err := s.appendApprovedDecision(ctx, projection); err != nil {
+		return err
+	}
+	return s.consumeLocalMockEvent(ctx)
+}
+
+func (s *Service) appendReviewing(ctx context.Context, projection coremedia.ReviewProjection) error {
+	payload, err := json.Marshal(coremedia.ConsumerEventPayload{
+		ProjectionID: projection.ProjectionID, ExpectedRowVersion: projection.RowVersion,
+	})
+	if err != nil {
+		return err
+	}
+	return s.appendProjectionEvent(ctx, projection, coremedia.ConsumerOperationReviewing, payload)
+}
+
+func (s *Service) appendApprovedDecision(ctx context.Context, projection coremedia.ReviewProjection) error {
+	if projection.ReviewTaskID == nil || *projection.ReviewTaskID == 0 {
+		return coremedia.ErrReviewInvariant
+	}
+	payloadHash := localMockDecisionHash(projection.ProjectionID, *projection.ReviewTaskID)
+	payload, err := json.Marshal(coremedia.ConsumerEventPayload{
+		ProjectionID: projection.ProjectionID, ReviewTaskID: *projection.ReviewTaskID,
+		ExpectedRowVersion: projection.RowVersion, ExpectedStatus: projection.Status,
+		DecisionVersion: projection.AppliedDecisionVersion + 1, Decision: coremedia.ProjectionApproved,
+		PayloadHash: payloadHash,
+	})
+	if err != nil {
+		return err
+	}
+	return s.appendProjectionEvent(ctx, projection, coremedia.ConsumerOperationDecision, payload)
+}
+
+func (s *Service) appendProjectionEvent(ctx context.Context, projection coremedia.ReviewProjection, operation string, payload []byte) error {
+	eventID, err := coremedia.NewULID()
+	if err != nil {
+		return err
+	}
+	now := s.now().UTC()
+	err = s.outbox.AppendOutbox(ctx, &coremedia.OutboxEvent{
+		EventID: eventID, AggregateID: projection.ProjectionID, AggregateVersion: projection.RowVersion,
+		Operation: operation, Payload: coremedia.JSONDocument(payload),
+		RowVersion: 1, CreatedAt: now, UpdatedAt: now,
+	})
+	if duplicateKey(err) {
+		return nil
+	}
+	return err
+}
+
+func (s *Service) consumeLocalMockEvent(ctx context.Context) error {
+	result, err := s.consumer.ConsumeBatch(ctx, 100)
+	if err != nil || result.Deadletters > 0 {
+		return errors.Join(ErrSubmissionPending, err)
+	}
+	return nil
+}
+
+func localMockDecisionHash(projectionID string, reviewTaskID uint64) string {
+	sum := sha256.Sum256([]byte(fmt.Sprintf("local-mock-approved:%s:%d", projectionID, reviewTaskID)))
+	return hex.EncodeToString(sum[:])
 }
 
 func duplicateKey(err error) bool {

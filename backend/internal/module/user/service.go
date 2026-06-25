@@ -23,7 +23,11 @@ type LoginResult struct {
 	User  User   `json:"user"`
 }
 
-const accessTokenTTL = 15 * time.Minute
+const (
+	accessTokenTTL    = 15 * time.Minute
+	localMockTokenTTL = 12 * time.Hour
+	productionAppEnv  = "prod"
+)
 
 var (
 	ErrBanned               = errors.New("user is banned")
@@ -41,11 +45,25 @@ type Service struct {
 	wechatAppID     string
 	wechatSecret    string
 	allowMockWechat bool
+	appEnv          string
 	httpClient      *http.Client
 }
 
-func NewService(repo Repository, jwtSecret, wechatAppID, wechatSecret string, allowMockWechat bool) *Service {
-	return &Service{repo: repo, jwtSecret: jwtSecret, wechatAppID: wechatAppID, wechatSecret: wechatSecret, allowMockWechat: allowMockWechat, httpClient: &http.Client{Timeout: 5 * time.Second}}
+type ServiceOption func(*Service)
+
+func WithAppEnv(appEnv string) ServiceOption {
+	return func(s *Service) { s.appEnv = appEnv }
+}
+
+func NewService(repo Repository, jwtSecret, wechatAppID, wechatSecret string, allowMockWechat bool, options ...ServiceOption) *Service {
+	service := &Service{
+		repo: repo, jwtSecret: jwtSecret, wechatAppID: wechatAppID, wechatSecret: wechatSecret,
+		allowMockWechat: allowMockWechat, httpClient: &http.Client{Timeout: 5 * time.Second},
+	}
+	for _, option := range options {
+		option(service)
+	}
+	return service
 }
 
 func (s *Service) WechatLogin(ctx context.Context, input LoginInput) (LoginResult, error) {
@@ -75,11 +93,22 @@ func (s *Service) WechatLogin(ctx context.Context, input LoginInput) (LoginResul
 	if value.TokenVersion == 0 {
 		value.TokenVersion = 1
 	}
-	token, err := generateToken(s.jwtSecret, value.ID, value.TokenVersion, accessTokenTTL)
+	token, err := generateToken(s.jwtSecret, value.ID, value.TokenVersion, s.accessTokenTTL())
 	if err != nil {
 		return LoginResult{}, fmt.Errorf("generate token: %w", err)
 	}
 	return LoginResult{Token: token, User: value}, nil
+}
+
+func (s *Service) accessTokenTTL() time.Duration {
+	if s.localMockWechatEnabled() {
+		return localMockTokenTTL
+	}
+	return accessTokenTTL
+}
+
+func (s *Service) localMockWechatEnabled() bool {
+	return s.appEnv != productionAppEnv && s.allowMockWechat && s.wechatAppID == "" && s.wechatSecret == ""
 }
 
 func (s *Service) exchangeCode(ctx context.Context, code string) (string, error) {
