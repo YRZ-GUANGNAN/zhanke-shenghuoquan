@@ -19,3 +19,9 @@ apps/admin/dist/
 apps/miniapp/project.private.config.json
 **/.swc/
 ~$*
+
+# Local Meilisearch runtime artifacts (data dir + downloaded binary)
+data.ms/
+meilisearch.exe
+meilisearch*.exe
+*.ms/
