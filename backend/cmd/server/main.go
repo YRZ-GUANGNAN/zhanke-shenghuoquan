@@ -17,6 +17,7 @@ import (
 	"campus-circle/backend/internal/module/admin/takeoutconsole"
 	takeoutreview "campus-circle/backend/internal/module/admin/takeoutconsole/reviewtarget"
 	"campus-circle/backend/internal/module/admin/takeoutmerchant"
+	"campus-circle/backend/internal/module/admin/takeoutrider"
 	"campus-circle/backend/internal/module/community"
 	"campus-circle/backend/internal/module/im"
 	coremedia "campus-circle/backend/internal/module/media"
@@ -172,6 +173,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("configure takeout withdrawal service: %v", err)
 	}
+	takeoutRiderService, err := takeoutrider.NewService(riderService, orderService, withdrawService, takeoutrider.NewRepository(db))
+	if err != nil {
+		log.Fatalf("configure takeout rider transport service: %v", err)
+	}
 	mediaAdminQuery, err := mediaconsole.NewQueryService(mediaconsole.NewQueryRepository(db))
 	if err != nil {
 		log.Fatalf("configure media admin console: %v", err)
@@ -223,6 +228,10 @@ func main() {
 	takeoutbuyer.NewHandler(takeoutBuyerQuery, orderService, func(c *gin.Context) uint64 {
 		return uint64(user.CurrentUserID(c))
 	}).Register(takeoutBuyerRoutes)
+	takeoutRiderRoutes := api.Group("/takeout/rider", userService.AuthRequired())
+	takeoutrider.NewHandler(takeoutRiderService, func(c *gin.Context) uint64 {
+		return uint64(user.CurrentUserID(c))
+	}).Register(takeoutRiderRoutes)
 
 	if err := router.Run(cfg.HTTPAddr); err != nil {
 		log.Fatalf("run server: %v", err)
