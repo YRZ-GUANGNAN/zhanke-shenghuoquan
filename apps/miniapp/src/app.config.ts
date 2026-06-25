@@ -15,7 +15,8 @@ export default defineAppConfig({
     'pages/chat/index',
     'pages/publish/index',
     'pages/media-history/index',
-    'pages/takeout-merchant/index'
+    'pages/takeout-merchant/index',
+    'pages/takeout-rider/index'
   ],
   window: {
     backgroundTextStyle: 'light',
