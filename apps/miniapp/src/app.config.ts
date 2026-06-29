@@ -8,6 +8,8 @@ export default defineAppConfig({
     'pages/market/index',
     'pages/tools/index',
     'pages/profile/index',
+    'pages/delivery-merchant/index',
+    'pages/delivery-rider/index',
     'pages/post-detail/index',
     'pages/notifications/index',
     'pages/product-detail/index',

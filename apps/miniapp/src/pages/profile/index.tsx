@@ -4,7 +4,7 @@ import { AvatarMark, BottomNav } from '../../components'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
 import { chooseAndUploadImages } from '../../services/media'
-import { legacyTakeoutEnabled } from '../../feature-flags'
+import { deliveryEnabled, legacyTakeoutEnabled } from '../../feature-flags'
 import './index.scss'
 
 const actions = ['收藏', '帖子', '评论', '宝贝']
@@ -70,6 +70,14 @@ export default function ProfilePage() {
           </View>
           <View className='settings__row' onClick={() => Taro.navigateTo({ url: '/pages/takeout-rider/index' })}>
             <Text>Rider Center</Text><Text className='settings__arrow'>{'>'}</Text>
+          </View>
+        </>}
+        {deliveryEnabled && <>
+          <View className='settings__row' onClick={() => Taro.navigateTo({ url: '/pages/delivery-merchant/index' })}>
+            <Text>配送商家中心</Text><Text className='settings__arrow'>›</Text>
+          </View>
+          <View className='settings__row' onClick={() => Taro.navigateTo({ url: '/pages/delivery-rider/index' })}>
+            <Text>配送骑手中心</Text><Text className='settings__arrow'>›</Text>
           </View>
         </>}
         <View className='settings__row' onClick={() => Taro.navigateTo({ url: '/pages/notifications/index' })}>
