@@ -30,6 +30,14 @@ type OrderView struct {
 	PlatformCutCents      uint64          `json:"platformCutCents"`
 	Status                delivery.Status `json:"status"`
 	RowVersion            uint64          `json:"rowVersion"`
+	ReadyForClaimAt       *time.Time      `json:"readyForClaimAt"`
+	ClaimedAt             *time.Time      `json:"claimedAt"`
+	ToPickupAt            *time.Time      `json:"toPickupAt"`
+	PickedUpAt            *time.Time      `json:"pickedUpAt"`
+	DeliveringAt          *time.Time      `json:"deliveringAt"`
+	DeliveredAt           *time.Time      `json:"deliveredAt"`
+	PaymentFailedAt       *time.Time      `json:"paymentFailedAt"`
+	CancelledAt           *time.Time      `json:"cancelledAt"`
 	CreatedAt             time.Time       `json:"createdAt"`
 	UpdatedAt             time.Time       `json:"updatedAt"`
 }
@@ -44,6 +52,11 @@ func orderView(value delivery.Order) OrderView {
 		DeliveryAddress: value.DeliveryAddress, Remark: value.Remark,
 		DeliveryFeeCents: value.DeliveryFeeCents, RiderFeeCents: value.RiderFeeCents,
 		PlatformCutCents: value.PlatformCutCents, Status: value.Status,
-		RowVersion: value.RowVersion, CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt,
+		RowVersion:      value.RowVersion,
+		ReadyForClaimAt: value.ReadyForClaimAt, ClaimedAt: value.ClaimedAt,
+		ToPickupAt: value.ToPickupAt, PickedUpAt: value.PickedUpAt,
+		DeliveringAt: value.DeliveringAt, DeliveredAt: value.DeliveredAt,
+		PaymentFailedAt: value.PaymentFailedAt, CancelledAt: value.CancelledAt,
+		CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt,
 	}
 }

@@ -182,6 +182,7 @@ func TestD2DeliveryRealHTTPMySQLAuthConcurrencyOutboxAndGates(t *testing.T) {
 		created.Status != delivery.StatusPendingFeePayment {
 		t.Fatalf("server-owned create fields=%#v", created)
 	}
+	assertD2AllStageTimesNil(t, body.Data)
 	status, repeatedBody := d2HTTPJSON(t, server.Client(), http.MethodPost,
 		server.URL+"/api/v1/delivery/merchant/orders", merchant.Token, createPayload)
 	if status != http.StatusCreated || !strings.Contains(string(repeatedBody.Data), created.DeliveryOrderPublicID) {
@@ -210,6 +211,17 @@ func TestD2DeliveryRealHTTPMySQLAuthConcurrencyOutboxAndGates(t *testing.T) {
 	if ready.Status != delivery.StatusReadyForClaim {
 		t.Fatalf("mock confirmation state=%#v", ready)
 	}
+	status, body = d2HTTPJSON(t, server.Client(), http.MethodGet,
+		server.URL+"/api/v1/delivery/merchant/orders/"+created.DeliveryOrderPublicID,
+		merchant.Token, nil)
+	if status != http.StatusOK {
+		t.Fatalf("merchant ready detail status=%d body=%s", status, body.Data)
+	}
+	readyTimes := decodeD2StageTimes(t, body.Data)
+	if readyTimes.ReadyForClaimAt == nil {
+		t.Fatalf("ready stage timestamp not projected: %s", body.Data)
+	}
+	assertD2LaterStageTimesNil(t, readyTimes)
 	var event delivery.OutboxEvent
 	if err := db.Where("aggregate_public_id = ?", created.DeliveryOrderPublicID).First(&event).Error; err != nil {
 		t.Fatal(err)
@@ -317,6 +329,35 @@ func TestD2DeliveryRealHTTPMySQLAuthConcurrencyOutboxAndGates(t *testing.T) {
 		}
 		version = winnerOrder.RowVersion
 	}
+	for _, endpoint := range []struct {
+		name  string
+		url   string
+		token string
+	}{
+		{
+			name:  "merchant",
+			url:   server.URL + "/api/v1/delivery/merchant/orders/" + created.DeliveryOrderPublicID,
+			token: merchant.Token,
+		},
+		{
+			name:  "assigned rider",
+			url:   server.URL + "/api/v1/delivery/rider/orders/" + created.DeliveryOrderPublicID,
+			token: winner.Token,
+		},
+	} {
+		status, body = d2HTTPJSON(t, server.Client(), http.MethodGet, endpoint.url, endpoint.token, nil)
+		if status != http.StatusOK {
+			t.Fatalf("%s delivered detail status=%d body=%s", endpoint.name, status, body.Data)
+		}
+		times := decodeD2StageTimes(t, body.Data)
+		if times.ReadyForClaimAt == nil || times.ClaimedAt == nil || times.ToPickupAt == nil ||
+			times.PickedUpAt == nil || times.DeliveringAt == nil || times.DeliveredAt == nil {
+			t.Fatalf("%s missing completed timeline: %s", endpoint.name, body.Data)
+		}
+		if times.PaymentFailedAt != nil || times.CancelledAt != nil {
+			t.Fatalf("%s unexpected terminal timestamp: %s", endpoint.name, body.Data)
+		}
+	}
 
 	second := createD2HTTPOrder(t, server, merchant, "01J00000000000000000000902")
 	status, body = d2HTTPJSON(t, server.Client(), http.MethodPost,
@@ -376,6 +417,53 @@ func TestD2DeliveryRealHTTPMySQLAuthConcurrencyOutboxAndGates(t *testing.T) {
 type d2CreatedOrder struct {
 	DeliveryOrderPublicID string `json:"deliveryOrderPublicId"`
 	RowVersion            uint64 `json:"rowVersion"`
+}
+
+type d2StageTimes struct {
+	ReadyForClaimAt *time.Time `json:"readyForClaimAt"`
+	ClaimedAt       *time.Time `json:"claimedAt"`
+	ToPickupAt      *time.Time `json:"toPickupAt"`
+	PickedUpAt      *time.Time `json:"pickedUpAt"`
+	DeliveringAt    *time.Time `json:"deliveringAt"`
+	DeliveredAt     *time.Time `json:"deliveredAt"`
+	PaymentFailedAt *time.Time `json:"paymentFailedAt"`
+	CancelledAt     *time.Time `json:"cancelledAt"`
+}
+
+func decodeD2StageTimes(t *testing.T, raw json.RawMessage) d2StageTimes {
+	t.Helper()
+	var value d2StageTimes
+	if err := json.Unmarshal(raw, &value); err != nil {
+		t.Fatal(err)
+	}
+	return value
+}
+
+func assertD2AllStageTimesNil(t *testing.T, raw json.RawMessage) {
+	t.Helper()
+	value := decodeD2StageTimes(t, raw)
+	if value.ReadyForClaimAt != nil || value.ClaimedAt != nil || value.ToPickupAt != nil ||
+		value.PickedUpAt != nil || value.DeliveringAt != nil || value.DeliveredAt != nil ||
+		value.PaymentFailedAt != nil || value.CancelledAt != nil {
+		t.Fatalf("new order has unexpected stage timestamp: %s", raw)
+	}
+	for _, field := range []string{
+		`"readyForClaimAt":null`, `"claimedAt":null`, `"toPickupAt":null`, `"pickedUpAt":null`,
+		`"deliveringAt":null`, `"deliveredAt":null`, `"paymentFailedAt":null`, `"cancelledAt":null`,
+	} {
+		if !strings.Contains(string(raw), field) {
+			t.Fatalf("missing nullable stage field %s in %s", field, raw)
+		}
+	}
+}
+
+func assertD2LaterStageTimesNil(t *testing.T, value d2StageTimes) {
+	t.Helper()
+	if value.ClaimedAt != nil || value.ToPickupAt != nil || value.PickedUpAt != nil ||
+		value.DeliveringAt != nil || value.DeliveredAt != nil ||
+		value.PaymentFailedAt != nil || value.CancelledAt != nil {
+		t.Fatalf("ready order has unexpected later stage timestamp: %#v", value)
+	}
 }
 
 func createD2HTTPOrder(t *testing.T, server *httptest.Server, merchant user.LoginResult, requestID string) d2CreatedOrder {

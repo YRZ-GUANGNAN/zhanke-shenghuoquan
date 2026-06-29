@@ -51,6 +51,14 @@ type AssignedOrderView struct {
 	DeliveryFeeCents      uint64          `json:"deliveryFeeCents"`
 	Status                delivery.Status `json:"status"`
 	RowVersion            uint64          `json:"rowVersion"`
+	ReadyForClaimAt       *time.Time      `json:"readyForClaimAt"`
+	ClaimedAt             *time.Time      `json:"claimedAt"`
+	ToPickupAt            *time.Time      `json:"toPickupAt"`
+	PickedUpAt            *time.Time      `json:"pickedUpAt"`
+	DeliveringAt          *time.Time      `json:"deliveringAt"`
+	DeliveredAt           *time.Time      `json:"deliveredAt"`
+	PaymentFailedAt       *time.Time      `json:"paymentFailedAt"`
+	CancelledAt           *time.Time      `json:"cancelledAt"`
 	CreatedAt             time.Time       `json:"createdAt"`
 	UpdatedAt             time.Time       `json:"updatedAt"`
 }
@@ -83,6 +91,10 @@ func assignedView(value delivery.Order) AssignedOrderView {
 		RecipientPhone: value.RecipientPhone, DeliveryAddress: value.DeliveryAddress,
 		Remark: value.Remark, DeliveryFeeCents: value.DeliveryFeeCents,
 		Status: value.Status, RowVersion: value.RowVersion,
+		ReadyForClaimAt: value.ReadyForClaimAt, ClaimedAt: value.ClaimedAt,
+		ToPickupAt: value.ToPickupAt, PickedUpAt: value.PickedUpAt,
+		DeliveringAt: value.DeliveringAt, DeliveredAt: value.DeliveredAt,
+		PaymentFailedAt: value.PaymentFailedAt, CancelledAt: value.CancelledAt,
 		CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt,
 	}
 }
