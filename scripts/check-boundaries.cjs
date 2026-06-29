@@ -3,7 +3,7 @@ const path = require('node:path')
 
 const root = path.resolve(__dirname, '..')
 const moduleRoot = path.join(root, 'backend', 'internal', 'module')
-const allowedDomains = new Set(['user', 'community', 'trade', 'navigation', 'im', 'admin', 'media', 'takeout'])
+const allowedDomains = new Set(['user', 'community', 'trade', 'navigation', 'im', 'admin', 'media', 'takeout', 'delivery'])
 const failures = []
 
 for (const entry of fs.readdirSync(moduleRoot, { withFileTypes: true })) {
@@ -41,6 +41,14 @@ if (/internal\/module\/(user|community|trade|navigation|im|admin|media)|github\.
   failures.push('domain G core imports HTTP or another business domain')
 }
 
+const deliverySource = files(path.join(moduleRoot, 'delivery'))
+  .filter((file) => file.endsWith('.go') && !file.endsWith('_test.go'))
+  .map((file) => fs.readFileSync(file, 'utf8'))
+  .join('\n')
+if (/internal\/module\/(user|community|trade|navigation|im|admin|media|takeout|delivery)|github\.com\/gin-gonic\/gin|"net\/http"/.test(deliverySource)) {
+  failures.push('delivery core imports HTTP or another business domain')
+}
+
 const forbiddenFrontend = ['content.ts', 'mock.ts']
 for (const name of forbiddenFrontend) if (fs.existsSync(path.join(root, 'apps', 'miniapp', 'src', 'services', name))) failures.push(`mixed frontend service exists: ${name}`)
 
@@ -48,5 +56,5 @@ if (failures.length) {
   console.error(failures.map((item) => `boundary error: ${item}`).join('\n'))
   process.exitCode = 1
 } else {
-  console.log('ok A-G boundaries plus isolated P0-4 media domain')
+  console.log('ok A-G boundaries plus independent delivery and isolated P0-4 media domains')
 }
