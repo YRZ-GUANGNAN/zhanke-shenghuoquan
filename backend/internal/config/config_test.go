@@ -5,6 +5,7 @@ import "testing"
 func validConfig() Config {
 	return Config{
 		AppEnv: "prod", JWTSecret: "production-secret-that-is-longer-than-thirty-two-characters",
+		EnableLegacyTakeout: true, EnableDelivery: true,
 		WechatAppID: "wx-app", WechatAppSecret: "wx-secret",
 		TencentIMSDKAppID: "1400000000", TencentIMSecret: "im-secret", TencentIMAdmin: "administrator",
 		MeiliHost: "http://meilisearch:7700", MeiliMasterKey: "meili-secret-that-is-long-enough", MeiliIndex: "products",
@@ -61,5 +62,60 @@ func TestLocalMockPaymentIsolation(t *testing.T) {
 func TestProductionConfigurationAcceptsExplicitCredentials(t *testing.T) {
 	if err := validConfig().Validate(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestLegacyTakeoutDisabledDoesNotRequireWechatPayCredentials(t *testing.T) {
+	cfg := validConfig()
+	cfg.EnableLegacyTakeout = false
+	cfg.WechatPayMchID = ""
+	cfg.WechatPayAPIv3Key = ""
+	cfg.WechatPayMerchantSerialNo = ""
+	cfg.WechatPayPrivateKeyPath = ""
+	cfg.WechatPayNotifyURL = ""
+	cfg.WechatPayPlatformKeyPath = ""
+
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("disabled legacy takeout must not require legacy payment credentials: %v", err)
+	}
+}
+
+func TestLegacyTakeoutEnabledStillRequiresWechatPayCredentials(t *testing.T) {
+	cfg := validConfig()
+	cfg.WechatPayMchID = ""
+	cfg.WechatPayAPIv3Key = ""
+	cfg.WechatPayMerchantSerialNo = ""
+	cfg.WechatPayPrivateKeyPath = ""
+	cfg.WechatPayNotifyURL = ""
+
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("enabled legacy takeout accepted missing production payment credentials")
+	}
+}
+
+func TestProductionMockPaymentRemainsForbiddenWhenLegacyTakeoutDisabled(t *testing.T) {
+	cfg := validConfig()
+	cfg.EnableLegacyTakeout = false
+	cfg.AllowMockPayment = true
+	cfg.WechatPayMchID = ""
+	cfg.WechatPayAPIv3Key = ""
+	cfg.WechatPayMerchantSerialNo = ""
+	cfg.WechatPayPrivateKeyPath = ""
+	cfg.WechatPayNotifyURL = ""
+	cfg.WechatPayPlatformKeyPath = ""
+
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("production mock payment was accepted while legacy takeout was disabled")
+	}
+}
+
+func TestFeatureGateDefaults(t *testing.T) {
+	t.Setenv("ENABLE_LEGACY_TAKEOUT", "")
+	t.Setenv("ENABLE_DELIVERY", "")
+	if envBool("ENABLE_LEGACY_TAKEOUT", false) {
+		t.Fatal("legacy takeout default must be fail-closed")
+	}
+	if !envBool("ENABLE_DELIVERY", true) {
+		t.Fatal("delivery placeholder default must be enabled")
 	}
 }

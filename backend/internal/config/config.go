@@ -46,6 +46,9 @@ type Config struct {
 	WechatPayAPIBase          string
 	WechatPayPlatformKeyPath  string
 	AllowMockPayment          bool
+
+	EnableLegacyTakeout bool
+	EnableDelivery      bool
 }
 
 func Load() (Config, error) {
@@ -87,6 +90,9 @@ func Load() (Config, error) {
 		WechatPayAPIBase:          env("WECHAT_PAY_API_BASE", "https://api.mch.weixin.qq.com"),
 		WechatPayPlatformKeyPath:  env("WECHAT_PAY_PLATFORM_PUBLIC_KEY_PATH", ""),
 		AllowMockPayment:          envBool("ALLOW_MOCK_PAYMENT", false),
+
+		EnableLegacyTakeout: envBool("ENABLE_LEGACY_TAKEOUT", false),
+		EnableDelivery:      envBool("ENABLE_DELIVERY", true),
 	}
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err
@@ -117,7 +123,7 @@ func (c Config) Validate() error {
 		if c.AllowMockPayment {
 			return errors.New("mock payment is forbidden in production")
 		}
-		if !c.WechatPayConfigured() {
+		if c.EnableLegacyTakeout && !c.WechatPayConfigured() {
 			return errors.New("production requires complete WeChat Pay credentials")
 		}
 		if c.TencentIMSDKAppID == "" || c.TencentIMSecret == "" || c.TencentIMAdmin == "" {

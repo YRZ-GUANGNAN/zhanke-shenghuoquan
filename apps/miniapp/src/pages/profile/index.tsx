@@ -4,6 +4,7 @@ import { AvatarMark, BottomNav } from '../../components'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
 import { chooseAndUploadImages } from '../../services/media'
+import { legacyTakeoutEnabled } from '../../feature-flags'
 import './index.scss'
 
 const actions = ['收藏', '帖子', '评论', '宝贝']
@@ -63,12 +64,14 @@ export default function ProfilePage() {
         <View className='settings__row' onClick={() => Taro.navigateTo({ url: '/pages/conversations/index' })}>
           <Text>交易会话</Text><Text className='settings__arrow'>›</Text>
         </View>
-        <View className='settings__row' onClick={() => Taro.navigateTo({ url: '/pages/takeout-merchant/index' })}>
-          <Text>Merchant Center</Text><Text className='settings__arrow'>{'>'}</Text>
-        </View>
-        <View className='settings__row' onClick={() => Taro.navigateTo({ url: '/pages/takeout-rider/index' })}>
-          <Text>Rider Center</Text><Text className='settings__arrow'>{'>'}</Text>
-        </View>
+        {legacyTakeoutEnabled && <>
+          <View className='settings__row' onClick={() => Taro.navigateTo({ url: '/pages/takeout-merchant/index' })}>
+            <Text>Merchant Center</Text><Text className='settings__arrow'>{'>'}</Text>
+          </View>
+          <View className='settings__row' onClick={() => Taro.navigateTo({ url: '/pages/takeout-rider/index' })}>
+            <Text>Rider Center</Text><Text className='settings__arrow'>{'>'}</Text>
+          </View>
+        </>}
         <View className='settings__row' onClick={() => Taro.navigateTo({ url: '/pages/notifications/index' })}>
           <Text>社区通知</Text><Text className='settings__arrow'>›</Text>
         </View>

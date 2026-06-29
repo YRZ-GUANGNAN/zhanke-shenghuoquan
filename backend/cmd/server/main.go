@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -29,6 +30,7 @@ import (
 	"campus-circle/backend/internal/module/user"
 	legacymedia "campus-circle/backend/internal/pkg/media"
 	"campus-circle/backend/internal/pkg/response"
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -138,54 +140,9 @@ func main() {
 	}()
 	navigationService := navigation.NewService(navigation.NewRepository(db))
 	adminService := admin.NewService(admin.NewRepository(db), reviewService)
-	takeoutRepository := takeout.NewRepository(db)
-	merchantService, err := takeout.NewMerchantService(takeoutRepository, nil)
+	legacyTakeout, err := newLegacyTakeoutRuntime(cfg, db, reviewService, coreMediaService)
 	if err != nil {
-		log.Fatalf("configure takeout merchant service: %v", err)
-	}
-	merchantIdentity, err := takeout.NewMerchantIdentityService(takeoutRepository)
-	if err != nil {
-		log.Fatalf("configure takeout merchant identity service: %v", err)
-	}
-	catalogService, err := takeout.NewCatalogService(takeoutRepository, nil)
-	if err != nil {
-		log.Fatalf("configure takeout catalog service: %v", err)
-	}
-	orderService, err := takeout.NewOrderService(takeoutRepository, takeoutRepository, nil)
-	if err != nil {
-		log.Fatalf("configure takeout order service: %v", err)
-	}
-	paymentService, err := takeout.NewPaymentService(takeoutRepository, orderService, nil)
-	if err != nil {
-		log.Fatalf("configure takeout payment service: %v", err)
-	}
-	paymentProvider, err := takeoutpayment.NewProviderFromConfig(cfg)
-	if err != nil {
-		log.Fatalf("configure takeout payment provider: %v", err)
-	}
-	riderOrderOps, err := takeout.NewRiderOrderOps(takeoutRepository, nil)
-	if err != nil {
-		log.Fatalf("configure takeout rider order operations: %v", err)
-	}
-	riderService, err := takeout.NewRiderService(takeoutRepository, riderOrderOps, nil)
-	if err != nil {
-		log.Fatalf("configure takeout rider service: %v", err)
-	}
-	takeoutAdminQuery, err := takeout.NewAdminQueryService(takeoutRepository)
-	if err != nil {
-		log.Fatalf("configure takeout admin query: %v", err)
-	}
-	takeoutBuyerQuery, err := takeout.NewBuyerQueryService(takeoutRepository)
-	if err != nil {
-		log.Fatalf("configure takeout buyer query: %v", err)
-	}
-	withdrawService, err := takeout.NewWithdrawService(takeoutRepository, nil)
-	if err != nil {
-		log.Fatalf("configure takeout withdrawal service: %v", err)
-	}
-	takeoutRiderService, err := takeoutrider.NewService(riderService, orderService, withdrawService, takeoutrider.NewRepository(db))
-	if err != nil {
-		log.Fatalf("configure takeout rider transport service: %v", err)
+		log.Fatal(err)
 	}
 	mediaAdminQuery, err := mediaconsole.NewQueryService(mediaconsole.NewQueryRepository(db))
 	if err != nil {
@@ -196,9 +153,6 @@ func main() {
 	}
 	reviewService.RegisterTarget(tradeService)
 	reviewService.RegisterTarget(adminService)
-	for _, target := range takeoutreview.NewTargets(merchantService, catalogService, coreMediaService) {
-		reviewService.RegisterTarget(target)
-	}
 
 	if cfg.AppEnv == "prod" {
 		gin.SetMode(gin.ReleaseMode)
@@ -228,34 +182,134 @@ func main() {
 	admin.NewHandler(adminService, reviewService, userService, communityService, tradeService, navigationService).Register(api)
 	mediaAdminRoutes := api.Group("/admin/media", userService.AuthRequired(), user.AdminRequired())
 	mediaconsole.NewHandler(mediaAdminQuery).Register(mediaAdminRoutes)
+	registerLegacyTakeoutRoutes(legacyTakeout, api, userService, reviewService, coreMediaService)
+
+	if err := router.Run(cfg.HTTPAddr); err != nil {
+		log.Fatalf("run server: %v", err)
+	}
+}
+
+type legacyTakeoutRuntime struct {
+	merchantService  *takeout.MerchantService
+	merchantIdentity *takeout.MerchantIdentityService
+	catalogService   *takeout.CatalogService
+	orderService     *takeout.OrderService
+	paymentService   *takeout.PaymentService
+	paymentProvider  takeoutpayment.Provider
+	riderService     *takeout.RiderService
+	adminQuery       *takeout.AdminQueryService
+	buyerQuery       *takeout.BuyerQueryService
+	withdrawService  *takeout.WithdrawService
+	riderTransport   *takeoutrider.Service
+}
+
+func newLegacyTakeoutRuntime(
+	cfg config.Config,
+	db *gorm.DB,
+	reviewService *review.Service,
+	coreMediaService *coremedia.Service,
+) (*legacyTakeoutRuntime, error) {
+	if !cfg.EnableLegacyTakeout {
+		return nil, nil
+	}
+
+	takeoutRepository := takeout.NewRepository(db)
+	merchantService, err := takeout.NewMerchantService(takeoutRepository, nil)
+	if err != nil {
+		return nil, fmt.Errorf("configure takeout merchant service: %w", err)
+	}
+	merchantIdentity, err := takeout.NewMerchantIdentityService(takeoutRepository)
+	if err != nil {
+		return nil, fmt.Errorf("configure takeout merchant identity service: %w", err)
+	}
+	catalogService, err := takeout.NewCatalogService(takeoutRepository, nil)
+	if err != nil {
+		return nil, fmt.Errorf("configure takeout catalog service: %w", err)
+	}
+	orderService, err := takeout.NewOrderService(takeoutRepository, takeoutRepository, nil)
+	if err != nil {
+		return nil, fmt.Errorf("configure takeout order service: %w", err)
+	}
+	paymentService, err := takeout.NewPaymentService(takeoutRepository, orderService, nil)
+	if err != nil {
+		return nil, fmt.Errorf("configure takeout payment service: %w", err)
+	}
+	paymentProvider, err := takeoutpayment.NewProviderFromConfig(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("configure takeout payment provider: %w", err)
+	}
+	riderOrderOps, err := takeout.NewRiderOrderOps(takeoutRepository, nil)
+	if err != nil {
+		return nil, fmt.Errorf("configure takeout rider order operations: %w", err)
+	}
+	riderService, err := takeout.NewRiderService(takeoutRepository, riderOrderOps, nil)
+	if err != nil {
+		return nil, fmt.Errorf("configure takeout rider service: %w", err)
+	}
+	adminQuery, err := takeout.NewAdminQueryService(takeoutRepository)
+	if err != nil {
+		return nil, fmt.Errorf("configure takeout admin query: %w", err)
+	}
+	buyerQuery, err := takeout.NewBuyerQueryService(takeoutRepository)
+	if err != nil {
+		return nil, fmt.Errorf("configure takeout buyer query: %w", err)
+	}
+	withdrawService, err := takeout.NewWithdrawService(takeoutRepository, nil)
+	if err != nil {
+		return nil, fmt.Errorf("configure takeout withdrawal service: %w", err)
+	}
+	riderTransport, err := takeoutrider.NewService(riderService, orderService, withdrawService, takeoutrider.NewRepository(db))
+	if err != nil {
+		return nil, fmt.Errorf("configure takeout rider transport service: %w", err)
+	}
+	for _, target := range takeoutreview.NewTargets(merchantService, catalogService, coreMediaService) {
+		reviewService.RegisterTarget(target)
+	}
+
+	return &legacyTakeoutRuntime{
+		merchantService: merchantService, merchantIdentity: merchantIdentity,
+		catalogService: catalogService, orderService: orderService,
+		paymentService: paymentService, paymentProvider: paymentProvider,
+		riderService: riderService, adminQuery: adminQuery, buyerQuery: buyerQuery,
+		withdrawService: withdrawService, riderTransport: riderTransport,
+	}, nil
+}
+
+func registerLegacyTakeoutRoutes(
+	runtime *legacyTakeoutRuntime,
+	api *gin.RouterGroup,
+	userService *user.Service,
+	reviewService *review.Service,
+	coreMediaService *coremedia.Service,
+) {
+	if runtime == nil {
+		return
+	}
+
 	takeoutAdminRoutes := api.Group("/admin/takeout", userService.AuthRequired(), user.AdminRequired())
-	takeoutconsole.NewHandler(merchantService, catalogService, orderService, riderService, takeoutAdminQuery, withdrawService).Register(takeoutAdminRoutes)
+	takeoutconsole.NewHandler(runtime.merchantService, runtime.catalogService, runtime.orderService, runtime.riderService, runtime.adminQuery, runtime.withdrawService).Register(takeoutAdminRoutes)
 	takeoutMerchantRoutes := api.Group("/takeout/merchant", userService.AuthRequired())
-	takeoutmerchant.NewHandler(merchantIdentity, merchantService, catalogService, orderService, takeoutAdminQuery, reviewService, coreMediaService, func(c *gin.Context) uint64 {
+	takeoutmerchant.NewHandler(runtime.merchantIdentity, runtime.merchantService, runtime.catalogService, runtime.orderService, runtime.adminQuery, reviewService, coreMediaService, func(c *gin.Context) uint64 {
 		return uint64(user.CurrentUserID(c))
 	}).Register(takeoutMerchantRoutes)
 	takeoutBuyerRoutes := api.Group("/takeout/buyer", userService.AuthRequired(), user.UnmutedRequired())
-	takeoutbuyer.NewHandler(takeoutBuyerQuery, orderService, func(c *gin.Context) uint64 {
+	takeoutbuyer.NewHandler(runtime.buyerQuery, runtime.orderService, func(c *gin.Context) uint64 {
 		return uint64(user.CurrentUserID(c))
 	}).Register(takeoutBuyerRoutes)
-	takeoutpayment.NewHandler(paymentService, paymentProvider, func(c *gin.Context) uint64 {
+	takeoutpayment.NewHandler(runtime.paymentService, runtime.paymentProvider, func(c *gin.Context) uint64 {
 		return uint64(user.CurrentUserID(c))
 	}, func(c *gin.Context) string {
 		return user.CurrentUser(c).OpenID
 	}).RegisterBuyer(takeoutBuyerRoutes)
-	takeoutpayment.NewHandler(paymentService, paymentProvider, func(c *gin.Context) uint64 {
+	takeoutpayment.NewHandler(runtime.paymentService, runtime.paymentProvider, func(c *gin.Context) uint64 {
 		return uint64(user.CurrentUserID(c))
 	}, func(c *gin.Context) string {
 		return user.CurrentUser(c).OpenID
 	}).RegisterWebhook(api.Group("/takeout/payments"))
 	takeoutRiderRoutes := api.Group("/takeout/rider", userService.AuthRequired())
-	takeoutrider.NewHandler(takeoutRiderService, func(c *gin.Context) uint64 {
+	takeoutrider.NewHandler(runtime.riderTransport, func(c *gin.Context) uint64 {
 		return uint64(user.CurrentUserID(c))
 	}).Register(takeoutRiderRoutes)
-
-	if err := router.Run(cfg.HTTPAddr); err != nil {
-		log.Fatalf("run server: %v", err)
-	}
 }
 
 func newWechatMediaSafety(cfg config.Config) (legacymedia.SafetyChecker, error) {

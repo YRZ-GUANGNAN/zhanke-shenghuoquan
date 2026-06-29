@@ -2,10 +2,11 @@ import React from 'react'
 import { Image, View, Text } from '@tarojs/components'
 import Taro from './services/taro'
 import type { TabKey } from './types'
+import { legacyTakeoutEnabled } from './feature-flags'
 
 const tabs: Array<{ key: TabKey; label: string; icon: string; url: string }> = [
   { key: 'home', label: '首页', icon: 'S', url: '/pages/home/index' },
-  { key: 'takeout', label: '外卖', icon: 'F', url: '/pages/takeout/index' },
+  ...(legacyTakeoutEnabled ? [{ key: 'takeout' as const, label: '外卖', icon: 'F', url: '/pages/takeout/index' }] : []),
   { key: 'market', label: '二手', icon: 'M', url: '/pages/market/index' },
   { key: 'tools', label: '工具', icon: 'T', url: '/pages/tools/index' },
   { key: 'profile', label: '我的', icon: 'U', url: '/pages/profile/index' }
