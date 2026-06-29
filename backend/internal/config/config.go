@@ -47,8 +47,10 @@ type Config struct {
 	WechatPayPlatformKeyPath  string
 	AllowMockPayment          bool
 
-	EnableLegacyTakeout bool
-	EnableDelivery      bool
+	EnableLegacyTakeout              bool
+	EnableDelivery                   bool
+	AllowMockDeliveryFeeConfirmation bool
+	WeComRiderWebhookURL             string
 }
 
 func Load() (Config, error) {
@@ -91,8 +93,10 @@ func Load() (Config, error) {
 		WechatPayPlatformKeyPath:  env("WECHAT_PAY_PLATFORM_PUBLIC_KEY_PATH", ""),
 		AllowMockPayment:          envBool("ALLOW_MOCK_PAYMENT", false),
 
-		EnableLegacyTakeout: envBool("ENABLE_LEGACY_TAKEOUT", false),
-		EnableDelivery:      envBool("ENABLE_DELIVERY", true),
+		EnableLegacyTakeout:              envBool("ENABLE_LEGACY_TAKEOUT", false),
+		EnableDelivery:                   envBool("ENABLE_DELIVERY", true),
+		AllowMockDeliveryFeeConfirmation: envBool("ALLOW_MOCK_DELIVERY_FEE_CONFIRMATION", false),
+		WeComRiderWebhookURL:             env("WECOM_RIDER_WEBHOOK_URL", ""),
 	}
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err
@@ -122,6 +126,9 @@ func (c Config) Validate() error {
 		}
 		if c.AllowMockPayment {
 			return errors.New("mock payment is forbidden in production")
+		}
+		if c.AllowMockDeliveryFeeConfirmation {
+			return errors.New("mock delivery fee confirmation is forbidden in production")
 		}
 		if c.EnableLegacyTakeout && !c.WechatPayConfigured() {
 			return errors.New("production requires complete WeChat Pay credentials")

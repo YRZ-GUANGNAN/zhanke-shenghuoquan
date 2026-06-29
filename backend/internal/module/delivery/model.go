@@ -51,6 +51,7 @@ type Order struct {
 	ID                    uint64     `gorm:"column:id;primaryKey"`
 	DeliveryOrderPublicID string     `gorm:"column:delivery_order_public_id;size:26;not null;uniqueIndex:uq_delivery_order_public_id"`
 	MerchantUserID        uint64     `gorm:"column:merchant_user_id;not null;index:idx_delivery_order_merchant_created,priority:1"`
+	MerchantRequestID     *string    `gorm:"column:merchant_request_id;size:26;uniqueIndex:uq_delivery_order_merchant_request,priority:2"`
 	RiderUserID           *uint64    `gorm:"column:rider_user_id;index:idx_delivery_order_rider_status,priority:1"`
 	PickupContactName     string     `gorm:"column:pickup_contact_name;size:64;not null"`
 	PickupContactPhone    string     `gorm:"column:pickup_contact_phone;size:32;not null"`
@@ -81,6 +82,7 @@ func (Order) TableName() string { return "delivery_orders" }
 func (o Order) ValidateNew() error {
 	fee, ok := checkedAddAmount(o.RiderFeeCents, o.PlatformCutCents)
 	if !ValidULID(o.DeliveryOrderPublicID) || o.MerchantUserID == 0 || o.RiderUserID != nil ||
+		(o.MerchantRequestID != nil && !ValidULID(*o.MerchantRequestID)) ||
 		o.Status != StatusPendingFeePayment || o.DeliveryFeeCents == 0 || !ok ||
 		fee != o.DeliveryFeeCents || o.RowVersion != 1 || o.CreatedAt.IsZero() ||
 		o.UpdatedAt.IsZero() || !validContactSnapshot(o) {

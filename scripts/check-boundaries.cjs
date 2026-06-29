@@ -49,6 +49,22 @@ if (/internal\/module\/(user|community|trade|navigation|im|admin|media|takeout|d
   failures.push('delivery core imports HTTP or another business domain')
 }
 
+const deliveryMerchantSource = files(path.join(moduleRoot, 'admin', 'deliverymerchant'))
+  .filter((file) => file.endsWith('.go') && !file.endsWith('_test.go'))
+  .map((file) => fs.readFileSync(file, 'utf8'))
+  .join('\n')
+if (/internal\/module\/(takeout|community|trade|navigation|im|media)/.test(deliveryMerchantSource)) {
+  failures.push('delivery merchant transport imports a forbidden business domain')
+}
+
+const deliveryNotifySource = files(path.join(moduleRoot, 'admin', 'deliverynotify'))
+  .filter((file) => file.endsWith('.go') && !file.endsWith('_test.go'))
+  .map((file) => fs.readFileSync(file, 'utf8'))
+  .join('\n')
+if (/internal\/module\/(takeout|user|community|trade|navigation|im|media)/.test(deliveryNotifySource)) {
+  failures.push('delivery notification adapter imports a forbidden business domain')
+}
+
 const forbiddenFrontend = ['content.ts', 'mock.ts']
 for (const name of forbiddenFrontend) if (fs.existsSync(path.join(root, 'apps', 'miniapp', 'src', 'services', name))) failures.push(`mixed frontend service exists: ${name}`)
 

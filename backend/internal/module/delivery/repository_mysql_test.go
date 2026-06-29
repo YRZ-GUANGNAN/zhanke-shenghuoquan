@@ -27,6 +27,7 @@ var acceptanceMerchantIDs = []uint64{acceptanceMerchant, fixtureMerchant}
 func Test00DeliveryMigrationRollbackApplyAgainstRealMySQL84(t *testing.T) {
 	db := openD1MySQL(t)
 	assertD1MySQL84(t, db)
+	rollbackLaterDeliveryMigrationsForD1(t, db)
 	cleanupD1Orders(t, db)
 	if db.Migrator().HasTable(&Order{}) {
 		var count int64
@@ -43,7 +44,40 @@ func Test00DeliveryMigrationRollbackApplyAgainstRealMySQL84(t *testing.T) {
 	}
 	applyD1SQLFile(t, db, "../../../migrations/023_delivery_order.sql")
 	assertD1Schema(t, db)
+	if _, err := os.Stat("../../../migrations/024_delivery_dispatch.sql"); err == nil {
+		applyD1SQLFile(t, db, "../../../migrations/024_delivery_dispatch.sql")
+	}
 	t.Log("migration_023_apply_rollback_apply=PASS tables=1 foreign_keys=0 checks=status+fee_snapshot")
+}
+
+func rollbackLaterDeliveryMigrationsForD1(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	if db.Migrator().HasTable("delivery_outbox") {
+		var count int64
+		if err := db.Table("delivery_outbox").Count(&count).Error; err != nil {
+			t.Fatal(err)
+		}
+		if count != 0 {
+			t.Fatalf("refusing to remove non-empty delivery_outbox rows=%d", count)
+		}
+		if err := db.Exec("DROP TABLE delivery_outbox").Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if db.Migrator().HasColumn(&Order{}, "merchant_request_id") {
+		var count int64
+		if err := db.Model(&Order{}).Where("merchant_request_id IS NOT NULL").Count(&count).Error; err != nil {
+			t.Fatal(err)
+		}
+		if count != 0 {
+			t.Fatalf("refusing to remove merchant_request_id with rows=%d", count)
+		}
+		if err := db.Exec(`ALTER TABLE delivery_orders
+			DROP INDEX uq_delivery_order_merchant_request,
+			DROP COLUMN merchant_request_id`).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
 }
 
 func TestDeliveryLifecycleIdempotencyAndTimestampsAgainstRealMySQL84(t *testing.T) {

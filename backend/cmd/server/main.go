@@ -12,6 +12,9 @@ import (
 	"campus-circle/backend/internal/database"
 	"campus-circle/backend/internal/middleware"
 	"campus-circle/backend/internal/module/admin"
+	"campus-circle/backend/internal/module/admin/deliverymerchant"
+	"campus-circle/backend/internal/module/admin/deliverynotify"
+	"campus-circle/backend/internal/module/admin/deliveryrider"
 	"campus-circle/backend/internal/module/admin/mediaconsole"
 	"campus-circle/backend/internal/module/admin/review"
 	"campus-circle/backend/internal/module/admin/takeoutbuyer"
@@ -21,6 +24,7 @@ import (
 	"campus-circle/backend/internal/module/admin/takeoutpayment"
 	"campus-circle/backend/internal/module/admin/takeoutrider"
 	"campus-circle/backend/internal/module/community"
+	"campus-circle/backend/internal/module/delivery"
 	"campus-circle/backend/internal/module/im"
 	coremedia "campus-circle/backend/internal/module/media"
 	"campus-circle/backend/internal/module/media/miniappflow"
@@ -144,6 +148,20 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	deliveryRuntime, err := newDeliveryRuntime(cfg, db)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if deliveryRuntime != nil {
+		go func() {
+			for {
+				if err := deliveryRuntime.notificationConsumer.Run(context.Background(), time.Second); err != nil {
+					log.Printf("delivery notification worker stopped; retrying in 5s: %v", err)
+				}
+				time.Sleep(5 * time.Second)
+			}
+		}()
+	}
 	mediaAdminQuery, err := mediaconsole.NewQueryService(mediaconsole.NewQueryRepository(db))
 	if err != nil {
 		log.Fatalf("configure media admin console: %v", err)
@@ -183,10 +201,75 @@ func main() {
 	mediaAdminRoutes := api.Group("/admin/media", userService.AuthRequired(), user.AdminRequired())
 	mediaconsole.NewHandler(mediaAdminQuery).Register(mediaAdminRoutes)
 	registerLegacyTakeoutRoutes(legacyTakeout, api, userService, reviewService, coreMediaService)
+	registerDeliveryRoutes(deliveryRuntime, api, userService)
 
 	if err := router.Run(cfg.HTTPAddr); err != nil {
 		log.Fatalf("run server: %v", err)
 	}
+}
+
+type deliveryRuntime struct {
+	dispatch             *delivery.DispatchService
+	identity             *deliveryrider.IdentityAdapter
+	notificationConsumer *deliverynotify.Consumer
+	allowMockConfirm     bool
+}
+
+func newDeliveryRuntime(cfg config.Config, db *gorm.DB) (*deliveryRuntime, error) {
+	if !cfg.EnableDelivery {
+		return nil, nil
+	}
+	repository := delivery.NewRepository(db)
+	orderService, err := delivery.NewService(repository, nil)
+	if err != nil {
+		return nil, fmt.Errorf("configure delivery order service: %w", err)
+	}
+	riderIdentity, err := takeout.NewRiderIdentityService(takeout.NewRepository(db), nil)
+	if err != nil {
+		return nil, fmt.Errorf("configure delivery rider identity: %w", err)
+	}
+	identityAdapter, err := deliveryrider.NewIdentityAdapter(riderIdentity)
+	if err != nil {
+		return nil, fmt.Errorf("configure delivery rider adapter: %w", err)
+	}
+	dispatchService, err := delivery.NewDispatchService(
+		repository, orderService, identityAdapter,
+		delivery.FeePolicy{DeliveryFeeCents: 150, RiderFeeCents: 100, PlatformCutCents: 50},
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("configure delivery dispatch service: %w", err)
+	}
+	sender, err := deliverynotify.NewWeComSender(cfg.WeComRiderWebhookURL)
+	if err != nil {
+		return nil, fmt.Errorf("configure delivery rider notification: %w", err)
+	}
+	consumer, err := deliverynotify.NewConsumer(repository, sender, deliverynotify.ConsumerConfig{})
+	if err != nil {
+		return nil, fmt.Errorf("configure delivery notification consumer: %w", err)
+	}
+	return &deliveryRuntime{
+		dispatch: dispatchService, identity: identityAdapter,
+		notificationConsumer: consumer,
+		allowMockConfirm: cfg.AppEnv != "prod" && cfg.EnableDelivery &&
+			cfg.AllowMockDeliveryFeeConfirmation,
+	}, nil
+}
+
+func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, userService *user.Service) {
+	if runtime == nil {
+		return
+	}
+	currentUserID := func(c *gin.Context) uint64 {
+		return uint64(user.CurrentUserID(c))
+	}
+	merchantRoutes := api.Group("/delivery/merchant", userService.AuthRequired())
+	deliverymerchant.NewHandler(runtime.dispatch, currentUserID, runtime.allowMockConfirm).Register(merchantRoutes)
+	riderRoutes := api.Group("/delivery/rider", userService.AuthRequired())
+	riderHandler := deliveryrider.NewHandler(runtime.dispatch, runtime.identity, userService, currentUserID)
+	riderHandler.Register(riderRoutes)
+	adminRoutes := api.Group("/admin/delivery", userService.AuthRequired(), user.AdminRequired())
+	riderHandler.RegisterAdmin(adminRoutes)
 }
 
 type legacyTakeoutRuntime struct {

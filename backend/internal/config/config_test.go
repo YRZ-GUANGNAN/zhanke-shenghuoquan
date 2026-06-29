@@ -32,6 +32,7 @@ func TestProductionConfigurationRejectsUnsafeAuthentication(t *testing.T) {
 		{name: "unsafe media base", mutate: func(c *Config) { c.MediaPublicBaseURL = "http://api.example.com" }},
 		{name: "short callback token", mutate: func(c *Config) { c.WechatCallbackToken = "short" }},
 		{name: "mock payment enabled", mutate: func(c *Config) { c.AllowMockPayment = true }},
+		{name: "mock delivery fee enabled", mutate: func(c *Config) { c.AllowMockDeliveryFeeConfirmation = true }},
 		{name: "missing payment credential", mutate: func(c *Config) { c.WechatPayMchID = "" }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -112,10 +113,45 @@ func TestProductionMockPaymentRemainsForbiddenWhenLegacyTakeoutDisabled(t *testi
 func TestFeatureGateDefaults(t *testing.T) {
 	t.Setenv("ENABLE_LEGACY_TAKEOUT", "")
 	t.Setenv("ENABLE_DELIVERY", "")
+	t.Setenv("ALLOW_MOCK_DELIVERY_FEE_CONFIRMATION", "")
 	if envBool("ENABLE_LEGACY_TAKEOUT", false) {
 		t.Fatal("legacy takeout default must be fail-closed")
 	}
 	if !envBool("ENABLE_DELIVERY", true) {
 		t.Fatal("delivery placeholder default must be enabled")
+	}
+	if envBool("ALLOW_MOCK_DELIVERY_FEE_CONFIRMATION", false) {
+		t.Fatal("mock delivery fee confirmation must be fail-closed")
+	}
+}
+
+func TestLocalMockDeliveryFeeConfirmationIsIndependent(t *testing.T) {
+	cfg := Config{
+		AppEnv: "dev", JWTSecret: "local-secret-that-is-longer-than-thirty-two-characters",
+		AllowMockWechat: true, EnableDelivery: true, AllowMockDeliveryFeeConfirmation: true,
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("local delivery mock bridge should be allowed: %v", err)
+	}
+	if cfg.AllowMockPayment {
+		t.Fatal("delivery mock bridge unexpectedly enabled legacy mock payment")
+	}
+	cfg.AppEnv = "prod"
+	cfg.WechatAppID = "wx-app"
+	cfg.WechatAppSecret = "wx-secret"
+	cfg.TencentIMSDKAppID = "1400000000"
+	cfg.TencentIMSecret = "im-secret"
+	cfg.TencentIMAdmin = "administrator"
+	cfg.MeiliHost = "http://meili:7700"
+	cfg.MeiliMasterKey = "meili-secret-that-is-long-enough"
+	cfg.COSSecretID = "cos-id"
+	cfg.COSSecretKey = "cos-key"
+	cfg.COSBucket = "bucket"
+	cfg.COSRegion = "ap-guangzhou"
+	cfg.COSAppID = "123"
+	cfg.MediaPublicBaseURL = "https://api.example.com"
+	cfg.WechatCallbackToken = "callback-token-long-enough"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("production accepted mock delivery fee confirmation")
 	}
 }
