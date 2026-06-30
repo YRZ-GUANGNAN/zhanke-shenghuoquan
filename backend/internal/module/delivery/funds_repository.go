@@ -25,6 +25,7 @@ type FundsRepository interface {
 	RequestRefund(context.Context, RefundRequest) (RefundResult, error)
 	CompleteRefund(context.Context, string, string, bool, string, time.Time) (RefundResult, error)
 	FindRefundByOutRefundNo(context.Context, string) (Refund, error)
+	FindOrderFundsOwned(context.Context, string, uint64) (OrderFundsSnapshot, error)
 }
 
 var _ FundsRepository = (*GormRepository)(nil)
@@ -61,6 +62,13 @@ type RefundResult struct {
 	Order      Order
 	Wallet     *MerchantWallet
 	Ledger     *WalletLedger
+}
+
+type OrderFundsSnapshot struct {
+	Order      Order
+	Settlement *FeeSettlement
+	Refund     *Refund
+	Payment    *PaymentAttempt
 }
 
 func (r *GormRepository) Wallet(ctx context.Context, merchantUserID uint64, now time.Time) (MerchantWallet, error) {
@@ -612,6 +620,65 @@ func (r *GormRepository) FindRefundByOutRefundNo(ctx context.Context, outRefundN
 	var result Refund
 	err := r.db.WithContext(ctx).Where("out_refund_no = ?", outRefundNo).First(&result).Error
 	return result, normalizeNotFound(err)
+}
+
+func (r *GormRepository) FindOrderFundsOwned(
+	ctx context.Context,
+	orderPublicID string,
+	merchantUserID uint64,
+) (OrderFundsSnapshot, error) {
+	var result OrderFundsSnapshot
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where(
+			"delivery_order_public_id = ? AND merchant_user_id = ?",
+			orderPublicID,
+			merchantUserID,
+		).First(&result.Order).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrForbiddenOrder
+			}
+			return err
+		}
+
+		var settlement FeeSettlement
+		if err := tx.Where(
+			"delivery_order_public_id = ? AND merchant_user_id = ?",
+			orderPublicID,
+			merchantUserID,
+		).First(&settlement).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil
+			}
+			return err
+		}
+		result.Settlement = &settlement
+
+		var refund Refund
+		if err := tx.Where(
+			"settlement_public_id = ? AND merchant_user_id = ?",
+			settlement.SettlementPublicID,
+			merchantUserID,
+		).First(&refund).Error; err == nil {
+			result.Refund = &refund
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+
+		if settlement.PaymentPublicID == nil {
+			return nil
+		}
+		var payment PaymentAttempt
+		if err := tx.Where(
+			"payment_public_id = ? AND merchant_user_id = ?",
+			*settlement.PaymentPublicID,
+			merchantUserID,
+		).First(&payment).Error; err != nil {
+			return normalizeNotFound(err)
+		}
+		result.Payment = &payment
+		return nil
+	})
+	return result, err
 }
 
 func lockOwnedOrderTx(tx *gorm.DB, orderPublicID string, merchantUserID uint64) (Order, error) {

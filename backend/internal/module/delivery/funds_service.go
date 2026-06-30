@@ -54,6 +54,18 @@ func (s *FundsService) Payment(ctx context.Context, merchantUserID uint64, payme
 	return s.repository.FindPaymentAttemptOwned(ctx, strings.TrimSpace(paymentPublicID), merchantUserID)
 }
 
+func (s *FundsService) OrderFunds(
+	ctx context.Context,
+	merchantUserID uint64,
+	orderPublicID string,
+) (OrderFundsSnapshot, error) {
+	orderPublicID = strings.TrimSpace(orderPublicID)
+	if merchantUserID == 0 || !ValidULID(orderPublicID) {
+		return OrderFundsSnapshot{}, ErrInvalidRecord
+	}
+	return s.repository.FindOrderFundsOwned(ctx, orderPublicID, merchantUserID)
+}
+
 func (s *FundsService) PayOrderWithWallet(
 	ctx context.Context,
 	merchantUserID uint64,

@@ -34,6 +34,7 @@ func (h *Handler) RegisterMerchant(group *gin.RouterGroup) {
 	group.GET("/wallet/ledger", h.ledger)
 	group.POST("/wallet/recharges", h.recharge)
 	group.GET("/payments/:id", h.payment)
+	group.GET("/orders/:id/funds", h.orderFunds)
 	group.POST("/orders/:id/pay-with-wallet", h.payWithWallet)
 	group.POST("/orders/:id/pay-with-wechat", h.payWithWechat)
 	group.POST("/orders/:id/refunds", h.merchantRefund)
@@ -81,6 +82,15 @@ func (h *Handler) payment(c *gin.Context) {
 		return
 	}
 	response.OK(c, paymentView(value, nil))
+}
+
+func (h *Handler) orderFunds(c *gin.Context) {
+	value, err := h.funds.OrderFunds(c.Request.Context(), h.currentUserID(c), c.Param("id"))
+	if err != nil {
+		h.write(c, nil, err)
+		return
+	}
+	response.OK(c, orderFundsView(value))
 }
 
 func (h *Handler) recharge(c *gin.Context) {

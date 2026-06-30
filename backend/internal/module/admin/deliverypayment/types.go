@@ -83,6 +83,13 @@ type FundsResponse struct {
 	Refund     *RefundView     `json:"refund,omitempty"`
 }
 
+type OrderFundsView struct {
+	DeliveryOrderPublicID string          `json:"deliveryOrderPublicId"`
+	Settlement            *SettlementView `json:"settlement"`
+	Refund                *RefundView     `json:"refund"`
+	Payment               *PaymentView    `json:"payment"`
+}
+
 func walletView(value delivery.MerchantWallet) WalletView {
 	return WalletView{
 		WalletPublicID: value.WalletPublicID, AvailableBalanceCents: value.AvailableBalanceCents,
@@ -133,4 +140,18 @@ func orderView(value delivery.Order) OrderView {
 		Status:                value.Status,
 		RowVersion:            value.RowVersion,
 	}
+}
+
+func orderFundsView(value delivery.OrderFundsSnapshot) OrderFundsView {
+	result := OrderFundsView{DeliveryOrderPublicID: value.Order.DeliveryOrderPublicID}
+	if value.Settlement != nil {
+		result.Settlement = pointer(settlementView(*value.Settlement))
+	}
+	if value.Refund != nil {
+		result.Refund = pointer(refundView(*value.Refund))
+	}
+	if value.Payment != nil {
+		result.Payment = pointer(paymentView(*value.Payment, nil))
+	}
+	return result
 }
