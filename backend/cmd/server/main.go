@@ -14,6 +14,7 @@ import (
 	"campus-circle/backend/internal/module/admin"
 	"campus-circle/backend/internal/module/admin/deliverymerchant"
 	"campus-circle/backend/internal/module/admin/deliverynotify"
+	"campus-circle/backend/internal/module/admin/deliverypayment"
 	"campus-circle/backend/internal/module/admin/deliveryrider"
 	"campus-circle/backend/internal/module/admin/mediaconsole"
 	"campus-circle/backend/internal/module/admin/review"
@@ -210,6 +211,8 @@ func main() {
 
 type deliveryRuntime struct {
 	dispatch             *delivery.DispatchService
+	funds                *delivery.FundsService
+	paymentProvider      deliverypayment.Provider
 	identity             *deliveryrider.IdentityAdapter
 	notificationConsumer *deliverynotify.Consumer
 	allowMockConfirm     bool
@@ -248,12 +251,25 @@ func newDeliveryRuntime(cfg config.Config, db *gorm.DB) (*deliveryRuntime, error
 	if err != nil {
 		return nil, fmt.Errorf("configure delivery notification consumer: %w", err)
 	}
-	return &deliveryRuntime{
+	runtime := &deliveryRuntime{
 		dispatch: dispatchService, identity: identityAdapter,
 		notificationConsumer: consumer,
 		allowMockConfirm: cfg.AppEnv != "prod" && cfg.EnableDelivery &&
 			cfg.AllowMockDeliveryFeeConfirmation,
-	}, nil
+	}
+	if cfg.EnableDeliveryPayment {
+		funds, err := delivery.NewFundsService(repository, repository, nil)
+		if err != nil {
+			return nil, fmt.Errorf("configure delivery funds service: %w", err)
+		}
+		provider, err := deliverypayment.NewProviderFromConfig(cfg)
+		if err != nil {
+			return nil, fmt.Errorf("configure delivery payment provider: %w", err)
+		}
+		runtime.funds = funds
+		runtime.paymentProvider = provider
+	}
+	return runtime, nil
 }
 
 func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, userService *user.Service) {
@@ -265,11 +281,23 @@ func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, user
 	}
 	merchantRoutes := api.Group("/delivery/merchant", userService.AuthRequired())
 	deliverymerchant.NewHandler(runtime.dispatch, currentUserID, runtime.allowMockConfirm).Register(merchantRoutes)
+	var paymentHandler *deliverypayment.Handler
+	if runtime.funds != nil {
+		paymentHandler = deliverypayment.NewHandler(
+			runtime.funds, runtime.paymentProvider, currentUserID,
+			func(c *gin.Context) string { return user.CurrentUser(c).OpenID },
+		)
+		paymentHandler.RegisterMerchant(merchantRoutes)
+		paymentHandler.RegisterWebhook(api.Group("/delivery/payments"))
+	}
 	riderRoutes := api.Group("/delivery/rider", userService.AuthRequired())
 	riderHandler := deliveryrider.NewHandler(runtime.dispatch, runtime.identity, userService, currentUserID)
 	riderHandler.Register(riderRoutes)
 	adminRoutes := api.Group("/admin/delivery", userService.AuthRequired(), user.AdminRequired())
 	riderHandler.RegisterAdmin(adminRoutes)
+	if paymentHandler != nil {
+		paymentHandler.RegisterAdmin(adminRoutes)
+	}
 }
 
 type legacyTakeoutRuntime struct {

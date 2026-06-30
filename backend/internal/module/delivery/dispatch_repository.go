@@ -107,48 +107,70 @@ func (r *GormRepository) TransitionToReadyAndEnqueue(
 	riderUserID *uint64,
 	updatedAt time.Time,
 ) (Order, OutboxEvent, error) {
+	var result Order
+	var event OutboxEvent
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var err error
+		result, event, err = transitionToReadyAndEnqueueTx(
+			tx, publicID, merchantUserID, expectedRowVersion, from, riderUserID, updatedAt,
+		)
+		return err
+	})
+	return result, event, err
+}
+
+func transitionToReadyAndEnqueueTx(
+	tx *gorm.DB,
+	publicID string,
+	merchantUserID *uint64,
+	expectedRowVersion uint64,
+	from Status,
+	riderUserID *uint64,
+	updatedAt time.Time,
+) (Order, OutboxEvent, error) {
 	if !CanTransition(from, StatusReadyForClaim) {
 		return Order{}, OutboxEvent{}, ErrInvalidTransition
 	}
 	var result Order
 	var event OutboxEvent
-	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		query := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("delivery_order_public_id = ?", publicID)
-		if merchantUserID != nil {
-			query = query.Where("merchant_user_id = ?", *merchantUserID)
+	query := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("delivery_order_public_id = ?", publicID)
+	if merchantUserID != nil {
+		query = query.Where("merchant_user_id = ?", *merchantUserID)
+	}
+	if err := query.First(&result).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) && merchantUserID != nil {
+			return Order{}, OutboxEvent{}, ErrForbiddenOrder
 		}
-		if err := query.First(&result).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) && merchantUserID != nil {
-				return ErrForbiddenOrder
-			}
-			return normalizeNotFound(err)
-		}
-		if result.Status == StatusReadyForClaim {
-			return loadOrInsertRiderPoolEvent(tx, result, updatedAt, &event)
-		}
-		updates, err := buildTransitionUpdates(result, from, StatusReadyForClaim, riderUserID, updatedAt)
-		if err != nil {
-			return err
-		}
-		updates["status"] = StatusReadyForClaim
-		updates["updated_at"] = updatedAt
-		updates["row_version"] = gorm.Expr("row_version + 1")
-		update := tx.Model(&Order{}).
-			Where("id = ? AND status = ? AND row_version = ?", result.ID, from, expectedRowVersion).
-			Updates(updates)
-		if update.Error != nil {
-			return update.Error
-		}
-		if update.RowsAffected != 1 {
-			return ErrConcurrentUpdate
-		}
-		applyTransition(&result, StatusReadyForClaim, riderUserID, updatedAt)
-		result.RowVersion++
-		result.UpdatedAt = updatedAt
-		return loadOrInsertRiderPoolEvent(tx, result, updatedAt, &event)
-	})
-	return result, event, err
+		return Order{}, OutboxEvent{}, normalizeNotFound(err)
+	}
+	if result.Status == StatusReadyForClaim {
+		err := loadOrInsertRiderPoolEvent(tx, result, updatedAt, &event)
+		return result, event, err
+	}
+	updates, err := buildTransitionUpdates(result, from, StatusReadyForClaim, riderUserID, updatedAt)
+	if err != nil {
+		return Order{}, OutboxEvent{}, err
+	}
+	updates["status"] = StatusReadyForClaim
+	updates["updated_at"] = updatedAt
+	updates["row_version"] = gorm.Expr("row_version + 1")
+	update := tx.Model(&Order{}).
+		Where("id = ? AND status = ? AND row_version = ?", result.ID, from, expectedRowVersion).
+		Updates(updates)
+	if update.Error != nil {
+		return Order{}, OutboxEvent{}, update.Error
+	}
+	if update.RowsAffected != 1 {
+		return Order{}, OutboxEvent{}, ErrConcurrentUpdate
+	}
+	applyTransition(&result, StatusReadyForClaim, riderUserID, updatedAt)
+	result.RowVersion++
+	result.UpdatedAt = updatedAt
+	if err := loadOrInsertRiderPoolEvent(tx, result, updatedAt, &event); err != nil {
+		return Order{}, OutboxEvent{}, err
+	}
+	return result, event, nil
 }
 
 func loadOrInsertRiderPoolEvent(tx *gorm.DB, order Order, now time.Time, result *OutboxEvent) error {

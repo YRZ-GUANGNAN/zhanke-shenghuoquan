@@ -49,7 +49,11 @@ type Config struct {
 
 	EnableLegacyTakeout              bool
 	EnableDelivery                   bool
+	EnableDeliveryPayment            bool
 	AllowMockDeliveryFeeConfirmation bool
+	AllowMockDeliveryPayment         bool
+	DeliveryWechatPayNotifyURL       string
+	DeliveryWechatRefundNotifyURL    string
 	WeComRiderWebhookURL             string
 }
 
@@ -95,7 +99,11 @@ func Load() (Config, error) {
 
 		EnableLegacyTakeout:              envBool("ENABLE_LEGACY_TAKEOUT", false),
 		EnableDelivery:                   envBool("ENABLE_DELIVERY", true),
+		EnableDeliveryPayment:            envBool("ENABLE_DELIVERY_PAYMENT", false),
 		AllowMockDeliveryFeeConfirmation: envBool("ALLOW_MOCK_DELIVERY_FEE_CONFIRMATION", false),
+		AllowMockDeliveryPayment:         envBool("ALLOW_MOCK_DELIVERY_PAYMENT", false),
+		DeliveryWechatPayNotifyURL:       env("DELIVERY_WECHAT_PAY_NOTIFY_URL", ""),
+		DeliveryWechatRefundNotifyURL:    env("DELIVERY_WECHAT_REFUND_NOTIFY_URL", ""),
 		WeComRiderWebhookURL:             env("WECOM_RIDER_WEBHOOK_URL", ""),
 	}
 	if err := cfg.Validate(); err != nil {
@@ -111,11 +119,30 @@ func (c Config) Validate() error {
 	if (c.WechatAppID == "") != (c.WechatAppSecret == "") {
 		return errors.New("WECHAT_APP_ID and WECHAT_APP_SECRET must be configured together")
 	}
-	if c.WechatPayAnyCredentialSet() && !c.WechatPayConfigured() {
-		return errors.New("WeChat Pay credentials must be configured together")
+	if c.WechatPayAnyCoreCredentialSet() && !c.WechatPayCoreConfigured() {
+		return errors.New("WeChat Pay core credentials must be configured together")
+	}
+	if c.WechatPayNotifyURL != "" && !c.WechatPayCoreConfigured() {
+		return errors.New("legacy WeChat Pay notify URL requires complete core credentials")
+	}
+	if c.WechatPayPlatformKeyPath != "" && !c.WechatPayCoreConfigured() {
+		return errors.New("WeChat Pay platform public key requires complete core credentials")
+	}
+	if (c.DeliveryWechatPayNotifyURL != "" || c.DeliveryWechatRefundNotifyURL != "") && !c.WechatPayCoreConfigured() {
+		return errors.New("delivery WeChat Pay notify URLs require complete core credentials")
 	}
 	if c.AllowMockPayment && c.WechatPayAnyCredentialSet() {
 		return errors.New("mock payment cannot be enabled with real WeChat Pay credentials")
+	}
+	if c.AllowMockDeliveryPayment && c.DeliveryWechatPayAnyCredentialSet() {
+		return errors.New("mock delivery payment cannot be enabled with real WeChat Pay credentials")
+	}
+	if c.EnableDeliveryPayment && c.AllowMockDeliveryPayment && c.AllowMockDeliveryFeeConfirmation {
+		return errors.New("delivery payment mock and legacy fee confirmation mock cannot be enabled together")
+	}
+	if c.EnableDeliveryPayment && !c.AllowMockDeliveryPayment &&
+		c.DeliveryWechatPayAnyCredentialSet() && !c.DeliveryWechatPayConfigured() {
+		return errors.New("enabled delivery payment requires either no real credentials or a complete real configuration")
 	}
 	if c.AppEnv == "prod" {
 		if c.WechatAppID == "" || c.WechatAppSecret == "" {
@@ -130,8 +157,14 @@ func (c Config) Validate() error {
 		if c.AllowMockDeliveryFeeConfirmation {
 			return errors.New("mock delivery fee confirmation is forbidden in production")
 		}
+		if c.AllowMockDeliveryPayment {
+			return errors.New("mock delivery payment is forbidden in production")
+		}
 		if c.EnableLegacyTakeout && !c.WechatPayConfigured() {
 			return errors.New("production requires complete WeChat Pay credentials")
+		}
+		if c.EnableDeliveryPayment && !c.DeliveryWechatPayConfigured() {
+			return errors.New("production delivery payment requires complete WeChat Pay credentials and notify URLs")
 		}
 		if c.TencentIMSDKAppID == "" || c.TencentIMSecret == "" || c.TencentIMAdmin == "" {
 			return errors.New("production requires Tencent IM SDKAppID, secret and administrator")
@@ -152,13 +185,32 @@ func (c Config) Validate() error {
 }
 
 func (c Config) WechatPayConfigured() bool {
+	return c.WechatPayCoreConfigured() && c.WechatPayNotifyURL != ""
+}
+
+func (c Config) WechatPayCoreConfigured() bool {
 	return c.WechatPayMchID != "" && c.WechatPayAPIv3Key != "" && c.WechatPayMerchantSerialNo != "" &&
-		c.WechatPayPrivateKeyPath != "" && c.WechatPayNotifyURL != ""
+		c.WechatPayPrivateKeyPath != ""
+}
+
+func (c Config) DeliveryWechatPayConfigured() bool {
+	return c.WechatPayCoreConfigured() && c.WechatPayPlatformKeyPath != "" &&
+		c.DeliveryWechatPayNotifyURL != "" && c.DeliveryWechatRefundNotifyURL != ""
 }
 
 func (c Config) WechatPayAnyCredentialSet() bool {
 	return c.WechatPayMchID != "" || c.WechatPayAPIv3Key != "" || c.WechatPayMerchantSerialNo != "" ||
 		c.WechatPayPrivateKeyPath != "" || c.WechatPayNotifyURL != "" || c.WechatPayPlatformKeyPath != ""
+}
+
+func (c Config) WechatPayAnyCoreCredentialSet() bool {
+	return c.WechatPayMchID != "" || c.WechatPayAPIv3Key != "" || c.WechatPayMerchantSerialNo != "" ||
+		c.WechatPayPrivateKeyPath != ""
+}
+
+func (c Config) DeliveryWechatPayAnyCredentialSet() bool {
+	return c.WechatPayAnyCoreCredentialSet() || c.WechatPayPlatformKeyPath != "" ||
+		c.DeliveryWechatPayNotifyURL != "" || c.DeliveryWechatRefundNotifyURL != ""
 }
 
 func env(key string, fallback string) string {
