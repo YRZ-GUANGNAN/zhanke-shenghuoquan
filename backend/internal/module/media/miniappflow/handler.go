@@ -108,6 +108,10 @@ func (h *Handler) displayContent(c *gin.Context) {
 		return
 	}
 	referenceType := coremedia.Purpose(c.Param("referenceType"))
+	if referenceType.Valid() && !referenceType.PubliclyResolvable() {
+		response.Fail(c, http.StatusNotFound, "media content not found")
+		return
+	}
 	if !referenceType.Valid() {
 		response.Fail(c, http.StatusBadRequest, "invalid media reference")
 		return
@@ -133,6 +137,10 @@ func (h *Handler) resolveContentURL(c *gin.Context) {
 		return
 	}
 	referenceType := coremedia.Purpose(c.Param("referenceType"))
+	if referenceType.Valid() && !referenceType.PubliclyResolvable() {
+		response.Fail(c, http.StatusNotFound, "media content not found")
+		return
+	}
 	if !referenceType.Valid() {
 		response.Fail(c, http.StatusBadRequest, "invalid media reference")
 		return

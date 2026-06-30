@@ -13,14 +13,27 @@ import (
 type Purpose string
 
 const (
-	PurposePost         Purpose = "post"
-	PurposeProduct      Purpose = "product"
-	PurposeAvatar       Purpose = "avatar"
-	PurposeDish         Purpose = "dish"
-	PurposeMerchantLogo Purpose = "merchant_logo"
+	PurposePost          Purpose = "post"
+	PurposeProduct       Purpose = "product"
+	PurposeAvatar        Purpose = "avatar"
+	PurposeDish          Purpose = "dish"
+	PurposeMerchantLogo  Purpose = "merchant_logo"
+	PurposeDeliveryProof Purpose = "delivery_proof"
 )
 
 func (v Purpose) Valid() bool {
+	switch v {
+	case PurposePost, PurposeProduct, PurposeAvatar, PurposeDish, PurposeMerchantLogo, PurposeDeliveryProof:
+		return true
+	default:
+		return false
+	}
+}
+
+// PubliclyResolvable is an explicit privacy boundary for the generic mini-app
+// media endpoints. Delivery proof photos are resolved only after the Delivery
+// participant fence has been checked.
+func (v Purpose) PubliclyResolvable() bool {
 	switch v {
 	case PurposePost, PurposeProduct, PurposeAvatar, PurposeDish, PurposeMerchantLogo:
 		return true

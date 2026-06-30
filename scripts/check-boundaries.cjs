@@ -73,6 +73,14 @@ if (/internal\/module\/(takeout|user|community|trade|navigation|im|media)/.test(
   failures.push('delivery payment adapter imports a forbidden business domain')
 }
 
+const deliveryProofSource = files(path.join(moduleRoot, 'admin', 'deliveryproof'))
+  .filter((file) => file.endsWith('.go') && !file.endsWith('_test.go'))
+  .map((file) => fs.readFileSync(file, 'utf8'))
+  .join('\n')
+if (/internal\/module\/(takeout|user|community|trade|navigation|im)/.test(deliveryProofSource)) {
+  failures.push('delivery proof adapter imports a forbidden business domain')
+}
+
 const forbiddenFrontend = ['content.ts', 'mock.ts']
 for (const name of forbiddenFrontend) if (fs.existsSync(path.join(root, 'apps', 'miniapp', 'src', 'services', name))) failures.push(`mixed frontend service exists: ${name}`)
 

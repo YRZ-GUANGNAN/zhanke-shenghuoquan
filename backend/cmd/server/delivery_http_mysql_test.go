@@ -39,6 +39,18 @@ func (failingDeliverySender) Send(context.Context, delivery.OutboxEvent, deliver
 	return errors.New("synthetic webhook failure containing no URL")
 }
 
+type d2ApprovedProofPort struct{}
+
+func (d2ApprovedProofPort) ValidateOwnedApprovedAsset(context.Context, uint64, string) error {
+	return nil
+}
+func (d2ApprovedProofPort) PublishProofReference(context.Context, string, string, uint16) error {
+	return nil
+}
+func (d2ApprovedProofPort) ResolveProofURL(context.Context, string, uint16, time.Duration) (string, error) {
+	return "https://signed.example/d2-proof", nil
+}
+
 func TestD2DeliveryRealHTTPMySQLAuthConcurrencyOutboxAndGates(t *testing.T) {
 	db := openD2ServerMySQL(t)
 	assertD2ServerSchema(t, db)
@@ -83,7 +95,7 @@ func TestD2DeliveryRealHTTPMySQLAuthConcurrencyOutboxAndGates(t *testing.T) {
 		AppEnv: "dev", EnableDelivery: true, AllowMockDeliveryFeeConfirmation: true,
 		WeComRiderWebhookURL: "",
 	}
-	runtime, err := newDeliveryRuntime(cfg, db)
+	runtime, err := newDeliveryRuntime(cfg, db, d2ApprovedProofPort{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,6 +265,11 @@ func TestD2DeliveryRealHTTPMySQLAuthConcurrencyOutboxAndGates(t *testing.T) {
 			t.Fatalf("claim pool leaked private value %q: %s", private, body.Data)
 		}
 	}
+	for _, forbidden := range []string{`"proof`, `"asset`, `"url"`} {
+		if strings.Contains(strings.ToLower(string(body.Data)), forbidden) {
+			t.Fatalf("claim pool leaked D-4 media field %q: %s", forbidden, body.Data)
+		}
+	}
 
 	start := make(chan struct{})
 	type claimResult struct {
@@ -317,12 +334,24 @@ func TestD2DeliveryRealHTTPMySQLAuthConcurrencyOutboxAndGates(t *testing.T) {
 		t.Fatalf("stale rider transition status=%d", status)
 	}
 	version := winnerOrder.RowVersion
-	for _, path := range []string{"to-pickup", "picked-up", "delivering", "delivered"} {
+	for _, step := range []struct {
+		path    string
+		proofID string
+	}{
+		{path: "to-pickup"},
+		{path: "picked-up", proofID: "01J00000000000000000000911"},
+		{path: "delivering"},
+		{path: "delivered", proofID: "01J00000000000000000000912"},
+	} {
+		payload := map[string]any{"expectedRowVersion": version}
+		if step.proofID != "" {
+			payload["proofAssetPublicId"] = step.proofID
+		}
 		status, body = d2HTTPJSON(t, server.Client(), http.MethodPatch,
-			server.URL+"/api/v1/delivery/rider/orders/"+created.DeliveryOrderPublicID+"/"+path,
-			winner.Token, map[string]any{"expectedRowVersion": version})
+			server.URL+"/api/v1/delivery/rider/orders/"+created.DeliveryOrderPublicID+"/"+step.path,
+			winner.Token, payload)
 		if status != http.StatusOK {
-			t.Fatalf("%s status=%d body=%s message=%s", path, status, body.Data, body.Message)
+			t.Fatalf("%s status=%d body=%s message=%s", step.path, status, body.Data, body.Message)
 		}
 		if err := json.Unmarshal(body.Data, &winnerOrder); err != nil {
 			t.Fatal(err)
@@ -499,7 +528,7 @@ func openD2ServerMySQL(t *testing.T) *gorm.DB {
 
 func assertD2ServerSchema(t *testing.T, db *gorm.DB) {
 	t.Helper()
-	for _, table := range []string{"users", "takeout_riders", "delivery_orders", "delivery_outbox"} {
+	for _, table := range []string{"users", "takeout_riders", "delivery_orders", "delivery_outbox", "delivery_proofs"} {
 		if !db.Migrator().HasTable(table) {
 			t.Fatalf("missing D-2 required table %s", table)
 		}
@@ -533,6 +562,11 @@ func cleanupD2Server(t *testing.T, db *gorm.DB) {
 	if len(orderIDs) > 0 && db.Migrator().HasTable(&delivery.OutboxEvent{}) {
 		if err := db.Where("aggregate_public_id IN ?", orderIDs).Delete(&delivery.OutboxEvent{}).Error; err != nil {
 			t.Errorf("cleanup D-2 outbox: %v", err)
+		}
+	}
+	if len(orderIDs) > 0 && db.Migrator().HasTable(&delivery.Proof{}) {
+		if err := db.Where("delivery_order_public_id IN ?", orderIDs).Delete(&delivery.Proof{}).Error; err != nil {
+			t.Errorf("cleanup D-2 proofs: %v", err)
 		}
 	}
 	if len(userIDs) > 0 {

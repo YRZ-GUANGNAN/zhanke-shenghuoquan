@@ -19,6 +19,11 @@ type Handler struct {
 	identity      *IdentityAdapter
 	users         *user.Service
 	currentUserID func(*gin.Context) uint64
+	proofs        proofCommands
+}
+
+type proofCommands interface {
+	AdvanceWithProof(context.Context, delivery.ProofTransitionInput) (delivery.Order, delivery.Proof, error)
 }
 
 func NewHandler(
@@ -26,8 +31,13 @@ func NewHandler(
 	identity *IdentityAdapter,
 	users *user.Service,
 	currentUserID func(*gin.Context) uint64,
+	proofs ...proofCommands,
 ) *Handler {
-	return &Handler{service: service, identity: identity, users: users, currentUserID: currentUserID}
+	handler := &Handler{service: service, identity: identity, users: users, currentUserID: currentUserID}
+	if len(proofs) > 0 {
+		handler.proofs = proofs[0]
+	}
+	return handler
 }
 
 func (h *Handler) Register(group *gin.RouterGroup) {
@@ -151,7 +161,7 @@ func (h *Handler) toPickup(c *gin.Context) {
 }
 
 func (h *Handler) pickedUp(c *gin.Context) {
-	h.transition(c, h.service.MarkPickedUp)
+	h.proofTransition(c, delivery.ProofPickup)
 }
 
 func (h *Handler) delivering(c *gin.Context) {
@@ -159,7 +169,28 @@ func (h *Handler) delivering(c *gin.Context) {
 }
 
 func (h *Handler) delivered(c *gin.Context) {
-	h.transition(c, h.service.MarkDelivered)
+	h.proofTransition(c, delivery.ProofDelivery)
+}
+
+func (h *Handler) proofTransition(c *gin.Context, proofType delivery.ProofType) {
+	if h.proofs == nil {
+		response.Fail(c, http.StatusServiceUnavailable, "delivery proof service unavailable")
+		return
+	}
+	var req struct {
+		ExpectedRowVersion uint64 `json:"expectedRowVersion"`
+		ProofAssetPublicID string `json:"proofAssetPublicId"`
+	}
+	if c.ShouldBindJSON(&req) != nil || req.ProofAssetPublicID == "" {
+		response.Fail(c, http.StatusBadRequest, "delivery proof is required")
+		return
+	}
+	value, _, err := h.proofs.AdvanceWithProof(c.Request.Context(), delivery.ProofTransitionInput{
+		OrderPublicID: c.Param("id"), RiderUserID: h.currentUserID(c),
+		ExpectedRowVersion: req.ExpectedRowVersion, ProofType: proofType,
+		AssetPublicID: req.ProofAssetPublicID,
+	})
+	h.write(c, assignedView(value), err)
 }
 
 func (h *Handler) transition(
@@ -204,10 +235,16 @@ func (h *Handler) write(c *gin.Context, value any, err error) {
 	case errors.Is(err, delivery.ErrRiderUnavailable):
 		response.Fail(c, http.StatusForbidden, err.Error())
 	case errors.Is(err, delivery.ErrConcurrentUpdate), errors.Is(err, delivery.ErrRiderMismatch),
-		errors.Is(err, delivery.ErrInvalidTransition), errors.Is(err, delivery.ErrIdempotencyConflict):
+		errors.Is(err, delivery.ErrInvalidTransition), errors.Is(err, delivery.ErrIdempotencyConflict),
+		errors.Is(err, delivery.ErrProofConflict):
 		response.Fail(c, http.StatusConflict, err.Error())
-	case errors.Is(err, delivery.ErrInvalidRecord), errors.Is(err, delivery.ErrInvalidULID):
+	case errors.Is(err, delivery.ErrInvalidRecord), errors.Is(err, delivery.ErrInvalidULID),
+		errors.Is(err, delivery.ErrInvalidProof), errors.Is(err, delivery.ErrProofRequired):
 		response.Fail(c, http.StatusBadRequest, err.Error())
+	case errors.Is(err, delivery.ErrProofAssetRejected):
+		response.Fail(c, http.StatusUnprocessableEntity, "delivery proof asset rejected")
+	case errors.Is(err, delivery.ErrProofBindingPending):
+		response.Fail(c, http.StatusServiceUnavailable, "delivery proof binding pending")
 	default:
 		response.Fail(c, http.StatusInternalServerError, "delivery rider operation failed")
 	}

@@ -15,6 +15,7 @@ import (
 	"campus-circle/backend/internal/module/admin/deliverymerchant"
 	"campus-circle/backend/internal/module/admin/deliverynotify"
 	"campus-circle/backend/internal/module/admin/deliverypayment"
+	"campus-circle/backend/internal/module/admin/deliveryproof"
 	"campus-circle/backend/internal/module/admin/deliveryrider"
 	"campus-circle/backend/internal/module/admin/mediaconsole"
 	"campus-circle/backend/internal/module/admin/review"
@@ -102,6 +103,16 @@ func main() {
 	if err != nil {
 		log.Fatalf("configure Module 10 media display: %v", err)
 	}
+	privateProofDisplay, err := coremedia.NewMediaDisplayService(
+		coreMediaGateway, mediaRepository, completionStore, delivery.PrivateProofURLTTL,
+	)
+	if err != nil {
+		log.Fatalf("configure private delivery proof display: %v", err)
+	}
+	deliveryProofMedia, err := deliveryproof.NewMediaAdapter(coreMediaService, coreMediaGateway, privateProofDisplay)
+	if err != nil {
+		log.Fatalf("configure delivery proof media adapter: %v", err)
+	}
 	miniappMedia, err := miniappflow.NewService(
 		uploadTickets, mediaRepository, completionService, coreMediaService,
 		projectionService, mediaRepository, mediaConsumer, miniappflow.NewStatusRepository(db), nil,
@@ -149,7 +160,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	deliveryRuntime, err := newDeliveryRuntime(cfg, db)
+	deliveryRuntime, err := newDeliveryRuntime(cfg, db, deliveryProofMedia)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -162,6 +173,16 @@ func main() {
 				time.Sleep(5 * time.Second)
 			}
 		}()
+		if deliveryRuntime.proofs != nil {
+			go func() {
+				for {
+					if err := deliveryRuntime.proofs.Run(context.Background(), time.Second); err != nil {
+						log.Printf("delivery proof binding worker stopped; retrying in 5s: %v", err)
+					}
+					time.Sleep(5 * time.Second)
+				}
+			}()
+		}
 	}
 	mediaAdminQuery, err := mediaconsole.NewQueryService(mediaconsole.NewQueryRepository(db))
 	if err != nil {
@@ -215,10 +236,11 @@ type deliveryRuntime struct {
 	paymentProvider      deliverypayment.Provider
 	identity             *deliveryrider.IdentityAdapter
 	notificationConsumer *deliverynotify.Consumer
+	proofs               *delivery.ProofService
 	allowMockConfirm     bool
 }
 
-func newDeliveryRuntime(cfg config.Config, db *gorm.DB) (*deliveryRuntime, error) {
+func newDeliveryRuntime(cfg config.Config, db *gorm.DB, proofPorts ...delivery.MediaProofPort) (*deliveryRuntime, error) {
 	if !cfg.EnableDelivery {
 		return nil, nil
 	}
@@ -257,6 +279,13 @@ func newDeliveryRuntime(cfg config.Config, db *gorm.DB) (*deliveryRuntime, error
 		allowMockConfirm: cfg.AppEnv != "prod" && cfg.EnableDelivery &&
 			cfg.AllowMockDeliveryFeeConfirmation,
 	}
+	if len(proofPorts) > 0 && proofPorts[0] != nil {
+		proofService, err := delivery.NewProofService(repository, proofPorts[0], delivery.ProofServiceConfig{})
+		if err != nil {
+			return nil, fmt.Errorf("configure delivery proof service: %w", err)
+		}
+		runtime.proofs = proofService
+	}
 	if cfg.EnableDeliveryPayment {
 		funds, err := delivery.NewFundsService(repository, repository, nil)
 		if err != nil {
@@ -291,8 +320,12 @@ func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, user
 		paymentHandler.RegisterWebhook(api.Group("/delivery/payments"))
 	}
 	riderRoutes := api.Group("/delivery/rider", userService.AuthRequired())
-	riderHandler := deliveryrider.NewHandler(runtime.dispatch, runtime.identity, userService, currentUserID)
+	riderHandler := deliveryrider.NewHandler(runtime.dispatch, runtime.identity, userService, currentUserID, runtime.proofs)
 	riderHandler.Register(riderRoutes)
+	if runtime.proofs != nil {
+		proofRoutes := api.Group("/delivery/orders", userService.AuthRequired())
+		deliveryproof.NewHandler(runtime.proofs, currentUserID).Register(proofRoutes)
+	}
 	adminRoutes := api.Group("/admin/delivery", userService.AuthRequired(), user.AdminRequired())
 	riderHandler.RegisterAdmin(adminRoutes)
 	if paymentHandler != nil {
