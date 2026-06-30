@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import { Button, Input, Text, Textarea, View } from '@tarojs/components'
 import Taro from '../../services/taro'
-import { deliveryMockFeeEnabled } from '../../feature-flags'
+import {
+  deliveryMockFeeEnabled,
+  deliveryPaymentEnabled,
+  deliveryPaymentMockEnabled
+} from '../../feature-flags'
 import {
   cancelMerchantDeliveryOrder,
   centsToYuan,
@@ -14,6 +18,17 @@ import {
   type MerchantDeliveryOrder,
   type StageTimestamps
 } from '../../services/delivery-merchant'
+import {
+  getDeliveryOrderFunds,
+  payDeliveryOrderWithWallet,
+  payDeliveryOrderWithWechat,
+  pollDeliveryPayment,
+  pollDeliveryRefund,
+  requestDeliveryOrderRefund,
+  type DeliveryFundsResponse,
+  type DeliveryOrderFunds,
+  type DeliveryPayment
+} from '../../services/delivery-payment'
 import './index.scss'
 
 type Tab = 'create' | 'orders'
@@ -64,6 +79,7 @@ export default function DeliveryMerchantPage() {
   const [clientRequestId, setClientRequestId] = useState(createDeliveryClientRequestId)
   const [orders, setOrders] = useState<MerchantDeliveryOrder[]>([])
   const [detail, setDetail] = useState<MerchantDeliveryOrder | null>(null)
+  const [funds, setFunds] = useState<DeliveryOrderFunds | null>(null)
   const [loading, setLoading] = useState(false)
   const [busyOrderId, setBusyOrderId] = useState('')
 
@@ -86,7 +102,14 @@ export default function DeliveryMerchantPage() {
   const openDetail = async (order: MerchantDeliveryOrder) => {
     setBusyOrderId(order.deliveryOrderPublicId)
     try {
-      setDetail(await getMerchantDeliveryOrder(order.deliveryOrderPublicId))
+      const [orderValue, fundsValue] = await Promise.all([
+        getMerchantDeliveryOrder(order.deliveryOrderPublicId),
+        deliveryPaymentEnabled
+          ? getDeliveryOrderFunds(order.deliveryOrderPublicId)
+          : Promise.resolve(null)
+      ])
+      setDetail(orderValue)
+      setFunds(fundsValue)
     } catch (error) {
       showDeliveryError(error, '配送单详情加载失败')
     } finally {
@@ -133,10 +156,98 @@ export default function DeliveryMerchantPage() {
 
   const refreshDetail = async (orderId: string) => {
     try {
-      setDetail(await getMerchantDeliveryOrder(orderId))
+      const [orderValue, fundsValue] = await Promise.all([
+        getMerchantDeliveryOrder(orderId),
+        deliveryPaymentEnabled ? getDeliveryOrderFunds(orderId) : Promise.resolve(null)
+      ])
+      setDetail(orderValue)
+      setFunds(fundsValue)
     } catch {
       setDetail(null)
+      setFunds(null)
     }
+  }
+
+  const payWithWallet = async (order: MerchantDeliveryOrder) => {
+    await runFundsCommand(order, async () => {
+      const result = await payDeliveryOrderWithWallet(
+        order.deliveryOrderPublicId,
+        order.rowVersion
+      )
+      await refreshOrderAndFunds(order.deliveryOrderPublicId)
+      await Taro.showToast({
+        title: result.settlement?.status === 'paid' ? '钱包支付成功' : '支付状态已刷新',
+        icon: result.settlement?.status === 'paid' ? 'success' : 'none'
+      })
+    })
+  }
+
+  const payWithWechat = async (order: MerchantDeliveryOrder) => {
+    await runFundsCommand(order, async () => {
+      const result = await payDeliveryOrderWithWechat(
+        order.deliveryOrderPublicId,
+        order.rowVersion
+      )
+      const initial = requirePayment(result)
+      const latest = await finishWechatPayment(initial)
+      await refreshOrderAndFunds(order.deliveryOrderPublicId)
+      await Taro.showToast({
+        title: latest.status === 'paid' ? '配送费已支付' : '支付处理中，请稍后刷新',
+        icon: latest.status === 'paid' ? 'success' : 'none'
+      })
+    })
+  }
+
+  const requestRefund = async (order: MerchantDeliveryOrder) => {
+    await runFundsCommand(order, async () => {
+      const result = await requestDeliveryOrderRefund(
+        order.deliveryOrderPublicId,
+        order.rowVersion
+      )
+      let latest = await getDeliveryOrderFunds(order.deliveryOrderPublicId)
+      if (result.refund?.status === 'pending' || result.refund?.status === 'refund_pending') {
+        latest = await pollDeliveryRefund(order.deliveryOrderPublicId)
+      }
+      await refreshOrderAndFunds(order.deliveryOrderPublicId)
+      const status = latest.refund?.status
+      await Taro.showToast({
+        title: status === 'succeeded' ? '退款已完成' : status === 'failed' ? '退款失败' : '退款处理中',
+        icon: status === 'succeeded' ? 'success' : 'none'
+      })
+    })
+  }
+
+  const runFundsCommand = async (
+    order: MerchantDeliveryOrder,
+    command: () => Promise<void>
+  ) => {
+    if (busyOrderId) return
+    setBusyOrderId(order.deliveryOrderPublicId)
+    try {
+      await command()
+    } catch (error) {
+      showDeliveryError(error, '资金操作失败')
+      await refreshOrderAndFunds(order.deliveryOrderPublicId)
+    } finally {
+      setBusyOrderId('')
+    }
+  }
+
+  const refreshOrderAndFunds = async (orderId: string) => {
+    await Promise.all([loadOrders(), refreshDetail(orderId)])
+  }
+
+  const finishWechatPayment = async (payment: DeliveryPayment): Promise<DeliveryPayment> => {
+    if (payment.provider === 'mock') {
+      return payment.status === 'paid'
+        ? payment
+        : pollDeliveryPayment(payment.paymentPublicId)
+    }
+    if (!payment.wechat) {
+      throw new Error('后端未返回微信支付参数')
+    }
+    await Taro.requestPayment(payment.wechat)
+    return pollDeliveryPayment(payment.paymentPublicId)
   }
 
   return (
@@ -144,6 +255,17 @@ export default function DeliveryMerchantPage() {
       <View className='delivery-hero'>
         <Text className='delivery-hero__title'>校园配送派单</Text>
         <Text className='delivery-hero__desc'>平台只处理配送服务。配送费由服务端计算，页面不会提交或修改金额。</Text>
+        {deliveryPaymentEnabled && (
+          <Button
+            className='delivery-wallet-entry-button'
+            onClick={() => void Taro.navigateTo({ url: '/pages/delivery-wallet/index' })}
+          >
+            配送钱包
+          </Button>
+        )}
+        {deliveryPaymentEnabled && deliveryPaymentMockEnabled && (
+          <Text className='delivery-payment-mock-tip'>本地 mock 支付提示已开启，资金结果仍以后端为准</Text>
+        )}
       </View>
 
       <View className='delivery-tabs'>
@@ -224,7 +346,7 @@ export default function DeliveryMerchantPage() {
             <Text className='delivery-line'>配送费：¥{centsToYuan(order.deliveryFeeCents)}</Text>
             <View className='delivery-actions'>
               <Button className='cc-button cc-button--small' disabled={!!busyOrderId} onClick={() => void openDetail(order)}>查看详情</Button>
-              {deliveryMockFeeEnabled && order.status === 'pending_fee_payment' && (
+              {deliveryMockFeeEnabled && !deliveryPaymentEnabled && order.status === 'pending_fee_payment' && (
                 <Button
                   className='cc-button cc-button--small delivery-dev-button'
                   disabled={!!busyOrderId}
@@ -250,11 +372,13 @@ export default function DeliveryMerchantPage() {
   }
 
   function renderDetail(order: MerchantDeliveryOrder) {
+    const canRefund = order.status === 'ready_for_claim' && !order.riderUserId
+    const showRefundAction = funds?.settlement?.status === 'paid' && !funds.refund
     return (
       <View className='card delivery-card delivery-detail'>
         <View className='between'>
           <Text className='delivery-section-title'>配送详情</Text>
-          <Text onClick={() => setDetail(null)}>关闭</Text>
+          <Text onClick={() => { setDetail(null); setFunds(null) }}>关闭</Text>
         </View>
         <Text className='delivery-line'>单号：{order.deliveryOrderPublicId}</Text>
         <Text className='delivery-line'>取货：{order.pickupContactName} {order.pickupContactPhone}</Text>
@@ -263,6 +387,34 @@ export default function DeliveryMerchantPage() {
         <Text className='delivery-line'>{order.deliveryAddress}</Text>
         {order.remark && <Text className='delivery-line'>备注：{order.remark}</Text>}
         <Text className='delivery-line'>配送费：¥{centsToYuan(order.deliveryFeeCents)}</Text>
+        {deliveryPaymentEnabled && order.status === 'pending_fee_payment' && (
+          <View className='delivery-actions'>
+            <Button
+              className='cc-button cc-button--small cc-button--primary'
+              disabled={!!busyOrderId}
+              onClick={() => void payWithWallet(order)}
+            >
+              钱包支付
+            </Button>
+            <Button
+              className='cc-button cc-button--small'
+              disabled={!!busyOrderId}
+              onClick={() => void payWithWechat(order)}
+            >
+              {deliveryPaymentMockEnabled ? '微信支付（本地模拟）' : '微信支付'}
+            </Button>
+          </View>
+        )}
+        {deliveryPaymentEnabled && renderFunds(funds)}
+        {deliveryPaymentEnabled && showRefundAction && (
+          <Button
+            className='cc-button cc-button--small delivery-danger-button delivery-refund-button'
+            disabled={!!busyOrderId || !canRefund}
+            onClick={() => void requestRefund(order)}
+          >
+            {canRefund ? '申请退款' : '当前状态不可退款'}
+          </Button>
+        )}
         {renderTimeline(order)}
       </View>
     )
@@ -319,6 +471,10 @@ function renderTimeline(order: MerchantDeliveryOrder) {
 
 function friendlyDeliveryMessage(error: unknown, fallback: string): string {
   const message = error instanceof Error ? error.message : fallback
+  if (/insufficient delivery wallet balance/i.test(message)) return '钱包余额不足，请先充值'
+  if (/refund is not allowed/i.test(message)) return '当前配送状态不允许退款'
+  if (/provider is not configured/i.test(message)) return '微信支付尚未配置'
+  if (/provider rejected/i.test(message)) return '微信支付请求失败，请稍后重试'
   if (/concurrent|invalid transition|idempotency conflict|rider mismatch/i.test(message)) {
     return '配送单状态已变化，已刷新最新数据'
   }
@@ -331,10 +487,73 @@ function showDeliveryError(error: unknown, fallback: string) {
   void Taro.showToast({ title: friendlyDeliveryMessage(error, fallback), icon: 'none' })
 }
 
-function formatTime(value: string): string {
+function formatTime(value?: string): string {
   return value ? value.replace('T', ' ').slice(0, 19) : '-'
 }
 
 function shortId(value: string): string {
   return value.length > 12 ? `${value.slice(0, 6)}...${value.slice(-4)}` : value
 }
+
+function requirePayment(value: DeliveryFundsResponse): DeliveryPayment {
+  if (!value.payment) throw new Error('后端未返回支付记录')
+  return value.payment
+}
+
+function renderFunds(value: DeliveryOrderFunds | null) {
+  if (!value) {
+    return <Text className='delivery-hint delivery-funds-loading'>资金状态读取中…</Text>
+  }
+  return (
+    <View className='delivery-funds'>
+      <Text className='delivery-section-title'>资金状态</Text>
+      {!value.settlement && <Text className='delivery-line'>尚未支付配送费</Text>}
+      {value.settlement && (
+        <>
+          <Text className='delivery-line'>
+            结算：{settlementStatusText[value.settlement.status]} · {settlementSourceText[value.settlement.source]}
+          </Text>
+          <Text className='delivery-line'>金额：¥{centsToYuan(value.settlement.amountCents)}</Text>
+        </>
+      )}
+      {value.payment && (
+        <Text className='delivery-line'>
+          支付：{paymentStatusText[value.payment.status]} · {value.payment.provider === 'mock' ? '本地模拟' : '微信支付'}
+        </Text>
+      )}
+      {value.refund && (
+        <>
+          <Text className='delivery-line'>退款：{refundStatusText[value.refund.status]}</Text>
+          {value.refund.failureReason && <Text className='delivery-line'>说明：{value.refund.failureReason}</Text>}
+        </>
+      )}
+    </View>
+  )
+}
+
+const settlementStatusText = {
+  paid: '已支付',
+  refund_pending: '退款处理中',
+  refunded: '已退款'
+} as const
+
+const settlementSourceText = {
+  wallet: '钱包',
+  wechat: '微信',
+  mock: '本地模拟'
+} as const
+
+const paymentStatusText = {
+  created: '已创建',
+  prepay_issued: '待确认',
+  paid: '已支付',
+  failed: '失败',
+  closed: '已关闭'
+} as const
+
+const refundStatusText = {
+  pending: '已申请',
+  succeeded: '已完成',
+  failed: '失败',
+  refund_pending: '处理中'
+} as const
