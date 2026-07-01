@@ -20,10 +20,16 @@ type Handler struct {
 	users         *user.Service
 	currentUserID func(*gin.Context) uint64
 	proofs        proofCommands
+	conversations conversationCommands
 }
 
 type proofCommands interface {
 	AdvanceWithProof(context.Context, delivery.ProofTransitionInput) (delivery.Order, delivery.Proof, error)
+}
+
+type conversationCommands interface {
+	AfterClaim(context.Context, delivery.Order) error
+	BeforeRelease(context.Context, uint64, string) error
 }
 
 func NewHandler(
@@ -38,6 +44,11 @@ func NewHandler(
 		handler.proofs = proofs[0]
 	}
 	return handler
+}
+
+func (h *Handler) WithConversationCommands(commands conversationCommands) *Handler {
+	h.conversations = commands
+	return h
 }
 
 func (h *Handler) Register(group *gin.RouterGroup) {
@@ -131,6 +142,9 @@ func (h *Handler) claim(c *gin.Context) {
 	value, err := h.service.ClaimOrder(
 		c.Request.Context(), h.currentUserID(c), c.Param("id"), req.ExpectedRowVersion,
 	)
+	if err == nil && h.conversations != nil {
+		err = h.conversations.AfterClaim(c.Request.Context(), value)
+	}
 	h.write(c, assignedView(value), err)
 }
 
@@ -217,6 +231,14 @@ func (h *Handler) release(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, "invalid request")
 		return
 	}
+	if h.conversations != nil {
+		if err := h.conversations.BeforeRelease(
+			c.Request.Context(), h.currentUserID(c), c.Param("id"),
+		); err != nil {
+			h.write(c, nil, err)
+			return
+		}
+	}
 	value, _, err := h.service.ReleaseToPool(
 		c.Request.Context(), h.currentUserID(c), c.Param("id"),
 		req.ExpectedStatus, req.ExpectedRowVersion,
@@ -245,6 +267,8 @@ func (h *Handler) write(c *gin.Context, value any, err error) {
 		response.Fail(c, http.StatusUnprocessableEntity, "delivery proof asset rejected")
 	case errors.Is(err, delivery.ErrProofBindingPending):
 		response.Fail(c, http.StatusServiceUnavailable, "delivery proof binding pending")
+	case errors.Is(err, delivery.ErrConversationUnavailable), errors.Is(err, delivery.ErrConversationLease):
+		response.Fail(c, http.StatusServiceUnavailable, "delivery conversation unavailable")
 	default:
 		response.Fail(c, http.StatusInternalServerError, "delivery rider operation failed")
 	}

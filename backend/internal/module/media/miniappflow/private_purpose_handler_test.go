@@ -10,22 +10,24 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func TestGenericResolveExplicitlyRejectsDeliveryProof(t *testing.T) {
+func TestGenericResolveExplicitlyRejectsPrivatePurposes(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	NewHandler(nil, func(*gin.Context) uint64 { return 1 }, &fakeDisplayService{}).Register(router.Group("/miniapp/media"))
-	for _, endpoint := range []string{
-		"/miniapp/media/resolve/delivery_proof/01J00000000000000000000001/0",
-		"/miniapp/media/display/delivery_proof/01J00000000000000000000001/0/content",
-	} {
-		recorder := httptest.NewRecorder()
-		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, endpoint, nil))
-		if recorder.Code != http.StatusNotFound {
-			t.Fatalf("%s status=%d body=%s", endpoint, recorder.Code, recorder.Body.String())
+	for _, purpose := range []coremedia.Purpose{coremedia.PurposeDeliveryProof, coremedia.PurposeDeliveryIM} {
+		for _, endpoint := range []string{
+			"/miniapp/media/resolve/" + string(purpose) + "/01J00000000000000000000001/0",
+			"/miniapp/media/display/" + string(purpose) + "/01J00000000000000000000001/0/content",
+		} {
+			recorder := httptest.NewRecorder()
+			router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, endpoint, nil))
+			if recorder.Code != http.StatusNotFound {
+				t.Fatalf("%s status=%d body=%s", endpoint, recorder.Code, recorder.Body.String())
+			}
 		}
-	}
-	if !coremedia.PurposeDeliveryProof.Valid() || coremedia.PurposeDeliveryProof.PubliclyResolvable() {
-		t.Fatal("delivery proof purpose must be valid for upload but private for generic resolve")
+		if !purpose.Valid() || purpose.PubliclyResolvable() {
+			t.Fatalf("%s must be valid for upload but private for generic resolve", purpose)
+		}
 	}
 }
 

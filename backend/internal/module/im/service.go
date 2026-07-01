@@ -72,6 +72,16 @@ func (s *Service) ensureIMUser(ctx context.Context, userID uint) (UserMapping, e
 	return mapping, nil
 }
 
+// EnsureUser exposes the existing account-import boundary to application-layer
+// adapters without coupling the IM domain to any business object.
+func (s *Service) EnsureUser(ctx context.Context, userID uint) (string, error) {
+	mapping, err := s.ensureIMUser(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	return mapping.IMUserID, nil
+}
+
 func (s *Service) EnsureProductConversation(ctx context.Context, productID, buyerID, sellerID uint) (ConversationContext, error) {
 	if productID == 0 || buyerID == 0 || sellerID == 0 {
 		return ConversationContext{}, errors.New("invalid conversation relation")
