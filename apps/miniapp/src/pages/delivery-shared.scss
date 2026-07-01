@@ -175,3 +175,34 @@
   color: #16835d;
   font-weight: 700;
 }
+
+.delivery-proofs {
+  margin-top: 26rpx;
+}
+
+.delivery-proof-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18rpx;
+  margin-top: 12rpx;
+}
+
+.delivery-proof-item {
+  width: calc(50% - 9rpx);
+  min-width: 0;
+}
+
+.delivery-proof-image {
+  width: 100%;
+  height: 240rpx;
+  margin-top: 12rpx;
+  border-radius: 16rpx;
+  background: #edf2f7;
+}
+
+.delivery-proof-error {
+  display: block;
+  margin-top: 12rpx;
+  color: #c2413d;
+  font-size: 24rpx;
+}

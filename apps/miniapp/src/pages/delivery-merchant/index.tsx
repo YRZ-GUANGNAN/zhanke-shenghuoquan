@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Button, Input, Text, Textarea, View } from '@tarojs/components'
+import { Button, Image, Input, Text, Textarea, View } from '@tarojs/components'
 import Taro from '../../services/taro'
 import {
   deliveryMockFeeEnabled,
@@ -29,6 +29,10 @@ import {
   type DeliveryOrderFunds,
   type DeliveryPayment
 } from '../../services/delivery-payment'
+import {
+  loadPrivateDeliveryProofs,
+  type DeliveryProofImage
+} from '../../services/delivery-proof'
 import './index.scss'
 
 type Tab = 'create' | 'orders'
@@ -82,6 +86,9 @@ export default function DeliveryMerchantPage() {
   const [funds, setFunds] = useState<DeliveryOrderFunds | null>(null)
   const [loading, setLoading] = useState(false)
   const [busyOrderId, setBusyOrderId] = useState('')
+  const [proofs, setProofs] = useState<DeliveryProofImage[]>([])
+  const [proofsLoading, setProofsLoading] = useState(false)
+  const [proofsError, setProofsError] = useState('')
 
   useEffect(() => {
     void loadOrders()
@@ -110,6 +117,7 @@ export default function DeliveryMerchantPage() {
       ])
       setDetail(orderValue)
       setFunds(fundsValue)
+      await refreshProofs(orderValue.deliveryOrderPublicId)
     } catch (error) {
       showDeliveryError(error, '配送单详情加载失败')
     } finally {
@@ -162,11 +170,35 @@ export default function DeliveryMerchantPage() {
       ])
       setDetail(orderValue)
       setFunds(fundsValue)
+      await refreshProofs(orderId)
     } catch {
       setDetail(null)
       setFunds(null)
+      setProofs([])
     }
   }
+
+  const refreshProofs = async (orderId: string) => {
+    setProofsLoading(true)
+    setProofsError('')
+    try {
+      setProofs(await loadPrivateDeliveryProofs(orderId))
+    } catch (error) {
+      setProofs([])
+      setProofsError(error instanceof Error ? error.message : '履约凭证加载失败')
+    } finally {
+      setProofsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    const orderId = detail?.deliveryOrderPublicId
+    if (!orderId) return
+    const timer = setInterval(() => {
+      void refreshProofs(orderId)
+    }, 50000)
+    return () => clearInterval(timer)
+  }, [detail?.deliveryOrderPublicId])
 
   const payWithWallet = async (order: MerchantDeliveryOrder) => {
     await runFundsCommand(order, async () => {
@@ -378,7 +410,12 @@ export default function DeliveryMerchantPage() {
       <View className='card delivery-card delivery-detail'>
         <View className='between'>
           <Text className='delivery-section-title'>配送详情</Text>
-          <Text onClick={() => { setDetail(null); setFunds(null) }}>关闭</Text>
+          <Text onClick={() => {
+            setDetail(null)
+            setFunds(null)
+            setProofs([])
+            setProofsError('')
+          }}>关闭</Text>
         </View>
         <Text className='delivery-line'>单号：{order.deliveryOrderPublicId}</Text>
         <Text className='delivery-line'>取货：{order.pickupContactName} {order.pickupContactPhone}</Text>
@@ -415,10 +452,49 @@ export default function DeliveryMerchantPage() {
             {canRefund ? '申请退款' : '当前状态不可退款'}
           </Button>
         )}
+        {renderProofs(proofs, proofsLoading, proofsError)}
         {renderTimeline(order)}
       </View>
     )
   }
+}
+
+function renderProofs(
+  proofs: DeliveryProofImage[],
+  loading: boolean,
+  error: string
+) {
+  return (
+    <View className='delivery-proofs'>
+      <View className='between'>
+        <Text className='delivery-section-title'>骑手履约凭证</Text>
+        {loading && <Text className='delivery-hint'>正在获取私有短期地址...</Text>}
+      </View>
+      {error && <Text className='delivery-proof-error'>{error}</Text>}
+      {!loading && !error && proofs.length === 0 && (
+        <Text className='delivery-hint'>骑手尚未提交取货或送达凭证</Text>
+      )}
+      <View className='delivery-proof-grid'>
+        {proofs.map((proof) => (
+          <View key={`${proof.proofType}-${proof.slot}`} className='delivery-proof-item'>
+            <Text className='delivery-line'>
+              {proof.proofType === 'pickup' ? '取货凭证' : '送达凭证'}
+            </Text>
+            {proof.status === 'active' && proof.url
+              ? <Image className='delivery-proof-image' src={proof.url} mode='aspectFill' />
+              : <Text className='delivery-hint'>{proofStatusText(proof.status)}</Text>}
+          </View>
+        ))}
+      </View>
+    </View>
+  )
+}
+
+function proofStatusText(status: DeliveryProofImage['status']): string {
+  if (status === 'binding') return '照片引用处理中'
+  if (status === 'deadletter') return '照片处理失败，请联系平台'
+  if (status === 'revoked') return '照片已撤销'
+  return '照片可查看'
 }
 
 function normalizedForm(form: DeliveryForm): DeliveryForm | null {

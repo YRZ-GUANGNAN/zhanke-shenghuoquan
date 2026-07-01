@@ -79,16 +79,39 @@ export function startToPickup(order: AssignedDeliveryOrder): Promise<AssignedDel
   return riderCommand(order.deliveryOrderPublicId, 'to-pickup', order.rowVersion)
 }
 
-export function markPickedUp(order: AssignedDeliveryOrder): Promise<AssignedDeliveryOrder> {
-  return riderCommand(order.deliveryOrderPublicId, 'picked-up', order.rowVersion)
+export function markPickedUp(
+  order: AssignedDeliveryOrder,
+  proofAssetPublicId: string
+): Promise<AssignedDeliveryOrder> {
+  return proofCommand(order.deliveryOrderPublicId, 'picked-up', order.rowVersion, proofAssetPublicId)
 }
 
 export function startDelivery(order: AssignedDeliveryOrder): Promise<AssignedDeliveryOrder> {
   return riderCommand(order.deliveryOrderPublicId, 'delivering', order.rowVersion)
 }
 
-export function markDelivered(order: AssignedDeliveryOrder): Promise<AssignedDeliveryOrder> {
-  return riderCommand(order.deliveryOrderPublicId, 'delivered', order.rowVersion)
+export function markDelivered(
+  order: AssignedDeliveryOrder,
+  proofAssetPublicId: string
+): Promise<AssignedDeliveryOrder> {
+  return proofCommand(order.deliveryOrderPublicId, 'delivered', order.rowVersion, proofAssetPublicId)
+}
+
+function proofCommand(
+  deliveryOrderPublicId: string,
+  action: 'picked-up' | 'delivered',
+  expectedRowVersion: number,
+  proofAssetPublicId: string
+): Promise<AssignedDeliveryOrder> {
+  return request<AssignedDeliveryOrder>(
+    `${BASE}/orders/${encodeURIComponent(deliveryOrderPublicId)}/${action}`,
+    {
+      url: '',
+      method: 'PATCH',
+      data: { expectedRowVersion, proofAssetPublicId },
+      timeout: 20000
+    }
+  )
 }
 
 export function releaseDeliveryOrder(order: AssignedDeliveryOrder): Promise<AssignedDeliveryOrder> {

@@ -1,7 +1,7 @@
 import Taro from './taro'
 import { request } from './api'
 
-export type MediaPurpose = 'post_image' | 'product_image' | 'avatar' | 'dish' | 'merchant_logo'
+export type MediaPurpose = 'post_image' | 'product_image' | 'avatar' | 'dish' | 'merchant_logo' | 'delivery_proof'
 export type MediaClientState =
   | 'waiting_upload'
   | 'processing'
@@ -16,7 +16,7 @@ export type MediaClientState =
 export interface MediaStatus {
   assetId: string
   ticketId: string
-  purpose: 'post' | 'product' | 'avatar' | 'dish' | 'merchant_logo'
+  purpose: 'post' | 'product' | 'avatar' | 'dish' | 'merchant_logo' | 'delivery_proof'
   state: MediaClientState
   technicalStatus: string
   reviewStatus: string
@@ -63,7 +63,15 @@ export interface UploadProgress {
   message: string
 }
 
-const MAX_EDGE: Record<MediaPurpose, number> = { post_image: 1920, product_image: 1920, avatar: 1024, dish: 1920, merchant_logo: 1024 }
+const MAX_EDGE: Record<MediaPurpose, number> = {
+  post_image: 1920,
+  product_image: 1920,
+  avatar: 1024,
+  dish: 1920,
+  merchant_logo: 1024,
+  delivery_proof: 1920
+}
+const DELIVERY_PROOF_MAX_BYTES = 5 * 1024 * 1024
 
 export async function chooseAndUploadImages(
   purpose: MediaPurpose,
@@ -92,6 +100,26 @@ export async function retryUploadCompletion(ticketId: string): Promise<MediaStat
   })
 }
 
+export async function waitForMediaApproval(
+  assetId: string,
+  onStatus?: (value: MediaStatus) => void,
+  timeoutMs = 90000
+): Promise<MediaStatus> {
+  const deadline = Date.now() + timeoutMs
+  while (true) {
+    const status = await getMediaStatus(assetId)
+    onStatus?.(status)
+    if (status.canUse && status.state === 'approved') return status
+    if (status.state === 'rejected') throw new Error('照片未通过内容安全审核，请重新拍摄')
+    if (status.state === 'review_failed') throw new Error('照片审核失败，请重新拍摄')
+    if (status.state === 'expired' || status.state === 'upload_failed' || status.state === 'deleted') {
+      throw new Error(status.message || '照片处理失败，请重新拍摄')
+    }
+    if (Date.now() >= deadline) throw new Error('照片仍在审核处理中，请稍后重试')
+    await delay(1500)
+  }
+}
+
 async function uploadImage(
   sourcePath: string,
   purpose: MediaPurpose,
@@ -100,6 +128,9 @@ async function uploadImage(
   progress(5, 'compressing', '正在压缩图片')
   const prepared = await prepareImage(sourcePath, purpose)
   const file = await Taro.getFileInfo({ filePath: prepared.path, digestAlgorithm: 'md5' })
+  if (purpose === 'delivery_proof' && file.size > DELIVERY_PROOF_MAX_BYTES) {
+    throw new Error('凭证照片压缩后仍超过 5 MiB，请重新拍摄')
+  }
   const bytes = readFileBytes(prepared.path)
   if (bytes.byteLength !== file.size) throw new Error('压缩文件大小校验失败，请重新选择图片')
 
@@ -189,12 +220,17 @@ function readFileBytes(path: string): ArrayBuffer {
   return copy.buffer
 }
 
-function domainPurpose(value: MediaPurpose): 'post' | 'product' | 'avatar' | 'dish' | 'merchant_logo' {
+function domainPurpose(value: MediaPurpose): 'post' | 'product' | 'avatar' | 'dish' | 'merchant_logo' | 'delivery_proof' {
   if (value === 'post_image') return 'post'
   if (value === 'product_image') return 'product'
   if (value === 'dish') return 'dish'
   if (value === 'merchant_logo') return 'merchant_logo'
+  if (value === 'delivery_proof') return 'delivery_proof'
   return 'avatar'
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
 function mimeFor(type: string): string {
