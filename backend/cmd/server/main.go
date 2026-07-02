@@ -201,6 +201,7 @@ func main() {
 		deliveryRuntime.conversationLifecycle = lifecycle
 		deliveryRuntime.conversationImageTokens = imageTokens
 		deliveryRuntime.conversationImagesEnabled = localMockWechatMode(cfg)
+		deliveryRuntime.conversationReadReceiptEnabled = cfg.EnableDeliveryIMReadReceipt
 	}
 	if deliveryRuntime != nil {
 		go func() {
@@ -279,18 +280,19 @@ func main() {
 }
 
 type deliveryRuntime struct {
-	orders                    *delivery.Service
-	dispatch                  *delivery.DispatchService
-	funds                     *delivery.FundsService
-	paymentProvider           deliverypayment.Provider
-	identity                  *deliveryrider.IdentityAdapter
-	notificationConsumer      *deliverynotify.Consumer
-	proofs                    *delivery.ProofService
-	conversations             *delivery.ConversationService
-	conversationLifecycle     *deliveryim.Lifecycle
-	conversationImageTokens   *deliveryim.ImageTokenCodec
-	conversationImagesEnabled bool
-	allowMockConfirm          bool
+	orders                         *delivery.Service
+	dispatch                       *delivery.DispatchService
+	funds                          *delivery.FundsService
+	paymentProvider                deliverypayment.Provider
+	identity                       *deliveryrider.IdentityAdapter
+	notificationConsumer           *deliverynotify.Consumer
+	proofs                         *delivery.ProofService
+	conversations                  *delivery.ConversationService
+	conversationLifecycle          *deliveryim.Lifecycle
+	conversationImageTokens        *deliveryim.ImageTokenCodec
+	conversationImagesEnabled      bool
+	conversationReadReceiptEnabled bool
+	allowMockConfirm               bool
 }
 
 func newDeliveryRuntime(cfg config.Config, db *gorm.DB, proofPorts ...delivery.MediaProofPort) (*deliveryRuntime, error) {
@@ -386,7 +388,7 @@ func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, user
 		conversationRoutes := api.Group("/delivery", userService.AuthRequired())
 		deliveryim.NewHandler(
 			runtime.conversations, currentUserID, runtime.conversationImageTokens,
-			runtime.conversationImagesEnabled,
+			runtime.conversationImagesEnabled, runtime.conversationReadReceiptEnabled,
 		).Register(conversationRoutes)
 	}
 	adminRoutes := api.Group("/admin/delivery", userService.AuthRequired(), user.AdminRequired())

@@ -103,7 +103,7 @@ func TestD5ParticipantHTTPAndRiderReplacementAgainstMySQL84(t *testing.T) {
 	NewHandler(conversations, func(c *gin.Context) uint64 {
 		value, _ := strconv.ParseUint(c.GetHeader("X-Test-User"), 10, 64)
 		return value
-	}, codec, true).Register(router.Group("/delivery"))
+	}, codec, true, false).Register(router.Group("/delivery"))
 
 	assertD5ConversationHTTP(t, router, merchant, orderID, http.StatusOK)
 	assertD5ConversationHTTP(t, router, riderOne, orderID, http.StatusOK)

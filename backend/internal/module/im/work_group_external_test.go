@@ -65,6 +65,14 @@ func TestTencentWorkGroupAgainstRealIM(t *testing.T) {
 }
 
 func TestTencentWorkGroupReadReceiptAgainstRealIM(t *testing.T) {
+	// Upgrade path: after Tencent IM is upgraded to a plan that supports group
+	// message read receipts and the console capability is enabled, set
+	// ENABLE_DELIVERY_IM_READ_RECEIPT=true plus DELIVERY_D5_RUN_REAL_READ_RECEIPT=1
+	// to run this preserved acceptance gate. The default is intentionally off
+	// because the current Tencent IM edition returns Code=10062 for receipts.
+	if !envEnabled("ENABLE_DELIVERY_IM_READ_RECEIPT") {
+		t.Skip("set ENABLE_DELIVERY_IM_READ_RECEIPT=true after Tencent IM read receipts are enabled")
+	}
 	if os.Getenv("DELIVERY_D5_RUN_REAL_TENCENT_IM") != "1" ||
 		os.Getenv("DELIVERY_D5_RUN_REAL_READ_RECEIPT") != "1" {
 		t.Skip("set DELIVERY_D5_RUN_REAL_TENCENT_IM=1 and DELIVERY_D5_RUN_REAL_READ_RECEIPT=1")
@@ -124,6 +132,11 @@ func TestTencentD5WorkGroupResidueAgainstRealIM(t *testing.T) {
 	t.Logf("real_tencent_group_residue=0 cleaned=%d", len(groups))
 }
 
+func envEnabled(key string) bool {
+	value := strings.TrimSpace(os.Getenv(key))
+	return value == "1" || strings.EqualFold(value, "true")
+}
+
 func listD5AcceptanceGroups(t *testing.T, client *TencentRESTClient) []string {
 	t.Helper()
 	var result struct {
@@ -161,51 +174,31 @@ func assertRealWorkGroupReadReceipt(
 	groupID, sender, reader string,
 ) {
 	t.Helper()
-	var sent struct {
-		MsgSeq uint64 `json:"MsgSeq"`
-	}
-	if err := client.groupCall(t.Context(), "send_group_msg", map[string]any{
-		"GroupId": groupID, "Random": uint32(time.Now().UnixNano()),
-		"From_Account": sender, "NeedReadReceipt": 1,
-		"MsgBody": []map[string]any{{
-			"MsgType":    "TIMTextElem",
-			"MsgContent": map[string]string{"Text": "D-5 acceptance"},
-		}},
-	}, &sent); err != nil {
+	msgSeq, err := client.SendWorkGroupTextMessage(
+		t.Context(), groupID, sender, "D-5 acceptance", true,
+	)
+	if err != nil {
 		t.Fatalf("real Tencent group read-receipt send gate: %v", err)
 	}
-	if sent.MsgSeq == 0 {
-		t.Fatal("real Tencent group message returned zero MsgSeq")
-	}
-	if err := client.groupCall(t.Context(), "group_msg_receipt", map[string]any{
-		"GroupId": groupID, "From_Account": reader,
-		"MsgSeqList": []map[string]uint64{{"MsgSeq": sent.MsgSeq}},
-	}, nil); err != nil {
+	if err := client.ConfirmWorkGroupMessageRead(
+		t.Context(), groupID, reader, []uint64{msgSeq},
+	); err != nil {
 		t.Fatalf("real Tencent group read-receipt gate is not enabled: %v", err)
 	}
-	var receipt struct {
-		Items []struct {
-			Code      int    `json:"Code"`
-			MsgSeq    uint64 `json:"MsgSeq"`
-			ReadNum   int    `json:"ReadNum"`
-			UnreadNum int    `json:"UnreadNum"`
-		} `json:"GroupMsgReceiptList"`
-	}
 	for attempt := 0; attempt < 10; attempt++ {
-		receipt.Items = nil
-		if err := client.groupCall(t.Context(), "get_group_msg_receipt", map[string]any{
-			"GroupId":    groupID,
-			"MsgSeqList": []map[string]uint64{{"MsgSeq": sent.MsgSeq}},
-		}, &receipt); err != nil {
+		receipts, err := client.GetWorkGroupMessageReadReceipts(
+			t.Context(), groupID, []uint64{msgSeq},
+		)
+		if err != nil {
 			t.Fatalf("real Tencent group receipt query: %v", err)
 		}
-		if len(receipt.Items) == 1 && receipt.Items[0].Code == 0 &&
-			receipt.Items[0].MsgSeq == sent.MsgSeq && receipt.Items[0].ReadNum >= 1 {
+		if len(receipts) == 1 && receipts[0].Code == 0 &&
+			receipts[0].MsgSeq == msgSeq && receipts[0].ReadNum >= 1 {
 			return
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
-	t.Fatalf("real Tencent group receipt=%#v", receipt.Items)
+	t.Fatalf("real Tencent group receipt did not become readable for msgSeq=%d", msgSeq)
 }
 
 func assertRealWorkGroupMuted(

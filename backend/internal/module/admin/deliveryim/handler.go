@@ -22,10 +22,11 @@ type conversationQueries interface {
 }
 
 type Handler struct {
-	service       conversationQueries
-	currentUserID func(*gin.Context) uint64
-	imageTokens   *ImageTokenCodec
-	imagesEnabled bool
+	service            conversationQueries
+	currentUserID      func(*gin.Context) uint64
+	imageTokens        *ImageTokenCodec
+	imagesEnabled      bool
+	readReceiptEnabled bool
 }
 
 func NewHandler(
@@ -33,10 +34,12 @@ func NewHandler(
 	currentUserID func(*gin.Context) uint64,
 	imageTokens *ImageTokenCodec,
 	imagesEnabled bool,
+	readReceiptEnabled bool,
 ) *Handler {
 	return &Handler{
 		service: service, currentUserID: currentUserID,
 		imageTokens: imageTokens, imagesEnabled: imagesEnabled,
+		readReceiptEnabled: readReceiptEnabled,
 	}
 }
 
@@ -55,6 +58,7 @@ type ConversationView struct {
 	Status                delivery.ConversationStatus `json:"status"`
 	CanSend               bool                        `json:"canSend"`
 	ImagesEnabled         bool                        `json:"imagesEnabled"`
+	ReadReceiptEnabled    bool                        `json:"readReceiptEnabled"`
 	CreatedAt             time.Time                   `json:"createdAt"`
 	UpdatedAt             time.Time                   `json:"updatedAt"`
 }
@@ -155,7 +159,8 @@ func (h *Handler) view(value delivery.Conversation) ConversationView {
 		AssignmentVersion:     value.AssignmentVersion,
 		TencentConversationID: "GROUP" + value.TencentGroupID,
 		Status:                value.Status, CanSend: value.Status == delivery.ConversationActive,
-		ImagesEnabled: h.imagesEnabled, CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt,
+		ImagesEnabled: h.imagesEnabled, ReadReceiptEnabled: h.readReceiptEnabled,
+		CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt,
 	}
 }
 

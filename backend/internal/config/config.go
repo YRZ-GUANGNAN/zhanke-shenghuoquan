@@ -52,6 +52,7 @@ type Config struct {
 	EnableDeliveryPayment            bool
 	AllowMockDeliveryFeeConfirmation bool
 	AllowMockDeliveryPayment         bool
+	EnableDeliveryIMReadReceipt      bool
 	DeliveryWechatPayNotifyURL       string
 	DeliveryWechatRefundNotifyURL    string
 	WeComRiderWebhookURL             string
@@ -102,6 +103,7 @@ func Load() (Config, error) {
 		EnableDeliveryPayment:            envBool("ENABLE_DELIVERY_PAYMENT", false),
 		AllowMockDeliveryFeeConfirmation: envBool("ALLOW_MOCK_DELIVERY_FEE_CONFIRMATION", false),
 		AllowMockDeliveryPayment:         envBool("ALLOW_MOCK_DELIVERY_PAYMENT", false),
+		EnableDeliveryIMReadReceipt:      envBool("ENABLE_DELIVERY_IM_READ_RECEIPT", false),
 		DeliveryWechatPayNotifyURL:       env("DELIVERY_WECHAT_PAY_NOTIFY_URL", ""),
 		DeliveryWechatRefundNotifyURL:    env("DELIVERY_WECHAT_REFUND_NOTIFY_URL", ""),
 		WeComRiderWebhookURL:             env("WECOM_RIDER_WEBHOOK_URL", ""),

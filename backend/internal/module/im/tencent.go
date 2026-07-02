@@ -181,6 +181,81 @@ func (c *TencentRESTClient) SetWorkGroupReadOnly(
 	}, nil)
 }
 
+type WorkGroupMessageReadReceipt struct {
+	MsgSeq    uint64
+	ReadNum   int
+	UnreadNum int
+	Code      int
+}
+
+func (c *TencentRESTClient) SendWorkGroupTextMessage(
+	ctx context.Context,
+	groupID, sender, text string,
+	needReadReceipt bool,
+) (uint64, error) {
+	body := map[string]any{
+		"GroupId": groupID, "Random": uint32(time.Now().UnixNano()),
+		"From_Account": sender,
+		"MsgBody": []map[string]any{{
+			"MsgType":    "TIMTextElem",
+			"MsgContent": map[string]string{"Text": text},
+		}},
+	}
+	if needReadReceipt {
+		body["NeedReadReceipt"] = 1
+	}
+	var result struct {
+		MsgSeq uint64 `json:"MsgSeq"`
+	}
+	if err := c.groupCall(ctx, "send_group_msg", body, &result); err != nil {
+		return 0, err
+	}
+	if result.MsgSeq == 0 {
+		return 0, fmt.Errorf("Tencent IM send_group_msg returned zero MsgSeq")
+	}
+	return result.MsgSeq, nil
+}
+
+func (c *TencentRESTClient) ConfirmWorkGroupMessageRead(
+	ctx context.Context,
+	groupID, reader string,
+	msgSeqs []uint64,
+) error {
+	return c.groupCall(ctx, "group_msg_receipt", map[string]any{
+		"GroupId": groupID, "From_Account": reader,
+		"MsgSeqList": workGroupMsgSeqList(msgSeqs),
+	}, nil)
+}
+
+func (c *TencentRESTClient) GetWorkGroupMessageReadReceipts(
+	ctx context.Context,
+	groupID string,
+	msgSeqs []uint64,
+) ([]WorkGroupMessageReadReceipt, error) {
+	var result struct {
+		Items []struct {
+			Code      int    `json:"Code"`
+			MsgSeq    uint64 `json:"MsgSeq"`
+			ReadNum   int    `json:"ReadNum"`
+			UnreadNum int    `json:"UnreadNum"`
+		} `json:"GroupMsgReceiptList"`
+	}
+	if err := c.groupCall(ctx, "get_group_msg_receipt", map[string]any{
+		"GroupId":    groupID,
+		"MsgSeqList": workGroupMsgSeqList(msgSeqs),
+	}, &result); err != nil {
+		return nil, err
+	}
+	receipts := make([]WorkGroupMessageReadReceipt, 0, len(result.Items))
+	for _, item := range result.Items {
+		receipts = append(receipts, WorkGroupMessageReadReceipt{
+			MsgSeq: item.MsgSeq, ReadNum: item.ReadNum,
+			UnreadNum: item.UnreadNum, Code: item.Code,
+		})
+	}
+	return receipts, nil
+}
+
 func (c *TencentRESTClient) DismissWorkGroup(ctx context.Context, groupID string) error {
 	err := c.groupCall(ctx, "destroy_group", map[string]string{"GroupId": groupID}, nil)
 	var restErr *TencentRESTError
@@ -270,6 +345,17 @@ func uniqueNonEmpty(values []string) []string {
 		}
 		seen[value] = struct{}{}
 		result = append(result, value)
+	}
+	return result
+}
+
+func workGroupMsgSeqList(msgSeqs []uint64) []map[string]uint64 {
+	result := make([]map[string]uint64, 0, len(msgSeqs))
+	for _, msgSeq := range msgSeqs {
+		if msgSeq == 0 {
+			continue
+		}
+		result = append(result, map[string]uint64{"MsgSeq": msgSeq})
 	}
 	return result
 }

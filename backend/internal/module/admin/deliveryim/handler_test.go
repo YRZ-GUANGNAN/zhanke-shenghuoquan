@@ -46,7 +46,7 @@ func TestHandlerParticipant404AndPrivateImagePayload(t *testing.T) {
 		Status: delivery.ConversationActive, CreatedAt: time.Now(), UpdatedAt: time.Now(),
 	}, resolved: "https://signed.example/private?signature=redacted"}
 	router := gin.New()
-	NewHandler(stub, func(*gin.Context) uint64 { return 7 }, codec, true).Register(router.Group("/delivery"))
+	NewHandler(stub, func(*gin.Context) uint64 { return 7 }, codec, true, false).Register(router.Group("/delivery"))
 
 	body, _ := json.Marshal(map[string]string{"assetPublicId": "01J00000000000000000000003"})
 	recorder := httptest.NewRecorder()
@@ -89,11 +89,50 @@ func TestHandlerParticipant404AndPrivateImagePayload(t *testing.T) {
 	}
 }
 
+func TestHandlerReadReceiptFlagIsDegradableDTO(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	conversationID := "01J00000000000000000000011"
+	stub := &conversationQueryStub{prepared: delivery.Conversation{
+		ConversationPublicID: conversationID, DeliveryOrderPublicID: "01J00000000000000000000012",
+		AssignmentVersion: 1, TencentGroupID: "d5_" + conversationID,
+		Status: delivery.ConversationActive, CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}}
+	for _, test := range []struct {
+		name    string
+		enabled bool
+	}{
+		{name: "default off", enabled: false},
+		{name: "upgrade switch on", enabled: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			router := gin.New()
+			NewHandler(stub, func(*gin.Context) uint64 { return 7 }, nil, false, test.enabled).
+				Register(router.Group("/delivery"))
+			recorder := httptest.NewRecorder()
+			router.ServeHTTP(recorder, httptest.NewRequest(
+				http.MethodGet, "/delivery/orders/01J00000000000000000000012/conversation", nil,
+			))
+			if recorder.Code != http.StatusOK {
+				t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+			}
+			var envelope struct {
+				Data ConversationView `json:"data"`
+			}
+			if err := json.Unmarshal(recorder.Body.Bytes(), &envelope); err != nil {
+				t.Fatal(err)
+			}
+			if envelope.Data.ReadReceiptEnabled != test.enabled {
+				t.Fatalf("readReceiptEnabled=%v want=%v", envelope.Data.ReadReceiptEnabled, test.enabled)
+			}
+		})
+	}
+}
+
 func TestHandlerProductionImagePrepareIsFailClosed(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	codec, _ := NewImageTokenCodec("0123456789abcdef0123456789abcdef")
 	router := gin.New()
-	NewHandler(&conversationQueryStub{}, func(*gin.Context) uint64 { return 7 }, codec, false).
+	NewHandler(&conversationQueryStub{}, func(*gin.Context) uint64 { return 7 }, codec, false, false).
 		Register(router.Group("/delivery"))
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, httptest.NewRequest(

@@ -116,6 +116,7 @@ func TestFeatureGateDefaults(t *testing.T) {
 	t.Setenv("ENABLE_DELIVERY_PAYMENT", "")
 	t.Setenv("ALLOW_MOCK_DELIVERY_FEE_CONFIRMATION", "")
 	t.Setenv("ALLOW_MOCK_DELIVERY_PAYMENT", "")
+	t.Setenv("ENABLE_DELIVERY_IM_READ_RECEIPT", "")
 	if envBool("ENABLE_LEGACY_TAKEOUT", false) {
 		t.Fatal("legacy takeout default must be fail-closed")
 	}
@@ -130,6 +131,9 @@ func TestFeatureGateDefaults(t *testing.T) {
 	}
 	if envBool("ALLOW_MOCK_DELIVERY_PAYMENT", false) {
 		t.Fatal("mock delivery payment must be fail-closed")
+	}
+	if envBool("ENABLE_DELIVERY_IM_READ_RECEIPT", false) {
+		t.Fatal("delivery IM read receipt must be fail-closed")
 	}
 }
 
