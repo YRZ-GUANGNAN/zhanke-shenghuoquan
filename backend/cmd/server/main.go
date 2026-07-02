@@ -12,6 +12,7 @@ import (
 	"campus-circle/backend/internal/database"
 	"campus-circle/backend/internal/middleware"
 	"campus-circle/backend/internal/module/admin"
+	"campus-circle/backend/internal/module/admin/deliveryconsole"
 	"campus-circle/backend/internal/module/admin/deliveryim"
 	"campus-circle/backend/internal/module/admin/deliverymerchant"
 	"campus-circle/backend/internal/module/admin/deliverynotify"
@@ -283,6 +284,9 @@ type deliveryRuntime struct {
 	orders                         *delivery.Service
 	dispatch                       *delivery.DispatchService
 	funds                          *delivery.FundsService
+	fees                           delivery.FeeConfigRepository
+	riderWallets                   delivery.RiderWalletRepository
+	consoleQueries                 *deliveryconsole.GormQueryRepository
 	paymentProvider                deliverypayment.Provider
 	identity                       *deliveryrider.IdentityAdapter
 	notificationConsumer           *deliverynotify.Consumer
@@ -329,6 +333,7 @@ func newDeliveryRuntime(cfg config.Config, db *gorm.DB, proofPorts ...delivery.M
 	runtime := &deliveryRuntime{
 		orders: orderService, dispatch: dispatchService, identity: identityAdapter,
 		notificationConsumer: consumer,
+		fees:                 repository, riderWallets: repository, consoleQueries: deliveryconsole.NewQueryRepository(db),
 		allowMockConfirm: cfg.AppEnv != "prod" && cfg.EnableDelivery &&
 			cfg.AllowMockDeliveryFeeConfirmation,
 	}
@@ -394,6 +399,9 @@ func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, user
 	if paymentHandler != nil {
 		paymentHandler.RegisterAdmin(adminRoutes)
 	}
+	deliveryconsole.NewHandler(
+		runtime.consoleQueries, runtime.fees, runtime.riderWallets, currentUserID, nil,
+	).Register(adminRoutes)
 }
 
 type legacyTakeoutRuntime struct {

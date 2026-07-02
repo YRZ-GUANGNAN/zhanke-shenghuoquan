@@ -73,6 +73,14 @@ if (/internal\/module\/(takeout|user|community|trade|navigation|im|media)/.test(
   failures.push('delivery payment adapter imports a forbidden business domain')
 }
 
+const deliveryConsoleSource = files(path.join(moduleRoot, 'admin', 'deliveryconsole'))
+  .filter((file) => file.endsWith('.go') && !file.endsWith('_test.go'))
+  .map((file) => fs.readFileSync(file, 'utf8'))
+  .join('\n')
+if (/internal\/module\/(takeout|user|community|trade|navigation|im|media)/.test(deliveryConsoleSource)) {
+  failures.push('delivery console adapter imports a forbidden business domain')
+}
+
 const deliveryProofSource = files(path.join(moduleRoot, 'admin', 'deliveryproof'))
   .filter((file) => file.endsWith('.go') && !file.endsWith('_test.go'))
   .map((file) => fs.readFileSync(file, 'utf8'))
