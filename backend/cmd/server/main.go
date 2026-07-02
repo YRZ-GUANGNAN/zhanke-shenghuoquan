@@ -312,10 +312,8 @@ func newDeliveryRuntime(cfg config.Config, db *gorm.DB, proofPorts ...delivery.M
 	if err != nil {
 		return nil, fmt.Errorf("configure delivery rider adapter: %w", err)
 	}
-	dispatchService, err := delivery.NewDispatchService(
-		repository, orderService, identityAdapter,
-		delivery.FeePolicy{DeliveryFeeCents: 150, RiderFeeCents: 100, PlatformCutCents: 50},
-		nil,
+	dispatchService, err := delivery.NewDispatchServiceWithFeeProvider(
+		repository, orderService, identityAdapter, repository, nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("configure delivery dispatch service: %w", err)

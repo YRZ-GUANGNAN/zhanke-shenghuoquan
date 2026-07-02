@@ -385,14 +385,15 @@ func assertD2Schema(t *testing.T, db *gorm.DB) {
 
 func cleanupD2(t *testing.T, db *gorm.DB) {
 	t.Helper()
-	if db.Migrator().HasTable(&OutboxEvent{}) {
-		var orderIDs []string
-		if db.Migrator().HasColumn(&Order{}, "merchant_request_id") {
-			if err := db.Model(&Order{}).Where("merchant_user_id = ?", dispatchMerchant).
-				Pluck("delivery_order_public_id", &orderIDs).Error; err != nil {
-				t.Errorf("list D-2 orders: %v", err)
-			}
+	var orderIDs []string
+	if db.Migrator().HasTable(&Order{}) && db.Migrator().HasColumn(&Order{}, "merchant_request_id") {
+		if err := db.Model(&Order{}).Where("merchant_user_id = ?", dispatchMerchant).
+			Pluck("delivery_order_public_id", &orderIDs).Error; err != nil {
+			t.Errorf("list D-2 orders: %v", err)
 		}
+	}
+	cleanupD6RiderMoney(t, db, []uint64{dispatchRiderOne, dispatchRiderTwo}, orderIDs)
+	if db.Migrator().HasTable(&OutboxEvent{}) {
 		if len(orderIDs) > 0 {
 			if err := db.Where("aggregate_public_id IN ?", orderIDs).Delete(&OutboxEvent{}).Error; err != nil {
 				t.Errorf("cleanup D-2 outbox: %v", err)

@@ -54,7 +54,14 @@ func (r *GormRepository) Transition(
 			return normalizeNotFound(err)
 		}
 		if result.Status == to {
-			return validateIdempotentTransition(result, to, riderUserID)
+			if err := validateIdempotentTransition(result, to, riderUserID); err != nil {
+				return err
+			}
+			if to == StatusDelivered {
+				_, _, _, err := settleDeliveredOrderTx(tx, result, updatedAt)
+				return err
+			}
+			return nil
 		}
 		updates, err := buildTransitionUpdates(result, from, to, riderUserID, updatedAt)
 		if err != nil {
@@ -75,6 +82,10 @@ func (r *GormRepository) Transition(
 		applyTransition(&result, to, riderUserID, updatedAt)
 		result.RowVersion++
 		result.UpdatedAt = updatedAt
+		if to == StatusDelivered {
+			_, _, _, err := settleDeliveredOrderTx(tx, result, updatedAt)
+			return err
+		}
 		return nil
 	})
 	return result, err

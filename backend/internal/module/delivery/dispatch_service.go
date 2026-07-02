@@ -21,8 +21,12 @@ type DispatchService struct {
 	repository  DispatchRepository
 	orders      *Service
 	eligibility RiderEligibility
-	feePolicy   FeePolicy
+	feeProvider FeePolicyProvider
 	now         func() time.Time
+}
+
+type FeePolicyProvider interface {
+	FeePolicyForMerchant(context.Context, uint64) (FeePolicy, error)
 }
 
 func NewDispatchService(
@@ -32,7 +36,20 @@ func NewDispatchService(
 	feePolicy FeePolicy,
 	now func() time.Time,
 ) (*DispatchService, error) {
-	if repository == nil || orders == nil || eligibility == nil || !feePolicy.Valid() {
+	if !feePolicy.Valid() {
+		return nil, ErrInvalidRecord
+	}
+	return NewDispatchServiceWithFeeProvider(repository, orders, eligibility, staticFeePolicyProvider{policy: feePolicy}, now)
+}
+
+func NewDispatchServiceWithFeeProvider(
+	repository DispatchRepository,
+	orders *Service,
+	eligibility RiderEligibility,
+	feeProvider FeePolicyProvider,
+	now func() time.Time,
+) (*DispatchService, error) {
+	if repository == nil || orders == nil || eligibility == nil || feeProvider == nil {
 		return nil, ErrInvalidRecord
 	}
 	if now == nil {
@@ -40,8 +57,14 @@ func NewDispatchService(
 	}
 	return &DispatchService{
 		repository: repository, orders: orders, eligibility: eligibility,
-		feePolicy: feePolicy, now: now,
+		feeProvider: feeProvider, now: now,
 	}, nil
+}
+
+type staticFeePolicyProvider struct{ policy FeePolicy }
+
+func (p staticFeePolicyProvider) FeePolicyForMerchant(context.Context, uint64) (FeePolicy, error) {
+	return p.policy, nil
 }
 
 type CreateDispatchInput struct {
@@ -61,6 +84,13 @@ func (s *DispatchService) CreateOrder(ctx context.Context, input CreateDispatchI
 	if err != nil {
 		return Order{}, err
 	}
+	feePolicy, err := s.feeProvider.FeePolicyForMerchant(ctx, input.MerchantUserID)
+	if err != nil {
+		return Order{}, err
+	}
+	if !feePolicy.Valid() {
+		return Order{}, ErrInvalidRecord
+	}
 	now := s.now().UTC()
 	order := Order{
 		DeliveryOrderPublicID: publicID, MerchantUserID: input.MerchantUserID,
@@ -72,9 +102,9 @@ func (s *DispatchService) CreateOrder(ctx context.Context, input CreateDispatchI
 		RecipientPhone:     strings.TrimSpace(input.Recipient.Phone),
 		DeliveryAddress:    strings.TrimSpace(input.Recipient.Address),
 		Remark:             strings.TrimSpace(input.Remark),
-		DeliveryFeeCents:   s.feePolicy.DeliveryFeeCents,
-		RiderFeeCents:      s.feePolicy.RiderFeeCents,
-		PlatformCutCents:   s.feePolicy.PlatformCutCents,
+		DeliveryFeeCents:   feePolicy.DeliveryFeeCents,
+		RiderFeeCents:      feePolicy.RiderFeeCents,
+		PlatformCutCents:   feePolicy.PlatformCutCents,
 		Status:             StatusPendingFeePayment, RowVersion: 1, CreatedAt: now, UpdatedAt: now,
 	}
 	if err := order.ValidateNew(); err != nil {

@@ -516,6 +516,13 @@ func cleanupD1Orders(t *testing.T, db *gorm.DB) {
 	if !db.Migrator().HasTable(&Order{}) {
 		return
 	}
+	var orderIDs []string
+	if err := db.Model(&Order{}).
+		Where("merchant_user_id IN ?", acceptanceMerchantIDs).
+		Pluck("delivery_order_public_id", &orderIDs).Error; err != nil {
+		t.Errorf("list D-1 delivery orders: %v", err)
+	}
+	cleanupD6RiderMoney(t, db, []uint64{acceptanceRiderOne, acceptanceRiderTwo}, orderIDs)
 	if err := db.Where("merchant_user_id IN ?", acceptanceMerchantIDs).Delete(&Order{}).Error; err != nil {
 		t.Errorf("cleanup delivery orders: %v", err)
 	}

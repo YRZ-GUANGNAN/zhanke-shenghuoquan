@@ -60,6 +60,11 @@ func (r *GormRepository) CreateProofAndTransition(
 			if order.Status != to {
 				return ErrConcurrentUpdate
 			}
+			if to == StatusDelivered {
+				if _, _, _, err := settleDeliveredOrderTx(tx, order, now); err != nil {
+					return err
+				}
+			}
 			proof = existing
 			return nil
 		}
@@ -95,6 +100,11 @@ func (r *GormRepository) CreateProofAndTransition(
 		applyTransition(&order, to, &candidate.UploaderUserID, now)
 		order.RowVersion++
 		order.UpdatedAt = now
+		if to == StatusDelivered {
+			if _, _, _, err := settleDeliveredOrderTx(tx, order, now); err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 	return proof, order, err
