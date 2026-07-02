@@ -11,6 +11,7 @@ export default defineAppConfig({
     'pages/delivery-merchant/index',
     'pages/delivery-wallet/index',
     'pages/delivery-rider/index',
+    'pages/delivery-conversation/index',
     'pages/post-detail/index',
     'pages/notifications/index',
     'pages/product-detail/index',

@@ -1,7 +1,7 @@
 import Taro from './taro'
 import { request } from './api'
 
-export type MediaPurpose = 'post_image' | 'product_image' | 'avatar' | 'dish' | 'merchant_logo' | 'delivery_proof'
+export type MediaPurpose = 'post_image' | 'product_image' | 'avatar' | 'dish' | 'merchant_logo' | 'delivery_proof' | 'delivery_im'
 export type MediaClientState =
   | 'waiting_upload'
   | 'processing'
@@ -16,7 +16,7 @@ export type MediaClientState =
 export interface MediaStatus {
   assetId: string
   ticketId: string
-  purpose: 'post' | 'product' | 'avatar' | 'dish' | 'merchant_logo' | 'delivery_proof'
+  purpose: 'post' | 'product' | 'avatar' | 'dish' | 'merchant_logo' | 'delivery_proof' | 'delivery_im'
   state: MediaClientState
   technicalStatus: string
   reviewStatus: string
@@ -69,7 +69,8 @@ const MAX_EDGE: Record<MediaPurpose, number> = {
   avatar: 1024,
   dish: 1920,
   merchant_logo: 1024,
-  delivery_proof: 1920
+  delivery_proof: 1920,
+  delivery_im: 1920
 }
 const DELIVERY_PROOF_MAX_BYTES = 5 * 1024 * 1024
 
@@ -220,12 +221,13 @@ function readFileBytes(path: string): ArrayBuffer {
   return copy.buffer
 }
 
-function domainPurpose(value: MediaPurpose): 'post' | 'product' | 'avatar' | 'dish' | 'merchant_logo' | 'delivery_proof' {
+function domainPurpose(value: MediaPurpose): 'post' | 'product' | 'avatar' | 'dish' | 'merchant_logo' | 'delivery_proof' | 'delivery_im' {
   if (value === 'post_image') return 'post'
   if (value === 'product_image') return 'product'
   if (value === 'dish') return 'dish'
   if (value === 'merchant_logo') return 'merchant_logo'
   if (value === 'delivery_proof') return 'delivery_proof'
+  if (value === 'delivery_im') return 'delivery_im'
   return 'avatar'
 }
 

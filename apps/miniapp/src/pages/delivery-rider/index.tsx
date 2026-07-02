@@ -22,6 +22,7 @@ import {
   type ClaimableDeliveryOrder,
   type DeliveryRider
 } from '../../services/delivery-rider'
+import { getDeliveryConversationUnreadByOrder } from '../../services/delivery-im'
 import { chooseAndUploadImages, waitForMediaApproval } from '../../services/media'
 import './index.scss'
 
@@ -52,6 +53,7 @@ export default function DeliveryRiderPage() {
   const [proofsLoading, setProofsLoading] = useState(false)
   const [proofsError, setProofsError] = useState('')
   const [proofProgress, setProofProgress] = useState('')
+  const [detailConversationUnread, setDetailConversationUnread] = useState(0)
 
   useEffect(() => {
     void loadIdentity()
@@ -102,6 +104,7 @@ export default function DeliveryRiderPage() {
       const value = await getAssignedDeliveryOrder(order.deliveryOrderPublicId)
       setDetail(value)
       await refreshProofs(value.deliveryOrderPublicId)
+      await refreshConversationUnread(value.deliveryOrderPublicId)
     } catch (error) {
       showRiderError(error, '配送详情加载失败')
     } finally {
@@ -192,10 +195,27 @@ export default function DeliveryRiderPage() {
     try {
       setDetail(await getAssignedDeliveryOrder(orderId))
       await refreshProofs(orderId)
+      await refreshConversationUnread(orderId)
     } catch {
       setDetail(null)
       setProofs([])
+      setDetailConversationUnread(0)
     }
+  }
+
+  const refreshConversationUnread = async (orderId: string) => {
+    try {
+      const value = await getDeliveryConversationUnreadByOrder(orderId)
+      setDetailConversationUnread(value.unreadCount)
+    } catch {
+      setDetailConversationUnread(0)
+    }
+  }
+
+  const openConversation = async (order: AssignedDeliveryOrder) => {
+    await Taro.navigateTo({
+      url: `/pages/delivery-conversation/index?orderId=${encodeURIComponent(order.deliveryOrderPublicId)}&role=rider`
+    })
   }
 
   const refreshProofs = async (orderId: string) => {
@@ -363,13 +383,25 @@ export default function DeliveryRiderPage() {
       <View className='card delivery-card delivery-detail'>
         <View className='between'>
           <Text className='delivery-section-title'>配送任务详情</Text>
-          <Text onClick={() => { setDetail(null); setProofs([]); setProofsError('') }}>关闭</Text>
+          <Text onClick={() => {
+            setDetail(null)
+            setProofs([])
+            setProofsError('')
+            setDetailConversationUnread(0)
+          }}>关闭</Text>
         </View>
         <Text className='delivery-line'>取货联系人：{order.pickupContactName} {order.pickupContactPhone}</Text>
         <Text className='delivery-line'>取货地址：{order.pickupAddress}</Text>
         <Text className='delivery-line'>收货人：{order.recipientName} {order.recipientPhone}</Text>
         <Text className='delivery-line'>送货地址：{order.deliveryAddress}</Text>
         {order.remark && <Text className='delivery-line'>备注：{order.remark}</Text>}
+        <Button
+          className='cc-button cc-button--small cc-button--primary delivery-im-entry-button'
+          disabled={!!busyOrderId}
+          onClick={() => void openConversation(order)}
+        >
+          联系商家{detailConversationUnread > 0 ? `（${detailConversationUnread}）` : ''}
+        </Button>
         {renderProofs(proofs, proofsLoading, proofsError)}
         {renderTimeline(order)}
       </View>

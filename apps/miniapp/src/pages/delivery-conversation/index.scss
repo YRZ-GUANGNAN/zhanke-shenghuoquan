@@ -1,0 +1,130 @@
+.delivery-conversation-page {
+  min-height: 100vh;
+  padding: 24rpx;
+  background: #f4f7fb;
+  box-sizing: border-box;
+}
+
+.delivery-conversation-status {
+  margin-bottom: 20rpx;
+  padding: 20rpx;
+  border-radius: 20rpx;
+  background: #ffffff;
+  box-shadow: 0 8rpx 24rpx rgba(22, 119, 255, 0.08);
+}
+
+.delivery-conversation-title {
+  display: block;
+  color: #1f2d3d;
+  font-size: 30rpx;
+  font-weight: 800;
+}
+
+.delivery-conversation-hint {
+  display: block;
+  margin-top: 8rpx;
+  color: #708090;
+  font-size: 24rpx;
+  line-height: 1.5;
+}
+
+.delivery-conversation-list {
+  height: calc(100vh - 300rpx);
+  padding: 8rpx 0 20rpx;
+  box-sizing: border-box;
+}
+
+.delivery-message {
+  display: flex;
+  flex-direction: column;
+  max-width: 76%;
+  margin: 14rpx 0;
+  padding: 18rpx;
+  border-radius: 20rpx;
+  background: #ffffff;
+  box-shadow: 0 6rpx 18rpx rgba(31, 45, 61, 0.06);
+}
+
+.delivery-message--out {
+  margin-left: auto;
+  background: #e8f2ff;
+}
+
+.delivery-message--in {
+  margin-right: auto;
+}
+
+.delivery-message__text {
+  color: #1f2d3d;
+  font-size: 28rpx;
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.delivery-message__time {
+  margin-top: 8rpx;
+  color: #8a97a8;
+  font-size: 20rpx;
+  text-align: right;
+}
+
+.delivery-message__image {
+  width: 320rpx;
+  height: 240rpx;
+  border-radius: 16rpx;
+  background: #eef3f9;
+}
+
+.delivery-message__placeholder {
+  width: 320rpx;
+  min-height: 120rpx;
+  padding: 24rpx;
+  border-radius: 16rpx;
+  color: #708090;
+  background: #eef3f9;
+  font-size: 24rpx;
+  box-sizing: border-box;
+}
+
+.delivery-compose {
+  display: flex;
+  gap: 12rpx;
+  align-items: center;
+  padding: 18rpx;
+  border-radius: 24rpx;
+  background: #ffffff;
+  box-shadow: 0 -8rpx 24rpx rgba(31, 45, 61, 0.06);
+}
+
+.delivery-compose__input {
+  flex: 1;
+  height: 72rpx;
+  padding: 0 20rpx;
+  border-radius: 36rpx;
+  background: #f4f7fb;
+  color: #1f2d3d;
+  font-size: 26rpx;
+}
+
+.delivery-compose__button {
+  min-width: 112rpx;
+  height: 72rpx;
+  margin: 0;
+  padding: 0 20rpx;
+  border: 0;
+  border-radius: 36rpx;
+  background: #1677ff;
+  color: #ffffff;
+  font-size: 24rpx;
+  line-height: 72rpx;
+}
+
+.delivery-compose__button--plain {
+  background: #eef3f9;
+  color: #1677ff;
+}
+
+.delivery-compose__button[disabled] {
+  background: #d6dde8;
+  color: #8a97a8;
+}

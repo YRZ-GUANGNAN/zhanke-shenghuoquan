@@ -33,6 +33,7 @@ import {
   loadPrivateDeliveryProofs,
   type DeliveryProofImage
 } from '../../services/delivery-proof'
+import { getDeliveryConversationUnreadByOrder } from '../../services/delivery-im'
 import './index.scss'
 
 type Tab = 'create' | 'orders'
@@ -89,6 +90,7 @@ export default function DeliveryMerchantPage() {
   const [proofs, setProofs] = useState<DeliveryProofImage[]>([])
   const [proofsLoading, setProofsLoading] = useState(false)
   const [proofsError, setProofsError] = useState('')
+  const [detailConversationUnread, setDetailConversationUnread] = useState(0)
 
   useEffect(() => {
     void loadOrders()
@@ -118,6 +120,7 @@ export default function DeliveryMerchantPage() {
       setDetail(orderValue)
       setFunds(fundsValue)
       await refreshProofs(orderValue.deliveryOrderPublicId)
+      await refreshConversationUnread(orderValue.deliveryOrderPublicId)
     } catch (error) {
       showDeliveryError(error, '配送单详情加载失败')
     } finally {
@@ -171,11 +174,32 @@ export default function DeliveryMerchantPage() {
       setDetail(orderValue)
       setFunds(fundsValue)
       await refreshProofs(orderId)
+      await refreshConversationUnread(orderId)
     } catch {
       setDetail(null)
       setFunds(null)
       setProofs([])
+      setDetailConversationUnread(0)
     }
+  }
+
+  const refreshConversationUnread = async (orderId: string) => {
+    try {
+      const value = await getDeliveryConversationUnreadByOrder(orderId)
+      setDetailConversationUnread(value.unreadCount)
+    } catch {
+      setDetailConversationUnread(0)
+    }
+  }
+
+  const openConversation = async (order: MerchantDeliveryOrder) => {
+    if (!order.riderUserId) {
+      await Taro.showToast({ title: '骑手接单后才能进入会话', icon: 'none' })
+      return
+    }
+    await Taro.navigateTo({
+      url: `/pages/delivery-conversation/index?orderId=${encodeURIComponent(order.deliveryOrderPublicId)}&role=merchant`
+    })
   }
 
   const refreshProofs = async (orderId: string) => {
@@ -415,6 +439,7 @@ export default function DeliveryMerchantPage() {
             setFunds(null)
             setProofs([])
             setProofsError('')
+            setDetailConversationUnread(0)
           }}>关闭</Text>
         </View>
         <Text className='delivery-line'>单号：{order.deliveryOrderPublicId}</Text>
@@ -424,6 +449,15 @@ export default function DeliveryMerchantPage() {
         <Text className='delivery-line'>{order.deliveryAddress}</Text>
         {order.remark && <Text className='delivery-line'>备注：{order.remark}</Text>}
         <Text className='delivery-line'>配送费：¥{centsToYuan(order.deliveryFeeCents)}</Text>
+        {order.riderUserId && (
+          <Button
+            className='cc-button cc-button--small cc-button--primary delivery-im-entry-button'
+            disabled={!!busyOrderId}
+            onClick={() => void openConversation(order)}
+          >
+            联系骑手{detailConversationUnread > 0 ? `（${detailConversationUnread}）` : ''}
+          </Button>
+        )}
         {deliveryPaymentEnabled && order.status === 'pending_fee_payment' && (
           <View className='delivery-actions'>
             <Button
