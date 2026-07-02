@@ -1,8 +1,10 @@
 # D-5 Delivery IM Backend Residue Report
 
-Date: 2026-07-01
+Date: 2026-07-02
 
-Implementation commit: `ce451ee`
+Initial implementation commit: `ce451ee5`
+
+Read-receipt degradable patch commit: `65d115c9`
 
 ## Required scoped residue
 
@@ -18,13 +20,23 @@ Implementation commit: `ce451ee`
 | Temporary dependency junctions | 0 | Root, Admin and Miniapp junctions removed |
 | Untracked build output | 0 | Build outputs are ignored; no source/worktree residue introduced |
 
-Real Tencent group check:
+Real Tencent group check after the read-receipt degradable patch:
 
 `real_tencent_group_residue=0 cleaned=0`
 
+Local dependency junction check after final verification:
+
+`node_modules_junctions=0`
+
+## Read-receipt gate residue
+
+The patched default path does not create a read-receipt test group because `ENABLE_DELIVERY_IM_READ_RECEIPT` is unset by default. The acceptance run still executed the Tencent group lifecycle and residue scan; no D-5 prefixed groups remained.
+
+When the future upgrade test is run with `ENABLE_DELIVERY_IM_READ_RECEIPT=true`, it still uses deterministic test group IDs and cleanup hooks.
+
 ## Tencent test identity note
 
-Tencent IM account import is idempotent and production SDKAppIDs do not support deleting imported accounts through the tested `account_delete` call (`71000 Err_TLS_PT_Open_Login_Not_Demo_SDKAppID`). The finalized external tests therefore reuse four deterministic acceptance identities rather than creating new identities per run.
+Tencent IM account import is idempotent and production SDKAppIDs do not support deleting imported accounts through the tested `account_delete` call (`71000 Err_TLS_PT_Open_Login_Not_Demo_SDKAppID`). The finalized external tests therefore reuse deterministic acceptance identities rather than creating new identities per run.
 
 During early development runs, timestamped acceptance identities were imported before this correction. Tencent exposes no usable delete/list path for those identities on this SDKAppID, so strict “all historical imported IM identities = 0” cannot be independently attested. They have no active D-5 groups; the real group-prefix scan is zero. This limitation is recorded rather than hidden.
 
