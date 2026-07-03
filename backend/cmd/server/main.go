@@ -121,6 +121,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("configure private delivery conversation display: %v", err)
 	}
+	wechatReviewSubmitter, err := newWechatReviewSubmitter(cfg, completionStore)
+	if err != nil {
+		log.Fatalf("configure Module 10 WeChat image review: %v", err)
+	}
 	deliveryIMMedia, err := deliveryim.NewMediaAdapter(
 		coreMediaService, coreMediaGateway, privateConversationDisplay,
 	)
@@ -131,6 +135,7 @@ func main() {
 		uploadTickets, mediaRepository, completionService, coreMediaService,
 		projectionService, mediaRepository, mediaConsumer, miniappflow.NewStatusRepository(db), nil,
 		miniappflow.WithLocalMockAutoApproval(localMockWechatMode(cfg)),
+		miniappflow.WithWechatReviewSubmitter(wechatReviewSubmitter),
 	)
 	if err != nil {
 		log.Fatalf("configure Module 10 miniapp flow: %v", err)
@@ -260,9 +265,11 @@ func main() {
 		value := user.CurrentUser(c)
 		return value.ID, value.OpenID
 	}).Register(api.Group("/media"))
+	miniappflow.NewWechatCallbackHandler(miniappMedia, cfg.WechatCallbackToken).Register(api.Group("/miniapp/media"))
 	miniappMediaRoutes := api.Group("/miniapp/media", userService.AuthRequired(), user.UnmutedRequired())
-	miniappflow.NewHandler(miniappMedia, func(c *gin.Context) uint64 {
-		return uint64(user.CurrentUserID(c))
+	miniappflow.NewHandlerWithIdentity(miniappMedia, func(c *gin.Context) miniappflow.UserIdentity {
+		value := user.CurrentUser(c)
+		return miniappflow.UserIdentity{ID: uint64(value.ID), OpenID: value.OpenID}
 	}, mediaDisplay).Register(miniappMediaRoutes)
 	safety := review.NewSafetyClient(cfg)
 	community.NewHandler(communityService, userService, safety).Register(api.Group("/community"))
@@ -532,6 +539,16 @@ func newWechatMediaSafety(cfg config.Config) (legacymedia.SafetyChecker, error) 
 		return legacymedia.NewLocalNoopSafety(), nil
 	}
 	return legacymedia.NewWechatSafety(cfg.WechatAppID, cfg.WechatAppSecret, cfg.WechatAPIBase)
+}
+
+func newWechatReviewSubmitter(cfg config.Config, signer miniappflow.WechatReviewURLSigner) (miniappflow.WechatReviewSubmitter, error) {
+	if localMockWechatMode(cfg) {
+		return nil, nil
+	}
+	return miniappflow.NewWechatAsyncReviewSubmitter(miniappflow.WechatReviewSubmitterConfig{
+		AppID: cfg.WechatAppID, AppSecret: cfg.WechatAppSecret, APIBase: cfg.WechatAPIBase,
+		URLTTL: miniappflow.WechatReviewURLTTL,
+	}, signer)
 }
 
 func localMockWechatMode(cfg config.Config) bool {

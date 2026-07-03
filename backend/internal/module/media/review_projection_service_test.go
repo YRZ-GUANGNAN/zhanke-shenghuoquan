@@ -24,6 +24,9 @@ func (s *reviewProjectionRepositoryStub) CreateReviewProjection(context.Context,
 func (s *reviewProjectionRepositoryStub) FindReviewProjection(context.Context, string) (ReviewProjection, error) {
 	return ReviewProjection{}, nil
 }
+func (s *reviewProjectionRepositoryStub) FindReviewProjectionByTaskID(context.Context, uint64) (ReviewProjection, error) {
+	return ReviewProjection{}, nil
+}
 func (s *reviewProjectionRepositoryStub) TransitionReviewProjection(_ context.Context, id string, version uint64, from, to ProjectionStatus, taskID *uint64, _ time.Time) (ReviewProjection, error) {
 	s.transitionInput.projectionID = id
 	s.transitionInput.version = version

@@ -34,6 +34,7 @@ type assetCommands interface {
 type projectionCommands interface {
 	EnsureProjection(context.Context, string) (coremedia.ReviewProjection, bool, error)
 	Find(context.Context, string) (coremedia.ReviewProjection, error)
+	FindByReviewTaskID(context.Context, uint64) (coremedia.ReviewProjection, error)
 }
 
 type outboxAppender interface {
@@ -55,12 +56,17 @@ type Service struct {
 	status               StatusRepository
 	now                  func() time.Time
 	localMockAutoApprove bool
+	wechatReview         WechatReviewSubmitter
 }
 
 type ServiceOption func(*Service)
 
 func WithLocalMockAutoApproval(enabled bool) ServiceOption {
 	return func(s *Service) { s.localMockAutoApprove = enabled }
+}
+
+func WithWechatReviewSubmitter(submitter WechatReviewSubmitter) ServiceOption {
+	return func(s *Service) { s.wechatReview = submitter }
 }
 
 func NewService(
@@ -87,6 +93,9 @@ func NewService(
 	}
 	for _, option := range options {
 		option(service)
+	}
+	if service.localMockAutoApprove && service.wechatReview != nil {
+		return nil, ErrInvalidRequest
 	}
 	return service, nil
 }
@@ -131,6 +140,10 @@ func (s *Service) CreateUpload(ctx context.Context, input CreateUploadInput) (Up
 }
 
 func (s *Service) CompleteUpload(ctx context.Context, ownerID uint64, ticketID string) (AssetStatus, error) {
+	return s.CompleteUploadWithOpenID(ctx, ownerID, "", ticketID)
+}
+
+func (s *Service) CompleteUploadWithOpenID(ctx context.Context, ownerID uint64, openID, ticketID string) (AssetStatus, error) {
 	if ownerID == 0 || !coremedia.ValidULID(ticketID) {
 		return AssetStatus{}, ErrInvalidRequest
 	}
@@ -178,12 +191,17 @@ func (s *Service) CompleteUpload(ctx context.Context, ownerID uint64, ticketID s
 		return AssetStatus{}, err
 	}
 	if projection.Status == coremedia.ProjectionPending {
-		if err := s.appendReviewSubmission(ctx, projection, asset.ID); err != nil {
-			return AssetStatus{}, err
-		}
-		result, consumeErr := s.consumer.ConsumeBatch(ctx, 100)
-		if consumeErr != nil || result.Deadletters > 0 {
-			return AssetStatus{}, errors.Join(ErrSubmissionPending, consumeErr)
+		if s.wechatReview != nil {
+			if err := s.submitWechatReview(ctx, projection, asset, openID); err != nil {
+				return AssetStatus{}, errors.Join(ErrSubmissionPending, err)
+			}
+		} else {
+			if err := s.appendReviewSubmission(ctx, projection, asset.ID); err != nil {
+				return AssetStatus{}, err
+			}
+			if err := s.consumeProjectionEvent(ctx); err != nil {
+				return AssetStatus{}, err
+			}
 		}
 	}
 	if s.localMockAutoApprove {
@@ -192,6 +210,73 @@ func (s *Service) CompleteUpload(ctx context.Context, ownerID uint64, ticketID s
 		}
 	}
 	return s.Status(ctx, ownerID, asset.AssetPublicID)
+}
+
+func (s *Service) submitWechatReview(ctx context.Context, projection coremedia.ReviewProjection, asset coremedia.Asset, openID string) error {
+	if asset.FinalKey == nil || asset.FinalVersionID == nil {
+		return coremedia.ErrReviewInvariant
+	}
+	submission, err := s.wechatReview.SubmitMediaReview(ctx, WechatReviewSubmitInput{
+		OpenID: openID, AssetPublicID: asset.AssetPublicID, Purpose: asset.Purpose,
+		FinalKey: *asset.FinalKey, FinalVersionID: *asset.FinalVersionID,
+	})
+	if err != nil {
+		return err
+	}
+	if err := s.appendReviewSubmission(ctx, projection, submission.ReviewTaskID); err != nil {
+		return err
+	}
+	if err := s.consumeProjectionEvent(ctx); err != nil {
+		return err
+	}
+	projection, err = s.projections.Find(ctx, projection.ProjectionID)
+	if err != nil {
+		return err
+	}
+	if projection.Status == coremedia.ProjectionSubmitted {
+		if err := s.appendReviewing(ctx, projection); err != nil {
+			return err
+		}
+		return s.consumeProjectionEvent(ctx)
+	}
+	return nil
+}
+
+func (s *Service) ApplyWechatReviewResult(ctx context.Context, traceID, suggest string, label int) error {
+	reviewTaskID, err := WechatReviewTaskID(traceID)
+	if err != nil {
+		return err
+	}
+	projection, err := s.projections.FindByReviewTaskID(ctx, reviewTaskID)
+	if err != nil {
+		return err
+	}
+	if projection.Status.Terminal() {
+		return nil
+	}
+	if projection.Status == coremedia.ProjectionSubmitted {
+		if err := s.appendReviewing(ctx, projection); err != nil {
+			return err
+		}
+		if err := s.consumeProjectionEvent(ctx); err != nil {
+			return err
+		}
+		projection, err = s.projections.FindByReviewTaskID(ctx, reviewTaskID)
+		if err != nil {
+			return err
+		}
+	}
+	if projection.Status != coremedia.ProjectionReviewing || projection.ReviewTaskID == nil || *projection.ReviewTaskID != reviewTaskID {
+		return coremedia.ErrReviewInvariant
+	}
+	decision, resultCode, err := WechatSuggestDecision(suggest)
+	if err != nil {
+		return err
+	}
+	if err := s.appendWechatDecision(ctx, projection, traceID, suggest, label, decision, resultCode); err != nil {
+		return err
+	}
+	return s.consumeProjectionEvent(ctx)
 }
 
 func (s *Service) Status(ctx context.Context, ownerID uint64, assetPublicID string) (AssetStatus, error) {
@@ -297,6 +382,31 @@ func (s *Service) appendApprovedDecision(ctx context.Context, projection coremed
 	return s.appendProjectionEvent(ctx, projection, coremedia.ConsumerOperationDecision, payload)
 }
 
+func (s *Service) appendWechatDecision(
+	ctx context.Context,
+	projection coremedia.ReviewProjection,
+	traceID, suggest string,
+	label int,
+	decision coremedia.ProjectionStatus,
+	resultCode string,
+) error {
+	if projection.ReviewTaskID == nil || *projection.ReviewTaskID == 0 {
+		return coremedia.ErrReviewInvariant
+	}
+	decisionVersion := projection.AppliedDecisionVersion + 1
+	payloadHash := WechatDecisionPayloadHash(traceID, suggest, label, *projection.ReviewTaskID, decisionVersion, decision)
+	payload, err := json.Marshal(coremedia.ConsumerEventPayload{
+		ProjectionID: projection.ProjectionID, ReviewTaskID: *projection.ReviewTaskID,
+		ExpectedRowVersion: projection.RowVersion, ExpectedStatus: projection.Status,
+		DecisionVersion: decisionVersion, Decision: decision,
+		PayloadHash: payloadHash, ResultCode: resultCode,
+	})
+	if err != nil {
+		return err
+	}
+	return s.appendProjectionEvent(ctx, projection, coremedia.ConsumerOperationDecision, payload)
+}
+
 func (s *Service) appendProjectionEvent(ctx context.Context, projection coremedia.ReviewProjection, operation string, payload []byte) error {
 	eventID, err := coremedia.NewULID()
 	if err != nil {
@@ -315,6 +425,10 @@ func (s *Service) appendProjectionEvent(ctx context.Context, projection coremedi
 }
 
 func (s *Service) consumeLocalMockEvent(ctx context.Context) error {
+	return s.consumeProjectionEvent(ctx)
+}
+
+func (s *Service) consumeProjectionEvent(ctx context.Context) error {
 	result, err := s.consumer.ConsumeBatch(ctx, 100)
 	if err != nil || result.Deadletters > 0 {
 		return errors.Join(ErrSubmissionPending, err)

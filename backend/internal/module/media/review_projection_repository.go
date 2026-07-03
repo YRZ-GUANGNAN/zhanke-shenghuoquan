@@ -12,6 +12,7 @@ import (
 type ReviewProjectionRepository interface {
 	CreateReviewProjection(context.Context, string, string, time.Time) (ReviewProjection, bool, error)
 	FindReviewProjection(context.Context, string) (ReviewProjection, error)
+	FindReviewProjectionByTaskID(context.Context, uint64) (ReviewProjection, error)
 	TransitionReviewProjection(context.Context, string, uint64, ProjectionStatus, ProjectionStatus, *uint64, time.Time) (ReviewProjection, error)
 	ApplyReviewDecision(context.Context, ApplyReviewDecisionInput, time.Time) (ReviewProjection, error)
 }
@@ -53,6 +54,12 @@ func (r *GormRepository) CreateReviewProjection(ctx context.Context, assetPublic
 func (r *GormRepository) FindReviewProjection(ctx context.Context, projectionID string) (ReviewProjection, error) {
 	var value ReviewProjection
 	err := r.db.WithContext(ctx).Where("projection_id = ?", projectionID).First(&value).Error
+	return value, normalizeNotFound(err)
+}
+
+func (r *GormRepository) FindReviewProjectionByTaskID(ctx context.Context, reviewTaskID uint64) (ReviewProjection, error) {
+	var value ReviewProjection
+	err := r.db.WithContext(ctx).Where("review_task_id = ?", reviewTaskID).First(&value).Error
 	return value, normalizeNotFound(err)
 }
 

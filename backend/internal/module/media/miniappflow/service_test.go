@@ -62,6 +62,9 @@ func (s *projectionStub) EnsureProjection(context.Context, string) (coremedia.Re
 func (s *projectionStub) Find(context.Context, string) (coremedia.ReviewProjection, error) {
 	return s.value, nil
 }
+func (s *projectionStub) FindByReviewTaskID(context.Context, uint64) (coremedia.ReviewProjection, error) {
+	return s.value, nil
+}
 
 type outboxStub struct{ values []*coremedia.OutboxEvent }
 
@@ -97,6 +100,22 @@ func (s *statusStub) FindStatus(context.Context, uint64, string) (StatusFact, er
 }
 func (s *statusStub) ListStatus(context.Context, uint64, int, int) ([]StatusFact, int64, error) {
 	return []StatusFact{s.fact}, 1, nil
+}
+
+type wechatReviewSubmitterStub struct {
+	input     WechatReviewSubmitInput
+	submitted bool
+	response  WechatReviewSubmission
+	err       error
+}
+
+func (s *wechatReviewSubmitterStub) SubmitMediaReview(_ context.Context, input WechatReviewSubmitInput) (WechatReviewSubmission, error) {
+	s.input = input
+	s.submitted = true
+	if s.err != nil {
+		return WechatReviewSubmission{}, s.err
+	}
+	return s.response, nil
 }
 
 func TestCreateUploadReturnsOnlyBoundSinglePUTContract(t *testing.T) {
@@ -243,6 +262,122 @@ func TestCompleteUploadLocalMockAutoApprovesThroughProjectionEvents(t *testing.T
 		decision.ExpectedStatus != coremedia.ProjectionReviewing || decision.Decision != coremedia.ProjectionApproved ||
 		decision.DecisionVersion != 1 || !strings.EqualFold(decision.PayloadHash, localMockDecisionHash(projectionID, 41)) {
 		t.Fatalf("unexpected decision payload=%#v event=%#v", decision, outbox.values[2])
+	}
+}
+
+func TestCompleteUploadWithOpenIDSubmitsRealWechatReview(t *testing.T) {
+	assetID, ticketID, projectionID := testULID(t), testULID(t), testULID(t)
+	finalKey, finalVersion := "final/media.webp", "version-1"
+	now := time.Now().UTC()
+	bundle := coremedia.UploadBundle{
+		Asset:  coremedia.Asset{ID: 41, AssetPublicID: assetID, OwnerID: 7, StorageStage: coremedia.StorageStageStaging, TechnicalStatus: coremedia.TechnicalPendingUpload, RowVersion: 1},
+		Ticket: coremedia.UploadTicket{TicketID: ticketID, OwnerID: 7, Status: coremedia.TicketAuthorizationIssued, RowVersion: 2},
+	}
+	tickets := &ticketStub{bundle: bundle}
+	completion := &completionStub{asset: coremedia.Asset{
+		ID: 41, AssetPublicID: assetID, OwnerID: 7, Purpose: coremedia.PurposeDish,
+		StorageStage: coremedia.StorageStageFinal, TechnicalStatus: coremedia.TechnicalFinalReady,
+		FinalKey: &finalKey, FinalVersionID: &finalVersion,
+	}}
+	projection := &projectionStub{value: coremedia.ReviewProjection{ProjectionID: projectionID, AssetID: 41, Status: coremedia.ProjectionPending, RowVersion: 1}}
+	outbox := &outboxStub{}
+	consumer := &consumerStub{result: coremedia.ConsumerBatchResult{Claimed: 1, Succeeded: 1}, onConsume: func() {
+		last := outbox.last()
+		if last == nil {
+			return
+		}
+		switch last.Operation {
+		case coremedia.ConsumerOperationSubmit:
+			projection.value.Status = coremedia.ProjectionSubmitted
+			projection.value.ReviewTaskID = pointer(uint64(9001))
+			projection.value.RowVersion = 2
+		case coremedia.ConsumerOperationReviewing:
+			projection.value.Status = coremedia.ProjectionReviewing
+			projection.value.RowVersion = 3
+		}
+	}}
+	statuses := &statusStub{fact: StatusFact{
+		AssetID: 41, AssetPublicID: assetID, OwnerID: 7, Purpose: coremedia.PurposeDish,
+		StorageStage: coremedia.StorageStageFinal, TechnicalStatus: coremedia.TechnicalFinalReady,
+		TicketStatus: coremedia.TicketConsumed, TicketID: ticketID, Projection: pointer(coremedia.ProjectionReviewing), UpdatedAt: now,
+	}}
+	wechat := &wechatReviewSubmitterStub{response: WechatReviewSubmission{TraceID: "trace-9001", ReviewTaskID: 9001}}
+	service, err := NewService(
+		tickets, &bundleStub{bundle: bundle}, completion, &assetStub{}, projection,
+		outbox, consumer, statuses, func() time.Time { return now }, WithWechatReviewSubmitter(wechat),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	value, err := service.CompleteUploadWithOpenID(context.Background(), 7, "openid-7", ticketID)
+	if err != nil || value.State != StateReviewPending || !wechat.submitted {
+		t.Fatalf("value=%#v submitted=%v err=%v", value, wechat.submitted, err)
+	}
+	if wechat.input.OpenID != "openid-7" || wechat.input.FinalKey != finalKey || wechat.input.FinalVersionID != finalVersion {
+		t.Fatalf("unexpected wechat input: %#v", wechat.input)
+	}
+	if len(outbox.values) != 2 || outbox.values[0].Operation != coremedia.ConsumerOperationSubmit ||
+		outbox.values[1].Operation != coremedia.ConsumerOperationReviewing {
+		t.Fatalf("expected submit+reviewing events, got %#v", outbox.values)
+	}
+	var submit coremedia.ConsumerEventPayload
+	if err := json.Unmarshal(outbox.values[0].Payload, &submit); err != nil || submit.ReviewTaskID != 9001 {
+		t.Fatalf("submit payload=%#v err=%v", submit, err)
+	}
+}
+
+func TestApplyWechatReviewResultRecordsDecision(t *testing.T) {
+	traceID := "wechat-trace-decision"
+	reviewTaskID, err := WechatReviewTaskID(traceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	projectionID := testULID(t)
+	projection := &projectionStub{value: coremedia.ReviewProjection{
+		ProjectionID: projectionID, AssetID: 41, Status: coremedia.ProjectionReviewing,
+		ReviewTaskID: pointer(reviewTaskID), RowVersion: 3,
+	}}
+	outbox := &outboxStub{}
+	consumer := &consumerStub{result: coremedia.ConsumerBatchResult{Claimed: 1, Succeeded: 1}, onConsume: func() {
+		if last := outbox.last(); last != nil && last.Operation == coremedia.ConsumerOperationDecision {
+			projection.value.Status = coremedia.ProjectionApproved
+			projection.value.AppliedDecisionVersion = 1
+			projection.value.RowVersion = 4
+		}
+	}}
+	service, err := NewService(
+		&ticketStub{}, &bundleStub{}, &completionStub{}, &assetStub{}, projection,
+		outbox, consumer, &statusStub{}, nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.ApplyWechatReviewResult(context.Background(), traceID, "pass", 100); err != nil {
+		t.Fatal(err)
+	}
+	if len(outbox.values) != 1 || outbox.values[0].Operation != coremedia.ConsumerOperationDecision {
+		t.Fatalf("expected one decision event, got %#v", outbox.values)
+	}
+	var decision coremedia.ConsumerEventPayload
+	if err := json.Unmarshal(outbox.values[0].Payload, &decision); err != nil {
+		t.Fatal(err)
+	}
+	if decision.Decision != coremedia.ProjectionApproved || decision.ReviewTaskID != reviewTaskID ||
+		decision.ExpectedStatus != coremedia.ProjectionReviewing || decision.ExpectedRowVersion != 3 ||
+		decision.DecisionVersion != 1 || decision.PayloadHash == "" {
+		t.Fatalf("unexpected decision payload: %#v", decision)
+	}
+}
+
+func TestNewServiceRejectsLocalMockAndRealWechatTogether(t *testing.T) {
+	_, err := NewService(
+		&ticketStub{}, &bundleStub{}, &completionStub{}, &assetStub{}, &projectionStub{},
+		&outboxStub{}, &consumerStub{}, &statusStub{}, nil,
+		WithLocalMockAutoApproval(true),
+		WithWechatReviewSubmitter(&wechatReviewSubmitterStub{}),
+	)
+	if !errors.Is(err, ErrInvalidRequest) {
+		t.Fatalf("expected invalid request, got %v", err)
 	}
 }
 

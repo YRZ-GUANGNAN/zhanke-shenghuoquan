@@ -72,6 +72,13 @@ func (s *ReviewProjectionService) Find(ctx context.Context, projectionID string)
 	return s.repository.FindReviewProjection(ctx, projectionID)
 }
 
+func (s *ReviewProjectionService) FindByReviewTaskID(ctx context.Context, reviewTaskID uint64) (ReviewProjection, error) {
+	if reviewTaskID == 0 {
+		return ReviewProjection{}, ErrInvalidRecord
+	}
+	return s.repository.FindReviewProjectionByTaskID(ctx, reviewTaskID)
+}
+
 func validSHA256(value string) bool {
 	if len(value) != 64 {
 		return false

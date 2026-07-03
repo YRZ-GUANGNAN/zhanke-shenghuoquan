@@ -13,9 +13,15 @@ import (
 )
 
 type Handler struct {
-	service       *Service
-	display       displayContentService
-	currentUserID func(*gin.Context) uint64
+	service         *Service
+	display         displayContentService
+	currentUserID   func(*gin.Context) uint64
+	currentIdentity func(*gin.Context) UserIdentity
+}
+
+type UserIdentity struct {
+	ID     uint64
+	OpenID string
 }
 
 type displayContentService interface {
@@ -23,7 +29,27 @@ type displayContentService interface {
 }
 
 func NewHandler(service *Service, currentUserID func(*gin.Context) uint64, display ...displayContentService) *Handler {
-	handler := &Handler{service: service, currentUserID: currentUserID}
+	handler := &Handler{
+		service:       service,
+		currentUserID: currentUserID,
+		currentIdentity: func(c *gin.Context) UserIdentity {
+			return UserIdentity{ID: currentUserID(c)}
+		},
+	}
+	if len(display) > 0 {
+		handler.display = display[0]
+	}
+	return handler
+}
+
+func NewHandlerWithIdentity(service *Service, currentIdentity func(*gin.Context) UserIdentity, display ...displayContentService) *Handler {
+	handler := &Handler{
+		service: service,
+		currentUserID: func(c *gin.Context) uint64 {
+			return currentIdentity(c).ID
+		},
+		currentIdentity: currentIdentity,
+	}
 	if len(display) > 0 {
 		handler.display = display[0]
 	}
@@ -66,7 +92,8 @@ func (h *Handler) createUpload(c *gin.Context) {
 }
 
 func (h *Handler) completeUpload(c *gin.Context) {
-	value, err := h.service.CompleteUpload(c.Request.Context(), h.currentUserID(c), c.Param("ticketId"))
+	identity := h.currentIdentity(c)
+	value, err := h.service.CompleteUploadWithOpenID(c.Request.Context(), identity.ID, identity.OpenID, c.Param("ticketId"))
 	if err != nil {
 		h.writeError(c, err)
 		return
