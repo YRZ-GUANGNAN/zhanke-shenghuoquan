@@ -1,68 +1,58 @@
-import React, { useEffect, useState } from 'react'
-import { Button, Image, Text, Textarea, View } from '@tarojs/components'
-import { AvatarMark } from '../../components'
-import { addPostComment, getCommunityPost, listPostComments, togglePostFavorite, togglePostLike, toggleUserFollow } from '../../services/b-community'
+import React, { useState } from 'react'
+import { Button, Input, Text, View } from '@tarojs/components'
+import { AvatarMark, ImageTile, PageHeader, PageShell } from '../../components'
 import Taro from '../../services/taro'
-import type { CommunityComment, CommunityPost } from '../../types'
 import './index.scss'
 
+const comments = [
+  ['阿泽', '内容很实用，这周末我也想去看看。'],
+  ['南宁', '学生证优惠还能用吗？有人一起拼吗？'],
+  ['小满', '图里这个位置好像在二食堂门口。']
+]
+
 export default function PostDetailPage() {
-  const params = Taro.getCurrentInstance().router?.params || {}
-  const postId = params.id || ''
-  const [post, setPost] = useState<CommunityPost | null>(null)
-  const [comments, setComments] = useState<CommunityComment[]>([])
-  const [comment, setComment] = useState('')
   const [liked, setLiked] = useState(false)
-  const [favorited, setFavorited] = useState(false)
-  const [followed, setFollowed] = useState(false)
 
-  const load = async () => {
-    if (!postId) return
-    const [nextPost, nextComments] = await Promise.all([getCommunityPost(postId), listPostComments(postId)])
-    setPost(nextPost)
-    setComments(nextComments)
-  }
-
-  useEffect(() => { void load().catch(showError) }, [postId])
-
-  const act = async (run:()=>Promise<void>) => { try { await run() } catch (error) { showError(error) } }
-  const submitComment = () => act(async()=>{
-    const value=comment.trim()
-    if(!value){await Taro.showToast({title:'请输入评论',icon:'none'});return}
-    await addPostComment(postId,value)
-    setComment('')
-    await Taro.showToast({title:'评论已提交审核',icon:'none'})
-  })
-
-  if (!post) return <View className='page post-detail-page'><View className='card'>内容加载中</View></View>
-
-  return <View className='page post-detail-page'>
-    <View className='post-detail card'>
-      <View className='between'>
-        <View className='row post-detail__author'>
-          <AvatarMark label={post.author} src={post.avatar}/>
-          <View><Text className='post-detail__name'>{post.author}</Text><Text className='post-detail__meta'>{post.school} · {post.createdAt}</Text></View>
+  return (
+    <PageShell plain refreshTitle='帖子详情已刷新'>
+      <PageHeader title='帖子详情' right={<Text onClick={() => Taro.showToast({ title: '已收藏', icon: 'success' })}>收藏</Text>} />
+      <View className='detail-hero-image detail-hero-image--post'>
+        <ImageTile tone={1} label='校园' />
+      </View>
+      <View className='zk-card'>
+        <View className='author-row-live'>
+          <AvatarMark label='奶' />
+          <View>
+            <Text>奶茶脑袋</Text>
+            <Text>湛江科技学院 · 今天 12:30</Text>
+          </View>
+          <Text className='zk-chip'>关注</Text>
         </View>
-        <Button className='cc-button cc-button--small' onClick={()=>act(async()=>{const value=await toggleUserFollow(post.authorId);setFollowed(value)})}>{followed?'已关注':'关注'}</Button>
+        <Text className='detail-title-live'>三食堂新出的芋泥波波真的绝，一天一杯根本停不下</Text>
+        <Text className='detail-copy-live'>中杯 8 块，加一份波波 1 块。芋泥很绵密，不会太甜，下课后去人少一点，排队也快。</Text>
+        <View className='tag-row-live'>
+          <Text>校园美食</Text>
+          <Text>三食堂</Text>
+          <Text>奶茶推荐</Text>
+        </View>
       </View>
-      <Text className='cc-tag'>{post.topic}</Text>
-      <Text className='post-detail__title'>{post.title}</Text>
-      <Text className='post-detail__content'>{post.content}</Text>
-      {post.images.map(img=><Image key={img} src={img} mode='widthFix' className='post-detail__image'/>) }
-    </View>
-
-    <View className='comment-panel card'>
-      <Text className='comment-panel__title'>互动</Text>
-      <View className='comment-panel__stats'>
-        <Text onClick={()=>act(async()=>{const value=await togglePostLike(post.id);setLiked(value);setPost({...post,likedCount:Math.max(0,post.likedCount+(value?1:-1))})})}>{liked?'已赞':'赞'} {post.likedCount}</Text>
-        <Text>评论 {post.commentCount}</Text>
-        <Text onClick={()=>act(async()=>{const value=await togglePostFavorite(post.id);setFavorited(value);setPost({...post,favoriteCount:Math.max(0,post.favoriteCount+(value?1:-1))})})}>{favorited?'已收藏':'收藏'} {post.favoriteCount}</Text>
+      <View className='zk-card'>
+        <Text className='comment-title-live'>共 12 条评论</Text>
+        {comments.map((comment) => (
+          <View key={comment[0]} className='comment-row-live'>
+            <AvatarMark label={comment[0]} size='small' />
+            <View>
+              <Text>{comment[0]}</Text>
+              <Text>{comment[1]}</Text>
+            </View>
+          </View>
+        ))}
       </View>
-      <Textarea className='comment-panel__input' value={comment} maxlength={500} placeholder='写下你的评论' onInput={event=>setComment(String(event.detail.value))}/>
-      <Button className='cc-button cc-button--primary cc-button--block' onClick={submitComment}>提交评论</Button>
-      <View className='comment-list'>{comments.map(item=><View key={item.id} className='comment-item'><AvatarMark size='small' label={item.author} src={item.avatar}/><View><Text className='comment-item__author'>{item.author} · {item.createdAt}</Text><Text className='comment-item__content'>{item.content}</Text></View></View>)}</View>
-    </View>
-  </View>
+      <View className='comment-bar-live'>
+        <Input placeholder='友善评论一下' />
+        <Button onClick={() => setLiked(!liked)}>{liked ? '已赞' : '♡ 赞'}</Button>
+        <Button onClick={() => Taro.showToast({ title: '评论已发送', icon: 'success' })}>发送</Button>
+      </View>
+    </PageShell>
+  )
 }
-
-function showError(error:unknown){void Taro.showToast({title:error instanceof Error?error.message:'操作失败',icon:'none'})}

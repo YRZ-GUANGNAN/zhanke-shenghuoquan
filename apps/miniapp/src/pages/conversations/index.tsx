@@ -1,14 +1,31 @@
-import React, {useEffect, useState} from 'react'
-import {Text, View} from '@tarojs/components'
-import type {IMConversationContext} from '../../services/c-trade'
-import {listIMConversations} from '../../services/e-im'
+import React from 'react'
+import { Text, View } from '@tarojs/components'
+import { AvatarMark, PageHeader, PageShell } from '../../components'
 import Taro from '../../services/taro'
 import './index.scss'
 
-export default function ConversationsPage(){
-  const[items,setItems]=useState<IMConversationContext[]>([])
-  useEffect(()=>{listIMConversations().then(setItems).catch(showError)},[])
-  const open=(item:IMConversationContext)=>Taro.navigateTo({url:`/pages/chat/index?conversationId=${encodeURIComponent(item.conversationId)}&peerUserId=${encodeURIComponent(item.peerUserId)}&productId=${item.productId}&buyerId=${item.buyerId}&sellerId=${item.sellerId}&relationId=${item.relationId}`})
-  return <View className='page conversation-page'>{items.length===0&&<View className='card empty'>暂无交易会话</View>}{items.map(item=><View key={item.relationId} className='card conversation-row' onClick={()=>void open(item)}><View><Text className='conversation-row__title'>商品 #{item.productId}</Text><Text className='conversation-row__meta'>腾讯云 C2C · {item.peerUserId}</Text></View><Text>进入 ›</Text></View>)}</View>
+const rows = [
+  ['配', '配送会话 #D2407018', '骑手：我到店了，取货照片已上传。', '/pages/delivery-conversation/index'],
+  ['二', '二手宝贝咨询', '自行车今天还在吗？', '/pages/chat/index'],
+  ['通', '系统通知', '你的二手宝贝已通过展示审核。', '/pages/notifications/index']
+]
+
+export default function ConversationsPage() {
+  return (
+    <PageShell plain refreshTitle='消息已刷新'>
+      <PageHeader title='消息' />
+      <View className='list-stack'>
+        {rows.map((row) => (
+          <View key={row[1]} className='message-row-live' onClick={() => Taro.navigateTo({ url: row[3] })}>
+            <AvatarMark label={row[0]} />
+            <View>
+              <Text>{row[1]}</Text>
+              <Text>{row[2]}</Text>
+            </View>
+            <Text>›</Text>
+          </View>
+        ))}
+      </View>
+    </PageShell>
+  )
 }
-function showError(error:unknown){void Taro.showToast({title:error instanceof Error?error.message:'会话加载失败',icon:'none'})}

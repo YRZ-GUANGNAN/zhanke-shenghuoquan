@@ -1,7 +1,4 @@
-export type TabKey = 'home' | 'takeout' | 'market' | 'tools' | 'profile'
-
-// A: UserProfile; B: CommunityPost; C: Product; D: ToolLink.
-// E uses SDK-specific types in services/e-im.ts; F exists only in apps/admin.
+export type TabKey = 'home' | 'food' | 'publish' | 'market' | 'profile'
 
 export interface UserProfile {
   id: string

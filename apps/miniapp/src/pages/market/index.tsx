@@ -1,40 +1,54 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import { Button, Image, Input, ScrollView, Text, View } from '@tarojs/components'
-import { AvatarMark, BottomNav } from '../../components'
-import { listProducts } from '../../services/c-trade'
+import React, { useState } from 'react'
+import { Input, Text, View } from '@tarojs/components'
+import { ImageTile, PageShell } from '../../components'
 import Taro from '../../services/taro'
-import type { Product } from '../../types'
 import './index.scss'
 
-const categories=['全部','电子产品','宿舍必备','零食','书籍','学习']
-const statusLabels:Record<Product['status'],string>={selling:'出售中',reserved:'已预定',sold:'已售出'}
+const filters = ['全部', '教材资料', '宿舍好物', '数码闲置', '代步']
+const products = [
+  ['九成新自行车，毕业急出，车况好无锈', '150', '出售中', '自行车', 0],
+  ['四级真题一套 + 听力网课，半价出', '25', '出售中', '资料', 2],
+  ['宿舍小冰箱 70L，自提优先', '188', '预订', '冰箱', 1],
+  ['考研政治资料，笔记已经整理好', '38', '已售', '资料', 4]
+]
 
-export default function MarketPage(){
-  const[category,setCategory]=useState('全部')
-  const[status,setStatus]=useState<Product['status']>('selling')
-  const[keyword,setKeyword]=useState('')
-  const[items,setItems]=useState<Product[]>([])
-  const[total,setTotal]=useState(0)
-  const filtered=useMemo(()=>category==='全部'?items:items.filter(item=>item.category===category),[category,items])
+export default function MarketPage() {
+  const [active, setActive] = useState(filters[0])
 
-  const load=async(nextStatus=status,nextKeyword=keyword)=>{try{const result=await listProducts(1,nextKeyword.trim(),nextStatus);setItems(result.items);setTotal(result.total)}catch(error){void Taro.showToast({title:error instanceof Error?error.message:'商品加载失败',icon:'none'})}}
-  useEffect(()=>{void load(status,'')},[status])
-
-  return <View className='page market-page'>
-    <View className='market-hero'>
-      <Text className='market-hero__title'>校园二手</Text><Text className='market-hero__subtitle'>真实商品、校内沟通</Text>
-      <View className='cc-search'><Input value={keyword} placeholder='搜索标题和描述' onInput={event=>setKeyword(String(event.detail.value))} onConfirm={()=>void load()}/><Button className='cc-button cc-button--small' onClick={()=>void load()}>搜索</Button></View>
-    </View>
-    <View className='feed-tabs'>{(['selling','reserved','sold'] as Product['status'][]).map(value=><Text key={value} className={status===value?'feed-tabs__active':''} onClick={()=>{setKeyword('');setStatus(value)}}>{statusLabels[value]}</Text>)}</View>
-    <Text className='market-result-count'>共 {total} 件</Text>
-    <ScrollView className='category-bar' scrollX enhanced showScrollbar={false}><View className='category-bar__inner'>{categories.map(item=><View key={item} className={`category-bar__item ${category===item?'category-bar__item--active':''}`} onClick={()=>setCategory(item)}>{item}</View>)}</View></ScrollView>
-    <View className='product-grid'>{filtered.map(item=><View key={item.id} className='product-card card' onClick={()=>Taro.navigateTo({url:`/pages/product-detail/index?id=${item.id}`})}>
-      {item.images[0]?<Image src={item.images[0]} mode='aspectFill'/>:<View className='cc-placeholder product-card__cover'>暂无图片</View>}
-      <View className='product-card__body'><View className='between'><Text className='product-card__title'>{item.title}</Text><Text className={`cc-tag status-${item.status}`}>{statusLabels[item.status]}</Text></View>
-        <View className='product-card__price-row'><Text className='product-card__price'>¥{item.price}</Text>{item.originalPrice&&<Text className='product-card__origin'>¥{item.originalPrice}</Text>}</View>
-        <View className='between product-card__seller'><View className='row'><AvatarMark size='small' label={item.sellerName} src={item.sellerAvatar}/><Text>{item.sellerName}</Text></View><Text>{item.campus}</Text></View>
-      </View></View>)}</View>
-    <Button className='cc-button cc-button--primary publish-goods' onClick={()=>Taro.navigateTo({url:'/pages/publish/index?type=product'})}>发布二手</Button>
-    <BottomNav active='market'/>
-  </View>
+  return (
+    <PageShell active='market' refreshTitle='二手市场已刷新'>
+      <View className='market-head-live'>
+        <View>
+          <Text>二手集市</Text>
+          <Text>学生私下交易，平台只做展示与私聊连接</Text>
+        </View>
+        <Text onClick={() => Taro.navigateTo({ url: '/pages/publish/index?type=product' })}>发布</Text>
+      </View>
+      <View className='search-pill'>
+        <Text>⌕</Text>
+        <Input disabled placeholder='搜索自行车、教材、宿舍好物' />
+      </View>
+      <View className='filter-row'>
+        {filters.map((item) => (
+          <Text key={item} className={active === item ? 'filter-row__active' : ''} onClick={() => setActive(item)}>
+            {item}
+          </Text>
+        ))}
+      </View>
+      <View className='product-grid'>
+        {products.map((item) => (
+          <View key={item[0]} className='product-card' onClick={() => Taro.navigateTo({ url: '/pages/product-detail/index' })}>
+            <ImageTile tone={Number(item[4])} label={String(item[3])} />
+            <View className='product-card__body'>
+              <Text className='product-card__title'>{item[0]}</Text>
+              <View className='product-card__foot'>
+                <Text>¥{item[1]}</Text>
+                <Text className={item[2] === '出售中' ? 'zk-chip zk-chip--green' : 'zk-chip'}>{item[2]}</Text>
+              </View>
+            </View>
+          </View>
+        ))}
+      </View>
+    </PageShell>
+  )
 }

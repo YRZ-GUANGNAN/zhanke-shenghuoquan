@@ -1,97 +1,59 @@
-import React, { useState } from 'react'
-import { Button, Text, View } from '@tarojs/components'
-import { AvatarMark, BottomNav } from '../../components'
+import React from 'react'
+import { Text, View } from '@tarojs/components'
+import { AvatarMark, PageShell } from '../../components'
 import Taro from '../../services/taro'
-import { useSessionStore } from '../../stores/session'
-import { chooseAndUploadImages } from '../../services/media'
-import { deliveryEnabled, legacyTakeoutEnabled } from '../../feature-flags'
 import './index.scss'
 
-const actions = ['收藏', '帖子', '评论', '宝贝']
-const settings = ['内容审核记录', '问题反馈', '用户协议', '清除缓存', '检查新版本']
-
 export default function ProfilePage() {
-  const profile = useSessionStore((state) => state.profile)
-  const [changingAvatar, setChangingAvatar] = useState(false)
-  const [avatarProgress, setAvatarProgress] = useState('')
-
-  const changeAvatar = async () => {
-    if (!profile.id || changingAvatar) return
-    setChangingAvatar(true)
-    try {
-      const [uploaded] = await chooseAndUploadImages('avatar', 1, (value) => setAvatarProgress(`${value.percent}% · ${value.message}`))
-      if (!uploaded) return
-      Taro.showToast({
-        title: uploaded.canUse ? '头像媒体已审核；业务绑定暂未启用' : '头像已上传，等待审核',
-        icon: 'none'
-      })
-      await Taro.navigateTo({ url: '/pages/media-history/index' })
-    } catch (error) {
-      Taro.showToast({ title: error instanceof Error ? error.message : '头像上传失败', icon: 'none' })
-    } finally {
-      setChangingAvatar(false)
-      setAvatarProgress('')
-    }
-  }
-
   return (
-    <View className='page profile-page'>
-      <View className='profile-head'>
-        <View onClick={changeAvatar}><AvatarMark size='large' label={profile.nickname} src={profile.avatar} /></View>
-        <View className='profile-head__info'>
-          <View className='between'>
-            <Text className='profile-head__name'>{profile.nickname}</Text>
-            <Text className='profile-head__edit' onClick={changeAvatar}>{changingAvatar ? '上传中' : '修改头像'}</Text>
-          </View>
-          <Text className='profile-head__id'>ID: {profile.id}</Text>
-          <Text className='profile-head__id'>{profile.school} · {profile.campus}</Text>
-          {avatarProgress && <Text className='profile-head__id'>{avatarProgress}</Text>}
+    <PageShell active='profile' refreshTitle='我的页面已刷新'>
+      <View className='profile-hero-live'>
+        <AvatarMark label='泽' size='large' />
+        <View>
+          <Text>阿泽</Text>
+          <Text>湛科号：zk_aze233 · 湛江科技学院</Text>
         </View>
       </View>
-
-      <View className='quick-actions'>
-        {actions.map((action, index) => (
-          <View key={action} className='quick-actions__item card'>
-            <View className='quick-actions__icon'>{index + 1}</View><Text>{action}</Text>
+      <View className='profile-stats-live'>
+        {[
+          ['23', '收藏', 'favorites'],
+          ['8', '帖子', 'posts'],
+          ['41', '评论', 'comments'],
+          ['2', '宝贝', 'products']
+        ].map((item) => (
+          <View key={item[1]} onClick={() => Taro.navigateTo({ url: `/pages/my-content/index?tab=${item[2]}` })}>
+            <Text>{item[0]}</Text>
+            <Text>{item[1]}</Text>
           </View>
         ))}
       </View>
-
-      <View className='settings card'>
-        <View className='settings__row' onClick={() => Taro.navigateTo({ url: '/pages/media-history/index' })}>
-          <Text>图片上传与审核记录</Text><Text className='settings__arrow'>›</Text>
+      <View className='zk-card'>
+        <View className='section-head-live'>
+          <Text>身份切换</Text>
+          <Text>切换后进入不同工作台</Text>
         </View>
-        <View className='settings__row' onClick={() => Taro.navigateTo({ url: '/pages/conversations/index' })}>
-          <Text>交易会话</Text><Text className='settings__arrow'>›</Text>
+        <View className='role-grid-live'>
+          <RoleCard title='学生' sub='社交 · 二手 · 校园服务' active />
+          <RoleCard title='骑手' sub='抢单 · 配送 · 钱包' onClick={() => Taro.navigateTo({ url: '/pages/delivery-rider/index' })} />
+          <RoleCard title='商家' sub='发单 · 账单 · 消息' onClick={() => Taro.navigateTo({ url: '/pages/delivery-merchant/index' })} />
         </View>
-        {legacyTakeoutEnabled && <>
-          <View className='settings__row' onClick={() => Taro.navigateTo({ url: '/pages/takeout-merchant/index' })}>
-            <Text>Merchant Center</Text><Text className='settings__arrow'>{'>'}</Text>
-          </View>
-          <View className='settings__row' onClick={() => Taro.navigateTo({ url: '/pages/takeout-rider/index' })}>
-            <Text>Rider Center</Text><Text className='settings__arrow'>{'>'}</Text>
-          </View>
-        </>}
-        {deliveryEnabled && <>
-          <View className='settings__row' onClick={() => Taro.navigateTo({ url: '/pages/delivery-merchant/index' })}>
-            <Text>配送商家中心</Text><Text className='settings__arrow'>›</Text>
-          </View>
-          <View className='settings__row' onClick={() => Taro.navigateTo({ url: '/pages/delivery-rider/index' })}>
-            <Text>配送骑手中心</Text><Text className='settings__arrow'>›</Text>
-          </View>
-        </>}
-        <View className='settings__row' onClick={() => Taro.navigateTo({ url: '/pages/notifications/index' })}>
-          <Text>社区通知</Text><Text className='settings__arrow'>›</Text>
-        </View>
-        {settings.map((item) => (
-          <View key={item} className='settings__row' onClick={() => Taro.showToast({ title: item, icon: 'none' })}>
-            <Text>{item}</Text><Text className='settings__arrow'>›</Text>
-          </View>
-        ))}
       </View>
+      <View className='settings-card-live'>
+        <Text onClick={() => Taro.navigateTo({ url: '/pages/conversations/index' })}>消息中心</Text>
+        <Text onClick={() => Taro.navigateTo({ url: '/pages/media-history/index' })}>图片记录</Text>
+        <Text onClick={() => Taro.navigateTo({ url: '/pages/notifications/index' })}>通知</Text>
+        <Text>关于湛科生活圈</Text>
+      </View>
+    </PageShell>
+  )
+}
 
-      <Button className='cc-button cc-button--primary login-button'>微信登录</Button>
-      <BottomNav active='profile' />
+function RoleCard({ title, sub, active, onClick }: { title: string; sub: string; active?: boolean; onClick?: () => void }) {
+  return (
+    <View className={active ? 'role-card-live role-card-live--active' : 'role-card-live'} onClick={onClick}>
+      <Text>{title.slice(0, 1)}</Text>
+      <Text>{title}</Text>
+      <Text>{sub}</Text>
     </View>
   )
 }

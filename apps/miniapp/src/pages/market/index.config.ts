@@ -1,4 +1,7 @@
 export default definePageConfig({
-  navigationBarTitleText: '校园二手'
+  navigationBarTitleText: '',
+  navigationStyle: 'custom',
+  backgroundColor: '#f2f5f9',
+  backgroundTextStyle: 'dark',
+  enablePullDownRefresh: true
 })
-

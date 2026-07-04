@@ -1,3 +1,0 @@
-export default definePageConfig({
-  navigationBarTitleText: '外卖订单详情'
-})

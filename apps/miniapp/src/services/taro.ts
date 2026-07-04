@@ -47,6 +47,8 @@ interface TaroFacade {
   getFileInfo(options: { filePath: string; digestAlgorithm?: 'md5' | 'sha1' }): Promise<{ size: number; digest: string }>
   getFileSystemManager(): { readFileSync(filePath: string): ArrayBuffer | ArrayBufferView | string }
   requestPayment(options: RequestPaymentOptions): Promise<unknown>
+  usePullDownRefresh(callback: () => void): void
+  stopPullDownRefresh(): Promise<unknown>
 }
 
 export default TaroRuntime as unknown as TaroFacade

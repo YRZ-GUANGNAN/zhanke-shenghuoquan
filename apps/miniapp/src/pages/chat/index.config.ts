@@ -1,1 +1,7 @@
-export default definePageConfig({navigationBarTitleText:'腾讯云 IM 会话'})
+export default definePageConfig({
+  navigationBarTitleText: '',
+  navigationStyle: 'custom',
+  backgroundColor: '#f2f5f9',
+  backgroundTextStyle: 'dark',
+  enablePullDownRefresh: true
+})
