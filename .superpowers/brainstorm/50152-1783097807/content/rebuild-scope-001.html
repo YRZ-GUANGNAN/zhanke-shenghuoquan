@@ -1,0 +1,84 @@
+<h2>前端重构范围确认</h2>
+<p class="subtitle">基于 Claude Design 交接包 + $awesome-design-md 的 Claude 参考。请看三种执行强度，我建议选 B。</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f7f8fa;padding:18px">
+      <div style="width:180px;margin:auto;border-radius:28px;background:#fff;box-shadow:0 20px 44px rgba(28,55,95,.16);overflow:hidden">
+        <div style="height:86px;background:linear-gradient(150deg,#2E7DD4,#2168B8);color:#fff;padding:18px;font-weight:700">核心页</div>
+        <div style="padding:12px;display:grid;gap:8px">
+          <div style="height:42px;border-radius:12px;background:#E6F1FB"></div>
+          <div style="height:42px;border-radius:12px;background:#F2F5F9"></div>
+          <div style="height:42px;border-radius:12px;background:#F2F5F9"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. 核心页快修</h3>
+      <p>只处理学生首页、骑手大厅、商家工作台、钱包和发布页。速度最快，但其余页面仍可能风格断裂。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f7f8fa;padding:18px">
+      <div style="display:flex;gap:12px;justify-content:center">
+        <div style="width:130px;border-radius:24px;background:#fff;box-shadow:0 18px 40px rgba(28,55,95,.14);overflow:hidden">
+          <div style="height:62px;background:#fff;padding:14px;color:#1A2B3C;font-weight:700">学生端</div>
+          <div style="padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;background:#F2F5F9">
+            <div style="height:70px;border-radius:12px;background:#fff"></div>
+            <div style="height:92px;border-radius:12px;background:#fff"></div>
+          </div>
+        </div>
+        <div style="width:130px;border-radius:24px;background:#fff;box-shadow:0 18px 40px rgba(28,55,95,.14);overflow:hidden">
+          <div style="height:76px;background:linear-gradient(150deg,#2E7DD4,#2168B8);color:#fff;padding:14px;font-weight:700">配送端</div>
+          <div style="padding:10px;background:#F2F5F9;display:grid;gap:8px">
+            <div style="height:48px;border-radius:14px;background:#fff"></div>
+            <div style="height:48px;border-radius:14px;background:#fff"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. 小程序全量重构（推荐）</h3>
+      <p>重建全局设计系统、底部导航、学生/骑手/商家全部页面；保留真实业务功能，不碰后端 API。完成后先交付小程序可运行版本。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f7f8fa;padding:18px">
+      <div style="display:grid;grid-template-columns:1fr 1.2fr;gap:12px;align-items:center">
+        <div style="border-radius:22px;background:#fff;box-shadow:0 16px 36px rgba(28,55,95,.14);overflow:hidden">
+          <div style="height:70px;background:linear-gradient(150deg,#2E7DD4,#2168B8)"></div>
+          <div style="padding:10px;display:grid;gap:8px;background:#F2F5F9"><div style="height:42px;border-radius:12px;background:#fff"></div><div style="height:42px;border-radius:12px;background:#fff"></div></div>
+        </div>
+        <div style="border-radius:12px;background:#fff;border:1px solid #E4EAF1;padding:12px;box-shadow:0 14px 30px rgba(28,45,70,.06)">
+          <div style="height:18px;width:60%;border-radius:6px;background:#1A2B3C"></div>
+          <div style="margin-top:12px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px"><div style="height:52px;border-radius:8px;background:#E6F1FB"></div><div style="height:52px;border-radius:8px;background:#E6F1FB"></div><div style="height:52px;border-radius:8px;background:#E6F1FB"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. 小程序 + 后台一起重构</h3>
+      <p>同一轮覆盖 miniapp 和 admin。整体最完整，但改动面更大，验证时间更长，更容易和现有未提交改动交叠。</p>
+    </div>
+  </div>
+</div>
+
+<div class="pros-cons">
+  <div class="pros">
+    <h4>推荐落点</h4>
+    <ul>
+      <li>先执行 B，保证手机端主产品统一、精致、可构建。</li>
+      <li>后台乱码与视觉修复作为同轮第二阶段处理。</li>
+      <li>后端、接口、业务规则全部冻结。</li>
+    </ul>
+  </div>
+  <div class="cons">
+    <h4>明确不做</h4>
+    <ul>
+      <li>不添加地图、距离、在线开关、评分等不存在功能。</li>
+      <li>不暴露腾讯云 IM、后端、CAS 等技术词。</li>
+      <li>不把 Claude 品牌照搬进产品，只取设计方法。</li>
+    </ul>
+  </div>
+</div>
