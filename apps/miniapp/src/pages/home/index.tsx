@@ -1,106 +1,302 @@
-import React, { useEffect, useState } from 'react'
-import { Button, Image, Text, View } from '@tarojs/components'
-import { AvatarMark, BottomNav } from '../../components'
-import { listCommunityPosts, listFollowingPosts } from '../../services/b-community'
-import { listNavigationItems } from '../../services/d-navigation'
+import React, { useMemo, useState } from 'react'
+import { Text, View } from '@tarojs/components'
 import Taro from '../../services/taro'
-import type { CommunityPost, ToolLink } from '../../types'
 import './index.scss'
 
+type HomeTab = 'messages' | 'discover' | 'tools'
+
+type DiscoverCard = {
+  id: string
+  tone: 'peach' | 'sky' | 'mint' | 'lilac' | 'lemon' | 'cyan'
+  mediaLabel: string
+  title: string
+  author: string
+  avatar: string
+  likes: number
+  height: 'short' | 'medium' | 'tall'
+}
+
+type Conversation = {
+  id: string
+  name: string
+  avatar: string
+  preview: string
+  time: string
+  unread?: boolean
+}
+
+type ToolItem = {
+  id: string
+  icon: string
+  label: string
+  sub: string
+}
+
+const tabs: Array<{ key: HomeTab; label: string }> = [
+  { key: 'messages', label: '私信' },
+  { key: 'discover', label: '发现' },
+  { key: 'tools', label: '工具' }
+]
+
+const discoverCards: DiscoverCard[] = [
+  {
+    id: 'milk-tea',
+    tone: 'peach',
+    mediaLabel: '图 · 奶茶',
+    title: '三食堂新出的芋泥波波真的绝，一天一杯根本...',
+    author: '奶茶脑袋',
+    avatar: '奶',
+    likes: 128,
+    height: 'medium'
+  },
+  {
+    id: 'bike',
+    tone: 'sky',
+    mediaLabel: '图 · 自行车',
+    title: '出一辆九成新自行车，毕业急出，150 拿走',
+    author: '向北',
+    avatar: '向',
+    likes: 36,
+    height: 'tall'
+  },
+  {
+    id: 'sea',
+    tone: 'mint',
+    mediaLabel: '图 · 海边',
+    title: '有没有周末去金沙湾的搭子？拍照吹海风',
+    author: '小鹿乱撞',
+    avatar: '鹿',
+    likes: 87,
+    height: 'medium'
+  },
+  {
+    id: 'library',
+    tone: 'lilac',
+    mediaLabel: '图 · 图书馆',
+    title: '期末周图书馆占座攻略｜亲测有效的三个时间...',
+    author: '卷心菜',
+    avatar: '卷',
+    likes: 214,
+    height: 'medium'
+  },
+  {
+    id: 'express',
+    tone: 'lemon',
+    mediaLabel: '图 · 快递',
+    title: '求助：明天上午有人能帮拿北门快递吗，有偿',
+    author: '阿黎',
+    avatar: '黎',
+    likes: 12,
+    height: 'short'
+  },
+  {
+    id: 'part-time',
+    tone: 'cyan',
+    mediaLabel: '图 · 招聘',
+    title: '周末兼职招募，咖啡店需要两名同学帮忙',
+    author: '椰椰',
+    avatar: '椰',
+    likes: 68,
+    height: 'medium'
+  }
+]
+
+const conversations: Conversation[] = [
+  {
+    id: 'c1',
+    name: '小鹿乱撞',
+    avatar: '鹿',
+    preview: '明天去海边的话我可以带相机～',
+    time: '12:06',
+    unread: true
+  },
+  {
+    id: 'c2',
+    name: '卷心菜',
+    avatar: '卷',
+    preview: '图书馆三楼靠窗还有位置',
+    time: '昨天'
+  },
+  {
+    id: 'c3',
+    name: '向北',
+    avatar: '向',
+    preview: '自行车可以今晚看车',
+    time: '周二',
+    unread: true
+  }
+]
+
+const tools: ToolItem[] = [
+  { id: 'schedule', icon: '课', label: '课表', sub: '一键看今日课程' },
+  { id: 'bus', icon: '车', label: '校车', sub: '班次与校区路线' },
+  { id: 'print', icon: '印', label: '打印', sub: '附近打印点导航' },
+  { id: 'map', icon: '图', label: '校园地图', sub: '教学楼与宿舍区' },
+  { id: 'lost', icon: '失', label: '失物招领', sub: '找回遗落小物' },
+  { id: 'repair', icon: '修', label: '报修', sub: '宿舍维修入口' }
+]
+
+const navItems = [
+  { key: 'home', label: '首页', icon: '⌂', url: '/pages/home/index' },
+  { key: 'delivery', label: '外卖', icon: '▱', url: '/pages/delivery-merchant/index' },
+  { key: 'market', label: '二手', icon: '▢', url: '/pages/market/index' },
+  { key: 'profile', label: '我的', icon: '♙', url: '/pages/profile/index' }
+]
+
+function splitCards(cards: DiscoverCard[]) {
+  return {
+    left: cards.filter((_, index) => index % 2 === 0),
+    right: cards.filter((_, index) => index % 2 === 1)
+  }
+}
+
 export default function HomePage() {
-	const [posts, setPosts] = useState<CommunityPost[]>([])
-	const [tools, setTools] = useState<ToolLink[]>([])
-	const [feed, setFeed] = useState<'recent'|'following'>('recent')
+  const [activeTab, setActiveTab] = useState<HomeTab>('discover')
+  const [liked, setLiked] = useState<Record<string, boolean>>({})
+  const columns = useMemo(() => splitCards(discoverCards), [])
 
-  useEffect(() => {
-    let active = true
-	Promise.all([listCommunityPosts(), listNavigationItems()]).then(([nextPosts, nextTools]) => {
-      if (!active) return
-      setPosts(nextPosts)
-      setTools(nextTools)
-	}).catch(() => undefined)
-    return () => {
-      active = false
-    }
-  }, [])
+  const showTodoToast = (title = '静态预览，后续接入') => {
+    void Taro.showToast({ title, icon: 'none', duration: 1400 })
+  }
 
-  const switchFeed = async (next:'recent'|'following') => {
-    try {
-      setFeed(next)
-      setPosts(next==='recent'?await listCommunityPosts():await listFollowingPosts())
-    } catch (error) {
-      void Taro.showToast({title:error instanceof Error?error.message:'加载失败',icon:'none'})
-    }
+  const toggleLike = (id: string) => {
+    setLiked((current) => ({ ...current, [id]: !current[id] }))
+  }
+
+  const renderDiscoverCard = (card: DiscoverCard) => {
+    const isLiked = Boolean(liked[card.id])
+    return (
+      <View
+        key={card.id}
+        className='student-post-card'
+        onClick={() => showTodoToast('帖子详情静态占位')}
+      >
+        <View className={`student-post-card__media student-post-card__media--${card.tone} student-post-card__media--${card.height}`}>
+          <Text>{card.mediaLabel}</Text>
+        </View>
+        <View className='student-post-card__body'>
+          <Text className='student-post-card__title'>{card.title}</Text>
+          <View className='student-post-card__meta'>
+            <View className={`student-post-card__avatar student-post-card__avatar--${card.tone}`}>
+              <Text>{card.avatar}</Text>
+            </View>
+            <Text className='student-post-card__author'>{card.author}</Text>
+            <View
+              className={`student-post-card__like ${isLiked ? 'student-post-card__like--active' : ''}`}
+              onClick={(event) => {
+                event.stopPropagation()
+                toggleLike(card.id)
+              }}
+            >
+              <Text className='student-post-card__heart'>{isLiked ? '♥' : '♡'}</Text>
+              <Text>{card.likes + (isLiked ? 1 : 0)}</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+    )
   }
 
   return (
-    <View className='page home-page'>
-      <View className='home-header'>
-        <View>
-          <Text className='home-header__name'>广海空间</Text>
-          <Text className='home-header__school'>海大人的综合信息服务平台</Text>
+    <View className='page student-home-page'>
+      <View className='student-home-header'>
+        <View className='student-home-header__tabs'>
+          {tabs.map((tab) => (
+            <View
+              key={tab.key}
+              className={`student-home-header__tab ${activeTab === tab.key ? 'student-home-header__tab--active' : ''}`}
+              onClick={() => setActiveTab(tab.key)}
+            >
+              <Text>{tab.label}</Text>
+            </View>
+          ))}
         </View>
-        <Button className='cc-button cc-button--primary cc-button--small' onClick={() => Taro.navigateTo({ url: '/pages/publish/index?type=post' })}>
-          发布
-        </Button>
+        <View className='student-home-header__search' onClick={() => showTodoToast('搜索静态占位')} />
       </View>
 
-      <View className='cc-search'>搜索二手、帖子、资料、工具</View>
-
-      <View className='tool-grid card'>
-        {tools.slice(0, 8).map((tool) => (
-          <View key={tool.id} className='tool-grid__item' onClick={() => Taro.navigateTo({ url: '/pages/tools/index' })}>
-            <View className='tool-grid__icon' style={{ background: tool.color }}>{tool.iconText}</View>
-            <Text>{tool.title}</Text>
-          </View>
-        ))}
-      </View>
-
-      <View className='notice card'>
-        <View>
-          <Text className='notice__title'>校园服务导航已上线</Text>
-          <Text className='notice__desc'>聚合社区、二手交易、校内工具跳转和私聊提醒</Text>
-        </View>
-        <Button className='cc-button cc-button--small' onClick={() => Taro.navigateTo({ url: '/pages/tools/index' })}>查看</Button>
-      </View>
-
-      <View className='feed-tabs'>
-        <Text className={feed==='recent'?'feed-tabs__active':''} onClick={()=>void switchFeed('recent')}>最新</Text>
-        <Text className={feed==='following'?'feed-tabs__active':''} onClick={()=>void switchFeed('following')}>关注</Text>
-        <Text>二手精选</Text>
-      </View>
-
-      <View className='post-list'>
-        {posts.map((post) => (
-          <View key={post.id} className='post-card card' onClick={() => Taro.navigateTo({ url: `/pages/post-detail/index?id=${post.id}` })}>
-            {post.pinned && <View className='post-card__pin'>置顶</View>}
-            <View className='between'>
-              <View className='row post-card__author'>
-                <AvatarMark size='small' label={post.author} src={post.avatar} />
-                <View>
-                  <Text className='post-card__name'>{post.author}</Text>
-                  <Text className='post-card__meta'>{post.school} · {post.createdAt}</Text>
+      <View className='student-home-content'>
+        {activeTab === 'messages' && (
+          <View className='student-message-panel'>
+            {conversations.map((item) => (
+              <View
+                key={item.id}
+                className='student-message-row'
+                onClick={() => showTodoToast('私聊静态占位')}
+              >
+                <View className='student-message-row__avatar'>
+                  <Text>{item.avatar}</Text>
+                  {item.unread && <View className='student-message-row__dot' />}
+                </View>
+                <View className='student-message-row__main'>
+                  <View className='student-message-row__top'>
+                    <Text className='student-message-row__name'>{item.name}</Text>
+                    <Text className='student-message-row__time'>{item.time}</Text>
+                  </View>
+                  <Text className={`student-message-row__preview ${item.unread ? 'student-message-row__preview--unread' : ''}`}>
+                    {item.preview}
+                  </Text>
                 </View>
               </View>
-              <Text className='cc-tag'>{post.topic}</Text>
+            ))}
+            <Text className='student-home-footnote'>仅展示最近会话</Text>
+          </View>
+        )}
+
+        {activeTab === 'discover' && (
+          <View className='student-waterfall'>
+            <View className='student-waterfall__column'>
+              {columns.left.map(renderDiscoverCard)}
             </View>
-            <Text className='post-card__title'>{post.title}</Text>
-            <Text className='post-card__content'>{post.content}</Text>
-            {post.images.length > 0 && (
-              <View className={`post-card__images post-card__images--${Math.min(post.images.length, 3)}`}>
-                {post.images.slice(0, 3).map((img) => <Image key={img} src={img} mode='aspectFill' />)}
+            <View className='student-waterfall__column'>
+              {columns.right.map(renderDiscoverCard)}
+            </View>
+          </View>
+        )}
+
+        {activeTab === 'tools' && (
+          <View className='student-tools-grid'>
+            {tools.map((item) => (
+              <View
+                key={item.id}
+                className='student-tool-card'
+                onClick={() => showTodoToast(`${item.label}静态占位`)}
+              >
+                <View className='student-tool-card__icon'>
+                  <Text>{item.icon}</Text>
+                </View>
+                <Text className='student-tool-card__label'>{item.label}</Text>
+                <Text className='student-tool-card__sub'>{item.sub}</Text>
               </View>
-            )}
-            <View className='post-card__actions'>
-              <Text>赞 {post.likedCount}</Text>
-              <Text>评论 {post.commentCount}</Text>
-              <Text>分享</Text>
-            </View>
+            ))}
+          </View>
+        )}
+      </View>
+
+      <View className='student-bottom-nav'>
+        {navItems.slice(0, 2).map((item) => (
+          <View
+            key={item.key}
+            className={`student-bottom-nav__item ${item.key === 'home' ? 'student-bottom-nav__item--active' : ''}`}
+            onClick={() => item.key === 'home' ? undefined : showTodoToast(`${item.label}后续页面`)}
+          >
+            <Text className='student-bottom-nav__icon'>{item.icon}</Text>
+            <Text>{item.label}</Text>
+          </View>
+        ))}
+        <View className='student-bottom-nav__fab' onClick={() => showTodoToast('发布静态占位')}>
+          <Text>＋</Text>
+        </View>
+        {navItems.slice(2).map((item) => (
+          <View
+            key={item.key}
+            className='student-bottom-nav__item'
+            onClick={() => showTodoToast(`${item.label}后续页面`)}
+          >
+            <Text className='student-bottom-nav__icon'>{item.icon}</Text>
+            <Text>{item.label}</Text>
           </View>
         ))}
       </View>
-
-      <BottomNav active='home' />
     </View>
   )
 }

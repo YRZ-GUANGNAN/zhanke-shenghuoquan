@@ -1,0 +1,51 @@
+/* 湛科生活圈 / 学生端 UI token 地基
+   Claude Design 以 390px 画布给出数值；当前 Taro 项目使用 750 designWidth，
+   因此页面实现以 rpx 落地，核心比例保持 1px ≈ 2rpx。 */
+
+$brand-primary: #2E7DD4;
+$brand-primary-strong: #2168B8;
+$brand-primary-light: #3487DE;
+$brand-tint: #E6F1FB;
+$gradient-primary: linear-gradient(135deg, #3487DE, #2168B8);
+
+$text-strong: #1A2B3C;
+$text-primary: #2A3A4A;
+$text-secondary: #6B7C8F;
+$text-tertiary: #93A2B4;
+$text-muted: #9DB2C8;
+$text-faint: #B0BECD;
+$text-on-color: #FFFFFF;
+
+$bg-app: #F2F5F9;
+$bg-screen: #F7F8FA;
+$bg-surface: #FFFFFF;
+$divider-hairline: #F7F9FC;
+$divider-nav: #EDF1F6;
+
+$like-active: #FF6B8A;
+$heart-idle-stroke: #9DB2C8;
+$like-idle-count: #8A9AAD;
+$badge-unread: #FF5B5B;
+
+$shadow-header: 0 6rpx 20rpx rgba(24, 53, 92, .04);
+$shadow-card: 0 8rpx 28rpx -12rpx rgba(24, 53, 92, .08);
+$shadow-fab: 0 20rpx 40rpx -12rpx rgba(33, 104, 184, .55), 0 0 0 10rpx #fff;
+
+$placeholder-stripe: repeating-linear-gradient(135deg, rgba(30, 60, 100, .03) 0 20rpx, transparent 20rpx 40rpx);
+$placeholder-label: rgba(30, 50, 80, .38);
+
+page {
+  --brand-primary: #2E7DD4;
+  --brand-primary-strong: #2168B8;
+  --brand-primary-light: #3487DE;
+  --brand-tint: #E6F1FB;
+  --text-strong: #1A2B3C;
+  --text-primary: #2A3A4A;
+  --text-secondary: #6B7C8F;
+  --text-tertiary: #93A2B4;
+  --text-muted: #9DB2C8;
+  --text-faint: #B0BECD;
+  --bg-app: #F2F5F9;
+  --bg-screen: #F7F8FA;
+  --bg-surface: #FFFFFF;
+}

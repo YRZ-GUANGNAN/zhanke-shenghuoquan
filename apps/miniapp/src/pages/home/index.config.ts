@@ -1,4 +1,6 @@
 export default definePageConfig({
-  navigationBarTitleText: '广海空间'
+  navigationStyle: 'custom',
+  backgroundColor: '#F2F5F9',
+  navigationBarTextStyle: 'black'
 })
 
