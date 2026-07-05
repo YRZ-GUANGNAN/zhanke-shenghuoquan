@@ -137,10 +137,10 @@ const tools: ToolItem[] = [
 ]
 
 const navItems = [
-  { key: 'home', label: '首页', icon: '⌂', url: '/pages/home/index' },
-  { key: 'delivery', label: '外卖', icon: '▱', url: '/pages/delivery-merchant/index' },
-  { key: 'market', label: '二手', icon: '▢', url: '/pages/market/index' },
-  { key: 'profile', label: '我的', icon: '♙', url: '/pages/profile/index' }
+  { key: 'home', label: '首页', icon: 'home', url: '/pages/home/index' },
+  { key: 'delivery', label: '外卖', icon: 'takeaway', url: '/pages/delivery-merchant/index' },
+  { key: 'market', label: '二手', icon: 'market', url: '/pages/market/index' },
+  { key: 'profile', label: '我的', icon: 'profile', url: '/pages/profile/index' }
 ]
 
 function splitCards(cards: DiscoverCard[]) {
@@ -279,7 +279,7 @@ export default function HomePage() {
             className={`student-bottom-nav__item ${item.key === 'home' ? 'student-bottom-nav__item--active' : ''}`}
             onClick={() => item.key === 'home' ? undefined : showTodoToast(`${item.label}后续页面`)}
           >
-            <Text className='student-bottom-nav__icon'>{item.icon}</Text>
+            <View className={`student-bottom-nav__icon student-bottom-nav__icon--${item.icon}`} />
             <Text>{item.label}</Text>
           </View>
         ))}
@@ -292,7 +292,7 @@ export default function HomePage() {
             className='student-bottom-nav__item'
             onClick={() => showTodoToast(`${item.label}后续页面`)}
           >
-            <Text className='student-bottom-nav__icon'>{item.icon}</Text>
+            <View className={`student-bottom-nav__icon student-bottom-nav__icon--${item.icon}`} />
             <Text>{item.label}</Text>
           </View>
         ))}
