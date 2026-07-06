@@ -1,97 +1,158 @@
 import React, { useState } from 'react'
-import { Button, Text, View } from '@tarojs/components'
-import { AvatarMark, BottomNav } from '../../components'
+import { Text, View } from '@tarojs/components'
 import Taro from '../../services/taro'
-import { useSessionStore } from '../../stores/session'
-import { chooseAndUploadImages } from '../../services/media'
-import { deliveryEnabled, legacyTakeoutEnabled } from '../../feature-flags'
 import './index.scss'
 
-const actions = ['收藏', '帖子', '评论', '宝贝']
-const settings = ['内容审核记录', '问题反馈', '用户协议', '清除缓存', '检查新版本']
+type RoleKey = 'student' | 'rider' | 'merchant'
+
+interface RoleOption {
+  key: RoleKey
+  title: string
+  subtitle: string
+}
+
+interface SettingItem {
+  key: string
+  title: string
+  value?: string
+  icon: string
+  arrow?: boolean
+}
+
+const stats = [
+  { value: '23', label: '收藏' },
+  { value: '8', label: '帖子' },
+  { value: '41', label: '评论' },
+  { value: '2', label: '宝贝' }
+]
+
+const roles: RoleOption[] = [
+  { key: 'student', title: '学生', subtitle: '社交 · 校园服务' },
+  { key: 'rider', title: '骑手', subtitle: '抢单 · 配送' },
+  { key: 'merchant', title: '商家', subtitle: '发单 · 配送管理' }
+]
+
+const settings: SettingItem[] = [
+  { key: 'settings', title: '设置', icon: 'settings', arrow: true },
+  { key: 'privacy', title: '用户协议与隐私政策', icon: 'document', arrow: true },
+  { key: 'cache', title: '清理缓存', icon: 'trash', value: '12.6MB' },
+  { key: 'update', title: '检查更新', icon: 'refresh', value: 'v2.4.0' },
+  { key: 'about', title: '关于湛科生活圈', icon: 'info', arrow: true }
+]
+
+const navItems = [
+  { key: 'home', label: '首页', icon: 'home', url: '/pages/home/index' },
+  { key: 'delivery', label: '外卖', icon: 'takeaway', url: '/pages/delivery-merchant/index' },
+  { key: 'market', label: '二手', icon: 'market', url: '/pages/market/index' },
+  { key: 'profile', label: '我的', icon: 'profile', url: '/pages/profile/index' }
+]
+
+function showPlaceholder(title: string) {
+  void Taro.showToast({ title, icon: 'none', duration: 1400 })
+}
 
 export default function ProfilePage() {
-  const profile = useSessionStore((state) => state.profile)
-  const [changingAvatar, setChangingAvatar] = useState(false)
-  const [avatarProgress, setAvatarProgress] = useState('')
+  const [activeRole, setActiveRole] = useState<RoleKey>('student')
 
-  const changeAvatar = async () => {
-    if (!profile.id || changingAvatar) return
-    setChangingAvatar(true)
-    try {
-      const [uploaded] = await chooseAndUploadImages('avatar', 1, (value) => setAvatarProgress(`${value.percent}% · ${value.message}`))
-      if (!uploaded) return
-      Taro.showToast({
-        title: uploaded.canUse ? '头像媒体已审核；业务绑定暂未启用' : '头像已上传，等待审核',
-        icon: 'none'
-      })
-      await Taro.navigateTo({ url: '/pages/media-history/index' })
-    } catch (error) {
-      Taro.showToast({ title: error instanceof Error ? error.message : '头像上传失败', icon: 'none' })
-    } finally {
-      setChangingAvatar(false)
-      setAvatarProgress('')
-    }
+  const handleRoleClick = (role: RoleOption) => {
+    setActiveRole(role.key)
+    showPlaceholder(`${role.title}身份静态占位`)
   }
 
   return (
-    <View className='page profile-page'>
-      <View className='profile-head'>
-        <View onClick={changeAvatar}><AvatarMark size='large' label={profile.nickname} src={profile.avatar} /></View>
-        <View className='profile-head__info'>
-          <View className='between'>
-            <Text className='profile-head__name'>{profile.nickname}</Text>
-            <Text className='profile-head__edit' onClick={changeAvatar}>{changingAvatar ? '上传中' : '修改头像'}</Text>
+    <View className='student-profile-page'>
+      <View className='student-profile-hero'>
+        <View className='student-profile-hero__orb student-profile-hero__orb--small' />
+        <View className='student-profile-hero__orb student-profile-hero__orb--large' />
+        <View className='student-profile-user'>
+          <View className='student-profile-user__avatar'>
+            <Text>泽</Text>
           </View>
-          <Text className='profile-head__id'>ID: {profile.id}</Text>
-          <Text className='profile-head__id'>{profile.school} · {profile.campus}</Text>
-          {avatarProgress && <Text className='profile-head__id'>{avatarProgress}</Text>}
+          <View className='student-profile-user__main'>
+            <View className='student-profile-user__title-row'>
+              <Text className='student-profile-user__name'>阿泽</Text>
+              <Text className='student-profile-user__badge'>学生</Text>
+            </View>
+            <Text className='student-profile-user__meta'>湛科号：zk_aze233 · 湛江科技学院</Text>
+          </View>
+          <View className='student-profile-user__edit' onClick={() => showPlaceholder('编辑资料静态占位')}>
+            <Text>编辑资料</Text>
+          </View>
         </View>
       </View>
 
-      <View className='quick-actions'>
-        {actions.map((action, index) => (
-          <View key={action} className='quick-actions__item card'>
-            <View className='quick-actions__icon'>{index + 1}</View><Text>{action}</Text>
+      <View className='student-profile-content'>
+        <View className='student-profile-stats'>
+          {stats.map((item) => (
+            <View key={item.label} className='student-profile-stats__item'>
+              <Text className='student-profile-stats__value'>{item.value}</Text>
+              <Text className='student-profile-stats__label'>{item.label}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View className='student-profile-card student-profile-roles'>
+          <View className='student-profile-card__header'>
+            <Text className='student-profile-card__title'>身份切换</Text>
+            <Text className='student-profile-card__hint'>切换后主界面完全不同</Text>
+          </View>
+          <View className='student-profile-role-grid'>
+            {roles.map((role) => (
+              <View
+                key={role.key}
+                className={`student-profile-role ${activeRole === role.key ? 'student-profile-role--active' : ''}`}
+                onClick={() => handleRoleClick(role)}
+              >
+                {activeRole === role.key && <Text className='student-profile-role__corner'>当前</Text>}
+                <View className={`student-profile-role__icon student-profile-role__icon--${role.key}`} />
+                <Text className='student-profile-role__title'>{role.title}</Text>
+                <Text className='student-profile-role__subtitle'>{role.subtitle}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <View className='student-profile-card student-profile-settings'>
+          {settings.map((item) => (
+            <View
+              key={item.key}
+              className='student-profile-setting'
+              onClick={() => showPlaceholder(`${item.title}后续页面`)}
+            >
+              <View className={`student-profile-setting__icon student-profile-setting__icon--${item.icon}`} />
+              <Text className='student-profile-setting__title'>{item.title}</Text>
+              {item.value && <Text className='student-profile-setting__value'>{item.value}</Text>}
+              {item.arrow && <Text className='student-profile-setting__arrow'>›</Text>}
+            </View>
+          ))}
+        </View>
+      </View>
+
+      <View className='student-bottom-nav'>
+        {navItems.slice(0, 2).map((item) => (
+          <View
+            key={item.key}
+            className='student-bottom-nav__item'
+            onClick={() => showPlaceholder(`${item.label}静态占位`)}
+          >
+            <View className={`student-bottom-nav__icon student-bottom-nav__icon--${item.icon}`} />
+            <Text>{item.label}</Text>
+          </View>
+        ))}
+        <View className='student-bottom-nav__fab' onClick={() => showPlaceholder('发布静态占位')}>
+          <Text>＋</Text>
+        </View>
+        {navItems.slice(2).map((item) => (
+          <View
+            key={item.key}
+            className={`student-bottom-nav__item ${item.key === 'profile' ? 'student-bottom-nav__item--active' : ''}`}
+            onClick={() => item.key === 'profile' ? undefined : showPlaceholder(`${item.label}静态占位`)}
+          >
+            <View className={`student-bottom-nav__icon student-bottom-nav__icon--${item.icon}`} />
+            <Text>{item.label}</Text>
           </View>
         ))}
       </View>
-
-      <View className='settings card'>
-        <View className='settings__row' onClick={() => Taro.navigateTo({ url: '/pages/media-history/index' })}>
-          <Text>图片上传与审核记录</Text><Text className='settings__arrow'>›</Text>
-        </View>
-        <View className='settings__row' onClick={() => Taro.navigateTo({ url: '/pages/conversations/index' })}>
-          <Text>交易会话</Text><Text className='settings__arrow'>›</Text>
-        </View>
-        {legacyTakeoutEnabled && <>
-          <View className='settings__row' onClick={() => Taro.navigateTo({ url: '/pages/takeout-merchant/index' })}>
-            <Text>Merchant Center</Text><Text className='settings__arrow'>{'>'}</Text>
-          </View>
-          <View className='settings__row' onClick={() => Taro.navigateTo({ url: '/pages/takeout-rider/index' })}>
-            <Text>Rider Center</Text><Text className='settings__arrow'>{'>'}</Text>
-          </View>
-        </>}
-        {deliveryEnabled && <>
-          <View className='settings__row' onClick={() => Taro.navigateTo({ url: '/pages/delivery-merchant/index' })}>
-            <Text>配送商家中心</Text><Text className='settings__arrow'>›</Text>
-          </View>
-          <View className='settings__row' onClick={() => Taro.navigateTo({ url: '/pages/delivery-rider/index' })}>
-            <Text>配送骑手中心</Text><Text className='settings__arrow'>›</Text>
-          </View>
-        </>}
-        <View className='settings__row' onClick={() => Taro.navigateTo({ url: '/pages/notifications/index' })}>
-          <Text>社区通知</Text><Text className='settings__arrow'>›</Text>
-        </View>
-        {settings.map((item) => (
-          <View key={item} className='settings__row' onClick={() => Taro.showToast({ title: item, icon: 'none' })}>
-            <Text>{item}</Text><Text className='settings__arrow'>›</Text>
-          </View>
-        ))}
-      </View>
-
-      <Button className='cc-button cc-button--primary login-button'>微信登录</Button>
-      <BottomNav active='profile' />
     </View>
   )
 }
