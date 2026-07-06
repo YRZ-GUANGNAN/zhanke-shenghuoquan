@@ -1,1 +1,5 @@
-export default definePageConfig({ navigationBarTitleText: '配送骑手中心' })
+export default definePageConfig({
+  navigationStyle: 'custom',
+  backgroundColor: '#EEF3F8',
+  navigationBarTextStyle: 'white'
+})
