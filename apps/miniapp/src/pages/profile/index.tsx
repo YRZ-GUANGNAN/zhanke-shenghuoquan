@@ -55,6 +55,10 @@ export default function ProfilePage() {
   const [activeRole, setActiveRole] = useState<RoleKey>('student')
 
   const handleRoleClick = (role: RoleOption) => {
+    if (role.key === 'rider') {
+      void Taro.navigateTo({ url: '/pages/delivery-rider/index' })
+      return
+    }
     setActiveRole(role.key)
     showPlaceholder(`${role.title}身份静态占位`)
   }
