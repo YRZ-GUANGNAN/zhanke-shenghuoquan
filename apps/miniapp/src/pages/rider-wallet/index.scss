@@ -1,0 +1,364 @@
+@use '../../styles/design-tokens.scss' as *;
+
+.rider-wallet-page {
+  position: relative;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background: #eef3f8;
+  color: $text-strong;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
+}
+
+.rider-wallet-hero {
+  position: relative;
+  min-height: 438rpx;
+  padding: 68rpx 58rpx 54rpx;
+  overflow: hidden;
+  background: linear-gradient(145deg, #3489df 0%, #2777cd 54%, #2169b9 100%);
+  color: #fff;
+}
+
+.rider-wallet-hero__orb {
+  position: absolute;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, .09);
+  pointer-events: none;
+}
+
+.rider-wallet-hero__orb--one {
+  top: 54rpx;
+  right: 122rpx;
+  width: 190rpx;
+  height: 190rpx;
+}
+
+.rider-wallet-hero__orb--two {
+  top: 8rpx;
+  right: -28rpx;
+  width: 260rpx;
+  height: 260rpx;
+}
+
+.rider-wallet-nav {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 54rpx;
+}
+
+.rider-wallet-nav__back,
+.rider-wallet-nav__ghost {
+  width: 56rpx;
+  height: 56rpx;
+}
+
+.rider-wallet-nav__back {
+  display: flex;
+  align-items: center;
+  color: #fff;
+  font-size: 58rpx;
+  line-height: 1;
+}
+
+.rider-wallet-nav__title {
+  color: #fff;
+  font-size: 34rpx;
+  font-weight: 900;
+  letter-spacing: 1rpx;
+}
+
+.rider-wallet-balance {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 42rpx;
+}
+
+.rider-wallet-balance__label {
+  color: rgba(255, 255, 255, .84);
+  font-size: 24rpx;
+}
+
+.rider-wallet-balance__amount-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  margin-top: 6rpx;
+}
+
+.rider-wallet-balance__currency {
+  margin-right: 14rpx;
+  color: rgba(255, 255, 255, .95);
+  font-size: 36rpx;
+  font-weight: 800;
+}
+
+.rider-wallet-balance__amount {
+  color: #fff;
+  font-size: 86rpx;
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: 2rpx;
+}
+
+.rider-wallet-balance__hint {
+  margin-top: 18rpx;
+  color: rgba(255, 255, 255, .78);
+  font-size: 23rpx;
+}
+
+.rider-wallet-balance__withdraw {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14rpx;
+  width: 342rpx;
+  height: 82rpx;
+  margin-top: 34rpx;
+  border-radius: 999rpx;
+  background: #fff;
+  box-shadow: 0 18rpx 36rpx -22rpx rgba(11, 57, 111, .7);
+  color: $brand-primary-strong;
+  font-size: 28rpx;
+  font-weight: 800;
+}
+
+.rider-wallet-balance__withdraw-icon {
+  font-size: 30rpx;
+  font-weight: 900;
+}
+
+.rider-wallet-ledger {
+  position: relative;
+  z-index: 2;
+  margin: -28rpx 62rpx 54rpx;
+  padding: 32rpx 34rpx 38rpx;
+  border-radius: 24rpx;
+  background: #fff;
+  box-shadow: 0 22rpx 52rpx -30rpx rgba(30, 63, 103, .28);
+}
+
+.rider-wallet-ledger__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 22rpx;
+  border-bottom: 1rpx solid #edf2f7;
+}
+
+.rider-wallet-ledger__title {
+  color: $text-strong;
+  font-size: 30rpx;
+  font-weight: 900;
+}
+
+.rider-wallet-ledger__range {
+  color: $text-muted;
+  font-size: 22rpx;
+}
+
+.rider-wallet-ledger__list {
+  display: flex;
+  flex-direction: column;
+}
+
+.rider-wallet-ledger-row {
+  display: flex;
+  align-items: center;
+  min-height: 108rpx;
+  border-bottom: 1rpx solid rgba(237, 242, 247, .86);
+}
+
+.rider-wallet-ledger-row:last-child {
+  border-bottom: 0;
+}
+
+.rider-wallet-ledger-row__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 66rpx;
+  width: 66rpx;
+  height: 66rpx;
+  margin-right: 22rpx;
+  border-radius: 50%;
+  font-size: 24rpx;
+  font-weight: 900;
+}
+
+.rider-wallet-ledger-row__icon--income {
+  background: #e8f9f1;
+  color: #20a779;
+}
+
+.rider-wallet-ledger-row__icon--withdraw {
+  background: #eaf4ff;
+  color: $brand-primary;
+}
+
+.rider-wallet-ledger-row__main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.rider-wallet-ledger-row__title {
+  overflow: hidden;
+  color: $text-primary;
+  font-size: 27rpx;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rider-wallet-ledger-row__time {
+  margin-top: 6rpx;
+  color: $text-muted;
+  font-size: 23rpx;
+}
+
+.rider-wallet-ledger-row__right {
+  display: flex;
+  align-items: flex-end;
+  min-width: 126rpx;
+  flex-direction: column;
+}
+
+.rider-wallet-ledger-row__amount {
+  color: $text-strong;
+  font-size: 30rpx;
+  font-weight: 900;
+}
+
+.rider-wallet-ledger-row__amount--income {
+  color: #18a878;
+}
+
+.rider-wallet-ledger-row__amount--withdraw {
+  color: $text-strong;
+}
+
+.rider-wallet-ledger-row__status {
+  margin-top: 6rpx;
+  color: $text-muted;
+  font-size: 20rpx;
+}
+
+.rider-wallet-ledger__end {
+  display: block;
+  margin-top: 28rpx;
+  color: $text-faint;
+  font-size: 22rpx;
+  text-align: center;
+}
+
+.rider-wallet-mask {
+  position: fixed;
+  z-index: 50;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(20, 33, 48, .46);
+}
+
+.rider-wallet-sheet {
+  width: 100%;
+  padding: 42rpx 58rpx 58rpx;
+  border-radius: 34rpx 34rpx 0 0;
+  background: #fff;
+  box-shadow: 0 -22rpx 52rpx -28rpx rgba(20, 42, 72, .32);
+}
+
+.rider-wallet-sheet__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.rider-wallet-sheet__title {
+  color: $text-strong;
+  font-size: 32rpx;
+  font-weight: 900;
+}
+
+.rider-wallet-sheet__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 58rpx;
+  height: 58rpx;
+  border-radius: 50%;
+  background: #f3f7fb;
+  color: $text-secondary;
+  font-size: 34rpx;
+  line-height: 1;
+}
+
+.rider-wallet-withdraw-card {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  margin-top: 34rpx;
+  padding: 34rpx 28rpx 36rpx;
+  border-radius: 18rpx;
+  background: linear-gradient(180deg, #f7f9fc 0%, #f3f6fa 100%);
+}
+
+.rider-wallet-withdraw-card__label {
+  color: $text-tertiary;
+  font-size: 24rpx;
+}
+
+.rider-wallet-withdraw-card__amount-row {
+  display: flex;
+  align-items: baseline;
+  margin-top: 12rpx;
+}
+
+.rider-wallet-withdraw-card__currency {
+  margin-right: 10rpx;
+  color: $text-strong;
+  font-size: 30rpx;
+  font-weight: 800;
+}
+
+.rider-wallet-withdraw-card__amount {
+  color: $text-strong;
+  font-size: 62rpx;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 1rpx;
+}
+
+.rider-wallet-sheet__tip {
+  margin-top: 30rpx;
+  padding: 22rpx 24rpx;
+  border-radius: 16rpx;
+  background: #fff6ee;
+  color: #a66218;
+  font-size: 23rpx;
+  line-height: 1.55;
+}
+
+.rider-wallet-sheet__submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 86rpx;
+  margin-top: 34rpx;
+  border-radius: 18rpx;
+  background: linear-gradient(135deg, #348ce4 0%, #216dbe 100%);
+  box-shadow: 0 18rpx 34rpx -18rpx rgba(29, 104, 190, .72);
+  color: #fff;
+  font-size: 29rpx;
+  font-weight: 900;
+}
+

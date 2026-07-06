@@ -239,7 +239,7 @@ export default function DeliveryRiderPage() {
           </View>
           <View
             className='rider-grab-wallet-summary__button'
-            onClick={() => showStaticToast('钱包页 UI-05 接入')}
+            onClick={() => void Taro.navigateTo({ url: '/pages/rider-wallet/index' })}
           >
             <View className='rider-grab-wallet-summary__wallet-icon' />
             <Text>钱包</Text>
