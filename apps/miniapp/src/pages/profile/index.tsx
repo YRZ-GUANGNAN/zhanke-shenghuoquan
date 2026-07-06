@@ -133,7 +133,7 @@ export default function ProfilePage() {
           <View
             key={item.key}
             className='student-bottom-nav__item'
-            onClick={() => showPlaceholder(`${item.label}静态占位`)}
+            onClick={() => item.key === 'home' ? void Taro.redirectTo({ url: item.url }) : showPlaceholder(`${item.label}静态占位`)}
           >
             <View className={`student-bottom-nav__icon student-bottom-nav__icon--${item.icon}`} />
             <Text>{item.label}</Text>

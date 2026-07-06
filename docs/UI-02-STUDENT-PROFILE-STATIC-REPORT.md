@@ -106,3 +106,15 @@ npm run verify
 - 未改任何后端文件；
 - 未接真实登录态、真实身份切换、真实设置页或缓存清理；
 - `node_modules` 仅为 worktree 本地验收依赖，不入库。
+
+## 7. UI-02b 导航补丁
+
+验收时发现：`pages/home/index` 的底部导航“我的”仍是 UI-01 阶段的静态占位 toast，因此用户从首页无法进入本次新做的 `pages/profile/index`。
+
+已补最小跳转：
+
+- 首页底栏点击“我的” → `Taro.redirectTo({ url: '/pages/profile/index' })`
+- 我的页底栏点击“首页” → `Taro.redirectTo({ url: '/pages/home/index' })`
+- 外卖、二手、发布仍保持静态占位，避免跳回尚未重构的旧 UI。
+
+补丁仍然不接后端、不改接口、不放开旧页面入口。

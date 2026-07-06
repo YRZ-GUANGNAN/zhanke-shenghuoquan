@@ -290,7 +290,7 @@ export default function HomePage() {
           <View
             key={item.key}
             className='student-bottom-nav__item'
-            onClick={() => showTodoToast(`${item.label}后续页面`)}
+            onClick={() => item.key === 'profile' ? void Taro.redirectTo({ url: item.url }) : showTodoToast(`${item.label}后续页面`)}
           >
             <View className={`student-bottom-nav__icon student-bottom-nav__icon--${item.icon}`} />
             <Text>{item.label}</Text>
