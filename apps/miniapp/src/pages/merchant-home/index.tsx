@@ -141,6 +141,10 @@ function showPlaceholder(title: string) {
 }
 
 function handleShortcutClick(key: string, label: string) {
+  if (key === 'publish') {
+    void Taro.navigateTo({ url: '/pages/merchant-publish/index' })
+    return
+  }
   if (key === 'recharge' || key === 'bill') {
     void Taro.navigateTo({ url: '/pages/merchant-wallet/index' })
     return

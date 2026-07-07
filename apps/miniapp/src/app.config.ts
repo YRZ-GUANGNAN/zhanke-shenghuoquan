@@ -9,6 +9,7 @@ export default defineAppConfig({
     'pages/tools/index',
     'pages/profile/index',
     'pages/merchant-home/index',
+    'pages/merchant-publish/index',
     'pages/merchant-wallet/index',
     'pages/merchant-messages/index',
     'pages/delivery-merchant/index',
