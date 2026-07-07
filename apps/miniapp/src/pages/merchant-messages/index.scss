@@ -1,0 +1,208 @@
+@use 'sass:color';
+@use '../../styles/design-tokens.scss' as *;
+
+$message-blue-soft: color.mix($brand-primary, $bg-surface, 10%);
+$message-blue-strong: color.mix($brand-primary-strong, $brand-primary, 44%);
+$message-card-shadow: 0 18rpx 46rpx -30rpx rgba($text-strong, .34);
+$message-avatar-shadow: 0 12rpx 26rpx -20rpx rgba($brand-primary-strong, .72);
+$message-order-soft: color.mix($brand-primary, $bg-surface, 8%);
+$message-wallet-soft: color.mix(color.adjust($brand-primary, $hue: 112deg), $bg-surface, 9%);
+$message-ops-soft: color.mix(color.adjust($like-active, $hue: 44deg, $saturation: -22%), $bg-surface, 10%);
+
+page {
+  background: $bg-app;
+}
+
+.merchant-messages-page {
+  min-height: 100vh;
+  background: $bg-app;
+  color: $text-primary;
+  overflow: hidden;
+}
+
+.merchant-messages-nav {
+  position: relative;
+  height: 156rpx;
+  padding: 90rpx 30rpx 0;
+  box-sizing: border-box;
+  background: $bg-surface;
+  box-shadow: $shadow-header;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.merchant-messages-nav__back {
+  position: absolute;
+  left: 28rpx;
+  bottom: 28rpx;
+  width: 48rpx;
+  height: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: $text-primary;
+  font-size: 48rpx;
+  line-height: 1;
+  font-weight: 300;
+}
+
+.merchant-messages-nav__title {
+  color: $text-strong;
+  font-size: 31rpx;
+  line-height: 1;
+  font-weight: 850;
+}
+
+.merchant-messages-nav__read {
+  position: absolute;
+  right: 30rpx;
+  bottom: 32rpx;
+  color: $brand-primary;
+  font-size: 24rpx;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.merchant-messages-nav__read--muted {
+  color: $text-muted;
+}
+
+.merchant-messages-scroll {
+  height: calc(100vh - 156rpx);
+}
+
+.merchant-messages-card {
+  margin: 22rpx 28rpx 0;
+  padding: 8rpx 24rpx 0;
+  border-radius: 26rpx;
+  background: $bg-surface;
+  box-shadow: $message-card-shadow;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.merchant-message-item {
+  min-height: 134rpx;
+  padding: 26rpx 0 24rpx;
+  border-bottom: 1rpx solid $divider-hairline;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+}
+
+.merchant-message-item__avatar {
+  position: relative;
+  width: 72rpx;
+  height: 72rpx;
+  flex: 0 0 72rpx;
+  border-radius: 999rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 22rpx;
+  color: $text-on-color;
+  font-size: 28rpx;
+  font-weight: 800;
+  box-shadow: $message-avatar-shadow;
+}
+
+.merchant-message-item__avatar--rider {
+  background: $gradient-primary;
+}
+
+.merchant-message-item__avatar--order {
+  background: $message-order-soft;
+  color: $brand-primary;
+}
+
+.merchant-message-item__avatar--wallet {
+  background: $message-wallet-soft;
+  color: color.adjust($brand-primary, $hue: 112deg, $lightness: -10%);
+}
+
+.merchant-message-item__avatar--ops {
+  background: $message-ops-soft;
+  color: color.adjust($like-active, $hue: 44deg, $saturation: -24%, $lightness: -4%);
+}
+
+.merchant-message-item__dot {
+  position: absolute;
+  top: 2rpx;
+  right: 2rpx;
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 999rpx;
+  background: $badge-unread;
+  border: 4rpx solid $bg-surface;
+}
+
+.merchant-message-item__body {
+  min-width: 0;
+  flex: 1;
+}
+
+.merchant-message-item__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.merchant-message-item__title-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.merchant-message-item__title {
+  color: $text-strong;
+  font-size: 27rpx;
+  line-height: 1.2;
+  font-weight: 820;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.merchant-message-item__tag {
+  margin-left: 10rpx;
+  padding: 3rpx 11rpx 4rpx;
+  border-radius: 999rpx;
+  background: $message-blue-soft;
+  color: $message-blue-strong;
+  font-size: 18rpx;
+  line-height: 1.1;
+  font-weight: 750;
+}
+
+.merchant-message-item__time {
+  flex: 0 0 auto;
+  color: $text-tertiary;
+  font-size: 21rpx;
+  line-height: 1;
+}
+
+.merchant-message-item__preview {
+  display: block;
+  margin-top: 13rpx;
+  color: $text-tertiary;
+  font-size: 23rpx;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.merchant-message-item__preview--unread {
+  color: $text-secondary;
+}
+
+.merchant-messages-card__footer {
+  display: block;
+  padding: 24rpx 0 30rpx;
+  color: $text-faint;
+  text-align: center;
+  font-size: 22rpx;
+  line-height: 1;
+}

@@ -145,6 +145,10 @@ function handleShortcutClick(key: string, label: string) {
     void Taro.navigateTo({ url: '/pages/merchant-wallet/index' })
     return
   }
+  if (key === 'message') {
+    void Taro.navigateTo({ url: '/pages/merchant-messages/index' })
+    return
+  }
   showPlaceholder(`${label}静态占位`)
 }
 
