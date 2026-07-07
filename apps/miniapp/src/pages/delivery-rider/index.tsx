@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Text, View } from '@tarojs/components'
+import IdentitySwitchModal from '../../components/IdentitySwitchModal'
 import Taro from '../../services/taro'
 import './index.scss'
 
@@ -116,6 +117,7 @@ export default function DeliveryRiderPage() {
   const [activeTab, setActiveTab] = useState<RiderTab>('grab')
   const [proofKind, setProofKind] = useState<ProofKind | null>(null)
   const [photoCaptured, setPhotoCaptured] = useState(false)
+  const [showStudentSwitch, setShowStudentSwitch] = useState(false)
 
   const openProofSheet = (kind: ProofKind) => {
     setProofKind(kind)
@@ -221,7 +223,7 @@ export default function DeliveryRiderPage() {
           </View>
           <View
             className='rider-grab-user__switch'
-            onClick={() => showStaticToast('身份切换阶段二接入')}
+            onClick={() => setShowStudentSwitch(true)}
           >
             <Text className='rider-grab-user__switch-icon'>⇄</Text>
             <Text>切换身份</Text>
@@ -384,6 +386,17 @@ export default function DeliveryRiderPage() {
           </View>
         </View>
       )}
+
+      <IdentitySwitchModal
+        visible={showStudentSwitch}
+        currentRole='rider'
+        targetRole='student'
+        onCancel={() => setShowStudentSwitch(false)}
+        onConfirm={() => {
+          setShowStudentSwitch(false)
+          void Taro.redirectTo({ url: '/pages/profile/index' })
+        }}
+      />
     </View>
   )
 }

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
+import IdentitySwitchModal from '../../components/IdentitySwitchModal'
 import Taro from '../../services/taro'
 import './index.scss'
 
@@ -240,6 +241,7 @@ function OrderCard({ order, mode }: { order: MerchantOrder; mode: MerchantTabKey
 
 export default function MerchantHomePage() {
   const [activeTab, setActiveTab] = useState<MerchantTabKey>('pending')
+  const [showStudentSwitch, setShowStudentSwitch] = useState(false)
   const currentOrders = useMemo(() => orderGroups[activeTab], [activeTab])
 
   return (
@@ -263,7 +265,7 @@ export default function MerchantHomePage() {
               </View>
             </View>
           </View>
-          <View className='merchant-home-switch' onClick={() => showPlaceholder('切换身份静态占位')}>
+          <View className='merchant-home-switch' onClick={() => setShowStudentSwitch(true)}>
             <Text>⇄ 切换身份</Text>
           </View>
         </View>
@@ -318,6 +320,17 @@ export default function MerchantHomePage() {
           <Text className='merchant-home-orders__end'>— 到底了 —</Text>
         </View>
       </ScrollView>
+
+      <IdentitySwitchModal
+        visible={showStudentSwitch}
+        currentRole='merchant'
+        targetRole='student'
+        onCancel={() => setShowStudentSwitch(false)}
+        onConfirm={() => {
+          setShowStudentSwitch(false)
+          void Taro.redirectTo({ url: '/pages/profile/index' })
+        }}
+      />
     </View>
   )
 }

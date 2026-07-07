@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
 import { Text, View } from '@tarojs/components'
+import IdentitySwitchModal, { type IdentityRoleKey } from '../../components/IdentitySwitchModal'
 import Taro from '../../services/taro'
 import './index.scss'
 
-type RoleKey = 'student' | 'rider' | 'merchant'
+type RoleKey = IdentityRoleKey
 
 interface RoleOption {
   key: RoleKey
@@ -53,18 +54,27 @@ function showPlaceholder(title: string) {
 
 export default function ProfilePage() {
   const [activeRole, setActiveRole] = useState<RoleKey>('student')
+  const [pendingRole, setPendingRole] = useState<RoleKey | null>(null)
 
   const handleRoleClick = (role: RoleOption) => {
-    if (role.key === 'rider') {
-      void Taro.navigateTo({ url: '/pages/delivery-rider/index' })
+    if (role.key === activeRole) {
+      showPlaceholder(`当前为${role.title}身份`)
       return
     }
-    if (role.key === 'merchant') {
-      void Taro.navigateTo({ url: '/pages/merchant-home/index' })
-      return
-    }
-    setActiveRole(role.key)
-    showPlaceholder(`${role.title}身份静态占位`)
+    setPendingRole(role.key)
+  }
+
+  const confirmRoleSwitch = () => {
+    if (!pendingRole) return
+
+    setActiveRole(pendingRole)
+    const url = pendingRole === 'rider'
+      ? '/pages/delivery-rider/index'
+      : pendingRole === 'merchant'
+        ? '/pages/merchant-home/index'
+        : '/pages/profile/index'
+    setPendingRole(null)
+    void Taro.redirectTo({ url })
   }
 
   return (
@@ -161,6 +171,14 @@ export default function ProfilePage() {
           </View>
         ))}
       </View>
+
+      <IdentitySwitchModal
+        visible={Boolean(pendingRole)}
+        currentRole={activeRole}
+        targetRole={pendingRole ?? activeRole}
+        onCancel={() => setPendingRole(null)}
+        onConfirm={confirmRoleSwitch}
+      />
     </View>
   )
 }
