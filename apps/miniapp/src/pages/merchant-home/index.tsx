@@ -140,6 +140,14 @@ function showPlaceholder(title: string) {
   void Taro.showToast({ title, icon: 'none', duration: 1400 })
 }
 
+function handleShortcutClick(key: string, label: string) {
+  if (key === 'recharge' || key === 'bill') {
+    void Taro.navigateTo({ url: '/pages/merchant-wallet/index' })
+    return
+  }
+  showPlaceholder(`${label}静态占位`)
+}
+
 function OrderCard({ order, mode }: { order: MerchantOrder; mode: MerchantTabKey }) {
   const timeText = order.deliveredTime
     ? `#${order.id} · ${order.orderTime} · ${order.deliveredTime}`
@@ -268,7 +276,7 @@ export default function MerchantHomePage() {
 
       <View className='merchant-home-shortcuts'>
         {shortcuts.map((item, index) => (
-          <View key={item.key} className='merchant-home-shortcut' onClick={() => showPlaceholder(`${item.label}静态占位`)}>
+          <View key={item.key} className='merchant-home-shortcut' onClick={() => handleShortcutClick(item.key, item.label)}>
             <View className={`merchant-home-shortcut__icon ${index === 0 ? 'merchant-home-shortcut__icon--primary' : ''}`}>
               <Text>{item.icon}</Text>
             </View>
