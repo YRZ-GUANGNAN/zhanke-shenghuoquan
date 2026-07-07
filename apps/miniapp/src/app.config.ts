@@ -3,6 +3,7 @@ export default defineAppConfig({
     'pages/home/index',
     'pages/student-takeout/index',
     'pages/student-secondhand/index',
+    'pages/secondhand-detail/index',
     'pages/takeout/index',
     'pages/takeout-cart/index',
     'pages/takeout-orders/index',

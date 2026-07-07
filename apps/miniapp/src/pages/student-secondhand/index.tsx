@@ -133,11 +133,15 @@ export default function StudentSecondhandPage() {
 
   const columns = useMemo(() => splitProducts(visibleProducts), [visibleProducts])
 
+  const openDetail = () => {
+    void Taro.navigateTo({ url: '/pages/secondhand-detail/index' })
+  }
+
   const renderCard = (item: ProductCard) => (
     <View
       key={item.id}
       className={`secondhand-card ${item.status === 'sold' ? 'secondhand-card--sold' : ''}`}
-      onClick={() => showToast('宝贝详情下一页上线')}
+      onClick={openDetail}
     >
       <View className={`secondhand-card__media secondhand-card__media--${item.tone} secondhand-card__media--${item.height}`}>
         <Text>{item.imageLabel}</Text>
