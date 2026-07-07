@@ -59,6 +59,10 @@ export default function ProfilePage() {
       void Taro.navigateTo({ url: '/pages/delivery-rider/index' })
       return
     }
+    if (role.key === 'merchant') {
+      void Taro.navigateTo({ url: '/pages/merchant-home/index' })
+      return
+    }
     setActiveRole(role.key)
     showPlaceholder(`${role.title}身份静态占位`)
   }
