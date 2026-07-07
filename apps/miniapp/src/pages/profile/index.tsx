@@ -43,7 +43,7 @@ const settings: SettingItem[] = [
 
 const navItems = [
   { key: 'home', label: '首页', icon: 'home', url: '/pages/home/index' },
-  { key: 'delivery', label: '外卖', icon: 'takeaway', url: '/pages/delivery-merchant/index' },
+  { key: 'delivery', label: '外卖', icon: 'takeaway', url: '/pages/student-takeout/index' },
   { key: 'market', label: '二手', icon: 'market', url: '/pages/market/index' },
   { key: 'profile', label: '我的', icon: 'profile', url: '/pages/profile/index' }
 ]
@@ -151,7 +151,7 @@ export default function ProfilePage() {
           <View
             key={item.key}
             className='student-bottom-nav__item'
-            onClick={() => item.key === 'home' ? void Taro.redirectTo({ url: item.url }) : showPlaceholder(`${item.label}静态占位`)}
+            onClick={() => void Taro.redirectTo({ url: item.url })}
           >
             <View className={`student-bottom-nav__icon student-bottom-nav__icon--${item.icon}`} />
             <Text>{item.label}</Text>

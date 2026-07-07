@@ -138,7 +138,7 @@ const tools: ToolItem[] = [
 
 const navItems = [
   { key: 'home', label: '首页', icon: 'home', url: '/pages/home/index' },
-  { key: 'delivery', label: '外卖', icon: 'takeaway', url: '/pages/delivery-merchant/index' },
+  { key: 'delivery', label: '外卖', icon: 'takeaway', url: '/pages/student-takeout/index' },
   { key: 'market', label: '二手', icon: 'market', url: '/pages/market/index' },
   { key: 'profile', label: '我的', icon: 'profile', url: '/pages/profile/index' }
 ]
@@ -277,7 +277,7 @@ export default function HomePage() {
           <View
             key={item.key}
             className={`student-bottom-nav__item ${item.key === 'home' ? 'student-bottom-nav__item--active' : ''}`}
-            onClick={() => item.key === 'home' ? undefined : showTodoToast(`${item.label}后续页面`)}
+            onClick={() => item.key === 'home' ? undefined : void Taro.redirectTo({ url: item.url })}
           >
             <View className={`student-bottom-nav__icon student-bottom-nav__icon--${item.icon}`} />
             <Text>{item.label}</Text>

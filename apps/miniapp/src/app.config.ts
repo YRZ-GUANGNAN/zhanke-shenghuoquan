@@ -1,6 +1,7 @@
 export default defineAppConfig({
   pages: [
     'pages/home/index',
+    'pages/student-takeout/index',
     'pages/takeout/index',
     'pages/takeout-cart/index',
     'pages/takeout-orders/index',
