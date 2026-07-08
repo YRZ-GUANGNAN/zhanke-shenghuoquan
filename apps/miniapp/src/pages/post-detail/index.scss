@@ -164,13 +164,14 @@
 .post-detail-tag {
   display: flex;
   align-items: center;
-  height: 40px;
-  padding: 0 18px;
-  border-radius: 20px;
-  background: $brand-primary-light;
-  color: $brand-primary;
-  font-size: 18px;
+  min-height: 42px;
+  padding: 0 20px;
+  border-radius: 999px;
+  background: $brand-tint;
+  color: $brand-primary-strong;
+  font-size: 20px;
   font-weight: 700;
+  line-height: 42px;
 }
 
 .post-detail-content__meta {
