@@ -169,7 +169,9 @@ export default function HomePage() {
       <View
         key={card.id}
         className='student-post-card'
-        onClick={() => showTodoToast('帖子详情静态占位')}
+        onClick={() => {
+          void Taro.navigateTo({ url: '/pages/post-detail/index' })
+        }}
       >
         <View className={`student-post-card__media student-post-card__media--${card.tone} student-post-card__media--${card.height}`}>
           <Text>{card.mediaLabel}</Text>

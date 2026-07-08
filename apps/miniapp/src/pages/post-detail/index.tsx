@@ -1,68 +1,178 @@
-import React, { useEffect, useState } from 'react'
-import { Button, Image, Text, Textarea, View } from '@tarojs/components'
-import { AvatarMark } from '../../components'
-import { addPostComment, getCommunityPost, listPostComments, togglePostFavorite, togglePostLike, toggleUserFollow } from '../../services/b-community'
+import React, { useState } from 'react'
+import { Input, Text, View } from '@tarojs/components'
 import Taro from '../../services/taro'
-import type { CommunityComment, CommunityPost } from '../../types'
 import './index.scss'
 
-export default function PostDetailPage() {
-  const params = Taro.getCurrentInstance().router?.params || {}
-  const postId = params.id || ''
-  const [post, setPost] = useState<CommunityPost | null>(null)
-  const [comments, setComments] = useState<CommunityComment[]>([])
-  const [comment, setComment] = useState('')
-  const [liked, setLiked] = useState(false)
-  const [favorited, setFavorited] = useState(false)
-  const [followed, setFollowed] = useState(false)
+type CommentTone = 'sky' | 'peach' | 'green' | 'mint'
 
-  const load = async () => {
-    if (!postId) return
-    const [nextPost, nextComments] = await Promise.all([getCommunityPost(postId), listPostComments(postId)])
-    setPost(nextPost)
-    setComments(nextComments)
-  }
-
-  useEffect(() => { void load().catch(showError) }, [postId])
-
-  const act = async (run:()=>Promise<void>) => { try { await run() } catch (error) { showError(error) } }
-  const submitComment = () => act(async()=>{
-    const value=comment.trim()
-    if(!value){await Taro.showToast({title:'请输入评论',icon:'none'});return}
-    await addPostComment(postId,value)
-    setComment('')
-    await Taro.showToast({title:'评论已提交审核',icon:'none'})
-  })
-
-  if (!post) return <View className='page post-detail-page'><View className='card'>内容加载中</View></View>
-
-  return <View className='page post-detail-page'>
-    <View className='post-detail card'>
-      <View className='between'>
-        <View className='row post-detail__author'>
-          <AvatarMark label={post.author} src={post.avatar}/>
-          <View><Text className='post-detail__name'>{post.author}</Text><Text className='post-detail__meta'>{post.school} · {post.createdAt}</Text></View>
-        </View>
-        <Button className='cc-button cc-button--small' onClick={()=>act(async()=>{const value=await toggleUserFollow(post.authorId);setFollowed(value)})}>{followed?'已关注':'关注'}</Button>
-      </View>
-      <Text className='cc-tag'>{post.topic}</Text>
-      <Text className='post-detail__title'>{post.title}</Text>
-      <Text className='post-detail__content'>{post.content}</Text>
-      {post.images.map(img=><Image key={img} src={img} mode='widthFix' className='post-detail__image'/>) }
-    </View>
-
-    <View className='comment-panel card'>
-      <Text className='comment-panel__title'>互动</Text>
-      <View className='comment-panel__stats'>
-        <Text onClick={()=>act(async()=>{const value=await togglePostLike(post.id);setLiked(value);setPost({...post,likedCount:Math.max(0,post.likedCount+(value?1:-1))})})}>{liked?'已赞':'赞'} {post.likedCount}</Text>
-        <Text>评论 {post.commentCount}</Text>
-        <Text onClick={()=>act(async()=>{const value=await togglePostFavorite(post.id);setFavorited(value);setPost({...post,favoriteCount:Math.max(0,post.favoriteCount+(value?1:-1))})})}>{favorited?'已收藏':'收藏'} {post.favoriteCount}</Text>
-      </View>
-      <Textarea className='comment-panel__input' value={comment} maxlength={500} placeholder='写下你的评论' onInput={event=>setComment(String(event.detail.value))}/>
-      <Button className='cc-button cc-button--primary cc-button--block' onClick={submitComment}>提交评论</Button>
-      <View className='comment-list'>{comments.map(item=><View key={item.id} className='comment-item'><AvatarMark size='small' label={item.author} src={item.avatar}/><View><Text className='comment-item__author'>{item.author} · {item.createdAt}</Text><Text className='comment-item__content'>{item.content}</Text></View></View>)}</View>
-    </View>
-  </View>
+type CommentItem = {
+  id: string
+  avatar: string
+  author: string
+  content: string
+  time: string
+  likes: number
+  tone: CommentTone
 }
 
-function showError(error:unknown){void Taro.showToast({title:error instanceof Error?error.message:'操作失败',icon:'none'})}
+const tags = ['#奶茶推荐', '#三食堂', '#湛科日常']
+
+const comments: CommentItem[] = [
+  {
+    id: 'north',
+    avatar: '向',
+    author: '向北',
+    content: '昨天刚喝，波波确实弹，就是下午去要排一会儿',
+    time: '1 小时前',
+    likes: 6,
+    tone: 'sky'
+  },
+  {
+    id: 'pomelo',
+    avatar: '柚',
+    author: '柚子茶',
+    content: '甜度三分党+1，五分有点腻',
+    time: '58 分钟前',
+    likes: 3,
+    tone: 'peach'
+  },
+  {
+    id: 'morning',
+    avatar: '早',
+    author: '早八战士',
+    content: '学生证减 5 毛是真的吗？？明天就去',
+    time: '40 分钟前',
+    likes: 2,
+    tone: 'green'
+  },
+  {
+    id: 'deer',
+    avatar: '鹿',
+    author: '小鹿乱撞',
+    content: '蹲一个代喝，今天出不了门，有人帮带吗（跑腿费好说）',
+    time: '12 分钟前',
+    likes: 1,
+    tone: 'mint'
+  }
+]
+
+export default function PostDetailPage() {
+  const [followed, setFollowed] = useState(false)
+  const [liked, setLiked] = useState(false)
+  const [favorited, setFavorited] = useState(false)
+  const [draft, setDraft] = useState('')
+
+  const likeCount = 128 + (liked ? 1 : 0)
+  const favoriteCount = 23 + (favorited ? 1 : 0)
+
+  const goBack = () => {
+    void Taro.navigateBack().catch(() => {
+      void Taro.redirectTo({ url: '/pages/home/index' })
+    })
+  }
+
+  const showToast = (title: string) => {
+    void Taro.showToast({ title, icon: 'none', duration: 1200 })
+  }
+
+  const submitComment = () => {
+    if (!draft.trim()) {
+      showToast('先写点什么吧')
+      return
+    }
+    setDraft('')
+    showToast('评论已记录为本地预览')
+  }
+
+  return (
+    <View className='post-detail-page'>
+      <View className='post-detail-nav'>
+        <View className='post-detail-nav__back' onClick={goBack} />
+        <View className='post-detail-author' onClick={() => showToast('用户主页下一页接入')}>
+          <View className='post-detail-author__avatar'>
+            <Text>奶</Text>
+          </View>
+          <View className='post-detail-author__main'>
+            <Text className='post-detail-author__name'>奶茶脑袋</Text>
+            <Text className='post-detail-author__meta'>湛江科技学院 · 大三</Text>
+          </View>
+        </View>
+        <View
+          className={`post-detail-follow ${followed ? 'post-detail-follow--active' : ''}`}
+          onClick={() => setFollowed((value) => !value)}
+        >
+          <Text>{followed ? '已关注' : '关注'}</Text>
+        </View>
+      </View>
+
+      <View className='post-detail-scroll'>
+        <View className='post-detail-hero' onClick={() => showToast('图片预览下一页接入')}>
+          <Text>图 · 用户上传（奶茶实拍）</Text>
+        </View>
+
+        <View className='post-detail-content'>
+          <Text className='post-detail-content__title'>三食堂新出的芋泥波波真的绝，一天一杯根本停不下来</Text>
+          <Text className='post-detail-content__body'>
+            中杯 8 块，加一份波波才 1 块，芋泥是真材实料那种，甜度选三分刚刚好。下午四点后人少不用排队，学生证还能再减 5 毛。
+          </Text>
+          <View className='post-detail-tags'>
+            {tags.map((tag) => (
+              <View key={tag} className='post-detail-tag' onClick={() => showToast('标签搜索下一页接入')}>
+                <Text>{tag}</Text>
+              </View>
+            ))}
+          </View>
+          <Text className='post-detail-content__meta'>今天 12:32 发布 · 湛江科技学院</Text>
+        </View>
+
+        <View className='post-detail-comments'>
+          <Text className='post-detail-comments__title'>共 12 条评论</Text>
+          {comments.map((item) => (
+            <View key={item.id} className='post-detail-comment'>
+              <View className={`post-detail-comment__avatar post-detail-comment__avatar--${item.tone}`}>
+                <Text>{item.avatar}</Text>
+              </View>
+              <View className='post-detail-comment__main'>
+                <Text className='post-detail-comment__author'>{item.author}</Text>
+                <Text className='post-detail-comment__content'>{item.content}</Text>
+                <View className='post-detail-comment__meta'>
+                  <Text>{item.time}</Text>
+                  <Text onClick={() => showToast('回复下一页接入')}>回复</Text>
+                </View>
+              </View>
+              <View className='post-detail-comment__like' onClick={() => showToast('评论点赞本地预览')}>
+                <Text>♡</Text>
+                <Text>{item.likes}</Text>
+              </View>
+            </View>
+          ))}
+          <Text className='post-detail-comments__bottom'>— 到底了 —</Text>
+        </View>
+      </View>
+
+      <View className='post-detail-actionbar'>
+        <View className='post-detail-input'>
+          <Input
+            value={draft}
+            placeholder='说点什么...'
+            confirmType='send'
+            onInput={(event) => setDraft(String(event.detail.value))}
+            onConfirm={submitComment}
+          />
+        </View>
+        <View className={`post-detail-action ${liked ? 'post-detail-action--active' : ''}`} onClick={() => setLiked((value) => !value)}>
+          <Text className='post-detail-action__icon'>{liked ? '♥' : '♡'}</Text>
+          <Text>{likeCount}</Text>
+        </View>
+        <View className={`post-detail-action ${favorited ? 'post-detail-action--active' : ''}`} onClick={() => setFavorited((value) => !value)}>
+          <Text className='post-detail-action__icon'>{favorited ? '★' : '☆'}</Text>
+          <Text>{favoriteCount}</Text>
+        </View>
+        <View className='post-detail-action' onClick={() => showToast('已在评论区')}>
+          <Text className='post-detail-action__icon'>▱</Text>
+          <Text>12</Text>
+        </View>
+      </View>
+    </View>
+  )
+}
