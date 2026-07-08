@@ -157,8 +157,8 @@ export default function ProfilePage() {
             <Text>{item.label}</Text>
           </View>
         ))}
-        <View className='student-bottom-nav__fab' onClick={() => showPlaceholder('发布静态占位')}>
-          <Text>＋</Text>
+        <View className='student-bottom-nav__fab' onClick={() => void Taro.navigateTo({ url: '/pages/publish-entry/index' })}>
+          <Text>+</Text>
         </View>
         {navItems.slice(2).map((item) => (
           <View
