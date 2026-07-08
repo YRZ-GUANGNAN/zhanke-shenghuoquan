@@ -23,6 +23,7 @@ type Conversation = {
   preview: string
   time: string
   unread?: boolean
+  scene: string
 }
 
 type ToolItem = {
@@ -108,14 +109,16 @@ const conversations: Conversation[] = [
     avatar: '鹿',
     preview: '明天去海边的话我可以带相机～',
     time: '12:06',
-    unread: true
+    unread: true,
+    scene: 'sea'
   },
   {
     id: 'c2',
     name: '卷心菜',
     avatar: '卷',
     preview: '图书馆三楼靠窗还有位置',
-    time: '昨天'
+    time: '昨天',
+    scene: 'library'
   },
   {
     id: 'c3',
@@ -123,7 +126,8 @@ const conversations: Conversation[] = [
     avatar: '向',
     preview: '自行车可以今晚看车',
     time: '周二',
-    unread: true
+    unread: true,
+    scene: 'bike'
   }
 ]
 
@@ -161,6 +165,11 @@ export default function HomePage() {
 
   const toggleLike = (id: string) => {
     setLiked((current) => ({ ...current, [id]: !current[id] }))
+  }
+
+  const openConversation = (item: Conversation) => {
+    const query = `scene=${encodeURIComponent(item.scene)}&peerName=${encodeURIComponent(item.name)}&peerAvatar=${encodeURIComponent(item.avatar)}`
+    void Taro.navigateTo({ url: `/pages/secondhand-chat/index?${query}` })
   }
 
   const renderDiscoverCard = (card: DiscoverCard) => {
@@ -223,7 +232,7 @@ export default function HomePage() {
               <View
                 key={item.id}
                 className='student-message-row'
-                onClick={() => showTodoToast('私聊静态占位')}
+                onClick={() => openConversation(item)}
               >
                 <View className='student-message-row__avatar'>
                   <Text>{item.avatar}</Text>
