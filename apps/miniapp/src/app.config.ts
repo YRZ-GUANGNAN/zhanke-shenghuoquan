@@ -5,6 +5,7 @@ export default defineAppConfig({
     'pages/student-takeout/index',
     'pages/student-secondhand/index',
     'pages/secondhand-detail/index',
+    'pages/secondhand-chat/index',
     'pages/takeout/index',
     'pages/takeout-cart/index',
     'pages/takeout-orders/index',

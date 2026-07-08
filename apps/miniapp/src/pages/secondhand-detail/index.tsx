@@ -11,9 +11,15 @@ function showToast(title: string) {
 
 export default function SecondhandDetailPage() {
   const [favorited, setFavorited] = useState(false)
+  const [contactVisible, setContactVisible] = useState(false)
 
   const goBack = () => {
     void Taro.navigateBack().catch(() => Taro.redirectTo({ url: '/pages/student-secondhand/index' }))
+  }
+
+  const openChat = () => {
+    setContactVisible(false)
+    void Taro.navigateTo({ url: '/pages/secondhand-chat/index' })
   }
 
   return (
@@ -83,11 +89,45 @@ export default function SecondhandDetailPage() {
           <View className='secondhand-detail-favorite__star' />
           <Text>收藏</Text>
         </View>
-        <View className='secondhand-detail-contact' onClick={() => showToast('请私下微信联系卖家')}>
+        <View className='secondhand-detail-contact' onClick={() => setContactVisible(true)}>
           <View className='secondhand-detail-contact__icon' />
           <Text>联系卖家</Text>
         </View>
       </View>
+
+      {contactVisible && (
+        <View className='secondhand-contact-modal'>
+          <View className='secondhand-contact-modal__mask' onClick={() => setContactVisible(false)} />
+          <View className='secondhand-contact-sheet'>
+            <View className='secondhand-contact-sheet__head'>
+              <Text className='secondhand-contact-sheet__title'>联系卖家</Text>
+              <View className='secondhand-contact-sheet__close' onClick={() => setContactVisible(false)}>
+                <Text>×</Text>
+              </View>
+            </View>
+
+            <View className='secondhand-contact-option' onClick={openChat}>
+              <View className='secondhand-contact-option__icon secondhand-contact-option__icon--chat' />
+              <View className='secondhand-contact-option__main'>
+                <Text className='secondhand-contact-option__title'>发起私聊</Text>
+                <Text className='secondhand-contact-option__desc'>在湛科生活圈内给卖家发消息，可发送图片</Text>
+              </View>
+              <Text className='secondhand-contact-option__arrow'>›</Text>
+            </View>
+
+            <View className='secondhand-contact-option' onClick={() => showToast('微信号 zk_xiangbei 已复制')}>
+              <View className='secondhand-contact-option__icon secondhand-contact-option__icon--wechat' />
+              <View className='secondhand-contact-option__main'>
+                <Text className='secondhand-contact-option__title'>加微信联系</Text>
+                <Text className='secondhand-contact-option__desc'>微信号 zk_xiangbei · 点击复制</Text>
+              </View>
+              <Text className='secondhand-contact-option__arrow'>›</Text>
+            </View>
+
+            <Text className='secondhand-contact-sheet__safe'>交易由买卖双方私下完成，平台不担保、不代收款</Text>
+          </View>
+        </View>
+      )}
     </View>
   )
 }

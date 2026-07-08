@@ -342,3 +342,163 @@
   content: '';
   transform: skew(-20deg);
 }
+
+.secondhand-contact-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+}
+
+.secondhand-contact-modal__mask {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 31, 43, .46);
+}
+
+.secondhand-contact-sheet {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 34rpx 34rpx calc(46rpx + env(safe-area-inset-bottom));
+  border-radius: 42rpx 42rpx 0 0;
+  background: $bg-surface;
+  box-shadow: 0 -18rpx 60rpx rgba(24, 53, 92, .14);
+}
+
+.secondhand-contact-sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28rpx;
+}
+
+.secondhand-contact-sheet__title {
+  color: $text-strong;
+  font-size: 32rpx;
+  font-weight: 900;
+}
+
+.secondhand-contact-sheet__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 54rpx;
+  height: 54rpx;
+  border-radius: 50%;
+  background: $bg-screen;
+  color: $text-secondary;
+  font-size: 32rpx;
+  line-height: 1;
+}
+
+.secondhand-contact-option {
+  display: flex;
+  align-items: center;
+  gap: 22rpx;
+  min-height: 108rpx;
+  padding: 24rpx;
+  border: 1rpx solid $divider-nav;
+  border-radius: 22rpx;
+  background: $bg-surface;
+}
+
+.secondhand-contact-option + .secondhand-contact-option {
+  margin-top: 18rpx;
+}
+
+.secondhand-contact-option__icon {
+  position: relative;
+  flex: 0 0 auto;
+  width: 68rpx;
+  height: 68rpx;
+  border-radius: 18rpx;
+}
+
+.secondhand-contact-option__icon--chat {
+  background: $brand-tint;
+}
+
+.secondhand-contact-option__icon--chat::before {
+  position: absolute;
+  inset: 20rpx 16rpx 23rpx;
+  border: 4rpx solid $brand-primary;
+  border-radius: 5rpx;
+  content: '';
+}
+
+.secondhand-contact-option__icon--chat::after {
+  position: absolute;
+  left: 29rpx;
+  bottom: 17rpx;
+  width: 12rpx;
+  height: 12rpx;
+  border-right: 4rpx solid $brand-primary;
+  border-bottom: 4rpx solid $brand-primary;
+  content: '';
+  transform: skew(-20deg);
+}
+
+.secondhand-contact-option__icon--wechat {
+  background: rgba(36, 181, 120, .12);
+}
+
+.secondhand-contact-option__icon--wechat::before,
+.secondhand-contact-option__icon--wechat::after {
+  position: absolute;
+  border: 4rpx solid #22A76F;
+  border-radius: 50%;
+  content: '';
+}
+
+.secondhand-contact-option__icon--wechat::before {
+  top: 20rpx;
+  left: 16rpx;
+  width: 30rpx;
+  height: 22rpx;
+}
+
+.secondhand-contact-option__icon--wechat::after {
+  right: 14rpx;
+  bottom: 18rpx;
+  width: 24rpx;
+  height: 18rpx;
+}
+
+.secondhand-contact-option__main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.secondhand-contact-option__title {
+  color: $text-strong;
+  font-size: 28rpx;
+  font-weight: 800;
+}
+
+.secondhand-contact-option__desc {
+  overflow: hidden;
+  color: $text-secondary;
+  font-size: 23rpx;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.secondhand-contact-option__arrow {
+  color: $text-faint;
+  font-size: 42rpx;
+  line-height: 1;
+}
+
+.secondhand-contact-sheet__safe {
+  display: block;
+  margin-top: 28rpx;
+  color: $text-muted;
+  font-size: 22rpx;
+  line-height: 1.4;
+  text-align: center;
+}

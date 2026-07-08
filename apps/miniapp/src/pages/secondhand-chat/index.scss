@@ -1,0 +1,354 @@
+@use '../../styles/design-tokens.scss' as *;
+
+.secondhand-chat-page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  min-height: 100vh;
+  overflow: hidden;
+  background: $bg-app;
+  color: $text-primary;
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+}
+
+.secondhand-chat-header {
+  position: relative;
+  z-index: 6;
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: 42rpx 1fr 92rpx;
+  align-items: center;
+  gap: 18rpx;
+  height: 164rpx;
+  padding: 58rpx 34rpx 22rpx;
+  background: $bg-surface;
+  box-shadow: $shadow-header;
+}
+
+.secondhand-chat-header__back {
+  position: relative;
+  width: 42rpx;
+  height: 42rpx;
+}
+
+.secondhand-chat-header__back::before {
+  position: absolute;
+  top: 10rpx;
+  left: 12rpx;
+  width: 18rpx;
+  height: 18rpx;
+  border-bottom: 4rpx solid $text-strong;
+  border-left: 4rpx solid $text-strong;
+  content: '';
+  transform: rotate(45deg);
+}
+
+.secondhand-chat-seller {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 16rpx;
+}
+
+.secondhand-chat-seller__avatar,
+.secondhand-chat-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 58rpx;
+  height: 58rpx;
+  border-radius: 50%;
+  background: rgba($brand-primary, .62);
+  color: $text-on-color;
+  font-size: 25rpx;
+  font-weight: 800;
+}
+
+.secondhand-chat-seller__meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+
+.secondhand-chat-seller__name {
+  color: $text-strong;
+  font-size: 30rpx;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.secondhand-chat-seller__state {
+  position: relative;
+  padding-left: 16rpx;
+  color: $text-muted;
+  font-size: 22rpx;
+  line-height: 1.2;
+}
+
+.secondhand-chat-seller__state::before {
+  position: absolute;
+  top: 8rpx;
+  left: 0;
+  width: 8rpx;
+  height: 8rpx;
+  border-radius: 50%;
+  background: #20C282;
+  content: '';
+}
+
+.secondhand-chat-header__home {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48rpx;
+  border: 1rpx solid $divider-nav;
+  border-radius: 999rpx;
+  background: $bg-surface;
+  color: $brand-primary;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.secondhand-chat-product {
+  position: relative;
+  z-index: 4;
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: 72rpx 1fr 72rpx;
+  align-items: center;
+  gap: 18rpx;
+  padding: 20rpx 36rpx;
+  background: $bg-surface;
+  border-top: 1rpx solid $divider-nav;
+}
+
+.secondhand-chat-product__image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 16rpx;
+  background: $placeholder-stripe, $brand-tint;
+  color: $placeholder-label;
+  font-size: 20rpx;
+}
+
+.secondhand-chat-product__main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+
+.secondhand-chat-product__title {
+  overflow: hidden;
+  color: $text-strong;
+  font-size: 26rpx;
+  font-weight: 800;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.secondhand-chat-product__price {
+  color: #FF7548;
+  font-size: 25rpx;
+  font-weight: 900;
+}
+
+.secondhand-chat-product__button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 46rpx;
+  border-radius: 999rpx;
+  background: $brand-tint;
+  color: $brand-primary;
+  font-size: 23rpx;
+  font-weight: 700;
+}
+
+.secondhand-chat-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 22rpx 30rpx 150rpx;
+  box-sizing: border-box;
+  background: $bg-app;
+}
+
+.secondhand-chat-safe-tip {
+  display: flex;
+  justify-content: center;
+  margin: 4rpx auto 28rpx;
+}
+
+.secondhand-chat-safe-tip text {
+  display: inline-flex;
+  max-width: 560rpx;
+  padding: 10rpx 24rpx;
+  border-radius: 999rpx;
+  background: rgba($brand-primary, .07);
+  color: $text-muted;
+  font-size: 22rpx;
+  line-height: 1.3;
+}
+
+.secondhand-chat-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 18rpx;
+  margin-bottom: 26rpx;
+}
+
+.secondhand-chat-row--seller {
+  justify-content: flex-start;
+}
+
+.secondhand-chat-row--me {
+  justify-content: flex-end;
+}
+
+.secondhand-chat-avatar {
+  flex: 0 0 auto;
+  width: 54rpx;
+  height: 54rpx;
+  font-size: 23rpx;
+}
+
+.secondhand-chat-avatar--me {
+  background: $gradient-primary;
+}
+
+.secondhand-chat-bubble {
+  max-width: 456rpx;
+  padding: 22rpx 26rpx;
+  border-radius: 18rpx;
+  font-size: 27rpx;
+  line-height: 1.55;
+  box-shadow: $shadow-card;
+}
+
+.secondhand-chat-bubble--seller {
+  border-top-left-radius: 6rpx;
+  background: $bg-surface;
+  color: $text-strong;
+}
+
+.secondhand-chat-bubble--me {
+  border-top-right-radius: 6rpx;
+  background: $gradient-primary;
+  color: $text-on-color;
+}
+
+.secondhand-chat-image-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 246rpx;
+  height: 176rpx;
+  overflow: hidden;
+  border-radius: 20rpx;
+  background: $placeholder-stripe, #EAF4FD;
+  color: $placeholder-label;
+  font-size: 24rpx;
+  box-shadow: $shadow-card;
+}
+
+.secondhand-chat-image-message__img {
+  width: 100%;
+  height: 100%;
+}
+
+.secondhand-chat-inputbar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: 64rpx 1fr 92rpx;
+  align-items: center;
+  gap: 18rpx;
+  padding: 18rpx 28rpx calc(30rpx + env(safe-area-inset-bottom));
+  border-top: 1rpx solid $divider-nav;
+  background: rgba($bg-surface, .98);
+}
+
+.secondhand-chat-image-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  background: $brand-tint;
+}
+
+.secondhand-chat-image-button__icon {
+  position: relative;
+  width: 34rpx;
+  height: 28rpx;
+  border: 4rpx solid $brand-primary;
+  border-radius: 6rpx;
+}
+
+.secondhand-chat-image-button__icon::before {
+  position: absolute;
+  top: -10rpx;
+  left: 9rpx;
+  width: 14rpx;
+  height: 8rpx;
+  border-radius: 6rpx 6rpx 0 0;
+  background: $brand-primary;
+  content: '';
+}
+
+.secondhand-chat-image-button__icon::after {
+  position: absolute;
+  top: 7rpx;
+  left: 9rpx;
+  width: 10rpx;
+  height: 10rpx;
+  border: 4rpx solid $brand-primary;
+  border-radius: 50%;
+  content: '';
+}
+
+.secondhand-chat-input-wrap {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 64rpx;
+  padding: 0 24rpx;
+  border-radius: 999rpx;
+  background: $bg-screen;
+}
+
+.secondhand-chat-input {
+  width: 100%;
+  color: $text-strong;
+  font-size: 26rpx;
+}
+
+.secondhand-chat-input__placeholder {
+  color: $text-faint;
+}
+
+.secondhand-chat-send {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 64rpx;
+  border-radius: 999rpx;
+  background: #CAD8E6;
+  color: $text-on-color;
+  font-size: 26rpx;
+  font-weight: 800;
+}
+
+.secondhand-chat-send--active {
+  background: $gradient-primary;
+}
