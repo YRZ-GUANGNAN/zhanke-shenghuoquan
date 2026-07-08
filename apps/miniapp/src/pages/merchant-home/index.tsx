@@ -141,6 +141,12 @@ function showPlaceholder(title: string) {
   void Taro.showToast({ title, icon: 'none', duration: 1400 })
 }
 
+function openMerchantConversation(orderId = 'B1079') {
+  void Taro.navigateTo({
+    url: `/pages/delivery-conversation/index?orderId=${encodeURIComponent(orderId)}&role=merchant`
+  })
+}
+
 function handleShortcutClick(key: string, label: string) {
   if (key === 'publish') {
     void Taro.navigateTo({ url: '/pages/merchant-publish/index' })
@@ -185,7 +191,7 @@ function OrderCard({ order, mode }: { order: MerchantOrder; mode: MerchantTabKey
             <Text className='merchant-order-rider__phone'>{order.rider.phone}</Text>
           </View>
           <View className='merchant-order-rider__actions'>
-            <View className='merchant-order-rider__circle' onClick={() => showPlaceholder('私聊静态占位')}>
+            <View className='merchant-order-rider__circle' onClick={() => openMerchantConversation(order.id)}>
               <Text>□</Text>
             </View>
             <View className='merchant-order-rider__circle' onClick={() => showPlaceholder('电话静态占位')}>

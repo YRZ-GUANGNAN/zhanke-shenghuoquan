@@ -70,6 +70,17 @@ function messageToast(kind: MerchantMessageKind) {
   void Taro.showToast({ title, icon: 'none', duration: 1400 })
 }
 
+function openMerchantConversation(message: MerchantMessage) {
+  if (message.kind !== 'rider') {
+    messageToast(message.kind)
+    return
+  }
+  const orderId = message.id === 'rider-zhang' ? 'B1077' : 'B1079'
+  void Taro.navigateTo({
+    url: `/pages/delivery-conversation/index?orderId=${encodeURIComponent(orderId)}&role=merchant`
+  })
+}
+
 export default function MerchantMessagesPage() {
   const [readIds, setReadIds] = useState<string[]>([])
   const unreadIds = useMemo(
@@ -102,7 +113,7 @@ export default function MerchantMessagesPage() {
           {messages.map((item) => {
             const hasUnread = item.unread && !readIds.includes(item.id)
             return (
-              <View key={item.id} className='merchant-message-item' onClick={() => messageToast(item.kind)}>
+              <View key={item.id} className='merchant-message-item' onClick={() => openMerchantConversation(item)}>
                 <View className={`merchant-message-item__avatar merchant-message-item__avatar--${item.kind}`}>
                   {item.kind === 'rider' ? <Text>{item.avatar}</Text> : <Text>▵</Text>}
                   {hasUnread && <View className='merchant-message-item__dot' />}
