@@ -102,7 +102,7 @@ export default function ProfilePage() {
             </View>
             <Text className='student-profile-user__meta'>湛科号：zk_aze233 · 湛江科技学院</Text>
           </View>
-          <View className='student-profile-user__edit' onClick={() => showPlaceholder('编辑资料静态占位')}>
+          <View className='student-profile-user__edit' onClick={() => void Taro.navigateTo({ url: '/pages/edit-profile/index' })}>
             <Text>编辑资料</Text>
           </View>
         </View>
