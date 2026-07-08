@@ -113,6 +113,12 @@ function showStaticToast(title: string) {
   void Taro.showToast({ title, icon: 'none', duration: 1400 })
 }
 
+function openDeliveryConversation(order: AssignedOrder) {
+  void Taro.navigateTo({
+    url: `/pages/delivery-conversation/index?orderId=${encodeURIComponent(order.id.replace('#', ''))}&role=rider`
+  })
+}
+
 export default function DeliveryRiderPage() {
   const [activeTab, setActiveTab] = useState<RiderTab>('grab')
   const [proofKind, setProofKind] = useState<ProofKind | null>(null)
@@ -189,7 +195,7 @@ export default function DeliveryRiderPage() {
               <Text>{order.phone}</Text>
             </View>
             <View className='rider-order-card__actions'>
-              <View className='rider-order-card__message' onClick={() => showStaticToast('消息入口静态占位')}>
+              <View className='rider-order-card__message' onClick={() => openDeliveryConversation(order)}>
                 <Text>□</Text>
               </View>
               <View className='rider-order-card__grab' onClick={() => openProofSheet(order.proofKind)}>
