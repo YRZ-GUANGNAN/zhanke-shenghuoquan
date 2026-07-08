@@ -52,6 +52,15 @@ function showPlaceholder(title: string) {
   void Taro.showToast({ title, icon: 'none', duration: 1400 })
 }
 
+function handleSettingClick(item: SettingItem) {
+  if (item.key === 'settings') {
+    void Taro.navigateTo({ url: '/pages/settings/index' })
+    return
+  }
+
+  showPlaceholder(`${item.title}后续页面`)
+}
+
 export default function ProfilePage() {
   const [activeRole, setActiveRole] = useState<RoleKey>('student')
   const [pendingRole, setPendingRole] = useState<RoleKey | null>(null)
@@ -135,7 +144,7 @@ export default function ProfilePage() {
             <View
               key={item.key}
               className='student-profile-setting'
-              onClick={() => showPlaceholder(`${item.title}后续页面`)}
+              onClick={() => handleSettingClick(item)}
             >
               <View className={`student-profile-setting__icon student-profile-setting__icon--${item.icon}`} />
               <Text className='student-profile-setting__title'>{item.title}</Text>
