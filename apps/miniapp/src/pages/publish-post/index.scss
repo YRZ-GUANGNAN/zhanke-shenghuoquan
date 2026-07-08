@@ -1,0 +1,186 @@
+@import '../../styles/design-tokens.scss';
+
+page {
+  background: $bg-surface;
+}
+
+.publish-post-page {
+  min-height: 100vh;
+  background: $bg-surface;
+  color: $text-strong;
+  box-sizing: border-box;
+}
+
+.publish-post-nav {
+  height: 184rpx;
+  padding: 84rpx 32rpx 0;
+  display: grid;
+  grid-template-columns: 160rpx 1fr 160rpx;
+  align-items: center;
+  box-sizing: border-box;
+  border-bottom: 1rpx solid $divider-nav;
+  background: $bg-surface;
+}
+
+.publish-post-nav__side {
+  font-size: 30rpx;
+  line-height: 64rpx;
+  color: $text-secondary;
+}
+
+.publish-post-nav__title {
+  text-align: center;
+  font-size: 34rpx;
+  line-height: 64rpx;
+  font-weight: 800;
+  color: $text-strong;
+}
+
+.publish-post-nav__publish {
+  justify-self: end;
+  min-width: 104rpx;
+  height: 60rpx;
+  padding: 0 30rpx;
+  border-radius: 999rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  background: $divider-nav;
+  color: $text-muted;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.publish-post-nav__publish--active {
+  background: $brand-primary;
+  color: $text-on-color;
+  box-shadow: $shadow-card;
+}
+
+.publish-post-body {
+  padding: 32rpx 32rpx 0;
+  box-sizing: border-box;
+}
+
+.publish-post-upload {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 18rpx;
+  border: 2rpx dashed $text-faint;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  background: $bg-surface;
+  color: $text-muted;
+}
+
+.publish-post-upload__icon {
+  font-size: 36rpx;
+  line-height: 40rpx;
+  color: $text-muted;
+}
+
+.publish-post-upload__count {
+  margin-top: 14rpx;
+  font-size: 26rpx;
+  line-height: 32rpx;
+  color: $text-muted;
+}
+
+.publish-post-textarea {
+  width: 100%;
+  height: 330rpx;
+  margin-top: 38rpx;
+  font-size: 30rpx;
+  line-height: 46rpx;
+  color: $text-primary;
+  box-sizing: border-box;
+}
+
+.publish-post-textarea__placeholder {
+  color: $text-faint;
+}
+
+.publish-post-divider {
+  height: 1rpx;
+  background: $divider-hairline;
+  margin: 24rpx 0 28rpx;
+}
+
+.publish-post-topic-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22rpx;
+}
+
+.publish-post-topic-head__title {
+  font-size: 30rpx;
+  line-height: 40rpx;
+  font-weight: 800;
+  color: $text-strong;
+}
+
+.publish-post-topic-head__hint {
+  font-size: 24rpx;
+  line-height: 32rpx;
+  color: $text-faint;
+}
+
+.publish-post-topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx 18rpx;
+}
+
+.publish-post-topic {
+  height: 54rpx;
+  padding: 0 28rpx;
+  border-radius: 999rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: $brand-tint;
+  color: $brand-primary;
+  font-size: 28rpx;
+  line-height: 36rpx;
+  box-sizing: border-box;
+}
+
+.publish-post-topic--active {
+  background: $brand-primary;
+  color: $text-on-color;
+  box-shadow: $shadow-card;
+}
+
+.publish-post-note {
+  min-height: 58rpx;
+  margin-top: 44rpx;
+  padding: 0 24rpx;
+  border-radius: 10rpx;
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  background: $divider-hairline;
+  color: $text-muted;
+  font-size: 24rpx;
+  line-height: 34rpx;
+  box-sizing: border-box;
+}
+
+.publish-post-note__icon {
+  width: 24rpx;
+  height: 24rpx;
+  border-radius: 50%;
+  border: 2rpx solid $text-muted;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  font-size: 18rpx;
+  line-height: 20rpx;
+  font-weight: 700;
+}

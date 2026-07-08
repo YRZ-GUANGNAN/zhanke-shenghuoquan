@@ -219,7 +219,7 @@ export default function StudentSecondhandPage() {
             <Text>{item.label}</Text>
           </View>
         ))}
-        <View className='student-bottom-nav__fab' onClick={() => void Taro.navigateTo({ url: '/pages/publish-entry/index' })}>
+        <View className='student-bottom-nav__fab' onClick={() => void Taro.navigateTo({ url: '/pages/publish-post/index' })}>
           <Text>+</Text>
         </View>
         {navItems.slice(2).map((item) => (
