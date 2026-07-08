@@ -7,12 +7,24 @@ function showToast(title: string) {
   void Taro.showToast({ title, icon: 'none', duration: 1400 })
 }
 
+function safeDecode(value?: string): string | undefined {
+  if (!value) {
+    return undefined
+  }
+
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
 type ChatCopy = {
   peerName: string
   peerAvatar: string
   peerState: string
   productTitle: string
-  productPrice: string
+  productPrice?: string
   productImageLabel: string
   safeTip: string
   peerMessage1: string
@@ -42,7 +54,6 @@ const chatCopies: Record<string, ChatCopy> = {
     peerAvatar: '鹿',
     peerState: '在线 · 湛江科技学院',
     productTitle: '有没有周末去金沙湾的搭子？',
-    productPrice: '搭子',
     productImageLabel: '图 · 海边',
     safeTip: '仅本次沟通，请勿透露与约见无关的隐私',
     peerMessage1: '明天去海边的话我可以带相机～',
@@ -56,7 +67,6 @@ const chatCopies: Record<string, ChatCopy> = {
     peerAvatar: '卷',
     peerState: '在线 · 湛江科技学院',
     productTitle: '期末周图书馆占座攻略',
-    productPrice: '资料',
     productImageLabel: '图 · 图书馆',
     safeTip: '仅本次沟通，请勿透露与学习无关的隐私',
     peerMessage1: '图书馆三楼靠窗还有位置',
@@ -69,12 +79,13 @@ const chatCopies: Record<string, ChatCopy> = {
 
 function resolveChatCopy(): ChatCopy {
   const params = Taro.getCurrentInstance().router?.params || {}
-  const scene = params.scene || 'bike'
+  const scene = safeDecode(params.scene) || 'bike'
   const base = chatCopies[scene] || chatCopies.bike
+
   return {
     ...base,
-    peerName: params.peerName || base.peerName,
-    peerAvatar: params.peerAvatar || base.peerAvatar
+    peerName: safeDecode(params.peerName) || base.peerName,
+    peerAvatar: safeDecode(params.peerAvatar) || base.peerAvatar
   }
 }
 
@@ -138,7 +149,7 @@ export default function SecondhandChatPage() {
         </View>
         <View className='secondhand-chat-product__main'>
           <Text className='secondhand-chat-product__title'>{copy.productTitle}</Text>
-          <Text className='secondhand-chat-product__price'>{copy.productPrice}</Text>
+          {copy.productPrice ? <Text className='secondhand-chat-product__price'>{copy.productPrice}</Text> : null}
         </View>
         <View className='secondhand-chat-product__button' onClick={() => Taro.navigateTo({ url: '/pages/secondhand-detail/index' })}>
           <Text>查看</Text>
