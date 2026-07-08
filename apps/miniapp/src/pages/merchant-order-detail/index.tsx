@@ -31,6 +31,12 @@ function handleBack() {
   void Taro.navigateBack()
 }
 
+function openMerchantConversation() {
+  void Taro.navigateTo({
+    url: '/pages/delivery-conversation/index?orderId=B1079&role=merchant'
+  })
+}
+
 export default function MerchantOrderDetailPage() {
   return (
     <View className='merchant-order-detail-page'>
@@ -72,7 +78,7 @@ export default function MerchantOrderDetailPage() {
               <Text className='merchant-detail-rider-card__phone'>137 5560 8814</Text>
             </View>
             <View className='merchant-detail-rider-card__actions'>
-              <View className='merchant-detail-rider-card__circle' onClick={() => showStaticToast('私聊功能稍后开放')}>
+              <View className='merchant-detail-rider-card__circle' onClick={openMerchantConversation}>
                 <Text>□</Text>
               </View>
               <View className='merchant-detail-rider-card__circle' onClick={() => showStaticToast('电话联系稍后开放')}>
