@@ -68,7 +68,7 @@ const merchants: MerchantCard[] = [
 const navItems = [
   { key: 'home', label: '首页', icon: 'home', url: '/pages/home/index' },
   { key: 'takeout', label: '外卖', icon: 'takeaway', url: '/pages/student-takeout/index' },
-  { key: 'market', label: '二手', icon: 'market', url: '/pages/market/index' },
+  { key: 'market', label: '二手', icon: 'market', url: '/pages/student-secondhand/index' },
   { key: 'profile', label: '我的', icon: 'profile', url: '/pages/profile/index' }
 ]
 
@@ -76,18 +76,10 @@ function showMiniProgramToast() {
   void Taro.showToast({ title: '即将跳转商家小程序', icon: 'none', duration: 1400 })
 }
 
-function showPlaceholder(title: string) {
-  void Taro.showToast({ title, icon: 'none', duration: 1400 })
-}
-
 export default function StudentTakeoutPage() {
   const handleNavClick = (item: typeof navItems[number]) => {
     if (item.key === 'takeout') return
-    if (item.key === 'home' || item.key === 'profile') {
-      void Taro.redirectTo({ url: item.url })
-      return
-    }
-    showPlaceholder(`${item.label}后续页面`)
+    void Taro.redirectTo({ url: item.url })
   }
 
   return (
