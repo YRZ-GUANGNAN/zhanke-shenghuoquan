@@ -104,10 +104,10 @@ export default function SettingsPage() {
                 </View>
               </View>
             ))}
-            <View className='student-settings-row' onClick={() => showStaticToast('黑名单管理静态占位')}>
+            <View className='student-settings-row' onClick={() => void Taro.navigateTo({ url: '/pages/blacklist/index' })}>
               <Text className='student-settings-row__title'>黑名单管理</Text>
               <View className='student-settings-row__right'>
-                <Text className='student-settings-row__value'>1 人</Text>
+                <Text className='student-settings-row__value'>2 人</Text>
                 <Text className='student-settings-row__arrow'>›</Text>
               </View>
             </View>
