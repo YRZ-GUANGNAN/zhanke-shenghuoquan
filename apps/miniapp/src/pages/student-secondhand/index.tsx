@@ -137,6 +137,10 @@ export default function StudentSecondhandPage() {
     void Taro.navigateTo({ url: '/pages/secondhand-detail/index' })
   }
 
+  const openSearch = () => {
+    void Taro.navigateTo({ url: '/pages/search/index' })
+  }
+
   const renderCard = (item: ProductCard) => (
     <View
       key={item.id}
@@ -170,7 +174,7 @@ export default function StudentSecondhandPage() {
           <Text className='student-secondhand-header__title'>二手集市</Text>
           <View
             className='student-secondhand-search'
-            onClick={() => showToast('搜索功能下一页接入')}
+            onClick={openSearch}
           >
             <View className='student-secondhand-search__icon' />
             <Text>搜二手好物</Text>

@@ -1,0 +1,171 @@
+@use '../../styles/design-tokens.scss' as *;
+
+.student-search-page {
+  min-height: 100vh;
+  background: $bg-screen;
+  color: $text-primary;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
+}
+
+.student-search-header {
+  box-sizing: border-box;
+  height: 176rpx;
+  padding: 96rpx 32rpx 20rpx;
+  display: flex;
+  align-items: center;
+  gap: 22rpx;
+  background: $bg-surface;
+  border-bottom: 1rpx solid $divider-nav;
+}
+
+.student-search-back {
+  position: relative;
+  flex: 0 0 auto;
+  width: 44rpx;
+  height: 44rpx;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 15rpx;
+    top: 11rpx;
+    width: 18rpx;
+    height: 18rpx;
+    border-left: 4rpx solid $text-strong;
+    border-bottom: 4rpx solid $text-strong;
+    border-radius: 2rpx;
+    transform: rotate(45deg);
+  }
+}
+
+.student-search-box {
+  box-sizing: border-box;
+  flex: 1;
+  height: 64rpx;
+  padding: 0 28rpx;
+  border-radius: 36rpx;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  background: #F0F3F7;
+}
+
+.student-search-box__icon {
+  position: relative;
+  width: 28rpx;
+  height: 28rpx;
+  opacity: .82;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 2rpx;
+    top: 2rpx;
+    width: 17rpx;
+    height: 17rpx;
+    border: 3rpx solid $text-muted;
+    border-radius: 50%;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    right: 3rpx;
+    bottom: 4rpx;
+    width: 11rpx;
+    height: 3rpx;
+    border-radius: 999rpx;
+    background: $text-muted;
+    transform: rotate(45deg);
+    transform-origin: center;
+  }
+}
+
+.student-search-box__placeholder {
+  font-size: 26rpx;
+  line-height: 1;
+  color: $text-muted;
+}
+
+.student-search-content {
+  padding: 34rpx 32rpx 0;
+}
+
+.student-search-section {
+  margin-bottom: 58rpx;
+}
+
+.student-search-section--popular {
+  margin-top: 4rpx;
+}
+
+.student-search-section__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.student-search-section__title {
+  font-size: 28rpx;
+  line-height: 1.2;
+  font-weight: 700;
+  color: $text-strong;
+}
+
+.student-search-section__clear {
+  font-size: 24rpx;
+  line-height: 1.2;
+  color: $text-muted;
+}
+
+.student-search-chip-row {
+  margin-top: 22rpx;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20rpx 18rpx;
+}
+
+.student-search-chip-row--popular {
+  gap: 18rpx 16rpx;
+}
+
+.student-search-chip {
+  box-sizing: border-box;
+  height: 52rpx;
+  padding: 0 28rpx;
+  border-radius: 28rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10rpx;
+  font-size: 26rpx;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.student-search-chip--history {
+  background: $bg-surface;
+  border: 1rpx solid $divider-nav;
+  color: $text-primary;
+  box-shadow: 0 4rpx 12rpx rgba(31, 72, 120, .03);
+}
+
+.student-search-chip--popular {
+  padding: 0 26rpx;
+  background: $brand-tint;
+  color: $brand-primary;
+}
+
+.student-search-hot {
+  min-width: 34rpx;
+  height: 30rpx;
+  padding: 0 7rpx;
+  border-radius: 8rpx;
+  background: #FF7145;
+  color: #FFFFFF;
+  font-size: 20rpx;
+  font-weight: 700;
+  line-height: 30rpx;
+  text-align: center;
+}

@@ -163,6 +163,10 @@ export default function HomePage() {
     void Taro.showToast({ title, icon: 'none', duration: 1400 })
   }
 
+  const openSearch = () => {
+    void Taro.navigateTo({ url: '/pages/search/index' })
+  }
+
   const toggleLike = (id: string) => {
     setLiked((current) => ({ ...current, [id]: !current[id] }))
   }
@@ -222,7 +226,7 @@ export default function HomePage() {
             </View>
           ))}
         </View>
-        <View className='student-home-header__search' onClick={() => showTodoToast('搜索静态占位')} />
+        <View className='student-home-header__search' onClick={openSearch} />
       </View>
 
       <View className='student-home-content'>
