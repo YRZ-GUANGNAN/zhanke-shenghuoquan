@@ -1,8 +1,9 @@
 import React from 'react'
 import { Text, View } from '@tarojs/components'
+import type { IdentityRoleKey } from '../types'
 import './IdentitySwitchModal.scss'
 
-export type IdentityRoleKey = 'student' | 'rider' | 'merchant'
+export type { IdentityRoleKey } from '../types'
 
 interface IdentitySwitchModalProps {
   visible: boolean

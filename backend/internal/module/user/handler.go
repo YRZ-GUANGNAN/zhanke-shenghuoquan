@@ -27,6 +27,8 @@ func (h *Handler) Register(rg *gin.RouterGroup) {
 	rg.POST("/wechat-login", h.login)
 	rg.GET("/me", h.service.AuthRequired(), h.me)
 	rg.PATCH("/me", h.service.AuthRequired(), UnmutedRequired(), h.updateMe)
+	rg.GET("/identity", h.service.AuthRequired(), h.identity)
+	rg.POST("/identity", h.service.AuthRequired(), h.switchIdentity)
 }
 
 func (h *Handler) updateMe(c *gin.Context) {
@@ -114,4 +116,40 @@ func (h *Handler) me(c *gin.Context) {
 		return
 	}
 	response.OK(c, value)
+}
+
+func (h *Handler) identity(c *gin.Context) {
+	value, err := h.service.IdentitySummary(c, CurrentUserID(c))
+	if errors.Is(err, ErrNotFound) {
+		response.Fail(c, http.StatusNotFound, err.Error())
+		return
+	}
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, "get identity failed")
+		return
+	}
+	response.OK(c, value)
+}
+
+func (h *Handler) switchIdentity(c *gin.Context) {
+	var req struct {
+		Identity Identity `json:"identity"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+	value, err := h.service.SwitchIdentity(c, CurrentUserID(c), req.Identity)
+	switch {
+	case err == nil:
+		response.OK(c, value)
+	case errors.Is(err, ErrInvalidIdentity):
+		response.Fail(c, http.StatusBadRequest, err.Error())
+	case errors.Is(err, ErrIdentityUnavailable):
+		response.Fail(c, http.StatusForbidden, err.Error())
+	case errors.Is(err, ErrNotFound):
+		response.Fail(c, http.StatusNotFound, err.Error())
+	default:
+		response.Fail(c, http.StatusInternalServerError, "switch identity failed")
+	}
 }

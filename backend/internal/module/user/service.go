@@ -40,19 +40,24 @@ var (
 )
 
 type Service struct {
-	repo            Repository
-	jwtSecret       string
-	wechatAppID     string
-	wechatSecret    string
-	allowMockWechat bool
-	appEnv          string
-	httpClient      *http.Client
+	repo                Repository
+	jwtSecret           string
+	wechatAppID         string
+	wechatSecret        string
+	allowMockWechat     bool
+	appEnv              string
+	httpClient          *http.Client
+	identityEligibility IdentityEligibility
 }
 
 type ServiceOption func(*Service)
 
 func WithAppEnv(appEnv string) ServiceOption {
 	return func(s *Service) { s.appEnv = appEnv }
+}
+
+func WithIdentityEligibility(eligibility IdentityEligibility) ServiceOption {
+	return func(s *Service) { s.identityEligibility = eligibility }
 }
 
 func NewService(repo Repository, jwtSecret, wechatAppID, wechatSecret string, allowMockWechat bool, options ...ServiceOption) *Service {
@@ -79,7 +84,7 @@ func (s *Service) WechatLogin(ctx context.Context, input LoginInput) (LoginResul
 		value = User{
 			OpenID: openID, Nickname: fallback(input.Nickname, "校园用户"), Avatar: "",
 			School: fallback(input.School, "未设置"), Campus: fallback(input.Campus, "未设置"),
-			Role: RoleUser, Status: StatusActive, TokenVersion: 1,
+			CurrentIdentity: IdentityStudent, Role: RoleUser, Status: StatusActive, TokenVersion: 1,
 		}
 		if err := s.repo.Create(ctx, &value); err != nil {
 			return LoginResult{}, fmt.Errorf("create user: %w", err)

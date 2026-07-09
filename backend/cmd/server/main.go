@@ -52,7 +52,20 @@ func main() {
 	}
 	// Composition root: repositories are private to their domain; only services cross boundaries.
 	reviewService := review.NewService(review.NewRepository(db))
-	userService := user.NewService(user.NewRepository(db), cfg.JWTSecret, cfg.WechatAppID, cfg.WechatAppSecret, cfg.AllowMockWechat, user.WithAppEnv(cfg.AppEnv))
+	takeoutIdentityRepository := takeout.NewRepository(db)
+	riderIdentityEligibility, err := takeout.NewRiderIdentityService(takeoutIdentityRepository, nil)
+	if err != nil {
+		log.Fatalf("configure user rider identity eligibility: %v", err)
+	}
+	merchantIdentityEligibility, err := takeout.NewMerchantIdentityService(takeoutIdentityRepository)
+	if err != nil {
+		log.Fatalf("configure user merchant identity eligibility: %v", err)
+	}
+	userService := user.NewService(
+		user.NewRepository(db), cfg.JWTSecret, cfg.WechatAppID, cfg.WechatAppSecret, cfg.AllowMockWechat,
+		user.WithAppEnv(cfg.AppEnv),
+		user.WithIdentityEligibility(newTakeoutIdentityEligibility(riderIdentityEligibility, merchantIdentityEligibility)),
+	)
 	cosClient, err := legacymedia.NewTencentCOS(cfg.COSSecretID, cfg.COSSecretKey, cfg.COSBucket, cfg.COSRegion, cfg.COSAppID)
 	if err != nil {
 		log.Fatalf("configure Tencent COS: %v", err)

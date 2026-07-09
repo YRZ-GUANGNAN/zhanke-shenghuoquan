@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
 import IdentitySwitchModal from '../../components/IdentitySwitchModal'
+import { switchIdentity } from '../../services/a-user'
 import Taro from '../../services/taro'
 import './index.scss'
 
@@ -141,6 +142,11 @@ function showPlaceholder(title: string) {
   void Taro.showToast({ title, icon: 'none', duration: 1400 })
 }
 
+function showSwitchError(error: unknown) {
+  const title = error instanceof Error && error.message ? error.message : '身份切换失败'
+  void Taro.showToast({ title, icon: 'none', duration: 1800 })
+}
+
 function openMerchantConversation(orderId = 'B1079') {
   void Taro.navigateTo({
     url: `/pages/delivery-conversation/index?orderId=${encodeURIComponent(orderId)}&role=merchant`
@@ -250,6 +256,17 @@ export default function MerchantHomePage() {
   const [showStudentSwitch, setShowStudentSwitch] = useState(false)
   const currentOrders = useMemo(() => orderGroups[activeTab], [activeTab])
 
+  const switchBackToStudent = async () => {
+    try {
+      await switchIdentity('student')
+      setShowStudentSwitch(false)
+      void Taro.redirectTo({ url: '/pages/profile/index' })
+    } catch (error) {
+      showSwitchError(error)
+      setShowStudentSwitch(false)
+    }
+  }
+
   return (
     <View className='merchant-home-page'>
       <View className='merchant-home-hero'>
@@ -332,10 +349,7 @@ export default function MerchantHomePage() {
         currentRole='merchant'
         targetRole='student'
         onCancel={() => setShowStudentSwitch(false)}
-        onConfirm={() => {
-          setShowStudentSwitch(false)
-          void Taro.redirectTo({ url: '/pages/profile/index' })
-        }}
+        onConfirm={() => void switchBackToStudent()}
       />
     </View>
   )

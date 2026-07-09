@@ -66,7 +66,17 @@ func (r *memoryRepository) UpdateProfile(_ context.Context, id uint, profile Pro
 	if !ok {
 		return ErrNotFound
 	}
-	value.Nickname, value.Avatar, value.School, value.Campus = profile.Nickname, profile.Avatar, profile.School, profile.Campus
+	value.Nickname, value.Avatar, value.AvatarAssetID, value.School, value.Campus = profile.Nickname, profile.Avatar, profile.AvatarAssetID, profile.School, profile.Campus
+	r.users[id] = value
+	return nil
+}
+
+func (r *memoryRepository) UpdateCurrentIdentity(_ context.Context, id uint, identity Identity) error {
+	value, ok := r.users[id]
+	if !ok {
+		return ErrNotFound
+	}
+	value.CurrentIdentity = identity
 	r.users[id] = value
 	return nil
 }
@@ -125,6 +135,21 @@ func (r *memoryRepository) CountActiveSuperAdmins(_ context.Context) (int64, err
 
 func (r *memoryRepository) Count(context.Context) (int64, int64, error) {
 	return int64(len(r.users)), 0, nil
+}
+
+type identityEligibilityStub struct {
+	rider       IdentityEligibilityResult
+	merchant    IdentityEligibilityResult
+	riderErr    error
+	merchantErr error
+}
+
+func (s identityEligibilityStub) RiderEligible(context.Context, uint64) (IdentityEligibilityResult, error) {
+	return s.rider, s.riderErr
+}
+
+func (s identityEligibilityStub) MerchantEligible(context.Context, uint64) (IdentityEligibilityResult, error) {
+	return s.merchant, s.merchantErr
 }
 
 func TestTokenRoundTripAndRejectsTampering(t *testing.T) {
@@ -210,6 +235,60 @@ func TestMockWechatLoginMustBeExplicitAndCannotCreateAdmin(t *testing.T) {
 	}
 	if result.User.Avatar != "" {
 		t.Fatalf("first-login avatar was persisted before media review: %q", result.User.Avatar)
+	}
+	if result.User.CurrentIdentity != IdentityStudent {
+		t.Fatalf("new login identity=%q want student", result.User.CurrentIdentity)
+	}
+}
+
+func TestIdentitySummaryFallsBackToStudentWhenStoredIdentityUnavailable(t *testing.T) {
+	repo := newMemoryRepository(User{ID: 1, CurrentIdentity: IdentityMerchant, Role: RoleUser, Status: StatusActive, TokenVersion: 1})
+	service := NewService(repo, testSecret, "", "", true, WithIdentityEligibility(identityEligibilityStub{
+		rider:    IdentityEligibilityResult{Available: true, Status: "active"},
+		merchant: IdentityEligibilityResult{Available: false, Reason: "merchant must be active", Status: "resting"},
+	}))
+
+	summary, err := service.IdentitySummary(context.Background(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.CurrentIdentity != IdentityStudent {
+		t.Fatalf("current identity=%q want student fallback", summary.CurrentIdentity)
+	}
+	if len(summary.Identities) != 3 || !summary.Identities[0].Available ||
+		!summary.Identities[1].Available || summary.Identities[2].Available {
+		t.Fatalf("unexpected identity availability: %#v", summary.Identities)
+	}
+}
+
+func TestSwitchIdentityEnforcesEligibilityAndDoesNotTouchAdminRole(t *testing.T) {
+	repo := newMemoryRepository(User{
+		ID: 1, CurrentIdentity: IdentityStudent,
+		Role: RoleAdmin, Status: StatusActive, TokenVersion: 1,
+	})
+	service := NewService(repo, testSecret, "", "", true, WithIdentityEligibility(identityEligibilityStub{
+		rider:    IdentityEligibilityResult{Available: false, Reason: "rider must be active", Status: "resting"},
+		merchant: IdentityEligibilityResult{Available: true, Status: "active"},
+	}))
+
+	if _, err := service.SwitchIdentity(context.Background(), 1, IdentityRider); !errors.Is(err, ErrIdentityUnavailable) {
+		t.Fatalf("unavailable rider switch err=%v", err)
+	}
+	if got := repo.users[1].CurrentIdentity; got != IdentityStudent {
+		t.Fatalf("failed switch mutated identity=%q", got)
+	}
+	summary, err := service.SwitchIdentity(context.Background(), 1, IdentityMerchant)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.CurrentIdentity != IdentityMerchant || repo.users[1].CurrentIdentity != IdentityMerchant {
+		t.Fatalf("merchant switch summary=%#v stored=%q", summary, repo.users[1].CurrentIdentity)
+	}
+	if repo.users[1].Role != RoleAdmin {
+		t.Fatalf("identity switch changed admin role: %q", repo.users[1].Role)
+	}
+	if _, err := service.SwitchIdentity(context.Background(), 1, Identity("admin")); !errors.Is(err, ErrInvalidIdentity) {
+		t.Fatalf("invalid identity err=%v", err)
 	}
 }
 

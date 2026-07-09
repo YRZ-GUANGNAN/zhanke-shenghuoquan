@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Text, View } from '@tarojs/components'
 import IdentitySwitchModal from '../../components/IdentitySwitchModal'
+import { switchIdentity } from '../../services/a-user'
 import Taro from '../../services/taro'
 import './index.scss'
 
@@ -113,6 +114,11 @@ function showStaticToast(title: string) {
   void Taro.showToast({ title, icon: 'none', duration: 1400 })
 }
 
+function showSwitchError(error: unknown) {
+  const title = error instanceof Error && error.message ? error.message : '身份切换失败'
+  void Taro.showToast({ title, icon: 'none', duration: 1800 })
+}
+
 function openDeliveryConversation(order: AssignedOrder) {
   void Taro.navigateTo({
     url: `/pages/delivery-conversation/index?orderId=${encodeURIComponent(order.id.replace('#', ''))}&role=rider`
@@ -133,6 +139,17 @@ export default function DeliveryRiderPage() {
   const closeProofSheet = () => {
     setProofKind(null)
     setPhotoCaptured(false)
+  }
+
+  const switchBackToStudent = async () => {
+    try {
+      await switchIdentity('student')
+      setShowStudentSwitch(false)
+      void Taro.redirectTo({ url: '/pages/profile/index' })
+    } catch (error) {
+      showSwitchError(error)
+      setShowStudentSwitch(false)
+    }
   }
 
   const confirmProof = () => {
@@ -398,10 +415,7 @@ export default function DeliveryRiderPage() {
         currentRole='rider'
         targetRole='student'
         onCancel={() => setShowStudentSwitch(false)}
-        onConfirm={() => {
-          setShowStudentSwitch(false)
-          void Taro.redirectTo({ url: '/pages/profile/index' })
-        }}
+        onConfirm={() => void switchBackToStudent()}
       />
     </View>
   )

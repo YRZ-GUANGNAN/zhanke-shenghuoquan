@@ -11,6 +11,20 @@ export interface UserProfile {
   campus: string
 }
 
+export type IdentityRoleKey = 'student' | 'rider' | 'merchant'
+
+export interface IdentityOption {
+  identity: IdentityRoleKey
+  available: boolean
+  reason?: string
+  status?: string
+}
+
+export interface IdentitySummary {
+  currentIdentity: IdentityRoleKey
+  identities: IdentityOption[]
+}
+
 export interface CommunityPost {
   id: string
   authorId: string

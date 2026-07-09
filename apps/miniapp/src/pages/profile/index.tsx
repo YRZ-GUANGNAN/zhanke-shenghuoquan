@@ -1,7 +1,9 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Text, View } from '@tarojs/components'
 import IdentitySwitchModal, { type IdentityRoleKey } from '../../components/IdentitySwitchModal'
+import { currentIdentity, switchIdentity } from '../../services/a-user'
 import Taro from '../../services/taro'
+import type { IdentitySummary } from '../../types'
 import './index.scss'
 
 type RoleKey = IdentityRoleKey
@@ -53,6 +55,21 @@ function showPlaceholder(title: string) {
   void Taro.showToast({ title, icon: 'none', duration: 1400 })
 }
 
+function showError(error: unknown, fallback: string) {
+  const title = error instanceof Error && error.message ? error.message : fallback
+  void Taro.showToast({ title, icon: 'none', duration: 1800 })
+}
+
+function roleTitle(role: RoleKey) {
+  return roles.find((item) => item.key === role)?.title ?? '学生'
+}
+
+function roleHome(role: RoleKey) {
+  if (role === 'rider') return '/pages/delivery-rider/index'
+  if (role === 'merchant') return '/pages/merchant-home/index'
+  return '/pages/profile/index'
+}
+
 function handleSettingClick(item: SettingItem) {
   if (item.key === 'settings') {
     void Taro.navigateTo({ url: '/pages/settings/index' })
@@ -65,6 +82,25 @@ function handleSettingClick(item: SettingItem) {
 export default function ProfilePage() {
   const [activeRole, setActiveRole] = useState<RoleKey>('student')
   const [pendingRole, setPendingRole] = useState<RoleKey | null>(null)
+  const [identitySummary, setIdentitySummary] = useState<IdentitySummary | null>(null)
+  const [switchingRole, setSwitchingRole] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    void currentIdentity()
+      .then((summary) => {
+        if (!alive) return
+        setIdentitySummary(summary)
+        setActiveRole(summary.currentIdentity)
+      })
+      .catch((error) => {
+        if (!alive) return
+        showError(error, '身份状态加载失败')
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
 
   const handleRoleClick = (role: RoleOption) => {
     if (role.key === activeRole) {
@@ -74,17 +110,23 @@ export default function ProfilePage() {
     setPendingRole(role.key)
   }
 
-  const confirmRoleSwitch = () => {
-    if (!pendingRole) return
+  const confirmRoleSwitch = async () => {
+    if (!pendingRole || switchingRole) return
 
-    setActiveRole(pendingRole)
-    const url = pendingRole === 'rider'
-      ? '/pages/delivery-rider/index'
-      : pendingRole === 'merchant'
-        ? '/pages/merchant-home/index'
-        : '/pages/profile/index'
-    setPendingRole(null)
-    void Taro.redirectTo({ url })
+    const target = pendingRole
+    setSwitchingRole(true)
+    try {
+      const summary = await switchIdentity(target)
+      setIdentitySummary(summary)
+      setActiveRole(summary.currentIdentity)
+      setPendingRole(null)
+      void Taro.redirectTo({ url: roleHome(summary.currentIdentity) })
+    } catch (error) {
+      showError(error, '身份切换失败')
+      setPendingRole(null)
+    } finally {
+      setSwitchingRole(false)
+    }
   }
 
   return (
@@ -99,7 +141,7 @@ export default function ProfilePage() {
           <View className='student-profile-user__main'>
             <View className='student-profile-user__title-row'>
               <Text className='student-profile-user__name'>阿泽</Text>
-              <Text className='student-profile-user__badge'>学生</Text>
+              <Text className='student-profile-user__badge'>{roleTitle(activeRole)}</Text>
             </View>
             <Text className='student-profile-user__meta'>湛科号：zk_aze233 · 湛江科技学院</Text>
           </View>
@@ -138,7 +180,11 @@ export default function ProfilePage() {
                 {activeRole === role.key && <Text className='student-profile-role__corner'>当前</Text>}
                 <View className={`student-profile-role__icon student-profile-role__icon--${role.key}`} />
                 <Text className='student-profile-role__title'>{role.title}</Text>
-                <Text className='student-profile-role__subtitle'>{role.subtitle}</Text>
+                <Text className='student-profile-role__subtitle'>
+                  {identitySummary?.identities.find((item) => item.identity === role.key)?.available === false
+                    ? '未开通 · 服务端校验'
+                    : role.subtitle}
+                </Text>
               </View>
             ))}
           </View>
@@ -191,7 +237,7 @@ export default function ProfilePage() {
         currentRole={activeRole}
         targetRole={pendingRole ?? activeRole}
         onCancel={() => setPendingRole(null)}
-        onConfirm={confirmRoleSwitch}
+        onConfirm={() => void confirmRoleSwitch()}
       />
     </View>
   )
