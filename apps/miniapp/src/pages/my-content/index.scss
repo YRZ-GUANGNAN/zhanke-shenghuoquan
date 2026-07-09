@@ -1,0 +1,275 @@
+@use '../../styles/design-tokens.scss' as *;
+
+.my-content-page {
+  min-height: 100vh;
+  background: $bg-app;
+  color: $text-strong;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.my-content-header {
+  position: relative;
+  height: 176rpx;
+  padding-top: 78rpx;
+  box-sizing: border-box;
+  background: $bg-surface;
+  border-bottom: 1rpx solid $divider-nav;
+}
+
+.my-content-header__back {
+  position: absolute;
+  left: 38rpx;
+  top: 80rpx;
+  width: 54rpx;
+  height: 54rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: $text-strong;
+  font-size: 54rpx;
+  line-height: 1;
+}
+
+.my-content-header__title {
+  display: block;
+  text-align: center;
+  color: $text-strong;
+  font-size: 34rpx;
+  font-weight: 800;
+  line-height: 54rpx;
+}
+
+.my-content-tabs {
+  height: 86rpx;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  align-items: center;
+  background: $bg-surface;
+  border-bottom: 1rpx solid $divider-nav;
+}
+
+.my-content-tab {
+  position: relative;
+  height: 86rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: $text-muted;
+  font-size: 28rpx;
+  font-weight: 500;
+}
+
+.my-content-tab--active {
+  color: $text-strong;
+  font-weight: 700;
+}
+
+.my-content-tab--active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 42rpx;
+  height: 8rpx;
+  border-radius: 999rpx;
+  background: $brand-primary;
+  transform: translateX(-50%);
+}
+
+.my-content-body {
+  padding: 22rpx 32rpx 80rpx;
+}
+
+.my-content-card {
+  background: $bg-surface;
+  border-radius: 28rpx;
+  box-shadow: $shadow-card;
+  overflow: hidden;
+}
+
+.my-content-card--favorites,
+.my-content-card--comments {
+  padding-top: 4rpx;
+}
+
+.my-content-favorite,
+.my-content-post,
+.my-content-market {
+  display: flex;
+  align-items: center;
+  min-height: 132rpx;
+  padding: 24rpx 26rpx;
+  box-sizing: border-box;
+  border-bottom: 1rpx solid $divider-hairline;
+}
+
+.my-content-favorite__main,
+.my-content-post__main,
+.my-content-market__main {
+  min-width: 0;
+  flex: 1;
+  padding-left: 22rpx;
+}
+
+.my-content-favorite__title,
+.my-content-post__title,
+.my-content-market__title {
+  display: block;
+  color: $text-strong;
+  font-size: 28rpx;
+  font-weight: 600;
+  line-height: 40rpx;
+}
+
+.my-content-favorite__meta,
+.my-content-post__meta {
+  display: block;
+  margin-top: 8rpx;
+  color: $text-muted;
+  font-size: 24rpx;
+  line-height: 32rpx;
+}
+
+.my-content-thumb {
+  width: 92rpx;
+  height: 92rpx;
+  flex: none;
+  border-radius: 18rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: $placeholder-label;
+  font-size: 22rpx;
+  background-image: $placeholder-stripe;
+  background-color: $brand-tint;
+  overflow: hidden;
+}
+
+.my-content-thumb--peach {
+  background-color: $bg-screen;
+}
+
+.my-content-thumb--mint {
+  background-color: $brand-tint;
+}
+
+.my-content-thumb--lavender {
+  background-color: $divider-nav;
+}
+
+.my-content-thumb--rose {
+  background-color: $bg-app;
+}
+
+.my-content-thumb--blue {
+  background-color: $brand-tint;
+}
+
+.my-content-like {
+  min-width: 78rpx;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8rpx;
+  color: $like-idle-count;
+  font-size: 24rpx;
+}
+
+.my-content-like__heart {
+  color: $like-active;
+  font-size: 24rpx;
+}
+
+.my-content-chevron {
+  margin-left: 18rpx;
+  color: $text-faint;
+  font-size: 42rpx;
+  line-height: 1;
+}
+
+.my-content-footer {
+  display: block;
+  padding: 26rpx 0 30rpx;
+  text-align: center;
+  color: $text-muted;
+  font-size: 24rpx;
+}
+
+.my-content-comment {
+  padding: 24rpx 26rpx;
+  border-bottom: 1rpx solid $divider-hairline;
+}
+
+.my-content-comment__content {
+  display: block;
+  color: $text-strong;
+  font-size: 27rpx;
+  font-weight: 500;
+  line-height: 40rpx;
+}
+
+.my-content-comment__source {
+  margin-top: 14rpx;
+  min-height: 44rpx;
+  border-radius: 12rpx;
+  background: $bg-screen;
+  display: flex;
+  align-items: center;
+  padding: 0 18rpx;
+  box-sizing: border-box;
+  color: $text-muted;
+  font-size: 22rpx;
+}
+
+.my-content-comment__icon {
+  margin-right: 10rpx;
+  color: $text-muted;
+}
+
+.my-content-comment__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.my-content-comment__time {
+  flex: none;
+  margin-left: 16rpx;
+}
+
+.my-content-market {
+  position: relative;
+}
+
+.my-content-market__price {
+  display: block;
+  margin-top: 8rpx;
+  color: $like-active;
+  font-size: 28rpx;
+  font-weight: 800;
+  line-height: 36rpx;
+}
+
+.my-content-market__price--sold {
+  color: $text-muted;
+}
+
+.my-content-market__status {
+  flex: none;
+  min-width: 76rpx;
+  height: 34rpx;
+  padding: 0 14rpx;
+  border-radius: 999rpx;
+  background: $brand-tint;
+  color: $brand-primary;
+  font-size: 22rpx;
+  line-height: 34rpx;
+  text-align: center;
+}
+
+.my-content-market__status--sold {
+  background: $bg-screen;
+  color: $text-muted;
+}

@@ -5,6 +5,7 @@ import Taro from '../../services/taro'
 import './index.scss'
 
 type RoleKey = IdentityRoleKey
+type MyContentTabKey = 'favorites' | 'posts' | 'comments' | 'items'
 
 interface RoleOption {
   key: RoleKey
@@ -20,11 +21,11 @@ interface SettingItem {
   arrow?: boolean
 }
 
-const stats = [
-  { value: '23', label: '收藏' },
-  { value: '8', label: '帖子' },
-  { value: '41', label: '评论' },
-  { value: '2', label: '宝贝' }
+const stats: Array<{ value: string; label: string; tab: MyContentTabKey }> = [
+  { value: '23', label: '收藏', tab: 'favorites' },
+  { value: '8', label: '帖子', tab: 'posts' },
+  { value: '41', label: '评论', tab: 'comments' },
+  { value: '2', label: '宝贝', tab: 'items' }
 ]
 
 const roles: RoleOption[] = [
@@ -111,7 +112,11 @@ export default function ProfilePage() {
       <View className='student-profile-content'>
         <View className='student-profile-stats'>
           {stats.map((item) => (
-            <View key={item.label} className='student-profile-stats__item'>
+            <View
+              key={item.label}
+              className='student-profile-stats__item'
+              onClick={() => void Taro.navigateTo({ url: `/pages/my-content/index?tab=${item.tab}` })}
+            >
               <Text className='student-profile-stats__value'>{item.value}</Text>
               <Text className='student-profile-stats__label'>{item.label}</Text>
             </View>

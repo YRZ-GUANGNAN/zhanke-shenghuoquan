@@ -14,6 +14,7 @@ export default defineAppConfig({
     'pages/market/index',
     'pages/tools/index',
     'pages/profile/index',
+    'pages/my-content/index',
     'pages/edit-profile/index',
     'pages/settings/index',
     'pages/merchant-home/index',
