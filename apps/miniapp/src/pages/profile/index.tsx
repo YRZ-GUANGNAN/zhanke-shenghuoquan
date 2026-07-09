@@ -59,6 +59,11 @@ function handleSettingClick(item: SettingItem) {
     return
   }
 
+  if (item.key === 'privacy') {
+    void Taro.navigateTo({ url: '/pages/legal/index' })
+    return
+  }
+
   showPlaceholder(`${item.title}后续页面`)
 }
 

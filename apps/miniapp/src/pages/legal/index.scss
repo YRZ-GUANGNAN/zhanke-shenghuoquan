@@ -1,0 +1,128 @@
+@use '../../styles/design-tokens.scss' as *;
+
+.student-legal-page {
+  min-height: 100vh;
+  overflow: hidden;
+  background: $bg-app;
+  color: $text-primary;
+}
+
+.student-legal-nav {
+  position: relative;
+  z-index: 10;
+  height: 244rpx;
+  padding-top: 86rpx;
+  box-sizing: border-box;
+  background: $bg-surface;
+  border-bottom: 1rpx solid $divider-nav;
+}
+
+.student-legal-nav__back {
+  position: absolute;
+  left: 42rpx;
+  top: 92rpx;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 56rpx;
+  height: 56rpx;
+  color: $text-strong;
+  font-size: 56rpx;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.student-legal-nav__title {
+  display: block;
+  color: $text-strong;
+  font-size: 32rpx;
+  font-weight: 800;
+  line-height: 56rpx;
+  text-align: center;
+}
+
+.student-legal-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 78rpx;
+  height: 92rpx;
+  padding-top: 34rpx;
+  box-sizing: border-box;
+}
+
+.student-legal-tab {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  min-width: 116rpx;
+  color: $text-muted;
+  font-size: 27rpx;
+  font-weight: 500;
+  line-height: 40rpx;
+}
+
+.student-legal-tab--active {
+  color: $text-strong;
+}
+
+.student-legal-tab--active::after {
+  position: absolute;
+  bottom: -12rpx;
+  left: 50%;
+  width: 42rpx;
+  height: 6rpx;
+  border-radius: 999rpx;
+  background: $brand-primary;
+  transform: translateX(-50%);
+  content: '';
+}
+
+.student-legal-scroll {
+  height: calc(100vh - 244rpx);
+  background: $bg-app;
+}
+
+.student-legal-content {
+  padding: 30rpx 54rpx calc(62rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
+.student-legal-intro {
+  display: block;
+  margin: 0 0 30rpx;
+  color: $text-muted;
+  font-size: 25rpx;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.student-legal-section {
+  margin-bottom: 48rpx;
+}
+
+.student-legal-section__title {
+  display: block;
+  margin-bottom: 18rpx;
+  color: $text-strong;
+  font-size: 29rpx;
+  font-weight: 800;
+  line-height: 1.28;
+}
+
+.student-legal-section__body {
+  display: block;
+  color: #52687f;
+  font-size: 26rpx;
+  font-weight: 400;
+  line-height: 1.9;
+  text-align: left;
+}
+
+.student-legal-end {
+  display: block;
+  margin-top: 8rpx;
+  color: $text-muted;
+  font-size: 24rpx;
+  line-height: 1.5;
+  text-align: center;
+}
