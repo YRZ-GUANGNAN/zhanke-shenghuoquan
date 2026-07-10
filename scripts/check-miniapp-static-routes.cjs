@@ -10,6 +10,7 @@ const expectedRoutes = [
   'pages/search/index',
   'pages/publish-entry/index',
   'pages/publish-post/index',
+  'pages/publish-secondhand/index',
   'pages/student-takeout/index',
   'pages/student-secondhand/index',
   'pages/secondhand-detail/index',
