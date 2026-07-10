@@ -17,6 +17,7 @@ type Repository interface {
 	FindProfiles(context.Context, []uint) (map[uint]Profile, error)
 	Create(context.Context, *User) error
 	UpdateProfile(context.Context, uint, Profile) error
+	UpdateCurrentIdentity(context.Context, uint, Identity) error
 	List(context.Context, int, int) ([]User, int64, error)
 	UpdateStatusAndRevoke(context.Context, uint, Status, bool) error
 	UpdateRoleAndRevoke(context.Context, uint, Role, bool) error
@@ -66,6 +67,14 @@ func (r *GormRepository) Create(ctx context.Context, value *User) error {
 
 func (r *GormRepository) UpdateProfile(ctx context.Context, id uint, profile Profile) error {
 	result := r.db.WithContext(ctx).Model(&User{}).Where("id = ?", id).Updates(map[string]any{"nickname": profile.Nickname, "avatar": profile.Avatar, "avatar_asset_id": profile.AvatarAssetID, "school": profile.School, "campus": profile.Campus})
+	if result.Error == nil && result.RowsAffected == 0 {
+		return ErrNotFound
+	}
+	return result.Error
+}
+
+func (r *GormRepository) UpdateCurrentIdentity(ctx context.Context, id uint, identity Identity) error {
+	result := r.db.WithContext(ctx).Model(&User{}).Where("id = ?", id).Update("current_identity", identity)
 	if result.Error == nil && result.RowsAffected == 0 {
 		return ErrNotFound
 	}

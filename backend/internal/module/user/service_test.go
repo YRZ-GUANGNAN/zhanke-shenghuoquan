@@ -66,7 +66,17 @@ func (r *memoryRepository) UpdateProfile(_ context.Context, id uint, profile Pro
 	if !ok {
 		return ErrNotFound
 	}
-	value.Nickname, value.Avatar, value.School, value.Campus = profile.Nickname, profile.Avatar, profile.School, profile.Campus
+	value.Nickname, value.Avatar, value.AvatarAssetID, value.School, value.Campus = profile.Nickname, profile.Avatar, profile.AvatarAssetID, profile.School, profile.Campus
+	r.users[id] = value
+	return nil
+}
+
+func (r *memoryRepository) UpdateCurrentIdentity(_ context.Context, id uint, identity Identity) error {
+	value, ok := r.users[id]
+	if !ok {
+		return ErrNotFound
+	}
+	value.CurrentIdentity = identity
 	r.users[id] = value
 	return nil
 }
@@ -125,6 +135,20 @@ func (r *memoryRepository) CountActiveSuperAdmins(_ context.Context) (int64, err
 
 func (r *memoryRepository) Count(context.Context) (int64, int64, error) {
 	return int64(len(r.users)), 0, nil
+}
+
+type identityEligibilityStub struct {
+	rider    IdentityEligibilityResult
+	merchant IdentityEligibilityResult
+	err      error
+}
+
+func (s identityEligibilityStub) RiderEligible(context.Context, uint64) (IdentityEligibilityResult, error) {
+	return s.rider, s.err
+}
+
+func (s identityEligibilityStub) MerchantEligible(context.Context, uint64) (IdentityEligibilityResult, error) {
+	return s.merchant, s.err
 }
 
 func TestTokenRoundTripAndRejectsTampering(t *testing.T) {
@@ -210,6 +234,57 @@ func TestMockWechatLoginMustBeExplicitAndCannotCreateAdmin(t *testing.T) {
 	}
 	if result.User.Avatar != "" {
 		t.Fatalf("first-login avatar was persisted before media review: %q", result.User.Avatar)
+	}
+	if result.User.CurrentIdentity != IdentityStudent {
+		t.Fatalf("new user identity=%q want=%q", result.User.CurrentIdentity, IdentityStudent)
+	}
+}
+
+func TestIdentitySummaryAndSwitchPreserveAdministrativeRole(t *testing.T) {
+	repo := newMemoryRepository(User{
+		ID: 1, OpenID: "identity-user", CurrentIdentity: IdentityStudent,
+		Role: RoleAdmin, Status: StatusActive, TokenVersion: 7,
+	})
+	service := NewService(repo, testSecret, "", "", true, WithIdentityEligibility(identityEligibilityStub{
+		rider:    IdentityEligibilityResult{Available: true, Status: "active"},
+		merchant: IdentityEligibilityResult{Available: false, Reason: "delivery disabled", Status: "disabled"},
+	}))
+
+	summary, err := service.IdentitySummary(context.Background(), 1)
+	if err != nil || summary.CurrentIdentity != IdentityStudent {
+		t.Fatalf("summary=%+v err=%v", summary, err)
+	}
+	if _, err := service.SwitchIdentity(context.Background(), 1, IdentityMerchant); !errors.Is(err, ErrIdentityUnavailable) {
+		t.Fatalf("unavailable merchant err=%v", err)
+	}
+	if _, err := service.SwitchIdentity(context.Background(), 1, Identity("admin")); !errors.Is(err, ErrInvalidIdentity) {
+		t.Fatalf("admin identity err=%v", err)
+	}
+	switched, err := service.SwitchIdentity(context.Background(), 1, IdentityRider)
+	if err != nil || switched.CurrentIdentity != IdentityRider {
+		t.Fatalf("switched=%+v err=%v", switched, err)
+	}
+	stored := repo.users[1]
+	if stored.CurrentIdentity != IdentityRider || stored.Role != RoleAdmin || stored.TokenVersion != 7 {
+		t.Fatalf("stored=%+v", stored)
+	}
+	repeated, err := service.SwitchIdentity(context.Background(), 1, IdentityRider)
+	if err != nil || repeated.CurrentIdentity != IdentityRider {
+		t.Fatalf("repeated identity switch must be idempotent: summary=%+v err=%v", repeated, err)
+	}
+}
+
+func TestIdentitySummaryFallsBackToStudentWhenPersistedIdentityBecomesUnavailable(t *testing.T) {
+	repo := newMemoryRepository(User{ID: 1, CurrentIdentity: IdentityRider, Role: RoleUser, Status: StatusActive})
+	service := NewService(repo, testSecret, "", "", true, WithIdentityEligibility(identityEligibilityStub{
+		rider: IdentityEligibilityResult{Available: false, Reason: "rider must be active", Status: "resting"},
+	}))
+	summary, err := service.IdentitySummary(context.Background(), 1)
+	if err != nil || summary.CurrentIdentity != IdentityStudent {
+		t.Fatalf("summary=%+v err=%v", summary, err)
+	}
+	if repo.users[1].CurrentIdentity != IdentityRider {
+		t.Fatalf("GET identity mutated persisted value: %+v", repo.users[1])
 	}
 }
 
