@@ -80,6 +80,15 @@
   line-height: 1;
 }
 
+.identity-switch-modal__error {
+  display: block;
+  margin-top: 20rpx;
+  color: #d14343;
+  font-size: 23rpx;
+  line-height: 1.45;
+  text-align: center;
+}
+
 .identity-switch-modal__actions {
   display: grid;
   grid-template-columns: 1fr 1.15fr;
@@ -106,4 +115,8 @@
   color: $text-on-color;
   background: $gradient-primary;
   box-shadow: 0 14rpx 28rpx rgba(43, 128, 214, .22);
+}
+
+.identity-switch-modal__button--disabled {
+  opacity: .58;
 }

@@ -124,4 +124,3 @@ rg "db\.AutoMigrate\(" backend/cmd/server
 - [ ] 核实 `backend/internal/module/takeout` 业务逻辑与旧外卖路由无无关改动，旧分支仍保留。
 - [ ] 写入 Development/Acceptance/Residue 报告，注明真实环境证据与任何 Conditional 项。
 - [ ] 提交最终报告并确认 `git status` 干净；停在 `feat/ui21a-runtime-identity` 等 owner 验收。
-

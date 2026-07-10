@@ -1,5 +1,19 @@
 export type TabKey = 'home' | 'takeout' | 'market' | 'tools' | 'profile'
 
+export type IdentityRoleKey = 'student' | 'rider' | 'merchant'
+
+export interface IdentityAvailability {
+  identity: IdentityRoleKey
+  available: boolean
+  reason?: string
+  status?: string
+}
+
+export interface IdentitySummary {
+  currentIdentity: IdentityRoleKey
+  identities: IdentityAvailability[]
+}
+
 // A: UserProfile; B: CommunityPost; C: Product; D: ToolLink.
 // E uses SDK-specific types in services/e-im.ts; F exists only in apps/admin.
 

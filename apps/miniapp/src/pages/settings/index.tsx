@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Text, View } from '@tarojs/components'
 import Taro from '../../services/taro'
+import { useSessionStore } from '../../stores/session'
 import './index.scss'
 
 type ToggleKey = 'orderNotice' | 'socialNotice' | 'quietHours' | 'personalized'
@@ -26,6 +27,7 @@ function showStaticToast(title: string) {
 }
 
 export default function SettingsPage() {
+  const logout = useSessionStore((state) => state.logout)
   const [toggles, setToggles] = useState<Record<ToggleKey, boolean>>({
     orderNotice: true,
     socialNotice: true,
@@ -128,7 +130,10 @@ export default function SettingsPage() {
           </View>
         </View>
 
-        <View className='student-settings-logout' onClick={() => showStaticToast('退出登录静态占位')}>
+        <View className='student-settings-logout' onClick={() => {
+          logout()
+          void Taro.reLaunch({ url: '/pages/home/index' })
+        }}>
           <Text>退出登录</Text>
         </View>
       </View>

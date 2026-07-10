@@ -67,4 +67,3 @@ Profile 保留现有布局、卡片、底栏和静态统计，只把用户姓名
 ## 旧分支处理
 
 `feat/p0-identity-switch` 只作为实现参考。它与当前 master 分叉且包含旧 UI 与旧外卖商家资格语义，本模块不 merge、不 cherry-pick；UI-21a 验收冻结前也不删除该分支。
-

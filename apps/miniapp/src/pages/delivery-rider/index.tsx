@@ -1,7 +1,9 @@
 import React, { useState } from 'react'
 import { Text, View } from '@tarojs/components'
 import IdentitySwitchModal from '../../components/IdentitySwitchModal'
+import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
 import Taro from '../../services/taro'
+import { useSessionStore } from '../../stores/session'
 import './index.scss'
 
 type RiderTab = 'grab' | 'pickup' | 'delivery'
@@ -124,6 +126,25 @@ export default function DeliveryRiderPage() {
   const [proofKind, setProofKind] = useState<ProofKind | null>(null)
   const [photoCaptured, setPhotoCaptured] = useState(false)
   const [showStudentSwitch, setShowStudentSwitch] = useState(false)
+  const [switchingIdentity, setSwitchingIdentity] = useState(false)
+  const [switchIdentityError, setSwitchIdentityError] = useState('')
+  const switchIdentity = useSessionStore((state) => state.switchIdentity)
+  const identityAllowed = useIdentityGuard('rider')
+
+  const confirmStudentSwitch = async () => {
+    if (switchingIdentity) return
+    setSwitchingIdentity(true)
+    setSwitchIdentityError('')
+    try {
+      await switchIdentity('student')
+      await Taro.reLaunch({ url: identityRoute('student') })
+      setShowStudentSwitch(false)
+    } catch (error) {
+      setSwitchIdentityError(error instanceof Error ? error.message : '身份切换失败，请重试')
+    } finally {
+      setSwitchingIdentity(false)
+    }
+  }
 
   const openProofSheet = (kind: ProofKind) => {
     setProofKind(kind)
@@ -210,6 +231,8 @@ export default function DeliveryRiderPage() {
 
   const copy = proofKind ? proofCopy[proofKind] : null
 
+  if (!identityAllowed) return <View className='rider-grab-page' />
+
   return (
     <View className='rider-grab-page'>
       <View className='rider-grab-hero'>
@@ -229,7 +252,10 @@ export default function DeliveryRiderPage() {
           </View>
           <View
             className='rider-grab-user__switch'
-            onClick={() => setShowStudentSwitch(true)}
+            onClick={() => {
+              setSwitchIdentityError('')
+              setShowStudentSwitch(true)
+            }}
           >
             <Text className='rider-grab-user__switch-icon'>⇄</Text>
             <Text>切换身份</Text>
@@ -398,10 +424,9 @@ export default function DeliveryRiderPage() {
         currentRole='rider'
         targetRole='student'
         onCancel={() => setShowStudentSwitch(false)}
-        onConfirm={() => {
-          setShowStudentSwitch(false)
-          void Taro.redirectTo({ url: '/pages/profile/index' })
-        }}
+        onConfirm={() => void confirmStudentSwitch()}
+        confirming={switchingIdentity}
+        error={switchIdentityError}
       />
     </View>
   )

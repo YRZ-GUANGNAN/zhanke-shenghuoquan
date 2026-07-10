@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
 import IdentitySwitchModal from '../../components/IdentitySwitchModal'
+import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
 import Taro from '../../services/taro'
+import { useSessionStore } from '../../stores/session'
 import './index.scss'
 
 type MerchantTabKey = 'pending' | 'delivering' | 'completed'
@@ -250,7 +252,28 @@ function OrderCard({ order, mode }: { order: MerchantOrder; mode: MerchantTabKey
 export default function MerchantHomePage() {
   const [activeTab, setActiveTab] = useState<MerchantTabKey>('pending')
   const [showStudentSwitch, setShowStudentSwitch] = useState(false)
+  const [switchingIdentity, setSwitchingIdentity] = useState(false)
+  const [switchIdentityError, setSwitchIdentityError] = useState('')
+  const switchIdentity = useSessionStore((state) => state.switchIdentity)
+  const identityAllowed = useIdentityGuard('merchant')
   const currentOrders = useMemo(() => orderGroups[activeTab], [activeTab])
+
+  const confirmStudentSwitch = async () => {
+    if (switchingIdentity) return
+    setSwitchingIdentity(true)
+    setSwitchIdentityError('')
+    try {
+      await switchIdentity('student')
+      await Taro.reLaunch({ url: identityRoute('student') })
+      setShowStudentSwitch(false)
+    } catch (error) {
+      setSwitchIdentityError(error instanceof Error ? error.message : '身份切换失败，请重试')
+    } finally {
+      setSwitchingIdentity(false)
+    }
+  }
+
+  if (!identityAllowed) return <View className='merchant-home-page' />
 
   return (
     <View className='merchant-home-page'>
@@ -273,7 +296,10 @@ export default function MerchantHomePage() {
               </View>
             </View>
           </View>
-          <View className='merchant-home-switch' onClick={() => setShowStudentSwitch(true)}>
+          <View className='merchant-home-switch' onClick={() => {
+            setSwitchIdentityError('')
+            setShowStudentSwitch(true)
+          }}>
             <Text>⇄ 切换身份</Text>
           </View>
         </View>
@@ -334,10 +360,9 @@ export default function MerchantHomePage() {
         currentRole='merchant'
         targetRole='student'
         onCancel={() => setShowStudentSwitch(false)}
-        onConfirm={() => {
-          setShowStudentSwitch(false)
-          void Taro.redirectTo({ url: '/pages/profile/index' })
-        }}
+        onConfirm={() => void confirmStudentSwitch()}
+        confirming={switchingIdentity}
+        error={switchIdentityError}
       />
     </View>
   )

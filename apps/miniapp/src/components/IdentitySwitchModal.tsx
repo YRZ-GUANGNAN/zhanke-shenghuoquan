@@ -1,8 +1,7 @@
 import React from 'react'
 import { Text, View } from '@tarojs/components'
+import type { IdentityRoleKey } from '../types'
 import './IdentitySwitchModal.scss'
-
-export type IdentityRoleKey = 'student' | 'rider' | 'merchant'
 
 interface IdentitySwitchModalProps {
   visible: boolean
@@ -10,6 +9,8 @@ interface IdentitySwitchModalProps {
   targetRole: IdentityRoleKey
   onCancel: () => void
   onConfirm: () => void
+  confirming?: boolean
+  error?: string
 }
 
 const roleNames: Record<IdentityRoleKey, string> = {
@@ -29,13 +30,15 @@ export default function IdentitySwitchModal({
   currentRole,
   targetRole,
   onCancel,
-  onConfirm
+  onConfirm,
+  confirming = false,
+  error = ''
 }: IdentitySwitchModalProps) {
   if (!visible) return null
 
   const title = targetRole === 'student'
-    ? '切回学生身份?'
-    : `切换为${roleNames[targetRole]}身份?`
+    ? '切回学生身份？'
+    : `切换为${roleNames[targetRole]}身份？`
 
   const confirmText = targetRole === 'student'
     ? '确认切回'
@@ -43,7 +46,7 @@ export default function IdentitySwitchModal({
 
   return (
     <View className='identity-switch-modal'>
-      <View className='identity-switch-modal__mask' onClick={onCancel} />
+      <View className='identity-switch-modal__mask' onClick={() => !confirming && onCancel()} />
       <View className='identity-switch-modal__panel'>
         <Text className='identity-switch-modal__title'>{title}</Text>
         <Text className='identity-switch-modal__desc'>
@@ -58,12 +61,19 @@ export default function IdentitySwitchModal({
             <Text>{roleNames[targetRole]}</Text>
           </View>
         </View>
+        {error && <Text className='identity-switch-modal__error'>{error}</Text>}
         <View className='identity-switch-modal__actions'>
-          <View className='identity-switch-modal__button identity-switch-modal__button--cancel' onClick={onCancel}>
+          <View
+            className={`identity-switch-modal__button identity-switch-modal__button--cancel ${confirming ? 'identity-switch-modal__button--disabled' : ''}`}
+            onClick={() => !confirming && onCancel()}
+          >
             <Text>取消</Text>
           </View>
-          <View className='identity-switch-modal__button identity-switch-modal__button--confirm' onClick={onConfirm}>
-            <Text>{confirmText}</Text>
+          <View
+            className={`identity-switch-modal__button identity-switch-modal__button--confirm ${confirming ? 'identity-switch-modal__button--disabled' : ''}`}
+            onClick={() => !confirming && onConfirm()}
+          >
+            <Text>{confirming ? '切换中...' : confirmText}</Text>
           </View>
         </View>
       </View>

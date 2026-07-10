@@ -23,6 +23,7 @@ declare module '@tarojs/taro' {
   }
 
   interface Router {
+    path?: string
     params: Record<string, string | undefined>
   }
 
@@ -33,9 +34,14 @@ declare module '@tarojs/taro' {
   interface TaroStatic {
     navigateTo(options: NavigateOptions): Promise<unknown>
     redirectTo(options: NavigateOptions): Promise<unknown>
+    reLaunch(options: NavigateOptions): Promise<unknown>
     navigateBack(options?: { delta?: number }): Promise<unknown>
     showToast(options: ToastOptions): Promise<unknown>
+    login(options?: { timeout?: number }): Promise<{ code: string; errMsg?: string }>
     request<T = unknown>(options: RequestOptions): Promise<RequestResult<T>>
+    getStorageSync<T = unknown>(key: string): T
+    setStorageSync<T = unknown>(key: string, value: T): void
+    removeStorageSync(key: string): void
     getCurrentInstance(): CurrentInstance
     chooseMedia(options: { count: number; mediaType: ['image']; sourceType: Array<'album' | 'camera'>; sizeType?: Array<'original' | 'compressed'> }): Promise<{ tempFiles: Array<{ tempFilePath: string; size: number; fileType?: string }> }>
     getImageInfo(options: { src: string }): Promise<{ width: number; height: number; type: string; path: string }>
