@@ -47,17 +47,12 @@ export default function UserProfilePage() {
     })
   }
 
-  const openConversation = () => {
-    const query = `scene=profile&peerName=${encodeURIComponent(profile.nickname)}&peerAvatar=${encodeURIComponent(profile.avatarText)}`
-    void Taro.navigateTo({ url: `/pages/secondhand-chat/index?${query}` })
-  }
-
   const handleSecondaryAction = () => {
     if (profile.isSelf) {
       showToast('主页分享静态预览')
       return
     }
-    openConversation()
+    showToast('私信功能待接入通用会话')
   }
 
   const handleMenuAction = (action: 'copy' | 'report' | 'block') => {
