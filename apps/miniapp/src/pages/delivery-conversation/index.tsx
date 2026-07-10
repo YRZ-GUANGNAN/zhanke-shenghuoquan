@@ -1,49 +1,20 @@
 import React, { useState } from 'react'
 import { Image, Input, ScrollView, Text, View } from '@tarojs/components'
 import Taro from '../../services/taro'
+import { resolveStaticDeliveryOrder } from '../delivery-static-data'
 import './index.scss'
 
 type ConversationRole = 'merchant' | 'rider'
 
-interface ConversationCopy {
-  peerAvatar: string
-  selfAvatar: string
-  peerName: string
-  peerMeta: string
-  orderTitle: string
-  orderMeta: string
-  leftFirst: string
-  rightReply: string
-  leftSecond: string
-  detailUrl: string
+interface ConversationRoleCopy {
   fallbackUrl: string
 }
 
-const copyByRole: Record<ConversationRole, ConversationCopy> = {
+const copyByRole: Record<ConversationRole, ConversationRoleCopy> = {
   merchant: {
-    peerAvatar: '李',
-    selfAvatar: '茶',
-    peerName: '李伟 · 骑手',
-    peerMeta: '配送中 · 137 5560 8814',
-    orderTitle: '#B1079 · 本店 → 3栋 4楼 412室',
-    orderMeta: '配送中 · 配送费 ¥1.5',
-    leftFirst: '老板，B1079 我到店了，在几号取餐口拿？',
-    rightReply: '左手边 3 号取餐架，蓝色袋子写了 412',
-    leftSecond: '好的看到了，这就出发',
-    detailUrl: '/pages/merchant-order-detail/index',
     fallbackUrl: '/pages/merchant-home/index'
   },
   rider: {
-    peerAvatar: '茶',
-    selfAvatar: '李',
-    peerName: '茶知味 · 商家',
-    peerMeta: '配送中 · 188 5530 2217',
-    orderTitle: '#B1079 · 本店 → 3栋 4楼 412室',
-    orderMeta: '配送中 · 配送费 ¥1.5',
-    leftFirst: '左手边 3 号取餐架，蓝色袋子写了 412',
-    rightReply: '老板，B1079 我到店了，在几号取餐口拿？',
-    leftSecond: '好的看到了，这就出发',
-    detailUrl: '/pages/delivery-order-detail/index',
     fallbackUrl: '/pages/delivery-rider/index'
   }
 }
@@ -55,16 +26,35 @@ function showToast(title: string) {
 export default function DeliveryConversationPage() {
   const params = Taro.getCurrentInstance().router?.params || {}
   const role: ConversationRole = params.role === 'rider' ? 'rider' : 'merchant'
-  const copy = copyByRole[role]
+  const roleCopy = copyByRole[role]
+  const { order, found } = resolveStaticDeliveryOrder(params.orderId)
+  const assignedRider = order.rider || { name: '骑手待接单', phone: '暂无电话', avatar: '骑' }
+  const peer = role === 'merchant' ? assignedRider : order.merchant
+  const selfAvatar = role === 'merchant' ? order.merchant.avatar : assignedRider.avatar
+  const riderQuestion = `老板，${order.id} 我到 ${order.pickupName} 了，在几号取货口拿？`
+  const merchantReply = `请在 ${order.pickupName} 的取货架拿，送往 ${order.destination}`
+  const copy = {
+    peerAvatar: peer.avatar,
+    selfAvatar,
+    peerName: peer.name,
+    peerMeta: `${order.statusLabel} · ${peer.phone}`,
+    orderTitle: `#${order.id} · ${order.pickupName} → ${order.destination}`,
+    orderMeta: `${order.statusLabel} · 配送费 ¥${order.fee}`,
+    leftFirst: role === 'merchant' ? riderQuestion : merchantReply,
+    rightReply: role === 'merchant' ? merchantReply : riderQuestion,
+    leftSecond: found ? '好的，信息核对无误，保持本单沟通' : '静态订单数据待补充'
+  }
   const [draft, setDraft] = useState('')
   const [pickedImage, setPickedImage] = useState('')
 
   const goBack = () => {
-    void Taro.navigateBack().catch(() => Taro.redirectTo({ url: copy.fallbackUrl }))
+    void Taro.navigateBack().catch(() => Taro.redirectTo({ url: roleCopy.fallbackUrl }))
   }
 
   const openOrder = () => {
-    void Taro.navigateTo({ url: copy.detailUrl }).catch(() => showToast('详情页稍后接入'))
+    void Taro.navigateTo({
+      url: `/pages/merchant-order-detail/index?orderId=${encodeURIComponent(order.id)}&role=${role}`
+    }).catch(() => showToast('详情页稍后接入'))
   }
 
   const pickImage = async () => {

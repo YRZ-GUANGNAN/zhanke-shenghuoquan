@@ -1,6 +1,7 @@
 import React from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
 import Taro from '../../services/taro'
+import { resolveStaticDeliveryOrder, type StaticDeliveryOrder } from '../delivery-static-data'
 import './index.scss'
 
 type StepState = 'done' | 'current' | 'todo'
@@ -13,15 +14,32 @@ interface ProgressStep {
   state: StepState
 }
 
-const progressSteps: ProgressStep[] = [
-  { key: 'created', title: '创建订单', time: '12:31', state: 'done' },
-  { key: 'paid', title: '支付配送费', note: '¥1.50 · 钱包支付', time: '12:31', state: 'done' },
-  { key: 'pool', title: '进入抢单池', note: '等待骑手抢单', time: '12:32', state: 'done' },
-  { key: 'claimed', title: '骑手接单', note: '李伟 · 137 5560 8814', time: '12:35', state: 'done' },
-  { key: 'picked', title: '已取货', note: '已上传取货照', time: '12:41', state: 'done' },
-  { key: 'delivering', title: '配送中', note: '前往 3栋 4楼 412室', state: 'current' },
-  { key: 'delivered', title: '送达', note: '骑手上传送达照后完成', state: 'todo' }
-]
+function buildProgressSteps(order: StaticDeliveryOrder): ProgressStep[] {
+  const currentIndex = {
+    waiting: 2,
+    pickup: 3,
+    delivering: 5,
+    completed: 6
+  }[order.stage]
+  const templates = [
+    { key: 'created', title: '创建订单', time: order.orderTime },
+    { key: 'paid', title: '支付配送费', note: `¥${order.fee} · ${order.paymentLabel}`, time: order.orderTime },
+    { key: 'pool', title: '进入抢单池', note: '等待骑手抢单', time: order.orderTime },
+    { key: 'claimed', title: '骑手接单', note: order.rider ? `${order.rider.name} · ${order.rider.phone}` : '等待骑手接单' },
+    { key: 'picked', title: '已取货', note: '骑手上传取货照后进入配送' },
+    { key: 'delivering', title: '配送中', note: `前往 ${order.destination}` },
+    { key: 'delivered', title: '送达', note: '骑手上传送达照后完成' }
+  ]
+
+  return templates.map((step, index) => ({
+    ...step,
+    state: order.stage === 'completed' || index < currentIndex
+      ? 'done'
+      : index === currentIndex
+        ? 'current'
+        : 'todo'
+  }))
+}
 
 function showStaticToast(title: string) {
   void Taro.showToast({ title, icon: 'none', duration: 1400 })
@@ -31,13 +49,23 @@ function handleBack() {
   void Taro.navigateBack()
 }
 
-function openMerchantConversation() {
+function openConversation(orderId: string, role: 'merchant' | 'rider') {
   void Taro.navigateTo({
-    url: '/pages/delivery-conversation/index?orderId=B1079&role=merchant'
+    url: `/pages/delivery-conversation/index?orderId=${encodeURIComponent(orderId)}&role=${role}`
   })
 }
 
 export default function MerchantOrderDetailPage() {
+  const params = Taro.getCurrentInstance().router?.params || {}
+  const role = params.role === 'rider' ? 'rider' : 'merchant'
+  const { order } = resolveStaticDeliveryOrder(params.orderId)
+  const progressSteps = buildProgressSteps(order)
+  const contact = role === 'rider'
+    ? order.merchant
+    : order.rider
+  const pickupUploaded = order.stage === 'delivering' || order.stage === 'completed'
+  const deliveredUploaded = order.stage === 'completed'
+
   return (
     <View className='merchant-order-detail-page'>
       <View className='merchant-detail-nav'>
@@ -53,39 +81,48 @@ export default function MerchantOrderDetailPage() {
           <View className='merchant-detail-status-card'>
             <View className='merchant-detail-status-card__main'>
               <View className='merchant-detail-status-card__state-row'>
-                <Text className='merchant-detail-status-card__state'>配送中</Text>
+                <Text className='merchant-detail-status-card__state'>{order.statusLabel}</Text>
                 <View className='merchant-detail-status-card__dot' />
               </View>
-              <Text className='merchant-detail-status-card__sub'>骑手已取货，正在前往送达点</Text>
+              <Text className='merchant-detail-status-card__sub'>{order.statusSub}</Text>
             </View>
             <View className='merchant-detail-status-card__fee'>
-              <Text className='merchant-detail-status-card__amount'>¥1.50</Text>
-              <Text className='merchant-detail-status-card__pay'>钱包支付</Text>
+              <Text className='merchant-detail-status-card__amount'>¥{order.fee}</Text>
+              <Text className='merchant-detail-status-card__pay'>{order.paymentLabel}</Text>
             </View>
             <View className='merchant-detail-status-card__divider' />
             <View className='merchant-detail-status-card__meta'>
-              <Text>#B1079 · 12:31 下单</Text>
-              <Text>送达点: 3栋 4楼 412室</Text>
+              <Text>#{order.id} · {order.orderTime} 下单</Text>
+              <Text>送达点: {order.destination}</Text>
             </View>
           </View>
 
-          <View className='merchant-detail-rider-card'>
-            <View className='merchant-detail-rider-card__avatar'>
-              <Text>李</Text>
-            </View>
-            <View className='merchant-detail-rider-card__main'>
-              <Text className='merchant-detail-rider-card__name'>李伟 · 骑手 · 12:35 接单</Text>
-              <Text className='merchant-detail-rider-card__phone'>137 5560 8814</Text>
-            </View>
-            <View className='merchant-detail-rider-card__actions'>
-              <View className='merchant-detail-rider-card__circle' onClick={openMerchantConversation}>
-                <Text>□</Text>
+          {contact ? (
+            <View className='merchant-detail-rider-card'>
+              <View className='merchant-detail-rider-card__avatar'>
+                <Text>{contact.avatar}</Text>
               </View>
-              <View className='merchant-detail-rider-card__circle' onClick={() => showStaticToast('电话联系稍后开放')}>
-                <Text>⌕</Text>
+              <View className='merchant-detail-rider-card__main'>
+                <Text className='merchant-detail-rider-card__name'>{contact.name}</Text>
+                <Text className='merchant-detail-rider-card__phone'>{contact.phone}</Text>
+              </View>
+              <View className='merchant-detail-rider-card__actions'>
+                <View className='merchant-detail-rider-card__circle' onClick={() => openConversation(order.id, role)}>
+                  <Text>□</Text>
+                </View>
+                <View className='merchant-detail-rider-card__circle' onClick={() => showStaticToast('电话联系稍后开放')}>
+                  <Text>⌕</Text>
+                </View>
               </View>
             </View>
-          </View>
+          ) : (
+            <View className='merchant-detail-rider-card'>
+              <View className='merchant-detail-rider-card__main'>
+                <Text className='merchant-detail-rider-card__name'>等待骑手接单</Text>
+                <Text className='merchant-detail-rider-card__phone'>接单后开放本单私信与电话入口</Text>
+              </View>
+            </View>
+          )}
 
           <View className='merchant-detail-progress-card'>
             <Text className='merchant-detail-section-title'>配送进度</Text>
@@ -123,20 +160,20 @@ export default function MerchantOrderDetailPage() {
             </View>
             <View className='merchant-detail-photo-grid'>
               <View className='merchant-detail-photo-item' onClick={() => showStaticToast('取货照静态展示')}>
-                <View className='merchant-detail-photo-item__thumb merchant-detail-photo-item__thumb--ready'>
-                  <Text>取货照 · 骑手拍摄</Text>
+                <View className={`merchant-detail-photo-item__thumb ${pickupUploaded ? 'merchant-detail-photo-item__thumb--ready' : 'merchant-detail-photo-item__thumb--pending'}`}>
+                  <Text>{pickupUploaded ? '取货照 · 骑手拍摄' : '骑手取货后上传'}</Text>
                 </View>
-                <Text className='merchant-detail-photo-item__caption merchant-detail-photo-item__caption--ready'>
-                  ✓ 取货照 · 12:41 已上传
+                <Text className={`merchant-detail-photo-item__caption ${pickupUploaded ? 'merchant-detail-photo-item__caption--ready' : 'merchant-detail-photo-item__caption--pending'}`}>
+                  {pickupUploaded ? '✓ 取货照 · 已上传' : '· 取货照 · 待上传'}
                 </Text>
               </View>
               <View className='merchant-detail-photo-item' onClick={() => showStaticToast('送达照待上传')}>
-                <View className='merchant-detail-photo-item__thumb merchant-detail-photo-item__thumb--pending'>
+                <View className={`merchant-detail-photo-item__thumb ${deliveredUploaded ? 'merchant-detail-photo-item__thumb--ready' : 'merchant-detail-photo-item__thumb--pending'}`}>
                   <Text className='merchant-detail-photo-item__camera'>□</Text>
-                  <Text>送达后由骑手上传</Text>
+                  <Text>{deliveredUploaded ? '送达照 · 骑手拍摄' : '送达后由骑手上传'}</Text>
                 </View>
-                <Text className='merchant-detail-photo-item__caption merchant-detail-photo-item__caption--pending'>
-                  · 送达照 · 待上传
+                <Text className={`merchant-detail-photo-item__caption ${deliveredUploaded ? 'merchant-detail-photo-item__caption--ready' : 'merchant-detail-photo-item__caption--pending'}`}>
+                  {deliveredUploaded ? '✓ 送达照 · 已上传' : '· 送达照 · 待上传'}
                 </Text>
               </View>
             </View>

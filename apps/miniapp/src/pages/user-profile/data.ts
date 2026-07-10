@@ -76,9 +76,100 @@ const profiles: Record<string, PublicProfileView> = {
     isSelf: false,
     isFollowing: false,
     posts: [
-      { id: 'milk-tea-main', title: '三食堂新出的芋泥波波真的绝，一天一杯根本停不下来', mediaLabel: '图 · 奶茶', likes: 128, tone: 'peach', height: 'tall' },
+      { id: 'milk-tea', title: '三食堂新出的芋泥波波真的绝，一天一杯根本停不下来', mediaLabel: '图 · 奶茶', likes: 128, tone: 'peach', height: 'tall' },
       { id: 'milk-tea-review', title: '大学城奶茶测评｜十家喝下来这三家最能打', mediaLabel: '图 · 测评', likes: 256, tone: 'lemon', height: 'medium' },
       { id: 'milk-tea-menu', title: '隐藏喝法：这家的四季春加波波椰果绝配', mediaLabel: '图 · 隐藏菜单', likes: 89, tone: 'sky', height: 'medium' }
+    ],
+    products: []
+  },
+  deer: {
+    id: 'deer',
+    nickname: '小鹿乱撞',
+    account: 'zk_deer77',
+    avatarText: '鹿',
+    school: '湛江科技学院',
+    grade: '大二',
+    bio: '喜欢海风、晚霞和临时起意的校园散步',
+    followingCount: 36,
+    followerCount: 142,
+    likedCount: 608,
+    isSelf: false,
+    isFollowing: false,
+    posts: [
+      { id: 'sea', title: '有没有周末去金沙湾的搭子？拍照吹海风', mediaLabel: '图 · 海边', likes: 87, tone: 'mint', height: 'tall' },
+      { id: 'sunset', title: '今天的晚霞，操场随手拍的，太治愈了', mediaLabel: '图 · 晚霞', likes: 156, tone: 'peach', height: 'medium' }
+    ],
+    products: []
+  },
+  cabbage: {
+    id: 'cabbage',
+    nickname: '卷心菜',
+    account: 'zk_cabbage',
+    avatarText: '卷',
+    school: '湛江科技学院',
+    grade: '大三',
+    bio: '期末周常驻图书馆，分享学习位置和资料',
+    followingCount: 51,
+    followerCount: 203,
+    likedCount: 792,
+    isSelf: false,
+    isFollowing: false,
+    posts: [
+      { id: 'library', title: '期末周图书馆占座攻略｜亲测有效的三个时间点', mediaLabel: '图 · 图书馆', likes: 214, tone: 'lilac', height: 'tall' }
+    ],
+    products: []
+  },
+  ali: {
+    id: 'ali',
+    nickname: '阿黎',
+    account: 'zk_ali09',
+    avatarText: '黎',
+    school: '湛江科技学院',
+    grade: '大二',
+    bio: '课程排得满，偶尔在线求助也认真互助',
+    followingCount: 18,
+    followerCount: 67,
+    likedCount: 184,
+    isSelf: false,
+    isFollowing: false,
+    posts: [
+      { id: 'express', title: '求助：明天上午有人能帮拿北门快递吗，有偿', mediaLabel: '图 · 快递', likes: 12, tone: 'lemon', height: 'medium' }
+    ],
+    products: []
+  },
+  yeye: {
+    id: 'yeye',
+    nickname: '椰椰',
+    account: 'zk_yeye',
+    avatarText: '椰',
+    school: '湛江科技学院',
+    grade: '大四',
+    bio: '分享靠谱兼职和毕业季校园信息',
+    followingCount: 73,
+    followerCount: 191,
+    likedCount: 533,
+    isSelf: false,
+    isFollowing: false,
+    posts: [
+      { id: 'part-time', title: '周末兼职招募，咖啡店需要两名同学帮忙', mediaLabel: '图 · 招聘', likes: 68, tone: 'sky', height: 'medium' }
+    ],
+    products: []
+  },
+  pomelo: {
+    id: 'pomelo',
+    nickname: '柚子茶',
+    account: 'zk_pomelo',
+    avatarText: '柚',
+    school: '湛江科技学院',
+    grade: '大三',
+    bio: '宿舍收纳爱好者，持续更新低成本改造清单',
+    followingCount: 44,
+    followerCount: 238,
+    likedCount: 981,
+    isSelf: false,
+    isFollowing: false,
+    posts: [
+      { id: 'dorm-makeover', title: '宿舍改造第二弹｜300 块把上床下桌改成 ins 风', mediaLabel: '图 · 宿舍', likes: 342, tone: 'peach', height: 'tall' }
     ],
     products: []
   },

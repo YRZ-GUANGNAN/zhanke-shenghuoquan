@@ -1,5 +1,6 @@
 import React from 'react'
 import { Text, View } from '@tarojs/components'
+import StudentBottomNav from '../../components/student-bottom-nav'
 import Taro from '../../services/taro'
 import './index.scss'
 
@@ -65,23 +66,11 @@ const merchants: MerchantCard[] = [
   }
 ]
 
-const navItems = [
-  { key: 'home', label: '首页', icon: 'home', url: '/pages/home/index' },
-  { key: 'takeout', label: '外卖', icon: 'takeaway', url: '/pages/student-takeout/index' },
-  { key: 'market', label: '二手', icon: 'market', url: '/pages/student-secondhand/index' },
-  { key: 'profile', label: '我的', icon: 'profile', url: '/pages/profile/index' }
-]
-
 function showMiniProgramToast() {
   void Taro.showToast({ title: '即将跳转商家小程序', icon: 'none', duration: 1400 })
 }
 
 export default function StudentTakeoutPage() {
-  const handleNavClick = (item: typeof navItems[number]) => {
-    if (item.key === 'takeout') return
-    void Taro.redirectTo({ url: item.url })
-  }
-
   return (
     <View className='student-takeout-page'>
       <View className='student-takeout-header'>
@@ -128,31 +117,7 @@ export default function StudentTakeoutPage() {
         <Text className='student-takeout-footer'>合作商家陆续入驻中</Text>
       </View>
 
-      <View className='student-bottom-nav'>
-        {navItems.slice(0, 2).map((item) => (
-          <View
-            key={item.key}
-            className={`student-bottom-nav__item ${item.key === 'takeout' ? 'student-bottom-nav__item--active' : ''}`}
-            onClick={() => handleNavClick(item)}
-          >
-            <View className={`student-bottom-nav__icon student-bottom-nav__icon--${item.icon}`} />
-            <Text>{item.label}</Text>
-          </View>
-        ))}
-        <View className='student-bottom-nav__fab' onClick={() => void Taro.navigateTo({ url: '/pages/publish-post/index' })}>
-          <Text>+</Text>
-        </View>
-        {navItems.slice(2).map((item) => (
-          <View
-            key={item.key}
-            className='student-bottom-nav__item'
-            onClick={() => handleNavClick(item)}
-          >
-            <View className={`student-bottom-nav__icon student-bottom-nav__icon--${item.icon}`} />
-            <Text>{item.label}</Text>
-          </View>
-        ))}
-      </View>
+      <StudentBottomNav active='takeout' />
     </View>
   )
 }

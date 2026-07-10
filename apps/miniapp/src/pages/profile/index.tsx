@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Text, View } from '@tarojs/components'
 import IdentitySwitchModal, { type IdentityRoleKey } from '../../components/IdentitySwitchModal'
+import StudentBottomNav from '../../components/student-bottom-nav'
 import Taro from '../../services/taro'
 import './index.scss'
 
@@ -40,13 +41,6 @@ const settings: SettingItem[] = [
   { key: 'cache', title: '清理缓存', icon: 'trash', value: '12.6MB' },
   { key: 'update', title: '检查更新', icon: 'refresh', value: 'v2.4.0' },
   { key: 'about', title: '关于湛科生活圈', icon: 'info', arrow: true }
-]
-
-const navItems = [
-  { key: 'home', label: '首页', icon: 'home', url: '/pages/home/index' },
-  { key: 'delivery', label: '外卖', icon: 'takeaway', url: '/pages/student-takeout/index' },
-  { key: 'market', label: '二手', icon: 'market', url: '/pages/student-secondhand/index' },
-  { key: 'profile', label: '我的', icon: 'profile', url: '/pages/profile/index' }
 ]
 
 function showPlaceholder(title: string) {
@@ -108,9 +102,8 @@ export default function ProfilePage() {
             </View>
             <Text className='student-profile-user__meta'>湛科号：zk_aze233 · 湛江科技学院</Text>
           </View>
-          <View className='student-profile-user__home' onClick={() => void Taro.navigateTo({ url: '/pages/user-profile/index?userId=current-user&source=profile' })}>
-            <Text>主页</Text>
-            <Text className='student-profile-user__home-arrow'>›</Text>
+          <View className='student-profile-user__edit' onClick={() => void Taro.navigateTo({ url: '/pages/edit-profile/index' })}>
+            <Text>编辑资料</Text>
           </View>
         </View>
       </View>
@@ -166,31 +159,7 @@ export default function ProfilePage() {
         </View>
       </View>
 
-      <View className='student-bottom-nav'>
-        {navItems.slice(0, 2).map((item) => (
-          <View
-            key={item.key}
-            className='student-bottom-nav__item'
-            onClick={() => void Taro.redirectTo({ url: item.url })}
-          >
-            <View className={`student-bottom-nav__icon student-bottom-nav__icon--${item.icon}`} />
-            <Text>{item.label}</Text>
-          </View>
-        ))}
-        <View className='student-bottom-nav__fab' onClick={() => void Taro.navigateTo({ url: '/pages/publish-post/index' })}>
-          <Text>+</Text>
-        </View>
-        {navItems.slice(2).map((item) => (
-          <View
-            key={item.key}
-            className={`student-bottom-nav__item ${item.key === 'profile' ? 'student-bottom-nav__item--active' : ''}`}
-            onClick={() => item.key === 'profile' ? undefined : void Taro.redirectTo({ url: item.url })}
-          >
-            <View className={`student-bottom-nav__icon student-bottom-nav__icon--${item.icon}`} />
-            <Text>{item.label}</Text>
-          </View>
-        ))}
-      </View>
+      <StudentBottomNav active='profile' />
 
       <IdentitySwitchModal
         visible={Boolean(pendingRole)}

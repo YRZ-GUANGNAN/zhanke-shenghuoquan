@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
+import StudentBottomNav from '../../components/student-bottom-nav'
 import Taro from '../../services/taro'
 import './index.scss'
 
@@ -103,17 +104,6 @@ const products: ProductCard[] = [
   }
 ]
 
-const navItems = [
-  { key: 'home', label: '首页', icon: 'home', url: '/pages/home/index' },
-  { key: 'takeout', label: '外卖', icon: 'takeaway', url: '/pages/student-takeout/index' },
-  { key: 'market', label: '二手', icon: 'market', url: '/pages/student-secondhand/index' },
-  { key: 'profile', label: '我的', icon: 'profile', url: '/pages/profile/index' }
-]
-
-function showToast(title: string) {
-  void Taro.showToast({ title, icon: 'none', duration: 1400 })
-}
-
 function splitProducts(cards: ProductCard[]) {
   return {
     left: cards.filter((_, index) => index % 2 === 0),
@@ -133,8 +123,8 @@ export default function StudentSecondhandPage() {
 
   const columns = useMemo(() => splitProducts(visibleProducts), [visibleProducts])
 
-  const openDetail = () => {
-    void Taro.navigateTo({ url: '/pages/secondhand-detail/index' })
+  const openDetail = (item: ProductCard) => {
+    void Taro.navigateTo({ url: `/pages/secondhand-detail/index?id=${encodeURIComponent(item.id)}` })
   }
 
   const openSearch = () => {
@@ -145,7 +135,7 @@ export default function StudentSecondhandPage() {
     <View
       key={item.id}
       className={`secondhand-card ${item.status === 'sold' ? 'secondhand-card--sold' : ''}`}
-      onClick={openDetail}
+      onClick={() => openDetail(item)}
     >
       <View className={`secondhand-card__media secondhand-card__media--${item.tone} secondhand-card__media--${item.height}`}>
         <Text>{item.imageLabel}</Text>
@@ -212,31 +202,7 @@ export default function StudentSecondhandPage() {
         </View>
       </ScrollView>
 
-      <View className='student-bottom-nav student-bottom-nav--secondhand'>
-        {navItems.slice(0, 2).map((item) => (
-          <View
-            key={item.key}
-            className='student-bottom-nav__item'
-            onClick={() => void Taro.redirectTo({ url: item.url })}
-          >
-            <View className={`student-bottom-nav__icon student-bottom-nav__icon--${item.icon}`} />
-            <Text>{item.label}</Text>
-          </View>
-        ))}
-        <View className='student-bottom-nav__fab' onClick={() => void Taro.navigateTo({ url: '/pages/publish-post/index' })}>
-          <Text>+</Text>
-        </View>
-        {navItems.slice(2).map((item) => (
-          <View
-            key={item.key}
-            className={`student-bottom-nav__item ${item.key === 'market' ? 'student-bottom-nav__item--active' : ''}`}
-            onClick={() => item.key === 'market' ? undefined : void Taro.redirectTo({ url: item.url })}
-          >
-            <View className={`student-bottom-nav__icon student-bottom-nav__icon--${item.icon}`} />
-            <Text>{item.label}</Text>
-          </View>
-        ))}
-      </View>
+      <StudentBottomNav active='market' className='student-bottom-nav--secondhand' />
     </View>
   )
 }

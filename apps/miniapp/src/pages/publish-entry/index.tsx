@@ -10,7 +10,7 @@ type PublishEntry = {
   subtitle: string
   tag: string
   tone: 'blue' | 'orange' | 'green'
-  url: string
+  url?: string
 }
 
 const entries: PublishEntry[] = [
@@ -21,7 +21,7 @@ const entries: PublishEntry[] = [
     subtitle: '分享校园动态、求助、攻略和日常',
     tag: '学生',
     tone: 'blue',
-    url: '/pages/publish/index?type=post'
+    url: '/pages/publish-post/index'
   },
   {
     key: 'secondhand',
@@ -29,8 +29,7 @@ const entries: PublishEntry[] = [
     title: '发布二手',
     subtitle: '转让闲置、书籍资料、数码和生活用品',
     tag: '二手',
-    tone: 'orange',
-    url: '/pages/publish/index?type=product'
+    tone: 'orange'
   },
   {
     key: 'delivery',
@@ -45,6 +44,10 @@ const entries: PublishEntry[] = [
 
 export default function PublishEntryPage() {
   const openEntry = (entry: PublishEntry) => {
+    if (!entry.url) {
+      void Taro.showToast({ title: '二手发布静态页待设计', icon: 'none', duration: 1400 })
+      return
+    }
     void Taro.navigateTo({ url: entry.url })
   }
 

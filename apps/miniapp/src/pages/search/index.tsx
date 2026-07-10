@@ -32,13 +32,21 @@ function clearHistory() {
 }
 
 export default function SearchPage() {
+  const rawKeyword = Taro.getCurrentInstance().router?.params?.keyword
+  let keyword = rawKeyword || ''
+  try {
+    keyword = rawKeyword ? decodeURIComponent(rawKeyword) : ''
+  } catch {
+    keyword = rawKeyword || ''
+  }
+
   return (
     <View className='student-search-page'>
       <View className='student-search-header'>
         <View className='student-search-back' onClick={goBack} />
         <View className='student-search-box'>
           <View className='student-search-box__icon' />
-          <Text className='student-search-box__placeholder'>搜帖子、二手好物</Text>
+          <Text className='student-search-box__placeholder'>{keyword || '搜帖子、二手好物'}</Text>
         </View>
       </View>
 

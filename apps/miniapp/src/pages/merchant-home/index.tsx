@@ -163,8 +163,10 @@ function handleShortcutClick(key: string, label: string) {
   showPlaceholder(`${label}静态占位`)
 }
 
-function openOrderDetail() {
-  void Taro.navigateTo({ url: '/pages/merchant-order-detail/index' })
+function openOrderDetail(orderId: string) {
+  void Taro.navigateTo({
+    url: `/pages/merchant-order-detail/index?orderId=${encodeURIComponent(orderId)}&role=merchant`
+  })
 }
 
 function OrderCard({ order, mode }: { order: MerchantOrder; mode: MerchantTabKey }) {
@@ -236,7 +238,7 @@ function OrderCard({ order, mode }: { order: MerchantOrder; mode: MerchantTabKey
               <Text>取消并退款</Text>
             </View>
           )}
-          <View className='merchant-order-button merchant-order-button--primary' onClick={openOrderDetail}>
+          <View className='merchant-order-button merchant-order-button--primary' onClick={() => openOrderDetail(order.id)}>
             <Text>详情</Text>
           </View>
         </View>

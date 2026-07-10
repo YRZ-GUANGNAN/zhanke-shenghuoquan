@@ -20,6 +20,8 @@ function safeDecode(value?: string): string | undefined {
 }
 
 type ChatCopy = {
+  productId: string
+  sellerId: string
   peerName: string
   peerAvatar: string
   peerState: string
@@ -36,6 +38,8 @@ type ChatCopy = {
 
 const chatCopies: Record<string, ChatCopy> = {
   bike: {
+    productId: 'bike',
+    sellerId: 'north',
     peerName: '向北',
     peerAvatar: '向',
     peerState: '在线 · 湛江科技学院',
@@ -50,6 +54,8 @@ const chatCopies: Record<string, ChatCopy> = {
     peerMessage3: '今晚七点宿舍楼下可以来试骑'
   },
   sea: {
+    productId: 'bike',
+    sellerId: 'deer',
     peerName: '小鹿乱撞',
     peerAvatar: '鹿',
     peerState: '在线 · 湛江科技学院',
@@ -63,6 +69,8 @@ const chatCopies: Record<string, ChatCopy> = {
     peerMessage3: '我把集合点发你，记得带充电宝'
   },
   library: {
+    productId: 'bike',
+    sellerId: 'cabbage',
     peerName: '卷心菜',
     peerAvatar: '卷',
     peerState: '在线 · 湛江科技学院',
@@ -74,6 +82,22 @@ const chatCopies: Record<string, ChatCopy> = {
     peerMessage2: '从东门上来右转，第三排比较安静',
     imageLabel: '图片 · 座位位置',
     peerMessage3: '我先帮你占半小时，到了说一声'
+  },
+  product: {
+    productId: 'desk-lamp',
+    sellerId: 'north',
+    peerName: '向北',
+    peerAvatar: '向',
+    peerState: '在线 · 湛江科技学院',
+    productTitle: '校园二手好物',
+    productPrice: '¥35',
+    productImageLabel: '图 · 商品实拍',
+    safeTip: '平台不担保交易，请当面验货后再付款',
+    peerMessage1: '同学你好，商品还在，可以约时间当面看一下',
+    myMessage: '好的，功能和外观都正常吗？可以小刀吗',
+    peerMessage2: '目前使用都正常，见面可以再检查，价格可以小聊',
+    imageLabel: '图片 · 商品细节',
+    peerMessage3: '今晚宿舍楼下方便，到了给我发消息'
   }
 }
 
@@ -84,8 +108,13 @@ function resolveChatCopy(): ChatCopy {
 
   return {
     ...base,
+    productId: safeDecode(params.productId) || base.productId,
+    sellerId: safeDecode(params.sellerId) || base.sellerId,
     peerName: safeDecode(params.peerName) || base.peerName,
-    peerAvatar: safeDecode(params.peerAvatar) || base.peerAvatar
+    peerAvatar: safeDecode(params.peerAvatar) || base.peerAvatar,
+    productTitle: safeDecode(params.productTitle) || base.productTitle,
+    productPrice: safeDecode(params.productPrice) || base.productPrice,
+    productImageLabel: safeDecode(params.productImageLabel) || base.productImageLabel
   }
 }
 
@@ -96,6 +125,10 @@ export default function SecondhandChatPage() {
 
   const goBack = () => {
     void Taro.navigateBack().catch(() => Taro.redirectTo({ url: '/pages/secondhand-detail/index' }))
+  }
+
+  const openSellerProfile = () => {
+    void Taro.navigateTo({ url: `/pages/user-profile/index?userId=${encodeURIComponent(copy.sellerId)}&tab=secondhand` })
   }
 
   const pickImage = async () => {
@@ -129,7 +162,7 @@ export default function SecondhandChatPage() {
     <View className='secondhand-chat-page'>
       <View className='secondhand-chat-header'>
         <View className='secondhand-chat-header__back' onClick={goBack} />
-        <View className='secondhand-chat-seller'>
+        <View className='secondhand-chat-seller' onClick={openSellerProfile}>
           <View className='secondhand-chat-seller__avatar'>
             <Text>{copy.peerAvatar}</Text>
           </View>
@@ -138,7 +171,7 @@ export default function SecondhandChatPage() {
             <Text className='secondhand-chat-seller__state'>{copy.peerState}</Text>
           </View>
         </View>
-        <View className='secondhand-chat-header__home' onClick={() => showToast('卖家主页下一页接入')}>
+        <View className='secondhand-chat-header__home' onClick={openSellerProfile}>
           <Text>主页</Text>
         </View>
       </View>
@@ -151,7 +184,7 @@ export default function SecondhandChatPage() {
           <Text className='secondhand-chat-product__title'>{copy.productTitle}</Text>
           {copy.productPrice ? <Text className='secondhand-chat-product__price'>{copy.productPrice}</Text> : null}
         </View>
-        <View className='secondhand-chat-product__button' onClick={() => Taro.navigateTo({ url: '/pages/secondhand-detail/index' })}>
+        <View className='secondhand-chat-product__button' onClick={() => Taro.navigateTo({ url: `/pages/secondhand-detail/index?id=${encodeURIComponent(copy.productId)}` })}>
           <Text>查看</Text>
         </View>
       </View>

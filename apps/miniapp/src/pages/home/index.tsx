@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { Text, View } from '@tarojs/components'
+import StudentBottomNav from '../../components/student-bottom-nav'
 import Taro from '../../services/taro'
 import './index.scss'
 
@@ -7,6 +8,7 @@ type HomeTab = 'messages' | 'discover' | 'tools'
 
 type DiscoverCard = {
   id: string
+  target: 'post' | 'secondhand'
   tone: 'peach' | 'sky' | 'mint' | 'lilac' | 'lemon' | 'cyan'
   mediaLabel: string
   title: string
@@ -42,6 +44,7 @@ const tabs: Array<{ key: HomeTab; label: string }> = [
 const discoverCards: DiscoverCard[] = [
   {
     id: 'milk-tea',
+    target: 'post',
     tone: 'peach',
     mediaLabel: '图 · 奶茶',
     title: '三食堂新出的芋泥波波真的绝，一天一杯根本...',
@@ -52,6 +55,7 @@ const discoverCards: DiscoverCard[] = [
   },
   {
     id: 'bike',
+    target: 'secondhand',
     tone: 'sky',
     mediaLabel: '图 · 自行车',
     title: '出一辆九成新自行车，毕业急出，150 拿走',
@@ -62,6 +66,7 @@ const discoverCards: DiscoverCard[] = [
   },
   {
     id: 'sea',
+    target: 'post',
     tone: 'mint',
     mediaLabel: '图 · 海边',
     title: '有没有周末去金沙湾的搭子？拍照吹海风',
@@ -72,6 +77,7 @@ const discoverCards: DiscoverCard[] = [
   },
   {
     id: 'library',
+    target: 'post',
     tone: 'lilac',
     mediaLabel: '图 · 图书馆',
     title: '期末周图书馆占座攻略｜亲测有效的三个时间...',
@@ -82,6 +88,7 @@ const discoverCards: DiscoverCard[] = [
   },
   {
     id: 'express',
+    target: 'post',
     tone: 'lemon',
     mediaLabel: '图 · 快递',
     title: '求助：明天上午有人能帮拿北门快递吗，有偿',
@@ -92,6 +99,7 @@ const discoverCards: DiscoverCard[] = [
   },
   {
     id: 'part-time',
+    target: 'post',
     tone: 'cyan',
     mediaLabel: '图 · 招聘',
     title: '周末兼职招募，咖啡店需要两名同学帮忙',
@@ -140,13 +148,6 @@ const tools: ToolItem[] = [
   { id: 'repair', icon: '修', label: '报修', sub: '宿舍维修入口' }
 ]
 
-const navItems = [
-  { key: 'home', label: '首页', icon: 'home', url: '/pages/home/index' },
-  { key: 'delivery', label: '外卖', icon: 'takeaway', url: '/pages/student-takeout/index' },
-  { key: 'market', label: '二手', icon: 'market', url: '/pages/student-secondhand/index' },
-  { key: 'profile', label: '我的', icon: 'profile', url: '/pages/profile/index' }
-]
-
 function splitCards(cards: DiscoverCard[]) {
   return {
     left: cards.filter((_, index) => index % 2 === 0),
@@ -176,15 +177,20 @@ export default function HomePage() {
     void Taro.navigateTo({ url: `/pages/secondhand-chat/index?${query}` })
   }
 
+  const openCard = (card: DiscoverCard) => {
+    const url = card.target === 'secondhand'
+      ? `/pages/secondhand-detail/index?id=${encodeURIComponent(card.id)}`
+      : `/pages/post-detail/index?id=${encodeURIComponent(card.id)}`
+    void Taro.navigateTo({ url })
+  }
+
   const renderDiscoverCard = (card: DiscoverCard) => {
     const isLiked = Boolean(liked[card.id])
     return (
       <View
         key={card.id}
         className='student-post-card'
-        onClick={() => {
-          void Taro.navigateTo({ url: '/pages/post-detail/index' })
-        }}
+        onClick={() => openCard(card)}
       >
         <View className={`student-post-card__media student-post-card__media--${card.tone} student-post-card__media--${card.height}`}>
           <Text>{card.mediaLabel}</Text>
@@ -287,31 +293,7 @@ export default function HomePage() {
         )}
       </View>
 
-      <View className='student-bottom-nav'>
-        {navItems.slice(0, 2).map((item) => (
-          <View
-            key={item.key}
-            className={`student-bottom-nav__item ${item.key === 'home' ? 'student-bottom-nav__item--active' : ''}`}
-            onClick={() => item.key === 'home' ? undefined : void Taro.redirectTo({ url: item.url })}
-          >
-            <View className={`student-bottom-nav__icon student-bottom-nav__icon--${item.icon}`} />
-            <Text>{item.label}</Text>
-          </View>
-        ))}
-        <View className='student-bottom-nav__fab' onClick={() => void Taro.navigateTo({ url: '/pages/publish-post/index' })}>
-          <Text>+</Text>
-        </View>
-        {navItems.slice(2).map((item) => (
-          <View
-            key={item.key}
-            className='student-bottom-nav__item'
-            onClick={() => void Taro.redirectTo({ url: item.url })}
-          >
-            <View className={`student-bottom-nav__icon student-bottom-nav__icon--${item.icon}`} />
-            <Text>{item.label}</Text>
-          </View>
-        ))}
-      </View>
+      <StudentBottomNav active='home' />
     </View>
   )
 }
