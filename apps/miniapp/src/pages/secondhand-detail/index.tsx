@@ -69,7 +69,7 @@ export default function SecondhandDetailPage() {
               <Text className='secondhand-detail-seller__name'>向北</Text>
               <Text className='secondhand-detail-seller__meta'>湛江科技学院 · 在售 2 件 · 已卖出 5 件</Text>
             </View>
-            <View className='secondhand-detail-seller__button' onClick={() => showToast('卖家主页下一页接入')}>
+            <View className='secondhand-detail-seller__button' onClick={() => void Taro.navigateTo({ url: '/pages/user-profile/index?userId=north&source=secondhand&tab=secondhand' })}>
               <Text>主页</Text>
             </View>
           </View>

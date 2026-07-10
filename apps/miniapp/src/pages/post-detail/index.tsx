@@ -88,7 +88,7 @@ export default function PostDetailPage() {
     <View className='post-detail-page'>
       <View className='post-detail-nav'>
         <View className='post-detail-nav__back' onClick={goBack} />
-        <View className='post-detail-author' onClick={() => showToast('用户主页下一页接入')}>
+        <View className='post-detail-author' onClick={() => void Taro.navigateTo({ url: '/pages/user-profile/index?userId=milk-tea&source=post' })}>
           <View className='post-detail-author__avatar'>
             <Text>奶</Text>
           </View>

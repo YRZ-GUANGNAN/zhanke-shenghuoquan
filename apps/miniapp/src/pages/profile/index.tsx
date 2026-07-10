@@ -108,8 +108,9 @@ export default function ProfilePage() {
             </View>
             <Text className='student-profile-user__meta'>湛科号：zk_aze233 · 湛江科技学院</Text>
           </View>
-          <View className='student-profile-user__edit' onClick={() => void Taro.navigateTo({ url: '/pages/edit-profile/index' })}>
-            <Text>编辑资料</Text>
+          <View className='student-profile-user__home' onClick={() => void Taro.navigateTo({ url: '/pages/user-profile/index?userId=current-user&source=profile' })}>
+            <Text>主页</Text>
+            <Text className='student-profile-user__home-arrow'>›</Text>
           </View>
         </View>
       </View>

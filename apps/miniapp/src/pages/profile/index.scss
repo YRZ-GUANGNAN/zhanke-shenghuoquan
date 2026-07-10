@@ -113,12 +113,13 @@
   text-overflow: ellipsis;
 }
 
-.student-profile-user__edit {
+.student-profile-user__home {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 132rpx;
+  gap: 8rpx;
+  min-width: 126rpx;
   height: 58rpx;
   padding: 0 24rpx;
   border: 1.5rpx solid rgba(255, 255, 255, .72);
@@ -127,6 +128,12 @@
   font-size: 25rpx;
   font-weight: 500;
   background: rgba(255, 255, 255, .12);
+}
+
+.student-profile-user__home-arrow {
+  margin-top: -1rpx;
+  font-size: 30rpx;
+  line-height: 1;
 }
 
 .student-profile-content {
