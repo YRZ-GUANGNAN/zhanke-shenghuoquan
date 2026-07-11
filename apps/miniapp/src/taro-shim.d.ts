@@ -1,4 +1,6 @@
 declare module '@tarojs/taro' {
+  export function useDidShow(callback: () => void): void
+
   interface NavigateOptions {
     url: string
   }
