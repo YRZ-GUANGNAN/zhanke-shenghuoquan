@@ -69,7 +69,9 @@ UI-21a 已完成登录、服务端身份状态和身份切换地基，但微信�
 - `apps/miniapp/src/pages/merchant-home/index.tsx`；
 - `apps/miniapp/src/pages/delivery-rider/index.tsx`。
 
-商家与骑手页继续使用 `useIdentityGuard`。执行顺序为：session Gate 先确认认证状态，身份守卫再确认服务端当前身份。未通过任一层时，不渲染受限业务内容。
+每个入口页必须拆成“外层页面 + 内层 Content”两个组件：外层页面只渲染 `RuntimeSessionGate`，现有页面 hooks、`useDidShow`、身份守卫和业务 JSX 全部移动到内层 Content。Gate 只有在 `authenticated` 后才挂载内层 Content，避免 Profile 的 `useDidShow → refreshIdentity()` 等副作用在 bootstrap 前抢跑。
+
+商家与骑手页继续使用 `useIdentityGuard`，但该 hook 必须位于 Gate 后的内层 Content。学生首页与 Profile 的内层 Content 同样使用 `useIdentityGuard('student')`，防止持久化 rider/merchant 冷启动时短暂显示学生页面。执行顺序为：session Gate 先确认认证状态，身份守卫再确认服务端当前身份。未通过任一层时，受限业务组件不会被挂载。
 
 ### 样式
 
@@ -81,7 +83,7 @@ UI-21a 已完成登录、服务端身份状态和身份切换地基，但微信�
 2. App 立即挂载当前路由页面；
 3. 页面中的 Runtime Gate 看到 `idle/booting`，仅显示登录状态；
 4. App 的 effect 调用合并后的唯一 `bootstrap()`；
-5. session 成功后 Gate 渲染页面主体；
+5. session 成功后 Gate 才首次挂载页面内层 Content，并由身份守卫校验当前身份；
 6. 若当前服务端身份不是学生，App 在路由实例就绪后恢复到对应身份首页；
 7. 商家或骑手深链先由 Gate 等待认证，再由身份守卫校验；身份不匹配时不渲染受限主体并跳回正确身份首页。
 
@@ -93,7 +95,7 @@ UI-21a 已完成登录、服务端身份状态和身份切换地基，但微信�
 - 只有 401 清理 token；
 - 重试不新建第二套登录逻辑；
 - 身份切换按钮现有 loading/禁用逻辑保持不变；
-- 未认证、身份不匹配或身份不可用时，商家/骑手业务主体不得短暂出现。
+- 未认证时四个入口页的内层 Content 不得挂载，身份不匹配或身份不可用时学生/商家/骑手主体不得短暂出现。
 
 ## 测试与验收
 
@@ -105,7 +107,7 @@ UI-21a 已完成登录、服务端身份状态和身份切换地基，但微信�
    - `error/anonymous` 显示错误与重试；
    - 连续点击重试不会绕过 session store 的 in-flight 合并。
 2. App：首次渲染始终包含 `props.children`，bootstrap 仍只从 effect 发起。
-3. 身份页：未认证不显示主体；认证且身份不匹配时商家/骑手内容不可见。
+3. 身份页：未认证时 Content 组件及其 hooks 不执行；认证但身份不匹配时学生/商家/骑手内容不可见。
 4. 既有 session、identity、路由和身份切换测试继续通过。
 
 ### 微信开发者工具真实验收
