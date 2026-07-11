@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
 import IdentitySwitchModal from '../../components/IdentitySwitchModal'
+import RuntimeSessionGate from '../../components/runtime-session-gate'
 import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
@@ -249,7 +250,7 @@ function OrderCard({ order, mode }: { order: MerchantOrder; mode: MerchantTabKey
   )
 }
 
-export default function MerchantHomePage() {
+function MerchantHomeContent() {
   const [activeTab, setActiveTab] = useState<MerchantTabKey>('pending')
   const [showStudentSwitch, setShowStudentSwitch] = useState(false)
   const [switchingIdentity, setSwitchingIdentity] = useState(false)
@@ -365,5 +366,13 @@ export default function MerchantHomePage() {
         error={switchIdentityError}
       />
     </View>
+  )
+}
+
+export default function MerchantHomePage() {
+  return (
+    <RuntimeSessionGate>
+      <MerchantHomeContent />
+    </RuntimeSessionGate>
   )
 }

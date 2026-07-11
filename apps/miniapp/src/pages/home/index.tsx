@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react'
 import { Text, View } from '@tarojs/components'
+import RuntimeSessionGate from '../../components/runtime-session-gate'
 import StudentBottomNav from '../../components/student-bottom-nav'
+import { useIdentityGuard } from '../../hooks/use-identity-guard'
 import Taro from '../../services/taro'
 import './index.scss'
 
@@ -155,10 +157,11 @@ function splitCards(cards: DiscoverCard[]) {
   }
 }
 
-export default function HomePage() {
+function HomeContent() {
   const [activeTab, setActiveTab] = useState<HomeTab>('discover')
   const [liked, setLiked] = useState<Record<string, boolean>>({})
   const columns = useMemo(() => splitCards(discoverCards), [])
+  const identityAllowed = useIdentityGuard('student')
 
   const showTodoToast = (title = '静态预览，后续接入') => {
     void Taro.showToast({ title, icon: 'none', duration: 1400 })
@@ -217,6 +220,8 @@ export default function HomePage() {
       </View>
     )
   }
+
+  if (!identityAllowed) return <View className='student-home-page' />
 
   return (
     <View className='page student-home-page'>
@@ -295,5 +300,13 @@ export default function HomePage() {
 
       <StudentBottomNav active='home' />
     </View>
+  )
+}
+
+export default function HomePage() {
+  return (
+    <RuntimeSessionGate>
+      <HomeContent />
+    </RuntimeSessionGate>
   )
 }

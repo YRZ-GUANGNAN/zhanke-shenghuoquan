@@ -2,8 +2,9 @@ import React, { useState } from 'react'
 import { Text, View } from '@tarojs/components'
 import { useDidShow } from '@tarojs/taro'
 import IdentitySwitchModal from '../../components/IdentitySwitchModal'
+import RuntimeSessionGate from '../../components/runtime-session-gate'
 import StudentBottomNav from '../../components/student-bottom-nav'
-import { identityRoute } from '../../hooks/use-identity-guard'
+import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
 import type { IdentityAvailability, IdentityRoleKey } from '../../types'
@@ -74,7 +75,7 @@ function unavailableMessage(value?: IdentityAvailability): string {
   return value.reason || '该身份暂不可用'
 }
 
-export default function ProfilePage() {
+function ProfileContent() {
   const [pendingRole, setPendingRole] = useState<RoleKey | null>(null)
   const [switching, setSwitching] = useState(false)
   const [switchError, setSwitchError] = useState('')
@@ -84,6 +85,7 @@ export default function ProfilePage() {
   const switchIdentity = useSessionStore((state) => state.switchIdentity)
   const activeRole = identity?.currentIdentity ?? 'student'
   const roleName = roles.find((role) => role.key === activeRole)?.title ?? '学生'
+  const identityAllowed = useIdentityGuard('student')
 
   useDidShow(() => {
     void refreshIdentity().catch(() => {
@@ -121,6 +123,8 @@ export default function ProfilePage() {
       setSwitching(false)
     }
   }
+
+  if (!identityAllowed) return <View className='student-profile-page' />
 
   return (
     <View className='student-profile-page'>
@@ -209,5 +213,13 @@ export default function ProfilePage() {
         error={switchError}
       />
     </View>
+  )
+}
+
+export default function ProfilePage() {
+  return (
+    <RuntimeSessionGate>
+      <ProfileContent />
+    </RuntimeSessionGate>
   )
 }

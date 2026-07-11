@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Text, View } from '@tarojs/components'
 import IdentitySwitchModal from '../../components/IdentitySwitchModal'
+import RuntimeSessionGate from '../../components/runtime-session-gate'
 import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
@@ -121,7 +122,7 @@ function openDeliveryConversation(order: AssignedOrder) {
   })
 }
 
-export default function DeliveryRiderPage() {
+function DeliveryRiderContent() {
   const [activeTab, setActiveTab] = useState<RiderTab>('grab')
   const [proofKind, setProofKind] = useState<ProofKind | null>(null)
   const [photoCaptured, setPhotoCaptured] = useState(false)
@@ -429,5 +430,13 @@ export default function DeliveryRiderPage() {
         error={switchIdentityError}
       />
     </View>
+  )
+}
+
+export default function DeliveryRiderPage() {
+  return (
+    <RuntimeSessionGate>
+      <DeliveryRiderContent />
+    </RuntimeSessionGate>
   )
 }
