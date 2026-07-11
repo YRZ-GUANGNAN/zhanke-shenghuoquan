@@ -96,7 +96,7 @@ class ApiError extends Error {
 
 - [ ] Profile 从 session 读取真实 profile/identity；不可用角色不发切换请求并显示后端原因。
 - [ ] Modal 增加 loading/error，提交中禁止重复点击，不改变原面板尺寸、色彩和排版体系。
-- [ ] 新增 `useIdentityGuard(expected)`；authenticated 后身份不符时提示并 `redirectTo('/pages/profile/index')`。
+- [ ] 新增 `useIdentityGuard(expected)`；authenticated 后身份不符时不渲染业务内容，并按服务端当前身份 `reLaunch` 到对应首页。
 - [ ] 骑手和商家切回学生均先调用 `switchIdentity('student')`，成功后跳转。
 - [ ] 运行 typecheck、build 与 `npm run check:miniapp-static-routes`。
 - [ ] 提交 `feat(miniapp): 接通真实身份切换与页面守卫`。

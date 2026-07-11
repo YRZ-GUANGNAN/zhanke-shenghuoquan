@@ -39,7 +39,7 @@ Domain A 新增：
 Zustand session 状态为 `idle/booting/authenticated/anonymous/error`，并保存 profile、identity summary 和错误信息。启动流程：
 
 1. 读取 `domainA.token`；
-2. 有 token 时并发读取 `/auth/me` 与 `/auth/identity`；
+2. 有 token 时按序读取 `/auth/me` 与 `/auth/identity`，避免并发请求中的网络/5xx 错误掩盖过期 token 的 401；
 3. 只有 401 才清 token，并执行一次 `Taro.login → /auth/wechat-login`；
 4. 无 token 时直接执行一次微信登录；
 5. 网络、5xx 或微信登录失败进入 error，不自动循环；用户点击重试才重新执行；
