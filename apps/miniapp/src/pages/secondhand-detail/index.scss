@@ -68,9 +68,46 @@
   font-size: 24rpx;
 }
 
+.secondhand-detail-hero__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 .secondhand-detail-info {
   padding: 32rpx 40rpx 34rpx;
   background: $bg-surface;
+}
+
+.secondhand-detail-info--state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 430rpx;
+  text-align: center;
+}
+
+.secondhand-detail-info--retry {
+  cursor: pointer;
+}
+
+.secondhand-detail-state__title {
+  color: $text-strong;
+  font-size: 30rpx;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.secondhand-detail-info--retry .secondhand-detail-state__title {
+  color: $brand-primary;
+}
+
+.secondhand-detail-state__desc {
+  margin-top: 14rpx;
+  color: $text-muted;
+  font-size: 24rpx;
+  line-height: 1.5;
 }
 
 .secondhand-detail-info__price-row {
