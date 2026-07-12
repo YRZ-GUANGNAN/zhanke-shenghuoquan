@@ -87,49 +87,45 @@ npm run build:miniapp
 
 ## 5. 五场景自动化验收状态
 
-预期完整场景脚本：
+2026-07-12 在主仓库 `master@a4aa474b` 上完成补充验收。为确保“冷启动”是真正的新进程启动，而不是同一 Zustand 实例内的 `reLaunch`，每个冷启动场景均通过微信开发者工具 CLI 关闭项目后重新启动，并使用独立自动化端口连接。
 
-- `D:\codex-temp\ui21a-automator\runtime-scenarios-connect.js`
+补充验收环境：
 
-设计覆盖：
+- 真实 MySQL 8.4：本机 `MySQL84`，`127.0.0.1:3306`；
+- 真实 Meilisearch：`127.0.0.1:7700`；
+- 真实后端：主仓库 `backend/cmd/server`，`http://127.0.0.1:8080/healthz` 返回成功；
+- 真实微信开发者工具：AppID `wx27a4c1be22695ed6`；
+- 自动化：`miniprogram-automator` + 微信开发者工具 CLI `--trust-project`；
+- 临时验收夹具仅为测试用户补充 active rider 身份，结束后恢复原身份并删除夹具记录。
 
-1. 无 token 冷启动，只触发一次 `POST /api/v1/auth/wechat-login`，并正常渲染页面；
-2. merchant 身份冷启动进入商家首页；
-3. rider 身份冷启动进入骑手首页；
-4. 快速重复确认身份切换只发送一次 `POST /api/v1/auth/identity`；
-5. student 非法深链进入商家 / 骑手页时，不泄露业务内容并回到安全页面。
+完整结果：
 
-当前状态：未完整跑通，原因是本机微信开发者工具自动化 websocket 连接不稳定。
+1. **无 token 真冷启动：PASS**
+   页面根节点非空，token 成功写入；后端日志确认仅有一次 `POST /api/v1/auth/wechat-login`。
+2. **merchant 真冷启动恢复：PASS**
+   最终路由 `pages/merchant-home/index`；`.merchant-home-shop`、`.merchant-home-metrics`、`.merchant-home-shortcuts` 均为 1，订单卡为 2。
+3. **rider 真冷启动恢复：PASS**
+   最终路由 `pages/delivery-rider/index`；`.rider-grab-user`、`.rider-grab-wallet-summary`、`.rider-grab-tabs` 均为 1，订单卡为 3。
+4. **身份切换重复确认：PASS**
+   对同一确认按钮并发触发两次点击，后端日志仅出现一次 `POST /api/v1/auth/identity`，最终进入商家页。
+5. **student 非法深链 fail-closed：PASS**
+   分别深链进入商家页与骑手页；20 轮快速采样中全部受限业务选择器最大命中数均为 0，两个场景最终都回到 `pages/profile/index`。
 
-具体证据：
+机器可读证据：
 
-```text
-Error: Failed connecting to ws://127.0.0.1:9420,
-check if target project window is opened with automation enabled
-```
+- `D:\codex-temp\ui21a-current\evidence\ui21a-runtime-scenarios.json`
+- `D:\codex-temp\ui21a-current\evidence\screens\01-no-token-cold-start.png`
+- `D:\codex-temp\ui21a-current\evidence\screens\02-merchant-cold-start.png`
+- `D:\codex-temp\ui21a-current\evidence\screens\03-rider-cold-start.png`
+- `D:\codex-temp\ui21a-current\evidence\screens\04-double-confirm-merchant.png`
+- `D:\codex-temp\ui21a-current\evidence\screens\05-illegal-merchant-deeplink.png`
+- `D:\codex-temp\ui21a-current\evidence\screens\05-illegal-rider-deeplink.png`
 
-直接启动微信开发者工具 CLI 自动化服务时，CLI 能启动服务：
+补充验收脚本：
 
-```powershell
-& 'D:\3314\微信web开发者工具\cli.bat' auto --project 'C:\Users\33141\Documents\ui21a-runtime-identity\apps\miniapp' --auto-port 9445 --trust-project
-```
+- `D:\codex-temp\ui21a-automator\runtime-scenarios-current.js`
 
-输出显示：
-
-```text
-√ IDE server has started, listening on http://127.0.0.1:9420
-√ Using AppID: wx27a4c1be22695ed6
-√ auto
-```
-
-但 `miniprogram-automator.connect` 仍无法稳定连接该 websocket。本项判定为本机 DevTools 自动化链路限制，不作为应用代码错误处理。
-
-因此，本次可确认：
-
-- Red/Green 页面挂载问题已被验证；
-- `typecheck` 与 `build:miniapp` 均通过；
-- 五场景完整自动化仍保留为手动 / 后续工具链修复后的补充验收项；
-- 未冒充五场景全量 PASS。
+原先的 websocket `Conditional` 已通过“每次冷启动独立 CLI 自动化端口 + 页面就绪重试”消除；本轮五场景可判定为全量 PASS。
 
 ## 6. 边界与副作用
 
@@ -154,8 +150,9 @@ check if target project window is opened with automation enabled
 
 - `D:\codex-temp\ui21a-runtime`
 - `D:\codex-temp\ui21a-automator`
+- `D:\codex-temp\ui21a-current\evidence`
 
-验收过程中启动的后端 / Meilisearch 进程在收尾阶段关闭；若微信开发者工具窗口仍开着，视为 owner 本地交互窗口，不强制关闭。
+验收过程中创建的 rider 夹具已清理，测试用户身份已恢复；验收过程中启动的后端 / Meilisearch 进程在收尾阶段关闭。证据目录保留，不属于仓库残留。
 
 ## 8. 结论
 
@@ -167,4 +164,5 @@ UI-21a 的核心问题“运行时门控导致 Taro 页面空挂载”已经修�
 - `npm run typecheck`：PASS；
 - `npm run build:miniapp`：PASS；
 - Red/Green 挂载验收：PASS；
-- 五场景全自动验收：受本机 DevTools websocket 限制，未完整通过，保留为 conditional。
+- 五场景全自动验收：PASS；
+- 原 `Conditional`：已解除。
