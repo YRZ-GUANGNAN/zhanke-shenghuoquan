@@ -1,108 +1,56 @@
-import React, { useMemo, useState } from 'react'
-import { ScrollView, Text, View } from '@tarojs/components'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Image, ScrollView, Text, View } from '@tarojs/components'
 import StudentBottomNav from '../../components/student-bottom-nav'
+import { getProductsPage } from '../../services/c-trade'
 import Taro from '../../services/taro'
+import type { Product } from '../../types'
 import './index.scss'
 
 type CategoryKey = '全部' | '数码' | '书籍资料' | '生活用品' | '代步'
 type ProductTone = 'lemon' | 'lilac' | 'sky' | 'peach' | 'mint'
 type ProductStatus = 'selling' | 'sold'
+type ProductHeight = 'short' | 'medium' | 'tall'
 
 interface ProductCard {
   id: string
   title: string
   price: number
-  category: CategoryKey
+  category: string
   imageLabel: string
+  imageUrl?: string
   status: ProductStatus
   tone: ProductTone
-  height: 'short' | 'medium' | 'tall'
+  height: ProductHeight
 }
 
 const categories: CategoryKey[] = ['全部', '数码', '书籍资料', '生活用品', '代步']
+const productTones: ProductTone[] = ['lemon', 'lilac', 'sky', 'peach', 'mint']
+const productHeights: ProductHeight[] = ['short', 'medium', 'tall']
 
-const products: ProductCard[] = [
-  {
-    id: 'desk-lamp',
-    title: '护眼台灯，用了半年，搬宿舍不想带了',
-    price: 35,
-    category: '生活用品',
-    imageLabel: '图 · 台灯',
-    status: 'selling',
-    tone: 'lemon',
-    height: 'short'
-  },
-  {
-    id: 'earphones',
-    title: '半入耳蓝牙耳机，盒装齐全，功能正常',
-    price: 120,
-    category: '数码',
-    imageLabel: '图 · 耳机',
-    status: 'selling',
-    tone: 'lilac',
-    height: 'medium'
-  },
-  {
-    id: 'guitar',
-    title: '初学者民谣吉他，送变调夹和背袋',
-    price: 180,
-    category: '生活用品',
-    imageLabel: '图 · 吉他',
-    status: 'sold',
-    tone: 'peach',
-    height: 'tall'
-  },
-  {
-    id: 'fridge',
-    title: '寝室小冰箱，制冷正常，可小刀',
-    price: 99,
-    category: '生活用品',
-    imageLabel: '图 · 冰箱',
-    status: 'selling',
-    tone: 'sky',
-    height: 'tall'
-  },
-  {
-    id: 'books',
-    title: '管理学教材 + 科学计算器打包',
-    price: 30,
-    category: '书籍资料',
-    imageLabel: '图 · 教材',
-    status: 'selling',
-    tone: 'mint',
-    height: 'medium'
-  },
-  {
-    id: 'keyboard',
-    title: '机械键盘 87 键茶轴，手感好',
-    price: 110,
-    category: '数码',
-    imageLabel: '图 · 键盘',
-    status: 'selling',
-    tone: 'peach',
-    height: 'medium'
-  },
-  {
-    id: 'bike',
-    title: '九成新自行车，毕业急出，车况好无锈',
-    price: 150,
-    category: '代步',
-    imageLabel: '图 · 自行车',
-    status: 'selling',
-    tone: 'sky',
-    height: 'tall'
-  },
-  {
-    id: 'lamp-small',
-    title: '床头小夜灯，暖光可调节',
-    price: 18,
-    category: '生活用品',
-    imageLabel: '图 · 小灯',
-    status: 'selling',
-    tone: 'lemon',
-    height: 'short'
+function stableNumber(value: string) {
+  return Array.from(value).reduce((hash, char) => ((hash * 31) + char.charCodeAt(0)) >>> 0, 7)
+}
+
+function mergeProductsById(current: Product[], incoming: Product[]) {
+  const values = new Map(current.map((item) => [item.id, item]))
+  incoming.forEach((item) => values.set(item.id, item))
+  return Array.from(values.values())
+}
+
+function toCard(product: Product): ProductCard {
+  const value = stableNumber(`product:${product.id}`)
+  return {
+    id: product.id,
+    title: product.title,
+    price: product.price,
+    category: product.category,
+    imageLabel: `图 · ${product.category || '二手'}`,
+    imageUrl: product.images[0],
+    status: product.status === 'sold' ? 'sold' : 'selling',
+    tone: productTones[value % productTones.length],
+    height: productHeights[value % productHeights.length]
   }
-]
+}
 
 function splitProducts(cards: ProductCard[]) {
   return {
@@ -113,15 +61,87 @@ function splitProducts(cards: ProductCard[]) {
 
 export default function StudentSecondhandPage() {
   const [activeCategory, setActiveCategory] = useState<CategoryKey>('全部')
+  const [items, setItems] = useState<Product[]>([])
+  const [status, setStatus] = useState<'loading' | 'ready' | 'empty' | 'error'>('loading')
+  const [page, setPage] = useState(0)
+  const [total, setTotal] = useState(0)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [pagingError, setPagingError] = useState(false)
+  const [failedImageKeys, setFailedImageKeys] = useState<Set<string>>(() => new Set())
+  const queryVersion = useRef(0)
+  const categoryRef = useRef<CategoryKey>('全部')
+  const loadingKeys = useRef(new Set<string>())
 
-  const visibleProducts = useMemo(
-    () => activeCategory === '全部'
-      ? products
-      : products.filter((item) => item.category === activeCategory),
-    [activeCategory]
-  )
+  const fetchProductsPage = useCallback(async (
+    category: CategoryKey,
+    targetPage: number,
+    version: number,
+    reset: boolean
+  ) => {
+    const key = `${version}:${targetPage}`
+    if (loadingKeys.current.has(key)) return
+    loadingKeys.current.add(key)
+    if (reset) {
+      setStatus('loading')
+      setLoadingMore(false)
+    } else {
+      setLoadingMore(true)
+    }
+    setPagingError(false)
+    try {
+      const result = await getProductsPage({
+        page: targetPage,
+        pageSize: 20,
+        category: category === '全部' ? undefined : category,
+        status: 'selling'
+      })
+      if (queryVersion.current !== version || categoryRef.current !== category) return
+      setItems((current) => mergeProductsById(reset ? [] : current, result.items))
+      setPage(result.page)
+      setTotal(result.total)
+      setStatus(result.total === 0 ? 'empty' : 'ready')
+    } catch {
+      if (queryVersion.current !== version || categoryRef.current !== category) return
+      if (reset) setStatus('error')
+      else setPagingError(true)
+    } finally {
+      loadingKeys.current.delete(key)
+      if (queryVersion.current === version) setLoadingMore(false)
+    }
+  }, [])
 
-  const columns = useMemo(() => splitProducts(visibleProducts), [visibleProducts])
+  useEffect(() => {
+    categoryRef.current = activeCategory
+    const version = queryVersion.current + 1
+    queryVersion.current = version
+    setItems([])
+    setPage(0)
+    setTotal(0)
+    void fetchProductsPage(activeCategory, 1, version, true)
+
+    return () => {
+      queryVersion.current += 1
+    }
+  }, [activeCategory, fetchProductsPage])
+
+  const loadMoreProducts = useCallback(() => {
+    if (status !== 'ready' || loadingMore || items.length >= total) return
+    void fetchProductsPage(activeCategory, page + 1, queryVersion.current, false)
+  }, [activeCategory, fetchProductsPage, items.length, loadingMore, page, status, total])
+
+  const retryCurrentCategory = useCallback(() => {
+    const category = categoryRef.current
+    const version = queryVersion.current + 1
+    queryVersion.current = version
+    setItems([])
+    setPage(0)
+    setTotal(0)
+    setPagingError(false)
+    void fetchProductsPage(category, 1, version, true)
+  }, [fetchProductsPage])
+
+  const cards = useMemo(() => items.map(toCard), [items])
+  const columns = useMemo(() => splitProducts(cards), [cards])
 
   const openDetail = (item: ProductCard) => {
     void Taro.navigateTo({ url: `/pages/secondhand-detail/index?id=${encodeURIComponent(item.id)}` })
@@ -131,6 +151,14 @@ export default function StudentSecondhandPage() {
     void Taro.navigateTo({ url: '/pages/search/index' })
   }
 
+  const markImageFailed = (id: string) => {
+    setFailedImageKeys((current) => {
+      const next = new Set(current)
+      next.add(id)
+      return next
+    })
+  }
+
   const renderCard = (item: ProductCard) => (
     <View
       key={item.id}
@@ -138,7 +166,16 @@ export default function StudentSecondhandPage() {
       onClick={() => openDetail(item)}
     >
       <View className={`secondhand-card__media secondhand-card__media--${item.tone} secondhand-card__media--${item.height}`}>
-        <Text>{item.imageLabel}</Text>
+        {item.imageUrl && !failedImageKeys.has(item.id) ? (
+          <Image
+            className='secondhand-card__image'
+            src={item.imageUrl}
+            mode='aspectFill'
+            onError={() => markImageFailed(item.id)}
+          />
+        ) : (
+          <Text>{item.imageLabel}</Text>
+        )}
         {item.status === 'sold' && (
           <View className='secondhand-card__sold-badge'>
             <Text>已售出</Text>
@@ -157,15 +194,35 @@ export default function StudentSecondhandPage() {
     </View>
   )
 
+  const renderSkeleton = (key: string, tone: ProductTone, height: ProductHeight) => (
+    <View key={key} className='secondhand-card secondhand-card--skeleton'>
+      <View className={`secondhand-card__media secondhand-card__media--${tone} secondhand-card__media--${height}`} />
+      <View className='secondhand-card__body'>
+        <View className='secondhand-card__skeleton-line secondhand-card__skeleton-line--title' />
+        <View className='secondhand-card__skeleton-line secondhand-card__skeleton-line--meta' />
+      </View>
+    </View>
+  )
+
+  const renderStateCard = () => (
+    <View className='secondhand-card secondhand-card--state'>
+      <View className='secondhand-card__media secondhand-card__media--sky secondhand-card__media--medium'>
+        <Text>{status === 'empty' ? '该分类暂无在售宝贝' : '加载失败'}</Text>
+      </View>
+      {status === 'error' && (
+        <View className='secondhand-card__state-action' onClick={retryCurrentCategory}>
+          <Text>点击重试</Text>
+        </View>
+      )}
+    </View>
+  )
+
   return (
     <View className='student-secondhand-page'>
       <View className='student-secondhand-header'>
         <View className='student-secondhand-header__title-row'>
           <Text className='student-secondhand-header__title'>二手集市</Text>
-          <View
-            className='student-secondhand-search'
-            onClick={openSearch}
-          >
+          <View className='student-secondhand-search' onClick={openSearch}>
             <View className='student-secondhand-search__icon' />
             <Text>搜二手好物</Text>
           </View>
@@ -186,7 +243,14 @@ export default function StudentSecondhandPage() {
         </ScrollView>
       </View>
 
-      <ScrollView className='student-secondhand-scroll' scrollY enhanced showScrollbar={false}>
+      <ScrollView
+        className='student-secondhand-scroll'
+        scrollY
+        enhanced
+        showScrollbar={false}
+        lowerThreshold={120}
+        onScrollToLower={loadMoreProducts}
+      >
         <View className='student-secondhand-notice'>
           <Text className='student-secondhand-notice__icon'>i</Text>
           <Text>平台仅展示信息，交易请与卖家私下当面交付，验货后再付款。</Text>
@@ -194,11 +258,36 @@ export default function StudentSecondhandPage() {
 
         <View className='student-secondhand-waterfall'>
           <View className='student-secondhand-waterfall__column'>
-            {columns.left.map(renderCard)}
+            {status === 'loading'
+              ? [
+                  renderSkeleton('skeleton-left-1', 'lemon', 'short'),
+                  renderSkeleton('skeleton-left-2', 'mint', 'medium')
+                ]
+              : (status === 'ready' ? columns.left.map(renderCard) : renderStateCard())}
           </View>
           <View className='student-secondhand-waterfall__column'>
-            {columns.right.map(renderCard)}
+            {status === 'loading'
+              ? [
+                  renderSkeleton('skeleton-right-1', 'lilac', 'medium'),
+                  renderSkeleton('skeleton-right-2', 'peach', 'tall')
+                ]
+              : (status === 'ready' ? columns.right.map(renderCard) : null)}
           </View>
+          {loadingMore && (
+            <View className='student-secondhand-waterfall__footer'>
+              <Text>正在加载更多...</Text>
+            </View>
+          )}
+          {pagingError && (
+            <View className='student-secondhand-waterfall__footer student-secondhand-waterfall__footer--retry' onClick={loadMoreProducts}>
+              <Text>加载失败，点击重试</Text>
+            </View>
+          )}
+          {status === 'ready' && items.length >= total && total > 0 && (
+            <View className='student-secondhand-waterfall__footer'>
+              <Text>— 到底了 —</Text>
+            </View>
+          )}
         </View>
       </ScrollView>
 

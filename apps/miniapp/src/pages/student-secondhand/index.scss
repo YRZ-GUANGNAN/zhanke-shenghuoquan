@@ -148,6 +148,7 @@
 
 .student-secondhand-waterfall {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: 18rpx;
   padding: 0 24rpx 200rpx;
@@ -180,6 +181,12 @@
   color: $placeholder-label;
   font-size: 22rpx;
   font-weight: 400;
+}
+
+.secondhand-card__image {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .secondhand-card__media--short {
@@ -289,6 +296,69 @@
 .secondhand-card__status--sold {
   background: $bg-screen;
   color: $text-tertiary;
+}
+
+.secondhand-card--skeleton {
+  pointer-events: none;
+}
+
+.secondhand-card--skeleton .secondhand-card__media,
+.secondhand-card__skeleton-line {
+  animation: secondhand-skeleton-pulse 1.25s ease-in-out infinite alternate;
+}
+
+.secondhand-card__skeleton-line {
+  height: 24rpx;
+  border-radius: 999rpx;
+  background: $bg-screen;
+}
+
+.secondhand-card__skeleton-line--title {
+  width: 88%;
+}
+
+.secondhand-card__skeleton-line--meta {
+  width: 54%;
+  margin-top: 22rpx;
+}
+
+.secondhand-card--state {
+  cursor: default;
+}
+
+.secondhand-card__state-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 76rpx;
+  color: $brand-primary;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.student-secondhand-waterfall__footer {
+  flex: 0 0 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 64rpx;
+  color: $text-muted;
+  font-size: 22rpx;
+}
+
+.student-secondhand-waterfall__footer--retry {
+  color: $brand-primary;
+  font-weight: 700;
+}
+
+@keyframes secondhand-skeleton-pulse {
+  from {
+    opacity: .48;
+  }
+
+  to {
+    opacity: .92;
+  }
 }
 
 .student-bottom-nav--secondhand {
