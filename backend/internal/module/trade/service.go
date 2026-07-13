@@ -1,7 +1,10 @@
 package trade
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -26,6 +29,17 @@ type Service struct {
 	media         media.Gateway
 }
 
+var (
+	ErrCannotContactSelf        = errors.New("seller cannot contact self")
+	ErrContactStateUnavailable  = errors.New("conversation state lookup is unavailable")
+	ErrWriteContractUnavailable = errors.New("trade write contract is unavailable")
+)
+
+type stableProductConversationGateway interface {
+	FindProductConversation(context.Context, uint, uint, uint) (im.ConversationContext, bool, error)
+	EnsureProductConversationStable(context.Context, uint, uint, uint) (im.ConversationContext, error)
+}
+
 func NewService(repo Repository, users UserDirectory, reviews review.Submitter, conversations im.ConversationGateway, search SearchGateway, mediaGateway ...media.Gateway) *Service {
 	var gateway media.Gateway
 	if len(mediaGateway) > 0 {
@@ -41,9 +55,45 @@ type ProductInput struct {
 	ImageAssetIDs                                   []string
 }
 
+type productCreateContractRepository interface {
+	FindProductByRequest(context.Context, uint, string) (Product, bool, error)
+	CreateProductOrReplay(context.Context, *Product, *WriteOutbox) (bool, error)
+}
+
+type canonicalProductCreateRequest struct {
+	Version         string   `json:"version"`
+	Title           string   `json:"title"`
+	Description     string   `json:"description"`
+	Category        string   `json:"category"`
+	Price           int64    `json:"price"`
+	OriginalPrice   int64    `json:"originalPrice"`
+	Condition       string   `json:"condition"`
+	Campus          string   `json:"campus"`
+	OrderedAssetIDs []string `json:"orderedAssetPublicIds"`
+}
+
+type productCreatedOutboxPayload struct {
+	Version               string   `json:"version"`
+	OrderedAssetPublicIDs []string `json:"orderedAssetPublicIds"`
+	ReviewObjectType      string   `json:"reviewObjectType"`
+	ReviewSubmitterID     uint     `json:"reviewSubmitterId"`
+	ReviewRisk            string   `json:"reviewRisk"`
+}
+
 type ProductView struct {
 	Product
 	Seller user.Profile `json:"seller"`
+}
+
+type ProductViewerState struct {
+	Favorited       bool `json:"favorited"`
+	ContactedSeller bool `json:"contactedSeller"`
+}
+
+type ContactView struct {
+	ConversationID string `json:"conversationId"`
+	PeerUserID     string `json:"peerUserId"`
+	ProductID      uint   `json:"productId"`
 }
 
 type Page struct {
@@ -93,6 +143,130 @@ func (s *Service) Create(ctx context.Context, input ProductInput, risk string) (
 		return Product{}, err
 	}
 	return value, nil
+}
+
+// CreateKeyed creates a product together with its cross-module work outbox.
+// The legacy no-key Create path intentionally remains unchanged.
+func (s *Service) CreateKeyed(ctx context.Context, input ProductInput, risk, clientRequestID string) (Product, bool, error) {
+	if err := validateInput(input); err != nil {
+		return Product{}, false, err
+	}
+	if !validWriteContractULID(clientRequestID) {
+		return Product{}, false, ErrWriteContractInvalid
+	}
+	contractRepo, ok := s.repo.(productCreateContractRepository)
+	if !ok {
+		return Product{}, false, ErrWriteContractUnavailable
+	}
+
+	requestHash, err := canonicalProductCreateHash(input)
+	if err != nil {
+		return Product{}, false, err
+	}
+	existing, found, err := contractRepo.FindProductByRequest(ctx, input.SellerID, clientRequestID)
+	if err != nil {
+		return Product{}, false, err
+	}
+	if found {
+		if !bytes.Equal(existing.CreateRequestHash, requestHash) {
+			return Product{}, false, ErrIdempotencyConflict
+		}
+		return existing, true, nil
+	}
+
+	reservation := media.Reservation{}
+	if len(input.ImageAssetIDs) > 0 {
+		if s.media == nil {
+			return Product{}, false, errors.New("media pipeline is unavailable")
+		}
+		reservation, err = s.media.Reserve(ctx, input.SellerID, media.PurposeProductImage, input.ImageAssetIDs)
+		if err != nil {
+			if errors.Is(err, media.ErrAlreadyBound) || errors.Is(err, media.ErrInvalidAsset) {
+				if replay, replayErr, found := awaitProductReplay(ctx, contractRepo, input.SellerID, clientRequestID, requestHash); found {
+					return replay, true, replayErr
+				}
+			}
+			return Product{}, false, err
+		}
+	}
+	cancelReservation := func() {
+		if s.media != nil && reservation.Token != "" {
+			_ = s.media.Cancel(ctx, input.SellerID, reservation)
+		}
+	}
+
+	key := clientRequestID
+	value := Product{
+		SellerID: input.SellerID, ClientRequestID: &key, CreateRequestHash: requestHash,
+		Title: input.Title, Description: input.Description,
+		Category: fallback(input.Category, "其他"), Price: input.Price, OriginalPrice: input.OriginalPrice,
+		Condition: fallback(input.Condition, "未说明"), Campus: fallback(input.Campus, "校内"),
+		Status: StatusSelling, ReviewStatus: review.StatusSubmitted,
+	}
+	for index, ref := range reservation.References {
+		assetID := ref.InternalID
+		value.Images = append(value.Images, ProductImage{AssetID: &assetID, URL: ref.URL, Sort: index})
+	}
+	payload, err := json.Marshal(productCreatedOutboxPayload{
+		Version: "trade-product-create:v1", OrderedAssetPublicIDs: append([]string(nil), input.ImageAssetIDs...),
+		ReviewObjectType: "product", ReviewSubmitterID: input.SellerID, ReviewRisk: risk,
+	})
+	if err != nil {
+		cancelReservation()
+		return Product{}, false, err
+	}
+	event := WriteOutbox{EventType: "trade_product_created", Payload: string(payload)}
+	if reservation.Token != "" {
+		token := reservation.Token
+		event.ReservationToken = &token
+	}
+	replayed, err := contractRepo.CreateProductOrReplay(ctx, &value, &event)
+	if err != nil {
+		cancelReservation()
+		return Product{}, false, err
+	}
+	if replayed {
+		cancelReservation()
+	}
+	return value, replayed, nil
+}
+
+func awaitProductReplay(ctx context.Context, repo productCreateContractRepository, ownerID uint, clientRequestID string, requestHash []byte) (Product, error, bool) {
+	for attempt := 0; attempt < 20; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return Product{}, ctx.Err(), true
+			case <-time.After(10 * time.Millisecond):
+			}
+		}
+		existing, found, err := repo.FindProductByRequest(ctx, ownerID, clientRequestID)
+		if err != nil {
+			return Product{}, err, true
+		}
+		if !found {
+			continue
+		}
+		if !bytes.Equal(existing.CreateRequestHash, requestHash) {
+			return Product{}, ErrIdempotencyConflict, true
+		}
+		return existing, nil, true
+	}
+	return Product{}, nil, false
+}
+
+func canonicalProductCreateHash(input ProductInput) ([]byte, error) {
+	encoded, err := json.Marshal(canonicalProductCreateRequest{
+		Version: "trade-product-create:v1", Title: input.Title, Description: input.Description,
+		Category: fallback(input.Category, "其他"), Price: input.Price, OriginalPrice: input.OriginalPrice,
+		Condition: fallback(input.Condition, "未说明"), Campus: fallback(input.Campus, "校内"),
+		OrderedAssetIDs: append([]string(nil), input.ImageAssetIDs...),
+	})
+	if err != nil {
+		return nil, err
+	}
+	digest := sha256.Sum256(encoded)
+	return digest[:], nil
 }
 
 func (s *Service) Update(ctx context.Context, id uint, input ProductInput, risk string) (Product, error) {
@@ -273,6 +447,34 @@ func (s *Service) ToggleFavorite(ctx context.Context, id, userID uint) (bool, er
 	return s.repo.ToggleFavorite(ctx, id, userID, value.Status != StatusSold)
 }
 
+func (s *Service) ViewerState(ctx context.Context, id, userID uint) (ProductViewerState, error) {
+	value, err := s.repo.Find(ctx, id, true)
+	if err != nil {
+		return ProductViewerState{}, err
+	}
+	favorited, err := s.repo.IsFavorited(ctx, id, userID)
+	if err != nil {
+		return ProductViewerState{}, err
+	}
+	stable, ok := s.conversations.(stableProductConversationGateway)
+	if !ok {
+		return ProductViewerState{}, ErrContactStateUnavailable
+	}
+	_, contacted, err := stable.FindProductConversation(ctx, id, userID, value.SellerID)
+	if err != nil {
+		return ProductViewerState{}, err
+	}
+	return ProductViewerState{Favorited: favorited, ContactedSeller: contacted}, nil
+}
+
+func (s *Service) SetFavorite(ctx context.Context, id, userID uint, desired bool) (bool, error) {
+	value, err := s.repo.Find(ctx, id, true)
+	if err != nil {
+		return false, err
+	}
+	return s.repo.SetFavorite(ctx, id, userID, desired, value.Status != StatusSold)
+}
+
 func (s *Service) ContactSeller(ctx context.Context, id, buyerID uint) (im.ConversationContext, error) {
 	value, err := s.repo.Find(ctx, id, true)
 	if err != nil {
@@ -282,6 +484,36 @@ func (s *Service) ContactSeller(ctx context.Context, id, buyerID uint) (im.Conve
 		return im.ConversationContext{}, ErrProductSold
 	}
 	return s.conversations.EnsureProductConversation(ctx, id, buyerID, value.SellerID)
+}
+
+func (s *Service) EnsureSellerContact(ctx context.Context, id, buyerID uint) (ContactView, error) {
+	value, err := s.repo.Find(ctx, id, true)
+	if err != nil {
+		return ContactView{}, err
+	}
+	if value.Status == StatusSold {
+		return ContactView{}, ErrProductSold
+	}
+	if value.SellerID == buyerID {
+		return ContactView{}, ErrCannotContactSelf
+	}
+
+	stable, ok := s.conversations.(stableProductConversationGateway)
+	if !ok {
+		return ContactView{}, ErrContactStateUnavailable
+	}
+	created, err := stable.EnsureProductConversationStable(ctx, id, buyerID, value.SellerID)
+	if err != nil {
+		return ContactView{}, err
+	}
+	return sanitizeContact(created), nil
+}
+
+func sanitizeContact(value im.ConversationContext) ContactView {
+	return ContactView{
+		ConversationID: value.ConversationID,
+		PeerUserID:     value.PeerUserID, ProductID: value.ProductID,
+	}
 }
 
 func (s *Service) AdminList(ctx context.Context, page, size int) (Page, error) {

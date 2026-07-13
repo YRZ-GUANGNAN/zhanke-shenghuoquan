@@ -10,20 +10,22 @@ import (
 )
 
 type Post struct {
-	ID            uint           `json:"id" gorm:"primaryKey"`
-	UserID        uint           `json:"userId" gorm:"index"`
-	Topic         string         `json:"topic" gorm:"size:64;index"`
-	Title         string         `json:"title" gorm:"size:120"`
-	Content       string         `json:"content" gorm:"type:text"`
-	ReviewStatus  review.Status  `json:"reviewStatus" gorm:"size:24;index;default:submitted"`
-	Pinned        bool           `json:"pinned" gorm:"default:false"`
-	LikedCount    int64          `json:"likedCount"`
-	CommentCount  int64          `json:"commentCount"`
-	FavoriteCount int64          `json:"favoriteCount"`
-	Images        []PostImage    `json:"images"`
-	CreatedAt     time.Time      `json:"createdAt"`
-	UpdatedAt     time.Time      `json:"updatedAt"`
-	DeletedAt     gorm.DeletedAt `json:"-" gorm:"index"`
+	ID                uint           `json:"id" gorm:"primaryKey"`
+	UserID            uint           `json:"userId" gorm:"index"`
+	ClientRequestID   *string        `json:"-" gorm:"column:client_request_id;type:char(26)"`
+	CreateRequestHash []byte         `json:"-" gorm:"column:create_request_hash;type:binary(32)"`
+	Topic             string         `json:"topic" gorm:"size:64;index"`
+	Title             string         `json:"title" gorm:"size:120"`
+	Content           string         `json:"content" gorm:"type:text"`
+	ReviewStatus      review.Status  `json:"reviewStatus" gorm:"size:24;index;default:submitted"`
+	Pinned            bool           `json:"pinned" gorm:"default:false"`
+	LikedCount        int64          `json:"likedCount"`
+	CommentCount      int64          `json:"commentCount"`
+	FavoriteCount     int64          `json:"favoriteCount"`
+	Images            []PostImage    `json:"images"`
+	CreatedAt         time.Time      `json:"createdAt"`
+	UpdatedAt         time.Time      `json:"updatedAt"`
+	DeletedAt         gorm.DeletedAt `json:"-" gorm:"index"`
 }
 
 type PostImage struct {
@@ -36,13 +38,15 @@ type PostImage struct {
 }
 
 type Comment struct {
-	ID           uint          `json:"id" gorm:"primaryKey"`
-	PostID       uint          `json:"postId" gorm:"index"`
-	UserID       uint          `json:"userId" gorm:"index"`
-	Content      string        `json:"content" gorm:"type:text"`
-	ReviewStatus review.Status `json:"reviewStatus" gorm:"size:24;index;default:submitted"`
-	CreatedAt    time.Time     `json:"createdAt"`
-	UpdatedAt    time.Time     `json:"updatedAt"`
+	ID                uint          `json:"id" gorm:"primaryKey"`
+	PostID            uint          `json:"postId" gorm:"index"`
+	UserID            uint          `json:"userId" gorm:"index"`
+	ClientRequestID   *string       `json:"-" gorm:"column:client_request_id;type:char(26)"`
+	CreateRequestHash []byte        `json:"-" gorm:"column:create_request_hash;type:binary(32)"`
+	Content           string        `json:"content" gorm:"type:text"`
+	ReviewStatus      review.Status `json:"reviewStatus" gorm:"size:24;index;default:submitted"`
+	CreatedAt         time.Time     `json:"createdAt"`
+	UpdatedAt         time.Time     `json:"updatedAt"`
 }
 
 type PostLike struct {

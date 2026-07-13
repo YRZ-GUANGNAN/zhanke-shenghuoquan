@@ -108,6 +108,57 @@ func (s *Service) EnsureProductConversation(ctx context.Context, productID, buye
 	return toContext(value, seller.IMUserID), nil
 }
 
+// FindProductConversation performs a read-only lookup by the immutable product
+// relation. It never imports Tencent accounts or refreshes relation timestamps.
+func (s *Service) FindProductConversation(ctx context.Context, productID, buyerID, sellerID uint) (ConversationContext, bool, error) {
+	if productID == 0 || buyerID == 0 || sellerID == 0 {
+		return ConversationContext{}, false, errors.New("invalid conversation relation")
+	}
+	if buyerID == sellerID {
+		return ConversationContext{}, false, errors.New("seller cannot contact self")
+	}
+	value, found, err := s.repo.FindConversation(ctx, buyerID, sellerID, "product", productID)
+	if err != nil {
+		return ConversationContext{}, false, err
+	}
+	if !found {
+		return ConversationContext{}, false, nil
+	}
+	seller, err := s.repo.FindMapping(ctx, sellerID)
+	if err != nil {
+		return ConversationContext{}, false, fmt.Errorf("find IM peer mapping: %w", err)
+	}
+	return toContext(value, seller.IMUserID), true, nil
+}
+
+// EnsureProductConversationStable creates the immutable product relation once.
+// Replays return the canonical row without refreshing timestamps or importing
+// Tencent accounts again.
+func (s *Service) EnsureProductConversationStable(ctx context.Context, productID, buyerID, sellerID uint) (ConversationContext, error) {
+	value, found, err := s.FindProductConversation(ctx, productID, buyerID, sellerID)
+	if err != nil {
+		return ConversationContext{}, err
+	}
+	if found {
+		return value, nil
+	}
+	if _, err := s.ensureIMUser(ctx, buyerID); err != nil {
+		return ConversationContext{}, err
+	}
+	seller, err := s.ensureIMUser(ctx, sellerID)
+	if err != nil {
+		return ConversationContext{}, err
+	}
+	relation := Conversation{
+		ConversationID: "C2C" + seller.IMUserID, BuyerID: buyerID, SellerID: sellerID,
+		ReferenceType: "product", ReferenceID: productID,
+	}
+	if err := s.repo.EnsureConversationStable(ctx, &relation); err != nil {
+		return ConversationContext{}, err
+	}
+	return toContext(relation, seller.IMUserID), nil
+}
+
 func (s *Service) Conversations(ctx context.Context, userID uint, page, size int) (ConversationPage, error) {
 	page, size = normalize(page, size)
 	values, total, err := s.repo.ListConversations(ctx, userID, page, size)

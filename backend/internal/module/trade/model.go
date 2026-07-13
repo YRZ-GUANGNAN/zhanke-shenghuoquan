@@ -18,22 +18,24 @@ const (
 )
 
 type Product struct {
-	ID            uint           `json:"id" gorm:"primaryKey"`
-	SellerID      uint           `json:"sellerId" gorm:"index"`
-	Title         string         `json:"title" gorm:"size:160"`
-	Description   string         `json:"description" gorm:"type:text"`
-	Category      string         `json:"category" gorm:"size:64;index"`
-	Price         int64          `json:"price"`
-	OriginalPrice int64          `json:"originalPrice"`
-	Condition     string         `json:"condition" gorm:"column:condition_label;size:64"`
-	Campus        string         `json:"campus" gorm:"size:80;index"`
-	Status        ProductStatus  `json:"status" gorm:"size:24;index;default:selling"`
-	ReviewStatus  review.Status  `json:"reviewStatus" gorm:"size:24;index;default:submitted"`
-	Images        []ProductImage `json:"images"`
-	FavoriteCount int64          `json:"favoriteCount"`
-	CreatedAt     time.Time      `json:"createdAt"`
-	UpdatedAt     time.Time      `json:"updatedAt"`
-	DeletedAt     gorm.DeletedAt `json:"-" gorm:"index"`
+	ID                uint           `json:"id" gorm:"primaryKey"`
+	SellerID          uint           `json:"sellerId" gorm:"index"`
+	ClientRequestID   *string        `json:"-" gorm:"column:client_request_id;type:char(26)"`
+	CreateRequestHash []byte         `json:"-" gorm:"column:create_request_hash;type:binary(32)"`
+	Title             string         `json:"title" gorm:"size:160"`
+	Description       string         `json:"description" gorm:"type:text"`
+	Category          string         `json:"category" gorm:"size:64;index"`
+	Price             int64          `json:"price"`
+	OriginalPrice     int64          `json:"originalPrice"`
+	Condition         string         `json:"condition" gorm:"column:condition_label;size:64"`
+	Campus            string         `json:"campus" gorm:"size:80;index"`
+	Status            ProductStatus  `json:"status" gorm:"size:24;index;default:selling"`
+	ReviewStatus      review.Status  `json:"reviewStatus" gorm:"size:24;index;default:submitted"`
+	Images            []ProductImage `json:"images"`
+	FavoriteCount     int64          `json:"favoriteCount"`
+	CreatedAt         time.Time      `json:"createdAt"`
+	UpdatedAt         time.Time      `json:"updatedAt"`
+	DeletedAt         gorm.DeletedAt `json:"-" gorm:"index"`
 }
 type ProductImage struct {
 	ID        uint      `json:"id" gorm:"primaryKey"`

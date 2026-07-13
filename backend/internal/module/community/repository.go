@@ -12,6 +12,7 @@ import (
 )
 
 var ErrNotFound = errors.New("community content not found")
+var ErrInteractionInvariant = errors.New("community interaction count invariant violated")
 
 type FeedQuery struct {
 	Topic, Keyword, Sort string
@@ -28,11 +29,21 @@ type Repository interface {
 	ToggleLike(context.Context, uint, uint) (bool, error)
 	ToggleFavorite(context.Context, uint, uint) (bool, error)
 	ToggleFollow(context.Context, uint, uint) (bool, error)
+	ViewerState(context.Context, uint, uint, uint) (PostViewerState, error)
+	SetLike(context.Context, uint, uint, bool) (bool, error)
+	SetFavorite(context.Context, uint, uint, bool) (bool, error)
+	SetFollow(context.Context, uint, uint, bool) (bool, error)
 	ListNotifications(context.Context, uint, int, int) ([]Notification, int64, int64, error)
 	MarkNotificationRead(context.Context, uint, uint) error
 	SetReviewStatus(context.Context, string, uint, review.Status) error
 	AdminTakedownPost(context.Context, uint) error
 	Count(context.Context) (int64, int64, error)
+}
+
+type PostViewerState struct {
+	Liked           bool `json:"liked"`
+	Favorited       bool `json:"favorited"`
+	FollowingAuthor bool `json:"followingAuthor"`
 }
 
 func (r *GormRepository) ListFollowingPosts(ctx context.Context, userID uint, q FeedQuery) ([]Post, int64, error) {
@@ -210,6 +221,115 @@ func (r *GormRepository) ToggleFollow(ctx context.Context, followerID, followeeI
 		return tx.Delete(&value).Error
 	})
 	return followed, err
+}
+
+func (r *GormRepository) ViewerState(ctx context.Context, postID, viewerID, authorID uint) (PostViewerState, error) {
+	var state PostViewerState
+	queries := []struct {
+		destination *bool
+		model       any
+		where       string
+		args        []any
+	}{
+		{&state.Liked, &PostLike{}, "post_id = ? AND user_id = ?", []any{postID, viewerID}},
+		{&state.Favorited, &PostFavorite{}, "post_id = ? AND user_id = ?", []any{postID, viewerID}},
+		{&state.FollowingAuthor, &UserFollow{}, "follower_id = ? AND followee_id = ?", []any{viewerID, authorID}},
+	}
+	for _, query := range queries {
+		var count int64
+		if err := r.db.WithContext(ctx).Model(query.model).Where(query.where, query.args...).Limit(1).Count(&count).Error; err != nil {
+			return PostViewerState{}, err
+		}
+		*query.destination = count > 0
+	}
+	return state, nil
+}
+
+func (r *GormRepository) SetLike(ctx context.Context, postID, userID uint, desired bool) (bool, error) {
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var post Post
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Select("id", "review_status").First(&post, postID).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrNotFound
+		} else if err != nil {
+			return err
+		}
+		if post.ReviewStatus != review.StatusApproved {
+			return ErrNotFound
+		}
+		if desired {
+			result := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&PostLike{PostID: postID, UserID: userID})
+			if result.Error != nil || result.RowsAffected == 0 {
+				return result.Error
+			}
+			if err := requireInteractionUpdate(tx.Model(&Post{}).Where("id = ?", postID).
+				UpdateColumn("liked_count", gorm.Expr("liked_count + 1"))); err != nil {
+				return err
+			}
+			return r.createPostNotification(tx, postID, userID, NotificationLike, 0)
+		}
+		result := tx.Where("post_id = ? AND user_id = ?", postID, userID).Delete(&PostLike{})
+		if result.Error != nil || result.RowsAffected == 0 {
+			return result.Error
+		}
+		return requireInteractionUpdate(tx.Model(&Post{}).Where("id = ? AND liked_count > 0", postID).
+			UpdateColumn("liked_count", gorm.Expr("liked_count - 1")))
+	})
+	return desired, err
+}
+
+func (r *GormRepository) SetFavorite(ctx context.Context, postID, userID uint, desired bool) (bool, error) {
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var post Post
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Select("id", "review_status").First(&post, postID).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrNotFound
+		} else if err != nil {
+			return err
+		}
+		if post.ReviewStatus != review.StatusApproved {
+			return ErrNotFound
+		}
+		if desired {
+			result := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&PostFavorite{PostID: postID, UserID: userID})
+			if result.Error != nil || result.RowsAffected == 0 {
+				return result.Error
+			}
+			return requireInteractionUpdate(tx.Model(&Post{}).Where("id = ?", postID).
+				UpdateColumn("favorite_count", gorm.Expr("favorite_count + 1")))
+		}
+		result := tx.Where("post_id = ? AND user_id = ?", postID, userID).Delete(&PostFavorite{})
+		if result.Error != nil || result.RowsAffected == 0 {
+			return result.Error
+		}
+		return requireInteractionUpdate(tx.Model(&Post{}).Where("id = ? AND favorite_count > 0", postID).
+			UpdateColumn("favorite_count", gorm.Expr("favorite_count - 1")))
+	})
+	return desired, err
+}
+
+func requireInteractionUpdate(result *gorm.DB) error {
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return ErrInteractionInvariant
+	}
+	return nil
+}
+
+func (r *GormRepository) SetFollow(ctx context.Context, followerID, followeeID uint, desired bool) (bool, error) {
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if desired {
+			result := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&UserFollow{FollowerID: followerID, FolloweeID: followeeID})
+			if result.Error != nil || result.RowsAffected == 0 {
+				return result.Error
+			}
+			return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&Notification{
+				RecipientID: followeeID, ActorID: followerID, Type: NotificationFollow,
+			}).Error
+		}
+		return tx.Where("follower_id = ? AND followee_id = ?", followerID, followeeID).Delete(&UserFollow{}).Error
+	})
+	return desired, err
 }
 
 func (r *GormRepository) ListNotifications(ctx context.Context, recipientID uint, page, size int) ([]Notification, int64, int64, error) {

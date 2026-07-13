@@ -14,6 +14,8 @@ type communityMemoryRepo struct {
 	posts         map[uint]Post
 	comments      []Comment
 	followed      bool
+	liked         bool
+	favorited     bool
 	notifications []Notification
 	readID        uint
 }
@@ -61,6 +63,21 @@ func (r *communityMemoryRepo) ToggleFavorite(context.Context, uint, uint) (bool,
 func (r *communityMemoryRepo) ToggleFollow(context.Context, uint, uint) (bool, error) {
 	r.followed = !r.followed
 	return r.followed, nil
+}
+func (r *communityMemoryRepo) ViewerState(context.Context, uint, uint, uint) (PostViewerState, error) {
+	return PostViewerState{Liked: r.liked, Favorited: r.favorited, FollowingAuthor: r.followed}, nil
+}
+func (r *communityMemoryRepo) SetLike(_ context.Context, _, _ uint, desired bool) (bool, error) {
+	r.liked = desired
+	return desired, nil
+}
+func (r *communityMemoryRepo) SetFavorite(_ context.Context, _, _ uint, desired bool) (bool, error) {
+	r.favorited = desired
+	return desired, nil
+}
+func (r *communityMemoryRepo) SetFollow(_ context.Context, _, _ uint, desired bool) (bool, error) {
+	r.followed = desired
+	return desired, nil
 }
 func (r *communityMemoryRepo) ListNotifications(_ context.Context, userID uint, _, _ int) ([]Notification, int64, int64, error) {
 	values := []Notification{}
@@ -183,5 +200,32 @@ func TestCommunityLoopRejectsUnknownTargets(t *testing.T) {
 	}
 	if _, err := service.ToggleFollow(context.Background(), 1, 2); err == nil {
 		t.Fatal("follow accepted missing user")
+	}
+}
+
+func TestCommunityTargetStateAndViewerState(t *testing.T) {
+	repo := &communityMemoryRepo{posts: map[uint]Post{1: {ID: 1, UserID: 10, ReviewStatus: review.StatusApproved}}}
+	service := NewService(repo, profileDirectory{10: {ID: 10}}, &submissionRecorder{})
+
+	for i := 0; i < 2; i++ {
+		if value, err := service.SetLike(context.Background(), 1, 20, true); err != nil || !value {
+			t.Fatalf("set like true failed: value=%v err=%v", value, err)
+		}
+		if value, err := service.SetFavorite(context.Background(), 1, 20, true); err != nil || !value {
+			t.Fatalf("set favorite true failed: value=%v err=%v", value, err)
+		}
+		if value, err := service.SetFollow(context.Background(), 20, 10, true); err != nil || !value {
+			t.Fatalf("set follow true failed: value=%v err=%v", value, err)
+		}
+	}
+	state, err := service.ViewerState(context.Background(), 1, 20)
+	if err != nil || !state.Liked || !state.Favorited || !state.FollowingAuthor {
+		t.Fatalf("unexpected viewer state: %+v err=%v", state, err)
+	}
+	if _, err := service.SetFollow(context.Background(), 20, 20, true); !errors.Is(err, ErrCannotFollowSelf) {
+		t.Fatalf("self follow was not rejected: %v", err)
+	}
+	if value, err := service.SetLike(context.Background(), 1, 20, false); err != nil || value {
+		t.Fatalf("set like false failed: value=%v err=%v", value, err)
 	}
 }

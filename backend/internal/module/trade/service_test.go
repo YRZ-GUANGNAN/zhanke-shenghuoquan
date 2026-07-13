@@ -1,8 +1,11 @@
 package trade
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -19,6 +22,48 @@ type tradeMemoryRepo struct {
 	failed        []uint
 	forceConflict bool
 	favorites     map[[2]uint]bool
+}
+
+type tradeKeyedMemoryRepo struct {
+	*tradeMemoryRepo
+	productsByRequest map[string]uint
+	outboxes          []WriteOutbox
+}
+
+func newTradeKeyedMemoryRepo() *tradeKeyedMemoryRepo {
+	return &tradeKeyedMemoryRepo{tradeMemoryRepo: newTradeMemoryRepo(), productsByRequest: map[string]uint{}}
+}
+
+func (r *tradeKeyedMemoryRepo) requestCoordinate(ownerID uint, requestID string) string {
+	return fmt.Sprintf("%d:%s", ownerID, requestID)
+}
+
+func (r *tradeKeyedMemoryRepo) FindProductByRequest(_ context.Context, ownerID uint, requestID string) (Product, bool, error) {
+	id, ok := r.productsByRequest[r.requestCoordinate(ownerID, requestID)]
+	if !ok {
+		return Product{}, false, nil
+	}
+	return r.products[id], true, nil
+}
+
+func (r *tradeKeyedMemoryRepo) CreateProductOrReplay(_ context.Context, value *Product, event *WriteOutbox) (bool, error) {
+	coordinate := r.requestCoordinate(value.SellerID, *value.ClientRequestID)
+	if id, ok := r.productsByRequest[coordinate]; ok {
+		existing := r.products[id]
+		if !bytes.Equal(existing.CreateRequestHash, value.CreateRequestHash) {
+			return false, ErrIdempotencyConflict
+		}
+		*value = existing
+		return true, nil
+	}
+	value.ID = uint(len(r.products) + 1)
+	r.products[value.ID] = *value
+	r.productsByRequest[coordinate] = value.ID
+	event.AggregateType = "product"
+	event.AggregateID = uint64(value.ID)
+	event.OwnerUserID = uint64(value.SellerID)
+	r.outboxes = append(r.outboxes, *event)
+	return false, nil
 }
 
 func newTradeMemoryRepo(values ...Product) *tradeMemoryRepo {
@@ -124,6 +169,31 @@ func (r *tradeMemoryRepo) ToggleFavorite(_ context.Context, id, userID uint, all
 	r.favorites[key] = true
 	return true, nil
 }
+func (r *tradeMemoryRepo) IsFavorited(_ context.Context, id, userID uint) (bool, error) {
+	return r.favorites[[2]uint{id, userID}], nil
+}
+func (r *tradeMemoryRepo) SetFavorite(_ context.Context, id, userID uint, desired, allow bool) (bool, error) {
+	key := [2]uint{id, userID}
+	if r.favorites[key] == desired {
+		return desired, nil
+	}
+	if desired && !allow {
+		return false, ErrProductSold
+	}
+	r.favorites[key] = desired
+	if !desired {
+		delete(r.favorites, key)
+	}
+	value := r.products[id]
+	if desired {
+		value.FavoriteCount++
+	} else if value.FavoriteCount > 0 {
+		value.FavoriteCount--
+	}
+	r.products[id] = value
+	r.events = append(r.events, SearchOutbox{ProductID: id, Operation: SearchUpsert})
+	return desired, nil
+}
 func (r *tradeMemoryRepo) SetReviewStatus(_ context.Context, id uint, status review.Status) error {
 	v := r.products[id]
 	v.ReviewStatus = status
@@ -205,9 +275,14 @@ func (tradeReviews) Submit(_ context.Context, v review.Submission) (review.Task,
 	return review.Task{ObjectType: v.ObjectType, ObjectID: v.ObjectID}, nil
 }
 
-type tradeMediaFake struct{ committed, deleted bool }
+type tradeMediaFake struct {
+	committed, deleted bool
+	reserveCalls       int
+	cancelCalls        int
+}
 
 func (f *tradeMediaFake) Reserve(_ context.Context, _ uint, purpose media.Purpose, ids []string) (media.Reservation, error) {
+	f.reserveCalls++
 	if purpose != media.PurposeProductImage {
 		return media.Reservation{}, errors.New("wrong purpose")
 	}
@@ -217,7 +292,10 @@ func (f *tradeMediaFake) Commit(context.Context, uint, media.Reservation, string
 	f.committed = true
 	return nil
 }
-func (f *tradeMediaFake) Cancel(context.Context, uint, media.Reservation) error { return nil }
+func (f *tradeMediaFake) Cancel(context.Context, uint, media.Reservation) error {
+	f.cancelCalls++
+	return nil
+}
 func (f *tradeMediaFake) DeleteReference(context.Context, string, uint64, []uint64) error {
 	f.deleted = true
 	return nil
@@ -242,11 +320,105 @@ func TestProductImageBindingDoesNotChangeTransactionState(t *testing.T) {
 	}
 }
 
-type tradeConversations struct{ calls int }
+func TestCreateKeyedFirstReplayConflictAndStableOutboxPayload(t *testing.T) {
+	repo := newTradeKeyedMemoryRepo()
+	gateway := &tradeMediaFake{}
+	service := NewService(repo, tradeUsers{}, tradeReviews{}, &tradeConversations{}, &tradeSearchFake{}, gateway)
+	key, err := newWriteContractULID(time.Date(2026, 7, 13, 12, 0, 0, 0, time.UTC), zeroReader{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := ProductInput{
+		SellerID: 7, Title: "bike", Description: "used bike", Category: "travel",
+		Price: 15000, OriginalPrice: 22000, Condition: "used", Campus: "main",
+		ImageAssetIDs: []string{"01J00000000000000000000001", "01J00000000000000000000002"},
+	}
+	first, replayed, err := service.CreateKeyed(context.Background(), input, "wechat pass", key)
+	if err != nil || replayed || first.ID == 0 {
+		t.Fatalf("first keyed create failed: product=%+v replayed=%v err=%v", first, replayed, err)
+	}
+	if gateway.committed {
+		t.Fatal("keyed create bypassed creation outbox with a synchronous media commit")
+	}
+	if gateway.reserveCalls != 1 || gateway.cancelCalls != 0 || len(repo.outboxes) != 1 {
+		t.Fatalf("unexpected first-create effects reserve=%d cancel=%d outboxes=%d", gateway.reserveCalls, gateway.cancelCalls, len(repo.outboxes))
+	}
+	event := repo.outboxes[0]
+	if event.EventType != "trade_product_created" || event.ReservationToken == nil || *event.ReservationToken != "token" {
+		t.Fatalf("unexpected creation outbox coordinates: %+v", event)
+	}
+	var payload productCreatedOutboxPayload
+	if err := json.Unmarshal([]byte(event.Payload), &payload); err != nil {
+		t.Fatalf("decode creation outbox payload: %v", err)
+	}
+	if payload.Version != "trade-product-create:v1" || payload.ReviewObjectType != "product" || payload.ReviewSubmitterID != 7 || payload.ReviewRisk != "wechat pass" ||
+		len(payload.OrderedAssetPublicIDs) != 2 || payload.OrderedAssetPublicIDs[0] != input.ImageAssetIDs[0] || payload.OrderedAssetPublicIDs[1] != input.ImageAssetIDs[1] {
+		t.Fatalf("unstable creation outbox payload: %+v", payload)
+	}
+
+	second, replayed, err := service.CreateKeyed(context.Background(), input, "different transient safety text", key)
+	if err != nil || !replayed || second.ID != first.ID {
+		t.Fatalf("same request did not replay: product=%+v replayed=%v err=%v", second, replayed, err)
+	}
+	if gateway.reserveCalls != 1 || len(repo.outboxes) != 1 {
+		t.Fatalf("replay repeated side effects reserve=%d outboxes=%d", gateway.reserveCalls, len(repo.outboxes))
+	}
+
+	changed := input
+	changed.Price++
+	if _, _, err := service.CreateKeyed(context.Background(), changed, "wechat pass", key); !errors.Is(err, ErrIdempotencyConflict) {
+		t.Fatalf("changed payload did not conflict: %v", err)
+	}
+}
+
+func TestCanonicalProductCreateHashUsesIntegerMoneyAndOrderedAssets(t *testing.T) {
+	base := ProductInput{SellerID: 1, Title: "book", Price: 1234, OriginalPrice: 2345, ImageAssetIDs: []string{"asset-a", "asset-b"}}
+	first, err := canonicalProductCreateHash(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := canonicalProductCreateHash(base)
+	if err != nil || !bytes.Equal(first, second) {
+		t.Fatalf("canonical hash is unstable: equal=%v err=%v", bytes.Equal(first, second), err)
+	}
+	reordered := base
+	reordered.ImageAssetIDs = []string{"asset-b", "asset-a"}
+	reorderedHash, _ := canonicalProductCreateHash(reordered)
+	if bytes.Equal(first, reorderedHash) {
+		t.Fatal("ordered asset public IDs were not part of canonical hash")
+	}
+	changedMoney := base
+	changedMoney.Price++
+	changedMoneyHash, _ := canonicalProductCreateHash(changedMoney)
+	if bytes.Equal(first, changedMoneyHash) {
+		t.Fatal("integer price cents were not part of canonical hash")
+	}
+}
+
+type tradeConversations struct {
+	calls  int
+	values []im.ConversationContext
+}
 
 func (c *tradeConversations) EnsureProductConversation(_ context.Context, p, b, s uint) (im.ConversationContext, error) {
 	c.calls++
-	return im.ConversationContext{ProductID: p, BuyerID: b, SellerID: s}, nil
+	value := im.ConversationContext{RelationID: uint(len(c.values) + 1), ConversationID: "C2Ccampus_1", PeerUserID: "campus_1", ProductID: p, BuyerID: b, SellerID: s}
+	c.values = append(c.values, value)
+	return value, nil
+}
+func (c *tradeConversations) FindProductConversation(_ context.Context, productID, buyerID, sellerID uint) (im.ConversationContext, bool, error) {
+	for _, value := range c.values {
+		if value.ProductID == productID && value.BuyerID == buyerID && value.SellerID == sellerID {
+			return value, true, nil
+		}
+	}
+	return im.ConversationContext{}, false, nil
+}
+func (c *tradeConversations) EnsureProductConversationStable(ctx context.Context, productID, buyerID, sellerID uint) (im.ConversationContext, error) {
+	if value, ok, err := c.FindProductConversation(ctx, productID, buyerID, sellerID); err != nil || ok {
+		return value, err
+	}
+	return c.EnsureProductConversation(ctx, productID, buyerID, sellerID)
 }
 
 func newTradeService(repo *tradeMemoryRepo, search SearchGateway, conversations *tradeConversations) *Service {
@@ -322,6 +494,58 @@ func TestSoldProductBlocksMutationFavoriteAndContact(t *testing.T) {
 	}
 	if conversations.calls != 0 {
 		t.Fatal("sold product reached IM gateway")
+	}
+}
+
+func TestProductTargetFavoriteViewerStateAndStableContact(t *testing.T) {
+	repo := newTradeMemoryRepo(Product{ID: 1, SellerID: 1, Status: StatusSelling, ReviewStatus: review.StatusApproved})
+	conversations := &tradeConversations{}
+	service := newTradeService(repo, &tradeSearchFake{}, conversations)
+
+	for i := 0; i < 2; i++ {
+		favorited, err := service.SetFavorite(context.Background(), 1, 2, true)
+		if err != nil || !favorited {
+			t.Fatalf("set favorite failed: value=%v err=%v", favorited, err)
+		}
+	}
+	if repo.products[1].FavoriteCount != 1 || len(repo.events) != 1 {
+		t.Fatalf("favorite no-op drifted: count=%d events=%d", repo.products[1].FavoriteCount, len(repo.events))
+	}
+	state, err := service.ViewerState(context.Background(), 1, 2)
+	if err != nil || !state.Favorited || state.ContactedSeller {
+		t.Fatalf("unexpected initial viewer state: %+v err=%v", state, err)
+	}
+	first, err := service.EnsureSellerContact(context.Background(), 1, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := service.EnsureSellerContact(context.Background(), 1, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if conversations.calls != 1 || first != second || first.ProductID != 1 || first.PeerUserID == "" {
+		t.Fatalf("contact was not stable: calls=%d first=%+v second=%+v", conversations.calls, first, second)
+	}
+	state, err = service.ViewerState(context.Background(), 1, 2)
+	if err != nil || !state.ContactedSeller {
+		t.Fatalf("contact viewer state missing: %+v err=%v", state, err)
+	}
+	if _, err := service.EnsureSellerContact(context.Background(), 1, 1); !errors.Is(err, ErrCannotContactSelf) {
+		t.Fatalf("seller self-contact accepted: %v", err)
+	}
+}
+
+func TestSoldProductExistingFavoritePUTIsNoOp(t *testing.T) {
+	repo := newTradeMemoryRepo(Product{ID: 1, SellerID: 1, Status: StatusSold, ReviewStatus: review.StatusApproved, FavoriteCount: 1})
+	repo.favorites[[2]uint{1, 2}] = true
+	service := newTradeService(repo, &tradeSearchFake{}, &tradeConversations{})
+
+	favorited, err := service.SetFavorite(context.Background(), 1, 2, true)
+	if err != nil || !favorited {
+		t.Fatalf("existing favorite replay on sold product failed: favorited=%v err=%v", favorited, err)
+	}
+	if repo.products[1].FavoriteCount != 1 || len(repo.events) != 0 {
+		t.Fatalf("sold replay drifted count/outbox: count=%d events=%d", repo.products[1].FavoriteCount, len(repo.events))
 	}
 }
 

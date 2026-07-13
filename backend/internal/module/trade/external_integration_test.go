@@ -121,6 +121,38 @@ func TestMySQLFavoriteAndStatusConcurrency(t *testing.T) {
 	if favoriteRows != 0 || stored.FavoriteCount != 0 {
 		t.Fatalf("favorite drift rows=%d count=%d", favoriteRows, stored.FavoriteCount)
 	}
+	for _, desired := range []bool{true, false} {
+		targetErrors := make(chan error, 20)
+		for i := 0; i < 20; i++ {
+			wg.Add(1)
+			go func(target bool) {
+				defer wg.Done()
+				_, setErr := repo.SetFavorite(context.Background(), value.ID, buyer.ID, target, true)
+				targetErrors <- setErr
+			}(desired)
+		}
+		wg.Wait()
+		close(targetErrors)
+		for setErr := range targetErrors {
+			if setErr != nil {
+				t.Fatal(setErr)
+			}
+		}
+		favoriteRows = 0
+		if err := db.Model(&ProductFavorite{}).Where("product_id = ?", value.ID).Count(&favoriteRows).Error; err != nil {
+			t.Fatal(err)
+		}
+		if err := db.First(&stored, value.ID).Error; err != nil {
+			t.Fatal(err)
+		}
+		expected := int64(0)
+		if desired {
+			expected = 1
+		}
+		if favoriteRows != expected || stored.FavoriteCount != expected {
+			t.Fatalf("target favorite drift desired=%v rows=%d count=%d", desired, favoriteRows, stored.FavoriteCount)
+		}
+	}
 	var successes atomic.Int32
 	statusErrors := make(chan error, 2)
 	for _, next := range []ProductStatus{StatusReserved, StatusSold} {

@@ -11,6 +11,10 @@ type Submitter interface {
 	Submit(context.Context, Submission) (Task, error)
 }
 
+type EnsuringSubmitter interface {
+	EnsureSubmitted(context.Context, Submission) (Task, error)
+}
+
 type Service struct {
 	repo    Repository
 	mu      sync.RWMutex
@@ -32,6 +36,32 @@ func (s *Service) Submit(ctx context.Context, input Submission) (Task, error) {
 		return Task{}, fmt.Errorf("submit review: %w", err)
 	}
 	return value, nil
+}
+
+// EnsureSubmitted creates a submitted task only when the target has no task.
+// A replay returns the existing task exactly as stored, including terminal
+// decisions, and never resets status, reason, operator, risk, or submitter.
+func (s *Service) EnsureSubmitted(ctx context.Context, input Submission) (Task, error) {
+	if input.ObjectType == "" || input.ObjectID == 0 {
+		return Task{}, errors.New("invalid review submission")
+	}
+	value := Task{ObjectType: input.ObjectType, ObjectID: input.ObjectID, SubmitterID: input.SubmitterID, Risk: input.Risk, Status: StatusSubmitted}
+	if err := s.repo.EnsureSubmitted(ctx, &value); err != nil {
+		return Task{}, fmt.Errorf("ensure review submitted: %w", err)
+	}
+	if !validStatus(value.Status) {
+		return Task{}, fmt.Errorf("ensure review submitted: invalid existing status %q", value.Status)
+	}
+	return value, nil
+}
+
+func validStatus(status Status) bool {
+	switch status {
+	case StatusSubmitted, StatusReviewing, StatusApproved, StatusRejected:
+		return true
+	default:
+		return false
+	}
 }
 func (s *Service) Start(ctx context.Context, id, operatorID uint) (Task, error) {
 	value, err := s.repo.Find(ctx, id)

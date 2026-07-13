@@ -12,11 +12,12 @@ import (
 )
 
 var (
-	ErrNotFound       = errors.New("product not found")
-	ErrForbidden      = errors.New("product does not belong to current user")
-	ErrConflict       = errors.New("product changed concurrently or is not editable")
-	ErrProductSold    = errors.New("sold product does not accept this operation")
-	ErrSearchRequired = errors.New("keyword search must use Meilisearch")
+	ErrNotFound          = errors.New("product not found")
+	ErrForbidden         = errors.New("product does not belong to current user")
+	ErrConflict          = errors.New("product changed concurrently or is not editable")
+	ErrProductSold       = errors.New("sold product does not accept this operation")
+	ErrSearchRequired    = errors.New("keyword search must use Meilisearch")
+	ErrFavoriteInvariant = errors.New("product favorite count invariant violated")
 )
 
 type ListQuery struct {
@@ -36,6 +37,8 @@ type Repository interface {
 	ListSeller(context.Context, uint, int, int) ([]Product, int64, error)
 	SetStatus(context.Context, uint, uint, ProductStatus, ProductStatus) error
 	ToggleFavorite(context.Context, uint, uint, bool) (bool, error)
+	IsFavorited(context.Context, uint, uint) (bool, error)
+	SetFavorite(context.Context, uint, uint, bool, bool) (bool, error)
 	SetReviewStatus(context.Context, uint, review.Status) error
 	AdminTakedown(context.Context, uint) error
 	QueueSearchRebuild(context.Context) error
@@ -255,6 +258,70 @@ func (r *GormRepository) ToggleFavorite(ctx context.Context, productID, userID u
 		return enqueueSearch(tx, productID, SearchUpsert)
 	})
 	return favorited, err
+}
+
+func (r *GormRepository) IsFavorited(ctx context.Context, productID, userID uint) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&ProductFavorite{}).
+		Where("product_id = ? AND user_id = ?", productID, userID).Limit(1).Count(&count).Error
+	return count > 0, err
+}
+
+func (r *GormRepository) SetFavorite(ctx context.Context, productID, userID uint, desired, allowCreate bool) (bool, error) {
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var product Product
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&product, productID).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrNotFound
+		} else if err != nil {
+			return err
+		}
+		if product.ReviewStatus != review.StatusApproved {
+			return ErrNotFound
+		}
+		if desired {
+			var existing int64
+			if err := tx.Model(&ProductFavorite{}).
+				Where("product_id = ? AND user_id = ?", productID, userID).
+				Limit(1).Count(&existing).Error; err != nil {
+				return err
+			}
+			if existing > 0 {
+				return nil
+			}
+			if !allowCreate || product.Status == StatusSold {
+				return ErrProductSold
+			}
+			result := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&ProductFavorite{ProductID: productID, UserID: userID})
+			if result.Error != nil || result.RowsAffected == 0 {
+				return result.Error
+			}
+			if err := requireFavoriteUpdate(tx.Model(&Product{}).Where("id = ?", productID).
+				UpdateColumn("favorite_count", gorm.Expr("favorite_count + 1"))); err != nil {
+				return err
+			}
+			return enqueueSearch(tx, productID, SearchUpsert)
+		}
+		result := tx.Where("product_id = ? AND user_id = ?", productID, userID).Delete(&ProductFavorite{})
+		if result.Error != nil || result.RowsAffected == 0 {
+			return result.Error
+		}
+		if err := requireFavoriteUpdate(tx.Model(&Product{}).Where("id = ? AND favorite_count > 0", productID).
+			UpdateColumn("favorite_count", gorm.Expr("favorite_count - 1"))); err != nil {
+			return err
+		}
+		return enqueueSearch(tx, productID, SearchUpsert)
+	})
+	return desired, err
+}
+
+func requireFavoriteUpdate(result *gorm.DB) error {
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return ErrFavoriteInvariant
+	}
+	return nil
 }
 
 func (r *GormRepository) SetReviewStatus(ctx context.Context, id uint, status review.Status) error {

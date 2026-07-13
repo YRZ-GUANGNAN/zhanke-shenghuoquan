@@ -254,6 +254,19 @@ func (r *GormRepository) Commit(ctx context.Context, ownerID uint, token, refere
 	})
 }
 
+func (r *GormRepository) FindActiveReferenceSet(ctx context.Context, ownerID uint, referenceType string, referenceID uint64) ([]Asset, error) {
+	var values []Asset
+	err := r.db.WithContext(ctx).
+		Where(
+			"owner_user_id = ? AND reference_type = ? AND reference_id = ? AND status = ? AND delete_requested_at IS NULL AND storage_deleted_at IS NULL",
+			ownerID, referenceType, referenceID, StatusApproved,
+		).
+		Order("reference_sort ASC").
+		Order("id ASC").
+		Find(&values).Error
+	return values, err
+}
+
 func (r *GormRepository) CancelReservation(ctx context.Context, ownerID uint, token string) error {
 	return r.db.WithContext(ctx).Model(&Asset{}).Where("owner_user_id = ? AND reservation_token = ? AND reference_type = ''", ownerID, token).
 		Updates(map[string]any{"reservation_token": "", "reservation_expires_at": nil}).Error

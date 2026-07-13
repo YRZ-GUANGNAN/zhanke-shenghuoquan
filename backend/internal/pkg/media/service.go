@@ -54,6 +54,10 @@ type Gateway interface {
 	DeleteReference(context.Context, string, uint64, []uint64) error
 }
 
+type committedReferenceReader interface {
+	FindActiveReferenceSet(context.Context, uint, string, uint64) ([]Asset, error)
+}
+
 type Service struct {
 	repo       Repository
 	issuer     CredentialIssuer
@@ -274,6 +278,63 @@ func (s *Service) Commit(ctx context.Context, ownerID uint, reservation Reservat
 		ids = append(ids, ref.PublicID)
 	}
 	return s.repo.Commit(ctx, ownerID, reservation.Token, referenceType, referenceID, ids)
+}
+
+// EnsureCommitted makes an exact replay of a successful reference binding
+// idempotent without changing the historical Commit contract.
+func (s *Service) EnsureCommitted(ctx context.Context, ownerID uint, token, referenceType string, referenceID uint64, orderedIDs []string) error {
+	if ownerID == 0 || strings.TrimSpace(token) == "" || referenceID == 0 || len(orderedIDs) == 0 ||
+		(referenceType != "post" && referenceType != "product" && referenceType != "user") {
+		return ErrInvalidAsset
+	}
+	seen := make(map[string]struct{}, len(orderedIDs))
+	for _, publicID := range orderedIDs {
+		if strings.TrimSpace(publicID) == "" {
+			return ErrInvalidAsset
+		}
+		if _, exists := seen[publicID]; exists {
+			return ErrInvalidAsset
+		}
+		seen[publicID] = struct{}{}
+	}
+
+	commitErr := s.repo.Commit(ctx, ownerID, token, referenceType, referenceID, orderedIDs)
+	if commitErr == nil {
+		return nil
+	}
+	reader, ok := s.repo.(committedReferenceReader)
+	if !ok {
+		return commitErr
+	}
+	values, err := reader.FindActiveReferenceSet(ctx, ownerID, referenceType, referenceID)
+	if err != nil {
+		return err
+	}
+	if exactCommittedReferenceSet(values, ownerID, referenceType, referenceID, orderedIDs) {
+		return nil
+	}
+	return commitErr
+}
+
+func exactCommittedReferenceSet(values []Asset, ownerID uint, referenceType string, referenceID uint64, orderedIDs []string) bool {
+	if len(values) != len(orderedIDs) {
+		return false
+	}
+	for i, value := range values {
+		if value.PublicID != orderedIDs[i] ||
+			value.OwnerUserID != ownerID ||
+			value.ReferenceType != referenceType ||
+			value.ReferenceID != referenceID ||
+			value.ReferenceSort != i ||
+			value.Status != StatusApproved ||
+			value.ReservationToken != "" ||
+			value.ReservationExpiresAt != nil ||
+			value.DeleteRequestedAt != nil ||
+			value.StorageDeletedAt != nil {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Service) Cancel(ctx context.Context, ownerID uint, reservation Reservation) error {

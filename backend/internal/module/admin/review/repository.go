@@ -5,12 +5,14 @@ import (
 	"errors"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var ErrNotFound = errors.New("review task not found")
 
 type Repository interface {
 	Submit(context.Context, *Task) error
+	EnsureSubmitted(context.Context, *Task) error
 	Find(context.Context, uint) (Task, error)
 	Save(context.Context, *Task) error
 	List(context.Context, Status, int, int) ([]Task, int64, error)
@@ -26,9 +28,32 @@ func (r *GormRepository) Submit(ctx context.Context, value *Task) error {
 	}).FirstOrCreate(value).Error
 	return err
 }
+func (r *GormRepository) EnsureSubmitted(ctx context.Context, value *Task) error {
+	candidate := *value
+	if err := r.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "object_type"}, {Name: "object_id"}},
+		DoNothing: true,
+	}).Create(&candidate).Error; err != nil {
+		return err
+	}
+	existing, err := r.findByTarget(ctx, value.ObjectType, value.ObjectID)
+	if err != nil {
+		return err
+	}
+	*value = existing
+	return nil
+}
 func (r *GormRepository) Find(ctx context.Context, id uint) (Task, error) {
 	var value Task
 	err := r.db.WithContext(ctx).First(&value, id).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return Task{}, ErrNotFound
+	}
+	return value, err
+}
+func (r *GormRepository) findByTarget(ctx context.Context, objectType string, objectID uint) (Task, error) {
+	var value Task
+	err := r.db.WithContext(ctx).Where("object_type = ? AND object_id = ?", objectType, objectID).First(&value).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return Task{}, ErrNotFound
 	}

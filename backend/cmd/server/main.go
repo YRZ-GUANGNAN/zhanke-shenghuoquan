@@ -166,8 +166,28 @@ func main() {
 		log.Fatalf("initialize Meilisearch: %v", err)
 	}
 	cancelSearch()
-	communityService := community.NewService(community.NewRepository(db), userService, reviewService, mediaService)
-	tradeService := trade.NewService(trade.NewRepository(db), userService, reviewService, imService, searchIndex, mediaService)
+	communityRepository := community.NewRepository(db)
+	tradeRepository := trade.NewRepository(db)
+	communityService := community.NewService(communityRepository, userService, reviewService, mediaService)
+	tradeService := trade.NewService(tradeRepository, userService, reviewService, imService, searchIndex, mediaService)
+	communityWriteOutboxProcessor := community.NewWriteOutboxProcessor(communityRepository, mediaService, reviewService)
+	tradeWriteOutboxProcessor := trade.NewWriteOutboxProcessor(tradeRepository, mediaService, reviewService)
+	go func() {
+		for {
+			if err := communityWriteOutboxProcessor.Run(context.Background()); err != nil {
+				log.Printf("community write outbox worker stopped; retrying in 5s: %v", err)
+			}
+			time.Sleep(5 * time.Second)
+		}
+	}()
+	go func() {
+		for {
+			if err := tradeWriteOutboxProcessor.Run(context.Background()); err != nil {
+				log.Printf("trade write outbox worker stopped; retrying in 5s: %v", err)
+			}
+			time.Sleep(5 * time.Second)
+		}
+	}()
 	go func() {
 		for {
 			if err := tradeService.RunSearchWorker(context.Background(), time.Second); err != nil {

@@ -6,7 +6,9 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
+	"time"
 )
 
 type imMemoryRepo struct {
@@ -35,6 +37,28 @@ func (r *imMemoryRepo) EnsureConversation(_ context.Context, v *Conversation) er
 		}
 	}
 	v.ID = uint(len(r.conversations) + 1)
+	r.conversations = append(r.conversations, *v)
+	return nil
+}
+func (r *imMemoryRepo) FindConversation(_ context.Context, buyerID, sellerID uint, referenceType string, referenceID uint) (Conversation, bool, error) {
+	for _, current := range r.conversations {
+		if current.BuyerID == buyerID && current.SellerID == sellerID && current.ReferenceType == referenceType && current.ReferenceID == referenceID {
+			return current, true, nil
+		}
+	}
+	return Conversation{}, false, nil
+}
+func (r *imMemoryRepo) EnsureConversationStable(ctx context.Context, v *Conversation) error {
+	if current, found, err := r.FindConversation(ctx, v.BuyerID, v.SellerID, v.ReferenceType, v.ReferenceID); err != nil {
+		return err
+	} else if found {
+		*v = current
+		return nil
+	}
+	now := time.Now().UTC()
+	v.ID = uint(len(r.conversations) + 1)
+	v.CreatedAt = now
+	v.UpdatedAt = now
 	r.conversations = append(r.conversations, *v)
 	return nil
 }
@@ -89,6 +113,76 @@ func TestImportFailureDoesNotCreatePseudoConversation(t *testing.T) {
 	}
 	if len(repo.conversations) != 0 {
 		t.Fatal("local pseudo conversation was persisted")
+	}
+}
+
+func TestFindProductConversationIsReadOnly(t *testing.T) {
+	repo := newIMMemoryRepo()
+	repo.mappings[3] = UserMapping{ID: 3, UserID: 3, IMUserID: "campus_3"}
+	stamp := time.Date(2026, 7, 13, 10, 0, 0, 0, time.UTC)
+	repo.conversations = append(repo.conversations, Conversation{
+		ID: 7, ConversationID: "C2Ccampus_3", BuyerID: 2, SellerID: 3,
+		ReferenceType: "product", ReferenceID: 9, CreatedAt: stamp, UpdatedAt: stamp,
+	})
+	before := append([]Conversation(nil), repo.conversations...)
+	importer := &importerFake{}
+	service := NewService(repo, importer, "1400000000", "secret")
+
+	value, found, err := service.FindProductConversation(context.Background(), 9, 2, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !found || value.RelationID != 7 || value.ConversationID != "C2Ccampus_3" {
+		t.Fatalf("unexpected stable lookup: found=%v value=%+v", found, value)
+	}
+	if len(importer.users) != 0 {
+		t.Fatalf("read-only lookup imported accounts: %v", importer.users)
+	}
+	if !reflect.DeepEqual(before, repo.conversations) {
+		t.Fatalf("read-only lookup mutated relations: before=%+v after=%+v", before, repo.conversations)
+	}
+}
+
+func TestFindProductConversationMissingDoesNotWrite(t *testing.T) {
+	repo := newIMMemoryRepo()
+	importer := &importerFake{}
+	service := NewService(repo, importer, "1400000000", "secret")
+
+	value, found, err := service.FindProductConversation(context.Background(), 9, 2, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found || value != (ConversationContext{}) {
+		t.Fatalf("missing relation reported as found: found=%v value=%+v", found, value)
+	}
+	if len(importer.users) != 0 || len(repo.mappings) != 0 || len(repo.conversations) != 0 {
+		t.Fatalf("missing lookup produced writes: imports=%v mappings=%v conversations=%v", importer.users, repo.mappings, repo.conversations)
+	}
+}
+
+func TestEnsureProductConversationStableReplayDoesNotRefreshRelation(t *testing.T) {
+	repo := newIMMemoryRepo()
+	importer := &importerFake{}
+	service := NewService(repo, importer, "1400000000", "secret")
+
+	first, err := service.EnsureProductConversationStable(context.Background(), 9, 2, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	canonical := repo.conversations[0]
+	time.Sleep(time.Millisecond)
+	second, err := service.EnsureProductConversationStable(context.Background(), 9, 2, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != second || len(repo.conversations) != 1 {
+		t.Fatalf("replay changed canonical relation: first=%+v second=%+v rows=%+v", first, second, repo.conversations)
+	}
+	if len(importer.users) != 2 {
+		t.Fatalf("replay imported Tencent accounts again: %v", importer.users)
+	}
+	if repo.conversations[0].CreatedAt != canonical.CreatedAt || repo.conversations[0].UpdatedAt != canonical.UpdatedAt {
+		t.Fatalf("replay refreshed relation timestamps: before=%+v after=%+v", canonical, repo.conversations[0])
 	}
 }
 

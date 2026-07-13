@@ -2,6 +2,7 @@ package im
 
 import (
 	"context"
+	"errors"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -11,6 +12,8 @@ type Repository interface {
 	EnsureMapping(context.Context, *UserMapping) error
 	FindMapping(context.Context, uint) (UserMapping, error)
 	EnsureConversation(context.Context, *Conversation) error
+	FindConversation(context.Context, uint, uint, string, uint) (Conversation, bool, error)
+	EnsureConversationStable(context.Context, *Conversation) error
 	ListConversations(context.Context, uint, int, int) ([]Conversation, int64, error)
 }
 type GormRepository struct{ db *gorm.DB }
@@ -38,6 +41,39 @@ func (r *GormRepository) EnsureConversation(ctx context.Context, value *Conversa
 		return result.Error
 	}
 	return r.db.WithContext(ctx).Where("buyer_id = ? AND seller_id = ? AND reference_type = ? AND reference_id = ?", value.BuyerID, value.SellerID, value.ReferenceType, value.ReferenceID).First(value).Error
+}
+func (r *GormRepository) FindConversation(ctx context.Context, buyerID, sellerID uint, referenceType string, referenceID uint) (Conversation, bool, error) {
+	var value Conversation
+	err := r.db.WithContext(ctx).
+		Where("buyer_id = ? AND seller_id = ? AND reference_type = ? AND reference_id = ?", buyerID, sellerID, referenceType, referenceID).
+		First(&value).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return Conversation{}, false, nil
+	}
+	if err != nil {
+		return Conversation{}, false, err
+	}
+	return value, true, nil
+}
+func (r *GormRepository) EnsureConversationStable(ctx context.Context, value *Conversation) error {
+	buyerID, sellerID := value.BuyerID, value.SellerID
+	referenceType, referenceID := value.ReferenceType, value.ReferenceID
+	result := r.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "buyer_id"}, {Name: "seller_id"}, {Name: "reference_type"}, {Name: "reference_id"}},
+		DoNothing: true,
+	}).Create(value)
+	if result.Error != nil {
+		return result.Error
+	}
+	canonical, found, err := r.FindConversation(ctx, buyerID, sellerID, referenceType, referenceID)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return gorm.ErrRecordNotFound
+	}
+	*value = canonical
+	return nil
 }
 func (r *GormRepository) ListConversations(ctx context.Context, userID uint, page, size int) ([]Conversation, int64, error) {
 	var values []Conversation
