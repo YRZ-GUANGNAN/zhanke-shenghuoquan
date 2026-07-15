@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -82,6 +83,7 @@ func (r *tradeMemoryRepo) Update(_ context.Context, v *Product, _ []ProductImage
 	if r.forceConflict {
 		return ErrConflict
 	}
+	v.ReviewStatus = review.StatusSubmitted
 	r.products[v.ID] = *v
 	return nil
 }
@@ -281,6 +283,49 @@ type tradeMediaFake struct {
 	cancelCalls        int
 }
 
+type tradeMediaLifecycleFake struct {
+	reservation    media.Reservation
+	calls          []string
+	reserveOwner   uint
+	reserveProduct uint
+	deleteKeep     []uint64
+	onDelete       func()
+	onPublish      func()
+}
+
+func (f *tradeMediaLifecycleFake) Reserve(context.Context, uint, media.Purpose, []string) (media.Reservation, error) {
+	f.calls = append(f.calls, "reserve")
+	return f.reservation, nil
+}
+func (f *tradeMediaLifecycleFake) ReserveForProduct(_ context.Context, ownerID, productID uint, _ media.Purpose, _ []string) (media.Reservation, error) {
+	f.reserveOwner, f.reserveProduct = ownerID, productID
+	f.calls = append(f.calls, fmt.Sprintf("reserve:%d", productID))
+	return f.reservation, nil
+}
+func (f *tradeMediaLifecycleFake) Commit(_ context.Context, _ uint, _ media.Reservation, _ string, referenceID uint64) error {
+	f.calls = append(f.calls, fmt.Sprintf("commit:%d", referenceID))
+	return nil
+}
+func (f *tradeMediaLifecycleFake) Cancel(context.Context, uint, media.Reservation) error {
+	f.calls = append(f.calls, "cancel")
+	return nil
+}
+func (f *tradeMediaLifecycleFake) DeleteReference(_ context.Context, _ string, referenceID uint64, keep []uint64) error {
+	f.deleteKeep = append([]uint64(nil), keep...)
+	f.calls = append(f.calls, fmt.Sprintf("delete:%d", referenceID))
+	if f.onDelete != nil {
+		f.onDelete()
+	}
+	return nil
+}
+func (f *tradeMediaLifecycleFake) PublishProduct(_ context.Context, productID uint64) error {
+	f.calls = append(f.calls, fmt.Sprintf("publish:%d", productID))
+	if f.onPublish != nil {
+		f.onPublish()
+	}
+	return nil
+}
+
 func (f *tradeMediaFake) Reserve(_ context.Context, _ uint, purpose media.Purpose, ids []string) (media.Reservation, error) {
 	f.reserveCalls++
 	if purpose != media.PurposeProductImage {
@@ -317,6 +362,108 @@ func TestProductImageBindingDoesNotChangeTransactionState(t *testing.T) {
 	}
 	if err := service.Delete(context.Background(), product.ID, 4); err != nil || !gateway.deleted {
 		t.Fatalf("media cleanup not requested: %v", err)
+	}
+}
+
+func TestProductApprovalPublishesMediaAfterParentApproval(t *testing.T) {
+	repo := newTradeMemoryRepo(Product{ID: 42, SellerID: 7, Status: StatusSelling, ReviewStatus: review.StatusReviewing})
+	gateway := &tradeMediaLifecycleFake{}
+	gateway.onPublish = func() {
+		if repo.products[42].ReviewStatus != review.StatusApproved {
+			t.Fatal("media published before parent approval")
+		}
+	}
+	service := NewService(repo, tradeUsers{}, tradeReviews{}, &tradeConversations{}, &tradeSearchFake{}, gateway)
+	if err := service.SetReviewStatus(context.Background(), 42, review.StatusApproved); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(gateway.calls, []string{"publish:42"}) || repo.products[42].ReviewStatus != review.StatusApproved {
+		t.Fatalf("calls=%v product=%+v", gateway.calls, repo.products[42])
+	}
+}
+
+func TestProductRejectionHidesMediaBeforeParentRejection(t *testing.T) {
+	repo := newTradeMemoryRepo(Product{ID: 42, SellerID: 7, Status: StatusSelling, ReviewStatus: review.StatusReviewing})
+	gateway := &tradeMediaLifecycleFake{}
+	gateway.onDelete = func() {
+		if repo.products[42].ReviewStatus != review.StatusReviewing {
+			t.Fatal("parent rejected before media was hidden")
+		}
+	}
+	service := NewService(repo, tradeUsers{}, tradeReviews{}, &tradeConversations{}, &tradeSearchFake{}, gateway)
+	if err := service.SetReviewStatus(context.Background(), 42, review.StatusRejected); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(gateway.calls, []string{"delete:42"}) || repo.products[42].ReviewStatus != review.StatusRejected {
+		t.Fatalf("calls=%v product=%+v", gateway.calls, repo.products[42])
+	}
+}
+
+func TestProductDeleteHidesMediaBeforeParentDelete(t *testing.T) {
+	repo := newTradeMemoryRepo(Product{ID: 42, SellerID: 7, Status: StatusSelling, ReviewStatus: review.StatusApproved})
+	gateway := &tradeMediaLifecycleFake{}
+	gateway.onDelete = func() {
+		if _, exists := repo.products[42]; !exists {
+			t.Fatal("parent deleted before media was hidden")
+		}
+	}
+	service := NewService(repo, tradeUsers{}, tradeReviews{}, &tradeConversations{}, &tradeSearchFake{}, gateway)
+	if err := service.Delete(context.Background(), 42, 7); err != nil {
+		t.Fatal(err)
+	}
+	if _, exists := repo.products[42]; exists || !reflect.DeepEqual(gateway.calls, []string{"delete:42"}) {
+		t.Fatalf("calls=%v productExists=%v", gateway.calls, exists)
+	}
+}
+
+func TestProductAdminTakedownHidesMediaBeforeParentTakedown(t *testing.T) {
+	repo := newTradeMemoryRepo(Product{ID: 42, SellerID: 7, Status: StatusSelling, ReviewStatus: review.StatusApproved})
+	gateway := &tradeMediaLifecycleFake{}
+	gateway.onDelete = func() {
+		if repo.products[42].ReviewStatus == ReviewStatusTakenDown {
+			t.Fatal("parent taken down before media was hidden")
+		}
+	}
+	service := NewService(repo, tradeUsers{}, tradeReviews{}, &tradeConversations{}, &tradeSearchFake{}, gateway)
+	if err := service.AdminTakedown(context.Background(), 42, 9, "unsafe listing"); err != nil {
+		t.Fatal(err)
+	}
+	if repo.products[42].ReviewStatus != ReviewStatusTakenDown || !reflect.DeepEqual(gateway.calls, []string{"delete:42"}) {
+		t.Fatalf("calls=%v product=%+v", gateway.calls, repo.products[42])
+	}
+}
+
+func TestProductUpdateUsesReserveForProductAndHidesRemovedBeforeParentUpdate(t *testing.T) {
+	repo := newTradeMemoryRepo(Product{ID: 42, SellerID: 7, Title: "old", Status: StatusSelling, ReviewStatus: review.StatusApproved})
+	gateway := &tradeMediaLifecycleFake{reservation: media.Reservation{
+		Token: "m10_01J00000000000000000000001",
+		References: []media.Reference{
+			{InternalID: 11, PublicID: "01J00000000000000000000001", URL: "/api/v1/media/assets/1/content"},
+			{InternalID: 12, PublicID: "01J00000000000000000000002", URL: "/api/v1/media/assets/2/content"},
+		},
+	}}
+	gateway.onDelete = func() {
+		if repo.products[42].Title != "old" {
+			t.Fatal("parent updated before removed media was hidden")
+		}
+	}
+	service := NewService(repo, tradeUsers{}, tradeReviews{}, &tradeConversations{}, &tradeSearchFake{}, gateway)
+	value, err := service.Update(context.Background(), 42, ProductInput{
+		SellerID: 7, Title: "new", Price: 10,
+		ImageAssetIDs: []string{"01J00000000000000000000001", "01J00000000000000000000002"},
+	}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gateway.reserveOwner != 7 || gateway.reserveProduct != 42 || !reflect.DeepEqual(gateway.deleteKeep, []uint64{11, 12}) ||
+		!reflect.DeepEqual(gateway.calls, []string{"reserve:42", "delete:42", "commit:42"}) || value.ReviewStatus != review.StatusSubmitted ||
+		repo.products[42].Title != "new" {
+		t.Fatalf("gateway=%+v value=%+v product=%+v", gateway, value, repo.products[42])
+	}
+	for _, kept := range gateway.deleteKeep {
+		if kept == 99 {
+			t.Fatal("removed asset remained in keep set")
+		}
 	}
 }
 

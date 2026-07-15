@@ -2,6 +2,7 @@ package trade
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -27,6 +28,54 @@ func TestResolveCreateRequestID(t *testing.T) {
 			got, err := resolveCreateRequestID(test.header, test.body)
 			if (err != nil) != test.wantErr || got != test.want {
 				t.Fatalf("got key=%q err=%v, want key=%q wantErr=%v", got, err, test.want, test.wantErr)
+			}
+		})
+	}
+}
+
+func TestMediaCreateStatusMapping(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, path := range []string{"keyed", "non-keyed"} {
+		for _, test := range []struct {
+			name string
+			err  error
+			want int
+		}{
+			{name: "invalid media", err: ErrMediaInvalid, want: http.StatusConflict},
+			{name: "media conflict", err: ErrMediaConflict, want: http.StatusConflict},
+			{name: "deadline", err: context.DeadlineExceeded, want: http.StatusGatewayTimeout},
+			{name: "internal", err: errors.New("database unavailable"), want: http.StatusInternalServerError},
+		} {
+			t.Run(path+"/"+test.name, func(t *testing.T) {
+				recorder := httptest.NewRecorder()
+				ginContext, _ := gin.CreateTestContext(recorder)
+				writeCreateError(ginContext, test.err)
+				if recorder.Code != test.want {
+					t.Fatalf("status=%d want=%d body=%s", recorder.Code, test.want, recorder.Body.String())
+				}
+			})
+		}
+	}
+}
+
+func TestMediaWriteStatusMapping(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, test := range []struct {
+		name string
+		err  error
+		want int
+	}{
+		{name: "invalid media", err: ErrMediaInvalid, want: http.StatusConflict},
+		{name: "media conflict", err: ErrMediaConflict, want: http.StatusConflict},
+		{name: "deadline", err: context.DeadlineExceeded, want: http.StatusGatewayTimeout},
+		{name: "internal", err: errors.New("database unavailable"), want: http.StatusInternalServerError},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			ginContext, _ := gin.CreateTestContext(recorder)
+			write(ginContext, nil, test.err)
+			if recorder.Code != test.want {
+				t.Fatalf("status=%d want=%d body=%s", recorder.Code, test.want, recorder.Body.String())
 			}
 		})
 	}

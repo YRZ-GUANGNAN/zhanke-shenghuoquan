@@ -91,18 +91,7 @@ func (h *Handler) create(c *gin.Context) {
 	if clientRequestID != "" {
 		value, replayed, err := h.service.CreateKeyed(c, input, risk, clientRequestID)
 		if err != nil {
-			switch {
-			case errors.Is(err, ErrIdempotencyConflict):
-				response.Fail(c, http.StatusConflict, err.Error())
-			case errors.Is(err, ErrWriteContractInvalid):
-				response.Fail(c, http.StatusBadRequest, err.Error())
-			case errors.Is(err, ErrWriteContractUnavailable):
-				response.Fail(c, http.StatusServiceUnavailable, err.Error())
-			case errors.Is(err, context.DeadlineExceeded):
-				response.Fail(c, http.StatusGatewayTimeout, err.Error())
-			default:
-				response.Fail(c, http.StatusInternalServerError, err.Error())
-			}
+			writeCreateError(c, err)
 			return
 		}
 		if replayed {
@@ -114,10 +103,25 @@ func (h *Handler) create(c *gin.Context) {
 	}
 	value, err := h.service.Create(c, input, risk)
 	if err != nil {
-		response.Fail(c, 400, err.Error())
+		writeCreateError(c, err)
 		return
 	}
 	response.Created(c, value)
+}
+
+func writeCreateError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, ErrIdempotencyConflict), errors.Is(err, ErrMediaInvalid), errors.Is(err, ErrMediaConflict):
+		response.Fail(c, http.StatusConflict, err.Error())
+	case errors.Is(err, ErrWriteContractInvalid), errors.Is(err, ErrInvalidProductInput):
+		response.Fail(c, http.StatusBadRequest, err.Error())
+	case errors.Is(err, ErrWriteContractUnavailable):
+		response.Fail(c, http.StatusServiceUnavailable, err.Error())
+	case errors.Is(err, context.DeadlineExceeded):
+		response.Fail(c, http.StatusGatewayTimeout, err.Error())
+	default:
+		response.Fail(c, http.StatusInternalServerError, err.Error())
+	}
 }
 
 func writeCreateResult(c *gin.Context, value Product, replayed bool) {
@@ -248,7 +252,7 @@ func write(c *gin.Context, data any, err error) {
 		response.Fail(c, http.StatusForbidden, err.Error())
 		return
 	}
-	if errors.Is(err, ErrProductSold) || errors.Is(err, ErrConflict) {
+	if errors.Is(err, ErrProductSold) || errors.Is(err, ErrConflict) || errors.Is(err, ErrMediaInvalid) || errors.Is(err, ErrMediaConflict) {
 		response.Fail(c, http.StatusConflict, err.Error())
 		return
 	}
@@ -268,8 +272,12 @@ func write(c *gin.Context, data any, err error) {
 		response.Fail(c, http.StatusGatewayTimeout, err.Error())
 		return
 	}
+	if errors.Is(err, ErrInvalidProductInput) {
+		response.Fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
 	if err != nil {
-		response.Fail(c, 400, err.Error())
+		response.Fail(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 	response.OK(c, data)
@@ -281,7 +289,7 @@ func writeTargetState(c *gin.Context, data any, err error) {
 		response.Fail(c, http.StatusNotFound, err.Error())
 	case errors.Is(err, ErrForbidden):
 		response.Fail(c, http.StatusForbidden, err.Error())
-	case errors.Is(err, ErrProductSold), errors.Is(err, ErrConflict):
+	case errors.Is(err, ErrProductSold), errors.Is(err, ErrConflict), errors.Is(err, ErrMediaInvalid), errors.Is(err, ErrMediaConflict):
 		response.Fail(c, http.StatusConflict, err.Error())
 	case errors.Is(err, ErrCannotContactSelf):
 		response.Fail(c, http.StatusUnprocessableEntity, err.Error())
@@ -289,6 +297,8 @@ func writeTargetState(c *gin.Context, data any, err error) {
 		response.Fail(c, http.StatusServiceUnavailable, err.Error())
 	case errors.Is(err, context.DeadlineExceeded):
 		response.Fail(c, http.StatusGatewayTimeout, err.Error())
+	case errors.Is(err, ErrInvalidProductInput):
+		response.Fail(c, http.StatusBadRequest, err.Error())
 	case err != nil:
 		response.Fail(c, http.StatusInternalServerError, err.Error())
 	default:

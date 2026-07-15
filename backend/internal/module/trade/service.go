@@ -33,6 +33,7 @@ var (
 	ErrCannotContactSelf        = errors.New("seller cannot contact self")
 	ErrContactStateUnavailable  = errors.New("conversation state lookup is unavailable")
 	ErrWriteContractUnavailable = errors.New("trade write contract is unavailable")
+	ErrInvalidProductInput      = errors.New("invalid product input")
 )
 
 type stableProductConversationGateway interface {
@@ -181,7 +182,8 @@ func (s *Service) CreateKeyed(ctx context.Context, input ProductInput, risk, cli
 		}
 		reservation, err = s.media.Reserve(ctx, input.SellerID, media.PurposeProductImage, input.ImageAssetIDs)
 		if err != nil {
-			if errors.Is(err, media.ErrAlreadyBound) || errors.Is(err, media.ErrInvalidAsset) {
+			if errors.Is(err, media.ErrAlreadyBound) || errors.Is(err, media.ErrInvalidAsset) ||
+				errors.Is(err, ErrMediaConflict) || errors.Is(err, ErrMediaInvalid) {
 				if replay, replayErr, found := awaitProductReplay(ctx, contractRepo, input.SellerID, clientRequestID, requestHash); found {
 					return replay, true, replayErr
 				}
@@ -288,7 +290,11 @@ func (s *Service) Update(ctx context.Context, id uint, input ProductInput, risk 
 		if s.media == nil {
 			return Product{}, errors.New("media pipeline is unavailable")
 		}
-		reservation, err = s.media.Reserve(ctx, input.SellerID, media.PurposeProductImage, input.ImageAssetIDs)
+		if updater, ok := s.media.(productMediaUpdater); ok {
+			reservation, err = updater.ReserveForProduct(ctx, input.SellerID, id, media.PurposeProductImage, input.ImageAssetIDs)
+		} else {
+			reservation, err = s.media.Reserve(ctx, input.SellerID, media.PurposeProductImage, input.ImageAssetIDs)
+		}
 		if err != nil {
 			return Product{}, err
 		}
@@ -303,6 +309,14 @@ func (s *Service) Update(ctx context.Context, id uint, input ProductInput, risk 
 		keep = append(keep, assetID)
 		images = append(images, ProductImage{AssetID: &assetID, URL: ref.URL, Sort: i})
 	}
+	if s.media != nil {
+		if err := s.media.DeleteReference(ctx, "product", uint64(id), keep); err != nil {
+			if reservation.Token != "" {
+				_ = s.media.Cancel(ctx, input.SellerID, reservation)
+			}
+			return Product{}, err
+		}
+	}
 	if err := s.repo.Update(ctx, &existing, images); err != nil {
 		if s.media != nil && reservation.Token != "" {
 			_ = s.media.Cancel(ctx, input.SellerID, reservation)
@@ -311,11 +325,7 @@ func (s *Service) Update(ctx context.Context, id uint, input ProductInput, risk 
 	}
 	if len(reservation.References) > 0 {
 		if err := s.media.Commit(ctx, input.SellerID, reservation, "product", uint64(id)); err != nil {
-			return Product{}, err
-		}
-	}
-	if s.media != nil {
-		if err := s.media.DeleteReference(ctx, "product", uint64(id), keep); err != nil {
+			_ = s.media.Cancel(ctx, input.SellerID, reservation)
 			return Product{}, err
 		}
 	}
@@ -328,7 +338,7 @@ func (s *Service) Update(ctx context.Context, id uint, input ProductInput, risk 
 
 func validateInput(input ProductInput) error {
 	if input.Title == "" || input.Price < 0 || input.OriginalPrice < 0 {
-		return errors.New("title and valid price are required")
+		return fmt.Errorf("%w: title and valid price are required", ErrInvalidProductInput)
 	}
 	return nil
 }
@@ -344,13 +354,12 @@ func (s *Service) Delete(ctx context.Context, id, sellerID uint) error {
 	if value.Status == StatusSold {
 		return ErrProductSold
 	}
-	if err := s.repo.Delete(ctx, id, sellerID); err != nil {
-		return err
-	}
 	if s.media != nil {
-		return s.media.DeleteReference(ctx, "product", uint64(id), nil)
+		if err := s.media.DeleteReference(ctx, "product", uint64(id), nil); err != nil {
+			return err
+		}
 	}
-	return nil
+	return s.repo.Delete(ctx, id, sellerID)
 }
 
 func (s *Service) List(ctx context.Context, q ListQuery) (Page, error) {
@@ -530,6 +539,11 @@ func (s *Service) AdminTakedown(ctx context.Context, productID, operatorID uint,
 	if productID == 0 || operatorID == 0 || strings.TrimSpace(reason) == "" {
 		return errors.New("product id, operator and takedown reason are required")
 	}
+	if s.media != nil {
+		if err := s.media.DeleteReference(ctx, "product", uint64(productID), nil); err != nil {
+			return err
+		}
+	}
 	return s.repo.AdminTakedown(ctx, productID)
 }
 
@@ -554,11 +568,18 @@ func (s *Service) enrich(ctx context.Context, values []Product) ([]ProductView, 
 func (s *Service) ObjectType() string { return "product" }
 
 func (s *Service) SetReviewStatus(ctx context.Context, id uint, status review.Status) error {
+	if status == review.StatusRejected && s.media != nil {
+		if err := s.media.DeleteReference(ctx, "product", uint64(id), nil); err != nil {
+			return err
+		}
+	}
 	if err := s.repo.SetReviewStatus(ctx, id, status); err != nil {
 		return err
 	}
-	if status == review.StatusRejected && s.media != nil {
-		return s.media.DeleteReference(ctx, "product", uint64(id), nil)
+	if status == review.StatusApproved && s.media != nil {
+		if publisher, ok := s.media.(productMediaPublisher); ok {
+			return publisher.PublishProduct(ctx, uint64(id))
+		}
 	}
 	return nil
 }
