@@ -72,6 +72,20 @@ UI-21b-2c 的代码实施已完成。新版二手发布、详情和私信页面�
 
 构建仅报告既有 Sass `@import` 弃用提示，以及腾讯 IM SDK 进入二手私信页后该页面包体为 724 KiB 的性能提示；均未导致构建失败。
 
-## 6. 开发状态
+## 6. 真实环境联调结论
 
-代码状态为 **Development Complete**。真实环境验收因本机 `127.0.0.1:8080` 未启动而尚未执行，详见 Acceptance 与 Residue 报告。
+2026-07-15 已启动本机 MySQL、Meilisearch v1.46.0 与当前分支后端，并完成真实 HTTP、COS、Meilisearch 和腾讯云 IM 联调。除带图商品创建外，以下真实链路已通过：
+
+- 无图商品创建返回 201；同键同体重放返回 200 且带 `Idempotency-Replayed: true`；同键异体返回 409；
+- 审核通过后商品可被 Meilisearch 检索；
+- 收藏 `PUT` 重放不重复计数，取消收藏可重放，已售商品新增收藏返回 409；
+- 联系卖家重复调用返回稳定会话，viewer state、IM 凭证和会话列表一致；
+- 通过腾讯云官方 `openim/sendmsg` 与 `openim/admin_getroammsg` 接口完成 A→B、B→A 文字消息及双方漫游历史校验。
+
+真实图片链路已完成媒体票据申请、COS PUT、complete 和本地审核投影，但将该 `assetId` 绑定到 `POST /trade/products` 时返回 500 `invalid media asset`。定位结果是现有 Module 10 媒体资产与冻结的交易媒体网关使用了两套字段/状态约定：新版链路使用 `asset_public_id`、`purpose=product` 和 `technical_status=final_ready`/审核投影，交易服务仍通过旧媒体包校验 `public_id`、`purpose=product_image` 和旧 `approved` 状态。因此前端无法单独消除该阻断。
+
+本分支没有为通过验收而修改后端、迁移或放宽媒体审核。详细证据见 Acceptance 与 Residue 报告。
+
+## 7. 开发状态
+
+前端代码状态为 **Development Complete**；跨模块真实验收状态为 **Integration Blocked**。在 owner 明确扩大后端范围、补齐媒体适配并复验之前，本模块不应标记为完全上线 PASS。
