@@ -215,7 +215,7 @@ func (r *GormReferenceBindingRepository) PublishBinding(ctx context.Context, ref
 			return err
 		}
 		if len(references) == 0 {
-			return ErrBindingMismatch
+			return ErrNotFound
 		}
 		now := time.Now().UTC()
 		assetIDs := make([]uint64, 0, len(references))
@@ -254,22 +254,7 @@ func (r *GormReferenceBindingRepository) RevokeBinding(ctx context.Context, refe
 			return err
 		}
 		if len(references) == 0 {
-			if len(keep) == 0 {
-				return nil
-			}
-			return ErrBindingMismatch
-		}
-		keepSet := make(map[uint64]struct{}, len(keep))
-		for _, assetID := range keep {
-			keepSet[assetID] = struct{}{}
-		}
-		for _, reference := range references {
-			if reference.Status != ReferenceRevoked {
-				delete(keepSet, reference.AssetID)
-			}
-		}
-		if len(keepSet) != 0 {
-			return ErrBindingMismatch
+			return nil
 		}
 
 		now := time.Now().UTC()
