@@ -2,6 +2,7 @@ package media
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"strings"
 	"time"
@@ -116,7 +117,7 @@ func validateBindingReserve(input BindingReserveInput, now time.Time) error {
 	}
 	seen := make(map[string]struct{}, len(input.OrderedAssetPublicIDs))
 	for _, publicID := range input.OrderedAssetPublicIDs {
-		if !ValidULID(publicID) {
+		if !validBindingLookupID(publicID) {
 			return ErrBindingInvalidAsset
 		}
 		if _, exists := seen[publicID]; exists {
@@ -125,6 +126,17 @@ func validateBindingReserve(input BindingReserveInput, now time.Time) error {
 		seen[publicID] = struct{}{}
 	}
 	return nil
+}
+
+func validBindingLookupID(value string) bool {
+	if ValidULID(value) {
+		return true
+	}
+	if len(value) != 32 {
+		return false
+	}
+	decoded, err := hex.DecodeString(value)
+	return err == nil && len(decoded) == 16
 }
 
 func validateBindingCommit(input BindingCommitInput) error {

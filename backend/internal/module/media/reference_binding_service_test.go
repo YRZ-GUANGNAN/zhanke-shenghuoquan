@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	testBindingULID1 = "01J00000000000000000000001"
-	testBindingULID2 = "01J00000000000000000000002"
+	testBindingULID1  = "01J00000000000000000000001"
+	testBindingULID2  = "01J00000000000000000000002"
+	testLegacyMediaID = "0123456789abcdef0123456789abcdef"
 )
 
 type bindingRepositoryStub struct {
@@ -108,11 +109,24 @@ func TestReferenceBindingReservePropagatesLegacyClassification(t *testing.T) {
 	repo := &bindingRepositoryStub{reserveErr: ErrBindingLegacySet}
 	service, _ := NewReferenceBindingService(repo, func() time.Time { return now })
 	_, err := service.Reserve(context.Background(), BindingReserveInput{
-		OwnerID: 7, Purpose: PurposeProduct, OrderedAssetPublicIDs: []string{testBindingULID1},
+		OwnerID: 7, Purpose: PurposeProduct, OrderedAssetPublicIDs: []string{testLegacyMediaID},
 		Token: "m10_" + testBindingULID2, ExpiresAt: now.Add(time.Minute),
 	})
 	if !errors.Is(err, ErrBindingLegacySet) {
 		t.Fatalf("err=%v want ErrBindingLegacySet", err)
+	}
+}
+
+func TestReferenceBindingReserveRejectsInvalidLookupIDBeforeRepository(t *testing.T) {
+	now := time.Date(2026, 7, 15, 10, 0, 0, 0, time.UTC)
+	repo := &bindingRepositoryStub{}
+	service, _ := NewReferenceBindingService(repo, func() time.Time { return now })
+	_, err := service.Reserve(context.Background(), BindingReserveInput{
+		OwnerID: 7, Purpose: PurposeProduct, OrderedAssetPublicIDs: []string{"not-an-asset"},
+		Token: "m10_" + testBindingULID2, ExpiresAt: now.Add(time.Minute),
+	})
+	if !errors.Is(err, ErrBindingInvalidAsset) || repo.reserveCalls != 0 {
+		t.Fatalf("err=%v reserveCalls=%d", err, repo.reserveCalls)
 	}
 }
 
