@@ -39,9 +39,10 @@ UI-21b-2c 已通过代码、类型、构建、路由、领域边界和全量后�
 ## 4. 真实环境阻断证据
 
 - `npm run check:stack`：`connect ECONNREFUSED 127.0.0.1:8080`。
-- `GET http://127.0.0.1:8080/health`：无法连接。
+- `GET http://127.0.0.1:8080/healthz`：无法连接。
 - `GET /api/v1/trade/products?...`：无法连接。
-- 本机未发现 3306、7700、8080 监听进程。
+- 本机 MySQL `3306` 正在监听，但 Meilisearch `7700` 与后端 `8080` 均未监听。
+- 当前终端没有可用的 Docker CLI，无法在本轮自动补起 Meilisearch 依赖并完成后端运行态验收。
 
 ## 5. 最终判定
 
