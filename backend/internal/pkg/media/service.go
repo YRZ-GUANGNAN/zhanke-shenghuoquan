@@ -58,20 +58,37 @@ type committedReferenceReader interface {
 	FindActiveReferenceSet(context.Context, uint, string, uint64) ([]Asset, error)
 }
 
-type Service struct {
-	repo       Repository
-	issuer     CredentialIssuer
-	storage    ObjectStore
-	safety     SafetyChecker
-	reviews    ReviewFlow
-	bucket     string
-	region     string
-	publicBase string
-	now        func() time.Time
+type PublicContentResolver interface {
+	ContentURLByMediaID(context.Context, string) (string, error)
 }
 
-func NewService(repo Repository, issuer CredentialIssuer, storage ObjectStore, safety SafetyChecker, reviews ReviewFlow, bucket, region, publicBase string) *Service {
-	return &Service{repo: repo, issuer: issuer, storage: storage, safety: safety, reviews: reviews, bucket: bucket, region: region, publicBase: strings.TrimRight(publicBase, "/"), now: time.Now}
+type ServiceOption func(*Service)
+
+func WithPublicContentResolver(value PublicContentResolver) ServiceOption {
+	return func(service *Service) { service.contentResolver = value }
+}
+
+type Service struct {
+	repo            Repository
+	issuer          CredentialIssuer
+	storage         ObjectStore
+	safety          SafetyChecker
+	reviews         ReviewFlow
+	contentResolver PublicContentResolver
+	bucket          string
+	region          string
+	publicBase      string
+	now             func() time.Time
+}
+
+func NewService(repo Repository, issuer CredentialIssuer, storage ObjectStore, safety SafetyChecker, reviews ReviewFlow, bucket, region, publicBase string, options ...ServiceOption) *Service {
+	service := &Service{repo: repo, issuer: issuer, storage: storage, safety: safety, reviews: reviews, bucket: bucket, region: region, publicBase: strings.TrimRight(publicBase, "/"), now: time.Now}
+	for _, option := range options {
+		if option != nil {
+			option(service)
+		}
+	}
+	return service
 }
 
 func (s *Service) CreateUpload(ctx context.Context, input CreateUploadInput) (UploadTicket, error) {
@@ -236,6 +253,9 @@ func (s *Service) CancelUpload(ctx context.Context, ownerID uint, publicID strin
 func (s *Service) ContentURL(ctx context.Context, publicID string) (string, error) {
 	value, err := s.repo.FindPublic(ctx, publicID)
 	if err != nil {
+		if errors.Is(err, ErrNotFound) && s.contentResolver != nil {
+			return s.contentResolver.ContentURLByMediaID(ctx, publicID)
+		}
 		return "", err
 	}
 	return s.storage.SignedGetURL(ctx, value.ObjectKey, 5*time.Minute)

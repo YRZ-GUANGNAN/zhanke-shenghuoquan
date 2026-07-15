@@ -37,3 +37,24 @@ func (s *MediaDisplayService) ContentURL(ctx context.Context, referenceType Purp
 	}
 	return s.signer.SignedGetURL(ctx, object.FinalKey, object.FinalVersionID, s.ttl)
 }
+
+func (s *MediaDisplayService) ContentURLByMediaID(ctx context.Context, mediaID string) (string, error) {
+	if !ValidULID(mediaID) {
+		return "", ErrInvalidULID
+	}
+	metadata, err := s.gateway.GetVisibleMetadata(ctx, mediaID)
+	if err != nil {
+		return "", err
+	}
+	if metadata.MediaID != mediaID {
+		return "", ErrMediaNotVisible
+	}
+	object, err := s.repository.FindVisibleDisplayObjectByAsset(ctx, mediaID)
+	if err != nil {
+		return "", err
+	}
+	if object.MediaID != mediaID || strings.TrimSpace(object.FinalKey) == "" || strings.TrimSpace(object.FinalVersionID) == "" {
+		return "", ErrMediaNotVisible
+	}
+	return s.signer.SignedGetURL(ctx, object.FinalKey, object.FinalVersionID, s.ttl)
+}

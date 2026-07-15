@@ -24,8 +24,15 @@ func TestMediaDisplayRepositoryReturnsOnlyVisibleFinalIdentityAgainstMySQL84(t *
 	if value.MediaID != visible.Asset.AssetPublicID || value.FinalKey == "" || value.FinalVersionID == "" {
 		t.Fatalf("identity=%#v visible=%#v", value, visible.Asset)
 	}
+	byAsset, err := repository.FindVisibleDisplayObjectByAsset(context.Background(), visible.Asset.AssetPublicID)
+	if err != nil || byAsset != value {
+		t.Fatalf("asset identity=%#v reference identity=%#v err=%v", byAsset, value, err)
+	}
 	if _, err := repository.FindVisibleDisplayObjectByReference(context.Background(), PurposePost, hidden.Reference.ReferenceID, hidden.Reference.Slot); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("hidden err=%v want ErrNotFound", err)
+	}
+	if _, err := repository.FindVisibleDisplayObjectByAsset(context.Background(), hidden.Asset.AssetPublicID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("hidden asset err=%v want ErrNotFound", err)
 	}
 }
 

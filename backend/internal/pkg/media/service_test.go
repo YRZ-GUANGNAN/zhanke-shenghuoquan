@@ -19,11 +19,12 @@ import (
 )
 
 type memoryRepo struct {
-	mu      sync.Mutex
-	nextID  uint64
-	assets  map[uint64]Asset
-	byKey   map[string]uint64
-	byTrace map[string]uint64
+	mu            sync.Mutex
+	nextID        uint64
+	assets        map[uint64]Asset
+	byKey         map[string]uint64
+	byTrace       map[string]uint64
+	findPublicErr error
 }
 
 func newMemoryRepo() *memoryRepo {
@@ -65,12 +66,26 @@ func (r *memoryRepo) FindOwned(_ context.Context, publicID string, ownerID uint)
 func (r *memoryRepo) FindPublic(_ context.Context, publicID string) (Asset, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.findPublicErr != nil {
+		return Asset{}, r.findPublicErr
+	}
 	for _, value := range r.assets {
 		if value.PublicID == publicID && value.Status == StatusApproved && value.ReferenceType != "" && value.DeleteRequestedAt == nil {
 			return value, nil
 		}
 	}
 	return Asset{}, ErrNotFound
+}
+
+type fallbackContentResolver struct {
+	calls int
+	value string
+	err   error
+}
+
+func (r *fallbackContentResolver) ContentURLByMediaID(context.Context, string) (string, error) {
+	r.calls++
+	return r.value, r.err
 }
 func (r *memoryRepo) MarkUploaded(_ context.Context, id uint64, size int64, mime string, width, height int, openID string) error {
 	return r.update(id, func(value *Asset) error {
@@ -378,6 +393,44 @@ func TestUploadReviewBindingAndControlledURL(t *testing.T) {
 	}
 	if _, err := service.ContentURL(context.Background(), ticket.AssetID); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestContentURLFallbackUsesCoreOnlyForLegacyNotFound(t *testing.T) {
+	tests := []struct {
+		name          string
+		legacy        *Asset
+		legacyErr     error
+		wantURL       string
+		wantErr       error
+		resolverCalls int
+	}{
+		{name: "core fallback", wantURL: "https://core.invalid/fixed", resolverCalls: 1},
+		{name: "legacy wins", legacy: &Asset{ID: 1, PublicID: "legacy", Status: StatusApproved, ReferenceType: "product", ObjectKey: "legacy/product.webp"}, wantURL: "https://cos.invalid/legacy/product.webp?signature=secret"},
+		{name: "database failure does not fallback", legacyErr: errors.New("database unavailable"), wantErr: errors.New("database unavailable")},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			repo := newMemoryRepo()
+			repo.findPublicErr = test.legacyErr
+			if test.legacy != nil {
+				repo.assets[test.legacy.ID] = *test.legacy
+			}
+			resolver := &fallbackContentResolver{value: "https://core.invalid/fixed"}
+			service := NewService(repo, &fakeIssuer{}, &fakeStorage{}, &fakeSafety{}, &fakeReviews{},
+				"bucket-1", "ap-test", "https://api.example.com", WithPublicContentResolver(resolver))
+			value, err := service.ContentURL(context.Background(), "legacy")
+			if test.wantErr != nil {
+				if err == nil || err.Error() != test.wantErr.Error() {
+					t.Fatalf("err=%v want=%v", err, test.wantErr)
+				}
+			} else if err != nil || value != test.wantURL {
+				t.Fatalf("url=%q err=%v want=%q", value, err, test.wantURL)
+			}
+			if resolver.calls != test.resolverCalls {
+				t.Fatalf("resolver calls=%d want=%d", resolver.calls, test.resolverCalls)
+			}
+		})
 	}
 }
 

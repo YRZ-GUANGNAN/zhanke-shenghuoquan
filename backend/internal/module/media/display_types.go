@@ -15,6 +15,7 @@ type DisplayObjectIdentity struct {
 
 type MediaDisplayReadRepository interface {
 	FindVisibleDisplayObjectByReference(context.Context, Purpose, string, uint16) (DisplayObjectIdentity, error)
+	FindVisibleDisplayObjectByAsset(context.Context, string) (DisplayObjectIdentity, error)
 }
 
 type DisplayURLSigner interface {
@@ -23,4 +24,5 @@ type DisplayURLSigner interface {
 
 type displayGateway interface {
 	BuildDisplayView(context.Context, Purpose, string, uint16) (MediaDisplayView, error)
+	GetVisibleMetadata(context.Context, string) (MediaMetadataView, error)
 }
