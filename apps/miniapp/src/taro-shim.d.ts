@@ -46,6 +46,7 @@ declare module '@tarojs/taro' {
     removeStorageSync(key: string): void
     getCurrentInstance(): CurrentInstance
     chooseMedia(options: { count: number; mediaType: ['image']; sourceType: Array<'album' | 'camera'>; sizeType?: Array<'original' | 'compressed'> }): Promise<{ tempFiles: Array<{ tempFilePath: string; size: number; fileType?: string }> }>
+    previewImage(options: { urls: string[]; current?: string }): Promise<unknown>
     getImageInfo(options: { src: string }): Promise<{ width: number; height: number; type: string; path: string }>
     compressImage(options: { src: string; quality: number; compressedWidth?: number; compressedHeight?: number; format?: 'webp' }): Promise<{ tempFilePath: string }>
     getFileInfo(options: { filePath: string; digestAlgorithm?: 'md5' | 'sha1' }): Promise<{ size: number; digest: string }>
