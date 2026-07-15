@@ -258,6 +258,17 @@ func TestReferenceBindingUpdateKeepsReplacesAndReordersAgainstMySQL84(t *testing
 	if removedReference.Status != ReferenceRevoked || removedReference.ParentVisibility != ParentHidden || removedReference.Slot < maxReferenceBindingAssets {
 		t.Fatalf("removed reference=%+v", removedReference)
 	}
+	if err := service.Publish(context.Background(), PurposeProduct, "9002"); err != nil {
+		t.Fatalf("publish replacement set: %v", err)
+	}
+	assertBindingReferenceState(t, db, kept.Asset.ID, "9002", 0, ReferenceActive, ParentVisible)
+	assertBindingReferenceState(t, db, added.Asset.ID, "9002", 1, ReferenceActive, ParentVisible)
+	if err := db.First(&removedReference, removedReference.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if removedReference.Status != ReferenceRevoked || removedReference.ParentVisibility != ParentHidden || removedReference.RevocationFence == nil {
+		t.Fatalf("publish resurrected removed reference=%+v", removedReference)
+	}
 }
 
 func createApprovedProductBindingFixture(t *testing.T, db *gorm.DB, ownerID uint64) productBindingFixture {

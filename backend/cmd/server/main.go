@@ -72,8 +72,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("configure WeChat media safety: %v", err)
 	}
-	mediaService := legacymedia.NewService(legacymedia.NewRepository(db), cosClient, cosClient, wechatMediaSafety, reviewService, cfg.COSBucket, cfg.COSRegion, cfg.MediaPublicBaseURL)
-	reviewService.RegisterTarget(mediaService)
 	mediaRepository := coremedia.NewRepository(db)
 	uploadAuthorizer, err := coremedia.NewTencentUploadAuthorizer(coremedia.TencentUploadAuthorizerConfig{
 		SecretID: cfg.COSSecretID, SecretKey: cfg.COSSecretKey, Bucket: cfg.COSBucket,
@@ -115,6 +113,20 @@ func main() {
 	mediaDisplay, err := coremedia.NewMediaDisplayService(coreMediaGateway, mediaRepository, completionStore, coremedia.MediaDisplayURLTTL)
 	if err != nil {
 		log.Fatalf("configure Module 10 media display: %v", err)
+	}
+	mediaService := legacymedia.NewService(
+		legacymedia.NewRepository(db), cosClient, cosClient, wechatMediaSafety, reviewService,
+		cfg.COSBucket, cfg.COSRegion, cfg.MediaPublicBaseURL,
+		legacymedia.WithPublicContentResolver(mediaDisplay),
+	)
+	reviewService.RegisterTarget(mediaService)
+	bindingService, err := coremedia.NewReferenceBindingService(coremedia.NewReferenceBindingRepository(db), nil)
+	if err != nil {
+		log.Fatalf("configure Module 10 reference binding: %v", err)
+	}
+	tradeMediaGateway, err := trade.NewHybridMediaGateway(bindingService, mediaService, cfg.MediaPublicBaseURL)
+	if err != nil {
+		log.Fatalf("configure trade media gateway: %v", err)
 	}
 	privateProofDisplay, err := coremedia.NewMediaDisplayService(
 		coreMediaGateway, mediaRepository, completionStore, delivery.PrivateProofURLTTL,
@@ -169,9 +181,9 @@ func main() {
 	communityRepository := community.NewRepository(db)
 	tradeRepository := trade.NewRepository(db)
 	communityService := community.NewService(communityRepository, userService, reviewService, mediaService)
-	tradeService := trade.NewService(tradeRepository, userService, reviewService, imService, searchIndex, mediaService)
+	tradeService := trade.NewService(tradeRepository, userService, reviewService, imService, searchIndex, tradeMediaGateway)
 	communityWriteOutboxProcessor := community.NewWriteOutboxProcessor(communityRepository, mediaService, reviewService)
-	tradeWriteOutboxProcessor := trade.NewWriteOutboxProcessor(tradeRepository, mediaService, reviewService)
+	tradeWriteOutboxProcessor := trade.NewWriteOutboxProcessor(tradeRepository, tradeMediaGateway, reviewService)
 	go func() {
 		for {
 			if err := communityWriteOutboxProcessor.Run(context.Background()); err != nil {

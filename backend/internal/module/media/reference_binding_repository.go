@@ -219,11 +219,16 @@ func (r *GormReferenceBindingRepository) PublishBinding(ctx context.Context, ref
 		}
 		now := time.Now().UTC()
 		assetIDs := make([]uint64, 0, len(references))
+		publishable := 0
 		for _, reference := range references {
+			if reference.Status == ReferenceRevoked {
+				continue
+			}
 			if reference.RevocationFence != nil || (reference.Status != ReferencePending && reference.Status != ReferenceActive) ||
 				(reference.Status == ReferencePending && reference.ParentVisibility != ParentHidden) {
 				return ErrBindingMismatch
 			}
+			publishable++
 			assetIDs = append(assetIDs, reference.AssetID)
 			if reference.Status == ReferencePending {
 				updated := tx.Model(&AssetReference{}).Where("id = ? AND status = ?", reference.ID, ReferencePending).
@@ -233,7 +238,13 @@ func (r *GormReferenceBindingRepository) PublishBinding(ctx context.Context, ref
 				}
 			}
 		}
+		if publishable == 0 {
+			return ErrNotFound
+		}
 		for _, reference := range references {
+			if reference.Status == ReferenceRevoked {
+				continue
+			}
 			if reference.ParentVisibility != ParentHidden {
 				continue
 			}
