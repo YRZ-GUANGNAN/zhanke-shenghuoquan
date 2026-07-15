@@ -340,6 +340,11 @@
   color: $like-active;
 }
 
+.secondhand-detail-favorite--pending,
+.secondhand-detail-contact--pending {
+  opacity: .62;
+}
+
 .secondhand-detail-contact {
   display: flex;
   align-items: center;

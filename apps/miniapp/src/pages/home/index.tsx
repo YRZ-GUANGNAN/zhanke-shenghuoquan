@@ -223,7 +223,7 @@ function HomeContent() {
       if (!requestCommunity && !requestTrade) return
 
       const communityRequest: Promise<PageResult<CommunityPost> | null> = requestCommunity
-        ? getCommunityPostsPage(communityPage, 'recent', 10)
+        ? getCommunityPostsPage({ page: communityPage, sort: 'recent', pageSize: 10 })
         : Promise.resolve(null)
       const tradeRequest: Promise<ProductPageResult | null> = requestTrade
         ? getProductsPage({ page: tradePage, pageSize: 10, status: 'selling' })

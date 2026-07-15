@@ -1,13 +1,23 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
 import { isApiError } from '../../services/api'
-import { getProduct } from '../../services/c-trade'
+import { contactSeller, getProduct, getTradeViewerState, setProductFavorited } from '../../services/c-trade'
 import Taro from '../../services/taro'
 import type { Product } from '../../types'
 import './index.scss'
 
 function showToast(title: string) {
   void Taro.showToast({ title, icon: 'none', duration: 1400 })
+}
+
+function writeErrorMessage(error: unknown, action: '收藏' | '联系卖家'): string {
+  if (!isApiError(error)) return error instanceof Error ? error.message : `${action}失败，请稍后重试`
+  if (error.status === 0) return '网络连接失败，请稍后重试'
+  if (error.status === 401 || error.status === 403) return '登录状态已失效，请重新登录'
+  if (error.status === 404) return '宝贝不存在或已下架'
+  if (error.status === 409) return `当前宝贝状态不允许${action}`
+  if (error.status === 422) return action === '联系卖家' ? '不能联系自己发布的宝贝' : '当前收藏状态无法更新'
+  return error.message || `${action}失败，请稍后重试`
 }
 
 export default function SecondhandDetailPage() {
@@ -21,6 +31,9 @@ export default function SecondhandDetailPage() {
   const requestVersion = useRef(0)
   const [imageFailed, setImageFailed] = useState(false)
   const [contactVisible, setContactVisible] = useState(false)
+  const [favorited, setFavorited] = useState<boolean | null>(null)
+  const [favoritePending, setFavoritePending] = useState(false)
+  const [contactPending, setContactPending] = useState(false)
   const retryProduct = useCallback(() => setReloadKey((value) => value + 1), [])
 
   useEffect(() => {
@@ -33,10 +46,15 @@ export default function SecondhandDetailPage() {
     let active = true
     setStatus('loading')
     setImageFailed(false)
+    setFavorited(null)
 
-    void getProduct(requestedId).then((value) => {
+    void Promise.all([
+      getProduct(requestedId),
+      getTradeViewerState(requestedId).catch(() => null)
+    ]).then(([value, viewerState]) => {
       if (!active || requestVersion.current !== version) return
       setProduct(value)
+      setFavorited(viewerState?.favorited ?? null)
       setStatus('ready')
     }).catch((error: unknown) => {
       if (!active || requestVersion.current !== version) return
@@ -54,6 +72,16 @@ export default function SecondhandDetailPage() {
     void Taro.navigateBack().catch(() => Taro.redirectTo({ url: '/pages/student-secondhand/index' }))
   }
 
+  const openSellerProfile = () => {
+    if (!product?.sellerId) {
+      showToast('卖家资料暂不可用')
+      return
+    }
+    void Taro.navigateTo({
+      url: `/pages/user-profile/index?userId=${encodeURIComponent(product.sellerId)}&tab=secondhand`
+    })
+  }
+
   const statusLabel = product?.status === 'selling'
     ? '出售中'
     : product?.status === 'reserved'
@@ -63,6 +91,52 @@ export default function SecondhandDetailPage() {
   const sellerMeta = product?.campus || '校内'
   const sellerAvatar = product?.sellerName.trim().charAt(0) || '校'
   const firstImage = product?.images[0]
+
+  const handleFavorite = async () => {
+    if (!product || favoritePending) return
+    setFavoritePending(true)
+    try {
+      const serverState = favorited === null ? await getTradeViewerState(product.id) : null
+      const desired = !(serverState?.favorited ?? favorited)
+      if (product.status === 'sold' && desired) {
+        showToast('已售商品不能新增收藏')
+        return
+      }
+      const next = await setProductFavorited(product.id, desired)
+      setFavorited(next)
+      await Taro.showToast({ title: next ? '已收藏' : '已取消收藏', icon: 'success', duration: 1400 })
+    } catch (error) {
+      try {
+        const serverState = await getTradeViewerState(product.id)
+        setFavorited(serverState.favorited)
+      } catch {
+        // 结果未知时保留最后一次已确认状态，不在前端猜测成功。
+      }
+      await Taro.showToast({ title: writeErrorMessage(error, '收藏'), icon: 'none', duration: 1800 })
+    } finally {
+      setFavoritePending(false)
+    }
+  }
+
+  const handleStartChat = async () => {
+    if (!product || contactPending) return
+    if (product.status === 'sold') {
+      showToast('已售商品不能新建私信会话')
+      return
+    }
+    setContactPending(true)
+    try {
+      await contactSeller(product.id)
+      setContactVisible(false)
+      await Taro.navigateTo({
+        url: `/pages/secondhand-chat/index?productId=${encodeURIComponent(product.id)}`
+      })
+    } catch (error) {
+      await Taro.showToast({ title: writeErrorMessage(error, '联系卖家'), icon: 'none', duration: 1800 })
+    } finally {
+      setContactPending(false)
+    }
+  }
 
   const renderState = () => {
     const stateCopy = status === 'loading'
@@ -93,7 +167,11 @@ export default function SecondhandDetailPage() {
           <>
             <View
               className='secondhand-detail-hero'
-              onClick={() => firstImage && !imageFailed && showToast('图片预览下一阶段接入')}
+              onClick={() => {
+                if (!firstImage || imageFailed || !product) return
+                void Taro.previewImage({ urls: product.images, current: firstImage })
+                  .catch(() => showToast('图片预览失败，请稍后重试'))
+              }}
             >
               {firstImage && !imageFailed ? (
                 <Image
@@ -142,7 +220,7 @@ export default function SecondhandDetailPage() {
                   <Text className='secondhand-detail-seller__name'>{product.sellerName}</Text>
                   <Text className='secondhand-detail-seller__meta'>{sellerMeta}</Text>
                 </View>
-                <View className='secondhand-detail-seller__button' onClick={() => showToast('用户主页下一阶段接入')}>
+                <View className='secondhand-detail-seller__button' onClick={openSellerProfile}>
                   <Text>主页</Text>
                 </View>
               </View>
@@ -158,11 +236,17 @@ export default function SecondhandDetailPage() {
 
       {status === 'ready' && product && (
         <View className='secondhand-detail-actionbar'>
-          <View className='secondhand-detail-favorite' onClick={() => showToast('收藏功能下一阶段接入')}>
+          <View
+            className={`secondhand-detail-favorite ${favorited ? 'secondhand-detail-favorite--active' : ''} ${favoritePending ? 'secondhand-detail-favorite--pending' : ''}`}
+            onClick={() => void handleFavorite()}
+          >
             <View className='secondhand-detail-favorite__star' />
-            <Text>收藏</Text>
+            <Text>{favoritePending ? '处理中' : favorited ? '已收藏' : '收藏'}</Text>
           </View>
-          <View className='secondhand-detail-contact' onClick={() => setContactVisible(true)}>
+          <View
+            className={`secondhand-detail-contact ${contactPending ? 'secondhand-detail-contact--pending' : ''}`}
+            onClick={() => !contactPending && setContactVisible(true)}
+          >
             <View className='secondhand-detail-contact__icon' />
             <Text>联系卖家</Text>
           </View>
@@ -171,20 +255,22 @@ export default function SecondhandDetailPage() {
 
       {contactVisible && product && (
         <View className='secondhand-contact-modal'>
-          <View className='secondhand-contact-modal__mask' onClick={() => setContactVisible(false)} />
+          <View className='secondhand-contact-modal__mask' onClick={() => !contactPending && setContactVisible(false)} />
           <View className='secondhand-contact-sheet'>
             <View className='secondhand-contact-sheet__head'>
               <Text className='secondhand-contact-sheet__title'>联系卖家</Text>
-              <View className='secondhand-contact-sheet__close' onClick={() => setContactVisible(false)}>
+              <View className='secondhand-contact-sheet__close' onClick={() => !contactPending && setContactVisible(false)}>
                 <Text>×</Text>
               </View>
             </View>
 
-            <View className='secondhand-contact-option' onClick={() => showToast('私信功能下一阶段接入')}>
+            <View className='secondhand-contact-option' onClick={() => void handleStartChat()}>
               <View className='secondhand-contact-option__icon secondhand-contact-option__icon--chat' />
               <View className='secondhand-contact-option__main'>
                 <Text className='secondhand-contact-option__title'>发起私聊</Text>
-                <Text className='secondhand-contact-option__desc'>私信功能下一阶段接入</Text>
+                <Text className='secondhand-contact-option__desc'>
+                  {contactPending ? '正在建立安全会话' : '通过平台私信沟通'}
+                </Text>
               </View>
               <Text className='secondhand-contact-option__arrow'>›</Text>
             </View>

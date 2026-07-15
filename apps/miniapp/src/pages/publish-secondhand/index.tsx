@@ -1,5 +1,9 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useRef, useState } from 'react'
 import { Image, Input, ScrollView, Text, Textarea, View } from '@tarojs/components'
+import { isApiError } from '../../services/api'
+import { createProduct } from '../../services/c-trade'
+import { createClientRequestId } from '../../services/client-request-id'
+import { chooseAndUploadImages, waitForMediaApproval, type UploadedMedia } from '../../services/media'
 import Taro from '../../services/taro'
 import './index.scss'
 
@@ -11,62 +15,126 @@ function inputValue(event: { detail: { value?: string } }) {
   return String(event.detail.value ?? '')
 }
 
+export function priceTextToCents(value: string): number | null {
+  const match = /^(0|[1-9]\d*)(?:\.(\d{1,2}))?$/.exec(value.trim())
+  if (!match) return null
+  const cents = Number(match[1]) * 100 + Number((match[2] ?? '').padEnd(2, '0'))
+  return Number.isSafeInteger(cents) && cents > 0 ? cents : null
+}
+
+function publishErrorMessage(error: unknown): string {
+  if (!isApiError(error)) return error instanceof Error ? error.message : '发布失败，请稍后重试'
+  if (error.status === 0) return '网络连接失败，保持内容不变可安全重试'
+  if (error.status === 400) return '发布信息不符合要求，请检查后重试'
+  if (error.status === 401 || error.status === 403) return '登录状态已失效，请重新登录'
+  if (error.status === 409) return '本次发布请求冲突，请检查内容后重新发布'
+  if (error.status === 503 || error.status === 504) return '发布服务暂不可用，保持内容不变可安全重试'
+  return error.message || '发布失败，请稍后重试'
+}
+
 export default function PublishSecondhandPage() {
-  const [images, setImages] = useState<string[]>([])
+  const [images, setImages] = useState<UploadedMedia[]>([])
   const [title, setTitle] = useState('')
   const [price, setPrice] = useState('')
   const [category, setCategory] = useState<SecondhandCategory | null>(null)
   const [description, setDescription] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [uploadStatus, setUploadStatus] = useState('实拍图更容易卖出去')
+  const clientRequestIdRef = useRef<string | null>(null)
 
   const priceLabel = useMemo(() => {
     const normalized = price.trim()
     return normalized.length > 0 ? normalized : '0'
   }, [price])
 
+  const invalidateRequest = () => {
+    clientRequestIdRef.current = null
+  }
+
   const chooseImages = async () => {
+    if (uploading || submitting) return
     if (images.length >= 9) {
       await Taro.showToast({ title: '最多添加 9 张图片', icon: 'none', duration: 1400 })
       return
     }
 
+    setUploading(true)
+    setUploadStatus('正在安全上传图片')
     try {
-      const result = await Taro.chooseMedia({
-        count: 9 - images.length,
-        mediaType: ['image'],
-        sourceType: ['album', 'camera'],
-        sizeType: ['compressed']
+      const uploaded = await chooseAndUploadImages('product_image', 9 - images.length, (progress) => {
+        setUploadStatus(progress.message)
       })
-      setImages((current) => [
-        ...current,
-        ...result.tempFiles.map((file) => file.tempFilePath)
-      ].slice(0, 9))
-    } catch {
-      // 用户取消选择时保持当前表单，不额外打扰。
+      invalidateRequest()
+      setImages((current) => [...current, ...uploaded].slice(0, 9))
+      if (uploaded.length > 0) {
+        await Taro.showToast({ title: '图片已上传', icon: 'success', duration: 1400 })
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '图片上传未完成，请重试'
+      await Taro.showToast({ title: message, icon: 'none', duration: 1800 })
+    } finally {
+      setUploading(false)
+      setUploadStatus('实拍图更容易卖出去')
     }
   }
 
   const removeCover = () => {
+    if (uploading || submitting) return
+    invalidateRequest()
     setImages((current) => current.slice(1))
   }
 
-  const handlePublish = () => {
+  const handlePublish = async () => {
+    if (uploading || submitting) return
     if (images.length === 0) {
-      void Taro.showToast({ title: '请先添加宝贝实拍图', icon: 'none', duration: 1400 })
+      await Taro.showToast({ title: '请先添加宝贝实拍图', icon: 'none', duration: 1400 })
       return
     }
     if (!title.trim()) {
-      void Taro.showToast({ title: '请填写宝贝标题', icon: 'none', duration: 1400 })
+      await Taro.showToast({ title: '请填写宝贝标题', icon: 'none', duration: 1400 })
       return
     }
-    if (!price.trim() || Number(price) <= 0) {
-      void Taro.showToast({ title: '请填写有效价格', icon: 'none', duration: 1400 })
+    const priceCents = priceTextToCents(price)
+    if (priceCents === null) {
+      await Taro.showToast({ title: '价格最多保留两位小数', icon: 'none', duration: 1400 })
       return
     }
     if (!category) {
-      void Taro.showToast({ title: '请选择宝贝分类', icon: 'none', duration: 1400 })
+      await Taro.showToast({ title: '请选择宝贝分类', icon: 'none', duration: 1400 })
       return
     }
-    void Taro.showToast({ title: '静态演示，暂未提交数据', icon: 'none', duration: 1600 })
+    if (!description.trim()) {
+      await Taro.showToast({ title: '请补充宝贝描述', icon: 'none', duration: 1400 })
+      return
+    }
+
+    const clientRequestId = clientRequestIdRef.current ?? createClientRequestId()
+    clientRequestIdRef.current = clientRequestId
+    setSubmitting(true)
+    setUploadStatus('正在确认图片审核状态')
+    try {
+      await Promise.all(images.map((image) => waitForMediaApproval(image.assetId)))
+      await createProduct({
+        title: title.trim(),
+        description: description.trim(),
+        price: priceCents,
+        category,
+        imageAssetIds: images.map((image) => image.assetId),
+        clientRequestId
+      })
+      clientRequestIdRef.current = null
+      await Taro.showToast({ title: '发布成功，等待审核', icon: 'success', duration: 1600 })
+      await Taro.redirectTo({ url: '/pages/student-secondhand/index' })
+    } catch (error) {
+      if (isApiError(error) && error.status >= 400 && error.status < 500) {
+        clientRequestIdRef.current = null
+      }
+      await Taro.showToast({ title: publishErrorMessage(error), icon: 'none', duration: 2200 })
+    } finally {
+      setSubmitting(false)
+      setUploadStatus('实拍图更容易卖出去')
+    }
   }
 
   return (
@@ -84,7 +152,7 @@ export default function PublishSecondhandPage() {
           <View className='publish-secondhand-upload' onClick={() => void chooseImages()}>
             {images.length > 0 ? (
               <>
-                <Image className='publish-secondhand-upload__preview' src={images[0]} mode='aspectFill' />
+                <Image className='publish-secondhand-upload__preview' src={images[0].previewPath} mode='aspectFill' />
                 <View className='publish-secondhand-upload__count'>
                   <Text>{images.length}/9</Text>
                 </View>
@@ -101,7 +169,7 @@ export default function PublishSecondhandPage() {
 
           <View className='publish-secondhand-upload-copy'>
             <Text>最多 9 张，第一张为封面</Text>
-            <Text>实拍图更容易卖出去</Text>
+            <Text>{uploadStatus}</Text>
             {images.length > 0 && (
               <Text className='publish-secondhand-upload-copy__remove' onClick={removeCover}>移除封面</Text>
             )}
@@ -117,7 +185,10 @@ export default function PublishSecondhandPage() {
               maxlength={40}
               placeholder='品牌型号、新旧程度、入手渠道...'
               placeholderClass='publish-secondhand-field__placeholder'
-              onInput={(event) => setTitle(inputValue(event))}
+              onInput={(event) => {
+                invalidateRequest()
+                setTitle(inputValue(event))
+              }}
             />
           </View>
 
@@ -132,7 +203,10 @@ export default function PublishSecondhandPage() {
                 maxlength={8}
                 placeholder='0'
                 placeholderClass='publish-secondhand-price__placeholder'
-                onInput={(event) => setPrice(inputValue(event).replace(/[^\d.]/g, ''))}
+                onInput={(event) => {
+                  invalidateRequest()
+                  setPrice(inputValue(event).replace(/[^\d.]/g, ''))
+                }}
               />
             </View>
             <Text className='publish-secondhand-field__aside'>仅展示，线下私下交易</Text>
@@ -145,7 +219,10 @@ export default function PublishSecondhandPage() {
                 <View
                   key={item}
                   className={`publish-secondhand-category ${category === item ? 'publish-secondhand-category--active' : ''}`}
-                  onClick={() => setCategory(item)}
+                  onClick={() => {
+                    invalidateRequest()
+                    setCategory(item)
+                  }}
                 >
                   <Text>{item}</Text>
                 </View>
@@ -164,7 +241,10 @@ export default function PublishSecondhandPage() {
               maxlength={300}
               placeholder='说说宝贝的使用情况、交易方式（如宿舍楼下自提）...'
               placeholderClass='publish-secondhand-description__placeholder'
-              onInput={(event) => setDescription(inputValue(event))}
+              onInput={(event) => {
+                invalidateRequest()
+                setDescription(inputValue(event))
+              }}
             />
           </View>
         </View>
@@ -178,8 +258,11 @@ export default function PublishSecondhandPage() {
       </ScrollView>
 
       <View className='publish-secondhand-footer'>
-        <View className='publish-secondhand-footer__button' onClick={handlePublish}>
-          <Text>发布</Text>
+        <View
+          className={`publish-secondhand-footer__button ${uploading || submitting ? 'publish-secondhand-footer__button--disabled' : ''}`}
+          onClick={() => void handlePublish()}
+        >
+          <Text>{submitting ? '发布中' : uploading ? '图片上传中' : '发布'}</Text>
         </View>
       </View>
     </View>
