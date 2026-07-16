@@ -225,18 +225,34 @@ func TestWechatCallbackIgnoresUnknownOrdinaryFields(t *testing.T) {
 }
 
 type recordingWechatReviewApplier struct {
-	calls   int
-	traceID string
-	suggest string
-	label   int
-	err     error
+	calls          int
+	resultCalls    int
+	failureCalls   int
+	traceID        string
+	suggest        string
+	label          int
+	failureTraceID string
+	failureCode    string
+	err            error
 }
 
 func (value *recordingWechatReviewApplier) ApplyWechatReviewResult(_ context.Context, traceID, suggest string, label int) error {
 	value.calls++
+	value.resultCalls++
 	value.traceID = traceID
 	value.suggest = suggest
 	value.label = label
+	return value.err
+}
+
+func (value *recordingWechatReviewApplier) ApplyWechatReviewFailure(
+	_ context.Context,
+	traceID, failureCode string,
+) error {
+	value.calls++
+	value.failureCalls++
+	value.failureTraceID = traceID
+	value.failureCode = failureCode
 	return value.err
 }
 
@@ -269,6 +285,262 @@ func runWechatReviewCallback(t *testing.T, applier wechatReviewResultApplier, re
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, request)
 	return recorder
+}
+
+func TestWechatReviewCallbackAppliesOfficialSuccessJSONAndXML(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		body    string
+		traceID string
+	}{
+		{
+			name:    "json",
+			body:    `{"MsgType":"event","Event":"wxa_media_check","errcode":0,"trace_id":"trace-official-json","result":{"suggest":"pass","label":100}}`,
+			traceID: "trace-official-json",
+		},
+		{
+			name:    "xml",
+			body:    `<xml><MsgType>event</MsgType><Event>wxa_media_check</Event><errcode>0</errcode><trace_id>trace-official-xml</trace_id><result><suggest>pass</suggest><label>100</label></result></xml>`,
+			traceID: "trace-official-xml",
+		},
+		{
+			name:    "json string label whitespace",
+			body:    `{"MsgType":"event","Event":"wxa_media_check","errcode":0,"trace_id":"trace-official-json-string","result":{"suggest":"pass","label":" 100 "}}`,
+			traceID: "trace-official-json-string",
+		},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			applier := &recordingWechatReviewApplier{}
+			response := runWechatReviewCallback(t, applier, signedWechatReviewRequest(
+				test.body, "application/octet-stream", "callback-token-strong", true,
+			))
+			if response.Code != http.StatusOK || response.Body.String() != "success" {
+				t.Fatalf("status=%d response_length=%d", response.Code, response.Body.Len())
+			}
+			fieldsMatch := applier.traceID == test.traceID && applier.suggest == "pass" && applier.label == 100
+			if applier.resultCalls != 1 || applier.failureCalls != 0 || !fieldsMatch {
+				t.Fatalf(
+					"result_calls=%d failure_calls=%d fields_match=%t",
+					applier.resultCalls, applier.failureCalls, fieldsMatch,
+				)
+			}
+		})
+	}
+}
+
+func TestWechatReviewCallbackMapsDownloadAndPlatformErrors(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		body        string
+		traceID     string
+		failureCode string
+	}{
+		{
+			name:        "json download",
+			body:        `{"MsgType":"event","Event":"wxa_media_check","errcode":-1008,"trace_id":"trace-download-json"}`,
+			traceID:     "trace-download-json",
+			failureCode: wechatMediaDownloadFailureCode,
+		},
+		{
+			name:        "xml download",
+			body:        `<xml><MsgType>event</MsgType><Event>wxa_media_check</Event><errcode>-1008</errcode><trace_id>trace-download-xml</trace_id></xml>`,
+			traceID:     "trace-download-xml",
+			failureCode: wechatMediaDownloadFailureCode,
+		},
+		{
+			name:        "json platform",
+			body:        `{"MsgType":"event","Event":"wxa_media_check","errcode":-1001,"trace_id":"trace-platform-json"}`,
+			traceID:     "trace-platform-json",
+			failureCode: wechatMediaPlatformFailureCode,
+		},
+		{
+			name:        "xml platform",
+			body:        `<xml><MsgType>event</MsgType><Event>wxa_media_check</Event><errcode>-1001</errcode><trace_id>trace-platform-xml</trace_id></xml>`,
+			traceID:     "trace-platform-xml",
+			failureCode: wechatMediaPlatformFailureCode,
+		},
+		{
+			name:        "legacy json download",
+			body:        `{"errcode":-1008,"trace_id":"trace-download-legacy-json"}`,
+			traceID:     "trace-download-legacy-json",
+			failureCode: wechatMediaDownloadFailureCode,
+		},
+		{
+			name:        "legacy xml platform",
+			body:        `<xml><errcode>-1001</errcode><trace_id>trace-platform-legacy-xml</trace_id></xml>`,
+			traceID:     "trace-platform-legacy-xml",
+			failureCode: wechatMediaPlatformFailureCode,
+		},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			applier := &recordingWechatReviewApplier{}
+			response := runWechatReviewCallback(t, applier, signedWechatReviewRequest(
+				test.body, "application/octet-stream", "callback-token-strong", true,
+			))
+			if response.Code != http.StatusOK || response.Body.String() != "success" {
+				t.Fatalf("status=%d response_length=%d", response.Code, response.Body.Len())
+			}
+			fieldsMatch := applier.failureTraceID == test.traceID && applier.failureCode == test.failureCode
+			if applier.resultCalls != 0 || applier.failureCalls != 1 || !fieldsMatch {
+				t.Fatalf(
+					"result_calls=%d failure_calls=%d fields_match=%t",
+					applier.resultCalls, applier.failureCalls, fieldsMatch,
+				)
+			}
+		})
+	}
+}
+
+func TestWechatReviewCallbackIgnoresUnrelatedPushes(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		name string
+		body string
+	}{
+		{"json text", `{"MsgType":"text","Content":"hello"}`},
+		{"json other event", `{"MsgType":"event","Event":"subscribe","FromUserName":"opaque"}`},
+		{"xml text", `<xml><MsgType>text</MsgType><Content>hello</Content></xml>`},
+		{"xml other event", `<xml><MsgType>event</MsgType><Event>subscribe</Event><FromUserName>opaque</FromUserName></xml>`},
+	} {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			applier := &recordingWechatReviewApplier{}
+			response := runWechatReviewCallback(t, applier, signedWechatReviewRequest(
+				test.body, "application/octet-stream", "callback-token-strong", true,
+			))
+			if response.Code != http.StatusOK || response.Body.String() != "success" ||
+				applier.resultCalls != 0 || applier.failureCalls != 0 {
+				t.Fatalf(
+					"status=%d response_length=%d result_calls=%d failure_calls=%d",
+					response.Code, response.Body.Len(), applier.resultCalls, applier.failureCalls,
+				)
+			}
+		})
+	}
+}
+
+func TestWechatReviewCallbackRejectsAmbiguousOfficialEnvelope(t *testing.T) {
+	t.Parallel()
+	validJSONTail := `,"Event":"wxa_media_check","errcode":0,"trace_id":"trace-ambiguous","result":{"suggest":"pass","label":100}}`
+	validXMLTail := `<Event>wxa_media_check</Event><errcode>0</errcode><trace_id>trace-ambiguous</trace_id><result><suggest>pass</suggest><label>100</label></result></xml>`
+	tests := []struct {
+		name string
+		body string
+	}{
+		{"json duplicate msg type", `{"MsgType":"event","Msg\u0054ype":"event"` + validJSONTail},
+		{"json duplicate event", `{"MsgType":"event","Event":"wxa_media_check","Ev\u0065nt":"wxa_media_check","errcode":0,"trace_id":"trace-ambiguous","result":{"suggest":"pass","label":100}}`},
+		{"json duplicate error code", `{"MsgType":"event","Event":"wxa_media_check","errcode":0,"errc\u006fde":0,"trace_id":"trace-ambiguous","result":{"suggest":"pass","label":100}}`},
+		{"json duplicate encrypt", `{"Encrypt":"cipher","Encr\u0079pt":"cipher"}`},
+		{"json msg type scalar", `{"MsgType":1` + validJSONTail},
+		{"json event scalar", `{"MsgType":"event","Event":true,"errcode":0,"trace_id":"trace-ambiguous","result":{"suggest":"pass","label":100}}`},
+		{"json error code string", `{"MsgType":"event","Event":"wxa_media_check","errcode":"-1008","trace_id":"trace-ambiguous"}`},
+		{"json error code float", `{"MsgType":"event","Event":"wxa_media_check","errcode":-1008.0,"trace_id":"trace-ambiguous"}`},
+		{"json error code exponent", `{"MsgType":"event","Event":"wxa_media_check","errcode":-1e3,"trace_id":"trace-ambiguous"}`},
+		{"json encrypt scalar", `{"Encrypt":"opaque-ciphertext"}`},
+		{"json encrypt wrong type", `{"Encrypt":{"cipher":"opaque"}}`},
+		{"json media event with text type", `{"MsgType":"text","Event":"wxa_media_check","errcode":0,"trace_id":"trace-ambiguous","result":{"suggest":"pass","label":100}}`},
+		{"xml duplicate msg type", `<xml><MsgType>event</MsgType><MsgType>event</MsgType>` + validXMLTail},
+		{"xml duplicate event", `<xml><MsgType>event</MsgType><Event>wxa_media_check</Event><Event>wxa_media_check</Event><errcode>0</errcode><trace_id>trace-ambiguous</trace_id><result><suggest>pass</suggest><label>100</label></result></xml>`},
+		{"xml duplicate error code", `<xml><MsgType>event</MsgType><Event>wxa_media_check</Event><errcode>0</errcode><errcode>0</errcode><trace_id>trace-ambiguous</trace_id><result><suggest>pass</suggest><label>100</label></result></xml>`},
+		{"xml duplicate encrypt", `<xml><Encrypt>cipher</Encrypt><Encrypt>cipher</Encrypt></xml>`},
+		{"xml msg type non scalar", `<xml><MsgType><value>event</value></MsgType>` + validXMLTail},
+		{"xml event non scalar", `<xml><MsgType>event</MsgType><Event><value>wxa_media_check</value></Event><errcode>0</errcode><trace_id>trace-ambiguous</trace_id><result><suggest>pass</suggest><label>100</label></result></xml>`},
+		{"xml error code plus", `<xml><MsgType>event</MsgType><Event>wxa_media_check</Event><errcode>+1008</errcode><trace_id>trace-ambiguous</trace_id></xml>`},
+		{"xml error code float", `<xml><MsgType>event</MsgType><Event>wxa_media_check</Event><errcode>-1008.0</errcode><trace_id>trace-ambiguous</trace_id></xml>`},
+		{"xml error code exponent", `<xml><MsgType>event</MsgType><Event>wxa_media_check</Event><errcode>-1e3</errcode><trace_id>trace-ambiguous</trace_id></xml>`},
+		{"xml encrypt scalar", `<xml><Encrypt>opaque-ciphertext</Encrypt></xml>`},
+		{"xml encrypt non scalar", `<xml><Encrypt><cipher>opaque</cipher></Encrypt></xml>`},
+		{"xml media event with text type", `<xml><MsgType>text</MsgType><Event>wxa_media_check</Event><errcode>0</errcode><trace_id>trace-ambiguous</trace_id><result><suggest>pass</suggest><label>100</label></result></xml>`},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			applier := &recordingWechatReviewApplier{}
+			response := runWechatReviewCallback(t, applier, signedWechatReviewRequest(
+				test.body, "application/octet-stream", "callback-token-strong", true,
+			))
+			if response.Code != http.StatusBadRequest || response.Body.Len() != 0 ||
+				applier.resultCalls != 0 || applier.failureCalls != 0 {
+				t.Fatalf(
+					"status=%d response_length=%d result_calls=%d failure_calls=%d",
+					response.Code, response.Body.Len(), applier.resultCalls, applier.failureCalls,
+				)
+			}
+		})
+	}
+}
+
+func TestWechatReviewCallbackReturns500WhenFailureApplicationFails(t *testing.T) {
+	t.Parallel()
+	applier := &recordingWechatReviewApplier{err: errors.New("projection unavailable")}
+	response := runWechatReviewCallback(t, applier, signedWechatReviewRequest(
+		`{"MsgType":"event","Event":"wxa_media_check","errcode":-1001,"trace_id":"trace-service-failure"}`,
+		"application/json", "callback-token-strong", true,
+	))
+	if response.Code != http.StatusInternalServerError || response.Body.Len() != 0 ||
+		applier.resultCalls != 0 || applier.failureCalls != 1 ||
+		applier.failureCode != wechatMediaPlatformFailureCode {
+		t.Fatalf(
+			"status=%d response_length=%d result_calls=%d failure_calls=%d failure_code=%q",
+			response.Code, response.Body.Len(), applier.resultCalls, applier.failureCalls, applier.failureCode,
+		)
+	}
+}
+
+func TestWechatReviewCallbackKeepsLegacyMinimalSuccessEnvelope(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		name    string
+		body    string
+		traceID string
+	}{
+		{
+			name:    "json",
+			body:    `{"trace_id":"trace-legacy-json","result":{"suggest":"pass","label":100}}`,
+			traceID: "trace-legacy-json",
+		},
+		{
+			name:    "xml",
+			body:    `<xml><trace_id>trace-legacy-xml</trace_id><result><suggest>pass</suggest><label>100</label></result></xml>`,
+			traceID: "trace-legacy-xml",
+		},
+		{
+			name:    "json with zero error code",
+			body:    `{"errcode":0,"trace_id":"trace-legacy-json-zero","result":{"suggest":"pass","label":100}}`,
+			traceID: "trace-legacy-json-zero",
+		},
+		{
+			name:    "xml with zero error code",
+			body:    `<xml><errcode>0</errcode><trace_id>trace-legacy-xml-zero</trace_id><result><suggest>pass</suggest><label>100</label></result></xml>`,
+			traceID: "trace-legacy-xml-zero",
+		},
+	} {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			applier := &recordingWechatReviewApplier{}
+			response := runWechatReviewCallback(t, applier, signedWechatReviewRequest(
+				test.body, "application/octet-stream", "callback-token-strong", true,
+			))
+			if response.Code != http.StatusOK || response.Body.String() != "success" ||
+				applier.resultCalls != 1 || applier.failureCalls != 0 || applier.traceID != test.traceID {
+				t.Fatalf(
+					"status=%d response_length=%d result_calls=%d failure_calls=%d",
+					response.Code, response.Body.Len(), applier.resultCalls, applier.failureCalls,
+				)
+			}
+		})
+	}
 }
 
 func TestWechatCallbackIgnoresMisleadingContentType(t *testing.T) {

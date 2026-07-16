@@ -18,6 +18,7 @@ const maxWechatReviewCallbackBodyBytes int64 = 256 << 10
 
 type wechatReviewResultApplier interface {
 	ApplyWechatReviewResult(context.Context, string, string, int) error
+	ApplyWechatReviewFailure(context.Context, string, string) error
 }
 
 type WechatCallbackHandler struct {
@@ -42,12 +43,30 @@ func (h *WechatCallbackHandler) verify(c *gin.Context) {
 	c.String(http.StatusOK, c.Query("echostr"))
 }
 
+type wechatCallbackDisposition uint8
+
+const (
+	wechatCallbackApplyResult wechatCallbackDisposition = iota
+	wechatCallbackApplyFailure
+	wechatCallbackIgnore
+)
+
 type wechatReviewResult struct {
-	TraceID string `json:"trace_id" xml:"trace_id"`
-	Result  struct {
+	MsgType   *string
+	Event     *string
+	ErrCode   *int64
+	Encrypted bool
+	TraceID   string
+	Result    struct {
 		Suggest string             `json:"suggest" xml:"suggest"`
 		Label   *wechatReviewLabel `json:"label" xml:"label"`
-	} `json:"result" xml:"result"`
+	}
+}
+
+type decodedWechatCallback struct {
+	Disposition wechatCallbackDisposition
+	Value       wechatReviewResult
+	FailureCode string
 }
 
 var errInvalidWechatReviewCallback = errors.New("invalid wechat review callback")
@@ -55,6 +74,7 @@ var errInvalidWechatReviewCallback = errors.New("invalid wechat review callback"
 type wechatReviewLabel int
 
 func parseWechatReviewLabel(raw string) (wechatReviewLabel, error) {
+	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return 0, errInvalidWechatReviewCallback
 	}
@@ -71,17 +91,79 @@ func parseWechatReviewLabel(raw string) (wechatReviewLabel, error) {
 }
 
 func decodeWechatReviewResult(body []byte) (wechatReviewResult, error) {
+	decoded, err := decodeWechatReviewCallback(body)
+	if err != nil || decoded.Disposition != wechatCallbackApplyResult {
+		return wechatReviewResult{}, errInvalidWechatReviewCallback
+	}
+	return decoded.Value, nil
+}
+
+func decodeWechatReviewCallback(body []byte) (decodedWechatCallback, error) {
+	value, err := decodeWechatReviewEnvelope(body)
+	if err != nil || value.Encrypted {
+		return decodedWechatCallback{}, errInvalidWechatReviewCallback
+	}
+	msgType, event := "", ""
+	if value.MsgType != nil {
+		msgType = strings.TrimSpace(*value.MsgType)
+	}
+	if value.Event != nil {
+		event = strings.TrimSpace(*value.Event)
+	}
+
+	if value.Event != nil && event != "wxa_media_check" {
+		return decodedWechatCallback{Disposition: wechatCallbackIgnore, Value: value}, nil
+	}
+	if value.MsgType != nil && msgType != "event" {
+		if event == "wxa_media_check" {
+			return decodedWechatCallback{}, errInvalidWechatReviewCallback
+		}
+		return decodedWechatCallback{Disposition: wechatCallbackIgnore, Value: value}, nil
+	}
+	if value.ErrCode != nil && *value.ErrCode != 0 {
+		if strings.TrimSpace(value.TraceID) == "" {
+			return decodedWechatCallback{}, errInvalidWechatReviewCallback
+		}
+		failureCode := wechatMediaPlatformFailureCode
+		if *value.ErrCode == -1008 {
+			failureCode = wechatMediaDownloadFailureCode
+		}
+		return decodedWechatCallback{
+			Disposition: wechatCallbackApplyFailure,
+			Value:       value,
+			FailureCode: failureCode,
+		}, nil
+	}
+
+	legacy := value.MsgType == nil && value.Event == nil
+	if legacy {
+		if validateWechatReviewResult(value) != nil {
+			return decodedWechatCallback{}, errInvalidWechatReviewCallback
+		}
+		return decodedWechatCallback{Disposition: wechatCallbackApplyResult, Value: value}, nil
+	}
+	if value.MsgType == nil || value.Event == nil || msgType != "event" ||
+		event != "wxa_media_check" || strings.TrimSpace(value.TraceID) == "" {
+		return decodedWechatCallback{}, errInvalidWechatReviewCallback
+	}
+	if validateWechatReviewResult(value) != nil {
+		return decodedWechatCallback{}, errInvalidWechatReviewCallback
+	}
+	return decodedWechatCallback{Disposition: wechatCallbackApplyResult, Value: value}, nil
+}
+
+func decodeWechatReviewEnvelope(body []byte) (wechatReviewResult, error) {
 	body = bytes.TrimSpace(body)
 	if len(body) == 0 {
 		return wechatReviewResult{}, errInvalidWechatReviewCallback
 	}
 	if json.Valid(body) {
-		return decodeWechatReviewJSON(body)
+		return decodeWechatReviewJSONEnvelope(body)
 	}
-	return decodeWechatReviewXML(body)
+	return decodeWechatReviewXMLEnvelope(body)
 }
 
-func decodeWechatReviewJSON(body []byte) (wechatReviewResult, error) {
+func decodeWechatReviewJSONEnvelope(body []byte) (wechatReviewResult, error) {
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.UseNumber()
 	token, err := decoder.Token()
@@ -89,6 +171,10 @@ func decodeWechatReviewJSON(body []byte) (wechatReviewResult, error) {
 		return wechatReviewResult{}, errInvalidWechatReviewCallback
 	}
 	var value wechatReviewResult
+	seenMsgType := false
+	seenEvent := false
+	seenErrCode := false
+	seenEncrypt := false
 	seenTraceID := false
 	seenResult := false
 	for decoder.More() {
@@ -98,6 +184,37 @@ func decodeWechatReviewJSON(body []byte) (wechatReviewResult, error) {
 			return wechatReviewResult{}, errInvalidWechatReviewCallback
 		}
 		switch key {
+		case "MsgType":
+			if seenMsgType {
+				return wechatReviewResult{}, errInvalidWechatReviewCallback
+			}
+			seenMsgType = true
+			value.MsgType = new(string)
+			*value.MsgType, err = decodeWechatJSONString(decoder)
+		case "Event":
+			if seenEvent {
+				return wechatReviewResult{}, errInvalidWechatReviewCallback
+			}
+			seenEvent = true
+			value.Event = new(string)
+			*value.Event, err = decodeWechatJSONString(decoder)
+		case "errcode":
+			if seenErrCode {
+				return wechatReviewResult{}, errInvalidWechatReviewCallback
+			}
+			seenErrCode = true
+			var parsed int64
+			parsed, err = decodeWechatJSONInt64(decoder)
+			if err == nil {
+				value.ErrCode = &parsed
+			}
+		case "Encrypt":
+			if seenEncrypt {
+				return wechatReviewResult{}, errInvalidWechatReviewCallback
+			}
+			seenEncrypt = true
+			_, err = decodeWechatJSONString(decoder)
+			value.Encrypted = err == nil
 		case "trace_id":
 			if seenTraceID {
 				return wechatReviewResult{}, errInvalidWechatReviewCallback
@@ -122,9 +239,6 @@ func decodeWechatReviewJSON(body []byte) (wechatReviewResult, error) {
 	}
 	if _, err = decoder.Token(); !errors.Is(err, io.EOF) {
 		return wechatReviewResult{}, errInvalidWechatReviewCallback
-	}
-	if err := validateWechatReviewResult(value); err != nil {
-		return wechatReviewResult{}, err
 	}
 	return value, nil
 }
@@ -199,6 +313,41 @@ func decodeWechatReviewJSONLabel(decoder *json.Decoder) (wechatReviewLabel, erro
 	}
 }
 
+func parseWechatSignedInteger(raw string) (int64, error) {
+	if raw == "" {
+		return 0, errInvalidWechatReviewCallback
+	}
+	index := 0
+	if raw[0] == '-' {
+		index = 1
+		if len(raw) == 1 {
+			return 0, errInvalidWechatReviewCallback
+		}
+	}
+	for ; index < len(raw); index++ {
+		if raw[index] < '0' || raw[index] > '9' {
+			return 0, errInvalidWechatReviewCallback
+		}
+	}
+	parsed, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return 0, errInvalidWechatReviewCallback
+	}
+	return parsed, nil
+}
+
+func decodeWechatJSONInt64(decoder *json.Decoder) (int64, error) {
+	token, err := decoder.Token()
+	if err != nil {
+		return 0, errInvalidWechatReviewCallback
+	}
+	value, ok := token.(json.Number)
+	if !ok {
+		return 0, errInvalidWechatReviewCallback
+	}
+	return parseWechatSignedInteger(string(value))
+}
+
 func skipWechatJSONValue(decoder *json.Decoder) error {
 	token, err := decoder.Token()
 	if err != nil {
@@ -237,7 +386,7 @@ func skipWechatJSONValue(decoder *json.Decoder) error {
 	return nil
 }
 
-func decodeWechatReviewXML(body []byte) (wechatReviewResult, error) {
+func decodeWechatReviewXMLEnvelope(body []byte) (wechatReviewResult, error) {
 	decoder := xml.NewDecoder(bytes.NewReader(body))
 	for {
 		token, err := decoder.Token()
@@ -254,9 +403,6 @@ func decodeWechatReviewXML(body []byte) (wechatReviewResult, error) {
 				return wechatReviewResult{}, err
 			}
 			if err := requireWechatXMLEOF(decoder); err != nil {
-				return wechatReviewResult{}, err
-			}
-			if err := validateWechatReviewResult(result); err != nil {
 				return wechatReviewResult{}, err
 			}
 			return result, nil
@@ -276,6 +422,10 @@ func decodeWechatReviewXML(body []byte) (wechatReviewResult, error) {
 
 func decodeWechatReviewXMLRoot(decoder *xml.Decoder, root xml.StartElement) (wechatReviewResult, error) {
 	var value wechatReviewResult
+	seenMsgType := false
+	seenEvent := false
+	seenErrCode := false
+	seenEncrypt := false
 	seenTraceID := false
 	seenResult := false
 	for {
@@ -286,6 +436,41 @@ func decodeWechatReviewXMLRoot(decoder *xml.Decoder, root xml.StartElement) (wec
 		switch element := token.(type) {
 		case xml.StartElement:
 			switch element.Name.Local {
+			case "MsgType":
+				if seenMsgType {
+					return wechatReviewResult{}, errInvalidWechatReviewCallback
+				}
+				seenMsgType = true
+				value.MsgType = new(string)
+				*value.MsgType, err = decodeWechatXMLScalar(decoder, element)
+			case "Event":
+				if seenEvent {
+					return wechatReviewResult{}, errInvalidWechatReviewCallback
+				}
+				seenEvent = true
+				value.Event = new(string)
+				*value.Event, err = decodeWechatXMLScalar(decoder, element)
+			case "errcode":
+				if seenErrCode {
+					return wechatReviewResult{}, errInvalidWechatReviewCallback
+				}
+				seenErrCode = true
+				var raw string
+				raw, err = decodeWechatXMLScalar(decoder, element)
+				if err == nil {
+					var parsed int64
+					parsed, err = parseWechatSignedInteger(strings.TrimSpace(raw))
+					if err == nil {
+						value.ErrCode = &parsed
+					}
+				}
+			case "Encrypt":
+				if seenEncrypt {
+					return wechatReviewResult{}, errInvalidWechatReviewCallback
+				}
+				seenEncrypt = true
+				_, err = decodeWechatXMLScalar(decoder, element)
+				value.Encrypted = err == nil
 			case "trace_id":
 				if seenTraceID {
 					return wechatReviewResult{}, errInvalidWechatReviewCallback
@@ -356,7 +541,7 @@ func decodeWechatReviewXMLResult(decoder *xml.Decoder, root xml.StartElement, va
 						value.Result.Label = &label
 					}
 				}
-			case "trace_id", "result":
+			case "MsgType", "Event", "errcode", "Encrypt", "trace_id", "result":
 				return errInvalidWechatReviewCallback
 			default:
 				err = skipWechatUnknownXMLElement(decoder, element)
@@ -459,7 +644,7 @@ func requireWechatXMLEOF(decoder *xml.Decoder) error {
 
 func isWechatReviewCriticalXMLName(name string) bool {
 	switch name {
-	case "trace_id", "result", "suggest", "label":
+	case "MsgType", "Event", "errcode", "Encrypt", "trace_id", "result", "suggest", "label":
 		return true
 	default:
 		return false
@@ -485,18 +670,34 @@ func (h *WechatCallbackHandler) callback(c *gin.Context) {
 		c.Status(http.StatusBadRequest)
 		return
 	}
-	value, err := decodeWechatReviewResult(body)
+	decoded, err := decodeWechatReviewCallback(body)
 	if err != nil {
 		logWechatCallbackRejection(body)
 		c.Status(http.StatusBadRequest)
 		return
 	}
-	if err := h.service.ApplyWechatReviewResult(
-		c.Request.Context(),
-		value.TraceID,
-		value.Result.Suggest,
-		int(*value.Result.Label),
-	); err != nil {
+	switch decoded.Disposition {
+	case wechatCallbackIgnore:
+		structure, category := diagnoseWechatCallback(body)
+		logWechatCallbackCategory(structure, category)
+		c.String(http.StatusOK, "success")
+		return
+	case wechatCallbackApplyFailure:
+		structure, category := diagnoseWechatCallback(body)
+		logWechatCallbackCategory(structure, category)
+		err = h.service.ApplyWechatReviewFailure(
+			c.Request.Context(), decoded.Value.TraceID, decoded.FailureCode,
+		)
+	case wechatCallbackApplyResult:
+		err = h.service.ApplyWechatReviewResult(
+			c.Request.Context(), decoded.Value.TraceID,
+			decoded.Value.Result.Suggest, int(*decoded.Value.Result.Label),
+		)
+	default:
+		c.Status(http.StatusBadRequest)
+		return
+	}
+	if err != nil {
 		c.Status(http.StatusInternalServerError)
 		return
 	}
