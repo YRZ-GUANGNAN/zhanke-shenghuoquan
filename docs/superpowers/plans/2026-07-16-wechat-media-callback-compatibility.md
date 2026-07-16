@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Security review amendment:** 实施期复核发现 Gin 查询串日志、重复关键字段和固定 staging/模糊回滚问题。`docs/superpowers/specs/2026-07-16-wechat-media-callback-security-addendum.md` 是强制约束；其中要求在冲突时优先于本计划原有的简单结构体解码、固定 `/tmp` staging、`find latest` 回滚和日志 grep 步骤。未完成补充设计中的测试、日志探针与 Token 再轮换前，禁止部署或判定验收通过。
+
 **Goal:** 让生产后端安全兼容微信媒体审核回调的 JSON/XML 正文及字符串/数字 label，并以新的真实图片证明回调最终推进到 approved。
 
 **Architecture:** 在现有 `WechatCallbackHandler` 内加入受限正文读取和纯解析函数；解析函数不依赖 `Content-Type`，JSON 合法时严格按 JSON 处理，否则尝试 XML。审核签名、Service、projection、outbox 和 consumer 状态机保持不变，任何解析歧义继续 fail-closed。
