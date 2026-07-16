@@ -465,6 +465,9 @@ func (s *Service) ViewerState(ctx context.Context, id, userID uint) (ProductView
 	if err != nil {
 		return ProductViewerState{}, err
 	}
+	if userID == value.SellerID {
+		return ProductViewerState{Favorited: favorited, ContactedSeller: false}, nil
+	}
 	stable, ok := s.conversations.(stableProductConversationGateway)
 	if !ok {
 		return ProductViewerState{}, ErrContactStateUnavailable

@@ -543,8 +543,9 @@ func TestCanonicalProductCreateHashUsesIntegerMoneyAndOrderedAssets(t *testing.T
 }
 
 type tradeConversations struct {
-	calls  int
-	values []im.ConversationContext
+	calls     int
+	findCalls int
+	values    []im.ConversationContext
 }
 
 func (c *tradeConversations) EnsureProductConversation(_ context.Context, p, b, s uint) (im.ConversationContext, error) {
@@ -554,6 +555,10 @@ func (c *tradeConversations) EnsureProductConversation(_ context.Context, p, b, 
 	return value, nil
 }
 func (c *tradeConversations) FindProductConversation(_ context.Context, productID, buyerID, sellerID uint) (im.ConversationContext, bool, error) {
+	c.findCalls++
+	if buyerID == sellerID {
+		return im.ConversationContext{}, false, errors.New("seller cannot contact self")
+	}
 	for _, value := range c.values {
 		if value.ProductID == productID && value.BuyerID == buyerID && value.SellerID == sellerID {
 			return value, true, nil
@@ -570,6 +575,28 @@ func (c *tradeConversations) EnsureProductConversationStable(ctx context.Context
 
 func newTradeService(repo *tradeMemoryRepo, search SearchGateway, conversations *tradeConversations) *Service {
 	return NewService(repo, tradeUsers{1: {ID: 1, Nickname: "seller"}}, tradeReviews{}, conversations, search)
+}
+
+func TestViewerStateForSellerSkipsSelfConversationLookup(t *testing.T) {
+	repo := newTradeMemoryRepo(Product{
+		ID:           1,
+		SellerID:     1,
+		Status:       StatusSelling,
+		ReviewStatus: review.StatusApproved,
+	})
+	conversations := &tradeConversations{}
+	service := newTradeService(repo, &tradeSearchFake{}, conversations)
+
+	state, err := service.ViewerState(context.Background(), 1, 1)
+	if err != nil {
+		t.Fatalf("seller viewer state failed: %v", err)
+	}
+	if state.Favorited || state.ContactedSeller {
+		t.Fatalf("unexpected seller viewer state: %+v", state)
+	}
+	if conversations.findCalls != 0 {
+		t.Fatalf("seller viewer state reached self conversation lookup: calls=%d", conversations.findCalls)
+	}
 }
 
 func TestProductStatusTransitions(t *testing.T) {
