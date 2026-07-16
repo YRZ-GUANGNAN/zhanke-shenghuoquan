@@ -481,11 +481,13 @@ func (h *WechatCallbackHandler) callback(c *gin.Context) {
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxWechatReviewCallbackBodyBytes)
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
+		logWechatCallbackCategory(wechatStructureUnrecognized, wechatCategoryBodyReadError)
 		c.Status(http.StatusBadRequest)
 		return
 	}
 	value, err := decodeWechatReviewResult(body)
 	if err != nil {
+		logWechatCallbackRejection(body)
 		c.Status(http.StatusBadRequest)
 		return
 	}
