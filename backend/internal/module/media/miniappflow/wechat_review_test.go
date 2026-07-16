@@ -57,7 +57,7 @@ func TestWechatAsyncReviewSubmitterSignsFinalObjectAndSubmitsAsyncCheck(t *testi
 	defer server.Close()
 
 	submitter, err := NewWechatAsyncReviewSubmitter(WechatReviewSubmitterConfig{
-		AppID: "wx-app", AppSecret: "secret", APIBase: server.URL, URLTTL: time.Minute,
+		AppID: "wx-app", AppSecret: "secret", APIBase: server.URL,
 		Client: server.Client(),
 	}, signer)
 	if err != nil {
@@ -77,12 +77,49 @@ func TestWechatAsyncReviewSubmitterSignsFinalObjectAndSubmitsAsyncCheck(t *testi
 	if value.TraceID != "trace-real-1" || value.ReviewTaskID != expectedTaskID {
 		t.Fatalf("unexpected submission: %#v", value)
 	}
-	if signer.key != "final/key.webp" || signer.versionID != "v1" || signer.ttl != time.Minute {
+	if signer.key != "final/key.webp" || signer.versionID != "v1" || signer.ttl != WechatReviewURLTTL {
 		t.Fatalf("unexpected signer input: %#v", signer)
 	}
 	if received["openid"] != "openid-1" || received["media_url"] != signer.url ||
 		received["media_type"].(float64) != 2 || received["version"].(float64) != 2 || received["scene"].(float64) != 2 {
 		t.Fatalf("unexpected wechat request payload: %#v", received)
+	}
+}
+
+func TestWechatReviewURLTTLAllowsWechatHeadAndGetWindow(t *testing.T) {
+	if WechatReviewURLTTL != 35*time.Minute {
+		t.Fatalf("WechatReviewURLTTL=%s want=35m", WechatReviewURLTTL)
+	}
+}
+
+func TestWechatFailurePayloadHashBindsAllInputs(t *testing.T) {
+	base := WechatFailurePayloadHash("trace-1", wechatMediaDownloadFailureCode, 42, 1)
+	if base == "" || base != WechatFailurePayloadHash("trace-1", wechatMediaDownloadFailureCode, 42, 1) {
+		t.Fatal("failure payload hash must be deterministic")
+	}
+	values := []string{
+		WechatFailurePayloadHash("trace-2", wechatMediaDownloadFailureCode, 42, 1),
+		WechatFailurePayloadHash("trace-1", wechatMediaPlatformFailureCode, 42, 1),
+		WechatFailurePayloadHash("trace-1", wechatMediaDownloadFailureCode, 43, 1),
+		WechatFailurePayloadHash("trace-1", wechatMediaDownloadFailureCode, 42, 2),
+	}
+	for _, value := range values {
+		if value == base {
+			t.Fatal("failure payload hash did not bind every input")
+		}
+	}
+}
+
+func TestWechatMediaFailureCodesAreSealed(t *testing.T) {
+	for _, value := range []string{wechatMediaDownloadFailureCode, wechatMediaPlatformFailureCode} {
+		if !validWechatMediaFailureCode(value) {
+			t.Fatalf("sealed code rejected: %q", value)
+		}
+	}
+	for _, value := range []string{"", "-1008", "wechat_unknown_suggest", " wechat_media_download_error"} {
+		if validWechatMediaFailureCode(value) {
+			t.Fatalf("unsealed code accepted: %q", value)
+		}
 	}
 }
 

@@ -19,7 +19,12 @@ import (
 	coremedia "campus-circle/backend/internal/module/media"
 )
 
-const WechatReviewURLTTL = 10 * time.Minute
+const WechatReviewURLTTL = 35 * time.Minute
+
+const (
+	wechatMediaDownloadFailureCode = "wechat_media_download_error"
+	wechatMediaPlatformFailureCode = "wechat_media_platform_error"
+)
 
 type WechatReviewSubmitInput struct {
 	OpenID         string
@@ -197,6 +202,24 @@ func WechatReviewTaskID(traceID string) (uint64, error) {
 func WechatDecisionPayloadHash(traceID, suggest string, label int, reviewTaskID, decisionVersion uint64, decision coremedia.ProjectionStatus) string {
 	sum := sha256.Sum256([]byte(fmt.Sprintf("wechat:%s:%s:%d:%d:%d:%s",
 		strings.TrimSpace(traceID), strings.ToLower(strings.TrimSpace(suggest)), label, reviewTaskID, decisionVersion, decision,
+	)))
+	return hex.EncodeToString(sum[:])
+}
+
+func validWechatMediaFailureCode(value string) bool {
+	switch value {
+	case wechatMediaDownloadFailureCode, wechatMediaPlatformFailureCode:
+		return true
+	default:
+		return false
+	}
+}
+
+func WechatFailurePayloadHash(traceID, failureCode string, reviewTaskID, decisionVersion uint64) string {
+	sum := sha256.Sum256([]byte(fmt.Sprintf(
+		"wechat-failure:%s:%s:%d:%d:%s",
+		strings.TrimSpace(traceID), failureCode, reviewTaskID, decisionVersion,
+		coremedia.ProjectionReviewFailed,
 	)))
 	return hex.EncodeToString(sum[:])
 }
