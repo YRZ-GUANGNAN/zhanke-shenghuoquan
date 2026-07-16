@@ -279,6 +279,33 @@ func (s *Service) ApplyWechatReviewResult(ctx context.Context, traceID, suggest 
 	return s.consumeProjectionEvent(ctx)
 }
 
+func (s *Service) ApplyWechatReviewFailure(ctx context.Context, traceID, failureCode string) error {
+	if !validWechatMediaFailureCode(failureCode) {
+		return ErrInvalidRequest
+	}
+	reviewTaskID, err := WechatReviewTaskID(traceID)
+	if err != nil {
+		return err
+	}
+	projection, err := s.projections.FindByReviewTaskID(ctx, reviewTaskID)
+	if err != nil {
+		return err
+	}
+	if projection.Status.Terminal() {
+		return nil
+	}
+	if (projection.Status != coremedia.ProjectionSubmitted &&
+		projection.Status != coremedia.ProjectionReviewing) ||
+		projection.ReviewTaskID == nil ||
+		*projection.ReviewTaskID != reviewTaskID {
+		return coremedia.ErrReviewInvariant
+	}
+	if err := s.appendWechatFailureDecision(ctx, projection, traceID, failureCode); err != nil {
+		return err
+	}
+	return s.consumeProjectionEvent(ctx)
+}
+
 func (s *Service) Status(ctx context.Context, ownerID uint64, assetPublicID string) (AssetStatus, error) {
 	fact, err := s.status.FindStatus(ctx, ownerID, assetPublicID)
 	if err != nil {
@@ -400,6 +427,34 @@ func (s *Service) appendWechatDecision(
 		ExpectedRowVersion: projection.RowVersion, ExpectedStatus: projection.Status,
 		DecisionVersion: decisionVersion, Decision: decision,
 		PayloadHash: payloadHash, ResultCode: resultCode,
+	})
+	if err != nil {
+		return err
+	}
+	return s.appendProjectionEvent(ctx, projection, coremedia.ConsumerOperationDecision, payload)
+}
+
+func (s *Service) appendWechatFailureDecision(
+	ctx context.Context,
+	projection coremedia.ReviewProjection,
+	traceID, failureCode string,
+) error {
+	if projection.ReviewTaskID == nil || *projection.ReviewTaskID == 0 ||
+		!validWechatMediaFailureCode(failureCode) {
+		return coremedia.ErrReviewInvariant
+	}
+	decisionVersion := projection.AppliedDecisionVersion + 1
+	payload, err := json.Marshal(coremedia.ConsumerEventPayload{
+		ProjectionID:       projection.ProjectionID,
+		ReviewTaskID:       *projection.ReviewTaskID,
+		ExpectedRowVersion: projection.RowVersion,
+		ExpectedStatus:     projection.Status,
+		DecisionVersion:    decisionVersion,
+		Decision:           coremedia.ProjectionReviewFailed,
+		PayloadHash: WechatFailurePayloadHash(
+			traceID, failureCode, *projection.ReviewTaskID, decisionVersion,
+		),
+		ResultCode: failureCode,
 	})
 	if err != nil {
 		return err

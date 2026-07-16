@@ -54,7 +54,10 @@ func (s *assetStub) TransitionTechnical(context.Context, uint64, uint64, coremed
 	return nil
 }
 
-type projectionStub struct{ value coremedia.ReviewProjection }
+type projectionStub struct {
+	value                   coremedia.ReviewProjection
+	findByReviewTaskIDCalls int
+}
 
 func (s *projectionStub) EnsureProjection(context.Context, string) (coremedia.ReviewProjection, bool, error) {
 	return s.value, true, nil
@@ -63,6 +66,7 @@ func (s *projectionStub) Find(context.Context, string) (coremedia.ReviewProjecti
 	return s.value, nil
 }
 func (s *projectionStub) FindByReviewTaskID(context.Context, uint64) (coremedia.ReviewProjection, error) {
+	s.findByReviewTaskIDCalls++
 	return s.value, nil
 }
 
@@ -84,9 +88,11 @@ type consumerStub struct {
 	result    coremedia.ConsumerBatchResult
 	err       error
 	onConsume func()
+	calls     int
 }
 
 func (s *consumerStub) ConsumeBatch(context.Context, int) (coremedia.ConsumerBatchResult, error) {
+	s.calls++
 	if s.onConsume != nil {
 		s.onConsume()
 	}
@@ -366,6 +372,141 @@ func TestApplyWechatReviewResultRecordsDecision(t *testing.T) {
 		decision.ExpectedStatus != coremedia.ProjectionReviewing || decision.ExpectedRowVersion != 3 ||
 		decision.DecisionVersion != 1 || decision.PayloadHash == "" {
 		t.Fatalf("unexpected decision payload: %#v", decision)
+	}
+}
+
+func TestApplyWechatReviewFailureRecordsDownloadErrorFromSubmitted(t *testing.T) {
+	testApplyWechatReviewFailureRecordsDecision(
+		t, coremedia.ProjectionSubmitted, wechatMediaDownloadFailureCode,
+	)
+}
+
+func TestApplyWechatReviewFailureRecordsPlatformErrorFromReviewing(t *testing.T) {
+	testApplyWechatReviewFailureRecordsDecision(
+		t, coremedia.ProjectionReviewing, wechatMediaPlatformFailureCode,
+	)
+}
+
+func testApplyWechatReviewFailureRecordsDecision(
+	t *testing.T,
+	startingStatus coremedia.ProjectionStatus,
+	failureCode string,
+) {
+	t.Helper()
+	traceID := "wechat-failure-" + string(startingStatus)
+	reviewTaskID, err := WechatReviewTaskID(traceID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	projection := &projectionStub{value: coremedia.ReviewProjection{
+		ProjectionID: testULID(t), AssetID: 41, Status: startingStatus,
+		ReviewTaskID: pointer(reviewTaskID), RowVersion: 3,
+	}}
+	outbox := &outboxStub{}
+	consumer := &consumerStub{
+		result: coremedia.ConsumerBatchResult{Claimed: 1, Succeeded: 1},
+		onConsume: func() {
+			projection.value.Status = coremedia.ProjectionReviewFailed
+			projection.value.AppliedDecisionVersion = 1
+			projection.value.RowVersion = 4
+		},
+	}
+	service, err := NewService(
+		&ticketStub{}, &bundleStub{}, &completionStub{}, &assetStub{}, projection,
+		outbox, consumer, &statusStub{}, nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.ApplyWechatReviewFailure(context.Background(), traceID, failureCode); err != nil {
+		t.Fatal(err)
+	}
+	if len(outbox.values) != 1 || outbox.values[0].Operation != coremedia.ConsumerOperationDecision {
+		t.Fatalf("expected one decision event, got %#v", outbox.values)
+	}
+	var decision coremedia.ConsumerEventPayload
+	if err := json.Unmarshal(outbox.values[0].Payload, &decision); err != nil {
+		t.Fatal(err)
+	}
+	if decision.Decision != coremedia.ProjectionReviewFailed ||
+		decision.ResultCode != failureCode ||
+		decision.ReviewTaskID != reviewTaskID ||
+		decision.ExpectedStatus != startingStatus ||
+		decision.ExpectedRowVersion != 3 ||
+		decision.DecisionVersion != 1 || decision.PayloadHash == "" {
+		t.Fatalf("unexpected failure decision: %#v", decision)
+	}
+
+	if err := service.ApplyWechatReviewFailure(context.Background(), traceID, failureCode); err != nil {
+		t.Fatal(err)
+	}
+	if len(outbox.values) != 1 || consumer.calls != 1 {
+		t.Fatalf("duplicate callback appended or consumed work: outbox=%d consumer=%d", len(outbox.values), consumer.calls)
+	}
+}
+
+func TestApplyWechatReviewFailureIgnoresTerminalProjection(t *testing.T) {
+	t.Parallel()
+	for _, status := range []coremedia.ProjectionStatus{
+		coremedia.ProjectionApproved,
+		coremedia.ProjectionRejected,
+		coremedia.ProjectionReviewFailed,
+	} {
+		status := status
+		t.Run(string(status), func(t *testing.T) {
+			t.Parallel()
+			traceID := "wechat-terminal-failure-" + string(status)
+			reviewTaskID, err := WechatReviewTaskID(traceID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			projection := &projectionStub{value: coremedia.ReviewProjection{
+				ProjectionID: testULID(t), AssetID: 41, Status: status,
+				ReviewTaskID: pointer(reviewTaskID), AppliedDecisionVersion: 1, RowVersion: 4,
+			}}
+			outbox := &outboxStub{}
+			consumer := &consumerStub{}
+			service, err := NewService(
+				&ticketStub{}, &bundleStub{}, &completionStub{}, &assetStub{}, projection,
+				outbox, consumer, &statusStub{}, nil,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := service.ApplyWechatReviewFailure(
+				context.Background(), traceID, wechatMediaPlatformFailureCode,
+			); err != nil {
+				t.Fatal(err)
+			}
+			if len(outbox.values) != 0 || consumer.calls != 0 {
+				t.Fatalf("terminal callback appended or consumed work: outbox=%d consumer=%d", len(outbox.values), consumer.calls)
+			}
+		})
+	}
+}
+
+func TestApplyWechatReviewFailureRejectsUnknownReason(t *testing.T) {
+	t.Parallel()
+	projection := &projectionStub{}
+	outbox := &outboxStub{}
+	consumer := &consumerStub{}
+	service, err := NewService(
+		&ticketStub{}, &bundleStub{}, &completionStub{}, &assetStub{}, projection,
+		outbox, consumer, &statusStub{}, nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.ApplyWechatReviewFailure(
+		context.Background(), "trace-unknown-code", "-1008",
+	); !errors.Is(err, ErrInvalidRequest) {
+		t.Fatalf("expected invalid request, got %v", err)
+	}
+	if projection.findByReviewTaskIDCalls != 0 || len(outbox.values) != 0 || consumer.calls != 0 {
+		t.Fatalf(
+			"invalid reason reached dependencies: finds=%d outbox=%d consumer=%d",
+			projection.findByReviewTaskIDCalls, len(outbox.values), consumer.calls,
+		)
 	}
 }
 
