@@ -4,7 +4,7 @@ declare const TARO_APP_API_BASE: string | undefined
 
 const LOCAL_API_BASE = 'http://127.0.0.1:8080/api/v1'
 
-const API_BASE = (
+export const API_BASE = (
   typeof TARO_APP_API_BASE !== 'undefined' && TARO_APP_API_BASE
     ? TARO_APP_API_BASE
     : LOCAL_API_BASE

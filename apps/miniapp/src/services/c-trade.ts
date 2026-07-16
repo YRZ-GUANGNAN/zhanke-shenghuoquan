@@ -1,7 +1,8 @@
 // Domain C client: products, Meilisearch results, favorites, state transitions and Tencent IM entry.
 import type { Product } from '../types'
-import { request } from './api'
+import { API_BASE, request } from './api'
 import { createClientRequestId } from './client-request-id'
+import { resolveApiResourceUrl } from './resource-url'
 
 interface BackendImage{url:string}
 interface BackendUser{id?:number|string;nickname?:string;avatar?:string;campus?:string}
@@ -24,5 +25,5 @@ export async function setProductFavorited(id:string,favorited:boolean):Promise<b
 export async function changeProductStatus(id:string,status:Product['status']):Promise<void>{await request(`/trade/products/${id}/status`,{url:'',method:'PATCH',data:{status}})}
 export async function contactSeller(id:string):Promise<IMConversationContext>{return request(`/trade/products/${id}/contact`,{url:'',method:'PUT',timeout:10000})}
 
-function normalizeProduct(item:BackendProduct):Product{return{id:String(item.id),sellerId:String(item.sellerId||item.seller?.id||''),title:item.title||'',description:item.description||'',price:yuan(item.price),originalPrice:item.originalPrice?yuan(item.originalPrice):undefined,category:item.category||'',images:(item.images??[]).map(v=>v.url),sellerName:item.seller?.nickname||'校园用户',sellerAvatar:item.seller?.avatar||'',campus:item.campus||item.seller?.campus||'',condition:item.condition||'',createdAt:item.createdAt||'',status:item.status||'selling',reviewStatus:item.reviewStatus||'submitted',favoriteCount:item.favoriteCount||0}}
+function normalizeProduct(item:BackendProduct):Product{return{id:String(item.id),sellerId:String(item.sellerId||item.seller?.id||''),title:item.title||'',description:item.description||'',price:yuan(item.price),originalPrice:item.originalPrice?yuan(item.originalPrice):undefined,category:item.category||'',images:(item.images??[]).map(v=>resolveApiResourceUrl(v.url,API_BASE)),sellerName:item.seller?.nickname||'校园用户',sellerAvatar:item.seller?.avatar||'',campus:item.campus||item.seller?.campus||'',condition:item.condition||'',createdAt:item.createdAt||'',status:item.status||'selling',reviewStatus:item.reviewStatus||'submitted',favoriteCount:item.favoriteCount||0}}
 function yuan(value?:number):number{return Number(((value||0)/100).toFixed(2))}
