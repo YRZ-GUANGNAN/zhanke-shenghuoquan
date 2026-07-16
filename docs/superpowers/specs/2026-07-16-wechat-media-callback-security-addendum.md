@@ -47,6 +47,14 @@ Logger 使用 `SkipPaths` 精确跳过：
 
 普通路由和近似路径继续使用 Gin 默认日志。媒体回调的路径、状态和耗时仍由 Nginx `campus` 格式记录，且该格式使用 `$uri`，不包含查询参数。
 
+默认 `gin.Recovery()` 在 panic、尤其 broken-pipe 分支可能转储完整请求行，因此同样不能直接使用。Recovery 改为 `gin.CustomRecoveryWithWriter(io.Discard, ...)`：
+
+- Gin 内置请求转储写入 `io.Discard`；
+- 自定义恢复日志只记录 `URL.Path`、固定 `panic_recovered` 标记与 `debug.Stack()`；
+- 不记录 RawQuery、Authorization、原始 recovered 值或请求正文；
+- broken-pipe 分支允许不输出恢复详情，以保密优先；
+- 两条精确回调、普通路由和 broken-pipe 均使用带假 `signature=` 的 panic 探针测试。
+
 ### 2.3 Nginx 80/443 统一安全日志格式
 
 80 端口 server 显式增加：

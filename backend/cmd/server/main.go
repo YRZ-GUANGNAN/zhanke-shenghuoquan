@@ -3,7 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
+	"runtime/debug"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -296,7 +299,7 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	router := gin.Default()
+	router := newRouter(gin.DefaultWriter, gin.DefaultErrorWriter)
 	router.Use(middleware.CORS())
 	router.GET("/healthz", func(c *gin.Context) {
 		response.OK(c, gin.H{"status": "ok"})
@@ -328,6 +331,30 @@ func main() {
 	if err := router.Run(cfg.HTTPAddr); err != nil {
 		log.Fatalf("run server: %v", err)
 	}
+}
+
+func newRouter(loggerOutput io.Writer, recoveryOutput io.Writer) *gin.Engine {
+	router := gin.New()
+	router.Use(gin.LoggerWithConfig(gin.LoggerConfig{
+		Output: loggerOutput,
+		SkipPaths: []string{
+			"/api/v1/miniapp/media/wechat/callback",
+			"/api/v1/media/wechat/callback",
+		},
+	}))
+	router.Use(newSanitizedRecovery(recoveryOutput))
+	return router
+}
+
+func newSanitizedRecovery(recoveryOutput io.Writer) gin.HandlerFunc {
+	if recoveryOutput == nil {
+		recoveryOutput = io.Discard
+	}
+	recoveryLogger := log.New(recoveryOutput, "", 0)
+	return gin.CustomRecoveryWithWriter(io.Discard, func(c *gin.Context, _ any) {
+		recoveryLogger.Printf("path=%s panic_recovered\nstack:\n%s", c.Request.URL.Path, debug.Stack())
+		c.AbortWithStatus(http.StatusInternalServerError)
+	})
 }
 
 type deliveryRuntime struct {
