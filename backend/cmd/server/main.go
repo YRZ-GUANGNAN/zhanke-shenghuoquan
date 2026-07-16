@@ -147,7 +147,23 @@ func main() {
 	if err != nil {
 		log.Fatalf("configure private delivery conversation display: %v", err)
 	}
-	wechatReviewSubmitter, err := newWechatReviewSubmitter(cfg, completionStore)
+	var wechatReviewProxy *miniappflow.WechatReviewProxy
+	var wechatReviewSigner miniappflow.WechatReviewURLSigner
+	if !localMockWechatMode(cfg) {
+		wechatReviewProxy, err = miniappflow.NewWechatReviewProxy(
+			miniappflow.WechatReviewProxyConfig{
+				PublicBaseURL: cfg.MediaPublicBaseURL,
+				AppSecret:     cfg.WechatAppSecret,
+			},
+			completionStore,
+		)
+		if err != nil {
+			log.Fatalf("configure Module 10 WeChat review content proxy: %v", err)
+		}
+		wechatReviewSigner = wechatReviewProxy
+	}
+
+	wechatReviewSubmitter, err := newWechatReviewSubmitter(cfg, wechatReviewSigner)
 	if err != nil {
 		log.Fatalf("configure Module 10 WeChat image review: %v", err)
 	}
@@ -300,7 +316,7 @@ func main() {
 	}
 
 	router := newRouter(gin.DefaultWriter, gin.DefaultErrorWriter)
-	router.Use(middleware.CORS())
+	router.Use(middleware.CORS(miniappflow.WechatReviewContentPath))
 	router.GET("/healthz", func(c *gin.Context) {
 		response.OK(c, gin.H{"status": "ok"})
 	})
@@ -311,7 +327,11 @@ func main() {
 		value := user.CurrentUser(c)
 		return value.ID, value.OpenID
 	}).Register(api.Group("/media"))
-	miniappflow.NewWechatCallbackHandler(miniappMedia, cfg.WechatCallbackToken).Register(api.Group("/miniapp/media"))
+	publicMedia := api.Group("/miniapp/media")
+	miniappflow.NewWechatCallbackHandler(miniappMedia, cfg.WechatCallbackToken).Register(publicMedia)
+	if wechatReviewProxy != nil {
+		wechatReviewProxy.Register(publicMedia)
+	}
 	miniappMediaRoutes := api.Group("/miniapp/media", userService.AuthRequired(), user.UnmutedRequired())
 	miniappflow.NewHandlerWithIdentity(miniappMedia, func(c *gin.Context) miniappflow.UserIdentity {
 		value := user.CurrentUser(c)
@@ -340,6 +360,7 @@ func newRouter(loggerOutput io.Writer, recoveryOutput io.Writer) *gin.Engine {
 		SkipPaths: []string{
 			"/api/v1/miniapp/media/wechat/callback",
 			"/api/v1/media/wechat/callback",
+			miniappflow.WechatReviewContentPath,
 		},
 	}))
 	router.Use(newSanitizedRecovery(recoveryOutput))

@@ -23,9 +23,10 @@ func (p *routerLogProbe) Write(data []byte) (int, error) {
 	return p.Buffer.Write(data)
 }
 
-func TestRouterLoggerSkipsOnlyExactWechatCallbackPaths(t *testing.T) {
+func TestRouterLoggerSkipsOnlyExactWechatSensitivePaths(t *testing.T) {
 	tests := []struct {
 		name       string
+		method     string
 		target     string
 		marker     string
 		wantLogged bool
@@ -38,6 +39,18 @@ func TestRouterLoggerSkipsOnlyExactWechatCallbackPaths(t *testing.T) {
 		{
 			name:       "legacy callback",
 			target:     "/api/v1/media/wechat/callback?logprobe=legacy-secret",
+			wantLogged: false,
+		},
+		{
+			name:       "review proxy get",
+			method:     http.MethodGet,
+			target:     "/api/v1/miniapp/media/wechat/review-content?token=proxy-secret",
+			wantLogged: false,
+		},
+		{
+			name:       "review proxy head",
+			method:     http.MethodHead,
+			target:     "/api/v1/miniapp/media/wechat/review-content?token=proxy-secret",
 			wantLogged: false,
 		},
 		{
@@ -58,6 +71,13 @@ func TestRouterLoggerSkipsOnlyExactWechatCallbackPaths(t *testing.T) {
 			marker:     "logprobe=legacy-similar",
 			wantLogged: true,
 		},
+		{
+			name:       "similar review proxy path",
+			method:     http.MethodGet,
+			target:     "/api/v1/miniapp/media/wechat/review-content/near?token=ordinary-marker",
+			marker:     "token=ordinary-marker",
+			wantLogged: true,
+		},
 	}
 
 	for _, test := range tests {
@@ -68,7 +88,11 @@ func TestRouterLoggerSkipsOnlyExactWechatCallbackPaths(t *testing.T) {
 				c.Status(http.StatusOK)
 			})
 
-			request := httptest.NewRequest(http.MethodGet, test.target, nil)
+			method := test.method
+			if method == "" {
+				method = http.MethodGet
+			}
+			request := httptest.NewRequest(method, test.target, nil)
 			response := httptest.NewRecorder()
 			router.ServeHTTP(response, request)
 
@@ -82,7 +106,7 @@ func TestRouterLoggerSkipsOnlyExactWechatCallbackPaths(t *testing.T) {
 				return
 			}
 			if probe.writes != 0 || probe.Len() != 0 {
-				t.Fatalf("callback request leaked into Gin log: %q", probe.String())
+				t.Fatalf("sensitive request leaked into Gin log: %q", probe.String())
 			}
 		})
 	}
@@ -102,6 +126,11 @@ func TestRouterRecoverySanitizesPanicLogs(t *testing.T) {
 		{
 			name:             "legacy callback panic",
 			target:           "/api/v1/media/wechat/callback?signature=legacy-query-secret",
+			wantAccessLogged: false,
+		},
+		{
+			name:             "review proxy panic",
+			target:           "/api/v1/miniapp/media/wechat/review-content?token=proxy-secret",
 			wantAccessLogged: false,
 		},
 		{
@@ -138,7 +167,7 @@ func TestRouterRecoverySanitizesPanicLogs(t *testing.T) {
 			if !strings.Contains(recoveryLog, "stack:") || !strings.Contains(recoveryLog, "goroutine ") {
 				t.Fatalf("recovery log = %q, want stack", recoveryLog)
 			}
-			if strings.Contains(recoveryLog, "signature=") || strings.Contains(recoveryLog, "logprobe=") || strings.Contains(recoveryLog, "panic-value-secret") {
+			if strings.Contains(recoveryLog, "signature=") || strings.Contains(recoveryLog, "token=") || strings.Contains(recoveryLog, "proxy-secret") || strings.Contains(recoveryLog, "logprobe=") || strings.Contains(recoveryLog, "panic-value-secret") {
 				t.Fatalf("recovery log leaked RawQuery or recovered value: %q", recoveryLog)
 			}
 			if strings.Contains(accessProbe.String(), "panic-value-secret") {
@@ -150,7 +179,7 @@ func TestRouterRecoverySanitizesPanicLogs(t *testing.T) {
 					t.Fatalf("ordinary access log = %q, want existing query logging behavior", accessProbe.String())
 				}
 			} else if accessProbe.Len() != 0 || accessProbe.writes != 0 {
-				t.Fatalf("callback panic leaked into access log: %q", accessProbe.String())
+				t.Fatalf("sensitive panic leaked into access log: %q", accessProbe.String())
 			}
 		})
 	}

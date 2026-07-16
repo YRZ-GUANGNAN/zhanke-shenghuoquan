@@ -37,7 +37,22 @@ func TestModule10Boundary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(mainSource), `api.Group("/miniapp/media", userService.AuthRequired(), user.UnmutedRequired())`) {
+	main := string(mainSource)
+	if !strings.Contains(main, `api.Group("/miniapp/media", userService.AuthRequired(), user.UnmutedRequired())`) {
 		t.Fatal("Module 10 routes are not protected by frozen authentication and muted-user middleware")
+	}
+	for _, expected := range []string{
+		`publicMedia := api.Group("/miniapp/media")`,
+		`Register(publicMedia)`,
+		`wechatReviewProxy.Register(publicMedia)`,
+		`var wechatReviewSigner miniappflow.WechatReviewURLSigner`,
+		`if !localMockWechatMode(cfg) {`,
+		`wechatReviewSigner = wechatReviewProxy`,
+		`newWechatReviewSubmitter(cfg, wechatReviewSigner)`,
+		`middleware.CORS(miniappflow.WechatReviewContentPath)`,
+	} {
+		if !strings.Contains(main, expected) {
+			t.Fatalf("composition root is missing %q", expected)
+		}
 	}
 }
