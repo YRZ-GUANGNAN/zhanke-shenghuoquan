@@ -49,6 +49,13 @@ func (h *Handler) Register(api *gin.RouterGroup) {
 	secured.POST("/navigation/items", h.createItem)
 	secured.PUT("/navigation/items/:id", h.updateItem)
 	secured.DELETE("/navigation/items/:id", h.deleteItem)
+	secured.GET("/navigation/external-takeout-merchants", h.externalTakeoutDirectory)
+	secured.POST("/navigation/external-takeout-merchants", h.createExternalTakeoutMerchant)
+	secured.PATCH("/navigation/external-takeout-merchants/category-visibility", h.setExternalTakeoutCategoryVisibility)
+	secured.PUT("/navigation/external-takeout-merchants/:id", h.updateExternalTakeoutMerchant)
+	secured.DELETE("/navigation/external-takeout-merchants/:id", h.deleteExternalTakeoutMerchant)
+	secured.PATCH("/navigation/external-takeout-merchants/:id/operating-status", h.setExternalTakeoutOperatingStatus)
+	secured.PATCH("/navigation/external-takeout-merchants/:id/visibility", h.setExternalTakeoutVisibility)
 }
 func (h *Handler) submitReport(c *gin.Context) {
 	var req struct {
@@ -215,7 +222,7 @@ func (h *Handler) takedownProduct(c *gin.Context) {
 
 func (h *Handler) navigationTree(c *gin.Context) {
 	value, err := h.navigation.AdminTree(c)
-	write(c, value, err)
+	writeNavigation(c, http.StatusOK, value, err)
 }
 func (h *Handler) createCategory(c *gin.Context) {
 	var value navigation.Category
@@ -224,11 +231,7 @@ func (h *Handler) createCategory(c *gin.Context) {
 		return
 	}
 	result, err := h.navigation.CreateCategory(c, value)
-	if err != nil {
-		response.Fail(c, 400, err.Error())
-		return
-	}
-	response.Created(c, result)
+	writeNavigation(c, http.StatusCreated, result, err)
 }
 func (h *Handler) updateCategory(c *gin.Context) {
 	id, ok := paramID(c)
@@ -241,14 +244,14 @@ func (h *Handler) updateCategory(c *gin.Context) {
 		return
 	}
 	value.ID = id
-	write(c, gin.H{"updated": true}, h.navigation.UpdateCategory(c, value))
+	writeNavigation(c, http.StatusOK, gin.H{"updated": true}, h.navigation.UpdateCategory(c, value))
 }
 func (h *Handler) deleteCategory(c *gin.Context) {
 	id, ok := paramID(c)
 	if !ok {
 		return
 	}
-	write(c, gin.H{"deleted": true}, h.navigation.DeleteCategory(c, id))
+	writeNavigation(c, http.StatusOK, gin.H{"deleted": true}, h.navigation.DeleteCategory(c, id))
 }
 func (h *Handler) createItem(c *gin.Context) {
 	var value navigation.Item
@@ -257,11 +260,7 @@ func (h *Handler) createItem(c *gin.Context) {
 		return
 	}
 	result, err := h.navigation.CreateItem(c, value)
-	if err != nil {
-		response.Fail(c, 400, err.Error())
-		return
-	}
-	response.Created(c, result)
+	writeNavigation(c, http.StatusCreated, result, err)
 }
 func (h *Handler) updateItem(c *gin.Context) {
 	id, ok := paramID(c)
@@ -274,14 +273,14 @@ func (h *Handler) updateItem(c *gin.Context) {
 		return
 	}
 	value.ID = id
-	write(c, gin.H{"updated": true}, h.navigation.UpdateItem(c, value))
+	writeNavigation(c, http.StatusOK, gin.H{"updated": true}, h.navigation.UpdateItem(c, value))
 }
 func (h *Handler) deleteItem(c *gin.Context) {
 	id, ok := paramID(c)
 	if !ok {
 		return
 	}
-	write(c, gin.H{"deleted": true}, h.navigation.DeleteItem(c, id))
+	writeNavigation(c, http.StatusOK, gin.H{"deleted": true}, h.navigation.DeleteItem(c, id))
 }
 func pagination(c *gin.Context) (int, int) {
 	p, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
