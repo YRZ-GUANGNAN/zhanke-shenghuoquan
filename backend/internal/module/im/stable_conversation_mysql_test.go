@@ -28,7 +28,7 @@ func TestStableProductConversationAgainstMySQL(t *testing.T) {
 	seed := uint(time.Now().UnixNano()%300_000_000 + 1_500_000_000)
 	buyerID, sellerID, productID := seed, seed+1, seed+2
 	cleanup := func() {
-		_ = db.Where("buyer_id = ? AND seller_id = ? AND reference_type = ? AND reference_id IN ?", buyerID, sellerID, "product", []uint{productID, productID + 1}).Delete(&Conversation{}).Error
+		_ = db.Where("buyer_id = ? AND seller_id = ?", buyerID, sellerID).Delete(&Conversation{}).Error
 		_ = db.Where("user_id IN ?", []uint{buyerID, sellerID}).Delete(&UserMapping{}).Error
 	}
 	cleanup()
@@ -47,6 +47,31 @@ func TestStableProductConversationAgainstMySQL(t *testing.T) {
 	var persistedFirst Conversation
 	if err := db.Where("buyer_id = ? AND seller_id = ? AND reference_type = ? AND reference_id = ?", buyerID, sellerID, "product", productID).First(&persistedFirst).Error; err != nil {
 		t.Fatal(err)
+	}
+	nonProduct := Conversation{
+		ConversationID: "C2Ccampus_delivery", BuyerID: buyerID, SellerID: sellerID,
+		ReferenceType: "delivery", ReferenceID: productID + 10,
+	}
+	if err := db.Create(&nonProduct).Error; err != nil {
+		t.Fatal(err)
+	}
+	value, found, err := repo.FindConversationForParticipant(ctx, persistedFirst.ID, buyerID)
+	if err != nil || !found || value.ID != persistedFirst.ID {
+		t.Fatalf("participant lookup: found=%v value=%+v err=%v", found, value, err)
+	}
+	if _, found, err := repo.FindConversationForParticipant(ctx, persistedFirst.ID, seed+99); err != nil || found {
+		t.Fatalf("third-party leak: found=%v err=%v", found, err)
+	}
+	listed, total, err := repo.ListConversations(ctx, buyerID, 1, 20)
+	if err != nil || total != 1 || len(listed) != 1 || listed[0].ReferenceType != "product" {
+		t.Fatalf("product list: total=%d values=%+v err=%v", total, listed, err)
+	}
+	var unchanged Conversation
+	if err := db.First(&unchanged, persistedFirst.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !unchanged.CreatedAt.Equal(persistedFirst.CreatedAt) || !unchanged.UpdatedAt.Equal(persistedFirst.UpdatedAt) {
+		t.Fatalf("read changed timestamps: before=%+v after=%+v", persistedFirst, unchanged)
 	}
 	time.Sleep(10 * time.Millisecond)
 	second, err := service.EnsureProductConversationStable(ctx, productID, buyerID, sellerID)

@@ -13,6 +13,7 @@ type Repository interface {
 	FindMapping(context.Context, uint) (UserMapping, error)
 	EnsureConversation(context.Context, *Conversation) error
 	FindConversation(context.Context, uint, uint, string, uint) (Conversation, bool, error)
+	FindConversationForParticipant(context.Context, uint, uint) (Conversation, bool, error)
 	EnsureConversationStable(context.Context, *Conversation) error
 	ListConversations(context.Context, uint, int, int) ([]Conversation, int64, error)
 }
@@ -55,6 +56,19 @@ func (r *GormRepository) FindConversation(ctx context.Context, buyerID, sellerID
 	}
 	return value, true, nil
 }
+func (r *GormRepository) FindConversationForParticipant(ctx context.Context, relationID, userID uint) (Conversation, bool, error) {
+	var value Conversation
+	err := r.db.WithContext(ctx).
+		Where("id = ? AND reference_type = ? AND (buyer_id = ? OR seller_id = ?)", relationID, "product", userID, userID).
+		First(&value).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return Conversation{}, false, nil
+	}
+	if err != nil {
+		return Conversation{}, false, err
+	}
+	return value, true, nil
+}
 func (r *GormRepository) EnsureConversationStable(ctx context.Context, value *Conversation) error {
 	buyerID, sellerID := value.BuyerID, value.SellerID
 	referenceType, referenceID := value.ReferenceType, value.ReferenceID
@@ -78,7 +92,8 @@ func (r *GormRepository) EnsureConversationStable(ctx context.Context, value *Co
 func (r *GormRepository) ListConversations(ctx context.Context, userID uint, page, size int) ([]Conversation, int64, error) {
 	var values []Conversation
 	var total int64
-	query := r.db.WithContext(ctx).Model(&Conversation{}).Where("buyer_id = ? OR seller_id = ?", userID, userID)
+	query := r.db.WithContext(ctx).Model(&Conversation{}).
+		Where("reference_type = ? AND (buyer_id = ? OR seller_id = ?)", "product", userID, userID)
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}

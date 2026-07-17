@@ -29,6 +29,8 @@ type ConversationPage struct {
 	Total    int64                 `json:"total"`
 }
 
+var ErrConversationNotFound = errors.New("conversation not found or access denied")
+
 type ConversationGateway interface {
 	EnsureProductConversation(context.Context, uint, uint, uint) (ConversationContext, error)
 }
@@ -159,6 +161,34 @@ func (s *Service) EnsureProductConversationStable(ctx context.Context, productID
 	return toContext(relation, seller.IMUserID), nil
 }
 
+func (s *Service) Conversation(ctx context.Context, relationID, userID uint) (ConversationContext, error) {
+	value, found, err := s.repo.FindConversationForParticipant(ctx, relationID, userID)
+	if err != nil {
+		return ConversationContext{}, err
+	}
+	if !found {
+		return ConversationContext{}, ErrConversationNotFound
+	}
+	return s.contextForParticipant(ctx, value, userID)
+}
+
+func (s *Service) contextForParticipant(ctx context.Context, value Conversation, userID uint) (ConversationContext, error) {
+	var peerID uint
+	switch userID {
+	case value.BuyerID:
+		peerID = value.SellerID
+	case value.SellerID:
+		peerID = value.BuyerID
+	default:
+		return ConversationContext{}, ErrConversationNotFound
+	}
+	mapping, err := s.repo.FindMapping(ctx, peerID)
+	if err != nil {
+		return ConversationContext{}, fmt.Errorf("find IM peer mapping: %w", err)
+	}
+	return toContext(value, mapping.IMUserID), nil
+}
+
 func (s *Service) Conversations(ctx context.Context, userID uint, page, size int) (ConversationPage, error) {
 	page, size = normalize(page, size)
 	values, total, err := s.repo.ListConversations(ctx, userID, page, size)
@@ -167,16 +197,11 @@ func (s *Service) Conversations(ctx context.Context, userID uint, page, size int
 	}
 	result := make([]ConversationContext, 0, len(values))
 	for _, value := range values {
-		peerID := value.SellerID
-		if userID == value.SellerID {
-			peerID = value.BuyerID
-		}
-		mapping, err := s.repo.FindMapping(ctx, peerID)
+		item, err := s.contextForParticipant(ctx, value, userID)
 		if err != nil {
-			return ConversationPage{}, fmt.Errorf("find IM peer mapping: %w", err)
+			return ConversationPage{}, err
 		}
-		value.ConversationID = "C2C" + mapping.IMUserID
-		result = append(result, toContext(value, mapping.IMUserID))
+		result = append(result, item)
 	}
 	return ConversationPage{Items: result, Page: page, PageSize: size, Total: total}, nil
 }

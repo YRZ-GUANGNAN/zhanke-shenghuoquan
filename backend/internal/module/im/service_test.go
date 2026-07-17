@@ -12,8 +12,9 @@ import (
 )
 
 type imMemoryRepo struct {
-	mappings      map[uint]UserMapping
-	conversations []Conversation
+	mappings              map[uint]UserMapping
+	conversations         []Conversation
+	conversationLookupErr error
 }
 
 func newIMMemoryRepo() *imMemoryRepo { return &imMemoryRepo{mappings: map[uint]UserMapping{}} }
@@ -48,6 +49,17 @@ func (r *imMemoryRepo) FindConversation(_ context.Context, buyerID, sellerID uin
 	}
 	return Conversation{}, false, nil
 }
+func (r *imMemoryRepo) FindConversationForParticipant(_ context.Context, relationID, userID uint) (Conversation, bool, error) {
+	if r.conversationLookupErr != nil {
+		return Conversation{}, false, r.conversationLookupErr
+	}
+	for _, value := range r.conversations {
+		if value.ID == relationID && value.ReferenceType == "product" && (value.BuyerID == userID || value.SellerID == userID) {
+			return value, true, nil
+		}
+	}
+	return Conversation{}, false, nil
+}
 func (r *imMemoryRepo) EnsureConversationStable(ctx context.Context, v *Conversation) error {
 	if current, found, err := r.FindConversation(ctx, v.BuyerID, v.SellerID, v.ReferenceType, v.ReferenceID); err != nil {
 		return err
@@ -65,11 +77,69 @@ func (r *imMemoryRepo) EnsureConversationStable(ctx context.Context, v *Conversa
 func (r *imMemoryRepo) ListConversations(_ context.Context, userID uint, _, _ int) ([]Conversation, int64, error) {
 	values := []Conversation{}
 	for _, v := range r.conversations {
-		if v.BuyerID == userID || v.SellerID == userID {
+		if v.ReferenceType == "product" && (v.BuyerID == userID || v.SellerID == userID) {
 			values = append(values, v)
 		}
 	}
 	return values, int64(len(values)), nil
+}
+
+func TestConversationForParticipantUsesCallerSpecificPeer(t *testing.T) {
+	repo := newIMMemoryRepo()
+	repo.mappings[2] = UserMapping{UserID: 2, IMUserID: "campus_2"}
+	repo.mappings[3] = UserMapping{UserID: 3, IMUserID: "campus_3"}
+	repo.conversations = []Conversation{{ID: 7, ConversationID: "stale", BuyerID: 2, SellerID: 3, ReferenceType: "product", ReferenceID: 9}}
+	service := NewService(repo, &importerFake{}, "1400000000", "secret")
+	buyer, err := service.Conversation(context.Background(), 7, 2)
+	if err != nil || buyer.PeerUserID != "campus_3" || buyer.ConversationID != "C2Ccampus_3" {
+		t.Fatalf("buyer=%+v err=%v", buyer, err)
+	}
+	seller, err := service.Conversation(context.Background(), 7, 3)
+	if err != nil || seller.PeerUserID != "campus_2" || seller.ConversationID != "C2Ccampus_2" {
+		t.Fatalf("seller=%+v err=%v", seller, err)
+	}
+}
+
+func TestConversationForParticipantHidesMissingUnauthorizedAndNonProduct(t *testing.T) {
+	repo := newIMMemoryRepo()
+	repo.conversations = []Conversation{
+		{ID: 7, BuyerID: 2, SellerID: 3, ReferenceType: "product", ReferenceID: 9},
+		{ID: 8, BuyerID: 2, SellerID: 3, ReferenceType: "delivery", ReferenceID: 10},
+	}
+	service := NewService(repo, &importerFake{}, "1400000000", "secret")
+	for _, input := range [][2]uint{{7, 99}, {999, 2}, {8, 2}} {
+		if _, err := service.Conversation(context.Background(), input[0], input[1]); !errors.Is(err, ErrConversationNotFound) {
+			t.Fatalf("input=%v err=%v", input, err)
+		}
+	}
+}
+
+func TestConversationForParticipantIsReadOnly(t *testing.T) {
+	stamp := time.Date(2026, 7, 17, 9, 0, 0, 0, time.UTC)
+	repo := newIMMemoryRepo()
+	repo.mappings[3] = UserMapping{UserID: 3, IMUserID: "campus_3"}
+	repo.conversations = []Conversation{{ID: 7, BuyerID: 2, SellerID: 3, ReferenceType: "product", ReferenceID: 9, CreatedAt: stamp, UpdatedAt: stamp}}
+	before := append([]Conversation(nil), repo.conversations...)
+	importer := &importerFake{}
+	if _, err := NewService(repo, importer, "1400000000", "secret").Conversation(context.Background(), 7, 2); err != nil {
+		t.Fatal(err)
+	}
+	if len(importer.users) != 0 || !reflect.DeepEqual(before, repo.conversations) {
+		t.Fatalf("imports=%v before=%+v after=%+v", importer.users, before, repo.conversations)
+	}
+}
+
+func TestConversationsOnlyReturnsProductRelations(t *testing.T) {
+	repo := newIMMemoryRepo()
+	repo.mappings[3] = UserMapping{UserID: 3, IMUserID: "campus_3"}
+	repo.conversations = []Conversation{
+		{ID: 7, BuyerID: 2, SellerID: 3, ReferenceType: "product", ReferenceID: 9},
+		{ID: 8, BuyerID: 2, SellerID: 3, ReferenceType: "delivery", ReferenceID: 10},
+	}
+	page, err := NewService(repo, &importerFake{}, "1400000000", "secret").Conversations(context.Background(), 2, 1, 20)
+	if err != nil || len(page.Items) != 1 || page.Items[0].RelationID != 7 {
+		t.Fatalf("page=%+v err=%v", page, err)
+	}
 }
 
 type importerFake struct {
