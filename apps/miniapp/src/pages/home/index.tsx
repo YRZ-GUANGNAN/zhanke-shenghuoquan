@@ -1,12 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import TaroRuntime from '@tarojs/taro'
+import TaroRuntime, { useDidShow } from '@tarojs/taro'
 import { Image, Text, View } from '@tarojs/components'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import StudentBottomNav from '../../components/student-bottom-nav'
 import { useIdentityGuard } from '../../hooks/use-identity-guard'
 import type { CommunityPost, Product } from '../../types'
+import { isApiError } from '../../services/api'
 import { getCommunityPostsPage, type PageResult } from '../../services/b-community'
-import { getProductsPage, type ProductPageResult } from '../../services/c-trade'
+import { getProduct, getProductsPage, type IMConversationContext, type ProductPageResult } from '../../services/c-trade'
+import { listIMConversations } from '../../services/e-im'
+import { requestWithSingleSessionRecovery } from '../../services/session-recovery'
 import Taro from '../../services/taro'
 import './index.scss'
 
@@ -23,16 +26,6 @@ type DiscoverCard = {
   likes: number
   height: 'short' | 'medium' | 'tall'
   imageUrl?: string
-}
-
-type Conversation = {
-  id: string
-  name: string
-  avatar: string
-  preview: string
-  time: string
-  unread?: boolean
-  scene: string
 }
 
 type ToolItem = {
@@ -63,35 +56,6 @@ const tabs: Array<{ key: HomeTab; label: string }> = [
   { key: 'messages', label: '私信' },
   { key: 'discover', label: '发现' },
   { key: 'tools', label: '工具' }
-]
-
-const conversations: Conversation[] = [
-  {
-    id: 'c1',
-    name: '小鹿乱撞',
-    avatar: '鹿',
-    preview: '明天去海边的话我可以带相机～',
-    time: '12:06',
-    unread: true,
-    scene: 'sea'
-  },
-  {
-    id: 'c2',
-    name: '卷心菜',
-    avatar: '卷',
-    preview: '图书馆三楼靠窗还有位置',
-    time: '昨天',
-    scene: 'library'
-  },
-  {
-    id: 'c3',
-    name: '向北',
-    avatar: '向',
-    preview: '自行车可以今晚看车',
-    time: '周二',
-    unread: true,
-    scene: 'bike'
-  }
 ]
 
 const tools: ToolItem[] = [
@@ -175,6 +139,13 @@ function splitCards(cards: DiscoverCard[]) {
   }
 }
 
+type ConversationItem = {
+  context: IMConversationContext
+  product: Product | null
+}
+
+type ConversationStatus = 'idle' | 'loading' | 'empty' | 'ready' | 'error'
+
 function HomeContent() {
   const [activeTab, setActiveTab] = useState<HomeTab>('discover')
   const [postCards, setPostCards] = useState<DiscoverCard[]>([])
@@ -183,10 +154,14 @@ function HomeContent() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [sourceError, setSourceError] = useState({ community: false, trade: false })
   const [failedImageKeys, setFailedImageKeys] = useState<Set<string>>(() => new Set())
+  const [conversationItems, setConversationItems] = useState<ConversationItem[]>([])
+  const [conversationStatus, setConversationStatus] = useState<ConversationStatus>('idle')
   const sourceRef = useRef({ communityPage: 0, tradePage: 0, communityTotal: 0, tradeTotal: 0 })
   const loadingRef = useRef(false)
   const mountedRef = useRef(true)
   const discoverRequestVersion = useRef(0)
+  const conversationLoadingRef = useRef(false)
+  const conversationRequestVersion = useRef(0)
   const cards = useMemo(
     () => interleaveCards(postCards, productCards),
     [postCards, productCards]
@@ -284,18 +259,58 @@ function HomeContent() {
     }
   }, [])
 
+  const loadConversations = useCallback(async () => {
+    if (!mountedRef.current || conversationLoadingRef.current) return
+    conversationLoadingRef.current = true
+    const version = conversationRequestVersion.current + 1
+    conversationRequestVersion.current = version
+    setConversationStatus('loading')
+    try {
+      const contexts = await requestWithSingleSessionRecovery(() => listIMConversations(1, 20))
+      const items = await Promise.all(contexts.map(async (context): Promise<ConversationItem> => {
+        try {
+          return { context, product: await getProduct(String(context.productId)) }
+        } catch {
+          return { context, product: null }
+        }
+      }))
+      if (!mountedRef.current || conversationRequestVersion.current !== version) return
+      setConversationItems(items)
+      setConversationStatus(items.length ? 'ready' : 'empty')
+    } catch (error) {
+      if (!mountedRef.current || conversationRequestVersion.current !== version) return
+      setConversationItems([])
+      setConversationStatus('error')
+      if (isApiError(error) && error.status === 401) {
+        void Taro.showToast({ title: '登录恢复失败，请点击重试', icon: 'none' })
+      }
+    } finally {
+      if (conversationRequestVersion.current === version) conversationLoadingRef.current = false
+    }
+  }, [])
+
   useEffect(() => {
     mountedRef.current = true
     return () => {
       mountedRef.current = false
       discoverRequestVersion.current += 1
       loadingRef.current = false
+      conversationRequestVersion.current += 1
+      conversationLoadingRef.current = false
     }
   }, [])
 
   useEffect(() => {
     void loadDiscover(true)
   }, [loadDiscover])
+
+  useEffect(() => {
+    if (activeTab === 'messages' && conversationStatus === 'idle') void loadConversations()
+  }, [activeTab, conversationStatus, loadConversations])
+
+  useDidShow(() => {
+    if (activeTab === 'messages') void loadConversations()
+  })
 
   useEffect(() => {
     if (
@@ -323,11 +338,6 @@ function HomeContent() {
 
   const openSearch = () => {
     void Taro.navigateTo({ url: '/pages/search/index' })
-  }
-
-  const openConversation = (item: Conversation) => {
-    const query = `scene=${encodeURIComponent(item.scene)}&peerName=${encodeURIComponent(item.name)}&peerAvatar=${encodeURIComponent(item.avatar)}`
-    void Taro.navigateTo({ url: `/pages/secondhand-chat/index?${query}` })
   }
 
   const openCard = (card: DiscoverCard) => {
@@ -430,28 +440,36 @@ function HomeContent() {
       <View className='student-home-content'>
         {activeTab === 'messages' && (
           <View className='student-message-panel'>
-            {conversations.map((item) => (
-              <View
-                key={item.id}
-                className='student-message-row'
-                onClick={() => openConversation(item)}
-              >
-                <View className='student-message-row__avatar'>
-                  <Text>{item.avatar}</Text>
-                  {item.unread && <View className='student-message-row__dot' />}
-                </View>
-                <View className='student-message-row__main'>
-                  <View className='student-message-row__top'>
-                    <Text className='student-message-row__name'>{item.name}</Text>
-                    <Text className='student-message-row__time'>{item.time}</Text>
-                  </View>
-                  <Text className={`student-message-row__preview ${item.unread ? 'student-message-row__preview--unread' : ''}`}>
-                    {item.preview}
-                  </Text>
-                </View>
+            {conversationStatus === 'loading' || conversationStatus === 'idle' ? (
+              <View className='student-message-state'><Text>正在读取真实私信...</Text></View>
+            ) : conversationStatus === 'error' ? (
+              <View className='student-message-state student-message-state--retry' onClick={() => void loadConversations()}>
+                <Text>私信加载失败，点击重试</Text>
               </View>
-            ))}
-            <Text className='student-home-footnote'>仅展示最近会话</Text>
+            ) : conversationStatus === 'empty' ? (
+              <View className='student-message-state'><Text>还没有二手交易私信</Text></View>
+            ) : (
+              conversationItems.map((item) => (
+                <View
+                  key={item.context.relationId}
+                  className='student-message-row'
+                  onClick={() => void Taro.navigateTo({
+                    url: `/pages/secondhand-chat/index?relationId=${encodeURIComponent(String(item.context.relationId))}`
+                  })}
+                >
+                  <View className='student-message-row__avatar'>
+                    {item.product?.images[0] ? (
+                      <Image className='student-message-row__avatar-image' src={item.product.images[0]} mode='aspectFill' />
+                    ) : <Text>聊</Text>}
+                  </View>
+                  <View className='student-message-row__main'>
+                    <Text className='student-message-row__name'>{item.product?.title || `二手商品 #${item.context.productId}`}</Text>
+                    <Text className='student-message-row__preview'>二手交易私信</Text>
+                  </View>
+                </View>
+              ))
+            )}
+            {conversationStatus === 'ready' && <Text className='student-home-footnote'>仅展示最近 20 个会话</Text>}
           </View>
         )}
 
@@ -509,7 +527,7 @@ function HomeContent() {
 
 export default function HomePage() {
   return (
-    <RuntimeSessionGate>
+    <RuntimeSessionGate preserveAuthenticatedChildrenDuringRetry>
       <HomeContent />
     </RuntimeSessionGate>
   )

@@ -3,16 +3,46 @@ import { Image, Input, ScrollView, Text, View } from '@tarojs/components'
 import { isApiError } from '../../services/api'
 import { contactSeller, getProduct, type IMConversationContext } from '../../services/c-trade'
 import {
+  getIMConversation,
   loadTencentMessages,
   sendTencentText,
   subscribeTencentMessages,
   type TencentMessage
 } from '../../services/e-im'
+import { requestWithSingleSessionRecovery } from '../../services/session-recovery'
 import Taro from '../../services/taro'
+import { useSessionStore } from '../../stores/session'
 import type { Product } from '../../types'
 import './index.scss'
 
 type PageStatus = 'loading' | 'ready' | 'error'
+type ChatEntry = { kind: 'product' | 'relation'; id: string }
+type ViewerRole = 'buyer' | 'seller'
+
+function parseChatEntry(params: Record<string, string | undefined>): ChatEntry | null {
+  const productId = params.productId?.trim() || ''
+  const relationId = params.relationId?.trim() || ''
+  if (Boolean(productId) === Boolean(relationId)) return null
+  const id = productId || relationId
+  if (!/^[1-9]\d*$/.test(id)) return null
+  return { kind: productId ? 'product' : 'relation', id }
+}
+
+function viewerRole(context: IMConversationContext, currentUserId: string): ViewerRole | null {
+  if (String(context.buyerId) === currentUserId) return 'buyer'
+  if (String(context.sellerId) === currentUserId) return 'seller'
+  return null
+}
+
+async function requireAuthenticatedUserId(): Promise<string> {
+  let session = useSessionStore.getState()
+  if (session.status !== 'authenticated') {
+    await session.retry()
+    session = useSessionStore.getState()
+  }
+  if (session.status !== 'authenticated' || !session.profile.id) throw new Error('登录恢复失败')
+  return session.profile.id
+}
 
 function showToast(title: string) {
   void Taro.showToast({ title, icon: 'none', duration: 1800 })
@@ -21,8 +51,9 @@ function showToast(title: string) {
 function chatErrorMessage(error: unknown): string {
   if (!isApiError(error)) return error instanceof Error ? error.message : '私信服务暂不可用，请稍后重试'
   if (error.status === 0) return '网络连接失败，请检查网络后重试'
+  if (error.status === 400) return '私信入口无效，请从商品详情或首页重新进入'
   if (error.status === 401 || error.status === 403) return '登录状态已失效，请重新登录'
-  if (error.status === 404) return '宝贝不存在或已下架'
+  if (error.status === 404) return '会话不存在或无权访问'
   if (error.status === 409 || error.status === 422) return '当前宝贝无法发起私信'
   return error.message || '私信服务暂不可用，请稍后重试'
 }
@@ -44,12 +75,13 @@ function formatTime(value: number): string {
 }
 
 export default function SecondhandChatPage() {
-  const productId = Taro.getCurrentInstance().router?.params?.productId ?? ''
-  const validProductId = /^[1-9]\d*$/.test(productId)
+  const params = Taro.getCurrentInstance().router?.params ?? {}
+  const entry = parseChatEntry(params)
   const [status, setStatus] = useState<PageStatus>('loading')
   const [reloadKey, setReloadKey] = useState(0)
   const [product, setProduct] = useState<Product | null>(null)
   const [context, setContext] = useState<IMConversationContext | null>(null)
+  const [role, setRole] = useState<ViewerRole | null>(null)
   const [messages, setMessages] = useState<TencentMessage[]>([])
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
@@ -62,12 +94,13 @@ export default function SecondhandChatPage() {
     setStatus('loading')
     setProduct(null)
     setContext(null)
+    setRole(null)
     setMessages([])
     setErrorMessage('')
 
-    if (!validProductId) {
+    if (!entry) {
       setStatus('error')
-      setErrorMessage('缺少有效的宝贝信息，请返回详情页重试。')
+      setErrorMessage('私信入口无效，请从商品详情或首页重新进入。')
       return () => {
         active = false
       }
@@ -75,14 +108,34 @@ export default function SecondhandChatPage() {
 
     void (async () => {
       try {
-        const [nextProduct, nextContext] = await Promise.all([
-          getProduct(productId),
-          contactSeller(productId)
-        ])
+        await requireAuthenticatedUserId()
+        const nextContext = await requestWithSingleSessionRecovery(() => (
+          entry.kind === 'product'
+            ? contactSeller(entry.id)
+            : getIMConversation(Number(entry.id))
+        ))
+        const recoveredSession = useSessionStore.getState()
+        if (recoveredSession.status !== 'authenticated' || !recoveredSession.profile.id) {
+          throw new Error('登录恢复失败')
+        }
+        const nextRole = viewerRole(nextContext, recoveredSession.profile.id)
+        const validRelation = Number.isInteger(nextContext.relationId) && nextContext.relationId > 0
+        const validProduct = Number.isInteger(nextContext.productId) && nextContext.productId > 0
+        const validTencentPeer = Boolean(nextContext.peerUserId) && nextContext.conversationId === `C2C${nextContext.peerUserId}`
+        if (!nextRole || !validRelation || !validProduct || !validTencentPeer) {
+          throw new Error('会话参与者校验失败')
+        }
+        let nextProduct: Product | null = null
+        try {
+          nextProduct = await getProduct(String(nextContext.productId))
+        } catch {
+          nextProduct = null
+        }
         if (!active) return
 
-        setProduct(nextProduct)
         setContext(nextContext)
+        setProduct(nextProduct)
+        setRole(nextRole)
         unsubscribe = await subscribeTencentMessages(nextContext, (incoming) => {
           if (!active) return
           setMessages((current) => mergeMessages(current, incoming.filter((message) => Boolean(messageText(message)))))
@@ -101,6 +154,9 @@ export default function SecondhandChatPage() {
         unsubscribe?.()
         unsubscribe = undefined
         if (!active) return
+        setProduct(null)
+        setContext(null)
+        setRole(null)
         const message = chatErrorMessage(error)
         setErrorMessage(message)
         setStatus('error')
@@ -112,28 +168,39 @@ export default function SecondhandChatPage() {
       active = false
       unsubscribe?.()
     }
-  }, [productId, reloadKey, validProductId])
+  }, [entry?.id, entry?.kind, reloadKey])
 
   const visibleMessages = useMemo(
     () => messages.filter((message) => Boolean(messageText(message))),
     [messages]
   )
-  const peerName = product?.sellerName || '校园卖家'
-  const peerAvatar = peerName.trim().charAt(0) || '校'
+  const peerName = role === 'seller' ? '交易对方' : product?.sellerName || '校园卖家'
+  const peerAvatar = role === 'seller' ? '买' : peerName.trim().charAt(0) || '校'
+  const peerAvatarImage = role === 'buyer' ? product?.sellerAvatar : ''
+  const peerState = role === 'seller' ? '买家 · 腾讯云 IM' : `${product?.campus || '校内'} · 腾讯云 IM`
+  const canOpenSellerProfile = role === 'buyer' && Boolean(product?.sellerId)
+  const resolvedProductId = context
+    ? String(context.productId)
+    : entry?.kind === 'product' ? entry.id : ''
   const productImage = product?.images[0]
 
   const goBack = () => {
-    const fallback = validProductId
-      ? `/pages/secondhand-detail/index?id=${encodeURIComponent(productId)}`
-      : '/pages/student-secondhand/index'
+    const fallback = entry?.kind === 'product'
+      ? `/pages/secondhand-detail/index?id=${encodeURIComponent(entry.id)}`
+      : '/pages/home/index'
     void Taro.navigateBack().catch(() => Taro.redirectTo({ url: fallback }))
   }
 
   const openSellerProfile = () => {
-    if (!product?.sellerId) return
+    if (!canOpenSellerProfile || !product?.sellerId) return
     void Taro.navigateTo({
       url: `/pages/user-profile/index?userId=${encodeURIComponent(product.sellerId)}&tab=secondhand`
     })
+  }
+
+  const openProduct = () => {
+    if (!resolvedProductId) return
+    void Taro.navigateTo({ url: `/pages/secondhand-detail/index?id=${encodeURIComponent(resolvedProductId)}` })
   }
 
   const sendText = async () => {
@@ -142,7 +209,7 @@ export default function SecondhandChatPage() {
       showToast('先输入消息')
       return
     }
-    if (!context || status !== 'ready' || sending) return
+    if (!context || !role || status !== 'ready' || sending) return
 
     setSending(true)
     try {
@@ -160,10 +227,10 @@ export default function SecondhandChatPage() {
     <View className='secondhand-chat-page'>
       <View className='secondhand-chat-header'>
         <View className='secondhand-chat-header__back' onClick={goBack} />
-        <View className='secondhand-chat-seller' onClick={openSellerProfile}>
+        <View className='secondhand-chat-seller' onClick={canOpenSellerProfile ? openSellerProfile : undefined}>
           <View className='secondhand-chat-seller__avatar'>
-            {product?.sellerAvatar ? (
-              <Image className='secondhand-chat-seller__avatar-image' src={product.sellerAvatar} mode='aspectFill' />
+            {peerAvatarImage ? (
+              <Image className='secondhand-chat-seller__avatar-image' src={peerAvatarImage} mode='aspectFill' />
             ) : (
               <Text>{peerAvatar}</Text>
             )}
@@ -171,12 +238,15 @@ export default function SecondhandChatPage() {
           <View className='secondhand-chat-seller__meta'>
             <Text className='secondhand-chat-seller__name'>{status === 'loading' ? '正在连接私信' : peerName}</Text>
             <Text className='secondhand-chat-seller__state'>
-              {status === 'ready' ? `${product?.campus || '校内'} · 腾讯云 IM` : status === 'error' ? '连接失败' : '安全初始化中'}
+              {status === 'ready' ? peerState : status === 'error' ? '连接失败' : '安全初始化中'}
             </Text>
           </View>
         </View>
-        <View className='secondhand-chat-header__home' onClick={openSellerProfile}>
-          <Text>主页</Text>
+        <View
+          className={`secondhand-chat-header__home ${canOpenSellerProfile ? '' : 'secondhand-chat-header__home--disabled'}`}
+          onClick={canOpenSellerProfile ? openSellerProfile : undefined}
+        >
+          <Text>{canOpenSellerProfile ? '主页' : '交易中'}</Text>
         </View>
       </View>
 
@@ -189,12 +259,14 @@ export default function SecondhandChatPage() {
           )}
         </View>
         <View className='secondhand-chat-product__main'>
-          <Text className='secondhand-chat-product__title'>{product?.title || '正在读取宝贝信息'}</Text>
+          <Text className='secondhand-chat-product__title'>
+            {product?.title || (resolvedProductId ? `二手商品 #${resolvedProductId}` : '正在读取宝贝信息')}
+          </Text>
           {product ? <Text className='secondhand-chat-product__price'>¥{product.price}</Text> : null}
         </View>
         <View
-          className='secondhand-chat-product__button'
-          onClick={() => validProductId && Taro.navigateTo({ url: `/pages/secondhand-detail/index?id=${encodeURIComponent(productId)}` })}
+          className={`secondhand-chat-product__button ${resolvedProductId ? '' : 'secondhand-chat-product__button--disabled'}`}
+          onClick={resolvedProductId ? openProduct : undefined}
         >
           <Text>查看</Text>
         </View>
@@ -218,7 +290,9 @@ export default function SecondhandChatPage() {
         ) : visibleMessages.length === 0 ? (
           <View className='secondhand-chat-state'>
             <Text className='secondhand-chat-state__title'>会话已建立</Text>
-            <Text className='secondhand-chat-state__desc'>发送第一条文字消息，与卖家确认宝贝情况。</Text>
+            <Text className='secondhand-chat-state__desc'>
+              {role === 'seller' ? '回复买家确认交易。' : '发送第一条文字消息，与卖家确认宝贝情况。'}
+            </Text>
           </View>
         ) : (
           visibleMessages.map((message) => {
@@ -257,7 +331,7 @@ export default function SecondhandChatPage() {
             className='secondhand-chat-input'
             value={draft}
             maxlength={500}
-            disabled={status !== 'ready' || sending}
+            disabled={status !== 'ready' || !role || sending}
             placeholder={status === 'ready' ? '发消息...' : '私信连接中...'}
             placeholderClass='secondhand-chat-input__placeholder'
             confirmType='send'
@@ -266,7 +340,7 @@ export default function SecondhandChatPage() {
           />
         </View>
         <View
-          className={`secondhand-chat-send ${draft.trim() && status === 'ready' && !sending ? 'secondhand-chat-send--active' : ''}`}
+          className={`secondhand-chat-send ${draft.trim() && status === 'ready' && role && !sending ? 'secondhand-chat-send--active' : ''}`}
           onClick={() => void sendText()}
         >
           <Text>{sending ? '发送中' : '发送'}</Text>

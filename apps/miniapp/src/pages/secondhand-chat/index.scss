@@ -122,6 +122,11 @@
   font-weight: 700;
 }
 
+.secondhand-chat-header__home--disabled {
+  background: $bg-screen;
+  color: $text-faint;
+}
+
 .secondhand-chat-product {
   position: relative;
   z-index: 4;
@@ -187,6 +192,11 @@
   color: $brand-primary;
   font-size: 23rpx;
   font-weight: 700;
+}
+
+.secondhand-chat-product__button--disabled {
+  background: $bg-screen;
+  color: $text-faint;
 }
 
 .secondhand-chat-scroll {

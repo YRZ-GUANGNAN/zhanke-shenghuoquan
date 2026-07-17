@@ -1,15 +1,31 @@
-import type { ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { Text, View } from '@tarojs/components'
 import { useSessionStore } from '../stores/session'
 
 interface RuntimeSessionGateProps {
   children: ReactNode
+  preserveAuthenticatedChildrenDuringRetry?: boolean
 }
 
-export default function RuntimeSessionGate({ children }: RuntimeSessionGateProps) {
+export default function RuntimeSessionGate({
+  children,
+  preserveAuthenticatedChildrenDuringRetry = false
+}: RuntimeSessionGateProps) {
   const status = useSessionStore((state) => state.status)
   const error = useSessionStore((state) => state.error)
   const retry = useSessionStore((state) => state.retry)
+  const previousStatus = useRef(status)
+  const preserveCurrentBoot = useRef(false)
+
+  if (status === 'booting' && previousStatus.current === 'authenticated') {
+    preserveCurrentBoot.current = true
+  }
+  if (status !== 'booting') preserveCurrentBoot.current = false
+  previousStatus.current = status
+
+  if (status === 'booting' && preserveAuthenticatedChildrenDuringRetry && preserveCurrentBoot.current) {
+    return <>{children}</>
+  }
 
   if (status === 'idle' || status === 'booting') {
     return (

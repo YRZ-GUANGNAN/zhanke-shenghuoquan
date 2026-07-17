@@ -10,7 +10,7 @@ interface BackendProduct{id:number|string;sellerId?:number|string;seller?:Backen
 interface BackendPage<T>{items:T[];page:number;pageSize:number;total:number}
 export interface ProductListQuery{page?:number;pageSize?:number;keyword?:string;category?:string;status?:Product['status']}
 export interface ProductPageResult{items:Product[];page:number;pageSize:number;total:number}
-export interface IMConversationContext{relationId?:number;conversationId:string;peerUserId:string;productId:number;buyerId?:number;sellerId?:number}
+export interface IMConversationContext{relationId:number;conversationId:string;peerUserId:string;productId:number;buyerId:number;sellerId:number}
 export interface CreateProductInput{title:string;description:string;price:number;category?:string;imageAssetIds?:string[];clientRequestId?:string}
 export interface TradeViewerState{favorited:boolean;contactedSeller:boolean}
 

@@ -11,7 +11,10 @@ let sdkAppId=''
 let loginPromise:Promise<ChatSDK>|null=null
 
 export function getIMCredentials():Promise<IMCredentials>{return request('/im/usersig',{url:'',timeout:10000})}
-export async function listIMConversations():Promise<IMConversationContext[]>{return(await request<ConversationPage>('/im/conversations')).items}
+export async function listIMConversations(page=1,pageSize=20):Promise<IMConversationContext[]>{
+  return(await request<ConversationPage>(`/im/conversations?page=${page}&pageSize=${pageSize}`)).items
+}
+export function getIMConversation(relationId:number):Promise<IMConversationContext>{return request(`/im/conversations/${relationId}`)}
 
 export async function ensureTencentIMReady():Promise<ChatSDK>{
   if(loginPromise)return loginPromise

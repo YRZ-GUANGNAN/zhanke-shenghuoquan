@@ -37,6 +37,12 @@ const config = fs.readFileSync(configPath, 'utf8')
 const registeredRoutes = [...config.matchAll(/'((?:pages\/)[^']+\/index)'/g)].map((match) => match[1])
 const registered = new Set(registeredRoutes)
 const expected = new Set(expectedRoutes)
+const forbiddenLegacyRoutes = ['pages/chat/index', 'pages/conversations/index']
+const registeredLegacyRoutes = forbiddenLegacyRoutes.filter((route) => registered.has(route))
+
+if (registeredLegacyRoutes.length > 0) {
+  throw new Error(`legacy chat routes must stay unregistered: ${registeredLegacyRoutes.join(', ')}`)
+}
 
 const missingFromConfig = expectedRoutes.filter((route) => !registered.has(route))
 const unexpectedInConfig = registeredRoutes.filter((route) => !expected.has(route))
@@ -76,6 +82,21 @@ for (const filePath of sourceFiles) {
 
 if (brokenTargets.length > 0) {
   throw new Error(`registered new-shell source points to an unregistered route:\n${brokenTargets.join('\n')}`)
+}
+
+const homeSource = fs.readFileSync(path.join(src, 'pages', 'home', 'index.tsx'), 'utf8')
+if (/const\s+conversations\s*[:=]/.test(homeSource)) {
+  throw new Error('home messages must not use a hard-coded conversations array')
+}
+if (/conversationId|peerUserId|buyerId|sellerId|peerName|peerAvatar|scene=/.test(homeSource)) {
+  throw new Error('home conversation navigation must carry relationId only')
+}
+const safeRelationTarget = '/pages/secondhand-chat/index?relationId=${encodeURIComponent(String(item.context.relationId))}'
+if (!homeSource.includes(safeRelationTarget)) {
+  throw new Error('home conversation navigation must use the authorized relationId')
+}
+if (!/RuntimeSessionGate\s+preserveAuthenticatedChildrenDuringRetry/.test(homeSource)) {
+  throw new Error('home must preserve an authenticated mount during one-shot session recovery')
 }
 
 console.log(`miniapp static route check PASS (${registeredRoutes.length} routes)`)
