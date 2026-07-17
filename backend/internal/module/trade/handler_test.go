@@ -5,8 +5,11 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"campus-circle/backend/internal/module/admin/review"
+	"campus-circle/backend/internal/module/user"
 	"github.com/gin-gonic/gin"
 )
 
@@ -95,6 +98,86 @@ func TestWriteCreateResultFirstAndReplay(t *testing.T) {
 	writeCreateResult(replayContext, Product{ID: 7}, true)
 	if replayRecorder.Code != http.StatusOK || replayRecorder.Header().Get("Idempotency-Replayed") != "true" {
 		t.Fatalf("unexpected replay response status=%d headers=%v", replayRecorder.Code, replayRecorder.Header())
+	}
+}
+
+type tradeSafetyCall struct {
+	ctx             context.Context
+	openID, content string
+}
+
+type tradeSafetyRecorder struct {
+	risk  string
+	calls []tradeSafetyCall
+}
+
+func (r *tradeSafetyRecorder) CheckText(ctx context.Context, openID, content string) string {
+	r.calls = append(r.calls, tradeSafetyCall{ctx: ctx, openID: openID, content: content})
+	return r.risk
+}
+
+type tradeReviewRecorder struct {
+	submissions []review.Submission
+}
+
+func (r *tradeReviewRecorder) Submit(_ context.Context, value review.Submission) (review.Task, error) {
+	r.submissions = append(r.submissions, value)
+	return review.Task{ObjectType: value.ObjectType, ObjectID: value.ObjectID}, nil
+}
+
+func TestTradeHandlersUseAuthenticatedOpenID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := newTradeMemoryRepo(Product{ID: 9, SellerID: 7, Title: "old", Status: StatusSelling, ReviewStatus: review.StatusApproved})
+	reviews := &tradeReviewRecorder{}
+	checker := &tradeSafetyRecorder{risk: "manual:wechat_request_failed"}
+	handler := NewHandler(NewService(repo, tradeUsers{}, reviews, &tradeConversations{}, &tradeSearchFake{}), nil, checker)
+	router := gin.New()
+	current := user.User{ID: 7, OpenID: "openid-trade-secret"}
+	router.POST("/products", func(c *gin.Context) {
+		c.Set("domainA.user", current)
+		handler.create(c)
+	})
+	router.PUT("/products/:id", func(c *gin.Context) {
+		c.Set("domainA.user", current)
+		handler.update(c)
+	})
+	tests := []struct {
+		method, path, body, content string
+	}{
+		{http.MethodPost, "/products", `{"title":"new","description":"create","price":100}`, "new\ncreate"},
+		{http.MethodPut, "/products/9", `{"title":"updated","description":"replace","price":200}`, "updated\nreplace"},
+	}
+	for _, test := range tests {
+		requestContext := context.WithValue(context.Background(), struct{}{}, test.path)
+		req := httptest.NewRequest(test.method, test.path, strings.NewReader(test.body)).WithContext(requestContext)
+		req.Header.Set("Content-Type", "application/json")
+		response := httptest.NewRecorder()
+		beforeCalls, beforeReviews := len(checker.calls), len(reviews.submissions)
+		router.ServeHTTP(response, req)
+		wantStatus := http.StatusOK
+		if test.method == http.MethodPost {
+			wantStatus = http.StatusCreated
+		}
+		if response.Code != wantStatus {
+			t.Fatalf("%s status=%d body=%s", test.path, response.Code, response.Body.String())
+		}
+		call := checker.calls[beforeCalls]
+		if call.ctx != requestContext || call.openID != current.OpenID || call.content != test.content {
+			t.Fatalf("%s call=%#v", test.path, call)
+		}
+		submission := reviews.submissions[beforeReviews]
+		if submission.ObjectType != "product" || submission.SubmitterID != current.ID || submission.Risk != checker.risk {
+			t.Fatalf("%s submission=%#v", test.path, submission)
+		}
+		if strings.Contains(response.Body.String(), current.OpenID) {
+			t.Fatalf("%s response leaked openid", test.path)
+		}
+	}
+	if repo.products[9].ReviewStatus != review.StatusSubmitted {
+		t.Fatalf("update review status=%s", repo.products[9].ReviewStatus)
+	}
+	if _, err := repo.Find(context.Background(), 9, true); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("updated product became public: %v", err)
 	}
 }
 

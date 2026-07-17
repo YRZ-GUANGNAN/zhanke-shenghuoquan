@@ -15,10 +15,10 @@ import (
 type Handler struct {
 	service *Service
 	users   *user.Service
-	safety  *review.SafetyClient
+	safety  review.TextSafetyChecker
 }
 
-func NewHandler(service *Service, users *user.Service, safety *review.SafetyClient) *Handler {
+func NewHandler(service *Service, users *user.Service, safety review.TextSafetyChecker) *Handler {
 	return &Handler{service: service, users: users, safety: safety}
 }
 func (h *Handler) Register(rg *gin.RouterGroup) {
@@ -86,8 +86,9 @@ func (h *Handler) create(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	input := toInput(req, user.CurrentUserID(c))
-	risk := h.safety.CheckText(c, "", req.Title+"\n"+req.Description)
+	currentUser := user.CurrentUser(c)
+	input := toInput(req, currentUser.ID)
+	risk := h.safety.CheckText(c.Request.Context(), currentUser.OpenID, req.Title+"\n"+req.Description)
 	if clientRequestID != "" {
 		value, replayed, err := h.service.CreateKeyed(c, input, risk, clientRequestID)
 		if err != nil {
@@ -157,8 +158,9 @@ func (h *Handler) update(c *gin.Context) {
 	if !ok {
 		return
 	}
-	input := toInput(req, user.CurrentUserID(c))
-	risk := h.safety.CheckText(c, "", req.Title+"\n"+req.Description)
+	currentUser := user.CurrentUser(c)
+	input := toInput(req, currentUser.ID)
+	risk := h.safety.CheckText(c.Request.Context(), currentUser.OpenID, req.Title+"\n"+req.Description)
 	value, err := h.service.Update(c, id, input, risk)
 	write(c, value, err)
 }

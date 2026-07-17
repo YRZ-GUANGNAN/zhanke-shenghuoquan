@@ -17,10 +17,10 @@ import (
 type Handler struct {
 	service *Service
 	users   *user.Service
-	safety  *review.SafetyClient
+	safety  review.TextSafetyChecker
 }
 
-func NewHandler(service *Service, users *user.Service, safety *review.SafetyClient) *Handler {
+func NewHandler(service *Service, users *user.Service, safety review.TextSafetyChecker) *Handler {
 	return &Handler{service: service, users: users, safety: safety}
 }
 func (h *Handler) Register(rg *gin.RouterGroup) {
@@ -87,8 +87,9 @@ func (h *Handler) create(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	risk := h.safety.CheckText(c, "", req.Title+"\n"+req.Content)
-	input := CreatePostInput{UserID: user.CurrentUserID(c), Title: req.Title, Content: req.Content, Topic: req.Topic, ImageAssetIDs: req.ImageAssetIDs}
+	currentUser := user.CurrentUser(c)
+	risk := h.safety.CheckText(c.Request.Context(), currentUser.OpenID, req.Title+"\n"+req.Content)
+	input := CreatePostInput{UserID: currentUser.ID, Title: req.Title, Content: req.Content, Topic: req.Topic, ImageAssetIDs: req.ImageAssetIDs}
 	if keyed {
 		result, err := h.service.CreatePostKeyed(c, input, clientRequestID, risk)
 		writeKeyedCreate(c, result.Value, result.Replayed, err)
@@ -128,13 +129,14 @@ func (h *Handler) addComment(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	risk := h.safety.CheckText(c, "", req.Content)
+	currentUser := user.CurrentUser(c)
+	risk := h.safety.CheckText(c.Request.Context(), currentUser.OpenID, req.Content)
 	if keyed {
-		result, err := h.service.AddCommentKeyed(c, id, user.CurrentUserID(c), req.Content, clientRequestID, risk)
+		result, err := h.service.AddCommentKeyed(c, id, currentUser.ID, req.Content, clientRequestID, risk)
 		writeKeyedCreate(c, result.Value, result.Replayed, err)
 		return
 	}
-	result, err := h.service.AddComment(c, id, user.CurrentUserID(c), req.Content, risk)
+	result, err := h.service.AddComment(c, id, currentUser.ID, req.Content, risk)
 	if err != nil {
 		response.Fail(c, 400, err.Error())
 		return
