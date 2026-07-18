@@ -28,7 +28,7 @@ for (const file of files(moduleRoot).filter((file) => file.endsWith('.go'))) {
 }
 
 const navigationSource = files(path.join(moduleRoot, 'navigation')).map((file) => fs.readFileSync(file, 'utf8')).join('\n')
-if (/internal\/module\/(user|community|trade|im|admin)/.test(navigationSource)) failures.push('domain D imports another business domain')
+if (/internal\/module\/(user|community|trade|im|admin|media|takeout|delivery)/.test(navigationSource)) failures.push('domain D imports another business domain')
 
 const imSource = files(path.join(moduleRoot, 'im')).map((file) => fs.readFileSync(file, 'utf8')).join('\n')
 if (/type\s+Message\b|message_content|messages\b/.test(imSource)) failures.push('domain E contains message storage')

@@ -21,7 +21,7 @@
 - A 可向 B/C/E/F 提供身份与公开资料；B/C 不修改 A 数据。
 - B、C 提交审核到 F；F 通过注册的领域服务回写审核状态，不直接访问帖子/商品表。
 - C 通过 E 的 `ConversationGateway` 创建腾讯云 IM 会话关系；E 不读取商品表。
-- D 不调用 A/B/C/E/F，不保存业务配置，只输出分类、`appid` 和 `path`。
+- D 不调用 A/B/C/E/F/G 或配送域，只保存分类、`systemKey`、展示字段、AppID/path、展示开关和营业展示状态。D 不保存菜单、订单、支付、配送信息或第三方回传数据。
 - F 管理 A–D 时调用各域 service；F 自有仓储只访问 `review_tasks` 和 `reports`。
 - A 向 G 提供身份与公开资料；G 不自建 token/权限。
 - G 的菜品图/商家图通过媒体子系统 `media_asset_references` 引用，展示经 MediaGateway（仅 final+approved）；G 不新建媒体逻辑。

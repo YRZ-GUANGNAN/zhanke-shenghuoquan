@@ -7,8 +7,10 @@ import (
 	"gorm.io/gorm"
 
 	"campus-circle/backend/internal/config"
+	"campus-circle/backend/internal/module/admin"
 	"campus-circle/backend/internal/module/admin/review"
 	coremedia "campus-circle/backend/internal/module/media"
+	"campus-circle/backend/internal/module/navigation"
 	"campus-circle/backend/internal/module/user"
 )
 
@@ -43,7 +45,29 @@ func TestLegacyTakeoutRouteGate(t *testing.T) {
 			}
 			users := user.NewService(user.NewRepository(db), "test-secret-that-is-longer-than-thirty-two-characters", "", "", true)
 			router := gin.New()
-			registerLegacyTakeoutRoutes(runtime, router.Group("/api/v1"), users, reviews, mediaService)
+			api := router.Group("/api/v1")
+			navigationService := navigation.NewService(navigation.NewRepository(db))
+			navigation.NewHandler(navigationService).Register(api.Group("/navigation"))
+			admin.NewHandler(nil, nil, users, nil, nil, navigationService).Register(api)
+			registerLegacyTakeoutRoutes(runtime, api, users, reviews, mediaService)
+
+			if !routeExists(router.Routes(), "GET", "/api/v1/navigation/categories") {
+				t.Fatal("public navigation route must stay mounted")
+			}
+			externalRoutes := []struct{ method, path string }{
+				{"GET", "/api/v1/admin/navigation/external-takeout-merchants"},
+				{"POST", "/api/v1/admin/navigation/external-takeout-merchants"},
+				{"PATCH", "/api/v1/admin/navigation/external-takeout-merchants/category-visibility"},
+				{"PUT", "/api/v1/admin/navigation/external-takeout-merchants/:id"},
+				{"DELETE", "/api/v1/admin/navigation/external-takeout-merchants/:id"},
+				{"PATCH", "/api/v1/admin/navigation/external-takeout-merchants/:id/operating-status"},
+				{"PATCH", "/api/v1/admin/navigation/external-takeout-merchants/:id/visibility"},
+			}
+			for _, route := range externalRoutes {
+				if !routeExists(router.Routes(), route.method, route.path) {
+					t.Fatalf("external directory route missing: %s %s", route.method, route.path)
+				}
+			}
 
 			got := routeExists(router.Routes(), "GET", "/api/v1/takeout/buyer/merchants")
 			if got != test.want {

@@ -9,6 +9,10 @@ export interface ProductRow{id:number;title:string;price:number;category:string;
 export interface ReportRow{id:number;targetType:string;targetId:number;reason:string;reviewStatus:string;createdAt:string}
 export interface NavigationItem{id:number;title:string;appId:string;path:string;enabled:boolean}
 export interface NavigationCategory{id:number;name:string;enabled:boolean;items:NavigationItem[]}
+export type ExternalTakeoutOperatingStatus='open'|'resting'
+export interface ExternalTakeoutMerchant{id:number;title:string;subtitle:string;iconText:string;appId:string;path:string;color:string;sort:number;enabled:boolean;operatingStatus:ExternalTakeoutOperatingStatus}
+export interface ExternalTakeoutMerchantDirectory{categoryEnabled:boolean;items:ExternalTakeoutMerchant[]}
+export interface ExternalTakeoutMerchantInput{title:string;subtitle:string;iconText:string;appId:string;path:string;color:string;sort:number}
 export interface Stats{totals:{users:number;posts:number;products:number;pendingReview:number};today:{users:number;posts:number;products:number}}
 
 export interface MediaQuery{page?:number;pageSize?:number;assetId?:string;status?:string;reviewStatus?:string;purpose?:string;taskId?:string;operation?:string;kind?:string;from?:string;to?:string}

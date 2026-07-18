@@ -4,6 +4,7 @@ import { useAdminStore } from './store'
 import { MediaConsole } from './MediaConsole'
 import { DeliveryConsole } from './DeliveryConsole'
 import { TakeoutConsole } from './TakeoutConsole'
+import { ExternalTakeoutMerchants } from './ExternalTakeoutMerchants'
 import { legacyTakeoutEnabled } from './feature-flags'
 import type { AdminSection, NavigationCategory, Page, PostRow, ProductRow, ReportRow, ReviewTask, Stats, UserRow } from './types'
 
@@ -32,7 +33,7 @@ function Products(){const[data,setData]=useState<Page<ProductRow>|null>(null);co
 
 function Reports(){const[data,setData]=useState<Page<ReportRow>|null>(null);const[error,setError]=useState('');useEffect(()=>{adminAPI.reports().then(setData).catch(e=>setError(String(e)))},[]);if(error)return <ErrorBox message={error}/>;return <Panel title="举报管理"><table><thead><tr><th>目标</th><th>原因</th><th>审核状态</th><th>提交时间</th></tr></thead><tbody>{(data?.items||[]).map(row=><tr key={row.id}><td>{row.targetType} #{row.targetId}</td><td>{row.reason}</td><td>{row.reviewStatus}</td><td>{row.createdAt}</td></tr>)}</tbody></table></Panel>}
 
-function Navigation(){const[data,setData]=useState<NavigationCategory[]>([]);const[error,setError]=useState('');useEffect(()=>{adminAPI.navigation().then(setData).catch(e=>setError(String(e)))},[]);if(error)return <ErrorBox message={error}/>;return <Panel title="导航管理（仅 AppID + Path）">{data.map(category=><div key={category.id}><h3>{category.name}</h3><table><thead><tr><th>名称</th><th>AppID</th><th>Path</th><th>状态</th></tr></thead><tbody>{category.items.map(item=><tr key={item.id}><td>{item.title}</td><td>{item.appId}</td><td>{item.path}</td><td>{item.enabled?'enabled':'disabled'}</td></tr>)}</tbody></table></div>)}</Panel>}
+function Navigation(){const[data,setData]=useState<NavigationCategory[]>([]);const[error,setError]=useState('');useEffect(()=>{adminAPI.navigation().then(setData).catch(e=>setError(String(e)))},[]);return <div className="navigation-console"><ExternalTakeoutMerchants/>{error?<ErrorBox message={error}/>:<Panel title="普通导航入口（仅 AppID + Path）">{data.map(category=><div key={category.id}><h3>{category.name}</h3><table><thead><tr><th>名称</th><th>AppID</th><th>Path</th><th>状态</th></tr></thead><tbody>{category.items.map(item=><tr key={item.id}><td>{item.title}</td><td>{item.appId}</td><td>{item.path}</td><td>{item.enabled?'enabled':'disabled'}</td></tr>)}</tbody></table></div>)}</Panel>}</div>}
 
 function takedownReason(kind:string,title:string){if(!window.confirm(`确认下架${kind}“${title}”吗？下架后该内容将从用户端消失，本模块不提供恢复入口，恢复需重新提交审核。`))return null;const reason=window.prompt('请输入下架原因。此原因仅用于本次操作校验；当前后端尚无下架原因存档字段。')?.trim()||'';return reason}
 

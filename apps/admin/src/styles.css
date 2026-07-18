@@ -620,6 +620,44 @@ td span {
 .content-takedown-button:disabled { cursor: not-allowed; opacity: .55; }
 .content-takedown-error { margin-bottom: 14px; padding: 11px 13px; border-radius: 7px; background: #fff1f1; color: #c2410c; font-weight: 700; }
 
+.navigation-console { display: grid; gap: 20px; }
+.external-merchant-panel { padding: 24px; border-radius: 10px; background: #fff; box-shadow: 0 8px 24px rgba(15, 23, 42, .05); }
+.external-merchant-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 20px; }
+.external-merchant-header h2 { margin: 5px 0 7px; color: #172033; }
+.external-merchant-header p { color: #718096; font-size: 13px; }
+.external-merchant-kicker { color: #1677ff; font-size: 12px; font-weight: 800; letter-spacing: .08em; }
+.external-merchant-header button,
+.external-merchant-form button,
+.external-merchant-row-actions button { padding: 8px 12px; border: 0; border-radius: 7px; background: #1677ff; color: #fff; }
+.external-merchant-header button:disabled,
+.external-merchant-form button:disabled,
+.external-merchant-row-actions button:disabled { cursor: not-allowed; opacity: .5; }
+.external-merchant-error { margin-bottom: 16px; padding: 11px 13px; border-radius: 7px; background: #fff1f1; color: #c2410c; font-weight: 700; }
+.external-merchant-form { display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)); align-items: end; gap: 13px; margin-bottom: 22px; padding: 18px; border: 1px solid #e2e8f0; border-radius: 9px; background: #f8fafc; }
+.external-merchant-form label { display: grid; gap: 6px; color: #64748b; font-size: 12px; }
+.external-merchant-form input { min-width: 0; padding: 9px 10px; border: 1px solid #dbe3ee; border-radius: 7px; background: #fff; color: #243044; }
+.external-merchant-form__wide { grid-column: span 2; }
+.external-merchant-form__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.external-merchant-secondary,
+.external-merchant-row-actions button { background: #eef2f7 !important; color: #475569 !important; }
+.external-merchant-danger { background: #fff1f1 !important; color: #c2410c !important; }
+.external-merchant-identity { display: flex; align-items: center; gap: 10px; min-width: 190px; }
+.external-merchant-avatar { flex: 0 0 38px; height: 38px; display: grid !important; place-items: center; border-radius: 9px; color: #fff !important; font-size: 13px !important; font-weight: 800; }
+.external-merchant-identity small,
+.external-merchant-table td > small { display: block; max-width: 280px; margin-top: 5px; overflow-wrap: anywhere; color: #8694a7; }
+.external-merchant-table code { color: #334155; font-size: 12px; }
+.external-merchant-badge { display: inline-flex !important; margin: 0 !important; padding: 4px 8px; border-radius: 999px; background: #eef2f7; color: #475569 !important; font-size: 12px !important; font-weight: 700; }
+.external-merchant-badge--open { background: #e9f8f3; color: #087f5b !important; }
+.external-merchant-badge--resting { background: #fff8e5; color: #a16207 !important; }
+.external-merchant-badge--off { background: #fff1f1; color: #c2410c !important; }
+.external-merchant-row-actions { display: flex; flex-wrap: wrap; gap: 7px; min-width: 330px; }
+.external-merchant-empty { padding: 32px; color: #718096; text-align: center; }
+
+@media (max-width: 1240px) {
+  .external-merchant-form { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
+  .external-merchant-header { flex-direction: column; }
+}
+
 .delivery-console { display: grid; gap: 18px; }
 .delivery-tabs { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; }
 .delivery-tabs button { padding: 9px 13px; border: 1px solid transparent; border-radius: 7px; background: #eef2f7; color: #526174; }

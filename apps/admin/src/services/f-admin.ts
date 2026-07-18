@@ -1,7 +1,31 @@
 // Domain F client: management and the unified review workflow only.
-import type { MediaAssetDetail, MediaAssetRow, MediaDeadletters, MediaDecisionRow, MediaEventRow, MediaGCJobRow, MediaQuery, MediaSummary, NavigationCategory, Page, PostRow, ProductRow, ReportRow, ReviewTask, Stats, UserRow } from '../types'
+import type { ExternalTakeoutMerchant, ExternalTakeoutMerchantDirectory, ExternalTakeoutMerchantInput, ExternalTakeoutOperatingStatus, MediaAssetDetail, MediaAssetRow, MediaDeadletters, MediaDecisionRow, MediaEventRow, MediaGCJobRow, MediaQuery, MediaSummary, NavigationCategory, Page, PostRow, ProductRow, ReportRow, ReviewTask, Stats, UserRow } from '../types'
 const base='/api/v1'
-async function api<T>(path:string,init:RequestInit={}):Promise<T>{const token=localStorage.getItem('domainA.token')||'';const response=await fetch(`${base}${path}`,{...init,headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})}});const body=await response.json() as {code:number;message:string;data:T};if(!response.ok||body.code!==0)throw new Error(body.message||`HTTP ${response.status}`);return body.data}
+export class AdminAPIError extends Error {
+	constructor(message:string,readonly status:number){super(message);this.name='AdminAPIError'}
+}
+type AdminAPIEnvelope<T>={code:number;message:string;data?:T}
+function protocolError(response:Response){return new AdminAPIError(response.ok?'Invalid API response':`HTTP ${response.status}`,response.status)}
+async function api<T>(path:string,init:RequestInit={}):Promise<T>{
+	const token=localStorage.getItem('domainA.token')||''
+	let response:Response
+	try{
+		response=await fetch(`${base}${path}`,{...init,headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})}})
+	}catch{
+		throw new AdminAPIError('Network request failed',0)
+	}
+	let value:unknown
+	try{value=await response.json()}catch{throw protocolError(response)}
+	if(typeof value!=='object'||value===null||Array.isArray(value))throw protocolError(response)
+	const body=value as Partial<AdminAPIEnvelope<T>>
+	if(typeof body.code!=='number'||typeof body.message!=='string')throw protocolError(response)
+	if(!response.ok||body.code!==0){
+		const status=response.ok&&body.code>0?body.code:response.status
+		throw new AdminAPIError(body.message||`HTTP ${status}`,status)
+	}
+	if(!('data' in body))throw protocolError(response)
+	return body.data as T
+}
 function queryString(query:MediaQuery={}){const params=new URLSearchParams();Object.entries(query).forEach(([key,value])=>{if(value!==undefined&&value!=='')params.set(key,String(value))});const value=params.toString();return value?`?${value}`:''}
 export const adminAPI={
 	stats:()=>api<Stats>('/admin/stats'),
@@ -17,6 +41,13 @@ export const adminAPI={
 	takedownProduct:(id:number,reason:string)=>api<{updated:boolean}>(`/admin/trade/products/${id}/takedown`,{method:'PATCH',body:JSON.stringify({reason})}),
 	reports:()=>api<Page<ReportRow>>('/admin/reports'),
 	navigation:()=>api<NavigationCategory[]>('/admin/navigation'),
+	externalTakeoutMerchants:()=>api<ExternalTakeoutMerchantDirectory>('/admin/navigation/external-takeout-merchants'),
+	createExternalTakeoutMerchant:(input:ExternalTakeoutMerchantInput)=>api<ExternalTakeoutMerchant>('/admin/navigation/external-takeout-merchants',{method:'POST',body:JSON.stringify(input)}),
+	updateExternalTakeoutMerchant:(id:number,input:ExternalTakeoutMerchantInput)=>api<ExternalTakeoutMerchant>(`/admin/navigation/external-takeout-merchants/${id}`,{method:'PUT',body:JSON.stringify(input)}),
+	deleteExternalTakeoutMerchant:(id:number)=>api<{deleted:boolean}>(`/admin/navigation/external-takeout-merchants/${id}`,{method:'DELETE'}),
+	setExternalTakeoutOperatingStatus:(id:number,operatingStatus:ExternalTakeoutOperatingStatus)=>api<{updated:boolean}>(`/admin/navigation/external-takeout-merchants/${id}/operating-status`,{method:'PATCH',body:JSON.stringify({operatingStatus})}),
+	setExternalTakeoutVisibility:(id:number,enabled:boolean)=>api<{updated:boolean}>(`/admin/navigation/external-takeout-merchants/${id}/visibility`,{method:'PATCH',body:JSON.stringify({enabled})}),
+	setExternalTakeoutCategoryVisibility:(enabled:boolean)=>api<{updated:boolean}>('/admin/navigation/external-takeout-merchants/category-visibility',{method:'PATCH',body:JSON.stringify({enabled})}),
 	mediaSummary:()=>api<MediaSummary>('/admin/media/summary'),
 	mediaAssets:(query:MediaQuery={})=>api<Page<MediaAssetRow>>(`/admin/media/assets${queryString(query)}`),
 	mediaAsset:(assetId:string)=>api<MediaAssetDetail>(`/admin/media/assets/${encodeURIComponent(assetId)}`),

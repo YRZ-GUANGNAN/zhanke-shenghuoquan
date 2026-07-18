@@ -37,7 +37,14 @@ const config = fs.readFileSync(configPath, 'utf8')
 const registeredRoutes = [...config.matchAll(/'((?:pages\/)[^']+\/index)'/g)].map((match) => match[1])
 const registered = new Set(registeredRoutes)
 const expected = new Set(expectedRoutes)
-const forbiddenLegacyRoutes = ['pages/chat/index', 'pages/conversations/index']
+const forbiddenLegacyRoutes = [
+  'pages/chat/index',
+  'pages/conversations/index',
+  'pages/takeout/index',
+  'pages/takeout-cart/index',
+  'pages/takeout-orders/index',
+  'pages/takeout-order-detail/index',
+]
 const registeredLegacyRoutes = forbiddenLegacyRoutes.filter((route) => registered.has(route))
 
 if (registeredLegacyRoutes.length > 0) {

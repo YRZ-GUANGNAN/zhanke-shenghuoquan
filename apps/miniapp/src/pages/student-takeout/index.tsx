@@ -1,118 +1,135 @@
-import React from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useDidShow } from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
 import StudentBottomNav from '../../components/student-bottom-nav'
+import {
+  listExternalTakeoutMerchants,
+  type ExternalTakeoutMerchantLink,
+} from '../../services/d-navigation'
 import Taro from '../../services/taro'
 import './index.scss'
 
-type MerchantStatus = '营业中' | '休息中'
-
-interface MerchantCard {
-  id: string
-  avatar: string
-  name: string
-  status: MerchantStatus
-  description: string
-  tone: 'tea' | 'wallace' | 'zhengxin' | 'yidiandian' | 'tastien' | 'mixue'
-}
-
-const merchants: MerchantCard[] = [
-  {
-    id: 'tea',
-    avatar: '茶',
-    name: '茶知味·大学城店',
-    status: '营业中',
-    description: '奶茶果茶 · 人气：芋泥波波',
-    tone: 'tea'
-  },
-  {
-    id: 'wallace',
-    avatar: '华',
-    name: '华莱士·西门店',
-    status: '营业中',
-    description: '炸鸡汉堡 · 人气：全鸡桶',
-    tone: 'wallace'
-  },
-  {
-    id: 'zhengxin',
-    avatar: '正',
-    name: '正新鸡排·二食堂',
-    status: '营业中',
-    description: '小吃炸串 · 人气：香辣鸡排',
-    tone: 'zhengxin'
-  },
-  {
-    id: 'yidiandian',
-    avatar: '一',
-    name: '一点点·北门店',
-    status: '营业中',
-    description: '奶茶 · 人气：波霸奶茶三分甜',
-    tone: 'yidiandian'
-  },
-  {
-    id: 'tastien',
-    avatar: '塔',
-    name: '塔斯汀·大学城店',
-    status: '营业中',
-    description: '中式汉堡 · 人气：香辣鸡腿堡',
-    tone: 'tastien'
-  },
-  {
-    id: 'mixue',
-    avatar: '蜜',
-    name: '蜜雪冰城·大学城店',
-    status: '休息中',
-    description: '冰淇淋与茶 · 人气：柠檬水',
-    tone: 'mixue'
-  }
-]
-
-function showMiniProgramToast() {
-  void Taro.showToast({ title: '即将跳转商家小程序', icon: 'none', duration: 1400 })
-}
+type DirectoryStatus = 'loading' | 'empty' | 'ready' | 'error'
 
 export default function StudentTakeoutPage() {
+  const [merchants, setMerchants] = useState<ExternalTakeoutMerchantLink[]>([])
+  const [status, setStatus] = useState<DirectoryStatus>('loading')
+  const [jumpingMerchantId, setJumpingMerchantId] = useState<string | null>(null)
+  const requestVersion = useRef(0)
+  const jumpingRef = useRef<string | null>(null)
+
+  const load = useCallback(async () => {
+    const version = requestVersion.current + 1
+    requestVersion.current = version
+    setStatus('loading')
+    try {
+      const values = await listExternalTakeoutMerchants()
+      if (version !== requestVersion.current) return
+      setMerchants(values)
+      setStatus(values.length > 0 ? 'ready' : 'empty')
+    } catch (error) {
+      console.error('load external takeout directory failed', error)
+      if (version !== requestVersion.current) return
+      setMerchants([])
+      setStatus('error')
+    }
+  }, [])
+
+  useDidShow(() => {
+    void load()
+  })
+
+  useEffect(() => () => {
+    requestVersion.current += 1
+  }, [])
+
+  const openMerchant = async (merchant: ExternalTakeoutMerchantLink) => {
+    if (merchant.operatingStatus === 'resting') {
+      await Taro.showToast({ title: '商家休息中', icon: 'none' })
+      return
+    }
+    if (jumpingRef.current) return
+    jumpingRef.current = merchant.id
+    setJumpingMerchantId(merchant.id)
+    try {
+      await Taro.navigateToMiniProgram({ appId: merchant.appId, path: merchant.path })
+    } catch (error) {
+      console.error('open external merchant mini program failed', error)
+      await Taro.showToast({ title: '商家小程序暂时无法打开', icon: 'none' })
+    } finally {
+      jumpingRef.current = null
+      setJumpingMerchantId(null)
+    }
+  }
+
   return (
     <View className='student-takeout-page'>
       <View className='student-takeout-header'>
-        <Text className='student-takeout-header__title'>外卖</Text>
-        <Text className='student-takeout-header__subtitle'>校内合作商家 · 点击跳转对应小程序下单</Text>
+        <View className='student-takeout-header__row'>
+          <Text className='student-takeout-header__title'>外卖</Text>
+          <View
+            className='student-takeout-search'
+            onClick={() => void Taro.navigateTo({ url: '/pages/search/index?scope=takeout' })}
+          >
+            <View className='student-takeout-search__icon' />
+            <Text>搜索商家</Text>
+          </View>
+        </View>
+        <Text className='student-takeout-header__subtitle'>校内合作商家 · 点击进入对应商家小程序</Text>
       </View>
 
       <View className='student-takeout-scroll'>
         <View className='student-takeout-tip'>
           <Text className='student-takeout-tip__icon'>i</Text>
           <Text className='student-takeout-tip__text'>
-            在商家小程序下单后，商家会通过湛科生活圈发配送单，由校园骑手送到宿舍楼下。
+            点击进入商家小程序，商品、价格、下单与售后由商家小程序提供。
           </Text>
         </View>
 
-        <View className='student-takeout-list'>
-          {merchants.map((merchant) => (
-            <View
-              key={merchant.id}
-              className='student-takeout-merchant'
-              onClick={showMiniProgramToast}
-            >
-              <View className={`student-takeout-merchant__avatar student-takeout-merchant__avatar--${merchant.tone}`}>
-                <Text>{merchant.avatar}</Text>
-              </View>
-              <View className='student-takeout-merchant__main'>
-                <View className='student-takeout-merchant__title-row'>
-                  <Text className='student-takeout-merchant__name'>{merchant.name}</Text>
-                  <View className={`student-takeout-status ${merchant.status === '营业中' ? 'student-takeout-status--open' : 'student-takeout-status--closed'}`}>
-                    <View className='student-takeout-status__dot' />
-                    <Text>{merchant.status}</Text>
+        {status === 'loading' && (
+          <View className='student-takeout-state'><Text>正在读取合作商家</Text></View>
+        )}
+        {status === 'empty' && (
+          <View className='student-takeout-state'><Text>暂无合作商家</Text></View>
+        )}
+        {status === 'error' && (
+          <View className='student-takeout-state student-takeout-state--retry' onClick={() => void load()}>
+            <Text>商家加载失败，点击重试</Text>
+          </View>
+        )}
+        {status === 'ready' && (
+          <View className='student-takeout-list'>
+            {merchants.map((merchant) => {
+              const resting = merchant.operatingStatus === 'resting'
+              const jumping = jumpingMerchantId === merchant.id
+              return (
+                <View
+                  key={merchant.id}
+                  className={`student-takeout-merchant${resting ? ' student-takeout-merchant--resting' : ''}`}
+                  onClick={() => void openMerchant(merchant)}
+                >
+                  <View className='student-takeout-merchant__avatar' style={{ backgroundColor: merchant.color }}>
+                    <Text>{merchant.iconText}</Text>
                   </View>
+                  <View className='student-takeout-merchant__main'>
+                    <View className='student-takeout-merchant__title-row'>
+                      <Text className='student-takeout-merchant__name'>{merchant.title}</Text>
+                      <View className={`student-takeout-status ${resting ? 'student-takeout-status--closed' : 'student-takeout-status--open'}`}>
+                        <View className='student-takeout-status__dot' />
+                        <Text>{resting ? '休息中' : '营业中'}</Text>
+                      </View>
+                    </View>
+                    <Text className='student-takeout-merchant__desc'>{merchant.subtitle}</Text>
+                  </View>
+                  <View className={`student-takeout-merchant__action${resting ? ' student-takeout-merchant__action--disabled' : ''}`}>
+                    <Text>{jumping ? '打开中' : resting ? '暂休' : '小程序'}</Text>
+                  </View>
+                  <Text className='student-takeout-merchant__arrow'>›</Text>
                 </View>
-                <Text className='student-takeout-merchant__desc'>{merchant.description}</Text>
-              </View>
-              <View className='student-takeout-merchant__action'>
-                <Text>小程序</Text>
-              </View>
-              <Text className='student-takeout-merchant__arrow'>›</Text>
-            </View>
-          ))}
-        </View>
+              )
+            })}
+          </View>
+        )}
 
         <Text className='student-takeout-footer'>合作商家陆续入驻中</Text>
       </View>

@@ -2,9 +2,10 @@
 
 .student-takeout-page {
   min-height: 100vh;
-  padding: 152rpx 28rpx 168rpx;
+  padding: 204rpx 28rpx 168rpx;
   background: $bg-app;
   color: $text-strong;
+  box-sizing: border-box;
 }
 
 .student-takeout-header {
@@ -21,6 +22,14 @@
   border-bottom: 1rpx solid $divider-nav;
   background: rgba(255, 255, 255, .98);
   box-shadow: $shadow-header;
+  box-sizing: border-box;
+}
+
+.student-takeout-header__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
 }
 
 .student-takeout-header__title {
@@ -35,6 +44,50 @@
   font-size: 24rpx;
   line-height: 1.35;
   color: $text-muted;
+}
+
+.student-takeout-search {
+  min-width: 176rpx;
+  height: 54rpx;
+  padding: 0 20rpx;
+  border-radius: 999rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  background: $brand-tint;
+  color: $brand-primary;
+  font-size: 24rpx;
+  box-sizing: border-box;
+}
+
+.student-takeout-search__icon {
+  position: relative;
+  width: 24rpx;
+  height: 24rpx;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 1rpx;
+    top: 1rpx;
+    width: 14rpx;
+    height: 14rpx;
+    border: 3rpx solid currentColor;
+    border-radius: 50%;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    right: 1rpx;
+    bottom: 2rpx;
+    width: 9rpx;
+    height: 3rpx;
+    border-radius: 999rpx;
+    background: currentColor;
+    transform: rotate(45deg);
+  }
 }
 
 .student-takeout-scroll {
@@ -102,30 +155,6 @@
   color: $text-on-color;
   font-size: 34rpx;
   font-weight: 900;
-}
-
-.student-takeout-merchant__avatar--tea {
-  background: linear-gradient(135deg, $brand-primary-light, $brand-primary);
-}
-
-.student-takeout-merchant__avatar--wallace {
-  background: linear-gradient(135deg, $like-active, $brand-primary-light);
-}
-
-.student-takeout-merchant__avatar--zhengxin {
-  background: linear-gradient(135deg, $like-active, $brand-primary);
-}
-
-.student-takeout-merchant__avatar--yidiandian {
-  background: linear-gradient(135deg, $brand-tint, $brand-primary-light);
-}
-
-.student-takeout-merchant__avatar--tastien {
-  background: linear-gradient(135deg, $brand-primary-strong, $text-muted);
-}
-
-.student-takeout-merchant__avatar--mixue {
-  background: linear-gradient(135deg, $text-faint, $brand-primary-light);
 }
 
 .student-takeout-merchant__main {
@@ -207,6 +236,16 @@
   font-weight: 700;
 }
 
+.student-takeout-merchant__action--disabled {
+  background: $divider-hairline;
+  color: $text-tertiary;
+}
+
+.student-takeout-merchant--resting {
+  opacity: .68;
+  box-shadow: none;
+}
+
 .student-takeout-merchant__arrow {
   flex: 0 0 auto;
   margin-left: 10rpx;
@@ -221,6 +260,26 @@
   color: $text-faint;
   font-size: 24rpx;
   text-align: center;
+}
+
+.student-takeout-state {
+  min-height: 300rpx;
+  padding: 48rpx;
+  border-radius: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: $bg-surface;
+  color: $text-muted;
+  font-size: 27rpx;
+  line-height: 42rpx;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.student-takeout-state--retry {
+  border: 1rpx dashed $brand-primary;
+  color: $brand-primary;
 }
 
 .student-bottom-nav {
