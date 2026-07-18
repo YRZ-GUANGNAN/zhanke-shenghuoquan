@@ -1,5 +1,6 @@
 import type { CommunityComment, CommunityNotification, CommunityPost } from '../types'
 import { request } from './api'
+import { createClientRequestId } from './client-request-id'
 
 export type CommunitySort = 'recent' | 'popular'
 
@@ -157,7 +158,7 @@ const unwrapPost = (raw: unknown): CommunityPost => {
 }
 
 export function createCommunityClientRequestId(): string {
-  return `community-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  return createClientRequestId()
 }
 
 export async function getCommunityPostsPage(params: { page?: number; pageSize?: number; sort?: CommunitySort } = {}): Promise<PageResult<CommunityPost>> {
@@ -186,6 +187,7 @@ export async function getCommunityPost(postId: string): Promise<CommunityPost> {
 }
 
 export async function createCommunityPost(input: CreateCommunityPostInput): Promise<CommunityPost> {
+  const clientRequestId = input.clientRequestId ?? createCommunityClientRequestId()
   const data = await request<unknown>('/community/posts', {
     url: '',
     method: 'POST',
@@ -194,8 +196,9 @@ export async function createCommunityPost(input: CreateCommunityPostInput): Prom
       content: input.content,
       topic: input.topic || '湛科日常',
       imageAssetIds: input.imageAssetIds ?? [],
-      clientRequestId: input.clientRequestId ?? createCommunityClientRequestId(),
+      clientRequestId,
     },
+    header: { 'Idempotency-Key': clientRequestId },
   })
   return unwrapPost(data)
 }

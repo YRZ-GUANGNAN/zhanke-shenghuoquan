@@ -16,6 +16,7 @@
     "db:seed": "node scripts/seed-db.cjs",
     "check:stack": "node scripts/check-stack.cjs",
     "check:boundaries": "node scripts/check-boundaries.cjs",
+    "check:miniapp-publish-contract": "node scripts/check-miniapp-publish-contract.cjs",
     "check:miniapp-static-routes": "node scripts/check-miniapp-static-routes.cjs",
     "test:backend": "cd backend && go test ./...",
     "build:miniapp": "npm --workspace apps/miniapp run build:weapp",
@@ -23,7 +24,7 @@
     "build:admin": "npm --workspace apps/admin run build",
     "build": "npm run build:miniapp && npm run build:admin",
     "typecheck": "npm --workspace apps/admin run typecheck && npm --workspace apps/miniapp run typecheck",
-	"verify": "npm run check:boundaries && npm run typecheck && npm run test:backend"
+	"verify": "npm run check:boundaries && npm run check:miniapp-publish-contract && npm run typecheck && npm run test:backend"
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",

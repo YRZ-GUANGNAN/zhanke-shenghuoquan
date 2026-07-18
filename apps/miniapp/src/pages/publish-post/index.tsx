@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Text, Textarea, View } from '@tarojs/components'
 import Taro from '../../services/taro'
+import { isApiError } from '../../services/api'
 import { createCommunityClientRequestId, createCommunityPost } from '../../services/b-community'
 import { chooseAndUploadImages, waitForMediaApproval, type UploadedMedia } from '../../services/media'
 import './index.scss'
@@ -19,10 +20,16 @@ export default function PublishPostPage() {
   const [uploading, setUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [uploadHint, setUploadHint] = useState('0/9')
+  const clientRequestIdRef = useRef<string | null>(null)
 
   const canPublish = useMemo(() => content.trim().length > 0 && !uploading && !submitting, [content, uploading, submitting])
 
+  const resetClientRequestId = () => {
+    clientRequestIdRef.current = null
+  }
+
   const toggleTopic = (topic: string) => {
+    resetClientRequestId()
     setSelectedTopics((current) => {
       if (current.includes(topic)) return current.filter((item) => item !== topic)
       if (current.length >= 3) {
@@ -46,6 +53,7 @@ export default function PublishPostPage() {
       const uploaded = await chooseAndUploadImages('post_image', remaining, (progress) => {
         setUploadHint(`${Math.max(images.length, images.length + progress.index - 1)}/${MAX_IMAGES}`)
       })
+      if (uploaded.length > 0) resetClientRequestId()
       setImages((current) => [...current, ...uploaded].slice(0, MAX_IMAGES))
       setUploadHint(`${Math.min(MAX_IMAGES, images.length + uploaded.length)}/${MAX_IMAGES}`)
       if (uploaded.length > 0) toast('图片已上传', 'success')
@@ -64,6 +72,8 @@ export default function PublishPostPage() {
       return
     }
     if (submitting) return
+    const clientRequestId = clientRequestIdRef.current ?? createCommunityClientRequestId()
+    clientRequestIdRef.current = clientRequestId
     setSubmitting(true)
     try {
       for (const image of images) {
@@ -78,13 +88,26 @@ export default function PublishPostPage() {
         content: normalizedContent,
         topic,
         imageAssetIds: images.map((image) => image.assetId),
-        clientRequestId: createCommunityClientRequestId(),
+        clientRequestId,
       })
+      clientRequestIdRef.current = null
       toast('发布成功', 'success')
       void Taro.redirectTo({ url: `/pages/post-detail/index?id=${encodeURIComponent(post.id)}` })
     } catch (error) {
       console.error('publish community post failed', error)
-      toast('发布失败，请稍后再试', 'error')
+      if (isApiError(error) && error.status >= 400 && error.status < 500) {
+        clientRequestIdRef.current = null
+      }
+      const title = !isApiError(error)
+        ? '发布失败，请稍后再试'
+        : error.status === 0
+          ? '网络异常，内容已保留'
+          : error.status === 409
+            ? '发布内容已变化，请重新提交'
+            : error.status >= 500
+              ? '服务暂不可用，稍后可重试'
+              : error.message || '发布内容不符合要求'
+      toast(title, 'none')
     } finally {
       setSubmitting(false)
       setUploadHint(`${images.length}/${MAX_IMAGES}`)
@@ -115,7 +138,10 @@ export default function PublishPostPage() {
           maxlength={600}
           autoHeight={false}
           placeholder="分享你的校园生活：好吃的、求助、找搭子、攻略..."
-          onInput={(event) => setContent(event.detail.value)}
+          onInput={(event) => {
+            resetClientRequestId()
+            setContent(event.detail.value)
+          }}
         />
 
         <View className="publish-post-divider" />

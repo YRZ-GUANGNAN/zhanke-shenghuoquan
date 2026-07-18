@@ -4,12 +4,12 @@ import Taro from '../../services/taro'
 import './index.scss'
 
 type PublishEntry = {
-  key: 'post' | 'secondhand' | 'delivery'
+  key: 'post' | 'secondhand'
   icon: string
   title: string
   subtitle: string
   tag: string
-  tone: 'blue' | 'orange' | 'green'
+  tone: 'blue' | 'orange'
   url: string
 }
 
@@ -31,15 +31,6 @@ const entries: PublishEntry[] = [
     tag: '二手',
     tone: 'orange',
     url: '/pages/publish-secondhand/index'
-  },
-  {
-    key: 'delivery',
-    icon: '配',
-    title: '发布配送单',
-    subtitle: '填写取货点和送达点，交给校园骑手配送',
-    tag: '商家',
-    tone: 'green',
-    url: '/pages/merchant-publish/index'
   }
 ]
 
@@ -63,7 +54,7 @@ export default function PublishEntryPage() {
         <View className='publish-entry-hero__orb publish-entry-hero__orb--small' />
         <Text className='publish-entry-hero__eyebrow'>选择你要发布的内容</Text>
         <Text className='publish-entry-hero__title'>今天想让校园帮你做什么？</Text>
-        <Text className='publish-entry-hero__desc'>帖子、二手和配送单统一从这里进入，后续页面会继续按新设计重做。</Text>
+        <Text className='publish-entry-hero__desc'>帖子与二手内容从这里进入，选择后填写对应信息。</Text>
       </View>
 
       <View className='publish-entry-list'>
@@ -90,7 +81,7 @@ export default function PublishEntryPage() {
 
       <View className='publish-entry-note'>
         <Text className='publish-entry-note__icon'>i</Text>
-        <Text>发布后会进入对应表单；本页只负责选择发布类型，不处理接口和支付。</Text>
+        <Text>选择内容类型后进入对应发布表单。</Text>
       </View>
     </View>
   )
