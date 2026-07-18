@@ -6,7 +6,7 @@ import type { IdentityRoleKey } from '../types'
 const routeForIdentity: Record<IdentityRoleKey, string> = {
   student: '/pages/profile/index',
   rider: '/pages/delivery-rider/index',
-  merchant: '/pages/merchant-home/index'
+  merchant: '/pages/delivery-merchant/index'
 }
 
 export function identityRoute(identity: IdentityRoleKey): string {

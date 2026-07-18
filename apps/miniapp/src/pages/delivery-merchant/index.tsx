@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Button, Image, Input, Text, Textarea, View } from '@tarojs/components'
+import { useIdentityGuard } from '../../hooks/use-identity-guard'
 import Taro from '../../services/taro'
 import {
   deliveryMockFeeEnabled,
@@ -79,6 +80,7 @@ const cancellable = new Set<DeliveryStatus>([
 ])
 
 export default function DeliveryMerchantPage() {
+  const identityAllowed = useIdentityGuard('merchant')
   const [tab, setTab] = useState<Tab>('create')
   const [form, setForm] = useState<DeliveryForm>(emptyForm)
   const [clientRequestId, setClientRequestId] = useState(createDeliveryClientRequestId)
@@ -93,8 +95,8 @@ export default function DeliveryMerchantPage() {
   const [detailConversationUnread, setDetailConversationUnread] = useState(0)
 
   useEffect(() => {
-    void loadOrders()
-  }, [])
+    if (identityAllowed) void loadOrders()
+  }, [identityAllowed])
 
   const loadOrders = async () => {
     setLoading(true)
@@ -305,6 +307,8 @@ export default function DeliveryMerchantPage() {
     await Taro.requestPayment(payment.wechat)
     return pollDeliveryPayment(payment.paymentPublicId)
   }
+
+  if (!identityAllowed) return <View className='page delivery-merchant-page' />
 
   return (
     <View className='page delivery-merchant-page'>

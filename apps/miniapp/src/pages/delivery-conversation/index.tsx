@@ -1,185 +1,245 @@
-import React, { useState } from 'react'
-import { Image, Input, ScrollView, Text, View } from '@tarojs/components'
+import React, { useEffect, useMemo, useState } from 'react'
+import { Button, Image, Input, ScrollView, Text, View } from '@tarojs/components'
+import { isApiError } from '../../services/api'
+import {
+  deliveryConversationCanSend,
+  getDeliveryOrderConversation,
+  loadDeliveryTencentMessages,
+  parseDeliveryImagePayload,
+  resolveDeliveryConversationImage,
+  sendDeliveryTencentImage,
+  sendDeliveryTencentText,
+  subscribeDeliveryTencentMessages,
+  type DeliveryConversation,
+  type DeliveryTencentMessage
+} from '../../services/delivery-im'
+import { chooseAndUploadImages, waitForMediaApproval } from '../../services/media'
 import Taro from '../../services/taro'
-import { resolveStaticDeliveryOrder } from '../delivery-static-data'
+import { useSessionStore } from '../../stores/session'
 import './index.scss'
 
-type ConversationRole = 'merchant' | 'rider'
+type PageStatus = 'loading' | 'ready' | 'error'
 
-interface ConversationRoleCopy {
-  fallbackUrl: string
+function mergeMessages(current: DeliveryTencentMessage[], next: DeliveryTencentMessage[]): DeliveryTencentMessage[] {
+  const values = new Map(current.map((item) => [item.ID, item]))
+  next.forEach((item) => values.set(item.ID, item))
+  return [...values.values()].sort((left, right) => left.time - right.time)
 }
 
-const copyByRole: Record<ConversationRole, ConversationRoleCopy> = {
-  merchant: {
-    fallbackUrl: '/pages/merchant-home/index'
-  },
-  rider: {
-    fallbackUrl: '/pages/delivery-rider/index'
+function messageText(message: DeliveryTencentMessage): string {
+  if (message.type !== 'TIMTextElem') return ''
+  return String((message.payload as { text?: unknown } | undefined)?.text ?? '').trim()
+}
+
+function messageError(error: unknown, fallback = '配送沟通暂时不可用'): string {
+  if (isApiError(error)) {
+    if (error.status === 404) return '配送会话不存在或你无权访问'
+    if (error.status === 409) return '会话状态已变化，请返回订单页刷新'
+    return error.message || fallback
   }
+  return error instanceof Error ? error.message : fallback
 }
 
-function showToast(title: string) {
-  void Taro.showToast({ title, icon: 'none', duration: 1400 })
+function formatTime(value: number): string {
+  const date = new Date(value * 1000)
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
 export default function DeliveryConversationPage() {
-  const params = Taro.getCurrentInstance().router?.params || {}
-  const role: ConversationRole = params.role === 'rider' ? 'rider' : 'merchant'
-  const roleCopy = copyByRole[role]
-  const { order, found } = resolveStaticDeliveryOrder(params.orderId)
-  const assignedRider = order.rider || { name: '骑手待接单', phone: '暂无电话', avatar: '骑' }
-  const peer = role === 'merchant' ? assignedRider : order.merchant
-  const selfAvatar = role === 'merchant' ? order.merchant.avatar : assignedRider.avatar
-  const riderQuestion = `老板，${order.id} 我到 ${order.pickupName} 了，在几号取货口拿？`
-  const merchantReply = `请在 ${order.pickupName} 的取货架拿，送往 ${order.destination}`
-  const copy = {
-    peerAvatar: peer.avatar,
-    selfAvatar,
-    peerName: peer.name,
-    peerMeta: `${order.statusLabel} · ${peer.phone}`,
-    orderTitle: `#${order.id} · ${order.pickupName} → ${order.destination}`,
-    orderMeta: `${order.statusLabel} · 配送费 ¥${order.fee}`,
-    leftFirst: role === 'merchant' ? riderQuestion : merchantReply,
-    rightReply: role === 'merchant' ? merchantReply : riderQuestion,
-    leftSecond: found ? '好的，信息核对无误，保持本单沟通' : '静态订单数据待补充'
-  }
+  const params = Taro.getCurrentInstance().router?.params ?? {}
+  const orderId = String(params.orderId || '').trim()
+  const identity = useSessionStore((state) => state.identity?.currentIdentity)
+  const [status, setStatus] = useState<PageStatus>('loading')
+  const [reloadKey, setReloadKey] = useState(0)
+  const [conversation, setConversation] = useState<DeliveryConversation | null>(null)
+  const [messages, setMessages] = useState<DeliveryTencentMessage[]>([])
+  const [imageUrls, setImageUrls] = useState<Record<string, string>>({})
   const [draft, setDraft] = useState('')
-  const [pickedImage, setPickedImage] = useState('')
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState('')
 
-  const goBack = () => {
-    void Taro.navigateBack().catch(() => Taro.redirectTo({ url: roleCopy.fallbackUrl }))
-  }
+  useEffect(() => {
+    let active = true
+    let unsubscribe: (() => void) | undefined
+    setStatus('loading')
+    setConversation(null)
+    setMessages([])
+    setImageUrls({})
+    setError('')
 
-  const openOrder = () => {
-    void Taro.navigateTo({
-      url: `/pages/merchant-order-detail/index?orderId=${encodeURIComponent(order.id)}&role=${role}`
-    }).catch(() => showToast('详情页稍后接入'))
-  }
+    if (!orderId) {
+      setStatus('error')
+      setError('配送会话入口无效，请从订单详情重新进入')
+      return () => { active = false }
+    }
 
-  const pickImage = async () => {
-    try {
-      const result = await Taro.chooseMedia({
-        count: 1,
-        mediaType: ['image'],
-        sourceType: ['album', 'camera'],
-        sizeType: ['compressed']
-      })
-      const imagePath = result.tempFiles[0]?.tempFilePath
-      if (imagePath) {
-        setPickedImage(imagePath)
-        showToast('图片已加入本单沟通')
+    void (async () => {
+      try {
+        const nextConversation = await getDeliveryOrderConversation(orderId)
+        if (!active) return
+        setConversation(nextConversation)
+        unsubscribe = await subscribeDeliveryTencentMessages(nextConversation, (incoming) => {
+          if (!active) return
+          setMessages((current) => mergeMessages(current, incoming))
+        })
+        if (!active) {
+          unsubscribe()
+          unsubscribe = undefined
+          return
+        }
+        const history = await loadDeliveryTencentMessages(nextConversation)
+        if (!active) return
+        setMessages((current) => mergeMessages(current, history))
+        setStatus('ready')
+      } catch (value) {
+        unsubscribe?.()
+        unsubscribe = undefined
+        if (!active) return
+        const nextError = messageError(value)
+        setError(nextError)
+        setStatus('error')
       }
-    } catch {
-      showToast('已取消选择图片')
+    })()
+
+    return () => {
+      active = false
+      unsubscribe?.()
+    }
+  }, [orderId, reloadKey])
+
+  useEffect(() => {
+    if (!conversation) return
+    let active = true
+    const pending = messages.reduce<Array<{ messageId: string; imageId: string }>>((result, message) => {
+      const payload = parseDeliveryImagePayload(message)
+      if (payload && payload.conversationId === conversation.conversationPublicId && !Object.prototype.hasOwnProperty.call(imageUrls, message.ID)) {
+        result.push({ messageId: message.ID, imageId: payload.imageId })
+      }
+      return result
+    }, [])
+    if (pending.length === 0) return () => { active = false }
+
+    void Promise.all(pending.map(async (item) => {
+      try {
+        const resolved = await resolveDeliveryConversationImage(conversation.conversationPublicId, item.imageId)
+        return { messageId: item.messageId, url: resolved.url }
+      } catch {
+        return { messageId: item.messageId, url: '' }
+      }
+    })).then((values) => {
+      if (!active) return
+      setImageUrls((current) => {
+        const next = { ...current }
+        values.forEach((value) => { next[value.messageId] = value.url })
+        return next
+      })
+    })
+    return () => { active = false }
+  }, [conversation, imageUrls, messages])
+
+  const canSend = Boolean(conversation && deliveryConversationCanSend(conversation))
+  const visibleMessages = useMemo(
+    () => messages.filter((message) => Boolean(messageText(message) || parseDeliveryImagePayload(message))),
+    [messages]
+  )
+
+  const sendText = async () => {
+    const text = draft.trim()
+    if (!text) return
+    if (!conversation || !canSend || sending) return
+    setSending(true)
+    try {
+      const sent = await sendDeliveryTencentText(conversation, text)
+      setMessages((current) => mergeMessages(current, [sent]))
+      setDraft('')
+    } catch (value) {
+      await Taro.showToast({ title: messageError(value, '消息发送失败'), icon: 'none' })
+    } finally {
+      setSending(false)
     }
   }
 
-  const sendText = () => {
-    if (!draft.trim()) {
-      showToast('先输入消息')
-      return
+  const sendImage = async () => {
+    if (!conversation || !canSend || !conversation.imagesEnabled || sending) return
+    setSending(true)
+    try {
+      const [uploaded] = await chooseAndUploadImages('delivery_im', 1, (progress) => {
+        void Taro.showLoading({ title: `${progress.message} ${progress.percent}%`, mask: true })
+      })
+      if (!uploaded) return
+      await waitForMediaApproval(uploaded.assetId, (mediaStatus) => {
+        void Taro.showLoading({ title: mediaStatus.message || '图片审核中', mask: true })
+      })
+      const sent = await sendDeliveryTencentImage(conversation, uploaded.assetId)
+      setImageUrls((current) => ({ ...current, [sent.ID]: uploaded.previewPath }))
+      setMessages((current) => mergeMessages(current, [sent]))
+    } catch (value) {
+      await Taro.showToast({ title: messageError(value, '图片发送失败'), icon: 'none' })
+    } finally {
+      Taro.hideLoading()
+      setSending(false)
     }
-    setDraft('')
-    showToast('静态演示：消息已发送')
+  }
+
+  const fallback = identity === 'merchant' ? '/pages/delivery-merchant/index' : '/pages/delivery-rider/index'
+  const goBack = () => {
+    void Taro.navigateBack().catch(() => Taro.redirectTo({ url: fallback }))
   }
 
   return (
     <View className='delivery-chat-page'>
-      <View className='delivery-chat-header'>
-        <View className='delivery-chat-back' onClick={goBack} />
-        <View className={`delivery-chat-peer delivery-chat-peer--${role}`}>
-          <View className='delivery-chat-peer__avatar'>
-            <Text>{copy.peerAvatar}</Text>
-          </View>
-          <View className='delivery-chat-peer__body'>
-            <Text className='delivery-chat-peer__name'>{copy.peerName}</Text>
-            <View className='delivery-chat-peer__meta'>
-              <View className='delivery-chat-peer__dot' />
-              <Text>{copy.peerMeta}</Text>
-            </View>
-          </View>
+      <View className='delivery-chat-order'>
+        <View>
+          <Text className='delivery-chat-order__title'>配送单沟通</Text>
+          <Text className='delivery-chat-order__id'>{orderId ? `单号 ${orderId}` : '缺少配送单号'}</Text>
         </View>
-        <View className='delivery-chat-phone' onClick={() => showToast('电话联系稍后接入')}>
-          <Text>⌕</Text>
-        </View>
+        <Button className='cc-button cc-button--small' onClick={goBack}>返回订单</Button>
       </View>
 
-      <View className='delivery-chat-order' onClick={openOrder}>
-        <View className='delivery-chat-order__route'>
-          <View className='delivery-chat-order__dot' />
-          <View className='delivery-chat-order__line' />
-          <View className='delivery-chat-order__square' />
-        </View>
-        <View className='delivery-chat-order__main'>
-          <Text className='delivery-chat-order__title'>{copy.orderTitle}</Text>
-          <Text className='delivery-chat-order__meta'>{copy.orderMeta}</Text>
-        </View>
-        <Text className='delivery-chat-order__link'>查看</Text>
-      </View>
+      <View className='delivery-chat-safe'>仅限本配送单的商家与骑手沟通；图片会先经过内容安全审核。</View>
 
       <ScrollView className='delivery-chat-scroll' scrollY enhanced showScrollbar={false}>
-        <View className='delivery-chat-tip'>
-          <Text>仅本单沟通，请勿透露与订单无关的隐私</Text>
-        </View>
-
-        <View className='delivery-chat-row delivery-chat-row--peer'>
-          <View className='delivery-chat-avatar delivery-chat-avatar--peer'>
-            <Text>{copy.peerAvatar}</Text>
+        {status === 'loading' ? <View className='delivery-chat-state'>正在连接配送会话…</View> : null}
+        {status === 'error' ? (
+          <View className='delivery-chat-state delivery-chat-state--error' onClick={() => setReloadKey((value) => value + 1)}>
+            <Text>{error}</Text>
+            <Text className='delivery-chat-state__retry'>点击重试</Text>
           </View>
-          <View className='delivery-chat-bubble delivery-chat-bubble--peer'>
-            <Text>{copy.leftFirst}</Text>
-          </View>
-        </View>
-
-        <View className='delivery-chat-row delivery-chat-row--self'>
-          <View className='delivery-chat-bubble delivery-chat-bubble--self'>
-            <Text>{copy.rightReply}</Text>
-          </View>
-          <View className='delivery-chat-avatar delivery-chat-avatar--self'>
-            <Text>{copy.selfAvatar}</Text>
-          </View>
-        </View>
-
-        <View className='delivery-chat-row delivery-chat-row--peer'>
-          <View className='delivery-chat-avatar delivery-chat-avatar--peer'>
-            <Text>{copy.peerAvatar}</Text>
-          </View>
-          <View className='delivery-chat-bubble delivery-chat-bubble--peer delivery-chat-bubble--short'>
-            <Text>{copy.leftSecond}</Text>
-          </View>
-        </View>
-
-        {pickedImage && (
-          <View className='delivery-chat-row delivery-chat-row--self delivery-chat-row--image'>
-            <View className='delivery-chat-image-message'>
-              <Image className='delivery-chat-image-message__img' src={pickedImage} mode='aspectFill' />
+        ) : null}
+        {status === 'ready' && visibleMessages.length === 0 ? <View className='delivery-chat-state'>会话已建立，发送第一条消息吧</View> : null}
+        {visibleMessages.map((message) => {
+          const mine = message.flow === 'out'
+          const text = messageText(message)
+          const imagePayload = parseDeliveryImagePayload(message)
+          const imageUrl = imageUrls[message.ID]
+          return (
+            <View key={message.ID} className={`delivery-chat-row ${mine ? 'delivery-chat-row--mine' : ''}`}>
+              <View className={`delivery-chat-bubble ${mine ? 'delivery-chat-bubble--mine' : ''}`}>
+                {text ? <Text>{text}</Text> : null}
+                {imagePayload ? (
+                  imageUrl ? <Image className='delivery-chat-image' src={imageUrl} mode='widthFix' /> : <Text className='delivery-chat-image-loading'>图片读取中…</Text>
+                ) : null}
+                <Text className='delivery-chat-time'>{formatTime(message.time)}</Text>
+              </View>
             </View>
-            <View className='delivery-chat-avatar delivery-chat-avatar--self'>
-              <Text>{copy.selfAvatar}</Text>
-            </View>
-          </View>
-        )}
+          )
+        })}
+        {status === 'ready' && !canSend ? <View className='delivery-chat-state'>订单已结束或会话已只读，可查看历史消息但不能继续发送。</View> : null}
       </ScrollView>
 
       <View className='delivery-chat-inputbar'>
-        <View className='delivery-chat-image-button' onClick={pickImage}>
-          <View className='delivery-chat-image-button__icon' />
-        </View>
-        <View className='delivery-chat-input-wrap'>
-          <Input
-            className='delivery-chat-input'
-            value={draft}
-            placeholder='发消息...'
-            placeholderClass='delivery-chat-input__placeholder'
-            confirmType='send'
-            onInput={(event) => setDraft(String(event.detail.value ?? ''))}
-            onConfirm={sendText}
-          />
-        </View>
-        <View className={`delivery-chat-send ${draft.trim() ? 'delivery-chat-send--active' : ''}`} onClick={sendText}>
-          <Text>发送</Text>
-        </View>
+        <Button className='delivery-chat-image-button' disabled={!canSend || !conversation?.imagesEnabled || sending} onClick={() => void sendImage()}>图片</Button>
+        <Input
+          className='delivery-chat-input'
+          value={draft}
+          maxlength={500}
+          disabled={!canSend || sending}
+          placeholder={canSend ? '输入消息' : '当前会话不可发送'}
+          confirmType='send'
+          onInput={(event) => setDraft(String(event.detail.value ?? ''))}
+          onConfirm={() => void sendText()}
+        />
+        <Button className='delivery-chat-send' disabled={!canSend || !draft.trim() || sending} onClick={() => void sendText()}>{sending ? '发送中' : '发送'}</Button>
       </View>
     </View>
   )

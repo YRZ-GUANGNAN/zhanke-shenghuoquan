@@ -21,7 +21,9 @@ export function listTradeSearchHistory():Promise<string[]>{return request<string
 export async function clearTradeSearchHistory():Promise<void>{await request('/trade/search-history',{url:'',method:'DELETE'})}
 export function listTradeHotSearches():Promise<TradeHotSearchKeyword[]>{return request<TradeHotSearchKeyword[]>('/trade/hot-searches')}
 export async function listProducts(page=1,keyword='',status:Product['status']='selling'):Promise<{items:Product[];total:number}>{const result=await getProductsPage({page,keyword,status});return{items:result.items,total:result.total}}
-export async function listMyProducts(page=1):Promise<Product[]>{const result=await request<BackendPage<BackendProduct>>(`/trade/my-products?page=${page}`);return result.items.map(normalizeProduct)}
+export async function getMyProductsPage(page=1,pageSize=20):Promise<ProductPageResult>{const result=await request<BackendPage<BackendProduct>>(`/trade/my-products?page=${page}&pageSize=${pageSize}`);return{...result,items:result.items.map(normalizeProduct)}}
+export async function getPublicUserProducts(userId:string,page=1,pageSize=20):Promise<ProductPageResult>{const result=await request<BackendPage<BackendProduct>>(`/trade/users/${encodeURIComponent(userId)}/products?page=${page}&pageSize=${pageSize}`);return{...result,items:result.items.map(normalizeProduct)}}
+export async function listMyProducts(page=1):Promise<Product[]>{return(await getMyProductsPage(page)).items}
 export async function getProduct(id:string):Promise<Product>{return normalizeProduct(await request<BackendProduct>(`/trade/products/${id}`))}
 export async function getTradeViewerState(id:string):Promise<TradeViewerState>{return request(`/trade/products/${id}/viewer-state`)}
 export async function createProduct(input:CreateProductInput):Promise<void>{const clientRequestId=input.clientRequestId??createClientRequestId();await request('/trade/products',{url:'',method:'POST',data:{...input,clientRequestId},header:{'Idempotency-Key':clientRequestId},timeout:10000})}

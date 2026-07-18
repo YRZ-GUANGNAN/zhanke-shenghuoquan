@@ -6,6 +6,8 @@ import RuntimeSessionGate from '../../components/runtime-session-gate'
 import StudentBottomNav from '../../components/student-bottom-nav'
 import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
 import Taro from '../../services/taro'
+import { getMyCommunitySummary } from '../../services/b-community'
+import { getMyProductsPage } from '../../services/c-trade'
 import { useSessionStore } from '../../stores/session'
 import type { IdentityAvailability, IdentityRoleKey } from '../../types'
 import './index.scss'
@@ -26,13 +28,6 @@ interface SettingItem {
   icon: string
   arrow?: boolean
 }
-
-const stats: Array<{ value: string; label: string; tab: MyContentTabKey }> = [
-  { value: '23', label: '收藏', tab: 'favorites' },
-  { value: '8', label: '帖子', tab: 'posts' },
-  { value: '41', label: '评论', tab: 'comments' },
-  { value: '2', label: '宝贝', tab: 'items' }
-]
 
 const roles: RoleOption[] = [
   { key: 'student', title: '学生', subtitle: '社交 · 校园服务' },
@@ -88,6 +83,7 @@ function ProfileContent() {
   const [pendingRole, setPendingRole] = useState<RoleKey | null>(null)
   const [switching, setSwitching] = useState(false)
   const [switchError, setSwitchError] = useState('')
+	const [contentCounts, setContentCounts] = useState({ favorites: 0, posts: 0, comments: 0, items: 0 })
   const profile = useSessionStore((state) => state.profile)
   const identity = useSessionStore((state) => state.identity)
   const refreshIdentity = useSessionStore((state) => state.refreshIdentity)
@@ -101,7 +97,19 @@ function ProfileContent() {
       // Keep the last known summary for transient failures. A 401 is handled
       // centrally by the session store and returns the app to login state.
     })
+		void Promise.all([getMyCommunitySummary(), getMyProductsPage(1, 1)]).then(([community, products]) => {
+			setContentCounts({ ...community, items: products.total })
+		}).catch(() => {
+			// Counts are secondary; the content pages still expose their own retry states.
+		})
   })
+
+	const stats: Array<{ value: string; label: string; tab: MyContentTabKey }> = [
+		{ value: String(contentCounts.favorites), label: '收藏', tab: 'favorites' },
+		{ value: String(contentCounts.posts), label: '帖子', tab: 'posts' },
+		{ value: String(contentCounts.comments), label: '评论', tab: 'comments' },
+		{ value: String(contentCounts.items), label: '宝贝', tab: 'items' }
+	]
 
   const handleRoleClick = (role: RoleOption) => {
     if (role.key === activeRole) {

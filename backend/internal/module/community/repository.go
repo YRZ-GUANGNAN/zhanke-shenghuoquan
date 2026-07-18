@@ -64,10 +64,11 @@ type GormRepository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *GormRepository { return &GormRepository{db: db} }
 
-func (r *GormRepository) SearchPosts(ctx context.Context, keyword string, page, size int) ([]Post, int64, error) {
+func (r *GormRepository) SearchPosts(ctx context.Context, viewerID uint, keyword string, page, size int) ([]Post, int64, error) {
 	like, prefix := "%"+keyword+"%", keyword+"%"
 	query := r.db.WithContext(ctx).Model(&Post{}).
 		Where("review_status = ?", review.StatusApproved).
+		Where("NOT EXISTS (SELECT 1 FROM user_blocks AS ub WHERE ub.blocker_id = ? AND ub.blocked_id = posts.user_id)", viewerID).
 		Where("title LIKE ? OR content LIKE ? OR CAST(tags AS CHAR) LIKE ?", like, like, like)
 	var total int64
 	if err := query.Count(&total).Error; err != nil {

@@ -52,10 +52,11 @@ type GormRepository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *GormRepository { return &GormRepository{db: db} }
 
-func (r *GormRepository) SearchProducts(ctx context.Context, keyword string, page, size int) ([]Product, int64, error) {
+func (r *GormRepository) SearchProducts(ctx context.Context, viewerID uint, keyword string, page, size int) ([]Product, int64, error) {
 	like, prefix := "%"+keyword+"%", keyword+"%"
 	query := r.db.WithContext(ctx).Model(&Product{}).
 		Where("review_status = ? AND status = ?", review.StatusApproved, StatusSelling).
+		Where("NOT EXISTS (SELECT 1 FROM user_blocks AS ub WHERE ub.blocker_id = ? AND ub.blocked_id = products.seller_id)", viewerID).
 		Where("title LIKE ? OR description LIKE ? OR category LIKE ?", like, like, like)
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
@@ -216,6 +217,20 @@ func (r *GormRepository) ListSeller(ctx context.Context, sellerID uint, page, si
 	var values []Product
 	var total int64
 	query := r.db.WithContext(ctx).Model(&Product{}).Where("seller_id = ?", sellerID)
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	err := query.Preload("Images", func(db *gorm.DB) *gorm.DB { return db.Order("sort ASC") }).
+		Order("created_at DESC, id DESC").Offset((page - 1) * size).Limit(size).Find(&values).Error
+	return values, total, err
+}
+
+func (r *GormRepository) ListPublicSeller(ctx context.Context, sellerID uint, page, size int) ([]Product, int64, error) {
+	var values []Product
+	var total int64
+	query := r.db.WithContext(ctx).Model(&Product{}).
+		Where("seller_id = ? AND review_status = ?", sellerID, review.StatusApproved).
+		Where("status IN ?", []ProductStatus{StatusSelling, StatusReserved, StatusSold})
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}

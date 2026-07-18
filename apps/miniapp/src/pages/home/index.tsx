@@ -13,7 +13,7 @@ import { requestWithSingleSessionRecovery } from '../../services/session-recover
 import Taro from '../../services/taro'
 import './index.scss'
 
-type HomeTab = 'messages' | 'discover' | 'tools'
+type HomeTab = 'messages' | 'discover'
 
 type DiscoverCard = {
   id: string
@@ -26,13 +26,6 @@ type DiscoverCard = {
   likes: number
   height: 'short' | 'medium' | 'tall'
   imageUrl?: string
-}
-
-type ToolItem = {
-  id: string
-  icon: string
-  label: string
-  sub: string
 }
 
 type SettledResult<T> =
@@ -54,17 +47,7 @@ const observerRuntime = TaroRuntime as unknown as ObserverRuntime
 
 const tabs: Array<{ key: HomeTab; label: string }> = [
   { key: 'messages', label: '私信' },
-  { key: 'discover', label: '发现' },
-  { key: 'tools', label: '工具' }
-]
-
-const tools: ToolItem[] = [
-  { id: 'schedule', icon: '课', label: '课表', sub: '一键看今日课程' },
-  { id: 'bus', icon: '车', label: '校车', sub: '班次与校区路线' },
-  { id: 'print', icon: '印', label: '打印', sub: '附近打印点导航' },
-  { id: 'map', icon: '图', label: '校园地图', sub: '教学楼与宿舍区' },
-  { id: 'lost', icon: '失', label: '失物招领', sub: '找回遗落小物' },
-  { id: 'repair', icon: '修', label: '报修', sub: '宿舍维修入口' }
+  { key: 'discover', label: '发现' }
 ]
 
 const tones: DiscoverCard['tone'][] = ['peach', 'sky', 'mint', 'lilac', 'lemon', 'cyan']
@@ -328,14 +311,6 @@ function HomeContent() {
     return () => observer.disconnect()
   }, [activeTab, initialStatus, loadDiscover, sourceError.community, sourceError.trade])
 
-  const showTodoToast = (title = '静态预览，后续接入') => {
-    void Taro.showToast({ title, icon: 'none', duration: 1400 })
-  }
-
-  const showReadOnlyToast = () => {
-    void Taro.showToast({ title: '互动功能下一阶段接入', icon: 'none', duration: 1400 })
-  }
-
   const openSearch = () => {
     void Taro.navigateTo({ url: '/pages/search/index?scope=community' })
   }
@@ -378,13 +353,7 @@ function HomeContent() {
               <Text>{card.avatar}</Text>
             </View>
             <Text className='student-post-card__author'>{card.author}</Text>
-            <View
-              className='student-post-card__like'
-              onClick={(event) => {
-                event.stopPropagation()
-                showReadOnlyToast()
-              }}
-            >
+            <View className='student-post-card__like'>
               <Text className='student-post-card__heart'>♡</Text>
               <Text>{card.likes}</Text>
             </View>
@@ -501,23 +470,6 @@ function HomeContent() {
           )
         )}
 
-        {activeTab === 'tools' && (
-          <View className='student-tools-grid'>
-            {tools.map((item) => (
-              <View
-                key={item.id}
-                className='student-tool-card'
-                onClick={() => showTodoToast(`${item.label}静态占位`)}
-              >
-                <View className='student-tool-card__icon'>
-                  <Text>{item.icon}</Text>
-                </View>
-                <Text className='student-tool-card__label'>{item.label}</Text>
-                <Text className='student-tool-card__sub'>{item.sub}</Text>
-              </View>
-            ))}
-          </View>
-        )}
       </View>
 
       <StudentBottomNav active='home' />

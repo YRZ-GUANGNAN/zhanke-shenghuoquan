@@ -51,7 +51,11 @@ interface TaroFacade {
   reLaunch(options: NavigateOptions): Promise<unknown>
   navigateBack(options?: { delta?: number }): Promise<unknown>
   showToast(options: ToastOptions): Promise<unknown>
+	showLoading(options: { title: string; mask?: boolean }): Promise<unknown>
+	hideLoading(): Promise<unknown>
 	showModal(options: ModalOptions): Promise<{ confirm: boolean; cancel: boolean }>
+	makePhoneCall(options: { phoneNumber: string }): Promise<unknown>
+	setClipboardData(options: { data: string }): Promise<unknown>
   login(options?: { timeout?: number }): Promise<LoginResult>
   request<T = unknown>(options: RequestOptions): Promise<RequestResult<T>>
 	getStorageSync<T = unknown>(key: string): T

@@ -29,6 +29,12 @@ func (h *Handler) Register(rg *gin.RouterGroup) {
 	rg.GET("/posts/:id/comments", h.comments)
 	auth := rg.Group("", h.users.AuthRequired())
 	auth.GET("/following-feed", h.followingFeed)
+	auth.GET("/me/summary", h.mySummary)
+	auth.GET("/me/favorites", h.myFavorites)
+	auth.GET("/me/posts", h.myPosts)
+	auth.GET("/me/comments", h.myComments)
+	auth.GET("/users/:id/profile", h.publicProfile)
+	auth.GET("/users/:id/posts", h.publicUserPosts)
 	auth.GET("/notifications", h.notifications)
 	auth.GET("/posts/:id/viewer-state", h.viewerState)
 	auth.POST("/notifications/:id/read", h.readNotification)
@@ -43,6 +49,48 @@ func (h *Handler) Register(rg *gin.RouterGroup) {
 	auth.DELETE("/posts/:id/favorite", h.setFavorite(false))
 	auth.PUT("/users/:id/follow", h.setFollow(true))
 	auth.DELETE("/users/:id/follow", h.setFollow(false))
+}
+
+func (h *Handler) publicProfile(c *gin.Context) {
+	id, ok := paramID(c)
+	if !ok {
+		return
+	}
+	value, err := h.service.PublicProfile(c, user.CurrentUserID(c), id)
+	write(c, value, err)
+}
+
+func (h *Handler) publicUserPosts(c *gin.Context) {
+	id, ok := paramID(c)
+	if !ok {
+		return
+	}
+	page, size := pagination(c)
+	value, err := h.service.PublicUserPosts(c, id, page, size)
+	write(c, value, err)
+}
+
+func (h *Handler) mySummary(c *gin.Context) {
+	value, err := h.service.MySummary(c, user.CurrentUserID(c))
+	write(c, value, err)
+}
+
+func (h *Handler) myFavorites(c *gin.Context) {
+	page, size := pagination(c)
+	value, err := h.service.MyFavoritePosts(c, user.CurrentUserID(c), page, size)
+	write(c, value, err)
+}
+
+func (h *Handler) myPosts(c *gin.Context) {
+	page, size := pagination(c)
+	value, err := h.service.MyPosts(c, user.CurrentUserID(c), page, size)
+	write(c, value, err)
+}
+
+func (h *Handler) myComments(c *gin.Context) {
+	page, size := pagination(c)
+	value, err := h.service.MyComments(c, user.CurrentUserID(c), page, size)
+	write(c, value, err)
 }
 func (h *Handler) viewerState(c *gin.Context) {
 	id, ok := paramID(c)

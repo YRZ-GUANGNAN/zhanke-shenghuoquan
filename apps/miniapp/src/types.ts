@@ -39,6 +39,7 @@ export interface CommunityPost {
   likedCount: number
   commentCount: number
   favoriteCount: number
+	reviewStatus?: 'submitted' | 'reviewing' | 'approved' | 'rejected' | 'taken_down'
   createdAt: string
   pinned?: boolean
 }

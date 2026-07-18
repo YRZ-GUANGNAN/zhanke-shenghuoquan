@@ -43,6 +43,35 @@ export interface HotCommunityTag {
   interactionScore: number
 }
 
+export interface MyCommunitySummary {
+	favorites: number
+	posts: number
+	comments: number
+}
+
+export interface MyCommunityComment {
+	id: string
+	postId: string
+	postTitle: string
+	content: string
+	reviewStatus: string
+	createdAt: string
+}
+
+export interface PublicCommunityProfile {
+	profile: {
+		id: number
+		nickname: string
+		avatar: string
+		school: string
+		campus: string
+	}
+	followingCount: number
+	followerCount: number
+	likedCount: number
+	isFollowing: boolean
+}
+
 type UnknownRecord = Record<string, unknown>
 
 const isRecord = (value: unknown): value is UnknownRecord =>
@@ -105,24 +134,25 @@ const normalizeStrings = (value: unknown): string[] => {
 const normalizePost = (raw: unknown): CommunityPost => {
   const record = isRecord(raw) ? raw : {}
   const authorRecord = isRecord(record.author) ? record.author : {}
-  const id = asString(first(record, ['id', 'postId', 'post_id', 'postPublicId', 'post_public_id']), 'demo-post')
-  const authorId = asString(first(record, ['authorId', 'author_id', 'userId', 'user_id'], first(authorRecord, ['id', 'userId', 'user_id'])), 'demo-author')
-  const author = asString(first(record, ['authorName', 'author_name', 'author'], first(authorRecord, ['name', 'nickname'])), '奶茶脑袋')
+  const id = asString(first(record, ['id', 'postId', 'post_id', 'postPublicId', 'post_public_id']))
+  const authorId = asString(first(record, ['authorId', 'author_id', 'userId', 'user_id'], first(authorRecord, ['id', 'userId', 'user_id'])))
+  const author = asString(first(record, ['authorName', 'author_name', 'author'], first(authorRecord, ['name', 'nickname'])), '校园用户')
 
   return {
     id,
     authorId,
     author,
     avatar: asString(first(record, ['avatar', 'avatarUrl', 'avatar_url'], first(authorRecord, ['avatar', 'avatarUrl', 'avatar_url']))),
-    school: asString(first(record, ['school', 'schoolName', 'school_name'], first(authorRecord, ['school', 'schoolName', 'school_name'])), '湛江科技学院'),
-    topic: asString(first(record, ['topic', 'tag']), '#湛科日常'),
+    school: asString(first(record, ['school', 'schoolName', 'school_name'], first(authorRecord, ['school', 'schoolName', 'school_name']))),
+    topic: asString(first(record, ['topic', 'tag'])),
     tags: normalizeStrings(first(record, ['tags', 'topics'], [])),
-    title: asString(first(record, ['title', 'headline']), '三食堂新出的芋泥波波真的绝，一天一杯根本停不下来'),
+    title: asString(first(record, ['title', 'headline'])),
     content: asString(first(record, ['content', 'body', 'text']), ''),
     images: normalizeImages(first(record, ['images', 'imageUrls', 'image_urls', 'media'])),
     likedCount: asNumber(first(record, ['likedCount', 'liked_count', 'likeCount', 'like_count']), 0),
     commentCount: asNumber(first(record, ['commentCount', 'comment_count']), 0),
     favoriteCount: asNumber(first(record, ['favoriteCount', 'favorite_count']), 0),
+		reviewStatus: asString(first(record, ['reviewStatus', 'review_status']), 'submitted') as CommunityPost['reviewStatus'],
     createdAt: dateLabel(first(record, ['createdAt', 'created_at'])),
     pinned: asBoolean(first(record, ['pinned', 'isPinned', 'is_pinned'])),
   }
@@ -132,7 +162,7 @@ const normalizeComment = (raw: unknown): CommunityComment => {
   const record = isRecord(raw) ? raw : {}
   const authorRecord = isRecord(record.author) ? record.author : {}
   return {
-    id: asString(first(record, ['id', 'commentId', 'comment_id']), `comment-${Date.now()}`),
+    id: asString(first(record, ['id', 'commentId', 'comment_id'])),
     author: asString(first(record, ['authorName', 'author_name', 'author'], first(authorRecord, ['name', 'nickname'])), '同学'),
     avatar: asString(first(record, ['avatar', 'avatarUrl', 'avatar_url'], first(authorRecord, ['avatar', 'avatarUrl', 'avatar_url']))),
     content: asString(first(record, ['content', 'body', 'text']), ''),
@@ -148,7 +178,7 @@ const normalizeNotification = (raw: unknown): CommunityNotification => {
     rawType === 'post_liked' || rawType === 'user_followed' ? rawType : 'post_commented'
 
   return {
-    id: asString(first(record, ['id', 'notificationId', 'notification_id']), `notification-${Date.now()}`),
+    id: asString(first(record, ['id', 'notificationId', 'notification_id'])),
     type,
     actor: asString(first(record, ['actorName', 'actor_name', 'actor'], first(actorRecord, ['name', 'nickname'])), '同学'),
     postId: asString(first(record, ['postId', 'post_id', 'postPublicId', 'post_public_id'])),
@@ -223,6 +253,44 @@ export async function createCommunityPost(input: CreateCommunityPostInput): Prom
   return unwrapPost(data)
 }
 
+export function getMyCommunitySummary(): Promise<MyCommunitySummary> {
+	return request('/community/me/summary')
+}
+
+export async function getMyFavoritePosts(page = 1, pageSize = 20): Promise<PageResult<CommunityPost>> {
+	const data = await request<unknown>(`/community/me/favorites?page=${page}&pageSize=${pageSize}`)
+	return normalizePage(data, normalizePost)
+}
+
+export async function getMyPosts(page = 1, pageSize = 20): Promise<PageResult<CommunityPost>> {
+	const data = await request<unknown>(`/community/me/posts?page=${page}&pageSize=${pageSize}`)
+	return normalizePage(data, normalizePost)
+}
+
+export async function getMyComments(page = 1, pageSize = 20): Promise<PageResult<MyCommunityComment>> {
+	const data = await request<unknown>(`/community/me/comments?page=${page}&pageSize=${pageSize}`)
+	return normalizePage(data, (raw) => {
+		const record = isRecord(raw) ? raw : {}
+		return {
+			id: asString(record.id),
+			postId: asString(first(record, ['postId', 'post_id'])),
+			postTitle: asString(first(record, ['postTitle', 'post_title']), '原帖子'),
+			content: asString(record.content),
+			reviewStatus: asString(first(record, ['reviewStatus', 'review_status'])),
+			createdAt: dateLabel(first(record, ['createdAt', 'created_at']))
+		}
+	})
+}
+
+export function getPublicCommunityProfile(userId: string): Promise<PublicCommunityProfile> {
+	return request(`/community/users/${encodeURIComponent(userId)}/profile`)
+}
+
+export async function getPublicUserPosts(userId: string, page = 1, pageSize = 20): Promise<PageResult<CommunityPost>> {
+	const data = await request<unknown>(`/community/users/${encodeURIComponent(userId)}/posts?page=${page}&pageSize=${pageSize}`)
+	return normalizePage(data, normalizePost)
+}
+
 export async function searchCommunityPosts(keyword: string, page = 1, pageSize = 20): Promise<PageResult<CommunityPost>> {
   const data = await request<unknown>('/community/searches', {
     url: '', method: 'POST', data: { keyword, page, pageSize }, timeout: 10000,
@@ -280,23 +348,23 @@ export async function getCommunityViewerState(postId: string): Promise<Community
 }
 
 export async function setPostLiked(postId: string, liked: boolean): Promise<void> {
-  await request(`/community/posts/${encodeURIComponent(postId)}/likes`, {
+  await request(`/community/posts/${encodeURIComponent(postId)}/like`, {
     url: '',
-    method: liked ? 'POST' : 'DELETE',
+    method: liked ? 'PUT' : 'DELETE',
   })
 }
 
 export async function setPostFavorited(postId: string, favorited: boolean): Promise<void> {
-  await request(`/community/posts/${encodeURIComponent(postId)}/favorites`, {
+  await request(`/community/posts/${encodeURIComponent(postId)}/favorite`, {
     url: '',
-    method: favorited ? 'POST' : 'DELETE',
+    method: favorited ? 'PUT' : 'DELETE',
   })
 }
 
 export async function setUserFollowing(userId: string, following: boolean): Promise<void> {
   await request(`/community/users/${encodeURIComponent(userId)}/follow`, {
     url: '',
-    method: following ? 'POST' : 'DELETE',
+    method: following ? 'PUT' : 'DELETE',
   })
 }
 

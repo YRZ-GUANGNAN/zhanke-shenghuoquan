@@ -53,7 +53,7 @@ const privacySections: LegalSection[] = [
   },
   {
     title: '四、你的权利',
-    body: '你可随时在「编辑资料」中修改个人信息，在「设置」中管理通知与个性化推荐，或通过客服申请注销账号与删除数据。'
+    body: '你可随时在「编辑资料」中修改个人信息，在「设置」中管理通知与个性化推荐，并可直接发起账号注销。为履行交易、审计与安全义务，已完成交易和历史内容会按规则匿名保留；可删除的个人设置、绑定关系与搜索历史会在注销时清理。'
   },
   {
     title: '五、信息安全',
@@ -93,7 +93,7 @@ export default function LegalPage() {
       <ScrollView scrollY className='student-legal-scroll'>
         <View className='student-legal-content'>
           {activeTab === 'privacy' && (
-            <Text className='student-legal-intro'>生效日期：2026 年 5 月 1 日 · 本文为示意条款</Text>
+            <Text className='student-legal-intro'>生效日期：2026 年 7 月 19 日</Text>
           )}
 
           {sections.map((section) => (

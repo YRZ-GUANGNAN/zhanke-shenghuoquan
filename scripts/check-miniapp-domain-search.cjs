@@ -10,6 +10,10 @@ const secondhand = read('apps', 'miniapp', 'src', 'pages', 'student-secondhand',
 const community = read('apps', 'miniapp', 'src', 'services', 'b-community.ts')
 const trade = read('apps', 'miniapp', 'src', 'services', 'c-trade.ts')
 const navigation = read('apps', 'miniapp', 'src', 'services', 'd-navigation.ts')
+const communityRepository = read('backend', 'internal', 'module', 'community', 'repository.go')
+const tradeRepository = read('backend', 'internal', 'module', 'trade', 'repository.go')
+const communitySearch = read('backend', 'internal', 'module', 'community', 'search.go')
+const tradeSearch = read('backend', 'internal', 'module', 'trade', 'search_api.go')
 
 if (!home.includes('/pages/search/index?scope=community')) {
   throw new Error('home search must use community scope')
@@ -32,6 +36,18 @@ for (const [source, endpoint] of [
   [navigation, '/navigation/external-takeout/searches']
 ]) {
   if (!source.includes(endpoint)) throw new Error(`domain search service is missing ${endpoint}`)
+}
+
+for (const [source, ownerColumn, label] of [
+  [communityRepository, 'posts.user_id', 'community'],
+  [tradeRepository, 'products.seller_id', 'trade']
+]) {
+  if (!source.includes('user_blocks AS ub') || !source.includes(`ub.blocked_id = ${ownerColumn}`)) {
+    throw new Error(`${label} search must exclude authors blocked by the current user`)
+  }
+}
+if (!communitySearch.includes('user.CurrentUserID(c), keyword') || !tradeSearch.includes('user.CurrentUserID(c), keyword')) {
+  throw new Error('authenticated search must pass the current user id into repository filtering')
 }
 
 console.log('miniapp domain search check PASS')

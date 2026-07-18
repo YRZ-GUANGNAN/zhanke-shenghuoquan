@@ -119,6 +119,10 @@ export async function removeBlockedUser(userId: number): Promise<void> {
 	await request(`/auth/blocks/${userId}`, { url: '', method: 'DELETE' })
 }
 
+export async function blockUser(userId: number): Promise<void> {
+	await request(`/auth/blocks/${userId}`, { url: '', method: 'POST' })
+}
+
 export async function submitFeedback(category: FeedbackCategory, content: string, imageAssetIds: string[]): Promise<FeedbackView> {
 	return request('/auth/feedbacks', { url: '', method: 'POST', data: { category, content, imageAssetIds }, timeout: 15000 })
 }

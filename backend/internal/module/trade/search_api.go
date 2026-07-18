@@ -13,10 +13,10 @@ import (
 )
 
 type tradeSearchRepository interface {
-	SearchProducts(context.Context, string, int, int) ([]Product, int64, error)
+	SearchProducts(context.Context, uint, string, int, int) ([]Product, int64, error)
 }
 
-func (s *Service) SearchProducts(ctx context.Context, keyword string, page, size int) (Page, error) {
+func (s *Service) SearchProducts(ctx context.Context, viewerID uint, keyword string, page, size int) (Page, error) {
 	display, _, err := searchmetrics.Normalize(keyword)
 	if err != nil {
 		return Page{}, err
@@ -26,7 +26,7 @@ func (s *Service) SearchProducts(ctx context.Context, keyword string, page, size
 	if !ok {
 		return Page{}, ErrSearchUnavailable
 	}
-	values, total, err := repository.SearchProducts(ctx, display, page, size)
+	values, total, err := repository.SearchProducts(ctx, viewerID, display, page, size)
 	if err != nil {
 		return Page{}, err
 	}
@@ -71,7 +71,7 @@ func (h *SearchHandler) search(c *gin.Context) {
 		response.Fail(c, http.StatusInternalServerError, "record trade search failed")
 		return
 	}
-	value, err := h.service.SearchProducts(c, keyword, request.Page, request.PageSize)
+	value, err := h.service.SearchProducts(c, user.CurrentUserID(c), keyword, request.Page, request.PageSize)
 	write(c, value, err)
 }
 

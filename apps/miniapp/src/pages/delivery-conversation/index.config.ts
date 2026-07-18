@@ -1,3 +1,1 @@
-export default definePageConfig({
-  navigationStyle: 'custom'
-})
+export default definePageConfig({ navigationBarTitleText: '配送沟通' })

@@ -1,16 +1,23 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ScrollView, Text, View } from '@tarojs/components'
-import Taro from '../../services/taro'
+import { Image, ScrollView, Text, View } from '@tarojs/components'
+import { blockUser } from '../../services/a-user'
 import {
-  type ProfileTab,
-  type PublicProfilePost,
-  type PublicProfileProduct,
-  resolvePublicProfile
-} from './data'
+  getPublicCommunityProfile,
+  getPublicUserPosts,
+  setUserFollowing,
+  type PublicCommunityProfile
+} from '../../services/b-community'
+import { getPublicUserProducts } from '../../services/c-trade'
+import Taro from '../../services/taro'
+import { useSessionStore } from '../../stores/session'
+import type { CommunityPost, Product } from '../../types'
 import './index.scss'
 
+type ProfileTab = 'posts' | 'secondhand'
+type PageStatus = 'loading' | 'ready' | 'error'
+
 function showToast(title: string) {
-  void Taro.showToast({ title, icon: 'none', duration: 1400 })
+  void Taro.showToast({ title, icon: 'none', duration: 1600 })
 }
 
 function splitColumns<T>(items: T[]) {
@@ -22,171 +29,218 @@ function splitColumns<T>(items: T[]) {
 
 export default function UserProfilePage() {
   const params = Taro.getCurrentInstance().router?.params || {}
+  const userId = String(params.userId || '').trim()
+  const currentUserId = useSessionStore((state) => state.profile.id)
   const initialTab: ProfileTab = params.tab === 'secondhand' ? 'secondhand' : 'posts'
-  const resolved = useMemo(() => resolvePublicProfile(params.userId), [params.userId])
-  const profile = resolved.profile
+  const [status, setStatus] = useState<PageStatus>('loading')
+  const [reloadKey, setReloadKey] = useState(0)
+  const [profile, setProfile] = useState<PublicCommunityProfile | null>(null)
+  const [posts, setPosts] = useState<CommunityPost[]>([])
+  const [products, setProducts] = useState<Product[]>([])
+  const [postTotal, setPostTotal] = useState(0)
+  const [productTotal, setProductTotal] = useState(0)
   const [activeTab, setActiveTab] = useState<ProfileTab>(initialTab)
-  const [following, setFollowing] = useState(profile.isFollowing)
-  const [followerCount, setFollowerCount] = useState(profile.followerCount)
+  const [following, setFollowing] = useState(false)
+  const [followerCount, setFollowerCount] = useState(0)
   const [menuVisible, setMenuVisible] = useState(false)
-  const postColumns = useMemo(() => splitColumns(profile.posts), [profile.posts])
-  const productColumns = useMemo(() => splitColumns(profile.products), [profile.products])
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    if (resolved.usedFallback) showToast('未找到该用户，已显示通用主页')
-  }, [resolved.usedFallback])
+    let active = true
+    setStatus('loading')
+    setError('')
+    if (!/^[1-9]\d*$/.test(userId)) {
+      setStatus('error')
+      setError('用户主页入口无效，请返回后重新进入')
+      return () => { active = false }
+    }
+    void Promise.all([
+      getPublicCommunityProfile(userId),
+      getPublicUserPosts(userId, 1, 40),
+      getPublicUserProducts(userId, 1, 40)
+    ]).then(([profileValue, postPage, productPage]) => {
+      if (!active) return
+      setProfile(profileValue)
+      setFollowing(profileValue.isFollowing)
+      setFollowerCount(profileValue.followerCount)
+      setPosts(postPage.items)
+      setProducts(productPage.items)
+      setPostTotal(postPage.total)
+      setProductTotal(productPage.total)
+      setStatus('ready')
+    }).catch((value: unknown) => {
+      if (!active) return
+      setStatus('error')
+      setError(value instanceof Error ? value.message : '用户主页加载失败')
+    })
+    return () => { active = false }
+  }, [reloadKey, userId])
 
-  const goBack = () => {
-    void Taro.navigateBack().catch(() => Taro.redirectTo({ url: '/pages/profile/index' }))
+  const postColumns = useMemo(() => splitColumns(posts), [posts])
+  const productColumns = useMemo(() => splitColumns(products), [products])
+  const isSelf = currentUserId === userId
+
+  const toggleFollow = async () => {
+    if (busy || isSelf) return
+    const next = !following
+    setBusy(true)
+    try {
+      await setUserFollowing(userId, next)
+      setFollowing(next)
+      setFollowerCount((count) => Math.max(0, count + (next ? 1 : -1)))
+    } catch (value) {
+      showToast(value instanceof Error ? value.message : '关注操作失败')
+    } finally {
+      setBusy(false)
+    }
   }
 
-  const toggleFollow = () => {
-    setFollowing((value) => {
-      setFollowerCount((count) => Math.max(0, count + (value ? -1 : 1)))
-      return !value
+  const secondaryAction = () => {
+    if (isSelf) {
+      void Taro.setClipboardData({ data: `pages/user-profile/index?userId=${userId}` }).then(() => showToast('主页路径已复制'))
+      return
+    }
+    const selling = products.find((item) => item.status === 'selling')
+    if (!selling) {
+      showToast('该用户当前没有可联系的在售商品')
+      return
+    }
+    void Taro.navigateTo({ url: `/pages/secondhand-detail/index?id=${encodeURIComponent(selling.id)}` })
+  }
+
+  const copyProfilePath = async () => {
+    setMenuVisible(false)
+    await Taro.setClipboardData({ data: `pages/user-profile/index?userId=${userId}` })
+    showToast('主页路径已复制')
+  }
+
+  const reportUser = () => {
+    setMenuVisible(false)
+    void Taro.navigateTo({
+      url: `/pages/feedback/index?category=report&targetUserId=${encodeURIComponent(userId)}`
     })
   }
 
-  const handleSecondaryAction = () => {
-    if (profile.isSelf) {
-      showToast('主页分享静态预览')
-      return
-    }
-    showToast('私信功能待接入通用会话')
-  }
-
-  const handleMenuAction = (action: 'copy' | 'report' | 'block') => {
+  const confirmBlock = async () => {
     setMenuVisible(false)
-    const copy = {
-      copy: '主页链接已复制（静态预览）',
-      report: '举报入口已记录为静态预览',
-      block: '拉黑入口已记录为静态预览'
+    const result = await Taro.showModal({
+      title: '确认拉黑该用户',
+      content: '拉黑记录会进入设置中的黑名单，你可以随时解除。',
+      confirmText: '确认拉黑'
+    })
+    if (!result.confirm) return
+    try {
+      await blockUser(Number(userId))
+      await Taro.showToast({ title: '已加入黑名单', icon: 'success' })
+      await Taro.navigateBack()
+    } catch (value) {
+      showToast(value instanceof Error ? value.message : '拉黑失败')
     }
-    showToast(copy[action])
   }
 
-  const openPost = (item: PublicProfilePost) => {
-    void Taro.navigateTo({ url: `/pages/post-detail/index?id=${encodeURIComponent(item.id)}` })
-  }
-
-  const openProduct = (item: PublicProfileProduct) => {
-    void Taro.navigateTo({ url: `/pages/secondhand-detail/index?id=${encodeURIComponent(item.id)}` })
-  }
-
-  const renderPost = (item: PublicProfilePost) => (
-    <View className='public-profile-card' key={item.id} onClick={() => openPost(item)}>
-      <View className={`public-profile-card__media public-profile-card__media--${item.tone} public-profile-card__media--${item.height}`}>
-        <Text>{item.mediaLabel}</Text>
+  const renderPost = (item: CommunityPost) => (
+    <View className='public-profile-card' key={item.id} onClick={() => void Taro.navigateTo({ url: `/pages/post-detail/index?id=${encodeURIComponent(item.id)}` })}>
+      <View className='public-profile-card__media public-profile-card__media--sky public-profile-card__media--medium'>
+        {item.images[0] ? <Image className='public-profile-card__media-image' src={item.images[0]} mode='aspectFill' /> : <Text>帖 · {item.topic || '校园'}</Text>}
       </View>
       <View className='public-profile-card__body'>
-        <Text className='public-profile-card__title'>{item.title}</Text>
-        <View className='public-profile-card__metric'>
-          <Text className='public-profile-card__heart'>♥</Text>
-          <Text>{item.likes}</Text>
-        </View>
+        <Text className='public-profile-card__title'>{item.title || item.content}</Text>
+        <View className='public-profile-card__metric'><Text className='public-profile-card__heart'>♥</Text><Text>{item.likedCount}</Text></View>
       </View>
     </View>
   )
 
-  const renderProduct = (item: PublicProfileProduct) => (
-    <View className='public-profile-card' key={item.id} onClick={() => openProduct(item)}>
-      <View className={`public-profile-card__media public-profile-card__media--${item.tone} public-profile-card__media--${item.height}`}>
-        <Text>{item.mediaLabel}</Text>
-        {item.status === 'sold' && <Text className='public-profile-card__sold'>已售</Text>}
+  const renderProduct = (item: Product) => (
+    <View className='public-profile-card' key={item.id} onClick={() => void Taro.navigateTo({ url: `/pages/secondhand-detail/index?id=${encodeURIComponent(item.id)}` })}>
+      <View className='public-profile-card__media public-profile-card__media--lemon public-profile-card__media--medium'>
+        {item.images[0] ? <Image className='public-profile-card__media-image' src={item.images[0]} mode='aspectFill' /> : <Text>物 · {item.category || '二手'}</Text>}
+        {item.status === 'sold' ? <Text className='public-profile-card__sold'>已售</Text> : null}
       </View>
       <View className='public-profile-card__body'>
         <Text className='public-profile-card__title'>{item.title}</Text>
         <View className='public-profile-card__product-meta'>
           <Text className='public-profile-card__price'>¥{item.price}</Text>
-          <Text>{item.status === 'selling' ? '出售中' : '已售出'}</Text>
+          <Text>{item.status === 'selling' ? '出售中' : item.status === 'reserved' ? '已预留' : '已售出'}</Text>
         </View>
       </View>
     </View>
   )
 
-  const empty = activeTab === 'posts' ? profile.posts.length === 0 : profile.products.length === 0
+  if (status === 'loading') return <View className='public-profile-page'><View className='public-profile-empty'><Text>正在加载真实主页…</Text></View></View>
+  if (status === 'error' || !profile) {
+    return (
+      <View className='public-profile-page'>
+        <View className='public-profile-empty' onClick={() => setReloadKey((value) => value + 1)}>
+          <Text className='public-profile-empty__title'>{error || '用户主页加载失败'}</Text>
+          <Text className='public-profile-empty__desc'>点击重试</Text>
+        </View>
+      </View>
+    )
+  }
 
+  const value = profile.profile
+  const empty = activeTab === 'posts' ? posts.length === 0 : products.length === 0
   return (
     <View className='public-profile-page'>
       <View className='public-profile-hero'>
         <View className='public-profile-nav'>
-          <View className='public-profile-nav__back' onClick={goBack} />
-          <View className='public-profile-nav__more' onClick={() => setMenuVisible(true)}>
-            <Text>•••</Text>
-          </View>
+          <View className='public-profile-nav__back' onClick={() => void Taro.navigateBack().catch(() => Taro.redirectTo({ url: '/pages/home/index' }))} />
+          <View className='public-profile-nav__more' onClick={() => setMenuVisible(true)}><Text>•••</Text></View>
         </View>
-
         <View className='public-profile-user'>
-          <View className='public-profile-user__avatar'><Text>{profile.avatarText}</Text></View>
+          <View className='public-profile-user__avatar'>
+            {value.avatar ? <Image className='public-profile-user__avatar-image' src={value.avatar} mode='aspectFill' /> : <Text>{value.nickname.slice(0, 1) || '校'}</Text>}
+          </View>
           <View className='public-profile-user__main'>
-            <Text className='public-profile-user__name'>{profile.nickname}</Text>
-            <Text className='public-profile-user__meta'>湛科号：{profile.account}</Text>
-            <Text className='public-profile-user__meta'>{profile.school}{profile.grade ? ` · ${profile.grade}` : ''}</Text>
+            <Text className='public-profile-user__name'>{value.nickname}</Text>
+            <Text className='public-profile-user__meta'>用户编号：{value.id}</Text>
+            <Text className='public-profile-user__meta'>{value.school || '未填写学校'}{value.campus ? ` · ${value.campus}` : ''}</Text>
           </View>
         </View>
-
-        <Text className='public-profile-bio'>{profile.bio}</Text>
-
+        <Text className='public-profile-bio'>这里展示该用户审核通过的公开内容。</Text>
         <View className='public-profile-stats'>
           <View><Text className='public-profile-stats__value'>{profile.followingCount}</Text><Text>关注</Text></View>
           <View><Text className='public-profile-stats__value'>{followerCount}</Text><Text>粉丝</Text></View>
           <View><Text className='public-profile-stats__value'>{profile.likedCount}</Text><Text>获赞</Text></View>
         </View>
-
         <View className='public-profile-actions'>
-          <View className={`public-profile-action public-profile-action--primary ${following ? 'public-profile-action--active' : ''}`} onClick={profile.isSelf ? () => void Taro.navigateTo({ url: '/pages/edit-profile/index' }) : toggleFollow}>
-            <Text>{profile.isSelf ? '编辑资料' : following ? '已关注' : '+ 关注'}</Text>
+          <View className={`public-profile-action public-profile-action--primary ${following ? 'public-profile-action--active' : ''}`} onClick={isSelf ? () => void Taro.navigateTo({ url: '/pages/edit-profile/index' }) : () => void toggleFollow()}>
+            <Text>{isSelf ? '编辑资料' : busy ? '处理中…' : following ? '已关注' : '+ 关注'}</Text>
           </View>
-          <View className='public-profile-action public-profile-action--secondary' onClick={handleSecondaryAction}>
-            <Text>{profile.isSelf ? '分享主页' : '▱ 私信'}</Text>
+          <View className='public-profile-action public-profile-action--secondary' onClick={secondaryAction}>
+            <Text>{isSelf ? '分享主页' : '查看在售商品'}</Text>
           </View>
         </View>
       </View>
-
       <View className='public-profile-tabs'>
-        <View className={`public-profile-tab ${activeTab === 'posts' ? 'public-profile-tab--active' : ''}`} onClick={() => setActiveTab('posts')}>
-          <Text>帖子 {profile.posts.length}</Text>
-        </View>
-        <View className={`public-profile-tab ${activeTab === 'secondhand' ? 'public-profile-tab--active' : ''}`} onClick={() => setActiveTab('secondhand')}>
-          <Text>二手 {profile.products.length}</Text>
-        </View>
+        <View className={`public-profile-tab ${activeTab === 'posts' ? 'public-profile-tab--active' : ''}`} onClick={() => setActiveTab('posts')}><Text>帖子 {postTotal}</Text></View>
+        <View className={`public-profile-tab ${activeTab === 'secondhand' ? 'public-profile-tab--active' : ''}`} onClick={() => setActiveTab('secondhand')}><Text>二手 {productTotal}</Text></View>
       </View>
-
       <View className='public-profile-content'>
         <ScrollView className='public-profile-scroll' scrollY enhanced showScrollbar={false}>
           {empty ? (
-            <View className='public-profile-empty'>
-              <Text className='public-profile-empty__icon'>{activeTab === 'posts' ? '文' : '物'}</Text>
-              <Text className='public-profile-empty__title'>{activeTab === 'posts' ? '还没有发布帖子' : '还没有发布二手'}</Text>
-              <Text className='public-profile-empty__desc'>发布后会展示在个人主页</Text>
-            </View>
+            <View className='public-profile-empty'><Text className='public-profile-empty__title'>{activeTab === 'posts' ? '暂无公开帖子' : '暂无公开二手商品'}</Text></View>
           ) : activeTab === 'posts' ? (
-            <View className='public-profile-waterfall'>
-              <View className='public-profile-waterfall__column'>{postColumns.left.map(renderPost)}</View>
-              <View className='public-profile-waterfall__column'>{postColumns.right.map(renderPost)}</View>
-            </View>
+            <View className='public-profile-waterfall'><View className='public-profile-waterfall__column'>{postColumns.left.map(renderPost)}</View><View className='public-profile-waterfall__column'>{postColumns.right.map(renderPost)}</View></View>
           ) : (
-            <View className='public-profile-waterfall'>
-              <View className='public-profile-waterfall__column'>{productColumns.left.map(renderProduct)}</View>
-              <View className='public-profile-waterfall__column'>{productColumns.right.map(renderProduct)}</View>
-            </View>
+            <View className='public-profile-waterfall'><View className='public-profile-waterfall__column'>{productColumns.left.map(renderProduct)}</View><View className='public-profile-waterfall__column'>{productColumns.right.map(renderProduct)}</View></View>
           )}
         </ScrollView>
       </View>
-
-      {menuVisible && (
+      {menuVisible ? (
         <View className='public-profile-sheet-layer'>
           <View className='public-profile-sheet-layer__mask' onClick={() => setMenuVisible(false)} />
           <View className='public-profile-sheet'>
             <View className='public-profile-sheet__group'>
-              <View className='public-profile-sheet__item' onClick={() => handleMenuAction('copy')}><Text>复制主页链接</Text></View>
-              {!profile.isSelf && <View className='public-profile-sheet__item public-profile-sheet__item--warning' onClick={() => handleMenuAction('report')}><Text>举报该用户</Text></View>}
-              {!profile.isSelf && <View className='public-profile-sheet__item public-profile-sheet__item--danger' onClick={() => handleMenuAction('block')}><Text>拉黑该用户</Text></View>}
+              <View className='public-profile-sheet__item' onClick={() => void copyProfilePath()}><Text>复制主页路径</Text></View>
+              {!isSelf ? <View className='public-profile-sheet__item public-profile-sheet__item--warning' onClick={reportUser}><Text>举报该用户</Text></View> : null}
+              {!isSelf ? <View className='public-profile-sheet__item public-profile-sheet__item--danger' onClick={() => void confirmBlock()}><Text>拉黑该用户</Text></View> : null}
             </View>
             <View className='public-profile-sheet__cancel' onClick={() => setMenuVisible(false)}><Text>取消</Text></View>
           </View>
         </View>
-      )}
+      ) : null}
     </View>
   )
 }

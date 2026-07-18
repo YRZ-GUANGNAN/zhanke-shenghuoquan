@@ -18,7 +18,7 @@ import (
 var ErrSearchUnavailable = errors.New("community search is unavailable")
 
 type communitySearchRepository interface {
-	SearchPosts(context.Context, string, int, int) ([]Post, int64, error)
+	SearchPosts(context.Context, uint, string, int, int) ([]Post, int64, error)
 	ListRecentTagPosts(context.Context, time.Time) ([]Post, error)
 }
 
@@ -28,7 +28,7 @@ type HotTag struct {
 	InteractionScore int64  `json:"interactionScore"`
 }
 
-func (s *Service) SearchPosts(ctx context.Context, keyword string, page, size int) (Page[PostView], error) {
+func (s *Service) SearchPosts(ctx context.Context, viewerID uint, keyword string, page, size int) (Page[PostView], error) {
 	display, _, err := searchmetrics.Normalize(keyword)
 	if err != nil {
 		return Page[PostView]{}, err
@@ -38,7 +38,7 @@ func (s *Service) SearchPosts(ctx context.Context, keyword string, page, size in
 	if !ok {
 		return Page[PostView]{}, ErrSearchUnavailable
 	}
-	values, total, err := repository.SearchPosts(ctx, display, page, size)
+	values, total, err := repository.SearchPosts(ctx, viewerID, display, page, size)
 	if err != nil {
 		return Page[PostView]{}, err
 	}
@@ -164,7 +164,7 @@ func (h *SearchHandler) search(c *gin.Context) {
 		response.Fail(c, http.StatusInternalServerError, "record community search failed")
 		return
 	}
-	value, err := h.service.SearchPosts(c, keyword, request.Page, request.PageSize)
+	value, err := h.service.SearchPosts(c, user.CurrentUserID(c), keyword, request.Page, request.PageSize)
 	write(c, value, err)
 }
 

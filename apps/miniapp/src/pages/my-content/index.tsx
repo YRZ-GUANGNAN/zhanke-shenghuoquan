@@ -1,283 +1,135 @@
-import React, { useState } from 'react'
-import { Text, View } from '@tarojs/components'
+import React, { useEffect, useState } from 'react'
+import { Image, Text, View } from '@tarojs/components'
+import type { CommunityPost, Product } from '../../types'
+import { getMyComments, getMyFavoritePosts, getMyPosts, type MyCommunityComment } from '../../services/b-community'
+import { getMyProductsPage } from '../../services/c-trade'
 import Taro from '../../services/taro'
 import './index.scss'
 
 type TabKey = 'favorites' | 'posts' | 'comments' | 'items'
-type ToneKey = 'peach' | 'mint' | 'lavender' | 'rose' | 'blue'
 
-interface TabOption {
-  key: TabKey
-  label: string
-}
-
-interface FavoriteItem {
-  id: string
-  postId: string
-  title: string
-  author: string
-  time: string
-  likes: string
-  tone: ToneKey
-}
-
-interface PostItem {
-  id: string
-  postId: string
-  title: string
-  meta: string
-  tone: ToneKey
-}
-
-interface CommentItem {
-  id: string
-  postId: string
-  content: string
-  source: string
-  time: string
-}
-
-interface MarketItem {
-  id: string
-  productId: string
-  title: string
-  price: string
-  status: '出售中' | '已售'
-  tone: ToneKey
-}
-
-const tabs: TabOption[] = [
+const tabs: Array<{ key: TabKey; label: string }> = [
   { key: 'favorites', label: '收藏' },
   { key: 'posts', label: '帖子' },
   { key: 'comments', label: '评论' },
   { key: 'items', label: '宝贝' }
 ]
 
-const favoriteItems: FavoriteItem[] = [
-  {
-    id: 'fav-1',
-    postId: 'sunset',
-    title: '今天的晚霞，操场随手拍的，太治愈了',
-    author: '小鹿乱撞',
-    time: '今天',
-    likes: '156',
-    tone: 'peach'
-  },
-  {
-    id: 'fav-2',
-    postId: 'library',
-    title: '期末周图书馆占座攻略｜亲测有效的三个时间点',
-    author: '卷心菜',
-    time: '昨天',
-    likes: '214',
-    tone: 'lavender'
-  },
-  {
-    id: 'fav-3',
-    postId: 'dorm-makeover',
-    title: '宿舍改造第二弹｜300 块把上床下桌改成 ins 风',
-    author: '柚子茶',
-    time: '6月30日',
-    likes: '342',
-    tone: 'rose'
-  }
-]
-
-const postItems: PostItem[] = [
-  {
-    id: 'post-1',
-    postId: 'express',
-    title: '求助：明天上午有人能帮拿北门快递吗，有偿',
-    meta: '今天 11:02 · 12 赞 · 3 评论',
-    tone: 'peach'
-  },
-  {
-    id: 'post-2',
-    postId: 'badminton',
-    title: '周末羽毛球局召集，体育馆 3 号场还差两人',
-    meta: '6月29日 · 31 赞 · 9 评论',
-    tone: 'mint'
-  }
-]
-
-const commentItems: CommentItem[] = [
-  {
-    id: 'comment-1',
-    postId: 'milk-tea',
-    content: '学生证减 5 毛是真的吗？？明天就去',
-    source: '评论了「三食堂新出的芋泥波波真的绝」',
-    time: '40 分钟前'
-  },
-  {
-    id: 'comment-2',
-    postId: 'library',
-    content: '蹲一个后排，考完一起吃饭',
-    source: '评论了「期末周图书馆占座攻略」',
-    time: '昨天'
-  },
-  {
-    id: 'comment-3',
-    postId: 'sea',
-    content: '+1 求拼，我有学生证优惠券',
-    source: '评论了「有没有周末去金沙湾的搭子」',
-    time: '6月30日'
-  }
-]
-
-const marketItems: MarketItem[] = [
-  {
-    id: 'item-1',
-    productId: 'bike',
-    title: '九成新自行车，毕业急出，车况好无锈',
-    price: '¥150',
-    status: '出售中',
-    tone: 'blue'
-  },
-  {
-    id: 'item-2',
-    productId: 'exam-pack',
-    title: '四级真题一套+听力网课，半价出',
-    price: '¥25',
-    status: '已售',
-    tone: 'mint'
-  }
-]
-
 function getInitialTab(): TabKey {
   const tab = Taro.getCurrentInstance().router?.params?.tab
-  if (tab === 'posts' || tab === 'comments' || tab === 'items' || tab === 'favorites') {
-    return tab
-  }
-  return 'favorites'
+  return tab === 'posts' || tab === 'comments' || tab === 'items' ? tab : 'favorites'
 }
 
-function Placeholder({ tone, label }: { tone: ToneKey; label?: string }) {
-  return (
-    <View className={`my-content-thumb my-content-thumb--${tone}`}>
-      <Text>图</Text>
-      {label ? <Text> · {label}</Text> : null}
-    </View>
-  )
+function reviewLabel(value?: string): string {
+  if (value === 'approved') return '已发布'
+  if (value === 'rejected' || value === 'taken_down') return '未通过'
+  return '审核中'
 }
 
-function renderEndText(label: string) {
-  return <View className="my-content-end">— {label} —</View>
+function PostThumb({ value }: { value: CommunityPost }) {
+  return value.images[0]
+    ? <Image className='my-content-thumb' src={value.images[0]} mode='aspectFill' />
+    : <View className='my-content-thumb my-content-thumb--blue'><Text>暂无图片</Text></View>
 }
 
 export default function MyContentPage() {
   const [activeTab, setActiveTab] = useState<TabKey>(getInitialTab)
+  const [favorites, setFavorites] = useState<CommunityPost[]>([])
+  const [posts, setPosts] = useState<CommunityPost[]>([])
+  const [comments, setComments] = useState<MyCommunityComment[]>([])
+  const [items, setItems] = useState<Product[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const load = async (tab = activeTab) => {
+    setLoading(true)
+    setError('')
+    try {
+      if (tab === 'favorites') setFavorites((await getMyFavoritePosts()).items)
+      if (tab === 'posts') setPosts((await getMyPosts()).items)
+      if (tab === 'comments') setComments((await getMyComments()).items)
+      if (tab === 'items') setItems((await getMyProductsPage()).items)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '内容加载失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { void load(activeTab) }, [activeTab])
 
   const openPost = (postId: string, anchor?: string) => {
     const anchorQuery = anchor ? `&anchor=${encodeURIComponent(anchor)}` : ''
     void Taro.navigateTo({ url: `/pages/post-detail/index?id=${encodeURIComponent(postId)}${anchorQuery}` })
   }
+  const openProduct = (productId: string) => void Taro.navigateTo({ url: `/pages/secondhand-detail/index?id=${encodeURIComponent(productId)}` })
 
-  const openProduct = (productId: string) => {
-    void Taro.navigateTo({ url: `/pages/secondhand-detail/index?id=${encodeURIComponent(productId)}` })
+  const state = () => {
+    if (loading) return <View className='my-content-card my-content-end'>正在加载…</View>
+    if (error) return <View className='my-content-card my-content-end' onClick={() => void load()}>加载失败：{error}，点击重试</View>
+    return null
   }
 
-  const renderFavorites = () => (
-    <View className="my-content-card my-content-card--list">
-      {favoriteItems.map((item) => (
-        <View key={item.id} className="favorite-row" onClick={() => openPost(item.postId)}>
-          <Placeholder tone={item.tone} />
-          <View className="favorite-row__main">
-            <Text className="favorite-row__title">{item.title}</Text>
-            <Text className="favorite-row__meta">
-              {item.author} · {item.time}
+  const renderPosts = (values: CommunityPost[], favorite = false) => (
+    <View className='my-content-card my-content-card--list'>
+      {values.map((item) => (
+        <View key={item.id} className={favorite ? 'favorite-row' : 'post-row'} onClick={() => openPost(item.id)}>
+          <PostThumb value={item} />
+          <View className={favorite ? 'favorite-row__main' : 'post-row__main'}>
+            <Text className={favorite ? 'favorite-row__title' : 'post-row__title'}>{item.title || item.content}</Text>
+            <Text className={favorite ? 'favorite-row__meta' : 'post-row__meta'}>
+              {favorite ? `${item.author} · ${item.createdAt}` : `${reviewLabel(item.reviewStatus)} · ${item.likedCount} 赞 · ${item.commentCount} 评论`}
             </Text>
           </View>
-          <View className="favorite-row__like">
-            <Text className="favorite-row__heart">♥</Text>
-            <Text>{item.likes}</Text>
-          </View>
+          {favorite ? <Text className='favorite-row__like'>♥ {item.likedCount}</Text> : <Text className='post-row__arrow'>›</Text>}
         </View>
       ))}
-      {renderEndText('仅展示最近收藏')}
-    </View>
-  )
-
-  const renderPosts = () => (
-    <View className="my-content-card my-content-card--list">
-      {postItems.map((item) => (
-        <View key={item.id} className="post-row" onClick={() => openPost(item.postId)}>
-          <Placeholder tone={item.tone} />
-          <View className="post-row__main">
-            <Text className="post-row__title">{item.title}</Text>
-            <Text className="post-row__meta">{item.meta}</Text>
-          </View>
-          <Text className="post-row__arrow">›</Text>
-        </View>
-      ))}
-      {renderEndText('到底了')}
+      {values.length === 0 && <View className='my-content-end'>暂无内容</View>}
     </View>
   )
 
   const renderComments = () => (
-    <View className="my-content-card my-content-card--comments">
-      {commentItems.map((item) => (
-        <View key={item.id} className="comment-row" onClick={() => openPost(item.postId, 'comments')}>
-          <Text className="comment-row__content">{item.content}</Text>
-          <View className="comment-row__source">
-            <Text className="comment-row__icon">▱</Text>
-            <Text className="comment-row__source-text">{item.source}</Text>
-            <Text className="comment-row__time">{item.time}</Text>
+    <View className='my-content-card my-content-card--comments'>
+      {comments.map((item) => (
+        <View key={item.id} className='comment-row' onClick={() => openPost(item.postId, 'comments')}>
+          <Text className='comment-row__content'>{item.content}</Text>
+          <View className='comment-row__source'>
+            <Text className='comment-row__source-text'>评论了《{item.postTitle}》</Text>
+            <Text className='comment-row__time'>{item.createdAt} · {reviewLabel(item.reviewStatus)}</Text>
           </View>
         </View>
       ))}
-      {renderEndText('仅展示最近评论')}
+      {comments.length === 0 && <View className='my-content-end'>暂无评论</View>}
     </View>
   )
 
   const renderItems = () => (
-    <View className="my-content-card my-content-card--list">
-      {marketItems.map((item) => (
-        <View key={item.id} className="item-row" onClick={() => openProduct(item.productId)}>
-          <Placeholder tone={item.tone} />
-          <View className="item-row__main">
-            <Text className="item-row__title">{item.title}</Text>
-            <Text className={`item-row__price ${item.status === '已售' ? 'item-row__price--muted' : ''}`}>
-              {item.price}
-            </Text>
-          </View>
-          <Text className={`item-row__status ${item.status === '已售' ? 'item-row__status--sold' : ''}`}>
-            {item.status}
-          </Text>
+    <View className='my-content-card my-content-card--list'>
+      {items.map((item) => (
+        <View key={item.id} className='item-row' onClick={() => openProduct(item.id)}>
+          {item.images[0] ? <Image className='my-content-thumb' src={item.images[0]} mode='aspectFill' /> : <View className='my-content-thumb my-content-thumb--blue'><Text>暂无图片</Text></View>}
+          <View className='item-row__main'><Text className='item-row__title'>{item.title}</Text><Text className='item-row__price'>¥{item.price}</Text></View>
+          <Text className={`item-row__status ${item.status === 'sold' ? 'item-row__status--sold' : ''}`}>{item.status === 'sold' ? '已售' : reviewLabel(item.reviewStatus)}</Text>
         </View>
       ))}
-      {renderEndText('到底了')}
+      {items.length === 0 && <View className='my-content-end'>暂无二手商品</View>}
     </View>
   )
 
   const renderContent = () => {
-    if (activeTab === 'posts') return renderPosts()
+    const status = state()
+    if (status) return status
+    if (activeTab === 'posts') return renderPosts(posts)
     if (activeTab === 'comments') return renderComments()
     if (activeTab === 'items') return renderItems()
-    return renderFavorites()
+    return renderPosts(favorites, true)
   }
 
   return (
-    <View className="my-content-page">
-      <View className="my-content-header">
-        <View className="my-content-header__back" onClick={() => void Taro.navigateBack()}>
-          <Text>‹</Text>
-        </View>
-        <Text className="my-content-header__title">我的内容</Text>
-      </View>
-
-      <View className="my-content-tabs">
-        {tabs.map((tab) => (
-          <View
-            key={tab.key}
-            className={`my-content-tab ${activeTab === tab.key ? 'my-content-tab--active' : ''}`}
-            onClick={() => setActiveTab(tab.key)}
-          >
-            <Text>{tab.label}</Text>
-          </View>
-        ))}
-      </View>
-
-      <View className="my-content-body">{renderContent()}</View>
+    <View className='my-content-page'>
+      <View className='my-content-header'><View className='my-content-header__back' onClick={() => void Taro.navigateBack()}><Text>‹</Text></View><Text className='my-content-header__title'>我的内容</Text></View>
+      <View className='my-content-tabs'>{tabs.map((tab) => <View key={tab.key} className={`my-content-tab ${activeTab === tab.key ? 'my-content-tab--active' : ''}`} onClick={() => setActiveTab(tab.key)}><Text>{tab.label}</Text></View>)}</View>
+      <View className='my-content-body'>{renderContent()}</View>
     </View>
   )
 }

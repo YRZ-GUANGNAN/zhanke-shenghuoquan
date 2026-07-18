@@ -13,8 +13,11 @@ const categories: Array<{ key: FeedbackCategory; label: string }> = [
 ]
 
 export default function FeedbackPage() {
-  const [category, setCategory] = useState<FeedbackCategory>('bug')
-  const [content, setContent] = useState('')
+  const params = Taro.getCurrentInstance().router?.params || {}
+  const initialCategory: FeedbackCategory = params.category === 'report' ? 'report' : 'bug'
+  const targetUserId = String(params.targetUserId || '').trim()
+  const [category, setCategory] = useState<FeedbackCategory>(initialCategory)
+  const [content, setContent] = useState(targetUserId ? `举报用户 ${targetUserId}：` : '')
   const [images, setImages] = useState<UploadedMedia[]>([])
   const [progress, setProgress] = useState('')
   const [submitting, setSubmitting] = useState(false)

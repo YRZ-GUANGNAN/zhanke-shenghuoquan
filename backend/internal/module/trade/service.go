@@ -402,6 +402,24 @@ func (s *Service) MyProducts(ctx context.Context, sellerID uint, page, size int)
 	return Page{Items: views, Page: page, PageSize: size, Total: total}, err
 }
 
+type publicSellerRepository interface {
+	ListPublicSeller(context.Context, uint, int, int) ([]Product, int64, error)
+}
+
+func (s *Service) UserProducts(ctx context.Context, sellerID uint, page, size int) (Page, error) {
+	repo, ok := s.repo.(publicSellerRepository)
+	if !ok || sellerID == 0 {
+		return Page{}, ErrNotFound
+	}
+	page, size = normalize(page, size)
+	values, total, err := repo.ListPublicSeller(ctx, sellerID, page, size)
+	if err != nil {
+		return Page{}, err
+	}
+	views, err := s.enrich(ctx, values)
+	return Page{Items: views, Page: page, PageSize: size, Total: total}, err
+}
+
 func (s *Service) Product(ctx context.Context, id uint) (ProductView, error) {
 	value, err := s.repo.Find(ctx, id, true)
 	if err != nil {

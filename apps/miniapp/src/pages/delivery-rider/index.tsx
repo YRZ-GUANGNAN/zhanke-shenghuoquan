@@ -1,442 +1,273 @@
-import React, { useState } from 'react'
-import { Text, View } from '@tarojs/components'
-import IdentitySwitchModal from '../../components/IdentitySwitchModal'
-import RuntimeSessionGate from '../../components/runtime-session-gate'
+import React, { useCallback, useState } from 'react'
+import { Button, Text, View } from '@tarojs/components'
+import { useDidShow } from '@tarojs/taro'
 import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
+import { isApiError } from '../../services/api'
+import {
+  claimDeliveryOrder,
+  getDeliveryRiderMe,
+  listAssignedDeliveryOrders,
+  listClaimableDeliveryOrders,
+  markDelivered,
+  markPickedUp,
+  releaseDeliveryOrder,
+  startDelivery,
+  startToPickup,
+  type AssignedDeliveryOrder,
+  type ClaimableDeliveryOrder,
+  type DeliveryRiderMe
+} from '../../services/delivery-rider'
+import { centsToYuan, type DeliveryStatus } from '../../services/delivery-merchant'
+import { chooseAndUploadImages, waitForMediaApproval } from '../../services/media'
 import Taro from '../../services/taro'
-import { useSessionStore } from '../../stores/session'
 import './index.scss'
 
-type RiderTab = 'grab' | 'pickup' | 'delivery'
-type ProofKind = 'pickup' | 'delivery'
+type Tab = 'claimable' | 'assigned'
 
-interface GrabOrder {
-  id: string
-  time: string
-  shop: string
-  floor: string
-  remark?: string
-  phone: string
+const statusText: Record<DeliveryStatus, string> = {
+  pending_fee_payment: '待付配送费',
+  payment_failed: '费用确认失败',
+  ready_for_claim: '待抢单',
+  claimed: '已接单',
+  to_pickup: '前往取货',
+  picked_up: '已取货',
+  delivering: '配送中',
+  delivered: '已送达',
+  cancelled: '已取消'
 }
 
-interface AssignedOrder {
-  id: string
-  time: string
-  shop: string
-  address: string
-  phone: string
-  remark?: string
-  actionText: string
-  proofKind: ProofKind
+function errorMessage(error: unknown, fallback: string): string {
+  if (isApiError(error)) return error.message || fallback
+  return error instanceof Error ? error.message : fallback
 }
 
-interface ProofCopy {
-  title: string
-  desc: string
-  placeholder: string
-  confirmText: string
-  successText: string
-}
-
-const tabs: Array<{ key: RiderTab; label: string; count: number }> = [
-  { key: 'grab', label: '待抢单', count: 5 },
-  { key: 'pickup', label: '待取货', count: 1 },
-  { key: 'delivery', label: '待送达', count: 1 }
-]
-
-const grabOrders: GrabOrder[] = [
-  {
-    id: '#A2048',
-    time: '12:32下单',
-    shop: '蜜雪冰城·大学城店',
-    floor: '3栋 · 4楼',
-    remark: '冰淇淋打包好别洒了，放门口就行',
-    phone: '138****2048'
-  },
-  {
-    id: '#A2051',
-    time: '12:35下单',
-    shop: '华莱士·西门店',
-    floor: '7栋 · 2楼',
-    phone: '176****0093'
-  },
-  {
-    id: '#A2053',
-    time: '12:38下单',
-    shop: '塔斯汀·大学城店',
-    floor: '5栋 · 4楼',
-    remark: '麻烦快一点，到了打电话',
-    phone: '150****3390'
-  }
-]
-
-const pickupOrders: AssignedOrder[] = [
-  {
-    id: '#A2044',
-    time: '12:25下单',
-    shop: '瑞幸咖啡·图书馆店',
-    address: '11栋 3楼 302室',
-    phone: '137 5560 8814',
-    actionText: '确认取货',
-    proofKind: 'pickup'
-  }
-]
-
-const deliveryOrders: AssignedOrder[] = [
-  {
-    id: '#A2039',
-    time: '12:18下单',
-    shop: '塔斯汀·大学城店',
-    address: '5栋 4楼 408室',
-    remark: '到楼下打个电话',
-    phone: '150 7712 3390',
-    actionText: '确认送达',
-    proofKind: 'delivery'
-  }
-]
-
-const proofCopy: Record<ProofKind, ProofCopy> = {
-  pickup: {
-    title: '上传取货照',
-    desc: '请拍摄商品完整外观，便于商家核对订单',
-    placeholder: '照片 · 商品实拍',
-    confirmText: '确认取货',
-    successText: '已确认取货（静态示意）'
-  },
-  delivery: {
-    title: '上传送达照',
-    desc: '请拍摄放置位置（含门牌号），作为送达凭证',
-    placeholder: '照片 · 送达位置实拍',
-    confirmText: '确认送达',
-    successText: '已确认送达（静态示意）'
-  }
-}
-
-function showStaticToast(title: string) {
-  void Taro.showToast({ title, icon: 'none', duration: 1400 })
-}
-
-function openDeliveryConversation(order: AssignedOrder) {
-  void Taro.navigateTo({
-    url: `/pages/delivery-conversation/index?orderId=${encodeURIComponent(order.id.replace('#', ''))}&role=rider`
-  })
-}
-
-function DeliveryRiderContent() {
-  const [activeTab, setActiveTab] = useState<RiderTab>('grab')
-  const [proofKind, setProofKind] = useState<ProofKind | null>(null)
-  const [photoCaptured, setPhotoCaptured] = useState(false)
-  const [showStudentSwitch, setShowStudentSwitch] = useState(false)
-  const [switchingIdentity, setSwitchingIdentity] = useState(false)
-  const [switchIdentityError, setSwitchIdentityError] = useState('')
-  const switchIdentity = useSessionStore((state) => state.switchIdentity)
-  const identityAllowed = useIdentityGuard('rider')
-
-  const confirmStudentSwitch = async () => {
-    if (switchingIdentity) return
-    setSwitchingIdentity(true)
-    setSwitchIdentityError('')
-    try {
-      await switchIdentity('student')
-      await Taro.reLaunch({ url: identityRoute('student') })
-      setShowStudentSwitch(false)
-    } catch (error) {
-      setSwitchIdentityError(error instanceof Error ? error.message : '身份切换失败，请重试')
-    } finally {
-      setSwitchingIdentity(false)
-    }
-  }
-
-  const openProofSheet = (kind: ProofKind) => {
-    setProofKind(kind)
-    setPhotoCaptured(false)
-  }
-
-  const closeProofSheet = () => {
-    setProofKind(null)
-    setPhotoCaptured(false)
-  }
-
-  const confirmProof = () => {
-    if (!proofKind) return
-    if (!photoCaptured) {
-      showStaticToast('请先拍照（静态示意）')
-      return
-    }
-    showStaticToast(proofCopy[proofKind].successText)
-    closeProofSheet()
-  }
-
-  const renderAssignedOrders = (orders: AssignedOrder[]) => (
-    <View className='rider-grab-list rider-grab-list--assigned'>
-      {orders.map((order) => (
-        <View key={order.id} className='rider-order-card rider-order-card--assigned'>
-          <View className='rider-order-card__top'>
-            <View className='rider-order-card__serial'>
-              <Text>{order.id}</Text>
-              <Text className='rider-order-card__dot'>·</Text>
-              <Text>{order.time}</Text>
-            </View>
-            <View className='rider-order-card__fee'>
-              <Text>配送费 </Text>
-              <Text className='rider-order-card__fee-price'>¥1.5</Text>
-            </View>
-          </View>
-
-          <View className='rider-order-route rider-order-route--assigned'>
-            <View className='rider-order-route__line' />
-            <View className='rider-order-route__row'>
-              <View className='rider-order-route__marker rider-order-route__marker--pickup' />
-              <View className='rider-order-route__info'>
-                <Text className='rider-order-route__label'>取货点</Text>
-                <Text className='rider-order-route__place'>{order.shop}</Text>
-              </View>
-            </View>
-            <View className='rider-order-route__row rider-order-route__row--drop'>
-              <View className='rider-order-route__marker rider-order-route__marker--drop' />
-              <View className='rider-order-route__info'>
-                <Text className='rider-order-route__label'>送达点</Text>
-                <View className='rider-order-route__drop-row'>
-                  <Text className='rider-order-route__place'>{order.address}</Text>
-                  <Text className='rider-order-route__complete'>✓ 完整门牌</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-
-          {order.remark && (
-            <View className='rider-order-card__remark rider-order-card__remark--assigned'>
-              <Text className='rider-order-card__remark-label'>备注</Text>
-              <Text>{order.remark}</Text>
-            </View>
-          )}
-
-          <View className='rider-order-card__bottom rider-order-card__bottom--assigned'>
-            <View className='rider-order-card__phone'>
-              <Text className='rider-order-card__phone-icon'>⌕</Text>
-              <Text>{order.phone}</Text>
-            </View>
-            <View className='rider-order-card__actions'>
-              <View className='rider-order-card__message' onClick={() => openDeliveryConversation(order)}>
-                <Text>□</Text>
-              </View>
-              <View className='rider-order-card__grab' onClick={() => openProofSheet(order.proofKind)}>
-                <Text>{order.actionText}</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-      ))}
-    </View>
-  )
-
-  const copy = proofKind ? proofCopy[proofKind] : null
-
-  if (!identityAllowed) return <View className='rider-grab-page' />
-
-  return (
-    <View className='rider-grab-page'>
-      <View className='rider-grab-hero'>
-        <View className='rider-grab-hero__orb rider-grab-hero__orb--one' />
-        <View className='rider-grab-hero__orb rider-grab-hero__orb--two' />
-
-        <View className='rider-grab-user'>
-          <View className='rider-grab-user__avatar'>
-            <Text>李</Text>
-          </View>
-          <View className='rider-grab-user__main'>
-            <View className='rider-grab-user__name-row'>
-              <Text className='rider-grab-user__name'>李伟</Text>
-              <Text className='rider-grab-user__badge'>骑手</Text>
-            </View>
-            <Text className='rider-grab-user__meta'>已认证 · 湛江科技学院</Text>
-          </View>
-          <View
-            className='rider-grab-user__switch'
-            onClick={() => {
-              setSwitchIdentityError('')
-              setShowStudentSwitch(true)
-            }}
-          >
-            <Text className='rider-grab-user__switch-icon'>⇄</Text>
-            <Text>切换身份</Text>
-          </View>
-        </View>
-
-        <View className='rider-grab-wallet-summary'>
-          <View className='rider-grab-wallet-summary__main'>
-            <Text className='rider-grab-wallet-summary__label'>钱包余额（元）</Text>
-            <View className='rider-grab-wallet-summary__amount-row'>
-              <Text className='rider-grab-wallet-summary__currency'>¥</Text>
-              <Text className='rider-grab-wallet-summary__amount'>128.50</Text>
-            </View>
-            <Text className='rider-grab-wallet-summary__sub'>今日收入 ¥18.00　｜　已完成 3 单</Text>
-          </View>
-          <View
-            className='rider-grab-wallet-summary__button'
-            onClick={() => void Taro.navigateTo({ url: '/pages/rider-wallet/index' })}
-          >
-            <View className='rider-grab-wallet-summary__wallet-icon' />
-            <Text>钱包</Text>
-          </View>
-        </View>
-      </View>
-
-      <View className='rider-grab-tabs'>
-        {tabs.map((tab) => (
-          <View
-            key={tab.key}
-            className={`rider-grab-tabs__item ${activeTab === tab.key ? 'rider-grab-tabs__item--active' : ''}`}
-            onClick={() => setActiveTab(tab.key)}
-          >
-            <Text>{tab.label}</Text>
-            <Text className={`rider-grab-tabs__count rider-grab-tabs__count--${tab.key}`}>{tab.count}</Text>
-          </View>
-        ))}
-      </View>
-
-      <View className='rider-grab-content'>
-        {activeTab === 'grab' && (
-          <>
-            <View className='rider-grab-list-head'>
-              <Text>手快有 · 共 5 单可抢</Text>
-              <View className='rider-grab-list-head__refresh' onClick={() => showStaticToast('刷新静态占位')}>
-                <Text>↻</Text>
-                <Text>刷新</Text>
-              </View>
-            </View>
-            <View className='rider-grab-list'>
-              {grabOrders.map((order) => (
-                <View key={order.id} className='rider-order-card'>
-                  <View className='rider-order-card__top'>
-                    <View className='rider-order-card__serial'>
-                      <Text>{order.id}</Text>
-                      <Text className='rider-order-card__dot'>·</Text>
-                      <Text>{order.time}</Text>
-                    </View>
-                    <View className='rider-order-card__fee'>
-                      <Text>配送费 </Text>
-                      <Text className='rider-order-card__fee-price'>¥1.5</Text>
-                    </View>
-                  </View>
-
-                  <View className='rider-order-route'>
-                    <View className='rider-order-route__line' />
-                    <View className='rider-order-route__row'>
-                      <View className='rider-order-route__marker rider-order-route__marker--pickup' />
-                      <View className='rider-order-route__info'>
-                        <Text className='rider-order-route__label'>取货点</Text>
-                        <Text className='rider-order-route__place'>{order.shop}</Text>
-                      </View>
-                    </View>
-                    <View className='rider-order-route__row rider-order-route__row--drop'>
-                      <View className='rider-order-route__marker rider-order-route__marker--drop' />
-                      <View className='rider-order-route__info'>
-                        <Text className='rider-order-route__label'>送达点</Text>
-                        <View className='rider-order-route__drop-row'>
-                          <Text className='rider-order-route__place'>{order.floor}</Text>
-                          <Text className='rider-order-route__lock'>锁 抢单后显示门牌</Text>
-                        </View>
-                      </View>
-                    </View>
-                  </View>
-
-                  {order.remark && (
-                    <View className='rider-order-card__remark'>
-                      <Text className='rider-order-card__remark-label'>备注</Text>
-                      <Text>{order.remark}</Text>
-                    </View>
-                  )}
-
-                  <View className='rider-order-card__bottom'>
-                    <View className='rider-order-card__phone'>
-                      <Text className='rider-order-card__phone-icon'>⌕</Text>
-                      <Text>{order.phone}</Text>
-                    </View>
-                    <View
-                      className='rider-order-card__grab'
-                      onClick={() => {
-                        showStaticToast('抢单成功（静态示意）')
-                        setActiveTab('pickup')
-                      }}
-                    >
-                      <Text>抢单</Text>
-                    </View>
-                  </View>
-                </View>
-              ))}
-            </View>
-          </>
-        )}
-
-        {activeTab === 'pickup' && renderAssignedOrders(pickupOrders)}
-        {activeTab === 'delivery' && renderAssignedOrders(deliveryOrders)}
-      </View>
-
-      {copy && (
-        <View className='rider-proof-mask'>
-          <View className='rider-proof-sheet'>
-            <View className='rider-proof-sheet__top'>
-              <Text className='rider-proof-sheet__title'>{copy.title}</Text>
-              <View className='rider-proof-sheet__close' onClick={closeProofSheet}>
-                <Text>×</Text>
-              </View>
-            </View>
-            <Text className='rider-proof-sheet__desc'>{copy.desc}</Text>
-
-            <View
-              className={`rider-proof-uploader ${photoCaptured ? 'rider-proof-uploader--captured' : ''}`}
-              onClick={() => setPhotoCaptured(true)}
-            >
-              {photoCaptured ? (
-                <>
-                  <View className='rider-proof-uploader__retake'>
-                    <Text>↻ 重拍</Text>
-                  </View>
-                  <Text className='rider-proof-uploader__photo-text'>{copy.placeholder}</Text>
-                  <View className='rider-proof-uploader__done'>
-                    <Text>✓ 已拍摄</Text>
-                  </View>
-                </>
-              ) : (
-                <>
-                  <View className='rider-proof-uploader__camera'>
-                    <Text>📷</Text>
-                  </View>
-                  <Text className='rider-proof-uploader__main'>点击拍照</Text>
-                  <Text className='rider-proof-uploader__hint'>示意交互，开发时调用微信相机</Text>
-                </>
-              )}
-            </View>
-
-            <Text className='rider-proof-sheet__privacy'>锁 照片仅本单商家与你可见</Text>
-            <View
-              className={`rider-proof-confirm ${photoCaptured ? 'rider-proof-confirm--active' : 'rider-proof-confirm--disabled'}`}
-              onClick={confirmProof}
-            >
-              <Text>{copy.confirmText}</Text>
-            </View>
-          </View>
-        </View>
-      )}
-
-      <IdentitySwitchModal
-        visible={showStudentSwitch}
-        currentRole='rider'
-        targetRole='student'
-        onCancel={() => setShowStudentSwitch(false)}
-        onConfirm={() => void confirmStudentSwitch()}
-        confirming={switchingIdentity}
-        error={switchIdentityError}
-      />
-    </View>
-  )
+function formatTime(value: string): string {
+  const timestamp = Date.parse(value)
+  if (!Number.isFinite(timestamp)) return value
+  const date = new Date(timestamp)
+  return `${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
 export default function DeliveryRiderPage() {
+  const identityAllowed = useIdentityGuard('rider')
+  const [tab, setTab] = useState<Tab>('claimable')
+  const [me, setMe] = useState<DeliveryRiderMe | null>(null)
+  const [claimable, setClaimable] = useState<ClaimableDeliveryOrder[]>([])
+  const [assigned, setAssigned] = useState<AssignedDeliveryOrder[]>([])
+  const [loading, setLoading] = useState(false)
+  const [busyOrderId, setBusyOrderId] = useState('')
+  const [error, setError] = useState('')
+
+  const load = useCallback(async () => {
+    if (!identityAllowed || loading) return
+    setLoading(true)
+    setError('')
+    try {
+      const rider = await getDeliveryRiderMe()
+      setMe(rider)
+      if (!rider.registered || !rider.rider) {
+        setClaimable([])
+        setAssigned([])
+        return
+      }
+      const [claimablePage, assignedPage] = await Promise.all([
+        listClaimableDeliveryOrders(),
+        listAssignedDeliveryOrders()
+      ])
+      setClaimable(claimablePage.items)
+      setAssigned(assignedPage.items)
+    } catch (value) {
+      const message = errorMessage(value, '骑手订单加载失败')
+      setError(message)
+      await Taro.showToast({ title: message, icon: 'none' })
+    } finally {
+      setLoading(false)
+    }
+  }, [identityAllowed, loading])
+
+  useDidShow(() => {
+    void load()
+  })
+
+  const claim = async (order: ClaimableDeliveryOrder) => {
+    if (busyOrderId) return
+    setBusyOrderId(order.deliveryOrderPublicId)
+    try {
+      await claimDeliveryOrder(order)
+      setTab('assigned')
+      await Taro.showToast({ title: '接单成功', icon: 'success' })
+      await refreshOrders()
+    } catch (value) {
+      await Taro.showToast({ title: errorMessage(value, '接单失败，请刷新后重试'), icon: 'none' })
+      await refreshOrders()
+    } finally {
+      setBusyOrderId('')
+    }
+  }
+
+  const runCommand = async (
+    order: AssignedDeliveryOrder,
+    command: (value: AssignedDeliveryOrder) => Promise<AssignedDeliveryOrder>,
+    success: string
+  ) => {
+    if (busyOrderId) return
+    setBusyOrderId(order.deliveryOrderPublicId)
+    try {
+      await command(order)
+      await Taro.showToast({ title: success, icon: 'success' })
+      await refreshOrders()
+    } catch (value) {
+      await Taro.showToast({ title: errorMessage(value, '操作失败，请刷新后重试'), icon: 'none' })
+      await refreshOrders()
+    } finally {
+      setBusyOrderId('')
+    }
+  }
+
+  const runProofCommand = async (
+    order: AssignedDeliveryOrder,
+    command: (value: AssignedDeliveryOrder, proofAssetPublicId: string) => Promise<AssignedDeliveryOrder>,
+    success: string
+  ) => {
+    if (busyOrderId) return
+    setBusyOrderId(order.deliveryOrderPublicId)
+    try {
+      const [uploaded] = await chooseAndUploadImages('delivery_proof', 1, (progress) => {
+        void Taro.showLoading({ title: `${progress.message} ${progress.percent}%`, mask: true })
+      })
+      if (!uploaded) return
+      await waitForMediaApproval(uploaded.assetId, (status) => {
+        void Taro.showLoading({ title: status.message || '凭证审核中', mask: true })
+      })
+      await command(order, uploaded.assetId)
+      await Taro.showToast({ title: success, icon: 'success' })
+      await refreshOrders()
+    } catch (value) {
+      await Taro.showToast({ title: errorMessage(value, '凭证提交失败，请重试'), icon: 'none' })
+      await refreshOrders()
+    } finally {
+      Taro.hideLoading()
+      setBusyOrderId('')
+    }
+  }
+
+  const release = async (order: AssignedDeliveryOrder) => {
+    const modal = await Taro.showModal({
+      title: '确认释放订单',
+      content: '释放后订单会重新进入抢单池，请确认你尚未取到货物。',
+      confirmText: '确认释放'
+    })
+    if (!modal.confirm) return
+    await runCommand(order, releaseDeliveryOrder, '订单已释放')
+  }
+
+  const refreshOrders = async () => {
+    const [claimablePage, assignedPage] = await Promise.all([
+      listClaimableDeliveryOrders(),
+      listAssignedDeliveryOrders()
+    ])
+    setClaimable(claimablePage.items)
+    setAssigned(assignedPage.items)
+  }
+
+  const openConversation = (orderId: string) => {
+    void Taro.navigateTo({
+      url: `/pages/delivery-conversation/index?orderId=${encodeURIComponent(orderId)}&role=rider`
+    })
+  }
+
+  const switchToStudent = async () => {
+    const store = await import('../../stores/session')
+    try {
+      await store.useSessionStore.getState().switchIdentity('student')
+      await Taro.reLaunch({ url: identityRoute('student') })
+    } catch (value) {
+      await Taro.showToast({ title: errorMessage(value, '身份切换失败'), icon: 'none' })
+    }
+  }
+
+  if (!identityAllowed) return <View className='page rider-page' />
+
+  if (!me || loading && !me) {
+    return <View className='page rider-page'><View className='card rider-state'>正在加载骑手工作台…</View></View>
+  }
+
+  if (!me.registered || !me.rider) {
+    return (
+      <View className='page rider-page'>
+        <View className='card rider-state'>
+          <Text className='rider-state__title'>骑手权限尚未开通</Text>
+          <Text className='rider-muted'>{me.message || '请联系管理员完成骑手身份审核。'}</Text>
+          <Button className='cc-button cc-button--primary cc-button--block' onClick={() => void switchToStudent()}>返回学生端</Button>
+        </View>
+      </View>
+    )
+  }
+
+  const rider = me.rider
+
   return (
-    <RuntimeSessionGate>
-      <DeliveryRiderContent />
-    </RuntimeSessionGate>
+    <View className='page rider-page'>
+      <View className='rider-hero'>
+        <View>
+          <Text className='rider-hero__title'>{rider.realName || '校园骑手'}</Text>
+          <Text className='rider-hero__meta'>状态：{rider.status === 'active' ? '可接单' : rider.status === 'resting' ? '休息中' : '已停用'}</Text>
+        </View>
+        <Button className='cc-button cc-button--small' disabled={loading} onClick={() => void load()}>{loading ? '刷新中' : '刷新'}</Button>
+      </View>
+
+      <View className='rider-note'>收入结算由平台后台处理；当前小程序不展示虚假余额，也不提供未接通的提现入口。</View>
+      {error ? <View className='card rider-error' onClick={() => void load()}>{error}，点击重试</View> : null}
+
+      <View className='rider-tabs'>
+        <Text className={tab === 'claimable' ? 'rider-tabs__active' : ''} onClick={() => setTab('claimable')}>可抢订单（{claimable.length}）</Text>
+        <Text className={tab === 'assigned' ? 'rider-tabs__active' : ''} onClick={() => setTab('assigned')}>我的订单（{assigned.length}）</Text>
+      </View>
+
+      {tab === 'claimable' ? (
+        claimable.length === 0 ? <View className='card rider-state'>当前暂无可抢配送单</View> : claimable.map((order) => (
+          <View key={order.deliveryOrderPublicId} className='card rider-order'>
+            <View className='rider-between'>
+              <Text className='rider-order__title'>{order.routeSummary || '校园配送单'}</Text>
+              <Text className='rider-fee'>¥{centsToYuan(order.deliveryFeeCents)}</Text>
+            </View>
+            <Text className='rider-muted'>{formatTime(order.createdAt)} · {order.deliveryOrderPublicId.slice(-8)}</Text>
+            <Button className='cc-button cc-button--primary cc-button--block' disabled={!!busyOrderId || rider.status !== 'active'} onClick={() => void claim(order)}>
+              {busyOrderId === order.deliveryOrderPublicId ? '接单中…' : '确认接单'}
+            </Button>
+          </View>
+        ))
+      ) : (
+        assigned.length === 0 ? <View className='card rider-state'>暂无已接配送单</View> : assigned.map((order) => renderAssigned(order))
+      )}
+    </View>
   )
+
+  function renderAssigned(order: AssignedDeliveryOrder) {
+    const busy = busyOrderId === order.deliveryOrderPublicId
+    const releasable = order.status === 'claimed' || order.status === 'to_pickup'
+    return (
+      <View key={order.deliveryOrderPublicId} className='card rider-order'>
+        <View className='rider-between'>
+          <Text className='rider-order__title'>{statusText[order.status]}</Text>
+          <Text className='rider-fee'>¥{centsToYuan(order.deliveryFeeCents)}</Text>
+        </View>
+        <Text className='rider-line'>取货：{order.pickupContactName} {order.pickupContactPhone}</Text>
+        <Text className='rider-line'>{order.pickupAddress}</Text>
+        <Text className='rider-line'>送达：{order.recipientName} {order.recipientPhone}</Text>
+        <Text className='rider-line'>{order.deliveryAddress}</Text>
+        {order.remark ? <Text className='rider-line'>备注：{order.remark}</Text> : null}
+        <Text className='rider-muted'>单号 {order.deliveryOrderPublicId}</Text>
+        <View className='rider-actions'>
+          <Button className='cc-button cc-button--small' disabled={!!busyOrderId} onClick={() => openConversation(order.deliveryOrderPublicId)}>联系商家</Button>
+          <Button className='cc-button cc-button--small' onClick={() => void Taro.makePhoneCall({ phoneNumber: order.pickupContactPhone })}>联系取货人</Button>
+          {order.status === 'claimed' ? <Button className='cc-button cc-button--small cc-button--primary' disabled={!!busyOrderId} onClick={() => void runCommand(order, startToPickup, '已开始前往取货')}>{busy ? '处理中…' : '前往取货'}</Button> : null}
+          {order.status === 'to_pickup' ? <Button className='cc-button cc-button--small cc-button--primary' disabled={!!busyOrderId} onClick={() => void runProofCommand(order, markPickedUp, '取货凭证已提交')}>{busy ? '处理中…' : '拍照确认取货'}</Button> : null}
+          {order.status === 'picked_up' ? <Button className='cc-button cc-button--small cc-button--primary' disabled={!!busyOrderId} onClick={() => void runCommand(order, startDelivery, '已开始配送')}>{busy ? '处理中…' : '开始配送'}</Button> : null}
+          {order.status === 'delivering' ? <Button className='cc-button cc-button--small cc-button--primary' disabled={!!busyOrderId} onClick={() => void runProofCommand(order, markDelivered, '送达凭证已提交')}>{busy ? '处理中…' : '拍照确认送达'}</Button> : null}
+          {releasable ? <Button className='cc-button cc-button--small rider-danger' disabled={!!busyOrderId} onClick={() => void release(order)}>释放订单</Button> : null}
+        </View>
+      </View>
+    )
+  }
 }

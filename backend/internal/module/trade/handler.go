@@ -26,6 +26,7 @@ func (h *Handler) Register(rg *gin.RouterGroup) {
 	rg.GET("/products/:id", h.product)
 	auth := rg.Group("", h.users.AuthRequired())
 	auth.GET("/my-products", h.myProducts)
+	auth.GET("/users/:id/products", h.userProducts)
 	auth.GET("/products/:id/viewer-state", h.viewerState)
 	auth.POST("/products", user.UnmutedRequired(), h.create)
 	auth.PUT("/products/:id", user.UnmutedRequired(), h.update)
@@ -36,6 +37,16 @@ func (h *Handler) Register(rg *gin.RouterGroup) {
 	auth.PUT("/products/:id/favorite", h.setFavorite(true))
 	auth.DELETE("/products/:id/favorite", h.setFavorite(false))
 	auth.PUT("/products/:id/contact", h.ensureContact)
+}
+
+func (h *Handler) userProducts(c *gin.Context) {
+	id, ok := paramID(c)
+	if !ok {
+		return
+	}
+	page, size := pagination(c)
+	value, err := h.service.UserProducts(c, id, page, size)
+	write(c, value, err)
 }
 func (h *Handler) viewerState(c *gin.Context) {
 	id, ok := paramID(c)
