@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Button, Image, Input, ScrollView, Text, View } from '@tarojs/components'
+import AppIcon from '../../components/app-icon'
 import { isApiError } from '../../services/api'
 import {
   deliveryConversationCanSend,
@@ -228,7 +229,9 @@ export default function DeliveryConversationPage() {
       </ScrollView>
 
       <View className='delivery-chat-inputbar'>
-        <Button className='delivery-chat-image-button' disabled={!canSend || !conversation?.imagesEnabled || sending} onClick={() => void sendImage()}>图片</Button>
+        <Button className='delivery-chat-image-button' disabled={!canSend || !conversation?.imagesEnabled || sending} onClick={() => void sendImage()}>
+          <AppIcon name='image' className='delivery-chat-image-button__icon' />
+        </Button>
         <Input
           className='delivery-chat-input'
           value={draft}

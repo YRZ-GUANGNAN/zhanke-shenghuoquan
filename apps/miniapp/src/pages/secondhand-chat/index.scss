@@ -362,33 +362,8 @@
 }
 
 .secondhand-chat-image-button__icon {
-  position: relative;
   width: 34rpx;
-  height: 28rpx;
-  border: 4rpx solid $brand-primary;
-  border-radius: 6rpx;
-}
-
-.secondhand-chat-image-button__icon::before {
-  position: absolute;
-  top: -10rpx;
-  left: 9rpx;
-  width: 14rpx;
-  height: 8rpx;
-  border-radius: 6rpx 6rpx 0 0;
-  background: $brand-primary;
-  content: '';
-}
-
-.secondhand-chat-image-button__icon::after {
-  position: absolute;
-  top: 7rpx;
-  left: 9rpx;
-  width: 10rpx;
-  height: 10rpx;
-  border: 4rpx solid $brand-primary;
-  border-radius: 50%;
-  content: '';
+  height: 34rpx;
 }
 
 .secondhand-chat-input-wrap {

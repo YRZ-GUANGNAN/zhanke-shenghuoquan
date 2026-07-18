@@ -153,6 +153,21 @@
   line-height: 72rpx;
 }
 
+.delivery-chat-image-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72rpx;
+  min-width: 72rpx;
+  padding: 0;
+  background: #eaf3fb;
+}
+
+.delivery-chat-image-button__icon {
+  width: 36rpx;
+  height: 36rpx;
+}
+
 .delivery-chat-send {
   color: #fff;
   background: #2375bf;

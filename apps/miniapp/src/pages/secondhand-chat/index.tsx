@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Image, Input, ScrollView, Text, View } from '@tarojs/components'
+import AppIcon from '../../components/app-icon'
 import { isApiError } from '../../services/api'
 import { contactSeller, getProduct, type IMConversationContext } from '../../services/c-trade'
 import {
@@ -324,7 +325,7 @@ export default function SecondhandChatPage() {
 
       <View className='secondhand-chat-inputbar'>
         <View className='secondhand-chat-image-button' onClick={() => showToast('二手私信图片发送尚未开放')}>
-          <View className='secondhand-chat-image-button__icon' />
+          <AppIcon name='image' className='secondhand-chat-image-button__icon' />
         </View>
         <View className='secondhand-chat-input-wrap'>
           <Input

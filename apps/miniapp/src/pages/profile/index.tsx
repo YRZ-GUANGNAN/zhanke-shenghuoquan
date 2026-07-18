@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Text, View } from '@tarojs/components'
 import { useDidShow } from '@tarojs/taro'
 import IdentitySwitchModal from '../../components/IdentitySwitchModal'
+import AppIcon from '../../components/app-icon'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import StudentBottomNav from '../../components/student-bottom-nav'
 import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
@@ -194,7 +195,9 @@ function ProfileContent() {
                 onClick={() => handleRoleClick(role)}
               >
                 {activeRole === role.key && <Text className='student-profile-role__corner'>当前</Text>}
-                <View className={`student-profile-role__icon student-profile-role__icon--${role.key}`} />
+                <View className='student-profile-role__icon'>
+                  <AppIcon name={role.key} active={activeRole === role.key} className='student-profile-role__icon-image' />
+                </View>
                 <Text className='student-profile-role__title'>{role.title}</Text>
                 <Text className='student-profile-role__subtitle'>{role.subtitle}</Text>
               </View>

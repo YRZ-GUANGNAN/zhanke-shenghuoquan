@@ -1,6 +1,8 @@
 import React from 'react'
 import { Text, View } from '@tarojs/components'
 import Taro from '../services/taro'
+import AppIcon from './app-icon'
+import './student-bottom-nav.scss'
 
 export type StudentNavKey = 'home' | 'takeout' | 'market' | 'profile'
 
@@ -28,7 +30,9 @@ export default function StudentBottomNav({ active, className = '' }: StudentBott
       className={`student-bottom-nav__item ${item.key === active ? 'student-bottom-nav__item--active' : ''}`}
       onClick={() => openPage(item.key, item.url)}
     >
-      <View className={`student-bottom-nav__icon student-bottom-nav__icon--${item.icon}`} />
+      <View className='student-bottom-nav__icon-asset'>
+        <AppIcon name={item.icon} active={item.key === active} />
+      </View>
       <Text>{item.label}</Text>
     </View>
   )
@@ -40,7 +44,7 @@ export default function StudentBottomNav({ active, className = '' }: StudentBott
         className='student-bottom-nav__fab'
         onClick={() => void Taro.navigateTo({ url: '/pages/publish-entry/index' })}
       >
-        <Text>+</Text>
+        <AppIcon name='add' className='student-bottom-nav__fab-icon' />
       </View>
       {navItems.slice(2).map(renderItem)}
     </View>

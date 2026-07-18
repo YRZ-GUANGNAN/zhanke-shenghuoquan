@@ -248,7 +248,9 @@
 }
 
 .student-profile-role__icon {
-  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 62rpx;
   height: 62rpx;
   border-radius: 50%;
@@ -261,68 +263,9 @@
   color: $brand-primary;
 }
 
-.student-profile-role__icon::before,
-.student-profile-role__icon::after {
-  position: absolute;
-  box-sizing: border-box;
-  content: '';
-}
-
-.student-profile-role__icon--student::before {
-  top: 15rpx;
-  left: 23rpx;
-  width: 16rpx;
-  height: 16rpx;
-  border: 4rpx solid currentColor;
-  border-radius: 50%;
-}
-
-.student-profile-role__icon--student::after {
-  right: 16rpx;
-  bottom: 14rpx;
-  left: 16rpx;
-  height: 16rpx;
-  border: 4rpx solid currentColor;
-  border-bottom: 0;
-  border-radius: 16rpx 16rpx 0 0;
-}
-
-.student-profile-role__icon--rider::before {
-  top: 17rpx;
-  left: 19rpx;
-  width: 24rpx;
-  height: 24rpx;
-  border: 4rpx solid currentColor;
-  transform: rotate(30deg) skewY(-18deg);
-}
-
-.student-profile-role__icon--rider::after {
-  top: 22rpx;
-  left: 28rpx;
-  width: 4rpx;
-  height: 18rpx;
-  border-radius: 4rpx;
-  background: currentColor;
-  transform: rotate(30deg);
-}
-
-.student-profile-role__icon--merchant::before {
-  top: 18rpx;
-  left: 17rpx;
-  width: 28rpx;
-  height: 22rpx;
-  border: 4rpx solid currentColor;
-  border-top-width: 8rpx;
-  border-radius: 5rpx 5rpx 8rpx 8rpx;
-}
-
-.student-profile-role__icon--merchant::after {
-  top: 14rpx;
-  left: 14rpx;
-  width: 34rpx;
-  height: 6rpx;
-  border-radius: 6rpx;
-  background: currentColor;
+.student-profile-role__icon-image {
+  width: 42rpx;
+  height: 42rpx;
 }
 
 .student-profile-role__title {
