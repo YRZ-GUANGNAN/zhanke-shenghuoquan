@@ -32,6 +32,7 @@ export interface CommunityPost {
   avatar: string
   school: string
   topic: string
+  tags?: string[]
   title: string
   content: string
   images: string[]

@@ -64,6 +64,37 @@ type GormRepository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *GormRepository { return &GormRepository{db: db} }
 
+func (r *GormRepository) SearchPosts(ctx context.Context, keyword string, page, size int) ([]Post, int64, error) {
+	like, prefix := "%"+keyword+"%", keyword+"%"
+	query := r.db.WithContext(ctx).Model(&Post{}).
+		Where("review_status = ?", review.StatusApproved).
+		Where("title LIKE ? OR content LIKE ? OR CAST(tags AS CHAR) LIKE ?", like, like, like)
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	values := make([]Post, 0, size)
+	rank := clause.Expr{SQL: `CASE
+		WHEN title = ? THEN 0
+		WHEN title LIKE ? THEN 1
+		WHEN title LIKE ? THEN 2
+		WHEN content LIKE ? THEN 3
+		ELSE 4 END`, Vars: []any{keyword, prefix, like, like}}
+	err := query.Preload("Images", func(db *gorm.DB) *gorm.DB { return db.Order("sort ASC") }).
+		Order(rank).Order("created_at DESC").
+		Order("(liked_count + comment_count + favorite_count) DESC").Order("id DESC").
+		Offset((page - 1) * size).Limit(size).Find(&values).Error
+	return values, total, err
+}
+
+func (r *GormRepository) ListRecentTagPosts(ctx context.Context, since time.Time) ([]Post, error) {
+	values := make([]Post, 0)
+	err := r.db.WithContext(ctx).Where(
+		"review_status = ? AND created_at >= ? AND tags IS NOT NULL", review.StatusApproved, since,
+	).Order("created_at ASC, id ASC").Find(&values).Error
+	return values, err
+}
+
 func (r *GormRepository) CreatePost(ctx context.Context, value *Post) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		images := value.Images

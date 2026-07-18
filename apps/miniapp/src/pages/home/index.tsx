@@ -337,7 +337,7 @@ function HomeContent() {
   }
 
   const openSearch = () => {
-    void Taro.navigateTo({ url: '/pages/search/index' })
+    void Taro.navigateTo({ url: '/pages/search/index?scope=community' })
   }
 
   const openCard = (card: DiscoverCard) => {

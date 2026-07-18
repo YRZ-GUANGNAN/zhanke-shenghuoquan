@@ -15,6 +15,7 @@ type Post struct {
 	ClientRequestID   *string        `json:"-" gorm:"column:client_request_id;type:char(26)"`
 	CreateRequestHash []byte         `json:"-" gorm:"column:create_request_hash;type:binary(32)"`
 	Topic             string         `json:"topic" gorm:"size:64;index"`
+	Tags              []string       `json:"tags" gorm:"serializer:json"`
 	Title             string         `json:"title" gorm:"size:120"`
 	Content           string         `json:"content" gorm:"type:text"`
 	ReviewStatus      review.Status  `json:"reviewStatus" gorm:"size:24;index;default:submitted"`

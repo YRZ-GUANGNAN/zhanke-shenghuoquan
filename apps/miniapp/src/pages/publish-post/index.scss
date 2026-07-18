@@ -1,4 +1,4 @@
-@import '../../styles/design-tokens.scss';
+@use '../../styles/design-tokens.scss' as *;
 
 page {
   background: $bg-surface;
@@ -154,6 +154,55 @@ page {
   background: $brand-primary;
   color: $text-on-color;
   box-shadow: $shadow-card;
+}
+
+.publish-post-custom-tag {
+  height: 70rpx;
+  margin-top: 24rpx;
+  padding-left: 24rpx;
+  border: 1rpx solid $divider-nav;
+  border-radius: 14rpx;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.publish-post-custom-tag__input {
+  flex: 1;
+  min-width: 0;
+  font-size: 26rpx;
+  color: $text-primary;
+}
+
+.publish-post-custom-tag__button {
+  height: 70rpx;
+  padding: 0 26rpx;
+  display: flex;
+  align-items: center;
+  background: $brand-tint;
+  color: $brand-primary;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.publish-post-selected {
+  margin-top: 20rpx;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14rpx;
+  font-size: 24rpx;
+}
+
+.publish-post-selected__label {
+  color: $text-muted;
+}
+
+.publish-post-selected__item {
+  padding: 8rpx 14rpx;
+  border-radius: 999rpx;
+  background: $brand-primary;
+  color: $text-on-color;
 }
 
 .publish-post-note {

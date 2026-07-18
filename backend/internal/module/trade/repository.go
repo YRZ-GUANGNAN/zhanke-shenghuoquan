@@ -52,6 +52,29 @@ type GormRepository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *GormRepository { return &GormRepository{db: db} }
 
+func (r *GormRepository) SearchProducts(ctx context.Context, keyword string, page, size int) ([]Product, int64, error) {
+	like, prefix := "%"+keyword+"%", keyword+"%"
+	query := r.db.WithContext(ctx).Model(&Product{}).
+		Where("review_status = ? AND status = ?", review.StatusApproved, StatusSelling).
+		Where("title LIKE ? OR description LIKE ? OR category LIKE ?", like, like, like)
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	values := make([]Product, 0, size)
+	rank := clause.Expr{SQL: `CASE
+		WHEN title = ? THEN 0
+		WHEN title LIKE ? THEN 1
+		WHEN title LIKE ? THEN 2
+		WHEN category = ? THEN 3
+		WHEN category LIKE ? THEN 4
+		ELSE 5 END`, Vars: []any{keyword, prefix, like, keyword, like}}
+	err := query.Preload("Images", func(db *gorm.DB) *gorm.DB { return db.Order("sort ASC") }).
+		Order(rank).Order("created_at DESC").Order("favorite_count DESC").Order("id DESC").
+		Offset((page - 1) * size).Limit(size).Find(&values).Error
+	return values, total, err
+}
+
 func (r *GormRepository) Create(ctx context.Context, value *Product) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		images := value.Images

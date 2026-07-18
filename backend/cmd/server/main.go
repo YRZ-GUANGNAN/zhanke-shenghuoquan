@@ -41,6 +41,7 @@ import (
 	"campus-circle/backend/internal/module/user"
 	legacymedia "campus-circle/backend/internal/pkg/media"
 	"campus-circle/backend/internal/pkg/response"
+	"campus-circle/backend/internal/pkg/searchmetrics"
 	"gorm.io/gorm"
 )
 
@@ -236,6 +237,24 @@ func main() {
 		}
 	}()
 	navigationService := navigation.NewService(navigation.NewRepository(db))
+	communityMetrics, err := searchmetrics.NewStore(db, searchmetrics.Tables{
+		History: "community_search_histories", Events: "community_search_events",
+	}, time.Now)
+	if err != nil {
+		log.Fatalf("configure community search metrics: %v", err)
+	}
+	tradeMetrics, err := searchmetrics.NewStore(db, searchmetrics.Tables{
+		History: "trade_search_histories", Events: "trade_search_events",
+	}, time.Now)
+	if err != nil {
+		log.Fatalf("configure trade search metrics: %v", err)
+	}
+	navigationMetrics, err := searchmetrics.NewStore(db, searchmetrics.Tables{
+		History: "navigation_search_histories", Events: "navigation_search_events",
+	}, time.Now)
+	if err != nil {
+		log.Fatalf("configure navigation search metrics: %v", err)
+	}
 	adminService := admin.NewService(admin.NewRepository(db), reviewService)
 	legacyTakeout, err := newLegacyTakeoutRuntime(cfg, db, reviewService, coreMediaService)
 	if err != nil {
@@ -338,9 +357,15 @@ func main() {
 		return miniappflow.UserIdentity{ID: uint64(value.ID), OpenID: value.OpenID}
 	}, mediaDisplay).Register(miniappMediaRoutes)
 	safety := review.NewSafetyClient(cfg)
-	community.NewHandler(communityService, userService, safety).Register(api.Group("/community"))
-	trade.NewHandler(tradeService, userService, safety).Register(api.Group("/trade"))
-	navigation.NewHandler(navigationService).Register(api.Group("/navigation"))
+	communityRoutes := api.Group("/community")
+	community.NewHandler(communityService, userService, safety).Register(communityRoutes)
+	community.NewSearchHandler(communityService, userService, communityMetrics).Register(communityRoutes)
+	tradeRoutes := api.Group("/trade")
+	trade.NewHandler(tradeService, userService, safety).Register(tradeRoutes)
+	trade.NewSearchHandler(tradeService, userService, tradeMetrics).Register(tradeRoutes)
+	navigationRoutes := api.Group("/navigation")
+	navigation.NewHandler(navigationService).Register(navigationRoutes)
+	navigation.NewSearchHandler(navigationService, userService.AuthRequired(), user.CurrentUserID, navigationMetrics).Register(navigationRoutes)
 	im.NewHandler(imService, userService).Register(api.Group("/im"))
 	admin.NewHandler(adminService, reviewService, userService, communityService, tradeService, navigationService).Register(api)
 	mediaAdminRoutes := api.Group("/admin/media", userService.AuthRequired(), user.AdminRequired())

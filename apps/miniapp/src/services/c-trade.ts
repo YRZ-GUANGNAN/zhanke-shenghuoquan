@@ -10,11 +10,16 @@ interface BackendProduct{id:number|string;sellerId?:number|string;seller?:Backen
 interface BackendPage<T>{items:T[];page:number;pageSize:number;total:number}
 export interface ProductListQuery{page?:number;pageSize?:number;keyword?:string;category?:string;status?:Product['status']}
 export interface ProductPageResult{items:Product[];page:number;pageSize:number;total:number}
+export interface TradeHotSearchKeyword{keyword:string;count:number;score:number}
 export interface IMConversationContext{relationId:number;conversationId:string;peerUserId:string;productId:number;buyerId:number;sellerId:number}
 export interface CreateProductInput{title:string;description:string;price:number;category?:string;imageAssetIds?:string[];clientRequestId?:string}
 export interface TradeViewerState{favorited:boolean;contactedSeller:boolean}
 
 export async function getProductsPage(query:ProductListQuery={}):Promise<ProductPageResult>{const page=query.page??1;const pageSize=query.pageSize??20;const status=query.status??'selling';const params=[`page=${page}`,`pageSize=${pageSize}`,`status=${status}`];if(query.keyword?.trim())params.push(`keyword=${encodeURIComponent(query.keyword.trim())}`);if(query.category?.trim())params.push(`category=${encodeURIComponent(query.category.trim())}`);const result=await request<BackendPage<BackendProduct>>(`/trade/products?${params.join('&')}`);return{...result,items:result.items.map(normalizeProduct)}}
+export async function searchTradeProducts(keyword:string,page=1,pageSize=20):Promise<ProductPageResult>{const result=await request<BackendPage<BackendProduct>>('/trade/searches',{url:'',method:'POST',data:{keyword,page,pageSize},timeout:10000});return{...result,items:result.items.map(normalizeProduct)}}
+export function listTradeSearchHistory():Promise<string[]>{return request<string[]>('/trade/search-history')}
+export async function clearTradeSearchHistory():Promise<void>{await request('/trade/search-history',{url:'',method:'DELETE'})}
+export function listTradeHotSearches():Promise<TradeHotSearchKeyword[]>{return request<TradeHotSearchKeyword[]>('/trade/hot-searches')}
 export async function listProducts(page=1,keyword='',status:Product['status']='selling'):Promise<{items:Product[];total:number}>{const result=await getProductsPage({page,keyword,status});return{items:result.items,total:result.total}}
 export async function listMyProducts(page=1):Promise<Product[]>{const result=await request<BackendPage<BackendProduct>>(`/trade/my-products?page=${page}`);return result.items.map(normalizeProduct)}
 export async function getProduct(id:string):Promise<Product>{return normalizeProduct(await request<BackendProduct>(`/trade/products/${id}`))}

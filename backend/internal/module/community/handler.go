@@ -75,6 +75,7 @@ func (h *Handler) create(c *gin.Context) {
 		Title           string   `json:"title"`
 		Content         string   `json:"content"`
 		Topic           string   `json:"topic"`
+		Tags            []string `json:"tags"`
 		ImageAssetIDs   []string `json:"imageAssetIds"`
 		ClientRequestID string   `json:"clientRequestId"`
 	}
@@ -89,7 +90,7 @@ func (h *Handler) create(c *gin.Context) {
 	}
 	currentUser := user.CurrentUser(c)
 	risk := h.safety.CheckText(c.Request.Context(), currentUser.OpenID, req.Title+"\n"+req.Content)
-	input := CreatePostInput{UserID: currentUser.ID, Title: req.Title, Content: req.Content, Topic: req.Topic, ImageAssetIDs: req.ImageAssetIDs}
+	input := CreatePostInput{UserID: currentUser.ID, Title: req.Title, Content: req.Content, Topic: req.Topic, Tags: req.Tags, ImageAssetIDs: req.ImageAssetIDs}
 	if keyed {
 		result, err := h.service.CreatePostKeyed(c, input, clientRequestID, risk)
 		writeKeyedCreate(c, result.Value, result.Replayed, err)
@@ -167,7 +168,7 @@ func writeKeyedCreate(c *gin.Context, data any, replayed bool, err error) {
 	switch {
 	case errors.Is(err, ErrIdempotencyConflict):
 		response.Fail(c, http.StatusConflict, err.Error())
-	case errors.Is(err, ErrWriteContractInvalid):
+	case errors.Is(err, ErrWriteContractInvalid), errors.Is(err, ErrInvalidTags):
 		response.Fail(c, http.StatusBadRequest, err.Error())
 	case errors.Is(err, ErrWriteContractUnavailable):
 		response.Fail(c, http.StatusServiceUnavailable, err.Error())

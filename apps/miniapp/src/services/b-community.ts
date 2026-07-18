@@ -15,6 +15,7 @@ export interface CreateCommunityPostInput {
   title: string
   content: string
   topic?: string
+  tags?: string[]
   imageAssetIds?: string[]
   clientRequestId?: string
 }
@@ -28,6 +29,18 @@ export interface CommunityViewerState {
 export interface CommunityNotificationResult {
   items: CommunityNotification[]
   unread: number
+}
+
+export interface HotSearchKeyword {
+  keyword: string
+  count: number
+  score: number
+}
+
+export interface HotCommunityTag {
+  tag: string
+  usageScore: number
+  interactionScore: number
 }
 
 type UnknownRecord = Record<string, unknown>
@@ -84,6 +97,11 @@ const normalizeImages = (value: unknown): string[] => {
     .filter(Boolean)
 }
 
+const normalizeStrings = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return []
+  return value.map((item) => asString(item).trim()).filter(Boolean)
+}
+
 const normalizePost = (raw: unknown): CommunityPost => {
   const record = isRecord(raw) ? raw : {}
   const authorRecord = isRecord(record.author) ? record.author : {}
@@ -98,6 +116,7 @@ const normalizePost = (raw: unknown): CommunityPost => {
     avatar: asString(first(record, ['avatar', 'avatarUrl', 'avatar_url'], first(authorRecord, ['avatar', 'avatarUrl', 'avatar_url']))),
     school: asString(first(record, ['school', 'schoolName', 'school_name'], first(authorRecord, ['school', 'schoolName', 'school_name'])), '湛江科技学院'),
     topic: asString(first(record, ['topic', 'tag']), '#湛科日常'),
+    tags: normalizeStrings(first(record, ['tags', 'topics'], [])),
     title: asString(first(record, ['title', 'headline']), '三食堂新出的芋泥波波真的绝，一天一杯根本停不下来'),
     content: asString(first(record, ['content', 'body', 'text']), ''),
     images: normalizeImages(first(record, ['images', 'imageUrls', 'image_urls', 'media'])),
@@ -195,12 +214,36 @@ export async function createCommunityPost(input: CreateCommunityPostInput): Prom
       title: input.title,
       content: input.content,
       topic: input.topic || '湛科日常',
+      tags: input.tags ?? [],
       imageAssetIds: input.imageAssetIds ?? [],
       clientRequestId,
     },
     header: { 'Idempotency-Key': clientRequestId },
   })
   return unwrapPost(data)
+}
+
+export async function searchCommunityPosts(keyword: string, page = 1, pageSize = 20): Promise<PageResult<CommunityPost>> {
+  const data = await request<unknown>('/community/searches', {
+    url: '', method: 'POST', data: { keyword, page, pageSize }, timeout: 10000,
+  })
+  return normalizePage(data, normalizePost)
+}
+
+export function listCommunitySearchHistory(): Promise<string[]> {
+  return request<string[]>('/community/search-history')
+}
+
+export async function clearCommunitySearchHistory(): Promise<void> {
+  await request('/community/search-history', { url: '', method: 'DELETE' })
+}
+
+export function listCommunityHotSearches(): Promise<HotSearchKeyword[]> {
+  return request<HotSearchKeyword[]>('/community/hot-searches')
+}
+
+export function listHotCommunityTags(): Promise<HotCommunityTag[]> {
+  return request<HotCommunityTag[]>('/community/hot-tags')
 }
 
 export async function getPostCommentsPage(postId: string, params: { page?: number; pageSize?: number } = {}): Promise<PageResult<CommunityComment>> {

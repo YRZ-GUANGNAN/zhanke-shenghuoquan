@@ -148,7 +148,7 @@ export default function StudentSecondhandPage() {
   }
 
   const openSearch = () => {
-    void Taro.navigateTo({ url: '/pages/search/index' })
+    void Taro.navigateTo({ url: '/pages/search/index?scope=secondhand' })
   }
 
   const markImageFailed = (id: string) => {

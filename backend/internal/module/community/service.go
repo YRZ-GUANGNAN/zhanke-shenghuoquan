@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"campus-circle/backend/internal/module/admin/review"
 	"campus-circle/backend/internal/module/user"
@@ -17,6 +19,7 @@ import (
 
 var (
 	ErrCannotFollowSelf         = errors.New("cannot follow yourself")
+	ErrInvalidTags              = errors.New("invalid community tags")
 	ErrUserNotFound             = errors.New("user not found")
 	ErrWriteContractUnavailable = errors.New("community write contract is unavailable")
 )
@@ -52,6 +55,7 @@ func NewService(repo Repository, users UserDirectory, reviews review.Submitter, 
 type CreatePostInput struct {
 	UserID                uint
 	Title, Content, Topic string
+	Tags                  []string
 	ImageAssetIDs         []string
 }
 
@@ -98,8 +102,11 @@ func (s *Service) CreatePost(ctx context.Context, input CreatePostInput, risk st
 	if input.Title == "" || input.Content == "" {
 		return Post{}, errors.New("title and content are required")
 	}
+	tags, err := normalizeTags(input.Tags)
+	if err != nil {
+		return Post{}, err
+	}
 	reservation := media.Reservation{}
-	var err error
 	if len(input.ImageAssetIDs) > 0 {
 		if s.media == nil {
 			return Post{}, errors.New("media pipeline is unavailable")
@@ -109,7 +116,7 @@ func (s *Service) CreatePost(ctx context.Context, input CreatePostInput, risk st
 			return Post{}, err
 		}
 	}
-	value := Post{UserID: input.UserID, Title: input.Title, Content: input.Content, Topic: fallback(input.Topic, "校园生活"), ReviewStatus: review.StatusSubmitted}
+	value := Post{UserID: input.UserID, Title: input.Title, Content: input.Content, Topic: fallback(input.Topic, "校园生活"), Tags: tags, ReviewStatus: review.StatusSubmitted}
 	for i, ref := range reservation.References {
 		assetID := ref.InternalID
 		value.Images = append(value.Images, PostImage{AssetID: &assetID, URL: ref.URL, Sort: i})
@@ -143,18 +150,14 @@ func (s *Service) CreatePostKeyed(ctx context.Context, input CreatePostInput, cl
 	if s.writeRepo == nil {
 		return KeyedCreateResult[Post]{}, ErrWriteContractUnavailable
 	}
+	tags, err := normalizeTags(input.Tags)
+	if err != nil {
+		return KeyedCreateResult[Post]{}, err
+	}
+	input.Tags = tags
 
 	input.Topic = fallback(input.Topic, "校园生活")
-	requestHash, err := canonicalCommunityHash(struct {
-		Version       string   `json:"version"`
-		Title         string   `json:"title"`
-		Content       string   `json:"content"`
-		Topic         string   `json:"topic"`
-		ImageAssetIDs []string `json:"imageAssetIds"`
-	}{
-		Version: "community-post-create:v1", Title: input.Title, Content: input.Content,
-		Topic: input.Topic, ImageAssetIDs: normalizedAssetIDs(input.ImageAssetIDs),
-	})
+	requestHash, err := postCreateRequestHash(input)
 	if err != nil {
 		return KeyedCreateResult[Post]{}, err
 	}
@@ -184,7 +187,7 @@ func (s *Service) CreatePostKeyed(ctx context.Context, input CreatePostInput, cl
 	}
 	value := Post{
 		UserID: input.UserID, ClientRequestID: &clientRequestID, CreateRequestHash: append([]byte(nil), requestHash...),
-		Title: input.Title, Content: input.Content, Topic: input.Topic, ReviewStatus: review.StatusSubmitted,
+		Title: input.Title, Content: input.Content, Topic: input.Topic, Tags: input.Tags, ReviewStatus: review.StatusSubmitted,
 	}
 	for index, ref := range reservation.References {
 		assetID := ref.InternalID
@@ -311,6 +314,58 @@ func canonicalCommunityHash(value any) ([]byte, error) {
 	}
 	digest := sha256.Sum256(encoded)
 	return digest[:], nil
+}
+
+func normalizeTags(values []string) ([]string, error) {
+	result := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		for strings.HasPrefix(value, "#") {
+			value = strings.TrimSpace(strings.TrimPrefix(value, "#"))
+		}
+		length := utf8.RuneCountInString(value)
+		if length < 1 || length > 12 || strings.IndexFunc(value, unicode.IsControl) >= 0 {
+			return nil, ErrInvalidTags
+		}
+		key := strings.ToLower(value)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, value)
+		if len(result) > 3 {
+			return nil, ErrInvalidTags
+		}
+	}
+	return result, nil
+}
+
+func postCreateRequestHash(input CreatePostInput) ([]byte, error) {
+	assets := normalizedAssetIDs(input.ImageAssetIDs)
+	if len(input.Tags) == 0 {
+		return canonicalCommunityHash(struct {
+			Version       string   `json:"version"`
+			Title         string   `json:"title"`
+			Content       string   `json:"content"`
+			Topic         string   `json:"topic"`
+			ImageAssetIDs []string `json:"imageAssetIds"`
+		}{
+			Version: "community-post-create:v1", Title: input.Title, Content: input.Content,
+			Topic: input.Topic, ImageAssetIDs: assets,
+		})
+	}
+	return canonicalCommunityHash(struct {
+		Version       string   `json:"version"`
+		Title         string   `json:"title"`
+		Content       string   `json:"content"`
+		Topic         string   `json:"topic"`
+		Tags          []string `json:"tags"`
+		ImageAssetIDs []string `json:"imageAssetIds"`
+	}{
+		Version: "community-post-create:v2", Title: input.Title, Content: input.Content,
+		Topic: input.Topic, Tags: input.Tags, ImageAssetIDs: assets,
+	})
 }
 
 func normalizedAssetIDs(values []string) []string {
