@@ -43,8 +43,7 @@ const roles: RoleOption[] = [
 const settings: SettingItem[] = [
   { key: 'settings', title: '设置', icon: 'settings', arrow: true },
   { key: 'privacy', title: '用户协议与隐私政策', icon: 'document', arrow: true },
-  { key: 'cache', title: '清理缓存', icon: 'trash', value: '12.6MB' },
-  { key: 'update', title: '检查更新', icon: 'refresh', value: 'v2.4.0' },
+	{ key: 'feedback', title: '意见反馈', icon: 'refresh', arrow: true },
   { key: 'about', title: '关于湛科生活圈', icon: 'info', arrow: true }
 ]
 
@@ -63,7 +62,17 @@ function handleSettingClick(item: SettingItem) {
     return
   }
 
-  showPlaceholder(`${item.title}后续页面`)
+	if (item.key === 'feedback') {
+		void Taro.navigateTo({ url: '/pages/feedback/index' })
+		return
+	}
+
+	if (item.key === 'about') {
+		void Taro.navigateTo({ url: '/pages/about/index' })
+		return
+	}
+
+  showPlaceholder(item.title)
 }
 
 function unavailableMessage(value?: IdentityAvailability): string {

@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"campus-circle/backend/internal/app/accountclosure"
 	"campus-circle/backend/internal/config"
 	"campus-circle/backend/internal/database"
 	"campus-circle/backend/internal/middleware"
@@ -68,6 +69,7 @@ func main() {
 		user.WithAppEnv(cfg.AppEnv),
 		user.WithIdentityEligibility(newDeliveryIdentityEligibility(cfg.EnableDelivery, identityRiders)),
 	)
+	userService.SetAccountClosureCoordinator(accountclosure.New(db))
 	cosClient, err := legacymedia.NewTencentCOS(cfg.COSSecretID, cfg.COSSecretKey, cfg.COSBucket, cfg.COSRegion, cfg.COSAppID)
 	if err != nil {
 		log.Fatalf("configure Tencent COS: %v", err)
@@ -128,6 +130,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("configure Module 10 reference binding: %v", err)
 	}
+	feedbackMedia, err := user.NewCoreFeedbackMedia(bindingService)
+	if err != nil {
+		log.Fatalf("configure feedback media binding: %v", err)
+	}
+	userService.SetFeedbackMedia(feedbackMedia)
 	tradeMediaGateway, err := trade.NewHybridMediaGateway(bindingService, mediaService, cfg.MediaPublicBaseURL)
 	if err != nil {
 		log.Fatalf("configure trade media gateway: %v", err)

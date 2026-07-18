@@ -20,11 +20,12 @@ const (
 	PurposeMerchantLogo  Purpose = "merchant_logo"
 	PurposeDeliveryProof Purpose = "delivery_proof"
 	PurposeDeliveryIM    Purpose = "delivery_im"
+	PurposeFeedback      Purpose = "feedback"
 )
 
 func (v Purpose) Valid() bool {
 	switch v {
-	case PurposePost, PurposeProduct, PurposeAvatar, PurposeDish, PurposeMerchantLogo, PurposeDeliveryProof, PurposeDeliveryIM:
+	case PurposePost, PurposeProduct, PurposeAvatar, PurposeDish, PurposeMerchantLogo, PurposeDeliveryProof, PurposeDeliveryIM, PurposeFeedback:
 		return true
 	default:
 		return false

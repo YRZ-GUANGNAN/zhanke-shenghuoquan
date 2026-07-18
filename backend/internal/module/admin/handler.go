@@ -36,6 +36,7 @@ func (h *Handler) Register(api *gin.RouterGroup) {
 	secured.POST("/reviews/:id/reject", h.reject)
 	secured.GET("/reports", h.reports)
 	secured.GET("/users", h.usersList)
+	secured.GET("/feedbacks", h.feedbacks)
 	secured.PATCH("/users/:id/status", h.userStatus)
 	secured.PATCH("/users/:id/role", user.SuperAdminRequired(), h.userRole)
 	secured.GET("/posts", h.posts)
@@ -56,6 +57,16 @@ func (h *Handler) Register(api *gin.RouterGroup) {
 	secured.DELETE("/navigation/external-takeout-merchants/:id", h.deleteExternalTakeoutMerchant)
 	secured.PATCH("/navigation/external-takeout-merchants/:id/operating-status", h.setExternalTakeoutOperatingStatus)
 	secured.PATCH("/navigation/external-takeout-merchants/:id/visibility", h.setExternalTakeoutVisibility)
+}
+
+func (h *Handler) feedbacks(c *gin.Context) {
+	page, size := pagination(c)
+	values, total, err := h.users.AdminFeedbacks(c, page, size)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, "list feedbacks failed")
+		return
+	}
+	response.OK(c, gin.H{"items": values, "page": page, "pageSize": size, "total": total})
 }
 func (h *Handler) submitReport(c *gin.Context) {
 	var req struct {

@@ -15,6 +15,15 @@ interface ToastOptions {
   duration?: number
 }
 
+interface ModalOptions {
+	title: string
+	content: string
+	confirmText?: string
+	cancelText?: string
+	confirmColor?: string
+	showCancel?: boolean
+}
+
 interface RequestOptions {
   url: string
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
@@ -42,6 +51,7 @@ interface TaroFacade {
   reLaunch(options: NavigateOptions): Promise<unknown>
   navigateBack(options?: { delta?: number }): Promise<unknown>
   showToast(options: ToastOptions): Promise<unknown>
+	showModal(options: ModalOptions): Promise<{ confirm: boolean; cancel: boolean }>
   login(options?: { timeout?: number }): Promise<LoginResult>
   request<T = unknown>(options: RequestOptions): Promise<RequestResult<T>>
 	getStorageSync<T = unknown>(key: string): T
@@ -55,7 +65,14 @@ interface TaroFacade {
   compressImage(options: { src: string; quality: number; compressedWidth?: number; compressedHeight?: number; format?: 'webp' }): Promise<{ tempFilePath: string }>
   getFileInfo(options: { filePath: string; digestAlgorithm?: 'md5' | 'sha1' }): Promise<{ size: number; digest: string }>
   getFileSystemManager(): { readFileSync(filePath: string): ArrayBuffer | ArrayBufferView | string }
-  requestPayment(options: RequestPaymentOptions): Promise<unknown>
+	requestPayment(options: RequestPaymentOptions): Promise<unknown>
+	getUpdateManager(): {
+		onCheckForUpdate(callback: (value: { hasUpdate: boolean }) => void): void
+		onUpdateReady(callback: () => void): void
+		onUpdateFailed(callback: () => void): void
+		applyUpdate(): void
+	}
+	getAccountInfoSync(): { miniProgram: { appId: string; envVersion: string; version: string } }
 }
 
 export default TaroRuntime as unknown as TaroFacade

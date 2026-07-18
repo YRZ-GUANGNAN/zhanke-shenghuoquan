@@ -11,6 +11,25 @@ import (
 
 var ErrNotFound = errors.New("user not found")
 
+type settingsRepository interface {
+	GetOrCreateSettings(context.Context, uint) (UserSettings, error)
+	UpdateSettings(context.Context, uint, UserSettings) (UserSettings, error)
+	UpdatePhone(context.Context, uint, string) error
+}
+
+type blocksRepository interface {
+	ListBlocks(context.Context, uint) ([]BlockedUserView, error)
+	AddBlock(context.Context, uint, uint) error
+	RemoveBlock(context.Context, uint, uint) error
+	CountBlocks(context.Context, uint) (int64, error)
+}
+
+type feedbackRepository interface {
+	CreateFeedback(context.Context, *Feedback, []string) error
+	DeleteFeedback(context.Context, uint, uint) error
+	ListFeedbacks(context.Context, int, int) ([]Feedback, int64, error)
+}
+
 type Repository interface {
 	FindByOpenID(context.Context, string) (User, error)
 	FindByID(context.Context, uint) (User, error)
@@ -143,4 +162,122 @@ func (r *GormRepository) Count(ctx context.Context) (int64, int64, error) {
 	start := time.Now().Truncate(24 * time.Hour)
 	err := r.db.WithContext(ctx).Model(&User{}).Where("created_at >= ?", start).Count(&today).Error
 	return total, today, err
+}
+
+func defaultUserSettings(userID uint) UserSettings {
+	return UserSettings{UserID: userID, OrderNotice: true, SocialNotice: true, Personalized: true}
+}
+
+func (r *GormRepository) GetOrCreateSettings(ctx context.Context, userID uint) (UserSettings, error) {
+	value := defaultUserSettings(userID)
+	if err := r.db.WithContext(ctx).Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "user_id"}}, DoNothing: true}).Create(&value).Error; err != nil {
+		return UserSettings{}, err
+	}
+	if err := r.db.WithContext(ctx).Where("user_id = ?", userID).First(&value).Error; err != nil {
+		return UserSettings{}, err
+	}
+	return value, nil
+}
+
+func (r *GormRepository) UpdateSettings(ctx context.Context, userID uint, value UserSettings) (UserSettings, error) {
+	if _, err := r.GetOrCreateSettings(ctx, userID); err != nil {
+		return UserSettings{}, err
+	}
+	updates := map[string]any{
+		"order_notice": value.OrderNotice, "social_notice": value.SocialNotice,
+		"quiet_hours": value.QuietHours, "personalized": value.Personalized,
+	}
+	if err := r.db.WithContext(ctx).Model(&UserSettings{}).Where("user_id = ?", userID).Updates(updates).Error; err != nil {
+		return UserSettings{}, err
+	}
+	return r.GetOrCreateSettings(ctx, userID)
+}
+
+func (r *GormRepository) UpdatePhone(ctx context.Context, userID uint, phone string) error {
+	result := r.db.WithContext(ctx).Model(&User{}).Where("id = ? AND status <> ?", userID, StatusClosed).Update("phone", phone)
+	if result.Error == nil && result.RowsAffected == 0 {
+		return ErrNotFound
+	}
+	return result.Error
+}
+
+func (r *GormRepository) ListBlocks(ctx context.Context, userID uint) ([]BlockedUserView, error) {
+	var rows []struct {
+		UserID    uint
+		Nickname  string
+		Avatar    string
+		Status    Status
+		CreatedAt time.Time
+	}
+	err := r.db.WithContext(ctx).Table("user_blocks AS b").
+		Select("u.id AS user_id, u.nickname, u.avatar, u.status, b.created_at").
+		Joins("JOIN users AS u ON u.id = b.blocked_user_id").
+		Where("b.user_id = ?", userID).Order("b.created_at DESC").Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	values := make([]BlockedUserView, 0, len(rows))
+	for _, row := range rows {
+		if row.Status == StatusClosed {
+			row.Nickname, row.Avatar = "账号已注销", ""
+		}
+		values = append(values, BlockedUserView{UserID: row.UserID, Nickname: row.Nickname, Avatar: row.Avatar, CreatedAt: row.CreatedAt})
+	}
+	return values, nil
+}
+
+func (r *GormRepository) AddBlock(ctx context.Context, userID, blockedUserID uint) error {
+	var count int64
+	if err := r.db.WithContext(ctx).Model(&User{}).Where("id = ? AND status <> ?", blockedUserID, StatusClosed).Count(&count).Error; err != nil {
+		return err
+	}
+	if count == 0 {
+		return ErrNotFound
+	}
+	return r.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&UserBlock{UserID: userID, BlockedUserID: blockedUserID}).Error
+}
+
+func (r *GormRepository) RemoveBlock(ctx context.Context, userID, blockedUserID uint) error {
+	return r.db.WithContext(ctx).Where("user_id = ? AND blocked_user_id = ?", userID, blockedUserID).Delete(&UserBlock{}).Error
+}
+
+func (r *GormRepository) CountBlocks(ctx context.Context, userID uint) (int64, error) {
+	var total int64
+	err := r.db.WithContext(ctx).Model(&UserBlock{}).Where("user_id = ?", userID).Count(&total).Error
+	return total, err
+}
+
+func (r *GormRepository) CreateFeedback(ctx context.Context, value *Feedback, assetIDs []string) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Omit("Images").Create(value).Error; err != nil {
+			return err
+		}
+		for index, assetID := range assetIDs {
+			image := FeedbackImage{FeedbackID: value.ID, AssetPublicID: assetID, Slot: uint16(index)}
+			if err := tx.Create(&image).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (r *GormRepository) DeleteFeedback(ctx context.Context, userID, feedbackID uint) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("feedback_id = ?", feedbackID).Delete(&FeedbackImage{}).Error; err != nil {
+			return err
+		}
+		return tx.Where("id = ? AND user_id = ?", feedbackID, userID).Delete(&Feedback{}).Error
+	})
+}
+
+func (r *GormRepository) ListFeedbacks(ctx context.Context, page, size int) ([]Feedback, int64, error) {
+	var values []Feedback
+	var total int64
+	query := r.db.WithContext(ctx).Model(&Feedback{})
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	err := query.Preload("Images").Order("created_at DESC, id DESC").Offset((page - 1) * size).Limit(size).Find(&values).Error
+	return values, total, err
 }

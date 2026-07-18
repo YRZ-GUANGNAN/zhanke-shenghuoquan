@@ -13,12 +13,14 @@ export const API_BASE = (
 export class ApiError extends Error {
   readonly status: number
   readonly code: number
+	readonly data?: unknown
 
-  constructor(message: string, status: number, code = status) {
+  constructor(message: string, status: number, code = status, data?: unknown) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.code = code
+		this.data = data
   }
 }
 
@@ -55,7 +57,8 @@ export async function request<T>(url: string, options: RequestOptions = { url: '
     throw new ApiError(
       body?.message || `Request failed: ${response.statusCode}`,
       response.statusCode,
-      body?.code ?? response.statusCode
+      body?.code ?? response.statusCode,
+			body?.data
     )
   }
   if (body && typeof body === 'object' && 'data' in body) {

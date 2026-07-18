@@ -18,6 +18,7 @@
     "check:boundaries": "node scripts/check-boundaries.cjs",
     "check:external-takeout-directory": "node scripts/check-external-takeout-directory.cjs",
     "check:miniapp-domain-search": "node scripts/check-miniapp-domain-search.cjs",
+		"check:miniapp-settings-contract": "node scripts/check-miniapp-settings-contract.cjs",
     "check:miniapp-publish-contract": "node scripts/check-miniapp-publish-contract.cjs",
     "check:miniapp-static-routes": "node scripts/check-miniapp-static-routes.cjs",
     "test:backend": "cd backend && go test ./...",
@@ -26,7 +27,7 @@
     "build:admin": "npm --workspace apps/admin run build",
     "build": "npm run build:miniapp && npm run build:admin",
     "typecheck": "npm --workspace apps/admin run typecheck && npm --workspace apps/miniapp run typecheck",
-	"verify": "npm run check:external-takeout-directory && npm run check:miniapp-static-routes && npm run check:boundaries && npm run check:miniapp-publish-contract && npm run check:miniapp-domain-search && npm run typecheck && npm run test:backend"
+	"verify": "npm run check:external-takeout-directory && npm run check:miniapp-static-routes && npm run check:boundaries && npm run check:miniapp-publish-contract && npm run check:miniapp-domain-search && npm run check:miniapp-settings-contract && npm run typecheck && npm run test:backend"
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",

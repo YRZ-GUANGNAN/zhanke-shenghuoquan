@@ -48,6 +48,9 @@ type Service struct {
 	appEnv              string
 	httpClient          *http.Client
 	identityEligibility IdentityEligibility
+	phoneResolver       WechatPhoneResolver
+	feedbackMedia       FeedbackMedia
+	accountClosure      AccountClosureCoordinator
 }
 
 type ServiceOption func(*Service)
@@ -60,6 +63,10 @@ func WithIdentityEligibility(eligibility IdentityEligibility) ServiceOption {
 	return func(s *Service) { s.identityEligibility = eligibility }
 }
 
+func WithWechatPhoneResolver(resolver WechatPhoneResolver) ServiceOption {
+	return func(s *Service) { s.phoneResolver = resolver }
+}
+
 func NewService(repo Repository, jwtSecret, wechatAppID, wechatSecret string, allowMockWechat bool, options ...ServiceOption) *Service {
 	service := &Service{
 		repo: repo, jwtSecret: jwtSecret, wechatAppID: wechatAppID, wechatSecret: wechatSecret,
@@ -68,7 +75,16 @@ func NewService(repo Repository, jwtSecret, wechatAppID, wechatSecret string, al
 	for _, option := range options {
 		option(service)
 	}
+	if service.phoneResolver == nil && wechatAppID != "" && wechatSecret != "" {
+		service.phoneResolver = NewWechatPhoneClient(wechatAppID, wechatSecret, service.httpClient)
+	}
 	return service
+}
+
+func (s *Service) SetFeedbackMedia(value FeedbackMedia) { s.feedbackMedia = value }
+
+func (s *Service) SetAccountClosureCoordinator(value AccountClosureCoordinator) {
+	s.accountClosure = value
 }
 
 func (s *Service) WechatLogin(ctx context.Context, input LoginInput) (LoginResult, error) {
@@ -94,6 +110,9 @@ func (s *Service) WechatLogin(ctx context.Context, input LoginInput) (LoginResul
 	}
 	if value.Status == StatusBanned {
 		return LoginResult{}, ErrBanned
+	}
+	if value.Status == StatusClosed {
+		return LoginResult{}, ErrTokenRevoked
 	}
 	if value.TokenVersion == 0 {
 		value.TokenVersion = 1
@@ -164,6 +183,9 @@ func (s *Service) Authenticate(ctx context.Context, token string) (User, error) 
 	}
 	if value.Status == StatusBanned {
 		return User{}, ErrBanned
+	}
+	if value.Status == StatusClosed {
+		return User{}, ErrTokenRevoked
 	}
 	if value.TokenVersion == 0 || claims.TokenVersion != value.TokenVersion {
 		return User{}, ErrTokenRevoked

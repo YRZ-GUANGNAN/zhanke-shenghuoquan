@@ -15,6 +15,8 @@ export default defineAppConfig({
     'pages/edit-profile/index',
     'pages/settings/index',
     'pages/blacklist/index',
+		'pages/feedback/index',
+		'pages/about/index',
     'pages/legal/index',
     'pages/merchant-home/index',
     'pages/merchant-publish/index',

@@ -182,3 +182,32 @@
   font-size: 28rpx;
   font-weight: 500;
 }
+
+.student-settings-phone {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: $brand-primary;
+  font-size: 25rpx;
+  line-height: 1.2;
+}
+
+.student-settings-phone::after {
+  border: 0;
+}
+
+.student-settings-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 82rpx;
+  margin-top: 20rpx;
+  color: $text-muted;
+  font-size: 25rpx;
+}
+
+.student-settings-close--disabled {
+  opacity: .5;
+}

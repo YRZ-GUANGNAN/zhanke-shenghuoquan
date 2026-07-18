@@ -3,6 +3,7 @@ package user
 import (
 	"errors"
 	"net/http"
+	"strconv"
 
 	"campus-circle/backend/internal/pkg/media"
 	"github.com/gin-gonic/gin"
@@ -29,6 +30,147 @@ func (h *Handler) Register(rg *gin.RouterGroup) {
 	rg.PATCH("/me", h.service.AuthRequired(), UnmutedRequired(), h.updateMe)
 	rg.GET("/identity", h.service.AuthRequired(), h.identity)
 	rg.POST("/identity", h.service.AuthRequired(), h.switchIdentity)
+	rg.GET("/settings", h.service.AuthRequired(), h.settings)
+	rg.PATCH("/settings", h.service.AuthRequired(), h.updateSettings)
+	rg.POST("/me/phone", h.service.AuthRequired(), h.bindPhone)
+	rg.GET("/blocks", h.service.AuthRequired(), h.blocks)
+	rg.POST("/blocks/:id", h.service.AuthRequired(), h.addBlock)
+	rg.DELETE("/blocks/:id", h.service.AuthRequired(), h.removeBlock)
+	rg.POST("/feedbacks", h.service.AuthRequired(), h.submitFeedback)
+	rg.DELETE("/me", h.service.AuthRequired(), h.closeAccount)
+}
+
+func (h *Handler) settings(c *gin.Context) {
+	value, err := h.service.Settings(c, CurrentUserID(c))
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, "get settings failed")
+		return
+	}
+	response.OK(c, value)
+}
+
+func (h *Handler) updateSettings(c *gin.Context) {
+	var request UserSettings
+	if err := c.ShouldBindJSON(&request); err != nil {
+		response.Fail(c, http.StatusBadRequest, "invalid settings")
+		return
+	}
+	value, err := h.service.UpdateSettings(c, CurrentUserID(c), request)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, "update settings failed")
+		return
+	}
+	response.OK(c, value)
+}
+
+func (h *Handler) bindPhone(c *gin.Context) {
+	var request struct {
+		Code string `json:"code"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		response.Fail(c, http.StatusBadRequest, "invalid phone code")
+		return
+	}
+	value, err := h.service.BindPhone(c, CurrentUserID(c), request.Code)
+	if err != nil {
+		status := http.StatusBadRequest
+		message := "手机号绑定失败，请稍后重试"
+		if errors.Is(err, ErrPhoneBindingUnavailable) {
+			status = http.StatusServiceUnavailable
+			message = "手机号绑定暂不可用"
+		} else if errors.Is(err, ErrInvalidPhone) {
+			message = "微信返回的手机号无效"
+		}
+		response.Fail(c, status, message)
+		return
+	}
+	response.OK(c, value)
+}
+
+func blockTargetID(c *gin.Context) (uint, bool) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		response.Fail(c, http.StatusBadRequest, "invalid user id")
+		return 0, false
+	}
+	return uint(id), true
+}
+
+func (h *Handler) blocks(c *gin.Context) {
+	values, err := h.service.Blocks(c, CurrentUserID(c))
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, "list blocks failed")
+		return
+	}
+	response.OK(c, gin.H{"items": values})
+}
+
+func (h *Handler) addBlock(c *gin.Context) {
+	targetID, ok := blockTargetID(c)
+	if !ok {
+		return
+	}
+	if err := h.service.AddBlock(c, CurrentUserID(c), targetID); err != nil {
+		status := http.StatusBadRequest
+		if errors.Is(err, ErrNotFound) {
+			status = http.StatusNotFound
+		}
+		response.Fail(c, status, err.Error())
+		return
+	}
+	response.OK(c, gin.H{"blocked": true})
+}
+
+func (h *Handler) removeBlock(c *gin.Context) {
+	targetID, ok := blockTargetID(c)
+	if !ok {
+		return
+	}
+	if err := h.service.RemoveBlock(c, CurrentUserID(c), targetID); err != nil {
+		response.Fail(c, http.StatusInternalServerError, "remove block failed")
+		return
+	}
+	response.OK(c, gin.H{"blocked": false})
+}
+
+func (h *Handler) submitFeedback(c *gin.Context) {
+	var request struct {
+		Category      string   `json:"category"`
+		Content       string   `json:"content"`
+		ImageAssetIDs []string `json:"imageAssetIds"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		response.Fail(c, http.StatusBadRequest, "invalid feedback")
+		return
+	}
+	value, err := h.service.SubmitFeedback(c, CurrentUserID(c), request.Category, request.Content, request.ImageAssetIDs)
+	if err != nil {
+		status := http.StatusBadRequest
+		if errors.Is(err, ErrFeedbackUnavailable) {
+			status = http.StatusServiceUnavailable
+		}
+		response.Fail(c, status, err.Error())
+		return
+	}
+	response.Created(c, value)
+}
+
+func (h *Handler) closeAccount(c *gin.Context) {
+	err := h.service.CloseAccount(c, CurrentUserID(c))
+	if err == nil {
+		response.OK(c, gin.H{"closed": true})
+		return
+	}
+	var blocked *AccountClosureBlockedError
+	if errors.As(err, &blocked) {
+		c.JSON(http.StatusConflict, response.Body{Code: http.StatusConflict, Message: "账号暂时无法注销", Data: gin.H{"blockers": blocked.Blockers}})
+		return
+	}
+	if errors.Is(err, ErrAccountClosureUnavailable) {
+		response.Fail(c, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+	response.Fail(c, http.StatusInternalServerError, "close account failed")
 }
 
 func (h *Handler) updateMe(c *gin.Context) {

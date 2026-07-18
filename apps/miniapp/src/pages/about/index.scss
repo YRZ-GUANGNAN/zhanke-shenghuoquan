@@ -1,0 +1,17 @@
+@use '../../styles/design-tokens.scss' as *;
+
+.about-page { min-height: 100vh; background: $bg-app; color: $text-primary; }
+.about-nav { position: sticky; top: 0; display: flex; align-items: flex-end; justify-content: center; height: 184rpx; padding-bottom: 34rpx; box-sizing: border-box; background: $bg-surface; }
+.about-nav__back { position: absolute; left: 36rpx; bottom: 23rpx; width: 56rpx; height: 56rpx; font-size: 54rpx; line-height: 1; }
+.about-nav__title { color: $text-strong; font-size: 32rpx; font-weight: 800; }
+.about-content { padding: 64rpx 36rpx; }
+.about-brand { display: flex; flex-direction: column; align-items: center; }
+.about-brand__mark { display: flex; align-items: center; justify-content: center; width: 126rpx; height: 126rpx; border-radius: 36rpx; background: $gradient-primary; box-shadow: 0 24rpx 50rpx -18rpx rgba(33, 104, 184, .6); color: #fff; font-size: 52rpx; font-weight: 900; }
+.about-brand__name { margin-top: 28rpx; color: $text-strong; font-size: 36rpx; font-weight: 900; }
+.about-brand__version { margin-top: 10rpx; color: $text-muted; font-size: 23rpx; }
+.about-description { display: block; max-width: 600rpx; margin: 42rpx auto; color: $text-secondary; font-size: 26rpx; line-height: 1.75; text-align: center; }
+.about-card { overflow: hidden; border-radius: 26rpx; background: $bg-surface; box-shadow: $shadow-card; }
+.about-row { position: relative; display: flex; align-items: center; justify-content: space-between; min-height: 94rpx; padding: 0 30rpx; color: $text-strong; font-size: 27rpx; }
+.about-row + .about-row::before { position: absolute; top: 0; right: 30rpx; left: 30rpx; height: 1rpx; background: $divider-hairline; content: ''; }
+.about-row text:last-child { color: $text-muted; font-size: 38rpx; }
+.about-footer { display: block; margin-top: 70rpx; color: $text-faint; font-size: 21rpx; text-align: center; }
