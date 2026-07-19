@@ -1,11 +1,13 @@
 const fs = require('node:fs')
 const path = require('node:path')
 const assert = require('node:assert/strict')
+const { assertHomeToolsDataFlow, assertSyntheticStaticToolsRejected } = require('./lib/home-tools-contract.cjs')
 
 const root = path.resolve(__dirname, '..')
 const read = (value) => fs.readFileSync(path.join(root, value), 'utf8')
 const readOptional = (value) => fs.existsSync(path.join(root, value)) ? read(value) : ''
 const navigation = read('apps/miniapp/src/services/d-navigation.ts')
+const navigationValidationSource = read('apps/miniapp/src/services/d-navigation-validation.js')
 const home = read('apps/miniapp/src/pages/home/index.tsx')
 const homeStyle = read('apps/miniapp/src/pages/home/index.scss')
 const headerLayout = readOptional('apps/miniapp/src/pages/home/header-layout.ts')
@@ -13,8 +15,9 @@ const taro = read('apps/miniapp/src/services/taro.ts')
 const taroShim = read('apps/miniapp/src/taro-shim.d.ts')
 const profile = read('apps/miniapp/src/pages/profile/index.tsx')
 const profileStyle = read('apps/miniapp/src/pages/profile/index.scss')
+const navigationValidation = require(path.join(root, 'apps/miniapp/src/services/d-navigation-validation.js'))
 
-assert.match(navigation, /legacy-missing-appid/)
+assert.match(navigationValidationSource, /legacy-missing-appid/)
 assert.match(navigation, /validMiniProgramAppID/)
 assert.match(navigation, /validMiniProgramPath/)
 assert.match(navigation, /filter\(isRealTool\)/)
@@ -40,6 +43,32 @@ assert.match(home, /createSelectorQuery/)
 assert.match(home, /select\('#home-discover-sentinel'\)/)
 assert.match(home, /if \(!rect\) return/)
 assert.doesNotMatch(home, /特价影票|学生兼职|生活服务|校园群聊|校园地图/)
+assertHomeToolsDataFlow(home)
+assertSyntheticStaticToolsRejected(home)
+
+for (const value of [
+  'pages/home/index',
+  'pages/store/index?id=1&name=hello+world',
+  'pages/store/index?id=1&name=hello%20world',
+  'pages/home/index?redirect=pages/detail/index',
+  'pages/home/index?redirect=pages%2Fdetail%2Findex',
+  'pages/%E5%95%86%E5%AE%B6/index'
+]) {
+  assert.equal(navigationValidation.validMiniProgramPath(value), true, `expected valid mini-program path: ${value}`)
+}
+for (const value of [
+  '', '/', '/pages/home/index', '%2Fpages/home/index', '../pages/home/index', 'pages/../home/index',
+  'pages//home/index', 'https://evil.example/path', 'custom:pages/home/index',
+  'pages\\home\\index', 'pages/home/index#fragment', 'pages/home/%zz',
+  'pages/home/index?value=%zz',
+  'pages/home/index?redirect=pages%252Fdetail', 'pages/home/index?redirect=https://evil.example',
+  'pages/home/index\u0000'
+]) {
+  assert.equal(navigationValidation.validMiniProgramPath(value), false, `expected invalid mini-program path: ${value}`)
+}
+assert.equal(navigationValidation.validMiniProgramAppID(' wx1234567890ABCDEF '), true)
+assert.equal(navigationValidation.validMiniProgramAppID('legacy-missing-appid'), false)
+assert.equal(navigationValidation.validMiniProgramAppID('wx0000000000000000'), false)
 
 const sentinelCheck = home.indexOf("select('#home-discover-sentinel')")
 const observerCreation = home.indexOf('createIntersectionObserver(page', sentinelCheck)

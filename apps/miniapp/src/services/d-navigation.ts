@@ -1,6 +1,8 @@
 // Domain D client: category + appid/path jump data. No business actions live here.
 import type { ToolLink } from '../types'
 import { request } from './api'
+import { validMiniProgramAppID, validMiniProgramPath } from './d-navigation-validation'
+export { validMiniProgramAppID, validMiniProgramPath } from './d-navigation-validation'
 export type NavigationOperatingStatus='open'|'resting'
 export interface ExternalTakeoutMerchantLink{id:string;title:string;subtitle:string;iconText:string;appId:string;path:string;color:string;sort:number;operatingStatus:NavigationOperatingStatus}
 export interface NavigationHotSearchKeyword{keyword:string;count:number;score:number}
@@ -8,19 +10,6 @@ export interface ExternalTakeoutSearchPage{items:ExternalTakeoutMerchantLink[];p
 interface BackendItem{id:number|string;title:string;subtitle:string;iconText:string;appId:string;path:string;color:string;sort:number;operatingStatus:NavigationOperatingStatus}
 interface BackendCategory{id:number|string;name:string;systemKey?:string;sort:number;items:BackendItem[]}
 const externalTakeoutSystemKey='external_takeout_merchants' as const
-const placeholderAppIDs=new Set(['legacy-missing-appid','wx0000000000000000'])
-const miniProgramAppIDPattern=/^wx[a-zA-Z0-9]{16}$/
-const miniProgramPathPattern=/^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))(?!.*\/\/)[a-zA-Z0-9_\-/]+(?:\?[a-zA-Z0-9_%=&.\-]+)?$/
-
-export function validMiniProgramAppID(value:string):boolean{
-	if(typeof value!=='string')return false
-	const normalized=value.trim()
-	return miniProgramAppIDPattern.test(normalized)&&!placeholderAppIDs.has(normalized)
-}
-
-export function validMiniProgramPath(value:string):boolean{
-	return typeof value==='string'&&miniProgramPathPattern.test(value.trim())
-}
 
 function isRealTool(item:BackendItem):boolean{
 	return validMiniProgramAppID(item.appId)&&validMiniProgramPath(item.path)
