@@ -96,6 +96,21 @@ func TestMigration034IsGuardedForRepeatApplication(t *testing.T) {
 	if strings.Contains(source, "AND LEFT(LOWER(") {
 		t.Fatal("migration 034 canonical checks must use exact normalized-expression allowlists")
 	}
+	for _, forbidden := range []string{"check_constraint.check_clause,'`',''", "),'_utf8mb4',''"} {
+		if strings.Contains(source, forbidden) {
+			t.Fatalf("migration 034 uses unsafe global check-clause normalization %q", forbidden)
+		}
+	}
+	for _, required := range []string{
+		"'`purpose`','purpose'",
+		"'`reference_type`','reference_type'",
+		"'(_utf8mb4''','('''",
+		"',_utf8mb4''',','''",
+	} {
+		if !strings.Contains(source, required) {
+			t.Fatalf("migration 034 missing semantic-safe normalization %q", required)
+		}
+	}
 	if !strings.Contains(source, "'reference_typein''post'',''product'',''avatar'',''dish'',''merchant_logo'',''delivery_proof'',''delivery_im'',''feedback''") {
 		t.Fatal("migration 034 must allow the exact migration 033 reference-type canonical expression")
 	}
@@ -253,6 +268,42 @@ func TestMigration034MySQLRejectsMisbindingCanonicalAndGuardChecksBeforeDDL(t *t
 			columnName: "reference_type",
 		},
 		{
+			name: "asset_canonical_uses_alias_column",
+			setup: []string{`ALTER TABLE media_assets ADD CONSTRAINT chk_media_asset_purpose
+				CHECK (purpose_utf8mb4 IN ('post','product','avatar','dish','merchant_logo','delivery_proof','delivery_im','feedback','identity_application'))`},
+			want:       "migration 034 media purpose canonical constraint mismatch",
+			columnName: "purpose",
+		},
+		{
+			name: "reference_canonical_uses_alias_column",
+			setup: []string{
+				`ALTER TABLE media_asset_references DROP CHECK chk_media_reference_type`,
+				`ALTER TABLE media_asset_references ADD CONSTRAINT chk_media_reference_type
+				CHECK (reference_type_utf8mb4 IN ('post','product','avatar','dish','merchant_logo','delivery_proof','delivery_im','feedback'))`,
+			},
+			want:       "migration 034 media reference type canonical constraint mismatch",
+			columnName: "reference_type",
+		},
+		{
+			name: "asset_canonical_mixes_unrelated_column_with_or",
+			setup: []string{`ALTER TABLE media_assets ADD CONSTRAINT chk_media_asset_purpose
+				CHECK (purpose IN ('post','product','avatar','dish','merchant_logo','delivery_proof','delivery_im','feedback','identity_application')
+				OR other_flag=1)`},
+			want:       "migration 034 media purpose canonical constraint mismatch",
+			columnName: "purpose",
+		},
+		{
+			name: "reference_canonical_mixes_unrelated_column_with_or",
+			setup: []string{
+				`ALTER TABLE media_asset_references DROP CHECK chk_media_reference_type`,
+				`ALTER TABLE media_asset_references ADD CONSTRAINT chk_media_reference_type
+				CHECK (reference_type IN ('post','product','avatar','dish','merchant_logo','delivery_proof','delivery_im','feedback')
+				OR other_flag=1)`,
+			},
+			want:       "migration 034 media reference type canonical constraint mismatch",
+			columnName: "reference_type",
+		},
+		{
 			name: "asset_guard_missing_identity_application",
 			setup: []string{`ALTER TABLE media_assets
 				ADD CONSTRAINT chk_media_asset_purpose_identity_application_guard
@@ -265,6 +316,22 @@ func TestMigration034MySQLRejectsMisbindingCanonicalAndGuardChecksBeforeDDL(t *t
 			setup: []string{`ALTER TABLE media_asset_references
 				ADD CONSTRAINT chk_media_reference_type_identity_application_guard
 				CHECK (reference_type IN ('post','product','avatar'))`},
+			want:       "migration 034 media reference type guard constraint mismatch",
+			columnName: "reference_type",
+		},
+		{
+			name: "asset_guard_uses_alias_column",
+			setup: []string{`ALTER TABLE media_assets
+				ADD CONSTRAINT chk_media_asset_purpose_identity_application_guard
+				CHECK (purpose_utf8mb4 IN ('post','product','avatar','dish','merchant_logo','delivery_proof','delivery_im','feedback','identity_application'))`},
+			want:       "migration 034 media purpose guard constraint mismatch",
+			columnName: "purpose",
+		},
+		{
+			name: "reference_guard_uses_alias_column",
+			setup: []string{`ALTER TABLE media_asset_references
+				ADD CONSTRAINT chk_media_reference_type_identity_application_guard
+				CHECK (reference_type_utf8mb4 IN ('post','product','avatar','dish','merchant_logo','delivery_proof','delivery_im','feedback','identity_application'))`},
 			want:       "migration 034 media reference type guard constraint mismatch",
 			columnName: "reference_type",
 		},
@@ -292,12 +359,17 @@ func TestMigration034MySQLPreservesUnrelatedMediaChecks(t *testing.T) {
 		CHECK (other_flag IN (0,1))`)
 	mustExec034(t, db, `ALTER TABLE media_asset_references ADD CONSTRAINT chk_media_reference_other_flag
 		CHECK (other_flag IN (0,1))`)
+	mustExec034(t, db, `ALTER TABLE media_assets ADD CONSTRAINT chk_media_asset_alias_column
+		CHECK (purpose_utf8mb4 IN ('post','product'))`)
+	mustExec034(t, db, `ALTER TABLE media_asset_references ADD CONSTRAINT chk_media_reference_alias_column
+		CHECK (reference_type_utf8mb4 IN ('post','product'))`)
 
 	applyMigration034(t, db)
 
-	assertCount034(t, db, 2, `SELECT COUNT(*) FROM information_schema.table_constraints
+	assertCount034(t, db, 4, `SELECT COUNT(*) FROM information_schema.table_constraints
 		WHERE constraint_schema=DATABASE() AND constraint_name IN (
-			'chk_media_asset_other_flag','chk_media_reference_other_flag'
+			'chk_media_asset_other_flag','chk_media_reference_other_flag',
+			'chk_media_asset_alias_column','chk_media_reference_alias_column'
 		) AND constraint_type='CHECK'`)
 }
 
@@ -432,11 +504,13 @@ func createMigration034BaseSchema(t *testing.T, db *sql.DB) {
 		`CREATE TABLE media_assets (
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
 			purpose VARCHAR(16) NOT NULL,
+			purpose_utf8mb4 VARCHAR(24) NOT NULL DEFAULT '',
 			other_flag INT NOT NULL DEFAULT 0
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 		`CREATE TABLE media_asset_references (
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
 			reference_type VARCHAR(16) NOT NULL,
+			reference_type_utf8mb4 VARCHAR(24) NOT NULL DEFAULT '',
 			other_flag INT NOT NULL DEFAULT 0,
 			CONSTRAINT chk_media_reference_type
 			CHECK (reference_type IN ('post','product','avatar','dish','merchant_logo','delivery_proof','delivery_im','feedback'))

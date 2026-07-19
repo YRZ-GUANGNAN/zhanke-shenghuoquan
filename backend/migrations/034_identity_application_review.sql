@@ -8,6 +8,10 @@ CREATE PROCEDURE migrate_identity_application_review()
 SQL SECURITY INVOKER
 BEGIN
   DECLARE lock_acquired INT DEFAULT 0;
+  DECLARE media_asset_purpose_canonical_clause LONGTEXT DEFAULT NULL;
+  DECLARE media_reference_type_canonical_clause LONGTEXT DEFAULT NULL;
+  DECLARE media_asset_purpose_guard_clause LONGTEXT DEFAULT NULL;
+  DECLARE media_reference_type_guard_clause LONGTEXT DEFAULT NULL;
 
   DECLARE EXIT HANDLER FOR SQLEXCEPTION
   BEGIN
@@ -75,7 +79,10 @@ BEGIN
     WHERE table_constraint.constraint_schema=DATABASE()
       AND table_constraint.table_name='media_assets'
       AND table_constraint.constraint_type='CHECK'
-      AND LOCATE('purpose',LOWER(REPLACE(check_constraint.check_clause,'`',''))) > 0
+      AND REGEXP_LIKE(
+        LOWER(check_constraint.check_clause),
+        '((^|[^[:alnum:]_`])purpose([^[:alnum:]_`]|$))|(`purpose`)'
+      )
       AND table_constraint.constraint_name NOT IN (
         'chk_media_asset_purpose',
         'chk_media_asset_purpose_identity_application_guard'
@@ -92,7 +99,10 @@ BEGIN
     WHERE table_constraint.constraint_schema=DATABASE()
       AND table_constraint.table_name='media_asset_references'
       AND table_constraint.constraint_type='CHECK'
-      AND LOCATE('reference_type',LOWER(REPLACE(check_constraint.check_clause,'`',''))) > 0
+      AND REGEXP_LIKE(
+        LOWER(check_constraint.check_clause),
+        '((^|[^[:alnum:]_`])reference_type([^[:alnum:]_`]|$))|(`reference_type`)'
+      )
       AND table_constraint.constraint_name NOT IN (
         'chk_media_reference_type',
         'chk_media_reference_type_identity_application_guard'
@@ -101,87 +111,85 @@ BEGIN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'migration 034 unexpected media reference type check constraint';
   END IF;
 
-  IF EXISTS (
-    SELECT 1 FROM information_schema.table_constraints
-    WHERE constraint_schema=DATABASE() AND table_name='media_assets'
-      AND constraint_name='chk_media_asset_purpose'
-  ) AND NOT EXISTS (
-    SELECT 1
-    FROM information_schema.table_constraints AS table_constraint
-    JOIN information_schema.check_constraints AS check_constraint
-      ON check_constraint.constraint_schema=table_constraint.constraint_schema
-     AND check_constraint.constraint_name=table_constraint.constraint_name
-    WHERE table_constraint.constraint_schema=DATABASE()
-      AND table_constraint.table_name='media_assets'
-      AND table_constraint.constraint_name='chk_media_asset_purpose'
-      AND table_constraint.constraint_type='CHECK'
-      AND LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
-        check_constraint.check_clause,'`',''),' ',''),CHAR(9),''),CHAR(10),''),CHAR(13),''),'(',''),')',''),'_utf8mb4',''))
-        = 'purposein''post'',''product'',''avatar'',''dish'',''merchant_logo'',''delivery_proof'',''delivery_im'',''feedback'',''identity_application'''
-  ) THEN
+  SELECT MAX(LOWER(check_constraint.check_clause))
+  INTO media_asset_purpose_canonical_clause
+  FROM information_schema.table_constraints AS table_constraint
+  JOIN information_schema.check_constraints AS check_constraint
+    ON check_constraint.constraint_schema=table_constraint.constraint_schema
+   AND check_constraint.constraint_name=table_constraint.constraint_name
+  WHERE table_constraint.constraint_schema=DATABASE()
+    AND table_constraint.table_name='media_assets'
+    AND table_constraint.constraint_name='chk_media_asset_purpose'
+    AND table_constraint.constraint_type='CHECK';
+  SELECT MAX(LOWER(check_constraint.check_clause))
+  INTO media_reference_type_canonical_clause
+  FROM information_schema.table_constraints AS table_constraint
+  JOIN information_schema.check_constraints AS check_constraint
+    ON check_constraint.constraint_schema=table_constraint.constraint_schema
+   AND check_constraint.constraint_name=table_constraint.constraint_name
+  WHERE table_constraint.constraint_schema=DATABASE()
+    AND table_constraint.table_name='media_asset_references'
+    AND table_constraint.constraint_name='chk_media_reference_type'
+    AND table_constraint.constraint_type='CHECK';
+  SELECT MAX(LOWER(check_constraint.check_clause))
+  INTO media_asset_purpose_guard_clause
+  FROM information_schema.table_constraints AS table_constraint
+  JOIN information_schema.check_constraints AS check_constraint
+    ON check_constraint.constraint_schema=table_constraint.constraint_schema
+   AND check_constraint.constraint_name=table_constraint.constraint_name
+  WHERE table_constraint.constraint_schema=DATABASE()
+    AND table_constraint.table_name='media_assets'
+    AND table_constraint.constraint_name='chk_media_asset_purpose_identity_application_guard'
+    AND table_constraint.constraint_type='CHECK';
+  SELECT MAX(LOWER(check_constraint.check_clause))
+  INTO media_reference_type_guard_clause
+  FROM information_schema.table_constraints AS table_constraint
+  JOIN information_schema.check_constraints AS check_constraint
+    ON check_constraint.constraint_schema=table_constraint.constraint_schema
+   AND check_constraint.constraint_name=table_constraint.constraint_name
+  WHERE table_constraint.constraint_schema=DATABASE()
+    AND table_constraint.table_name='media_asset_references'
+    AND table_constraint.constraint_name='chk_media_reference_type_identity_application_guard'
+    AND table_constraint.constraint_type='CHECK';
+
+  SET media_asset_purpose_canonical_clause=REPLACE(media_asset_purpose_canonical_clause,'`purpose`','purpose'),
+      media_asset_purpose_guard_clause=REPLACE(media_asset_purpose_guard_clause,'`purpose`','purpose'),
+      media_reference_type_canonical_clause=REPLACE(media_reference_type_canonical_clause,'`reference_type`','reference_type'),
+      media_reference_type_guard_clause=REPLACE(media_reference_type_guard_clause,'`reference_type`','reference_type');
+  SET media_asset_purpose_canonical_clause=REPLACE(REPLACE(REPLACE(REPLACE(media_asset_purpose_canonical_clause,' ',''),CHAR(9),''),CHAR(10),''),CHAR(13),''),
+      media_asset_purpose_guard_clause=REPLACE(REPLACE(REPLACE(REPLACE(media_asset_purpose_guard_clause,' ',''),CHAR(9),''),CHAR(10),''),CHAR(13),''),
+      media_reference_type_canonical_clause=REPLACE(REPLACE(REPLACE(REPLACE(media_reference_type_canonical_clause,' ',''),CHAR(9),''),CHAR(10),''),CHAR(13),''),
+      media_reference_type_guard_clause=REPLACE(REPLACE(REPLACE(REPLACE(media_reference_type_guard_clause,' ',''),CHAR(9),''),CHAR(10),''),CHAR(13),'');
+  SET media_asset_purpose_canonical_clause=REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+        media_asset_purpose_canonical_clause,'(_utf8mb4''','('''),',_utf8mb4''',','''),'(_utf8mb3''','('''),',_utf8mb3''',','''),'(_utf8''','('''),',_utf8''',','''),
+      media_asset_purpose_guard_clause=REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+        media_asset_purpose_guard_clause,'(_utf8mb4''','('''),',_utf8mb4''',','''),'(_utf8mb3''','('''),',_utf8mb3''',','''),'(_utf8''','('''),',_utf8''',','''),
+      media_reference_type_canonical_clause=REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+        media_reference_type_canonical_clause,'(_utf8mb4''','('''),',_utf8mb4''',','''),'(_utf8mb3''','('''),',_utf8mb3''',','''),'(_utf8''','('''),',_utf8''',','''),
+      media_reference_type_guard_clause=REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+        media_reference_type_guard_clause,'(_utf8mb4''','('''),',_utf8mb4''',','''),'(_utf8mb3''','('''),',_utf8mb3''',','''),'(_utf8''','('''),',_utf8''',',''');
+  SET media_asset_purpose_canonical_clause=REPLACE(REPLACE(media_asset_purpose_canonical_clause,'(',''),')',''),
+      media_asset_purpose_guard_clause=REPLACE(REPLACE(media_asset_purpose_guard_clause,'(',''),')',''),
+      media_reference_type_canonical_clause=REPLACE(REPLACE(media_reference_type_canonical_clause,'(',''),')',''),
+      media_reference_type_guard_clause=REPLACE(REPLACE(media_reference_type_guard_clause,'(',''),')','');
+
+  IF media_asset_purpose_canonical_clause IS NOT NULL AND
+     media_asset_purpose_canonical_clause <> 'purposein''post'',''product'',''avatar'',''dish'',''merchant_logo'',''delivery_proof'',''delivery_im'',''feedback'',''identity_application''' THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'migration 034 media purpose canonical constraint mismatch';
   END IF;
-  IF EXISTS (
-    SELECT 1 FROM information_schema.table_constraints
-    WHERE constraint_schema=DATABASE() AND table_name='media_asset_references'
-      AND constraint_name='chk_media_reference_type'
-  ) AND NOT EXISTS (
-    SELECT 1
-    FROM information_schema.table_constraints AS table_constraint
-    JOIN information_schema.check_constraints AS check_constraint
-      ON check_constraint.constraint_schema=table_constraint.constraint_schema
-     AND check_constraint.constraint_name=table_constraint.constraint_name
-    WHERE table_constraint.constraint_schema=DATABASE()
-      AND table_constraint.table_name='media_asset_references'
-      AND table_constraint.constraint_name='chk_media_reference_type'
-      AND table_constraint.constraint_type='CHECK'
-      AND LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
-        check_constraint.check_clause,'`',''),' ',''),CHAR(9),''),CHAR(10),''),CHAR(13),''),'(',''),')',''),'_utf8mb4','')) IN (
-          'reference_typein''post'',''product'',''avatar'',''dish'',''merchant_logo'',''delivery_proof'',''delivery_im'',''feedback''',
-          'reference_typein''post'',''product'',''avatar'',''dish'',''merchant_logo'',''delivery_proof'',''delivery_im'',''feedback'',''identity_application'''
-        )
-  ) THEN
+  IF media_reference_type_canonical_clause IS NOT NULL AND
+     media_reference_type_canonical_clause NOT IN (
+       'reference_typein''post'',''product'',''avatar'',''dish'',''merchant_logo'',''delivery_proof'',''delivery_im'',''feedback''',
+       'reference_typein''post'',''product'',''avatar'',''dish'',''merchant_logo'',''delivery_proof'',''delivery_im'',''feedback'',''identity_application'''
+     ) THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'migration 034 media reference type canonical constraint mismatch';
   END IF;
-
-  IF EXISTS (
-    SELECT 1 FROM information_schema.table_constraints
-    WHERE constraint_schema=DATABASE() AND table_name='media_assets'
-      AND constraint_name='chk_media_asset_purpose_identity_application_guard'
-  ) AND NOT EXISTS (
-    SELECT 1
-    FROM information_schema.table_constraints AS table_constraint
-    JOIN information_schema.check_constraints AS check_constraint
-      ON check_constraint.constraint_schema=table_constraint.constraint_schema
-     AND check_constraint.constraint_name=table_constraint.constraint_name
-    WHERE table_constraint.constraint_schema=DATABASE()
-      AND table_constraint.table_name='media_assets'
-      AND table_constraint.constraint_name='chk_media_asset_purpose_identity_application_guard'
-      AND table_constraint.constraint_type='CHECK'
-      AND LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
-        check_constraint.check_clause,'`',''),' ',''),CHAR(9),''),CHAR(10),''),CHAR(13),''),'(',''),')',''),'_utf8mb4',''))
-        = 'purposein''post'',''product'',''avatar'',''dish'',''merchant_logo'',''delivery_proof'',''delivery_im'',''feedback'',''identity_application'''
-  ) THEN
+  IF media_asset_purpose_guard_clause IS NOT NULL AND
+     media_asset_purpose_guard_clause <> 'purposein''post'',''product'',''avatar'',''dish'',''merchant_logo'',''delivery_proof'',''delivery_im'',''feedback'',''identity_application''' THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'migration 034 media purpose guard constraint mismatch';
   END IF;
-  IF EXISTS (
-    SELECT 1 FROM information_schema.table_constraints
-    WHERE constraint_schema=DATABASE() AND table_name='media_asset_references'
-      AND constraint_name='chk_media_reference_type_identity_application_guard'
-  ) AND NOT EXISTS (
-    SELECT 1
-    FROM information_schema.table_constraints AS table_constraint
-    JOIN information_schema.check_constraints AS check_constraint
-      ON check_constraint.constraint_schema=table_constraint.constraint_schema
-     AND check_constraint.constraint_name=table_constraint.constraint_name
-    WHERE table_constraint.constraint_schema=DATABASE()
-      AND table_constraint.table_name='media_asset_references'
-      AND table_constraint.constraint_name='chk_media_reference_type_identity_application_guard'
-      AND table_constraint.constraint_type='CHECK'
-      AND LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
-        check_constraint.check_clause,'`',''),' ',''),CHAR(9),''),CHAR(10),''),CHAR(13),''),'(',''),')',''),'_utf8mb4',''))
-        = 'reference_typein''post'',''product'',''avatar'',''dish'',''merchant_logo'',''delivery_proof'',''delivery_im'',''feedback'',''identity_application'''
-  ) THEN
+  IF media_reference_type_guard_clause IS NOT NULL AND
+     media_reference_type_guard_clause <> 'reference_typein''post'',''product'',''avatar'',''dish'',''merchant_logo'',''delivery_proof'',''delivery_im'',''feedback'',''identity_application''' THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'migration 034 media reference type guard constraint mismatch';
   END IF;
 
