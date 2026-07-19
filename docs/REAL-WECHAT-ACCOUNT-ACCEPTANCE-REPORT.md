@@ -25,6 +25,12 @@
 | `go vet ./internal/config ./internal/module/user ./cmd/audit-mock-users` | PASS |
 | MiniApp `typecheck` | PASS |
 | Admin `typecheck` | PASS |
+| `npm.cmd run check:miniapp-capsule-layout` | PASS |
+| `npm.cmd run check:home-real-tools-contract` | PASS |
+| `npm.cmd run check:miniapp-static-routes` | PASS（24 条路由） |
+| `npm.cmd run check:miniapp-business-closure` | PASS（24 条已注册路由） |
+| 公网 API 生产构建 | PASS（`Compiled successfully`） |
+| 生产产物地址与页面配置 | PASS（公网 API 命中 1 个文件、本地 API 命中 0 个文件、`PAGES=24`） |
 
 独立密钥保护复核还验证了临时 Git index、特殊文件名、UTF-16、二进制跳过和主 index 前后不变；自动检查不会读取或打印本机未跟踪的 Secret。
 
@@ -54,6 +60,7 @@
 | 后端健康检查 | PASS | 当前代码已使用真实配置启动，且 `/healthz` 成功。 |
 | 稳定用户号真验 | PASS | 同一微信账号连续两次仅清除 `domainA.token` 后登录，“我的”页面用户号完全一致。 |
 | mock 用户数据库审计 | PASS | 已完成当前本地数据库只读审计：36 个历史 mock 用户中，23 个为后续人工核查候选，13 个因业务关联受保护；本次未修改数据。 |
+| 微信胶囊独占行 | PENDING | 胶囊布局静态契约、MiniApp 类型检查及公网 API 生产构建已通过；仍需在真实设备逐页验证视觉位置与取消、保存、发布、搜索、返回、主页和身份切换等按钮可点击，代码与构建结果不能替代真机验收。 |
 | 真机与发布 | PENDING | 真机验证登录、胶囊避让、真实工具跳转和资料编辑；之后才可考虑上传体验版或发布。 |
 
 ## 下一步手册
