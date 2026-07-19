@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -13,9 +15,12 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	mysqlDriver "github.com/go-sql-driver/mysql"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 
+	"campus-circle/backend/internal/module/identityapplication"
 	"campus-circle/backend/internal/module/takeout"
 	"campus-circle/backend/internal/module/user"
 )
@@ -30,6 +35,13 @@ type ui21aIdentityEnvelope struct {
 
 func TestUI21AIdentityMigrationApplyRollbackApply(t *testing.T) {
 	db := openUI21AIdentityMySQL(t)
+	if err := db.Exec(`CREATE TABLE users (
+		id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+		campus VARCHAR(80) NOT NULL DEFAULT '',
+		PRIMARY KEY (id)
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`).Error; err != nil {
+		t.Fatal(err)
+	}
 	refuseUI21AIdentityRollbackWithNonDefaultFacts(t, db)
 
 	executeUI21AIdentitySQLFile(t, db, "../../migrations/029_user_current_identity.sql")
@@ -44,6 +56,9 @@ func TestUI21AIdentityMigrationApplyRollbackApply(t *testing.T) {
 
 func TestUI21AIdentityRealHTTPMySQL(t *testing.T) {
 	db := openUI21AIdentityMySQL(t)
+	if err := db.AutoMigrate(&user.User{}, &takeout.Rider{}, &identityapplication.IdentityGrant{}); err != nil {
+		t.Fatalf("create independent identity HTTP schema: %v", err)
+	}
 	executeUI21AIdentitySQLFile(t, db, "../../migrations/029_user_current_identity.sql")
 	if !db.Migrator().HasTable(&takeout.Rider{}) {
 		t.Fatal("takeout_riders is required for the shared rider identity acceptance")
@@ -55,7 +70,8 @@ func TestUI21AIdentityRealHTTPMySQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	auth := newUI21AIdentityAuth(db, newDeliveryIdentityEligibility(true, riders))
+	grants := identityapplication.NewRepository(db)
+	auth := newUI21AIdentityAuth(db, newDeliveryIdentityEligibility(true, riders, grants))
 	server := newUI21AIdentityServer(auth)
 	defer server.Close()
 
@@ -83,15 +99,31 @@ func TestUI21AIdentityRealHTTPMySQL(t *testing.T) {
 		t.Fatalf("missing rider switch status=%d", status)
 	}
 	status, body = ui21aIdentityHTTPJSON(t, server.Client(), http.MethodPost, server.URL+"/api/v1/auth/identity", login.Token, map[string]any{"identity": "merchant"})
+	if status != http.StatusForbidden {
+		t.Fatalf("missing merchant grant switch status=%d", status)
+	}
+	now := time.Now().UTC()
+	if err := db.Create(&identityapplication.IdentityGrant{
+		UserID: uint64(login.User.ID), Role: identityapplication.RoleMerchant, Status: identityapplication.GrantActive,
+		GrantedAt: now, RowVersion: 1, CreatedAt: now, UpdatedAt: now,
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	status, body = ui21aIdentityHTTPJSON(t, server.Client(), http.MethodPost, server.URL+"/api/v1/auth/identity", login.Token, map[string]any{"identity": "merchant"})
 	assertUI21AIdentityResponse(t, status, body, http.StatusOK, `"currentIdentity":"merchant"`)
 	status, body = ui21aIdentityHTTPJSON(t, server.Client(), http.MethodPost, server.URL+"/api/v1/auth/identity", login.Token, map[string]any{"identity": "merchant"})
 	assertUI21AIdentityResponse(t, status, body, http.StatusOK, `"currentIdentity":"merchant"`)
 
-	now := time.Now().UTC()
 	if err := db.Create(&takeout.Rider{
 		RiderUserID: uint64(login.User.ID), Status: takeout.RiderActive,
 		RealName: "UI21A Rider", Phone: "13100000000", RowVersion: 1,
 		CreatedAt: now, UpdatedAt: now,
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&identityapplication.IdentityGrant{
+		UserID: uint64(login.User.ID), Role: identityapplication.RoleRider, Status: identityapplication.GrantActive,
+		GrantedAt: now, RowVersion: 1, CreatedAt: now, UpdatedAt: now,
 	}).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +146,7 @@ func TestUI21AIdentityRealHTTPMySQL(t *testing.T) {
 		t.Fatalf("resting rider switch status=%d", status)
 	}
 
-	disabledAuth := newUI21AIdentityAuth(db, newDeliveryIdentityEligibility(false, nil))
+	disabledAuth := newUI21AIdentityAuth(db, newDeliveryIdentityEligibility(false, nil, grants))
 	disabledServer := newUI21AIdentityServer(disabledAuth)
 	defer disabledServer.Close()
 	status, _ = ui21aIdentityHTTPJSON(t, disabledServer.Client(), http.MethodPost, disabledServer.URL+"/api/v1/auth/identity", login.Token, map[string]any{"identity": "merchant"})
@@ -126,7 +158,7 @@ func TestUI21AIdentityRealHTTPMySQL(t *testing.T) {
 	if status != http.StatusOK {
 		t.Fatalf("merchant persistence setup status=%d", status)
 	}
-	restartedAuth := newUI21AIdentityAuth(db, newDeliveryIdentityEligibility(true, riders))
+	restartedAuth := newUI21AIdentityAuth(db, newDeliveryIdentityEligibility(true, riders, grants))
 	restartedServer := newUI21AIdentityServer(restartedAuth)
 	defer restartedServer.Close()
 	status, body = ui21aIdentityHTTPJSON(t, restartedServer.Client(), http.MethodGet, restartedServer.URL+"/api/v1/auth/identity", login.Token, nil)
@@ -158,11 +190,74 @@ func newUI21AIdentityServer(auth *user.Service) *httptest.Server {
 
 func openUI21AIdentityMySQL(t *testing.T) *gorm.DB {
 	t.Helper()
-	dsn := os.Getenv("UI21A_IDENTITY_MYSQL_DSN")
+	dsn := strings.TrimSpace(os.Getenv("TEST_MYSQL_DSN"))
 	if dsn == "" {
-		t.Skip("set UI21A_IDENTITY_MYSQL_DSN to run UI-21a real HTTP/MySQL acceptance")
+		t.Skip("PENDING: set TEST_MYSQL_DSN to run identity HTTP tests in an independent temporary MySQL database")
 	}
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	serverConfig, err := mysqlDriver.ParseDSN(dsn)
+	if err != nil {
+		t.Fatalf("parse TEST_MYSQL_DSN: %v", err)
+	}
+	serverConfig.DBName = ""
+	serverConfig.MultiStatements = false
+	serverConfig.ParseTime = true
+	serverConfig.Loc = time.UTC
+	serverDB, err := sql.Open("mysql", serverConfig.FormatDSN())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := serverDB.Ping(); err != nil {
+		_ = serverDB.Close()
+		t.Fatalf("connect TEST_MYSQL_DSN server: %v", err)
+	}
+	var version string
+	if err := serverDB.QueryRow("SELECT VERSION()").Scan(&version); err != nil {
+		_ = serverDB.Close()
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(version, "8.") {
+		_ = serverDB.Close()
+		t.Skipf("PENDING: identity HTTP contract requires MySQL 8, got %s", version)
+	}
+	databaseName := fmt.Sprintf("identity_http_%d_%d", os.Getpid(), time.Now().UnixNano())
+	if _, err := serverDB.Exec("CREATE DATABASE `" + databaseName + "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"); err != nil {
+		_ = serverDB.Close()
+		t.Skipf("PENDING: cannot create independent temporary database; shared campus_circle fallback is forbidden: %v", err)
+	}
+	databaseConfig, err := mysqlDriver.ParseDSN(dsn)
+	if err != nil {
+		_, _ = serverDB.Exec("DROP DATABASE IF EXISTS `" + databaseName + "`")
+		_ = serverDB.Close()
+		t.Fatal(err)
+	}
+	databaseConfig.DBName = databaseName
+	databaseConfig.MultiStatements = false
+	databaseConfig.ParseTime = true
+	databaseConfig.Loc = time.UTC
+	databaseSQL, err := sql.Open("mysql", databaseConfig.FormatDSN())
+	if err != nil {
+		_, _ = serverDB.Exec("DROP DATABASE IF EXISTS `" + databaseName + "`")
+		_ = serverDB.Close()
+		t.Fatal(err)
+	}
+	if err := databaseSQL.Ping(); err != nil {
+		_ = databaseSQL.Close()
+		_, _ = serverDB.Exec("DROP DATABASE IF EXISTS `" + databaseName + "`")
+		_ = serverDB.Close()
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := databaseSQL.Close(); err != nil {
+			t.Errorf("close identity HTTP database: %v", err)
+		}
+		if _, err := serverDB.Exec("DROP DATABASE IF EXISTS `" + databaseName + "`"); err != nil {
+			t.Errorf("drop identity HTTP database: %v", err)
+		}
+		if err := serverDB.Close(); err != nil {
+			t.Errorf("close MySQL server connection: %v", err)
+		}
+	})
+	db, err := gorm.Open(mysql.New(mysql.Config{Conn: databaseSQL}), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,6 +349,11 @@ func cleanupUI21AIdentity(t *testing.T, db *gorm.DB) {
 	}
 	if len(userIDs) == 0 {
 		return
+	}
+	if db.Migrator().HasTable(&identityapplication.IdentityGrant{}) {
+		if err := db.Where("user_id IN ?", userIDs).Delete(&identityapplication.IdentityGrant{}).Error; err != nil {
+			t.Errorf("cleanup UI-21a identity grants: %v", err)
+		}
 	}
 	if db.Migrator().HasTable(&takeout.Rider{}) {
 		if err := db.Where("rider_user_id IN ?", userIDs).Delete(&takeout.Rider{}).Error; err != nil {

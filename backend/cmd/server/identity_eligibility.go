@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"campus-circle/backend/internal/module/identityapplication"
 	"campus-circle/backend/internal/module/takeout"
 	"campus-circle/backend/internal/module/user"
 )
@@ -15,10 +16,11 @@ type riderIdentityFinder interface {
 type deliveryIdentityEligibility struct {
 	enabled bool
 	riders  riderIdentityFinder
+	grants  identityapplication.GrantFinder
 }
 
-func newDeliveryIdentityEligibility(enabled bool, riders riderIdentityFinder) user.IdentityEligibility {
-	return &deliveryIdentityEligibility{enabled: enabled, riders: riders}
+func newDeliveryIdentityEligibility(enabled bool, riders riderIdentityFinder, grants identityapplication.GrantFinder) user.IdentityEligibility {
+	return &deliveryIdentityEligibility{enabled: enabled, riders: riders, grants: grants}
 }
 
 func (e *deliveryIdentityEligibility) RiderEligible(ctx context.Context, userID uint64) (user.IdentityEligibilityResult, error) {
@@ -27,7 +29,11 @@ func (e *deliveryIdentityEligibility) RiderEligible(ctx context.Context, userID 
 			Available: false, Reason: "delivery is disabled", Status: "disabled",
 		}, nil
 	}
-	if e.riders == nil || userID == 0 {
+	grant, available, err := e.activeGrant(ctx, userID, identityapplication.RoleRider)
+	if err != nil || !available {
+		return grant, err
+	}
+	if e.riders == nil {
 		return user.IdentityEligibilityResult{
 			Available: false, Reason: "rider qualification required", Status: "missing",
 		}, nil
@@ -49,18 +55,42 @@ func (e *deliveryIdentityEligibility) RiderEligible(ctx context.Context, userID 
 	}
 }
 
-func (e *deliveryIdentityEligibility) MerchantEligible(_ context.Context, userID uint64) (user.IdentityEligibilityResult, error) {
+func (e *deliveryIdentityEligibility) MerchantEligible(ctx context.Context, userID uint64) (user.IdentityEligibilityResult, error) {
 	if e == nil || !e.enabled {
 		return user.IdentityEligibilityResult{
 			Available: false, Reason: "delivery is disabled", Status: "disabled",
 		}, nil
 	}
-	if userID == 0 {
-		return user.IdentityEligibilityResult{
-			Available: false, Reason: "authentication required", Status: "missing",
-		}, nil
+	result, _, err := e.activeGrant(ctx, userID, identityapplication.RoleMerchant)
+	return result, err
+}
+
+func (e *deliveryIdentityEligibility) activeGrant(ctx context.Context, userID uint64, role identityapplication.Role) (user.IdentityEligibilityResult, bool, error) {
+	missing := user.IdentityEligibilityResult{
+		Available: false, Reason: string(role) + " approval required", Status: "missing",
 	}
-	return user.IdentityEligibilityResult{Available: true, Status: "active"}, nil
+	if userID == 0 || e.grants == nil {
+		return missing, false, nil
+	}
+	grant, found, err := e.grants.FindGrant(ctx, userID, role)
+	if err != nil {
+		return user.IdentityEligibilityResult{}, false, err
+	}
+	if !found {
+		return missing, false, nil
+	}
+	switch grant.Status {
+	case identityapplication.GrantActive:
+		return user.IdentityEligibilityResult{Available: true, Status: string(grant.Status)}, true, nil
+	case identityapplication.GrantSuspended:
+		return user.IdentityEligibilityResult{
+			Available: false, Reason: string(role) + " approval is suspended", Status: string(grant.Status),
+		}, false, nil
+	default:
+		return user.IdentityEligibilityResult{
+			Available: false, Reason: string(role) + " approval is unavailable", Status: string(grant.Status),
+		}, false, nil
+	}
 }
 
 var _ user.IdentityEligibility = (*deliveryIdentityEligibility)(nil)

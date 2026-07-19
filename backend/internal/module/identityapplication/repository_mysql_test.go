@@ -31,6 +31,32 @@ type failAfterTransactionalMediaCommit struct {
 	err error
 }
 
+func TestGormRepositoryFindGrantAgainstMySQL(t *testing.T) {
+	db := requireIdentityApplicationMySQL(t)
+	now := time.Now().UTC()
+	for _, grant := range []IdentityGrant{
+		{UserID: 901, Role: RoleMerchant, Status: GrantActive, GrantedAt: now, RowVersion: 1, CreatedAt: now, UpdatedAt: now},
+		{UserID: 902, Role: RoleRider, Status: GrantSuspended, GrantedAt: now, RowVersion: 1, CreatedAt: now, UpdatedAt: now},
+	} {
+		if err := db.Create(&grant).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	repository := NewRepository(db)
+	active, found, err := repository.FindGrant(context.Background(), 901, RoleMerchant)
+	if err != nil || !found || active.Status != GrantActive {
+		t.Fatalf("active=%+v found=%v err=%v", active, found, err)
+	}
+	suspended, found, err := repository.FindGrant(context.Background(), 902, RoleRider)
+	if err != nil || !found || suspended.Status != GrantSuspended {
+		t.Fatalf("suspended=%+v found=%v err=%v", suspended, found, err)
+	}
+	missing, found, err := repository.FindGrant(context.Background(), 903, RoleMerchant)
+	if err != nil || found || missing.ID != 0 {
+		t.Fatalf("missing=%+v found=%v err=%v", missing, found, err)
+	}
+}
+
 func (m *failAfterTransactionalMediaCommit) EnsureCommittedInTransaction(ctx context.Context, tx *gorm.DB, ownerID uint64, reservation MediaReservation, applicationPublicID string) error {
 	if err := m.ApplicationMedia.EnsureCommittedInTransaction(ctx, tx, ownerID, reservation, applicationPublicID); err != nil {
 		return err

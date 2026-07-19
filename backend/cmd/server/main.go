@@ -56,6 +56,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("open database: %v", err)
 	}
+	identityApplicationRepository := identityapplication.NewRepository(db)
 	// Composition root: repositories are private to their domain; only services cross boundaries.
 	reviewService := review.NewService(review.NewRepository(db))
 	var identityRiders *takeout.RiderIdentityService
@@ -68,7 +69,7 @@ func main() {
 	userService := user.NewService(
 		user.NewRepository(db), cfg.JWTSecret, cfg.WechatAppID, cfg.WechatAppSecret, cfg.AllowMockWechat,
 		user.WithAppEnv(cfg.AppEnv),
-		user.WithIdentityEligibility(newDeliveryIdentityEligibility(cfg.EnableDelivery, identityRiders)),
+		user.WithIdentityEligibility(newDeliveryIdentityEligibility(cfg.EnableDelivery, identityRiders, identityApplicationRepository)),
 	)
 	userService.SetAccountClosureCoordinator(accountclosure.New(db))
 	cosClient, err := legacymedia.NewTencentCOS(cfg.COSSecretID, cfg.COSSecretKey, cfg.COSBucket, cfg.COSRegion, cfg.COSAppID)
@@ -136,7 +137,7 @@ func main() {
 		log.Fatalf("configure identity application proof media: %v", err)
 	}
 	identityApplicationService := identityapplication.NewService(
-		identityapplication.NewRepository(db), identityApplicationMedia, nil,
+		identityApplicationRepository, identityApplicationMedia, nil,
 		newIdentityApplicationApprovalProvisioner(nil),
 	)
 	feedbackMedia, err := user.NewCoreFeedbackMedia(bindingService)
@@ -359,8 +360,14 @@ func main() {
 	api := router.Group("/api/v1")
 	authRoutes := api.Group("/auth")
 	user.NewHandler(userService, mediaService).Register(authRoutes)
-	identityApplicationRoutes := authRoutes.Group("", userService.AuthRequired(), user.UnmutedRequired())
-	identityapplication.NewHandler(identityApplicationService).RegisterUser(identityApplicationRoutes)
+	registerIdentityApplicationRoutes(
+		api, authRoutes, identityapplication.NewHandler(identityApplicationService),
+		identityRoutePolicies{
+			authRequired:    userService.AuthRequired(),
+			unmutedRequired: user.UnmutedRequired(),
+			adminRequired:   user.AdminRequired(),
+		},
+	)
 	legacymedia.NewHandler(mediaService, cfg.WechatCallbackToken, userService.AuthRequired(), user.UnmutedRequired(), func(c *gin.Context) (uint, string) {
 		value := user.CurrentUser(c)
 		return value.ID, value.OpenID
@@ -395,6 +402,22 @@ func main() {
 	if err := router.Run(cfg.HTTPAddr); err != nil {
 		log.Fatalf("run server: %v", err)
 	}
+}
+
+type identityRoutePolicies struct {
+	authRequired    gin.HandlerFunc
+	unmutedRequired gin.HandlerFunc
+	adminRequired   gin.HandlerFunc
+}
+
+func registerIdentityApplicationRoutes(
+	api *gin.RouterGroup,
+	authRoutes *gin.RouterGroup,
+	handler *identityapplication.Handler,
+	policies identityRoutePolicies,
+) {
+	handler.RegisterUser(authRoutes.Group("", policies.authRequired, policies.unmutedRequired))
+	handler.RegisterAdmin(api.Group("/admin/identity-applications", policies.authRequired, policies.adminRequired))
 }
 
 func newRouter(loggerOutput io.Writer, recoveryOutput io.Writer) *gin.Engine {

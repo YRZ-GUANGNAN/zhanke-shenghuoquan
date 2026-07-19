@@ -23,12 +23,34 @@ type Repository interface {
 	Reject(context.Context, DecisionInput) (Application, error)
 }
 
+// GrantFinder is the read-only boundary used by other domains to decide
+// whether an approved rider or merchant identity is currently available.
+// A missing row is represented by found=false; suspended and active grants
+// are returned as ordinary persisted states.
+type GrantFinder interface {
+	FindGrant(context.Context, uint64, Role) (IdentityGrant, bool, error)
+}
+
 type SubmissionCommit func(context.Context, *gorm.DB) error
 type ApprovalCommit func(context.Context, *gorm.DB, ApprovedIdentity) error
 
 type GormRepository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *GormRepository { return &GormRepository{db: db} }
+
+func (r *GormRepository) FindGrant(ctx context.Context, userID uint64, role Role) (IdentityGrant, bool, error) {
+	if r == nil || r.db == nil || userID == 0 || !role.Valid() {
+		return IdentityGrant{}, false, ErrInvalidInput
+	}
+	var value IdentityGrant
+	err := r.db.WithContext(ctx).
+		Where("user_id = ? AND role = ?", userID, role).
+		Take(&value).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return IdentityGrant{}, false, nil
+	}
+	return value, err == nil, err
+}
 
 func (r *GormRepository) FindCurrent(ctx context.Context, userID uint64, role Role) (Application, bool, error) {
 	var value Application
@@ -397,3 +419,4 @@ func mapDecisionWriteError(err error) error {
 }
 
 var _ Repository = (*GormRepository)(nil)
+var _ GrantFinder = (*GormRepository)(nil)
