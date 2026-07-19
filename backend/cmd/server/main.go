@@ -137,6 +137,7 @@ func main() {
 	}
 	identityApplicationService := identityapplication.NewService(
 		identityapplication.NewRepository(db), identityApplicationMedia, nil,
+		newIdentityApplicationApprovalProvisioner(nil),
 	)
 	feedbackMedia, err := user.NewCoreFeedbackMedia(bindingService)
 	if err != nil {
