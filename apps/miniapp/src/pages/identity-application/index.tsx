@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Image, Input, Text, View } from '@tarojs/components'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import { getIdentityApplication, submitIdentityApplication } from '../../services/a-user'
 import { isApiError } from '../../services/api'
-import { chooseAndUploadImages, waitForMediaApproval, type UploadedMedia } from '../../services/media'
+import { chooseAndUploadImagesSettled, waitForMediaApproval, type UploadedMedia } from '../../services/media'
 import Taro from '../../services/taro'
 import type { IdentityApplicationRole, IdentityApplicationView } from '../../types'
 import './index.scss'
@@ -68,6 +68,12 @@ function readableTime(value?: string): string {
 
 function IdentityApplicationContent() {
   const role = useMemo(readRole, [])
+  const mountedRef = useRef(true)
+  const leavingRef = useRef(false)
+  const operationGenerationRef = useRef(0)
+  const loadSequenceRef = useRef(0)
+  const uploadLockRef = useRef(false)
+  const submitLockRef = useRef(false)
   const [application, setApplication] = useState<IdentityApplicationView | null>(null)
   const [realName, setRealName] = useState('')
   const [phone, setPhone] = useState('')
@@ -89,13 +95,34 @@ function IdentityApplicationContent() {
     setProofs((current) => value.assetIds.map((assetId) => current.find((item) => item.assetId === assetId) ?? existingProof(assetId)))
   }, [])
 
+  const isOperationActive = useCallback((generation: number) => (
+    mountedRef.current && !leavingRef.current && operationGenerationRef.current === generation
+  ), [])
+
+  useEffect(() => {
+    mountedRef.current = true
+    leavingRef.current = false
+    return () => {
+      mountedRef.current = false
+      leavingRef.current = true
+      operationGenerationRef.current += 1
+      loadSequenceRef.current += 1
+      uploadLockRef.current = false
+      submitLockRef.current = false
+    }
+  }, [])
+
   const loadApplication = useCallback(async () => {
-    if (!role) return
+    if (!role || !mountedRef.current || leavingRef.current) return
+    const requestId = ++loadSequenceRef.current
     setLoading(true)
     setLoadError('')
     try {
-      applyApplication(await getIdentityApplication(role))
+      const value = await getIdentityApplication(role)
+      if (!mountedRef.current || leavingRef.current || requestId !== loadSequenceRef.current) return
+      applyApplication(value)
     } catch (error) {
+      if (!mountedRef.current || leavingRef.current || requestId !== loadSequenceRef.current) return
       if (isApiError(error) && error.status === 404) {
         setApplication(null)
         setProofs([])
@@ -103,7 +130,7 @@ function IdentityApplicationContent() {
         setLoadError(applicationErrorMessage(error))
       }
     } finally {
-      setLoading(false)
+      if (mountedRef.current && !leavingRef.current && requestId === loadSequenceRef.current) setLoading(false)
     }
   }, [applyApplication, role])
 
@@ -116,34 +143,65 @@ function IdentityApplicationContent() {
   const copy = role ? roleCopy[role] : null
 
   const updateProof = (assetId: string, changes: Partial<ProofItem>) => {
+    if (!mountedRef.current || leavingRef.current) return
     setProofs((current) => current.map((item) => item.assetId === assetId ? { ...item, ...changes } : item))
   }
 
   const chooseProofs = async () => {
-    if (!editable || busy) return
-    if (proofs.length >= 6) {
-      await Taro.showToast({ title: '最多上传 6 张证明图片', icon: 'none' })
-      return
-    }
-    setUploading(true)
-    setProgress('正在选择证明图片')
+    if (!editable || leavingRef.current || uploadLockRef.current || submitLockRef.current) return
+    uploadLockRef.current = true
+    const generation = ++operationGenerationRef.current
     try {
-      const uploaded = await chooseAndUploadImages('identity_application', 6 - proofs.length, (value) => {
+      if (proofs.length >= 6) {
+        await Taro.showToast({ title: '最多上传 6 张证明图片', icon: 'none' })
+        return
+      }
+      if (!isOperationActive(generation)) return
+      setUploading(true)
+      setProgress('正在选择证明图片')
+      const settlements = await chooseAndUploadImagesSettled('identity_application', 6 - proofs.length, (value) => {
+        if (!isOperationActive(generation)) return
         setProgress(`第 ${value.index + 1}/${value.total} 张 · ${value.message}`)
       })
-      setProofs((current) => [...current, ...uploaded.map(uploadedProof)].slice(0, 6))
-      setProgress(uploaded.length > 0 ? '图片已上传，提交时将确认安全审核结果' : '')
+      if (!isOperationActive(generation)) return
+      const uploaded = settlements.reduce<UploadedMedia[]>((values, item) => {
+        if (item.status === 'fulfilled') values.push(item.value)
+        return values
+      }, [])
+      const failed = settlements.filter((item) => item.status === 'rejected')
+      setProofs((current) => {
+        const seen = new Set(current.map((item) => item.assetId))
+        const next = [...current]
+        for (const value of uploaded) {
+          if (seen.has(value.assetId)) continue
+          seen.add(value.assetId)
+          next.push(uploadedProof(value))
+        }
+        return next.slice(0, 6)
+      })
+      const failureDetail = failed.map((item) => `第 ${item.index + 1} 张：${item.reason.message}`).join('；')
+      const summary = failed.length > 0
+        ? `已保留 ${uploaded.length} 张上传成功的图片。${failureDetail}`
+        : uploaded.length > 0 ? '图片已上传，提交时将确认安全审核结果' : ''
+      setProgress(summary)
+      if (failed.length > 0 && isOperationActive(generation)) {
+        await Taro.showToast({ title: summary, icon: 'none', duration: 2400 })
+      }
     } catch (error) {
+      if (!isOperationActive(generation)) return
       const message = error instanceof Error ? error.message : '证明图片上传失败，请重新选择'
       setProgress(message)
       await Taro.showToast({ title: message, icon: 'none', duration: 2200 })
     } finally {
-      setUploading(false)
+      if (isOperationActive(generation)) {
+        uploadLockRef.current = false
+        setUploading(false)
+      }
     }
   }
 
   const removeProof = (index: number) => {
-    if (!editable || busy) return
+    if (!editable || leavingRef.current || uploadLockRef.current || submitLockRef.current) return
     setProofs((current) => current.filter((_, currentIndex) => currentIndex !== index))
   }
 
@@ -166,25 +224,31 @@ function IdentityApplicationContent() {
   }
 
   const submit = async () => {
-    if (!role || !editable || busy) return
-    const validation = validate()
-    if (validation) {
-      await Taro.showToast({ title: validation, icon: 'none' })
-      return
-    }
-
-    setSubmitting(true)
-    setProgress('正在确认所有证明图片的安全审核状态')
+    if (!role || !editable || leavingRef.current || uploadLockRef.current || submitLockRef.current) return
+    submitLockRef.current = true
+    const generation = ++operationGenerationRef.current
     try {
+      const validation = validate()
+      if (validation) {
+        await Taro.showToast({ title: validation, icon: 'none' })
+        return
+      }
+      if (!isOperationActive(generation)) return
+      setSubmitting(true)
+      setProgress('正在确认所有证明图片的安全审核状态')
       for (const proof of proofs) {
+        if (!isOperationActive(generation)) return
         updateProof(proof.assetId, { state: 'checking', message: '正在确认安全审核状态' })
         try {
           await waitForMediaApproval(proof.assetId, (status) => {
+            if (!isOperationActive(generation)) return
             updateProof(proof.assetId, { state: 'checking', message: status.message || '正在审核' })
             setProgress(status.message || '正在确认证明图片')
-          })
+          }, 90000, () => isOperationActive(generation))
+          if (!isOperationActive(generation)) return
           updateProof(proof.assetId, { state: 'approved', message: '证明图片已通过安全审核' })
         } catch (error) {
+          if (!isOperationActive(generation)) return
           updateProof(proof.assetId, {
             state: 'failed',
             message: error instanceof Error ? error.message : '图片处理失败，请重新上传'
@@ -193,6 +257,7 @@ function IdentityApplicationContent() {
         }
       }
 
+      if (!isOperationActive(generation)) return
       const result = await submitIdentityApplication(role, {
         realName: realName.trim(),
         phone: phone.trim(),
@@ -201,17 +266,44 @@ function IdentityApplicationContent() {
         assetIds: proofs.map((item) => item.assetId),
         expectedRowVersion: application?.status === 'rejected' ? application.rowVersion : 0
       })
+      if (!isOperationActive(generation)) return
       applyApplication(result)
       setProgress('')
       await Taro.showToast({ title: '申请已提交，等待平台审核', icon: 'success', duration: 1800 })
     } catch (error) {
+      if (!isOperationActive(generation)) return
       const message = applicationErrorMessage(error)
       setProgress(message)
-      if (isApiError(error) && error.status === 409) await loadApplication()
+      if (isApiError(error) && error.status === 409) {
+        await loadApplication()
+        if (!isOperationActive(generation)) return
+      }
       await Taro.showToast({ title: message, icon: 'none', duration: 2400 })
     } finally {
-      setSubmitting(false)
+      if (isOperationActive(generation)) {
+        submitLockRef.current = false
+        setSubmitting(false)
+      }
     }
+  }
+
+  const cancelAndBack = async () => {
+    if (leavingRef.current) return
+    const cancelling = uploadLockRef.current || submitLockRef.current
+    leavingRef.current = true
+    operationGenerationRef.current += 1
+    loadSequenceRef.current += 1
+    uploadLockRef.current = false
+    submitLockRef.current = false
+    if (mountedRef.current) {
+      setUploading(false)
+      setSubmitting(false)
+      setProgress(cancelling ? '当前操作已取消' : '')
+    }
+    if (cancelling && mountedRef.current) {
+      await Taro.showToast({ title: '已取消当前操作', icon: 'none', duration: 1200 })
+    }
+    if (mountedRef.current) await Taro.navigateBack()
   }
 
   if (!role || !copy) {
@@ -220,7 +312,7 @@ function IdentityApplicationContent() {
         <View className='identity-application-state'>
           <Text className='identity-application-state__title'>申请类型无效</Text>
           <Text className='identity-application-state__copy'>只能申请骑手或商家身份。</Text>
-          <View className='identity-application-state__action' onClick={() => void Taro.navigateBack()}><Text>返回</Text></View>
+          <View className='identity-application-state__action' onClick={() => void cancelAndBack()}><Text>返回</Text></View>
         </View>
       </View>
     )
@@ -229,7 +321,7 @@ function IdentityApplicationContent() {
   return (
     <View className='identity-application-page'>
       <View className='identity-application-nav'>
-        <View className='identity-application-nav__back' onClick={() => void Taro.navigateBack()}><Text>‹</Text></View>
+        <View className='identity-application-nav__back' onClick={() => void cancelAndBack()}><Text>‹</Text></View>
         <Text className='identity-application-nav__title'>{copy.title}</Text>
       </View>
 
@@ -334,7 +426,7 @@ function IdentityApplicationContent() {
               </View>
             )}
             {!editable && (
-              <View className='identity-application-secondary' onClick={() => void Taro.navigateBack()}><Text>返回“我的”</Text></View>
+              <View className='identity-application-secondary' onClick={() => void cancelAndBack()}><Text>返回“我的”</Text></View>
             )}
           </>
         )}

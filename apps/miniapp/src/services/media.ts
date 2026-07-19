@@ -48,6 +48,10 @@ export interface UploadedMedia extends MediaStatus {
   previewPath: string
 }
 
+export type ImageUploadSettlement =
+  | { index: number; status: 'fulfilled'; value: UploadedMedia }
+  | { index: number; status: 'rejected'; reason: Error }
+
 export interface MediaHistory {
   items: MediaStatus[]
   page: number
@@ -89,6 +93,28 @@ export async function chooseAndUploadImages(
   )
 }
 
+export async function chooseAndUploadImagesSettled(
+  purpose: MediaPurpose,
+  count: number,
+  onProgress?: (value: UploadProgress) => void
+): Promise<ImageUploadSettlement[]> {
+  const selected = await Taro.chooseMedia({ count, mediaType: ['image'], sourceType: ['album', 'camera'], sizeType: ['original'] })
+  return mapConcurrent(selected.tempFiles, 3, async (file, index) => {
+    try {
+      const value = await uploadImage(file.tempFilePath, purpose, (percent, stage, message) =>
+        onProgress?.({ index, total: selected.tempFiles.length, percent, stage, message })
+      )
+      return { index, status: 'fulfilled', value } as const
+    } catch (reason) {
+      return {
+        index,
+        status: 'rejected',
+        reason: reason instanceof Error ? reason : new Error('图片上传失败')
+      } as const
+    }
+  })
+}
+
 export async function getMediaStatus(assetId: string): Promise<MediaStatus> {
   return request<MediaStatus>(`/miniapp/media/assets/${assetId}`, { url: '', timeout: 10000 })
 }
@@ -106,11 +132,14 @@ export async function retryUploadCompletion(ticketId: string): Promise<MediaStat
 export async function waitForMediaApproval(
   assetId: string,
   onStatus?: (value: MediaStatus) => void,
-  timeoutMs = 90000
+  timeoutMs = 90000,
+  shouldContinue?: () => boolean
 ): Promise<MediaStatus> {
   const deadline = Date.now() + timeoutMs
   while (true) {
+    if (shouldContinue && !shouldContinue()) throw new Error('图片审核确认已取消')
     const status = await getMediaStatus(assetId)
+    if (shouldContinue && !shouldContinue()) throw new Error('图片审核确认已取消')
     onStatus?.(status)
     if (status.canUse && status.state === 'approved') return status
     if (status.state === 'rejected') throw new Error('照片未通过内容安全审核，请重新拍摄')
@@ -119,6 +148,7 @@ export async function waitForMediaApproval(
       throw new Error(status.message || '照片处理失败，请重新拍摄')
     }
     if (Date.now() >= deadline) throw new Error('照片仍在审核处理中，请稍后重试')
+    if (shouldContinue && !shouldContinue()) throw new Error('图片审核确认已取消')
     await delay(1500)
   }
 }
