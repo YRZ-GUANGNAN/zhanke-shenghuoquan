@@ -8,35 +8,15 @@
   font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 }
 
-.identity-application-nav {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  height: 184rpx;
-  padding: 0 36rpx 34rpx;
-  box-sizing: border-box;
-  background: $bg-surface;
-  box-shadow: $shadow-header;
-}
-
 .identity-application-nav__back {
-  position: absolute;
-  left: 36rpx;
-  bottom: 22rpx;
-  width: 58rpx;
-  height: 58rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
   color: $text-strong;
   font-size: 54rpx;
   line-height: 1;
-}
-
-.identity-application-nav__title {
-  color: $text-strong;
-  font-size: 32rpx;
-  font-weight: 800;
 }
 
 .identity-application-content {

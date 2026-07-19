@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Button, Text, View } from '@tarojs/components'
 import { useDidShow } from '@tarojs/taro'
+import CapsulePageHeader from '../../components/capsule-page-header'
 import {
   bindWechatPhone,
   closeAccount,
@@ -148,10 +149,7 @@ export default function SettingsPage() {
 
   return (
     <View className='student-settings-page'>
-      <View className='student-settings-nav'>
-        <View className='student-settings-nav__back' onClick={() => void Taro.navigateBack()}><Text>‹</Text></View>
-        <Text className='student-settings-nav__title'>设置</Text>
-      </View>
+      <CapsulePageHeader title='设置' left={<View className='student-settings-nav__back' onClick={() => void Taro.navigateBack()}><Text>‹</Text></View>} />
 
       <View className='student-settings-content'>
         <View className='student-settings-section'>

@@ -1,9 +1,7 @@
 @use '../../styles/design-tokens.scss' as *;
 
 .feedback-page { min-height: 100vh; background: $bg-app; color: $text-primary; }
-.feedback-nav { position: sticky; top: 0; z-index: 5; display: flex; align-items: flex-end; justify-content: center; height: 184rpx; padding: 0 36rpx 34rpx; box-sizing: border-box; background: $bg-surface; }
-.feedback-nav__back { position: absolute; left: 36rpx; bottom: 23rpx; width: 56rpx; height: 56rpx; font-size: 54rpx; line-height: 1; }
-.feedback-nav__title { color: $text-strong; font-size: 32rpx; font-weight: 800; }
+.feedback-nav__back { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; font-size: 54rpx; line-height: 1; }
 .feedback-content { padding: 32rpx 36rpx calc(72rpx + env(safe-area-inset-bottom)); }
 .feedback-label { display: block; margin: 26rpx 6rpx 16rpx; color: $text-secondary; font-size: 25rpx; font-weight: 700; }
 .feedback-categories { display: flex; flex-wrap: wrap; gap: 16rpx; }

@@ -1,5 +1,6 @@
 import React from 'react'
 import { Text, View } from '@tarojs/components'
+import CapsulePageHeader from '../../components/capsule-page-header'
 import Taro from '../../services/taro'
 import './index.scss'
 
@@ -15,10 +16,7 @@ function versionLabel(): string {
 export default function AboutPage() {
   return (
     <View className='about-page'>
-      <View className='about-nav'>
-        <View className='about-nav__back' onClick={() => void Taro.navigateBack()}><Text>‹</Text></View>
-        <Text className='about-nav__title'>关于</Text>
-      </View>
+      <CapsulePageHeader title='关于' left={<View className='about-nav__back' onClick={() => void Taro.navigateBack()}><Text>‹</Text></View>} />
       <View className='about-content'>
         <View className='about-brand'><View className='about-brand__mark'><Text>湛</Text></View><Text className='about-brand__name'>湛科生活圈</Text><Text className='about-brand__version'>{versionLabel()}</Text></View>
         <Text className='about-description'>面向湛科校园的帖子、二手交易、配送与生活服务入口。让校内信息更清楚，让每一次连接更可靠。</Text>

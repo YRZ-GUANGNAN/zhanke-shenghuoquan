@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
+import CapsulePageHeader from '../../components/capsule-page-header'
 import Taro from '../../services/taro'
 import './index.scss'
 
@@ -72,22 +73,22 @@ export default function LegalPage() {
 
   return (
     <View className='student-legal-page'>
-      <View className='student-legal-nav'>
-        <View className='student-legal-nav__back' onClick={() => void Taro.navigateBack()}>
+      <CapsulePageHeader
+        title='法律条款'
+        left={<View className='student-legal-nav__back' onClick={() => void Taro.navigateBack()}>
           <Text>‹</Text>
-        </View>
-        <Text className='student-legal-nav__title'>法律条款</Text>
-        <View className='student-legal-tabs'>
-          {tabs.map((tab) => (
-            <View
-              key={tab.key}
-              className={`student-legal-tab ${activeTab === tab.key ? 'student-legal-tab--active' : ''}`}
-              onClick={() => setActiveTab(tab.key)}
-            >
-              <Text>{tab.label}</Text>
-            </View>
-          ))}
-        </View>
+        </View>}
+      />
+      <View className='student-legal-tabs'>
+        {tabs.map((tab) => (
+          <View
+            key={tab.key}
+            className={`student-legal-tab ${activeTab === tab.key ? 'student-legal-tab--active' : ''}`}
+            onClick={() => setActiveTab(tab.key)}
+          >
+            <Text>{tab.label}</Text>
+          </View>
+        ))}
       </View>
 
       <ScrollView scrollY className='student-legal-scroll'>

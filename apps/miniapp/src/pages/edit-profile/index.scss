@@ -7,21 +7,13 @@
   font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 }
 
-.edit-profile-nav {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 192rpx;
-  padding: 84rpx var(--capsule-safe-right, 44rpx) 0 44rpx;
-  border-bottom: 1rpx solid $divider-nav;
-  background: $bg-surface;
-  box-sizing: border-box;
-}
-
 .edit-profile-nav__action,
 .edit-profile-nav__save {
-  min-width: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
   color: $text-secondary;
   font-size: 27rpx;
   font-weight: 400;
@@ -30,18 +22,6 @@
 
 .edit-profile-nav__save {
   color: $brand-primary;
-  text-align: right;
-}
-
-.edit-profile-nav__title {
-  position: absolute;
-  left: 50%;
-  bottom: 32rpx;
-  color: $text-strong;
-  font-size: 32rpx;
-  font-weight: 800;
-  line-height: 1;
-  transform: translateX(-50%);
 }
 
 .edit-profile-content {

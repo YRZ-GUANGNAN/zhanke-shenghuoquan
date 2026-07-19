@@ -7,36 +7,15 @@
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-.my-content-header {
-  position: relative;
-  height: 176rpx;
-  padding-top: 78rpx;
-  box-sizing: border-box;
-  background: $bg-surface;
-  border-bottom: 1rpx solid $divider-nav;
-}
-
 .my-content-header__back {
-  position: absolute;
-  left: 38rpx;
-  top: 80rpx;
-  width: 54rpx;
-  height: 54rpx;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: $text-strong;
   font-size: 54rpx;
   line-height: 1;
-}
-
-.my-content-header__title {
-  display: block;
-  text-align: center;
-  color: $text-strong;
-  font-size: 34rpx;
-  font-weight: 800;
-  line-height: 54rpx;
 }
 
 .my-content-tabs {

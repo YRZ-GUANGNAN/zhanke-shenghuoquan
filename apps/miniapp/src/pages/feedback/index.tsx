@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Image, Text, Textarea, View } from '@tarojs/components'
+import CapsulePageHeader from '../../components/capsule-page-header'
 import { submitFeedback, type FeedbackCategory } from '../../services/a-user'
 import { chooseAndUploadImages, waitForMediaApproval, type UploadedMedia } from '../../services/media'
 import Taro from '../../services/taro'
@@ -62,10 +63,7 @@ export default function FeedbackPage() {
 
   return (
     <View className='feedback-page'>
-      <View className='feedback-nav'>
-        <View className='feedback-nav__back' onClick={() => void Taro.navigateBack()}><Text>‹</Text></View>
-        <Text className='feedback-nav__title'>意见反馈</Text>
-      </View>
+      <CapsulePageHeader title='意见反馈' left={<View className='feedback-nav__back' onClick={() => void Taro.navigateBack()}><Text>‹</Text></View>} />
       <View className='feedback-content'>
         <Text className='feedback-label'>问题类型</Text>
         <View className='feedback-categories'>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Image, Text, View } from '@tarojs/components'
+import CapsulePageHeader from '../../components/capsule-page-header'
 import type { CommunityPost, Product } from '../../types'
 import { getMyComments, getMyFavoritePosts, getMyPosts, type MyCommunityComment } from '../../services/b-community'
 import { getMyProductsPage } from '../../services/c-trade'
@@ -127,7 +128,7 @@ export default function MyContentPage() {
 
   return (
     <View className='my-content-page'>
-      <View className='my-content-header'><View className='my-content-header__back' onClick={() => void Taro.navigateBack()}><Text>‹</Text></View><Text className='my-content-header__title'>我的内容</Text></View>
+      <CapsulePageHeader title='我的内容' left={<View className='my-content-header__back' onClick={() => void Taro.navigateBack()}><Text>‹</Text></View>} />
       <View className='my-content-tabs'>{tabs.map((tab) => <View key={tab.key} className={`my-content-tab ${activeTab === tab.key ? 'my-content-tab--active' : ''}`} onClick={() => setActiveTab(tab.key)}><Text>{tab.label}</Text></View>)}</View>
       <View className='my-content-body'>{renderContent()}</View>
     </View>

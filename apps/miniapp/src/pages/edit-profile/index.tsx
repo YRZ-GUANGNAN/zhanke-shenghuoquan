@@ -1,10 +1,10 @@
 import React, { useState } from 'react'
 import { Image, Input, Text, View } from '@tarojs/components'
+import CapsulePageHeader from '../../components/capsule-page-header'
 import { updateProfile } from '../../services/a-user'
 import { chooseAndUploadImages, waitForMediaApproval, type UploadedMedia } from '../../services/media'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
-import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import './index.scss'
 
 export default function EditProfilePage() {
@@ -52,12 +52,12 @@ export default function EditProfilePage() {
   const avatarSource = avatar?.previewPath || profile.avatar
 
   return (
-    <View className='edit-profile-page' style={getCapsuleSafeStyle()}>
-      <View className='edit-profile-nav'>
-        <Text className='edit-profile-nav__action' onClick={() => void Taro.navigateBack()}>取消</Text>
-        <Text className='edit-profile-nav__title'>编辑资料</Text>
-        <Text className='edit-profile-nav__save' onClick={() => void save()}>{saving ? '保存中' : '保存'}</Text>
-      </View>
+    <View className='edit-profile-page'>
+      <CapsulePageHeader
+        title='编辑资料'
+        left={<Text className='edit-profile-nav__action' onClick={() => void Taro.navigateBack()}>取消</Text>}
+        right={<Text className='edit-profile-nav__save' onClick={() => void save()}>{saving ? '保存中' : '保存'}</Text>}
+      />
 
       <View className='edit-profile-content'>
         <View className='edit-profile-avatar-panel'>

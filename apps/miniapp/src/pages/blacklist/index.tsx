@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Text, View } from '@tarojs/components'
 import { useDidShow } from '@tarojs/taro'
+import CapsulePageHeader from '../../components/capsule-page-header'
 import { listBlockedUsers, removeBlockedUser, type BlockedUserView } from '../../services/a-user'
 import Taro from '../../services/taro'
 import './index.scss'
@@ -49,10 +50,7 @@ export default function BlacklistPage() {
 
   return (
     <View className='student-blacklist-page'>
-      <View className='student-blacklist-nav'>
-        <View className='student-blacklist-nav__back' onClick={() => void Taro.navigateBack()}><Text>‹</Text></View>
-        <Text className='student-blacklist-nav__title'>黑名单</Text>
-      </View>
+      <CapsulePageHeader title='黑名单' left={<View className='student-blacklist-nav__back' onClick={() => void Taro.navigateBack()}><Text>‹</Text></View>} />
 
       <View className='student-blacklist-content'>
         <Text className='student-blacklist-tip'>被拉黑的用户无法继续与你互动。移出后将恢复正常的站内互动权限。</Text>

@@ -77,4 +77,21 @@ assert.match(styleSource, /min-width:\s*44px/)
 assert.match(styleSource, /min-height:\s*44px/)
 assert.match(styleSource, /pointer-events:\s*none/)
 
+const miniappPagesRoot = path.join(__dirname, '..', 'apps', 'miniapp', 'src', 'pages')
+const standardPages = [
+  'about',
+  'blacklist',
+  'feedback',
+  'edit-profile',
+  'legal',
+  'settings',
+  'my-content',
+  'identity-application',
+]
+
+for (const pageName of standardPages) {
+  const source = fs.readFileSync(path.join(miniappPagesRoot, pageName, 'index.tsx'), 'utf8')
+  assert.match(source, /CapsulePageHeader/, `${pageName} must use CapsulePageHeader`)
+}
+
 console.log('miniapp capsule geometry: ok')

@@ -6,36 +6,15 @@
   color: $text-primary;
 }
 
-.student-blacklist-nav {
-  position: relative;
-  height: 178rpx;
-  padding: 92rpx 36rpx 0;
-  box-sizing: border-box;
-  background: $bg-surface;
-  border-bottom: 1rpx solid $divider-nav;
-}
-
 .student-blacklist-nav__back {
-  position: absolute;
-  left: 36rpx;
-  bottom: 26rpx;
-  width: 52rpx;
-  height: 52rpx;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   color: $text-strong;
   font-size: 54rpx;
   line-height: 1;
-}
-
-.student-blacklist-nav__title {
-  display: block;
-  color: $text-strong;
-  font-size: 32rpx;
-  font-weight: 700;
-  line-height: 54rpx;
-  text-align: center;
 }
 
 .student-blacklist-content {

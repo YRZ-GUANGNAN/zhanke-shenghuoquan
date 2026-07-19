@@ -1,9 +1,7 @@
 @use '../../styles/design-tokens.scss' as *;
 
 .about-page { min-height: 100vh; background: $bg-app; color: $text-primary; }
-.about-nav { position: sticky; top: 0; display: flex; align-items: flex-end; justify-content: center; height: 184rpx; padding-bottom: 34rpx; box-sizing: border-box; background: $bg-surface; }
-.about-nav__back { position: absolute; left: 36rpx; bottom: 23rpx; width: 56rpx; height: 56rpx; font-size: 54rpx; line-height: 1; }
-.about-nav__title { color: $text-strong; font-size: 32rpx; font-weight: 800; }
+.about-nav__back { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; font-size: 54rpx; line-height: 1; }
 .about-content { padding: 64rpx 36rpx; }
 .about-brand { display: flex; flex-direction: column; align-items: center; }
 .about-brand__mark { display: flex; align-items: center; justify-content: center; width: 126rpx; height: 126rpx; border-radius: 36rpx; background: $gradient-primary; box-shadow: 0 24rpx 50rpx -18rpx rgba(33, 104, 184, .6); color: #fff; font-size: 52rpx; font-weight: 900; }
