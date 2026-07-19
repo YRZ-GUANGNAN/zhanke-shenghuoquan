@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
+import CapsulePageHeader from '../../components/capsule-page-header'
 import Taro from '../../services/taro'
-import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import './index.scss'
 
 type MerchantMessageKind = 'rider' | 'order' | 'wallet' | 'ops'
@@ -95,19 +95,20 @@ export default function MerchantMessagesPage() {
   }
 
   return (
-    <View className='merchant-messages-page' style={getCapsuleSafeStyle()}>
-      <View className='merchant-messages-nav'>
-        <View className='merchant-messages-nav__back' onClick={handleBack}>
-          <Text>‹</Text>
-        </View>
-        <Text className='merchant-messages-nav__title'>消息</Text>
-        <Text
-          className={`merchant-messages-nav__read ${unreadIds.length === 0 ? 'merchant-messages-nav__read--muted' : ''}`}
-          onClick={markAllRead}
-        >
-          全部已读
-        </Text>
-      </View>
+    <View className='merchant-messages-page'>
+      <CapsulePageHeader
+        className='merchant-messages-nav'
+        title='消息'
+        left={<View className='merchant-messages-nav__back' onClick={handleBack}><Text>‹</Text></View>}
+        right={(
+          <Text
+            className={`merchant-messages-nav__read ${unreadIds.length === 0 ? 'merchant-messages-nav__read--muted' : ''}`}
+            onClick={markAllRead}
+          >
+            全部已读
+          </Text>
+        )}
+      />
 
       <ScrollView className='merchant-messages-scroll' scrollY enhanced showScrollbar={false}>
         <View className='merchant-messages-card'>

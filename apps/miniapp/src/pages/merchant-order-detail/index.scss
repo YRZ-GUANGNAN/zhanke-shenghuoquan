@@ -15,49 +15,29 @@ page {
 }
 
 .merchant-order-detail-page {
-  min-height: 100vh;
+  height: 100vh;
   background: $bg-app;
   color: $text-primary;
   overflow: hidden;
-}
-
-.merchant-detail-nav {
-  height: 168rpx;
-  padding: 86rpx 34rpx 0;
-  box-sizing: border-box;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  background: $bg-surface;
-  border-bottom: 1rpx solid $divider-nav;
-}
-
-.merchant-detail-nav__back,
-.merchant-detail-nav__spacer {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
+  flex-direction: column;
 }
 
 .merchant-detail-nav__back {
-  justify-content: flex-start;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: $text-strong;
   font-size: 54rpx;
   font-weight: 300;
   line-height: 1;
 }
 
-.merchant-detail-nav__title {
-  padding-top: 8rpx;
-  color: $text-strong;
-  font-size: 31rpx;
-  font-weight: 850;
-  line-height: 1.2;
-}
-
 .merchant-detail-scroll {
-  height: calc(100vh - 168rpx);
+  min-height: 0;
+  flex: 1 1 auto;
   box-sizing: border-box;
 }
 

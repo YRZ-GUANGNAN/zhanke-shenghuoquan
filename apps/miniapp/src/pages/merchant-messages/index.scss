@@ -14,30 +14,21 @@ page {
 }
 
 .merchant-messages-page {
-  min-height: 100vh;
+  height: 100vh;
   background: $bg-app;
   color: $text-primary;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .merchant-messages-nav {
-  position: relative;
-  height: 156rpx;
-  padding: 90rpx 30rpx 0;
-  box-sizing: border-box;
-  background: $bg-surface;
   box-shadow: $shadow-header;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .merchant-messages-nav__back {
-  position: absolute;
-  left: 28rpx;
-  bottom: 28rpx;
-  width: 48rpx;
-  height: 48rpx;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -47,17 +38,13 @@ page {
   font-weight: 300;
 }
 
-.merchant-messages-nav__title {
-  color: $text-strong;
-  font-size: 31rpx;
-  line-height: 1;
-  font-weight: 850;
-}
-
 .merchant-messages-nav__read {
-  position: absolute;
-  right: var(--capsule-safe-right, 30rpx);
-  bottom: 32rpx;
+  min-height: 44px;
+  padding-left: 20rpx;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  box-sizing: border-box;
   color: $brand-primary;
   font-size: 24rpx;
   line-height: 1;
@@ -69,7 +56,8 @@ page {
 }
 
 .merchant-messages-scroll {
-  height: calc(100vh - 156rpx);
+  min-height: 0;
+  flex: 1 1 auto;
 }
 
 .merchant-messages-card {

@@ -1,5 +1,6 @@
 import React from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
+import CapsulePageHeader from '../../components/capsule-page-header'
 import Taro from '../../services/taro'
 import { resolveStaticDeliveryOrder, type StaticDeliveryOrder } from '../delivery-static-data'
 import './index.scss'
@@ -68,13 +69,11 @@ export default function MerchantOrderDetailPage() {
 
   return (
     <View className='merchant-order-detail-page'>
-      <View className='merchant-detail-nav'>
-        <View className='merchant-detail-nav__back' onClick={handleBack}>
-          <Text>‹</Text>
-        </View>
-        <Text className='merchant-detail-nav__title'>配送单详情</Text>
-        <View className='merchant-detail-nav__spacer' />
-      </View>
+      <CapsulePageHeader
+        className='merchant-detail-nav'
+        title='配送单详情'
+        left={<View className='merchant-detail-nav__back' onClick={handleBack}><Text>‹</Text></View>}
+      />
 
       <ScrollView scrollY className='merchant-detail-scroll' enhanced showScrollbar={false}>
         <View className='merchant-detail-content'>

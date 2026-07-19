@@ -129,6 +129,38 @@ for (const pageName of heroPages) {
   assert.match(source, /CapsuleSystemRow/, `${pageName} must use CapsuleSystemRow`)
 }
 
+const merchantPages = ['merchant-messages', 'merchant-order-detail', 'merchant-publish']
+
+for (const pageName of merchantPages) {
+  const source = fs.readFileSync(path.join(miniappPagesRoot, pageName, 'index.tsx'), 'utf8')
+  assert.match(source, /CapsulePageHeader/, `${pageName} must use CapsulePageHeader`)
+}
+
+const customNavigationPages = fs.readdirSync(miniappPagesRoot, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
+  .filter((pageName) => {
+    const configPath = path.join(miniappPagesRoot, pageName, 'index.config.ts')
+    return fs.existsSync(configPath) && /navigationStyle:\s*'custom'/.test(fs.readFileSync(configPath, 'utf8'))
+  })
+
+assert.equal(customNavigationPages.length, 26, 'custom navigation page inventory changed')
+
+for (const pageName of customNavigationPages) {
+  const sourcePath = path.join(miniappPagesRoot, pageName, 'index.tsx')
+  assert.ok(fs.existsSync(sourcePath), `${pageName} custom navigation page source is missing`)
+  const source = fs.readFileSync(sourcePath, 'utf8')
+  assert.match(source, /CapsulePageHeader|CapsuleSystemRow/, `${pageName} custom navigation is not capsule-safe`)
+}
+
+const allCustomNavigationSource = customNavigationPages
+  .flatMap((pageName) => ['index.tsx', 'index.scss'].map((fileName) => path.join(miniappPagesRoot, pageName, fileName)))
+  .filter(fs.existsSync)
+  .map((fileName) => fs.readFileSync(fileName, 'utf8'))
+  .join('\n')
+
+assert.doesNotMatch(allCustomNavigationSource, /--capsule-safe-right|--home-header-right/)
+
 assert.equal(fs.existsSync(path.join(miniappPagesRoot, 'home', 'header-layout.ts')), false)
 const studentTakeoutSource = fs.readFileSync(path.join(miniappPagesRoot, 'student-takeout', 'index.tsx'), 'utf8')
 const studentTakeoutStyle = fs.readFileSync(path.join(miniappPagesRoot, 'student-takeout', 'index.scss'), 'utf8')

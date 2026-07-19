@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Input, ScrollView, Text, Textarea, View } from '@tarojs/components'
+import CapsulePageHeader from '../../components/capsule-page-header'
 import Taro from '../../services/taro'
 import './index.scss'
 
@@ -55,13 +56,11 @@ export default function MerchantPublishPage() {
 
   return (
     <View className='merchant-publish-page'>
-      <View className='merchant-publish-nav'>
-        <View className='merchant-publish-nav__back' onClick={() => Taro.navigateBack()}>
-          <Text>‹</Text>
-        </View>
-        <Text className='merchant-publish-nav__title'>发布配送单</Text>
-        <View className='merchant-publish-nav__spacer' />
-      </View>
+      <CapsulePageHeader
+        className='merchant-publish-nav'
+        title='发布配送单'
+        left={<View className='merchant-publish-nav__back' onClick={() => void Taro.navigateBack()}><Text>‹</Text></View>}
+      />
 
       <ScrollView scrollY className='merchant-publish-scroll' enhanced showScrollbar={false}>
         <View className='merchant-publish-card'>

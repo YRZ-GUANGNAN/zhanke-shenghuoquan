@@ -15,47 +15,28 @@ page {
 }
 
 .merchant-publish-page {
-  min-height: 100vh;
+  height: 100vh;
   background: $bg-app;
   color: $text-primary;
   overflow: hidden;
-}
-
-.merchant-publish-nav {
-  height: 166rpx;
-  padding: 88rpx 34rpx 0;
-  box-sizing: border-box;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  background: $bg-surface;
-  border-bottom: 1rpx solid $divider-nav;
-}
-
-.merchant-publish-nav__back,
-.merchant-publish-nav__spacer {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
+  flex-direction: column;
 }
 
 .merchant-publish-nav__back {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: $text-primary;
   font-size: 52rpx;
   line-height: 1;
 }
 
-.merchant-publish-nav__title {
-  padding-top: 10rpx;
-  color: $text-strong;
-  font-size: 31rpx;
-  font-weight: 850;
-  line-height: 1;
-}
-
 .merchant-publish-scroll {
-  height: calc(100vh - 166rpx - 144rpx);
+  min-height: 0;
+  flex: 1 1 auto;
   box-sizing: border-box;
 }
 
