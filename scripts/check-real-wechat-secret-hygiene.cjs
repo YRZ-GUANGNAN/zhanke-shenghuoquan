@@ -120,9 +120,37 @@ function isExplicitPlaceholder(value) {
   return /(?:^|[^A-Za-z0-9])secret(?:[^A-Za-z0-9]|$)/i.test(normalized)
 }
 
-function assignedLiterals(line) {
+function structuredConfigFormat(file) {
+  const normalized = file.replace(/\\/g, '/').toLowerCase()
+  if (/\.ps1$/.test(normalized)) return 'powershell'
+  if (/\.ya?ml$/.test(normalized)) return 'yaml'
+  if (/\.jsonc?$/.test(normalized) || /\.json5$/.test(normalized)) return 'json'
+  return null
+}
+
+function yamlScalar(value) {
+  const normalized = stripInlineEnvComment(value)
+  const quoted = normalized.match(/^(["'])(.*?)\1$/)
+  if (quoted) return quoted[2]
+  if (/^\$\{[^}]+\}$/.test(normalized) || /^<[^>]+>$/.test(normalized)) return normalized
+  return /^[A-Za-z0-9_./+@=-]+$/.test(normalized) ? normalized : null
+}
+
+function jsonScalar(value) {
+  const normalized = value.trim()
+  const quoted = normalized.match(/^(["'])(.*?)\1\s*[,}]?\s*$/)
+  if (quoted) return quoted[2]
+  const variable = normalized.match(/^(\$\{[^}]+\})\s*[,}]?\s*$/)
+  if (variable) return variable[1]
+  const anglePlaceholder = normalized.match(/^(<[^>]+>)\s*[,}]?\s*$/)
+  if (anglePlaceholder) return anglePlaceholder[1]
+  const plain = normalized.match(/^([A-Za-z0-9_./+@=-]+)\s*[,}]?\s*$/)
+  return plain ? plain[1] : null
+}
+
+function assignedLiterals(line, file) {
   const values = []
-  const envMatch = line.match(/^\s*(?:(?:export\s+)|(?:\$env:))?WECHAT_APP_SECRET\s*=\s*(.*)$/i)
+  const envMatch = line.match(/^\s*(?:(?:export\s+)?WECHAT_APP_SECRET|\$env:WECHAT_APP_SECRET|\$\{env:WECHAT_APP_SECRET\})\s*=\s*(.*)$/i)
   if (envMatch) values.push(stripInlineEnvComment(envMatch[1]))
 
   const mappingMatch = line.match(/^\s*["']?WECHAT_APP_SECRET["']?\s*:\s*(.*)$/i)
@@ -133,7 +161,49 @@ function assignedLiterals(line) {
 
   const setenvLiteral = /Setenv\(\s*["']WECHAT_APP_SECRET["']\s*,\s*(["'])(.*?)\1/gi
   for (const match of line.matchAll(setenvLiteral)) values.push(match[2])
+
+  const format = structuredConfigFormat(file)
+  const genericKey = secretIdentifierPattern.source
+  if (format === 'yaml') {
+    const match = line.match(new RegExp(`^\\s*["']?${genericKey}["']?\\s*:\\s*(.+?)\\s*$`, 'i'))
+    const value = match ? yamlScalar(match[1]) : null
+    if (value !== null) values.push(value)
+  } else if (format === 'json') {
+    const match = line.match(new RegExp(`^\\s*(?:[,{}]\\s*)?["']${genericKey}["']\\s*:\\s*(.+?)\\s*$`, 'i'))
+    const value = match ? jsonScalar(match[1]) : null
+    if (value !== null) values.push(value)
+  } else if (format === 'powershell') {
+    const match = line.match(new RegExp(`^\\s*\\$?${genericKey}\\s*=\\s*(.+?)\\s*$`, 'i'))
+    if (match) values.push(stripInlineEnvComment(match[1]))
+  }
   return values
+}
+
+function adjacentAssignedLiteral(lines, index, file) {
+  const nextLine = lines[index + 1]
+  if (nextLine === undefined || nextLine.trim() === '') return null
+
+  const line = lines[index]
+  const format = structuredConfigFormat(file)
+  const genericKey = secretIdentifierPattern.source
+  if (format === 'yaml') {
+    const keyMatch = line.match(new RegExp(`^(\\s*)["']?${genericKey}["']?\\s*:\\s*$`, 'i'))
+    if (!keyMatch) return null
+    const nextIndent = nextLine.match(/^\s*/)[0]
+    if (nextIndent.length <= keyMatch[1].length) return null
+    return yamlScalar(nextLine.trim())
+  }
+  if (format === 'json') {
+    const keyMatch = line.match(new RegExp(`^\\s*(?:[,{}]\\s*)?["']${genericKey}["']\\s*:\\s*$`, 'i'))
+    return keyMatch ? jsonScalar(nextLine) : null
+  }
+  return null
+}
+
+function isAssignedSecret(value) {
+  const normalized = normalizeLiteral(value)
+  if (/^[A-Za-z0-9]{32}$/.test(normalized)) return true
+  return !isExplicitPlaceholder(normalized)
 }
 
 function containsSecret(text, file) {
@@ -142,9 +212,10 @@ function containsSecret(text, file) {
     const line = lines[index]
     if (!secretIdentifierPattern.test(line)) continue
 
-    const nearby = line + (index + 1 < lines.length ? `\n${lines[index + 1]}` : '')
-    if (secretShapePattern.test(nearby)) return true
-    if (assignedLiterals(line).some((value) => !isExplicitPlaceholder(value))) return true
+    if (secretShapePattern.test(line)) return true
+    if (assignedLiterals(line, file).some(isAssignedSecret)) return true
+    const adjacent = adjacentAssignedLiteral(lines, index, file)
+    if (adjacent !== null && isAssignedSecret(adjacent)) return true
   }
   return false
 }
@@ -160,14 +231,24 @@ function runSelfTests() {
     { path: 'backend/.env.example', text: `WECHAT_APP_SECRET=${secret} # local only`, violation: true },
     { path: 'src/config.json', text: `{"appSecret":"${secret}"}`, violation: true },
     { path: 'deploy/start.ps1', text: `$env:${envSecretName}=${realLikeValue}`, violation: true },
+    { path: 'deploy/start-braced.ps1', text: `\${env:${envSecretName}}='${realLikeValue}'`, violation: true },
     { path: 'deploy/prod.yml', text: `${envSecretName}: ${realLikeValue}`, violation: true },
+    { path: 'deploy/generic.yml', text: `${jsonSecretName}: ${realLikeValue}`, violation: true },
+    { path: 'deploy/next-line.yml', text: `${envSecretName}:\n  ${realLikeValue}`, violation: true },
+    { path: 'deploy/next-line-32.yml', text: `${envSecretName}:\n  ${secret}`, violation: true },
     { path: '.env.example', text: `${envSecretName}=${realLikeValue}`, violation: true },
     { path: 'src/config.json', text: JSON.stringify({ [jsonSecretName]: realLikeValue }), violation: true },
+    { path: 'src/config-next-line.json', text: `{"${jsonSecretName}":\n  "${realLikeValue}"}`, violation: true },
+    { path: 'src/config-next-line-unquoted.json', text: `{"${jsonSecretName}":\n  ${realLikeValue}}`, violation: true },
     { path: '.env.production.example', text: 'WECHAT_APP_SECRET=YOUR_WECHAT_APP_SECRET', violation: false },
     { path: '.env.production.example', text: 'WECHAT_APP_SECRET=changeme', violation: false },
     { path: '.env.example', text: 'WECHAT_APP_SECRET=change-me', violation: false },
     { path: '.env.stage.example', text: 'WECHAT_APP_SECRET=example', violation: false },
-    { path: 'docs/example.md', text: 'WECHAT_APP_SECRET=<YOUR_WECHAT_APP_SECRET>', violation: false }
+    { path: 'docs/example.md', text: 'WECHAT_APP_SECRET=<YOUR_WECHAT_APP_SECRET>', violation: false },
+    { path: 'deploy/next-line-placeholder.yml', text: 'WECHAT_APP_SECRET:\n  YOUR_WECHAT_APP_SECRET', violation: false },
+    { path: 'src/config-next-line-placeholder.json', text: '{"appSecret":\n  "changeme"}', violation: false },
+    { path: 'docs/adjacent.md', text: `The APP_SECRET field is documented below.\n${secret}`, violation: false },
+    { path: 'deploy/not-adjacent.yml', text: `WECHAT_APP_SECRET:\n\n  ${realLikeValue}`, violation: false }
   ]
   for (const fixture of fixtures) {
     if (containsSecret(fixture.text, fixture.path) !== fixture.violation) {
