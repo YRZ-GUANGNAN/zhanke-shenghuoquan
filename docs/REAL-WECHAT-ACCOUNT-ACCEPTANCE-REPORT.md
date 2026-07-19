@@ -2,7 +2,7 @@
 
 - 验收日期：2026-07-19
 - 代码基线：`74b5ee9`
-- 结论：代码与自动检查通过；真实微信账号、真实数据库和真机验收仍为 `PENDING`
+- 结论：代码、真实微信配置加载和本地健康检查通过；真实账号稳定用户号、真实数据库和真机验收仍为 `PENDING`
 
 ## 已完成的代码能力
 
@@ -34,18 +34,20 @@
 
 - `backend/.env` 已存在；
 - `APP_ENV=dev`；
-- `WECHAT_APP_ID` 当前为空；
-- `ALLOW_MOCK_WECHAT_LOGIN=true`；
-- `WECHAT_APP_SECRET` 当前为空。
+- `WECHAT_APP_ID=wx0dacef976daa8e55`，与 MiniApp 工程一致；
+- `ALLOW_MOCK_WECHAT_LOGIN=false`；
+- `WECHAT_APP_SECRET` 已存在，但本报告和日志均未记录其值；
+- `MEDIA_PUBLIC_BASE_URL=https://zhanduiwang.top`，公开健康检查返回 HTTP 200；
+- 当前代码已使用上述配置启动，`http://127.0.0.1:8080/healthz` 返回正常。
 
-因此当前环境仍是本地 mock 模式，不能将模拟器中的登录结果认定为真实微信账号验收。
+因此当前环境已退出 mock 登录模式，但必须完成两次真实登录并比较页面用户号，才能认定真实微信账号验收通过。
 
 ## 必须保持 PENDING 的验收
 
 | 场景 | 状态 | 完成条件 |
 | --- | --- | --- |
-| 真实微信凭据切换 | PENDING | 在本机未跟踪的 `backend/.env` 中配置匹配的 AppID/Secret，并关闭 mock；Secret 不得发到聊天、截图或版本库。 |
-| 后端健康检查 | PENDING | 使用真实配置启动后端且 `/healthz` 成功。 |
+| 真实微信凭据切换 | PASS | 本机未跟踪的 `backend/.env` 已配置匹配的 AppID/Secret 并关闭 mock；Secret 未进入报告、聊天、日志或版本库。 |
+| 后端健康检查 | PASS | 当前代码已使用真实配置启动，且 `/healthz` 成功。 |
 | 稳定用户号真验 | PENDING | 同一微信账号连续两次仅清除 `domainA.token` 后登录，“我的”页面用户号完全一致。 |
 | mock 用户数据库审计 | PENDING | 在明确允许连接目标数据库后运行只读审计；不得据此直接删除、合并或改绑用户。 |
 | 真机与发布 | PENDING | 真机验证登录、胶囊避让、真实工具跳转和资料编辑；之后才可考虑上传体验版或发布。 |
