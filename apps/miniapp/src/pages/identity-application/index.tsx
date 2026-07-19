@@ -287,6 +287,16 @@ function IdentityApplicationContent() {
     }
   }
 
+  const restoreAfterNavigationFailure = () => {
+    if (!mountedRef.current) return
+    leavingRef.current = false
+    uploadLockRef.current = false
+    submitLockRef.current = false
+    setUploading(false)
+    setSubmitting(false)
+    setProgress('')
+  }
+
   const cancelAndBack = async () => {
     if (leavingRef.current) return
     const cancelling = uploadLockRef.current || submitLockRef.current
@@ -301,9 +311,32 @@ function IdentityApplicationContent() {
       setProgress(cancelling ? '当前操作已取消' : '')
     }
     if (cancelling && mountedRef.current) {
-      await Taro.showToast({ title: '已取消当前操作', icon: 'none', duration: 1200 })
+      try {
+        await Taro.showToast({ title: '已取消当前操作', icon: 'none', duration: 1200 })
+      } catch {
+        // 提示失败不能阻止返回流程。
+      }
     }
-    if (mountedRef.current) await Taro.navigateBack()
+    if (!mountedRef.current) return
+    try {
+      await Taro.navigateBack()
+    } catch {
+      if (!mountedRef.current) return
+      restoreAfterNavigationFailure()
+      try {
+        await Taro.reLaunch({ url: '/pages/profile/index' })
+      } catch {
+        if (mountedRef.current) {
+          try {
+            await Taro.showToast({ title: '返回失败，请重试', icon: 'none' })
+          } catch {
+            // 最终提示也失败时仍由 finally 恢复交互状态。
+          }
+        }
+      } finally {
+        restoreAfterNavigationFailure()
+      }
+    }
   }
 
   if (!role || !copy) {

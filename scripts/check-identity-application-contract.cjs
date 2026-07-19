@@ -1,5 +1,6 @@
 const fs = require('node:fs')
 const path = require('node:path')
+const assert = require('node:assert/strict')
 
 const root = path.resolve(__dirname, '..')
 const read = (value) => fs.readFileSync(path.join(root, value), 'utf8')
@@ -57,6 +58,87 @@ for (const lock of ['uploadLockRef', 'submitLockRef']) {
   const acquire = page.indexOf(`${lock}.current = true`)
   const firstAwait = page.indexOf('await ', acquire)
   if (acquire < 0 || firstAwait < acquire) throw new Error(`${lock} must be acquired before the first await`)
+}
+
+const cancelStart = page.indexOf('  const restoreAfterNavigationFailure = () => {')
+const cancelEnd = page.indexOf('\n\n  if (!role || !copy)', cancelStart)
+const cancelAndBack = page.slice(cancelStart, cancelEnd)
+const cancelRequirements = [
+  'const restoreAfterNavigationFailure = () => {',
+  'leavingRef.current = false',
+  "setProgress('')",
+  'await Taro.navigateBack()',
+  "await Taro.reLaunch({ url: '/pages/profile/index' })",
+  'finally {\n        restoreAfterNavigationFailure()'
+]
+
+for (const fragment of cancelRequirements) {
+  if (!cancelAndBack.includes(fragment)) throw new Error(`cancelAndBack recovery contract missing: ${fragment}`)
+}
+
+const toastAttempt = cancelAndBack.indexOf("await Taro.showToast({ title: '已取消当前操作'")
+const navigateAttempt = cancelAndBack.indexOf('await Taro.navigateBack()')
+if (toastAttempt < 0 || navigateAttempt < toastAttempt || !cancelAndBack.slice(toastAttempt, navigateAttempt).includes('catch')) {
+  throw new Error('cancelAndBack must continue to navigateBack when cancellation toast fails')
+}
+
+const restoreAttempt = cancelAndBack.indexOf('restoreAfterNavigationFailure()', navigateAttempt)
+const relaunchAttempt = cancelAndBack.indexOf("await Taro.reLaunch({ url: '/pages/profile/index' })")
+if (restoreAttempt < navigateAttempt || relaunchAttempt < restoreAttempt) {
+  throw new Error('cancelAndBack must restore interaction before the profile reLaunch fallback')
+}
+
+function simulateCancelAndBack({ toastFails = false, navigateFails = false, relaunchFails = false }) {
+  const state = {
+    generation: 7,
+    leaving: false,
+    uploadLock: true,
+    submitLock: true,
+    uploading: true,
+    submitting: true,
+    progress: '处理中',
+    navigateAttempts: 0,
+    relaunchAttempts: 0
+  }
+  const restore = () => {
+    state.leaving = false
+    state.uploadLock = false
+    state.submitLock = false
+    state.uploading = false
+    state.submitting = false
+    state.progress = ''
+  }
+
+  state.leaving = true
+  state.generation += 1
+  state.uploadLock = false
+  state.submitLock = false
+  if (toastFails) state.progress = '提示失败'
+  state.navigateAttempts += 1
+  if (!navigateFails) return state
+  restore()
+  state.relaunchAttempts += 1
+  if (relaunchFails) restore()
+  return state
+}
+
+const toastFailure = simulateCancelAndBack({ toastFails: true })
+assert.equal(toastFailure.navigateAttempts, 1)
+assert.equal(toastFailure.leaving, true)
+assert.equal(toastFailure.generation, 8)
+
+for (const result of [
+  simulateCancelAndBack({ navigateFails: true }),
+  simulateCancelAndBack({ navigateFails: true, relaunchFails: true })
+]) {
+  assert.equal(result.relaunchAttempts, 1)
+  assert.equal(result.leaving, false)
+  assert.equal(result.uploadLock, false)
+  assert.equal(result.submitLock, false)
+  assert.equal(result.uploading, false)
+  assert.equal(result.submitting, false)
+  assert.equal(result.progress, '')
+  assert.equal(result.generation, 8)
 }
 
 console.log('identity application contract: ok')
