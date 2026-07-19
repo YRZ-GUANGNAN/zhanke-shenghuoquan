@@ -59,12 +59,14 @@ export function IdentityApplications() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [conflictLockedApplicationId, setConflictLockedApplicationId] = useState<string | null>(null)
   const mountedRef = useRef(true)
   const listRequestSequenceRef = useRef(0)
   const detailRequestSequenceRef = useRef(0)
   const decisionOperationSequenceRef = useRef(0)
   const selectionGenerationRef = useRef(0)
   const selectedApplicationIdRef = useRef<string | null>(null)
+  const conflictLockedApplicationIdRef = useRef<string | null>(null)
   const proofRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const loadLatestRef = useRef<(options?: { silent?: boolean }) => Promise<boolean>>(async () => false)
 
@@ -73,6 +75,17 @@ export function IdentityApplications() {
       clearTimeout(proofRefreshTimerRef.current)
       proofRefreshTimerRef.current = null
     }
+  }, [])
+
+  const lockConflictDecision = useCallback((applicationId: string) => {
+    conflictLockedApplicationIdRef.current = applicationId
+    if (mountedRef.current) setConflictLockedApplicationId(applicationId)
+  }, [])
+
+  const clearConflictDecisionLock = useCallback((applicationId: string) => {
+    if (conflictLockedApplicationIdRef.current !== applicationId) return
+    conflictLockedApplicationIdRef.current = null
+    if (mountedRef.current) setConflictLockedApplicationId(current => current === applicationId ? null : current)
   }, [])
 
   useEffect(() => {
@@ -84,6 +97,7 @@ export function IdentityApplications() {
       decisionOperationSequenceRef.current += 1
       selectionGenerationRef.current += 1
       selectedApplicationIdRef.current = null
+      conflictLockedApplicationIdRef.current = null
       clearProofRefreshTimer()
     }
   }, [clearProofRefreshTimer])
@@ -117,6 +131,7 @@ export function IdentityApplications() {
     mode: 'inspect' | 'decision' | 'proof' | 'conflict',
     decision?: IdentityApplicationRow,
     continuationIsCurrent?: () => boolean,
+    onResolved?: (detail: IdentityApplicationDetail) => void,
   ): Promise<boolean> => {
     if (!mountedRef.current || selectedApplicationIdRef.current !== applicationId) return false
     clearProofRefreshTimer()
@@ -137,6 +152,7 @@ export function IdentityApplications() {
       })
       if (prepared.expired) setError(proofExpiredMessage)
       else if (mode === 'proof') setError(current => current === proofExpiredMessage ? '' : current)
+      onResolved?.(detail)
       return true
     } catch (detailError) {
       if (!mountedRef.current || requestId !== detailRequestSequenceRef.current || selectedApplicationIdRef.current !== applicationId || (continuationIsCurrent && !continuationIsCurrent())) return true
@@ -153,6 +169,8 @@ export function IdentityApplications() {
 
   const inspect = useCallback((applicationId: string) => {
     if (!mountedRef.current) return Promise.resolve(false)
+    const previousApplicationId = selectedApplicationIdRef.current
+    if (previousApplicationId) clearConflictDecisionLock(previousApplicationId)
     selectionGenerationRef.current += 1
     decisionOperationSequenceRef.current += 1
     setBusy(false)
@@ -163,7 +181,7 @@ export function IdentityApplications() {
     setReason('')
     setError('')
     return fetchDetail(applicationId, 'inspect')
-  }, [clearProofRefreshTimer, fetchDetail])
+  }, [clearConflictDecisionLock, clearProofRefreshTimer, fetchDetail])
 
   useEffect(() => { void load() }, [load])
 
@@ -184,6 +202,8 @@ export function IdentityApplications() {
 
   const closeDetail = () => {
     if (!mountedRef.current) return
+    const applicationId = selectedApplicationIdRef.current
+    if (applicationId) clearConflictDecisionLock(applicationId)
     selectionGenerationRef.current += 1
     decisionOperationSequenceRef.current += 1
     detailRequestSequenceRef.current += 1
@@ -195,7 +215,7 @@ export function IdentityApplications() {
   }
 
   const decide = async (action: 'approve' | 'reject') => {
-    if (!mountedRef.current || !selected || selected.status !== 'pending' || selectedApplicationIdRef.current !== selected.applicationId) return
+    if (!mountedRef.current || !selected || selected.status !== 'pending' || selectedApplicationIdRef.current !== selected.applicationId || conflictLockedApplicationIdRef.current === selected.applicationId) return
     const applicationId = selected.applicationId
     const selectionGeneration = selectionGenerationRef.current
     const decisionOperation = ++decisionOperationSequenceRef.current
@@ -238,9 +258,10 @@ export function IdentityApplications() {
         return
       }
       if (decisionError instanceof AdminAPIError && decisionError.status === 409) {
+        lockConflictDecision(applicationId)
         const [listRefreshed, detailRefreshed] = await Promise.all([
           loadLatestRef.current({ silent: true }),
-          fetchDetail(applicationId, 'conflict', undefined, decisionIsCurrent),
+          fetchDetail(applicationId, 'conflict', undefined, decisionIsCurrent, () => clearConflictDecisionLock(applicationId)),
         ])
         if (!mountedRef.current || !decisionIsCurrent()) return
         setError(listRefreshed && detailRefreshed ? '该申请已被其他管理员处理' : '该申请已被其他管理员处理，刷新失败，请重新加载')
@@ -277,15 +298,16 @@ export function IdentityApplications() {
         <button disabled={data.page >= pageCount || loading} onClick={() => setPage(data.page + 1)}>下一页</button>
       </div>
     </Panel>
-    {selected && <ApplicationDetail value={selected} reason={reason} setReason={setReason} busy={busy} close={closeDetail} decide={decide} />}
+    {selected && <ApplicationDetail value={selected} reason={reason} setReason={setReason} busy={busy} decisionLocked={conflictLockedApplicationId === selected.applicationId} close={closeDetail} decide={decide} />}
   </div>
 }
 
-function ApplicationDetail({ value, reason, setReason, busy, close, decide }: {
+function ApplicationDetail({ value, reason, setReason, busy, decisionLocked, close, decide }: {
   value: IdentityApplicationDetail
   reason: string
   setReason: (value: string) => void
   busy: boolean
+  decisionLocked: boolean
   close: () => void
   decide: (action: 'approve' | 'reject') => Promise<void>
 }) {
@@ -319,7 +341,7 @@ function ApplicationDetail({ value, reason, setReason, busy, close, decide }: {
       {value.events.length === 0 && <p>暂无审核记录</p>}
     </div>
 
-    {value.status === 'pending' && <div className='identity-decision'>
+    {value.status === 'pending' && !decisionLocked && <div className='identity-decision'>
       <label>拒绝原因<textarea value={reason} maxLength={500} placeholder='拒绝时必填' onChange={event => setReason(event.target.value)} /></label>
       <div className='delivery-row-actions'>
         <button disabled={busy} onClick={() => void decide('approve')}>{busy ? '处理中…' : '通过'}</button>
