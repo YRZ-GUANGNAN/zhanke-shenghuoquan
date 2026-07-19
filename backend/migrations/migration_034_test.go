@@ -38,7 +38,11 @@ func TestMigration034DefinesIdentityApplicationsAndGrants(t *testing.T) {
 		"'identity_application'",
 		"MODIFY COLUMN purpose VARCHAR(24)",
 		"MODIFY COLUMN reference_type VARCHAR(24)",
+		"chk_media_asset_purpose_identity_application_guard",
 		"chk_media_reference_type_identity_application_guard",
+		"users.deleted_at IS NULL",
+		"users.closed_at IS NULL",
+		"users.status IN ('active','muted')",
 		"DROP CHECK chk_media_reference_type",
 		"ON DUPLICATE KEY UPDATE user_id=VALUES(user_id)",
 	} {
@@ -48,6 +52,15 @@ func TestMigration034DefinesIdentityApplicationsAndGrants(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join("rollback", migration034File)); !os.IsNotExist(err) {
 		t.Fatal("migration 034 must remain forward-only")
+	}
+	for _, token := range []string{
+		"users.deleted_at IS NULL",
+		"users.closed_at IS NULL",
+		"users.status IN ('active','muted')",
+	} {
+		if count := strings.Count(source, token); count != 2 {
+			t.Fatalf("migration 034 requires %q in both rider and merchant backfills, count=%d", token, count)
+		}
 	}
 }
 
@@ -70,28 +83,37 @@ func TestMigration034IsGuardedForRepeatApplication(t *testing.T) {
 			t.Fatalf("migration 034 repeat-application guard missing %q", token)
 		}
 	}
-	guard := strings.Index(source, "chk_media_reference_type_identity_application_guard")
-	drop := strings.Index(source, "DROP CHECK chk_media_reference_type")
-	if guard < 0 || drop < 0 || guard > drop {
-		t.Fatal("identity-application media guard must be installed before replacing the canonical constraint")
-	}
+	assertMigration034Order(t, source, "migration 034 unexpected media purpose check constraint", "CREATE TABLE identity_applications")
+	assertMigration034Order(t, source, "migration 034 unexpected media reference type check constraint", "CREATE TABLE identity_applications")
+	assertMigration034Order(t, source, "migration 034 unsupported media purpose", "CREATE TABLE identity_applications")
+	assertMigration034Order(t, source, "migration 034 unsupported media reference type", "CREATE TABLE identity_applications")
+	assertMigration034Order(t, source, "ADD CONSTRAINT chk_media_asset_purpose_identity_application_guard", "DROP CHECK chk_media_asset_purpose")
+	assertMigration034Order(t, source, "ADD CONSTRAINT chk_media_reference_type_identity_application_guard", "DROP CHECK chk_media_reference_type")
 }
 
 func TestMigration034MySQLIsIdempotentAndBackfillsOnlyRealQualifiedUsers(t *testing.T) {
 	db := newMigration034Database(t)
 	createMigration034BaseSchema(t, db)
 
-	mustExec034(t, db, `INSERT INTO users(id,open_id) VALUES
-		(101,'real-rider-openid'),
-		(102,'mock_openid_rider'),
-		(103,'real-resting-rider'),
-		(201,'real-merchant-openid'),
-		(202,'mock_openid_merchant')`)
+	mustExec034(t, db, `INSERT INTO users(id,open_id,status,closed_at,deleted_at) VALUES
+		(101,'real-active-openid','active',NULL,NULL),
+		(102,'real-muted-openid','muted',NULL,NULL),
+		(103,'real-banned-openid','banned',NULL,NULL),
+		(104,'real-closed-openid','closed',NULL,NULL),
+		(105,'real-closed-at-openid','active',NOW(3),NULL),
+		(106,'real-deleted-openid','active',NULL,NOW(3)),
+		(107,'mock_openid_qualified','active',NULL,NULL),
+		(108,'real-resting-rider','active',NULL,NULL)`)
 	mustExec034(t, db, `INSERT INTO takeout_riders(rider_user_id,status) VALUES
-		(101,'active'),(102,'active'),(103,'resting')`)
-	mustExec034(t, db, `INSERT INTO delivery_orders(merchant_user_id) VALUES (201),(201),(202)`)
+		(101,'active'),(102,'active'),(103,'active'),(104,'active'),
+		(105,'active'),(106,'active'),(107,'active'),(108,'resting')`)
+	mustExec034(t, db, `INSERT INTO delivery_orders(merchant_user_id) VALUES
+		(101),(101),(102),(103),(104),(105),(106),(107),(108)`)
 
 	applyMigration034(t, db)
+	mustExec034(t, db, `INSERT INTO user_identity_grants
+		(user_id,role,status,source_application_id,granted_at,row_version,created_at,updated_at)
+		VALUES (103,'rider','active',NULL,NOW(3),1,NOW(3),NOW(3))`)
 	applyMigration034(t, db)
 
 	assertCount034(t, db, 4, `SELECT COUNT(*) FROM information_schema.tables
@@ -99,13 +121,20 @@ func TestMigration034MySQLIsIdempotentAndBackfillsOnlyRealQualifiedUsers(t *test
 			'identity_applications','identity_application_assets',
 			'identity_application_events','user_identity_grants'
 		)`)
-	assertCount034(t, db, 1, `SELECT COUNT(*) FROM user_identity_grants
-		WHERE user_id=101 AND role='rider' AND status='active'`)
-	assertCount034(t, db, 1, `SELECT COUNT(*) FROM user_identity_grants
-		WHERE user_id=201 AND role='merchant' AND status='active'`)
+	assertCount034(t, db, 2, `SELECT COUNT(*) FROM user_identity_grants
+		WHERE user_id=101 AND role IN ('rider','merchant') AND status='active'`)
+	assertCount034(t, db, 2, `SELECT COUNT(*) FROM user_identity_grants
+		WHERE user_id=102 AND role IN ('rider','merchant') AND status='active'`)
 	assertCount034(t, db, 0, `SELECT COUNT(*) FROM user_identity_grants
-		WHERE user_id IN (102,103,202)`)
-	assertCount034(t, db, 2, `SELECT COUNT(*) FROM user_identity_grants`)
+		WHERE user_id IN (103,104,105,106,107) AND status='active'`)
+	assertCount034(t, db, 1, `SELECT COUNT(*) FROM user_identity_grants
+		WHERE user_id=103 AND role='rider' AND status='suspended' AND source_application_id IS NULL`)
+	assertCount034(t, db, 1, `SELECT COUNT(*) FROM user_identity_grants
+		WHERE user_id=108 AND role='merchant' AND status='active'`)
+	assertCount034(t, db, 0, `SELECT COUNT(*) FROM user_identity_grants
+		WHERE user_id=108 AND role='rider'`)
+	assertCount034(t, db, 5, `SELECT COUNT(*) FROM user_identity_grants WHERE status='active'`)
+	assertCount034(t, db, 6, `SELECT COUNT(*) FROM user_identity_grants`)
 	assertCount034(t, db, 2, `SELECT COUNT(*) FROM information_schema.columns
 		WHERE table_schema=DATABASE()
 		  AND ((table_name='media_assets' AND column_name='purpose')
@@ -120,6 +149,87 @@ func TestMigration034MySQLIsIdempotentAndBackfillsOnlyRealQualifiedUsers(t *test
 
 	mustExec034(t, db, `INSERT INTO media_assets(purpose) VALUES ('identity_application')`)
 	mustExec034(t, db, `INSERT INTO media_asset_references(reference_type) VALUES ('identity_application')`)
+}
+
+func TestMigration034MySQLRejectsUnexpectedMediaChecksBeforeDDL(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		setup      []string
+		want       string
+		columnName string
+	}{
+		{
+			name: "asset_purpose",
+			setup: []string{`ALTER TABLE media_assets ADD CONSTRAINT legacy_media_purpose_enum
+				CHECK (purpose IN ('post','product','avatar'))`},
+			want:       "migration 034 unexpected media purpose check constraint",
+			columnName: "purpose",
+		},
+		{
+			name: "reference_type",
+			setup: []string{
+				`ALTER TABLE media_asset_references DROP CHECK chk_media_reference_type`,
+				`ALTER TABLE media_asset_references ADD CONSTRAINT legacy_media_reference_enum
+				CHECK (reference_type IN ('post','product','avatar'))`,
+			},
+			want:       "migration 034 unexpected media reference type check constraint",
+			columnName: "reference_type",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db := newMigration034Database(t)
+			createMigration034BaseSchema(t, db)
+			for _, statement := range tc.setup {
+				mustExec034(t, db, statement)
+			}
+
+			err := executeMigration034(db)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("migration 034 error=%v want substring %q", err, tc.want)
+			}
+			assertCount034(t, db, 0, `SELECT COUNT(*) FROM information_schema.tables
+				WHERE table_schema=DATABASE() AND table_name IN (
+					'identity_applications','identity_application_assets',
+					'identity_application_events','user_identity_grants'
+				)`)
+			assertCount034(t, db, 1, `SELECT COUNT(*) FROM information_schema.columns
+				WHERE table_schema=DATABASE() AND column_name=?
+				  AND character_maximum_length=16`, tc.columnName)
+		})
+	}
+}
+
+func TestMigration034MySQLConvergesFromRecoverablePartialState(t *testing.T) {
+	db := newMigration034Database(t)
+	createMigration034BaseSchema(t, db)
+	applyMigration034(t, db)
+
+	mustExec034(t, db, `DROP TABLE identity_application_assets, identity_application_events, user_identity_grants`)
+	mustExec034(t, db, `ALTER TABLE media_assets
+		ADD CONSTRAINT chk_media_asset_purpose_identity_application_guard
+		CHECK (purpose IN ('post','product','avatar','dish','merchant_logo','delivery_proof','delivery_im','feedback','identity_application'))`)
+	mustExec034(t, db, `ALTER TABLE media_assets DROP CHECK chk_media_asset_purpose`)
+	mustExec034(t, db, `ALTER TABLE media_asset_references
+		ADD CONSTRAINT chk_media_reference_type_identity_application_guard
+		CHECK (reference_type IN ('post','product','avatar','dish','merchant_logo','delivery_proof','delivery_im','feedback','identity_application'))`)
+	mustExec034(t, db, `ALTER TABLE media_asset_references DROP CHECK chk_media_reference_type`)
+
+	applyMigration034(t, db)
+
+	assertCount034(t, db, 4, `SELECT COUNT(*) FROM information_schema.tables
+		WHERE table_schema=DATABASE() AND table_name IN (
+			'identity_applications','identity_application_assets',
+			'identity_application_events','user_identity_grants'
+		)`)
+	assertCount034(t, db, 2, `SELECT COUNT(*) FROM information_schema.table_constraints
+		WHERE constraint_schema=DATABASE() AND constraint_name IN (
+			'chk_media_asset_purpose','chk_media_reference_type'
+		)`)
+	assertCount034(t, db, 0, `SELECT COUNT(*) FROM information_schema.table_constraints
+		WHERE constraint_schema=DATABASE() AND constraint_name IN (
+			'chk_media_asset_purpose_identity_application_guard',
+			'chk_media_reference_type_identity_application_guard'
+		)`)
 }
 
 func newMigration034Database(t *testing.T) *sql.DB {
@@ -190,7 +300,10 @@ func createMigration034BaseSchema(t *testing.T, db *sql.DB) {
 	for _, statement := range []string{
 		`CREATE TABLE users (
 			id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
-			open_id VARCHAR(96) NOT NULL UNIQUE
+			open_id VARCHAR(96) NOT NULL UNIQUE,
+			status VARCHAR(24) NOT NULL DEFAULT 'active',
+			closed_at DATETIME(3) NULL,
+			deleted_at DATETIME(3) NULL
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 		`CREATE TABLE media_assets (
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -218,9 +331,13 @@ func createMigration034BaseSchema(t *testing.T, db *sql.DB) {
 
 func applyMigration034(t *testing.T, db *sql.DB) {
 	t.Helper()
-	if err := applyMigration031Script(db, migration034File); err != nil {
+	if err := executeMigration034(db); err != nil {
 		t.Fatalf("apply migration 034: %v", err)
 	}
+}
+
+func executeMigration034(db *sql.DB) error {
+	return applyMigration031Script(db, migration034File)
 }
 
 func mustExec034(t *testing.T, db *sql.DB, query string, args ...any) {
@@ -238,5 +355,14 @@ func assertCount034(t *testing.T, db *sql.DB, want int64, query string, args ...
 	}
 	if got != want {
 		t.Fatalf("query count=%d want=%d query=%s args=%v", got, want, query, args)
+	}
+}
+
+func assertMigration034Order(t *testing.T, source, beforeToken, afterToken string) {
+	t.Helper()
+	before := strings.Index(source, beforeToken)
+	after := strings.Index(source, afterToken)
+	if before < 0 || after < 0 || before >= after {
+		t.Fatalf("migration 034 requires %q before %q", beforeToken, afterToken)
 	}
 }

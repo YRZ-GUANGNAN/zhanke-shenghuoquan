@@ -28,6 +28,101 @@ BEGIN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'migration 034 base tables missing';
   END IF;
 
+  IF (SELECT COUNT(*) FROM information_schema.columns
+      WHERE table_schema=DATABASE() AND table_name='users' AND (
+        (column_name='id' AND column_type='bigint unsigned' AND is_nullable='NO') OR
+        (column_name='open_id' AND data_type='varchar' AND is_nullable='NO') OR
+        (column_name='status' AND data_type='varchar' AND is_nullable='NO') OR
+        (column_name='closed_at' AND data_type='datetime' AND is_nullable='YES') OR
+        (column_name='deleted_at' AND data_type='datetime' AND is_nullable='YES')
+      )) <> 5 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'migration 034 users schema mismatch';
+  END IF;
+  IF (SELECT COUNT(*) FROM information_schema.columns
+      WHERE table_schema=DATABASE() AND (
+        (table_name='takeout_riders' AND column_name='rider_user_id' AND column_type='bigint unsigned' AND is_nullable='NO') OR
+        (table_name='takeout_riders' AND column_name='status' AND data_type='varchar' AND is_nullable='NO') OR
+        (table_name='delivery_orders' AND column_name='merchant_user_id' AND column_type='bigint unsigned' AND is_nullable='NO') OR
+        (table_name='media_assets' AND column_name='purpose' AND data_type='varchar' AND is_nullable='NO') OR
+        (table_name='media_asset_references' AND column_name='reference_type' AND data_type='varchar' AND is_nullable='NO')
+      )) <> 5 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'migration 034 domain schema mismatch';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM media_assets
+    WHERE CHAR_LENGTH(purpose) > 24 OR purpose NOT IN (
+      'post','product','avatar','dish','merchant_logo','delivery_proof','delivery_im','feedback','identity_application'
+    )
+  ) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'migration 034 unsupported media purpose';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM media_asset_references
+    WHERE CHAR_LENGTH(reference_type) > 24 OR reference_type NOT IN (
+      'post','product','avatar','dish','merchant_logo','delivery_proof','delivery_im','feedback','identity_application'
+    )
+  ) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'migration 034 unsupported media reference type';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.table_constraints AS table_constraint
+    JOIN information_schema.check_constraints AS check_constraint
+      ON check_constraint.constraint_schema=table_constraint.constraint_schema
+     AND check_constraint.constraint_name=table_constraint.constraint_name
+    WHERE table_constraint.constraint_schema=DATABASE()
+      AND table_constraint.table_name='media_assets'
+      AND table_constraint.constraint_type='CHECK'
+      AND LOCATE('purpose',LOWER(REPLACE(check_constraint.check_clause,'`',''))) > 0
+      AND table_constraint.constraint_name NOT IN (
+        'chk_media_asset_purpose',
+        'chk_media_asset_purpose_identity_application_guard'
+      )
+  ) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'migration 034 unexpected media purpose check constraint';
+  END IF;
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.table_constraints AS table_constraint
+    JOIN information_schema.check_constraints AS check_constraint
+      ON check_constraint.constraint_schema=table_constraint.constraint_schema
+     AND check_constraint.constraint_name=table_constraint.constraint_name
+    WHERE table_constraint.constraint_schema=DATABASE()
+      AND table_constraint.table_name='media_asset_references'
+      AND table_constraint.constraint_type='CHECK'
+      AND LOCATE('reference_type',LOWER(REPLACE(check_constraint.check_clause,'`',''))) > 0
+      AND table_constraint.constraint_name NOT IN (
+        'chk_media_reference_type',
+        'chk_media_reference_type_identity_application_guard'
+      )
+  ) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'migration 034 unexpected media reference type check constraint';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_schema=DATABASE()
+      AND constraint_name IN (
+        'chk_media_asset_purpose',
+        'chk_media_asset_purpose_identity_application_guard'
+      )
+      AND (table_name<>'media_assets' OR constraint_type<>'CHECK')
+  ) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'migration 034 conflicting media purpose constraint';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_schema=DATABASE()
+      AND constraint_name IN (
+        'chk_media_reference_type',
+        'chk_media_reference_type_identity_application_guard'
+      )
+      AND (table_name<>'media_asset_references' OR constraint_type<>'CHECK')
+  ) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'migration 034 conflicting media reference type constraint';
+  END IF;
+
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.tables
     WHERE table_schema=DATABASE() AND table_name='identity_applications'
@@ -118,23 +213,6 @@ BEGIN
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
   END IF;
 
-  IF EXISTS (
-    SELECT 1 FROM media_assets
-    WHERE CHAR_LENGTH(purpose) > 24 OR purpose NOT IN (
-      'post','product','avatar','dish','merchant_logo','delivery_proof','delivery_im','feedback','identity_application'
-    )
-  ) THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'migration 034 unsupported media purpose';
-  END IF;
-  IF EXISTS (
-    SELECT 1 FROM media_asset_references
-    WHERE CHAR_LENGTH(reference_type) > 24 OR reference_type NOT IN (
-      'post','product','avatar','dish','merchant_logo','delivery_proof','delivery_im','feedback','identity_application'
-    )
-  ) THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'migration 034 unsupported media reference type';
-  END IF;
-
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_schema=DATABASE() AND table_name='media_assets' AND column_name='purpose'
@@ -222,23 +300,47 @@ BEGIN
       DROP CHECK chk_media_reference_type_identity_application_guard;
   END IF;
 
+  -- Recover safely if an earlier interrupted/replaced 034 backfill activated a
+  -- legacy grant for an account that is no longer eligible. Application-backed
+  -- grants are audit facts and are intentionally outside this migration repair.
+  UPDATE user_identity_grants AS identity_grant
+  JOIN users ON users.id=identity_grant.user_id
+  SET identity_grant.status='suspended',
+      identity_grant.row_version=identity_grant.row_version+1,
+      identity_grant.updated_at=NOW(3)
+  WHERE identity_grant.source_application_id IS NULL
+    AND identity_grant.status='active'
+    AND (
+      users.open_id LIKE 'mock_openid\_%' OR
+      LEFT(users.open_id,12)='mock_openid_' OR
+      users.deleted_at IS NOT NULL OR
+      users.closed_at IS NOT NULL OR
+      users.status NOT IN ('active','muted')
+    );
+
   INSERT INTO user_identity_grants
     (user_id,role,status,source_application_id,granted_at,row_version,created_at,updated_at)
   SELECT tr.rider_user_id,'rider','active',NULL,NOW(3),1,NOW(3),NOW(3)
   FROM takeout_riders tr
-  JOIN users u ON u.id=tr.rider_user_id
+  JOIN users ON users.id=tr.rider_user_id
   WHERE tr.status='active'
-    AND u.open_id NOT LIKE 'mock_openid\_%'
-    AND LEFT(u.open_id,12)<>'mock_openid_'
+    AND users.open_id NOT LIKE 'mock_openid\_%'
+    AND LEFT(users.open_id,12)<>'mock_openid_'
+    AND users.deleted_at IS NULL
+    AND users.closed_at IS NULL
+    AND users.status IN ('active','muted')
   ON DUPLICATE KEY UPDATE user_id=VALUES(user_id);
 
   INSERT INTO user_identity_grants
     (user_id,role,status,source_application_id,granted_at,row_version,created_at,updated_at)
   SELECT DISTINCT o.merchant_user_id,'merchant','active',NULL,NOW(3),1,NOW(3),NOW(3)
   FROM delivery_orders o
-  JOIN users u ON u.id=o.merchant_user_id
-  WHERE u.open_id NOT LIKE 'mock_openid\_%'
-    AND LEFT(u.open_id,12)<>'mock_openid_'
+  JOIN users ON users.id=o.merchant_user_id
+  WHERE users.open_id NOT LIKE 'mock_openid\_%'
+    AND LEFT(users.open_id,12)<>'mock_openid_'
+    AND users.deleted_at IS NULL
+    AND users.closed_at IS NULL
+    AND users.status IN ('active','muted')
   ON DUPLICATE KEY UPDATE user_id=VALUES(user_id);
 
   DO RELEASE_LOCK('campus_circle:migration:034');
