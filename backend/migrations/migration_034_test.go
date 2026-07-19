@@ -85,6 +85,10 @@ func TestMigration034IsGuardedForRepeatApplication(t *testing.T) {
 	}
 	assertMigration034Order(t, source, "migration 034 unexpected media purpose check constraint", "CREATE TABLE identity_applications")
 	assertMigration034Order(t, source, "migration 034 unexpected media reference type check constraint", "CREATE TABLE identity_applications")
+	assertMigration034Order(t, source, "migration 034 media purpose canonical constraint mismatch", "CREATE TABLE identity_applications")
+	assertMigration034Order(t, source, "migration 034 media reference type canonical constraint mismatch", "CREATE TABLE identity_applications")
+	assertMigration034Order(t, source, "migration 034 media purpose guard constraint mismatch", "CREATE TABLE identity_applications")
+	assertMigration034Order(t, source, "migration 034 media reference type guard constraint mismatch", "CREATE TABLE identity_applications")
 	assertMigration034Order(t, source, "migration 034 unsupported media purpose", "CREATE TABLE identity_applications")
 	assertMigration034Order(t, source, "migration 034 unsupported media reference type", "CREATE TABLE identity_applications")
 	assertMigration034Order(t, source, "ADD CONSTRAINT chk_media_asset_purpose_identity_application_guard", "DROP CHECK chk_media_asset_purpose")
@@ -199,6 +203,79 @@ func TestMigration034MySQLRejectsUnexpectedMediaChecksBeforeDDL(t *testing.T) {
 	}
 }
 
+func TestMigration034MySQLRejectsMisbindingCanonicalAndGuardChecksBeforeDDL(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		setup      []string
+		want       string
+		columnName string
+	}{
+		{
+			name: "asset_canonical_on_unrelated_column",
+			setup: []string{`ALTER TABLE media_assets ADD CONSTRAINT chk_media_asset_purpose
+				CHECK (other_flag IN (0,1))`},
+			want:       "migration 034 media purpose canonical constraint mismatch",
+			columnName: "purpose",
+		},
+		{
+			name: "reference_canonical_on_unrelated_column",
+			setup: []string{
+				`ALTER TABLE media_asset_references DROP CHECK chk_media_reference_type`,
+				`ALTER TABLE media_asset_references ADD CONSTRAINT chk_media_reference_type
+				CHECK (other_flag IN (0,1))`,
+			},
+			want:       "migration 034 media reference type canonical constraint mismatch",
+			columnName: "reference_type",
+		},
+		{
+			name: "asset_guard_missing_identity_application",
+			setup: []string{`ALTER TABLE media_assets
+				ADD CONSTRAINT chk_media_asset_purpose_identity_application_guard
+				CHECK (purpose IN ('post','product','avatar'))`},
+			want:       "migration 034 media purpose guard constraint mismatch",
+			columnName: "purpose",
+		},
+		{
+			name: "reference_guard_missing_identity_application",
+			setup: []string{`ALTER TABLE media_asset_references
+				ADD CONSTRAINT chk_media_reference_type_identity_application_guard
+				CHECK (reference_type IN ('post','product','avatar'))`},
+			want:       "migration 034 media reference type guard constraint mismatch",
+			columnName: "reference_type",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db := newMigration034Database(t)
+			createMigration034BaseSchema(t, db)
+			for _, statement := range tc.setup {
+				mustExec034(t, db, statement)
+			}
+
+			err := executeMigration034(db)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("migration 034 error=%v want substring %q", err, tc.want)
+			}
+			assertMigration034BusinessSchemaUnchanged(t, db, tc.columnName)
+		})
+	}
+}
+
+func TestMigration034MySQLPreservesUnrelatedMediaChecks(t *testing.T) {
+	db := newMigration034Database(t)
+	createMigration034BaseSchema(t, db)
+	mustExec034(t, db, `ALTER TABLE media_assets ADD CONSTRAINT chk_media_asset_other_flag
+		CHECK (other_flag IN (0,1))`)
+	mustExec034(t, db, `ALTER TABLE media_asset_references ADD CONSTRAINT chk_media_reference_other_flag
+		CHECK (other_flag IN (0,1))`)
+
+	applyMigration034(t, db)
+
+	assertCount034(t, db, 2, `SELECT COUNT(*) FROM information_schema.table_constraints
+		WHERE constraint_schema=DATABASE() AND constraint_name IN (
+			'chk_media_asset_other_flag','chk_media_reference_other_flag'
+		) AND constraint_type='CHECK'`)
+}
+
 func TestMigration034MySQLConvergesFromRecoverablePartialState(t *testing.T) {
 	db := newMigration034Database(t)
 	createMigration034BaseSchema(t, db)
@@ -307,11 +384,13 @@ func createMigration034BaseSchema(t *testing.T, db *sql.DB) {
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 		`CREATE TABLE media_assets (
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-			purpose VARCHAR(16) NOT NULL
+			purpose VARCHAR(16) NOT NULL,
+			other_flag INT NOT NULL DEFAULT 0
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 		`CREATE TABLE media_asset_references (
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
 			reference_type VARCHAR(16) NOT NULL,
+			other_flag INT NOT NULL DEFAULT 0,
 			CONSTRAINT chk_media_reference_type
 			CHECK (reference_type IN ('post','product','avatar','dish','merchant_logo','delivery_proof','delivery_im','feedback'))
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
@@ -365,4 +444,16 @@ func assertMigration034Order(t *testing.T, source, beforeToken, afterToken strin
 	if before < 0 || after < 0 || before >= after {
 		t.Fatalf("migration 034 requires %q before %q", beforeToken, afterToken)
 	}
+}
+
+func assertMigration034BusinessSchemaUnchanged(t *testing.T, db *sql.DB, columnName string) {
+	t.Helper()
+	assertCount034(t, db, 0, `SELECT COUNT(*) FROM information_schema.tables
+		WHERE table_schema=DATABASE() AND table_name IN (
+			'identity_applications','identity_application_assets',
+			'identity_application_events','user_identity_grants'
+		)`)
+	assertCount034(t, db, 1, `SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema=DATABASE() AND column_name=?
+		  AND character_maximum_length=16`, columnName)
 }

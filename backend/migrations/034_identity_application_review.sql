@@ -100,6 +100,87 @@ BEGIN
   ) THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'migration 034 unexpected media reference type check constraint';
   END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_schema=DATABASE() AND table_name='media_assets'
+      AND constraint_name='chk_media_asset_purpose'
+  ) AND NOT EXISTS (
+    SELECT 1
+    FROM information_schema.table_constraints AS table_constraint
+    JOIN information_schema.check_constraints AS check_constraint
+      ON check_constraint.constraint_schema=table_constraint.constraint_schema
+     AND check_constraint.constraint_name=table_constraint.constraint_name
+    WHERE table_constraint.constraint_schema=DATABASE()
+      AND table_constraint.table_name='media_assets'
+      AND table_constraint.constraint_name='chk_media_asset_purpose'
+      AND table_constraint.constraint_type='CHECK'
+      AND LEFT(LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+        check_constraint.check_clause,'`',''),' ',''),CHAR(9),''),CHAR(10),''),CHAR(13),''),'(',''),')',''),'_utf8mb4','')),9)='purposein'
+  ) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'migration 034 media purpose canonical constraint mismatch';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_schema=DATABASE() AND table_name='media_asset_references'
+      AND constraint_name='chk_media_reference_type'
+  ) AND NOT EXISTS (
+    SELECT 1
+    FROM information_schema.table_constraints AS table_constraint
+    JOIN information_schema.check_constraints AS check_constraint
+      ON check_constraint.constraint_schema=table_constraint.constraint_schema
+     AND check_constraint.constraint_name=table_constraint.constraint_name
+    WHERE table_constraint.constraint_schema=DATABASE()
+      AND table_constraint.table_name='media_asset_references'
+      AND table_constraint.constraint_name='chk_media_reference_type'
+      AND table_constraint.constraint_type='CHECK'
+      AND LEFT(LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+        check_constraint.check_clause,'`',''),' ',''),CHAR(9),''),CHAR(10),''),CHAR(13),''),'(',''),')',''),'_utf8mb4','')),16)='reference_typein'
+  ) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'migration 034 media reference type canonical constraint mismatch';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_schema=DATABASE() AND table_name='media_assets'
+      AND constraint_name='chk_media_asset_purpose_identity_application_guard'
+  ) AND NOT EXISTS (
+    SELECT 1
+    FROM information_schema.table_constraints AS table_constraint
+    JOIN information_schema.check_constraints AS check_constraint
+      ON check_constraint.constraint_schema=table_constraint.constraint_schema
+     AND check_constraint.constraint_name=table_constraint.constraint_name
+    WHERE table_constraint.constraint_schema=DATABASE()
+      AND table_constraint.table_name='media_assets'
+      AND table_constraint.constraint_name='chk_media_asset_purpose_identity_application_guard'
+      AND table_constraint.constraint_type='CHECK'
+      AND LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+        check_constraint.check_clause,'`',''),' ',''),CHAR(9),''),CHAR(10),''),CHAR(13),''),'(',''),')',''),'_utf8mb4',''))
+        = 'purposein''post'',''product'',''avatar'',''dish'',''merchant_logo'',''delivery_proof'',''delivery_im'',''feedback'',''identity_application'''
+  ) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'migration 034 media purpose guard constraint mismatch';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_schema=DATABASE() AND table_name='media_asset_references'
+      AND constraint_name='chk_media_reference_type_identity_application_guard'
+  ) AND NOT EXISTS (
+    SELECT 1
+    FROM information_schema.table_constraints AS table_constraint
+    JOIN information_schema.check_constraints AS check_constraint
+      ON check_constraint.constraint_schema=table_constraint.constraint_schema
+     AND check_constraint.constraint_name=table_constraint.constraint_name
+    WHERE table_constraint.constraint_schema=DATABASE()
+      AND table_constraint.table_name='media_asset_references'
+      AND table_constraint.constraint_name='chk_media_reference_type_identity_application_guard'
+      AND table_constraint.constraint_type='CHECK'
+      AND LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+        check_constraint.check_clause,'`',''),' ',''),CHAR(9),''),CHAR(10),''),CHAR(13),''),'(',''),')',''),'_utf8mb4',''))
+        = 'reference_typein''post'',''product'',''avatar'',''dish'',''merchant_logo'',''delivery_proof'',''delivery_im'',''feedback'',''identity_application'''
+  ) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'migration 034 media reference type guard constraint mismatch';
+  END IF;
+
   IF EXISTS (
     SELECT 1 FROM information_schema.table_constraints
     WHERE constraint_schema=DATABASE()
