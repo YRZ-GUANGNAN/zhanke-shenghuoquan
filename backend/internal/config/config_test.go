@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func validConfig() Config {
 	return Config{
@@ -63,6 +66,41 @@ func TestLocalMockPaymentIsolation(t *testing.T) {
 func TestProductionConfigurationAcceptsExplicitCredentials(t *testing.T) {
 	if err := validConfig().Validate(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestRealWechatConfigurationDisablesMockFallback(t *testing.T) {
+	t.Setenv("APP_ENV", "dev")
+	t.Setenv("JWT_SECRET", strings.Repeat("s", 32))
+	t.Setenv("WECHAT_APP_ID", "wx0dacef976daa8e55")
+	t.Setenv("WECHAT_APP_SECRET", "test-secret-not-for-production")
+	t.Setenv("ALLOW_MOCK_WECHAT_LOGIN", "false")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AllowMockWechat {
+		t.Fatal("real WeChat configuration unexpectedly enabled mock fallback")
+	}
+	if cfg.WechatAppID != "wx0dacef976daa8e55" {
+		t.Fatal("real WeChat app id was not loaded")
+	}
+}
+
+func TestRealWechatConfigurationDefaultsMockFallbackToDisabled(t *testing.T) {
+	t.Setenv("APP_ENV", "dev")
+	t.Setenv("JWT_SECRET", strings.Repeat("s", 32))
+	t.Setenv("WECHAT_APP_ID", "wx0dacef976daa8e55")
+	t.Setenv("WECHAT_APP_SECRET", "test-secret-not-for-production")
+	t.Setenv("ALLOW_MOCK_WECHAT_LOGIN", "")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AllowMockWechat {
+		t.Fatal("mock WeChat login must default to disabled")
 	}
 }
 
