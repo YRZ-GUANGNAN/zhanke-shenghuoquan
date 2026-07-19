@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -24,9 +26,11 @@ type LoginResult struct {
 }
 
 const (
-	accessTokenTTL    = 15 * time.Minute
-	localMockTokenTTL = 12 * time.Hour
-	productionAppEnv  = "prod"
+	accessTokenTTL             = 15 * time.Minute
+	localMockTokenTTL          = 12 * time.Hour
+	productionAppEnv           = "prod"
+	defaultWechatAPIBase       = "https://api.weixin.qq.com"
+	maxWechatErrorMessageRunes = 256
 )
 
 var (
@@ -44,6 +48,7 @@ type Service struct {
 	jwtSecret           string
 	wechatAppID         string
 	wechatSecret        string
+	wechatAPIBase       string
 	allowMockWechat     bool
 	appEnv              string
 	httpClient          *http.Client
@@ -59,6 +64,15 @@ func WithAppEnv(appEnv string) ServiceOption {
 	return func(s *Service) { s.appEnv = appEnv }
 }
 
+func WithWechatAPIBase(value string) ServiceOption {
+	return func(s *Service) {
+		normalized := strings.TrimRight(strings.TrimSpace(value), "/")
+		if normalized != "" {
+			s.wechatAPIBase = normalized
+		}
+	}
+}
+
 func WithIdentityEligibility(eligibility IdentityEligibility) ServiceOption {
 	return func(s *Service) { s.identityEligibility = eligibility }
 }
@@ -70,7 +84,8 @@ func WithWechatPhoneResolver(resolver WechatPhoneResolver) ServiceOption {
 func NewService(repo Repository, jwtSecret, wechatAppID, wechatSecret string, allowMockWechat bool, options ...ServiceOption) *Service {
 	service := &Service{
 		repo: repo, jwtSecret: jwtSecret, wechatAppID: wechatAppID, wechatSecret: wechatSecret,
-		allowMockWechat: allowMockWechat, httpClient: &http.Client{Timeout: 5 * time.Second},
+		wechatAPIBase: defaultWechatAPIBase, allowMockWechat: allowMockWechat,
+		httpClient: &http.Client{Timeout: 5 * time.Second},
 	}
 	for _, option := range options {
 		option(service)
@@ -142,28 +157,61 @@ func (s *Service) exchangeCode(ctx context.Context, code string) (string, error)
 		}
 		return "mock_openid_" + code, nil
 	}
-	endpoint := "https://api.weixin.qq.com/sns/jscode2session?appid=" + url.QueryEscape(s.wechatAppID) + "&secret=" + url.QueryEscape(s.wechatSecret) + "&js_code=" + url.QueryEscape(code) + "&grant_type=authorization_code"
+	query := url.Values{}
+	query.Set("appid", s.wechatAppID)
+	query.Set("secret", s.wechatSecret)
+	query.Set("js_code", code)
+	query.Set("grant_type", "authorization_code")
+	endpoint := s.wechatAPIBase + "/sns/jscode2session?" + query.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
-		return "", err
+		return "", errors.New("wechat code exchange request failed")
 	}
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		return "", err
+		if errors.Is(err, context.DeadlineExceeded) {
+			return "", fmt.Errorf("wechat code exchange request failed: %w", context.DeadlineExceeded)
+		}
+		if errors.Is(err, context.Canceled) {
+			return "", fmt.Errorf("wechat code exchange request failed: %w", context.Canceled)
+		}
+		return "", errors.New("wechat code exchange request failed")
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("wechat code exchange http status %d", resp.StatusCode)
+	}
 	var result struct {
 		OpenID  string `json:"openid"`
 		ErrCode int    `json:"errcode"`
 		ErrMsg  string `json:"errmsg"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", err
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 32<<10)).Decode(&result); err != nil {
+		return "", errors.New("wechat code exchange returned invalid JSON")
+	}
+	if result.ErrCode != 0 {
+		message := sanitizeWechatErrorMessage(result.ErrMsg, s.wechatSecret)
+		if message == "" {
+			return "", fmt.Errorf("wechat code exchange errcode %d", result.ErrCode)
+		}
+		return "", fmt.Errorf("wechat code exchange errcode %d: %s", result.ErrCode, message)
 	}
 	if result.OpenID == "" {
-		return "", fmt.Errorf("wechat %d: %s", result.ErrCode, result.ErrMsg)
+		return "", errors.New("wechat code exchange returned empty openid")
 	}
 	return result.OpenID, nil
+}
+
+func sanitizeWechatErrorMessage(message, secret string) string {
+	message = strings.Join(strings.Fields(strings.TrimSpace(message)), " ")
+	if secret != "" {
+		message = strings.ReplaceAll(message, secret, "[redacted]")
+	}
+	runes := []rune(message)
+	if len(runes) > maxWechatErrorMessageRunes {
+		message = string(runes[:maxWechatErrorMessageRunes])
+	}
+	return message
 }
 
 func (s *Service) Get(ctx context.Context, id uint) (User, error) { return s.repo.FindByID(ctx, id) }

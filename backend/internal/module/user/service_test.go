@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -237,6 +238,119 @@ func TestMockWechatLoginMustBeExplicitAndCannotCreateAdmin(t *testing.T) {
 	}
 	if result.User.CurrentIdentity != IdentityStudent {
 		t.Fatalf("new user identity=%q want=%q", result.User.CurrentIdentity, IdentityStudent)
+	}
+}
+
+func TestRealWechatLoginMapsSameOpenIDToStableUser(t *testing.T) {
+	const (
+		appID     = "wx-real-app"
+		appSecret = "real-app-secret-must-never-appear-in-errors"
+		openID    = "stable-real-openid"
+	)
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		if r.URL.Path != "/sns/jscode2session" {
+			t.Errorf("path=%q", r.URL.Path)
+		}
+		query := r.URL.Query()
+		if query.Get("appid") != appID || query.Get("secret") != appSecret || query.Get("grant_type") != "authorization_code" {
+			t.Errorf("unexpected query parameters")
+		}
+		if query.Get("js_code") != "code with reserved ?& characters" {
+			t.Errorf("js_code=%q", query.Get("js_code"))
+		}
+		_ = json.NewEncoder(w).Encode(map[string]string{"openid": openID})
+	}))
+	defer server.Close()
+
+	repo := newMemoryRepository()
+	service := NewService(repo, testSecret, appID, appSecret, false, WithWechatAPIBase("  "+server.URL+"///  "))
+	first, err := service.WechatLogin(context.Background(), LoginInput{Code: "code with reserved ?& characters"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := service.WechatLogin(context.Background(), LoginInput{Code: "code with reserved ?& characters"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.User.ID == 0 || second.User.ID != first.User.ID || second.User.OpenID != openID {
+		t.Fatalf("real OpenID did not map to a stable user: first=%+v second=%+v", first.User, second.User)
+	}
+	if len(repo.users) != 1 || requests != 2 {
+		t.Fatalf("users=%d requests=%d", len(repo.users), requests)
+	}
+}
+
+func TestWechatAPIBaseDefaultsAndIgnoresEmptyOverride(t *testing.T) {
+	service := NewService(newMemoryRepository(), testSecret, "wx-real-app", "real-secret", false, WithWechatAPIBase("  ///  "))
+	if service.wechatAPIBase != defaultWechatAPIBase {
+		t.Fatalf("wechatAPIBase=%q want=%q", service.wechatAPIBase, defaultWechatAPIBase)
+	}
+}
+
+func TestRealWechatCodeExchangeFailuresAreSafe(t *testing.T) {
+	const appSecret = "real-app-secret-must-never-appear-in-errors"
+	tests := []struct {
+		name        string
+		status      int
+		body        string
+		want        string
+		wantErrCode bool
+	}{
+		{
+			name:        "wechat errcode",
+			body:        `{"errcode":40029,"errmsg":"invalid code ` + appSecret + ` ` + strings.Repeat("x", 600) + `"}`,
+			want:        "wechat code exchange errcode 40029",
+			wantErrCode: true,
+		},
+		{name: "empty openid", body: `{}`, want: "wechat code exchange returned empty openid"},
+		{name: "invalid json", body: `{not-json`, want: "wechat code exchange returned invalid JSON"},
+		{name: "http status", status: http.StatusInternalServerError, body: `server leaked ` + appSecret, want: "wechat code exchange http status 500"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				status := test.status
+				if status == 0 {
+					status = http.StatusOK
+				}
+				w.WriteHeader(status)
+				_, _ = w.Write([]byte(test.body))
+			}))
+			defer server.Close()
+
+			service := NewService(newMemoryRepository(), testSecret, "wx-real-app", appSecret, false, WithWechatAPIBase(server.URL))
+			_, err := service.WechatLogin(context.Background(), LoginInput{Code: "unsafe code ?&"})
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("err=%v want substring %q", err, test.want)
+			}
+			if strings.Contains(err.Error(), appSecret) || strings.Contains(err.Error(), server.URL) || strings.Contains(err.Error(), "unsafe code") {
+				t.Fatalf("sensitive request data leaked: %v", err)
+			}
+			if test.wantErrCode && len(err.Error()) > 400 {
+				t.Fatalf("wechat errmsg was not bounded: length=%d", len(err.Error()))
+			}
+		})
+	}
+}
+
+func TestRealWechatCodeExchangeTimeoutIsSafe(t *testing.T) {
+	const appSecret = "real-app-secret-must-never-appear-in-errors"
+	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+
+	service := NewService(newMemoryRepository(), testSecret, "wx-real-app", appSecret, false, WithWechatAPIBase(server.URL))
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	defer cancel()
+	_, err := service.WechatLogin(ctx, LoginInput{Code: "timeout-code"})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("err=%v want context deadline exceeded", err)
+	}
+	if strings.Contains(err.Error(), appSecret) || strings.Contains(err.Error(), server.URL) || strings.Contains(err.Error(), "timeout-code") {
+		t.Fatalf("sensitive request data leaked: %v", err)
 	}
 }
 

@@ -69,6 +69,7 @@ func main() {
 	userService := user.NewService(
 		user.NewRepository(db), cfg.JWTSecret, cfg.WechatAppID, cfg.WechatAppSecret, cfg.AllowMockWechat,
 		user.WithAppEnv(cfg.AppEnv),
+		user.WithWechatAPIBase(cfg.WechatAPIBase),
 		user.WithIdentityEligibility(newDeliveryIdentityEligibility(cfg.EnableDelivery, identityRiders, identityApplicationRepository)),
 	)
 	userService.SetAccountClosureCoordinator(accountclosure.New(db))
