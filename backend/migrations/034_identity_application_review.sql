@@ -79,10 +79,7 @@ BEGIN
     WHERE table_constraint.constraint_schema=DATABASE()
       AND table_constraint.table_name='media_assets'
       AND table_constraint.constraint_type='CHECK'
-      AND REGEXP_LIKE(
-        LOWER(check_constraint.check_clause),
-        '((^|[^[:alnum:]_`])purpose([^[:alnum:]_`]|$))|(`purpose`)'
-      )
+      AND LOCATE('`purpose`',LOWER(check_constraint.check_clause)) > 0
       AND table_constraint.constraint_name NOT IN (
         'chk_media_asset_purpose',
         'chk_media_asset_purpose_identity_application_guard'
@@ -99,10 +96,7 @@ BEGIN
     WHERE table_constraint.constraint_schema=DATABASE()
       AND table_constraint.table_name='media_asset_references'
       AND table_constraint.constraint_type='CHECK'
-      AND REGEXP_LIKE(
-        LOWER(check_constraint.check_clause),
-        '((^|[^[:alnum:]_`])reference_type([^[:alnum:]_`]|$))|(`reference_type`)'
-      )
+      AND LOCATE('`reference_type`',LOWER(check_constraint.check_clause)) > 0
       AND table_constraint.constraint_name NOT IN (
         'chk_media_reference_type',
         'chk_media_reference_type_identity_application_guard'

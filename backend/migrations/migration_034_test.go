@@ -101,6 +101,17 @@ func TestMigration034IsGuardedForRepeatApplication(t *testing.T) {
 			t.Fatalf("migration 034 uses unsafe global check-clause normalization %q", forbidden)
 		}
 	}
+	if strings.Contains(source, "REGEXP_LIKE(") {
+		t.Fatal("migration 034 unknown-check detection must not regex-match string literal contents")
+	}
+	for _, required := range []string{
+		"LOCATE('`purpose`',LOWER(check_constraint.check_clause))",
+		"LOCATE('`reference_type`',LOWER(check_constraint.check_clause))",
+	} {
+		if !strings.Contains(source, required) {
+			t.Fatalf("migration 034 missing exact target-identifier detection %q", required)
+		}
+	}
 	for _, required := range []string{
 		"'`purpose`','purpose'",
 		"'`reference_type`','reference_type'",
@@ -363,13 +374,18 @@ func TestMigration034MySQLPreservesUnrelatedMediaChecks(t *testing.T) {
 		CHECK (purpose_utf8mb4 IN ('post','product'))`)
 	mustExec034(t, db, `ALTER TABLE media_asset_references ADD CONSTRAINT chk_media_reference_alias_column
 		CHECK (reference_type_utf8mb4 IN ('post','product'))`)
+	mustExec034(t, db, `ALTER TABLE media_assets ADD CONSTRAINT chk_media_asset_purpose_literal
+		CHECK (other_text <> 'purpose')`)
+	mustExec034(t, db, `ALTER TABLE media_asset_references ADD CONSTRAINT chk_media_reference_json_path_literal
+		CHECK (json_path <> '$.reference_type')`)
 
 	applyMigration034(t, db)
 
-	assertCount034(t, db, 4, `SELECT COUNT(*) FROM information_schema.table_constraints
+	assertCount034(t, db, 6, `SELECT COUNT(*) FROM information_schema.table_constraints
 		WHERE constraint_schema=DATABASE() AND constraint_name IN (
 			'chk_media_asset_other_flag','chk_media_reference_other_flag',
-			'chk_media_asset_alias_column','chk_media_reference_alias_column'
+			'chk_media_asset_alias_column','chk_media_reference_alias_column',
+			'chk_media_asset_purpose_literal','chk_media_reference_json_path_literal'
 		) AND constraint_type='CHECK'`)
 }
 
@@ -505,12 +521,14 @@ func createMigration034BaseSchema(t *testing.T, db *sql.DB) {
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
 			purpose VARCHAR(16) NOT NULL,
 			purpose_utf8mb4 VARCHAR(24) NOT NULL DEFAULT '',
+			other_text VARCHAR(64) NOT NULL DEFAULT '',
 			other_flag INT NOT NULL DEFAULT 0
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 		`CREATE TABLE media_asset_references (
 			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
 			reference_type VARCHAR(16) NOT NULL,
 			reference_type_utf8mb4 VARCHAR(24) NOT NULL DEFAULT '',
+			json_path VARCHAR(64) NOT NULL DEFAULT '',
 			other_flag INT NOT NULL DEFAULT 0,
 			CONSTRAINT chk_media_reference_type
 			CHECK (reference_type IN ('post','product','avatar','dish','merchant_logo','delivery_proof','delivery_im','feedback'))
