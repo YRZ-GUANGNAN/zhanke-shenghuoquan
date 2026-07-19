@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
 const path = require('node:path')
 
 const layoutModule = path.join(
@@ -52,5 +53,28 @@ assert.deepEqual(fallback, {
 
 const totalFallback = calculateCapsuleLayout({ windowWidth: 375, statusBarHeight: 0 })
 assert.equal(totalFallback.systemRowHeight, 72)
+
+const componentPath = path.join(
+  __dirname,
+  '..',
+  'apps',
+  'miniapp',
+  'src',
+  'components',
+  'capsule-page-header.tsx',
+)
+const stylePath = componentPath.replace(/\.tsx$/, '.scss')
+assert.ok(fs.existsSync(componentPath), 'CapsulePageHeader component is required')
+assert.ok(fs.existsSync(stylePath), 'CapsulePageHeader styles are required')
+
+const componentSource = fs.readFileSync(componentPath, 'utf8')
+const styleSource = fs.readFileSync(stylePath, 'utf8')
+assert.match(componentSource, /export function CapsuleSystemRow/)
+assert.match(componentSource, /export default function CapsulePageHeader/)
+assert.match(styleSource, /var\(--capsule-system-row-height\)/)
+assert.match(styleSource, /var\(--capsule-business-row-height\)/)
+assert.match(styleSource, /min-width:\s*44px/)
+assert.match(styleSource, /min-height:\s*44px/)
+assert.match(styleSource, /pointer-events:\s*none/)
 
 console.log('miniapp capsule geometry: ok')
