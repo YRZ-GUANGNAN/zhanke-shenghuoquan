@@ -73,6 +73,9 @@ for (const value of [
   'pages/home/index?target=pages/../detail/index',
   'pages/home/index?page=pages//detail/index',
   'pages/home/index?route=pages%5Cdetail%5Cindex',
+  'pages/home/index?%2572edirect=custom:pages/detail/index',
+  'pages/home/index?%2570ath=%2Fpages/detail/index',
+  'pages/home/index?%2575rl=custom:pages/detail/index',
   'pages/home/index\u0000'
 ]) {
   assert.equal(navigationValidation.validMiniProgramPath(value), false, `expected invalid mini-program path: ${value}`)

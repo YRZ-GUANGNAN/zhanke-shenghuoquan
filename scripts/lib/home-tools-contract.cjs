@@ -114,6 +114,20 @@ function isToolLikeObject(node) {
     ['StringLiteral', 'NumericLiteral', 'BooleanLiteral', 'NullLiteral'].includes(unwrapExpression(property.value)?.type))
 }
 
+function toolCollectionMapFields(node) {
+  if (node?.type !== 'CallExpression' || node.callee.type !== 'MemberExpression' || node.callee.computed ||
+      !isIdentifier(node.callee.property, 'map') || node.arguments.length !== 1) return new Set()
+  const callback = unwrapExpression(node.arguments[0])
+  if (callback?.type !== 'ArrowFunctionExpression' || callback.params.length !== 1 || callback.params[0].type !== 'Identifier') {
+    return new Set()
+  }
+  const itemName = callback.params[0].name
+  return new Set(indexAST(callback.body).nodes
+    .filter((candidate) => candidate.type === 'MemberExpression' && !candidate.computed &&
+      isIdentifier(candidate.object, itemName) && candidate.property.type === 'Identifier' && toolFields.has(candidate.property.name))
+    .map((candidate) => candidate.property.name))
+}
+
 function validateToolText(node, className, fieldName) {
   if (node?.type !== 'JSXElement' || jsxName(node.openingElement.name) !== 'Text') return false
   const attributes = jsxAttributes(node)
@@ -244,6 +258,7 @@ function homeToolsDataFlowViolations(home) {
   if (homeFunctions.length !== 1) return [...violations, 'HomeContent function must exist exactly once']
   const homeFunction = homeFunctions[0]
   const homeIndex = indexAST(homeFunction)
+  const moduleIndex = indexAST(ast.program)
 
   const toolStates = homeIndex.nodes.filter((node) => node.type === 'VariableDeclarator' && node.id.type === 'ArrayPattern' &&
     node.id.elements.length === 2 && isIdentifier(node.id.elements[0], 'tools') && isIdentifier(node.id.elements[1], 'setTools') &&
@@ -273,19 +288,27 @@ function homeToolsDataFlowViolations(home) {
     violations.push('setTools must receive service values once and an empty reset once')
   }
 
-  for (const node of homeIndex.nodes) {
+  for (const node of moduleIndex.nodes) {
     if (isToolLikeObject(node)) {
-      violations.push('HomeContent must not declare a static tool-like object')
+      violations.push('home module must not declare a static tool-like object')
       break
     }
     if (node.type === 'VariableDeclarator' && node.init?.type === 'ArrayExpression' && node.init.elements.length > 0 &&
         isToolLinkArrayType(node.id)) {
-      violations.push('HomeContent must not declare a static ToolLink array')
+      violations.push('home module must not declare a static ToolLink array')
       break
     }
   }
 
-  const toolsContainers = homeIndex.nodes.filter((node) => node.type === 'JSXExpressionContainer' &&
+  const renderCandidates = homeFunction.body.body
+    .filter((node) => node.type === 'ReturnStatement' && node.argument)
+    .map((node) => indexAST(unwrapExpression(node.argument)))
+    .filter((index) => index.nodes.some((node) => node.type === 'JSXExpressionContainer' &&
+      unwrapExpression(node.expression)?.type === 'LogicalExpression' && unwrapExpression(node.expression).operator === '&&' &&
+      isStrictStringEquality(unwrapExpression(node.expression).left, 'activeTab', 'tools')))
+  if (renderCandidates.length !== 1) violations.push('HomeContent must have exactly one main JSX return containing the tools branch')
+  const renderIndex = renderCandidates[0] || { nodes: [] }
+  const toolsContainers = renderIndex.nodes.filter((node) => node.type === 'JSXExpressionContainer' &&
     unwrapExpression(node.expression)?.type === 'LogicalExpression' && unwrapExpression(node.expression).operator === '&&' &&
     isStrictStringEquality(unwrapExpression(node.expression).left, 'activeTab', 'tools'))
   let readyMapCall = null
@@ -312,6 +335,12 @@ function homeToolsDataFlowViolations(home) {
         validateStatusBranch(emptyConditional.alternate, 'loading', violations)
       }
     }
+  }
+
+  const extraToolCollectionMaps = renderIndex.nodes.filter((node) =>
+    node !== readyMapCall && toolCollectionMapFields(node).size >= 2)
+  if (extraToolCollectionMaps.length > 0) {
+    violations.push('HomeContent main JSX return must not render another tool-like collection outside canonical tools.map')
   }
 
   if (toolStates.length === 1 && readyMapCall) {
@@ -353,7 +382,8 @@ function assertSyntheticStaticToolsRejected(home) {
   if (!home.includes(marker)) throw new Error('HomeContent marker is missing')
   const toolsState = '  const [tools, setTools] = useState<ToolLink[]>([])'
   const toolsMap = '{tools.map((tool) => ('
-  if (!home.includes(toolsState) || !home.includes(toolsMap)) {
+  const messagesRender = "        {activeTab === 'messages' && ("
+  if (!home.includes(toolsState) || !home.includes(toolsMap) || !home.includes(messagesRender)) {
     throw new Error('Home tools state or render marker is missing')
   }
   const fakeTool = "{ id: 'fake', title: 'fake', subtitle: 'fake', iconText: 'F', appId: 'wx1234567890ABCDEF', path: 'pages/home/index', color: '#000' }"
@@ -365,7 +395,12 @@ function assertSyntheticStaticToolsRejected(home) {
     ['decoratedCards.map', home
       .replace(toolsState, `${toolsState}\n  const decoratedCards = tools`)
       .replace(toolsMap, '{decoratedCards.map((tool) => (')],
-    ['extra fake card', home.replace(toolsMap, `<View className='alternate-fake-card'><Text>fake</Text></View>\n              ${toolsMap}`)]
+    ['extra fake card', home.replace(toolsMap, `<View className='alternate-fake-card'><Text>fake</Text></View>\n              ${toolsMap}`)],
+    ['module arbitraryFakeCards', home.replace(marker, `const arbitraryFakeCards: ToolLink[] = [${fakeTool}]\n\n${marker}`)],
+    ['module static fake object', home.replace(marker, `const arbitraryFakeCard: ToolLink = ${fakeTool}\n\n${marker}`)],
+    ['module decoratedCollection.map outside tools', home
+      .replace(marker, `const arbitraryFakeCard: ToolLink = ${fakeTool}\nconst decoratedCollection: ToolLink[] = [arbitraryFakeCard]\n\n${marker}`)
+      .replace(messagesRender, `{decoratedCollection.map((entry) => (<View key={entry.id} className='alternate-fake-card'><Text>{entry.title}</Text></View>))}\n${messagesRender}`)]
   ]
   for (const [name, mutated] of mutations) {
     const violations = homeToolsDataFlowViolations(mutated)

@@ -62,7 +62,7 @@ function validMiniProgramQuery(rawQuery, alreadyDecoded = false) {
     const rawValue = separator >= 0 ? pair.slice(separator + 1) : ''
     const key = alreadyDecoded ? rawKey : decodeComponent(rawKey, true)
     const value = alreadyDecoded ? rawValue : decodeComponent(rawValue, true)
-    if (key === null || value === null || unsafePlainQueryComponent(key) || unsafePlainQueryComponent(value)) return false
+    if (key === null || value === null || key.includes('%') || unsafePlainQueryComponent(key) || unsafePlainQueryComponent(value)) return false
     return !pathSemanticQueryKey(key) || validDecodedRelativeMiniProgramPath(value)
   })
 }
