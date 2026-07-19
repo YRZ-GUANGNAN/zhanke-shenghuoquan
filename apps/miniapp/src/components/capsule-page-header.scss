@@ -38,9 +38,21 @@
   min-height: 44px;
 }
 
+.capsule-page-header__slot > * {
+  display: flex;
+  align-items: center;
+  min-width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+}
+
 .capsule-page-header__slot--right {
   justify-content: flex-end;
   margin-left: auto;
+}
+
+.capsule-page-header__slot--right > * {
+  justify-content: flex-end;
 }
 
 .capsule-page-header__center {
