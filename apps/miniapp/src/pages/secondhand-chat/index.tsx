@@ -14,6 +14,7 @@ import { requestWithSingleSessionRecovery } from '../../services/session-recover
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
 import type { Product } from '../../types'
+import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import './index.scss'
 
 type PageStatus = 'loading' | 'ready' | 'error'
@@ -225,7 +226,7 @@ export default function SecondhandChatPage() {
   }
 
   return (
-    <View className='secondhand-chat-page'>
+    <View className='secondhand-chat-page' style={getCapsuleSafeStyle()}>
       <View className='secondhand-chat-header'>
         <View className='secondhand-chat-header__back' onClick={goBack} />
         <View className='secondhand-chat-seller' onClick={canOpenSellerProfile ? openSellerProfile : undefined}>

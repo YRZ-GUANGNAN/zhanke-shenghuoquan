@@ -5,6 +5,7 @@ import RuntimeSessionGate from '../../components/runtime-session-gate'
 import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
+import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import './index.scss'
 
 type MerchantTabKey = 'pending' | 'delivering' | 'completed'
@@ -277,7 +278,7 @@ function MerchantHomeContent() {
   if (!identityAllowed) return <View className='merchant-home-page' />
 
   return (
-    <View className='merchant-home-page'>
+    <View className='merchant-home-page' style={getCapsuleSafeStyle()}>
       <View className='merchant-home-hero'>
         <View className='merchant-home-hero__orb merchant-home-hero__orb--left' />
         <View className='merchant-home-hero__orb merchant-home-hero__orb--right' />

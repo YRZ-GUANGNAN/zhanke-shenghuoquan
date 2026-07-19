@@ -13,7 +13,7 @@
   align-items: center;
   justify-content: space-between;
   height: 192rpx;
-  padding: 84rpx 44rpx 0;
+  padding: 84rpx var(--capsule-safe-right, 44rpx) 0 44rpx;
   border-bottom: 1rpx solid $divider-nav;
   background: $bg-surface;
   box-sizing: border-box;

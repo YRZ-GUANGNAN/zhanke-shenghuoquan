@@ -7,6 +7,7 @@ import {
   type ExternalTakeoutMerchantLink,
 } from '../../services/d-navigation'
 import Taro from '../../services/taro'
+import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import './index.scss'
 
 type DirectoryStatus = 'loading' | 'empty' | 'ready' | 'error'
@@ -63,7 +64,7 @@ export default function StudentTakeoutPage() {
   }
 
   return (
-    <View className='student-takeout-page'>
+    <View className='student-takeout-page' style={getCapsuleSafeStyle()}>
       <View className='student-takeout-header'>
         <View className='student-takeout-header__row'>
           <Text className='student-takeout-header__title'>外卖</Text>

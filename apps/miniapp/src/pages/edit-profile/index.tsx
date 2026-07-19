@@ -4,6 +4,7 @@ import { updateProfile } from '../../services/a-user'
 import { chooseAndUploadImages, waitForMediaApproval, type UploadedMedia } from '../../services/media'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
+import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import './index.scss'
 
 export default function EditProfilePage() {
@@ -51,7 +52,7 @@ export default function EditProfilePage() {
   const avatarSource = avatar?.previewPath || profile.avatar
 
   return (
-    <View className='edit-profile-page'>
+    <View className='edit-profile-page' style={getCapsuleSafeStyle()}>
       <View className='edit-profile-nav'>
         <Text className='edit-profile-nav__action' onClick={() => void Taro.navigateBack()}>取消</Text>
         <Text className='edit-profile-nav__title'>编辑资料</Text>

@@ -18,7 +18,7 @@
   flex-direction: column;
   justify-content: flex-end;
   height: 176rpx;
-  padding: 0 40rpx 22rpx;
+  padding: 0 var(--capsule-safe-right, 40rpx) 22rpx 40rpx;
   border-bottom: 1rpx solid $divider-nav;
   background: rgba(255, 255, 255, .98);
   box-shadow: $shadow-header;

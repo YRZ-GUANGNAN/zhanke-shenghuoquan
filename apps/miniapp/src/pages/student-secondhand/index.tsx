@@ -4,6 +4,7 @@ import StudentBottomNav from '../../components/student-bottom-nav'
 import { getProductsPage } from '../../services/c-trade'
 import Taro from '../../services/taro'
 import type { Product } from '../../types'
+import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import './index.scss'
 
 type CategoryKey = '全部' | '数码' | '书籍资料' | '生活用品' | '代步'
@@ -218,7 +219,7 @@ export default function StudentSecondhandPage() {
   )
 
   return (
-    <View className='student-secondhand-page'>
+    <View className='student-secondhand-page' style={getCapsuleSafeStyle()}>
       <View className='student-secondhand-header'>
         <View className='student-secondhand-header__title-row'>
           <Text className='student-secondhand-header__title'>二手集市</Text>

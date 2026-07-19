@@ -11,6 +11,7 @@ import { getMyCommunitySummary } from '../../services/b-community'
 import { getMyProductsPage } from '../../services/c-trade'
 import { useSessionStore } from '../../stores/session'
 import type { IdentityAvailability, IdentityRoleKey } from '../../types'
+import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import './index.scss'
 
 type RoleKey = IdentityRoleKey
@@ -159,7 +160,7 @@ function ProfileContent() {
   if (!identityAllowed) return <View className='student-profile-page' />
 
   return (
-    <View className='student-profile-page'>
+    <View className='student-profile-page' style={getCapsuleSafeStyle()}>
       <View className='student-profile-hero' onClick={openProfileEditor}>
         <View className='student-profile-hero__orb student-profile-hero__orb--small' />
         <View className='student-profile-hero__orb student-profile-hero__orb--large' />

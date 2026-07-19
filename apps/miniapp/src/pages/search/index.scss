@@ -10,7 +10,7 @@
 .student-search-header {
   box-sizing: border-box;
   min-height: 176rpx;
-  padding: 96rpx 28rpx 20rpx;
+  padding: 96rpx var(--capsule-safe-right, 28rpx) 20rpx 28rpx;
   display: flex;
   align-items: center;
   gap: 18rpx;

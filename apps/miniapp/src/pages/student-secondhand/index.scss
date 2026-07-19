@@ -16,7 +16,7 @@
   position: relative;
   z-index: 6;
   flex: 0 0 auto;
-  padding: 112rpx 28rpx 22rpx;
+  padding: 112rpx var(--capsule-safe-right, 28rpx) 22rpx 28rpx;
   background: $bg-surface;
   box-shadow: $shadow-header;
 }

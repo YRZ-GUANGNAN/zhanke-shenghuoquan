@@ -12,32 +12,41 @@ page {
 }
 
 .publish-post-nav {
+  position: relative;
   height: 184rpx;
-  padding: 84rpx 32rpx 0;
-  display: grid;
-  grid-template-columns: 160rpx 1fr 160rpx;
+  padding: 84rpx var(--capsule-safe-right, 32rpx) 0 32rpx;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   box-sizing: border-box;
   border-bottom: 1rpx solid $divider-nav;
   background: $bg-surface;
 }
 
 .publish-post-nav__side {
+  position: relative;
+  z-index: 1;
   font-size: 30rpx;
   line-height: 64rpx;
   color: $text-secondary;
 }
 
 .publish-post-nav__title {
+  position: absolute;
+  right: 0;
+  bottom: 18rpx;
+  left: 0;
   text-align: center;
   font-size: 34rpx;
   line-height: 64rpx;
   font-weight: 800;
   color: $text-strong;
+  pointer-events: none;
 }
 
 .publish-post-nav__publish {
-  justify-self: end;
+  position: relative;
+  z-index: 1;
   min-width: 104rpx;
   height: 60rpx;
   padding: 0 30rpx;

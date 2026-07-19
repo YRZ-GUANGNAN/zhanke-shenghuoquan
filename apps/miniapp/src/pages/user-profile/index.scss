@@ -54,6 +54,7 @@
   color: $text-on-color;
   font-size: 30rpx;
   line-height: 1;
+  margin-right: calc(var(--capsule-safe-right, 96px) - 30rpx);
 }
 
 .public-profile-user {

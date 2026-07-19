@@ -56,7 +56,7 @@ page {
 
 .merchant-messages-nav__read {
   position: absolute;
-  right: 30rpx;
+  right: var(--capsule-safe-right, 30rpx);
   bottom: 32rpx;
   color: $brand-primary;
   font-size: 24rpx;

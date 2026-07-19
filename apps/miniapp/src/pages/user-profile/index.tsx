@@ -11,6 +11,7 @@ import { getPublicUserProducts } from '../../services/c-trade'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
 import type { CommunityPost, Product } from '../../types'
+import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import './index.scss'
 
 type ProfileTab = 'posts' | 'secondhand'
@@ -182,7 +183,7 @@ export default function UserProfilePage() {
   const value = profile.profile
   const empty = activeTab === 'posts' ? posts.length === 0 : products.length === 0
   return (
-    <View className='public-profile-page'>
+    <View className='public-profile-page' style={getCapsuleSafeStyle()}>
       <View className='public-profile-hero'>
         <View className='public-profile-nav'>
           <View className='public-profile-nav__back' onClick={() => void Taro.navigateBack().catch(() => Taro.redirectTo({ url: '/pages/home/index' }))} />

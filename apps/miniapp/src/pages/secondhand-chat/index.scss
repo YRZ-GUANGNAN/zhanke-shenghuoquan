@@ -21,7 +21,7 @@
   align-items: center;
   gap: 18rpx;
   height: 164rpx;
-  padding: 58rpx 34rpx 22rpx;
+  padding: 58rpx var(--capsule-safe-right, 34rpx) 22rpx 34rpx;
   background: $bg-surface;
   box-shadow: $shadow-header;
 }

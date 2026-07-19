@@ -56,6 +56,7 @@ page {
   align-items: flex-start;
   justify-content: space-between;
   gap: 18rpx;
+  padding-right: calc(var(--capsule-safe-right, 96px) - 34rpx);
 }
 
 .merchant-home-shop {

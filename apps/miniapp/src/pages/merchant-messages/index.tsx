@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
 import Taro from '../../services/taro'
+import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import './index.scss'
 
 type MerchantMessageKind = 'rider' | 'order' | 'wallet' | 'ops'
@@ -94,7 +95,7 @@ export default function MerchantMessagesPage() {
   }
 
   return (
-    <View className='merchant-messages-page'>
+    <View className='merchant-messages-page' style={getCapsuleSafeStyle()}>
       <View className='merchant-messages-nav'>
         <View className='merchant-messages-nav__back' onClick={handleBack}>
           <Text>‹</Text>

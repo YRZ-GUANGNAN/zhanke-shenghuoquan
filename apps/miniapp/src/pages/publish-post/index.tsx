@@ -8,6 +8,7 @@ import {
   listHotCommunityTags,
 } from '../../services/b-community'
 import { chooseAndUploadImages, waitForMediaApproval, type UploadedMedia } from '../../services/media'
+import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import './index.scss'
 
 const FALLBACK_TAGS = ['奶茶推荐', '求助', '搭子', '二手', '兼职', '攻略', '湛科日常']
@@ -168,7 +169,7 @@ export default function PublishPostPage() {
   }
 
   return (
-    <View className='publish-post-page'>
+    <View className='publish-post-page' style={getCapsuleSafeStyle()}>
       <View className='publish-post-nav'>
         <Text className='publish-post-nav__side' onClick={() => void Taro.navigateBack()}>取消</Text>
         <Text className='publish-post-nav__title'>发布帖子</Text>

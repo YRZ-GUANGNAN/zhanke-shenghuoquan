@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Input, Text, View } from '@tarojs/components'
 import type { CommunityPost, Product } from '../../types'
 import Taro from '../../services/taro'
+import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import {
   clearCommunitySearchHistory,
   listCommunityHotSearches,
@@ -203,7 +204,7 @@ export default function SearchPage() {
 
   if (!scope || !copy) {
     return (
-      <View className='student-search-page'>
+      <View className='student-search-page' style={getCapsuleSafeStyle()}>
         <View className='student-search-header'>
           <View className='student-search-back' onClick={() => void Taro.navigateBack()} />
           <Text className='student-search-header__title'>搜索入口无效</Text>
@@ -214,7 +215,7 @@ export default function SearchPage() {
   }
 
   return (
-    <View className='student-search-page'>
+    <View className='student-search-page' style={getCapsuleSafeStyle()}>
       <View className='student-search-header'>
         <View className='student-search-back' onClick={() => void Taro.navigateBack()} />
         <View className='student-search-box'>
