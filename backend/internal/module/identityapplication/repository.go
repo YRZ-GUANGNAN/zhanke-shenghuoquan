@@ -15,10 +15,12 @@ import (
 type Repository interface {
 	FindCurrent(context.Context, uint64, Role) (Application, bool, error)
 	ListCurrent(context.Context, uint64) ([]Application, error)
-	SaveSubmission(context.Context, *Application, []string, EventType, uint64) error
+	SaveSubmission(context.Context, *Application, []string, EventType, uint64, SubmissionCommit) error
 	ListAdmin(context.Context, AdminListFilter) ([]Application, int64, error)
 	FindDetail(context.Context, string) (ApplicationDetail, error)
 }
+
+type SubmissionCommit func(context.Context, *gorm.DB) error
 
 type GormRepository struct{ db *gorm.DB }
 
@@ -44,8 +46,8 @@ func (r *GormRepository) ListCurrent(ctx context.Context, userID uint64) ([]Appl
 	return values, err
 }
 
-func (r *GormRepository) SaveSubmission(ctx context.Context, value *Application, assetIDs []string, eventType EventType, expectedRowVersion uint64) error {
-	if value == nil || value.UserID == 0 || !value.Role.Valid() || value.Status != StatusPending {
+func (r *GormRepository) SaveSubmission(ctx context.Context, value *Application, assetIDs []string, eventType EventType, expectedRowVersion uint64, commit SubmissionCommit) error {
+	if value == nil || value.UserID == 0 || !value.Role.Valid() || value.Status != StatusPending || commit == nil {
 		return ErrInvalidInput
 	}
 	if value.ID == 0 && eventType != EventSubmitted {
@@ -137,6 +139,9 @@ func (r *GormRepository) SaveSubmission(ctx context.Context, value *Application,
 		}
 		if err := tx.Create(&event).Error; err != nil {
 			return mapSubmissionWriteError(err)
+		}
+		if err := commit(ctx, tx); err != nil {
+			return err
 		}
 		value.Assets = assets
 		return nil

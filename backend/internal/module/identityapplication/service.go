@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"gorm.io/gorm"
 )
 
 const ulidAlphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
@@ -169,11 +171,13 @@ func (s *Service) Submit(ctx context.Context, userID uint64, role Role, input Su
 	if err != nil {
 		return ApplicationView{}, mapProofSubmissionMediaError(err)
 	}
-	if err := s.repo.SaveSubmission(ctx, &value, normalized.AssetPublicIDs, eventType, expectedRowVersion); err != nil {
-		return ApplicationView{}, s.cancelMediaAfterFailure(ctx, userID, reservation, err)
+	commit := func(commitContext context.Context, tx *gorm.DB) error {
+		return mapProofSubmissionMediaError(s.media.EnsureCommittedInTransaction(
+			commitContext, tx, userID, reservation, value.ApplicationPublicID,
+		))
 	}
-	if err := s.media.EnsureCommitted(ctx, userID, reservation, value.ApplicationPublicID); err != nil {
-		return ApplicationView{}, s.cancelMediaAfterFailure(ctx, userID, reservation, mapProofSubmissionMediaError(err))
+	if err := s.repo.SaveSubmission(ctx, &value, normalized.AssetPublicIDs, eventType, expectedRowVersion, commit); err != nil {
+		return ApplicationView{}, s.cancelMediaAfterFailure(ctx, userID, reservation, err)
 	}
 	return toApplicationView(value), nil
 }

@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	coremedia "campus-circle/backend/internal/module/media"
+	"gorm.io/gorm"
 )
 
 var fixedTime = time.Date(2026, 7, 19, 8, 30, 0, 0, time.UTC)
@@ -48,13 +50,20 @@ func (r *memoryRepository) ListCurrent(_ context.Context, userID uint64) ([]Appl
 	return values, nil
 }
 
-func (r *memoryRepository) SaveSubmission(_ context.Context, value *Application, assetIDs []string, eventType EventType, expectedRowVersion uint64) error {
+func (r *memoryRepository) SaveSubmission(ctx context.Context, value *Application, assetIDs []string, eventType EventType, expectedRowVersion uint64, commit SubmissionCommit) error {
 	if r.steps != nil {
 		*r.steps = append(*r.steps, "save")
 	}
 	if r.saveErr != nil {
 		return r.saveErr
 	}
+	if commit == nil {
+		return ErrInvalidInput
+	}
+	originalValue := cloneApplication(*value)
+	originalNextID := r.nextID
+	originalApplications := cloneApplicationMap(r.applications)
+	originalEvents := append([]ApplicationEvent(nil), r.events...)
 	key := currentKey(value.UserID, value.Role)
 	current, exists := r.applications[key]
 	if !exists {
@@ -93,6 +102,13 @@ func (r *memoryRepository) SaveSubmission(_ context.Context, value *Application,
 		Status:        value.Status,
 		CreatedAt:     value.UpdatedAt,
 	})
+	if err := commit(ctx, nil); err != nil {
+		r.nextID = originalNextID
+		r.applications = originalApplications
+		r.events = originalEvents
+		*value = originalValue
+		return err
+	}
 	return nil
 }
 
@@ -128,6 +144,14 @@ func (r *memoryRepository) approve(userID uint64, role Role) {
 func cloneApplication(value Application) Application {
 	value.Assets = append([]ApplicationAsset(nil), value.Assets...)
 	return value
+}
+
+func cloneApplicationMap(values map[string]Application) map[string]Application {
+	cloned := make(map[string]Application, len(values))
+	for key, value := range values {
+		cloned[key] = cloneApplication(value)
+	}
+	return cloned
 }
 
 func TestSubmitRejectAndResubmit(t *testing.T) {
@@ -397,15 +421,20 @@ func TestApplicationViewSerializesUserIDsAsStrings(t *testing.T) {
 
 func TestSaveSubmissionRejectsWrongEventType(t *testing.T) {
 	repository := NewRepository(nil)
+	commit := func(context.Context, *gorm.DB) error { return nil }
+	valid := Application{UserID: 41, Role: RoleRider, Status: StatusPending, RowVersion: 1}
+	if err := repository.SaveSubmission(context.Background(), &valid, []string{"01ARZ3NDEKTSV4RRFFQ69G5FAV"}, EventSubmitted, 0, nil); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("submission accepted nil transactional media commit: %v", err)
+	}
 	created := Application{UserID: 41, Role: RoleRider, Status: StatusPending, RowVersion: 1}
-	if err := repository.SaveSubmission(context.Background(), &created, []string{"01ARZ3NDEKTSV4RRFFQ69G5FAV"}, EventApproved, 0); !errors.Is(err, ErrInvalidInput) {
+	if err := repository.SaveSubmission(context.Background(), &created, []string{"01ARZ3NDEKTSV4RRFFQ69G5FAV"}, EventApproved, 0, commit); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("new application accepted approved event: %v", err)
 	}
 	existing := Application{ID: 7, UserID: 41, Role: RoleRider, Status: StatusPending, RowVersion: 3}
-	if err := repository.SaveSubmission(context.Background(), &existing, []string{"01ARZ3NDEKTSV4RRFFQ69G5FAV"}, EventSubmitted, 2); !errors.Is(err, ErrInvalidInput) {
+	if err := repository.SaveSubmission(context.Background(), &existing, []string{"01ARZ3NDEKTSV4RRFFQ69G5FAV"}, EventSubmitted, 2, commit); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("existing application accepted submitted event: %v", err)
 	}
-	if err := repository.SaveSubmission(context.Background(), &existing, []string{"01ARZ3NDEKTSV4RRFFQ69G5FAV"}, EventRejected, 2); !errors.Is(err, ErrInvalidInput) {
+	if err := repository.SaveSubmission(context.Background(), &existing, []string{"01ARZ3NDEKTSV4RRFFQ69G5FAV"}, EventRejected, 2, commit); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("existing application accepted rejected event: %v", err)
 	}
 }
@@ -418,6 +447,9 @@ type submissionMediaStub struct {
 	steps       *[]string
 	cancelled   bool
 	existingID  string
+	assetIDs    map[string]uint64
+	liveIDs     []uint64
+	revokedIDs  []uint64
 }
 
 func (m *submissionMediaStub) Reserve(_ context.Context, _ uint64, assetIDs []string) (MediaReservation, error) {
@@ -434,6 +466,20 @@ func (m *submissionMediaStub) Reserve(_ context.Context, _ uint64, assetIDs []st
 	if len(value.AssetPublicIDs) == 0 {
 		value.AssetPublicIDs = append([]string(nil), assetIDs...)
 	}
+	if len(value.InternalAssetIDs) == 0 {
+		if m.assetIDs == nil {
+			m.assetIDs = make(map[string]uint64)
+		}
+		value.InternalAssetIDs = make([]uint64, len(assetIDs))
+		for index, assetID := range assetIDs {
+			internalID, exists := m.assetIDs[assetID]
+			if !exists {
+				internalID = uint64(101 + len(m.assetIDs))
+				m.assetIDs[assetID] = internalID
+			}
+			value.InternalAssetIDs[index] = internalID
+		}
+	}
 	return value, nil
 }
 
@@ -447,10 +493,27 @@ func (m *submissionMediaStub) Commit(context.Context, uint64, MediaReservation, 
 }
 
 func (m *submissionMediaStub) EnsureCommitted(_ context.Context, _ uint64, _ MediaReservation, _ string) error {
+	panic("Submit must use EnsureCommittedInTransaction")
+}
+
+func (m *submissionMediaStub) EnsureCommittedInTransaction(_ context.Context, _ *gorm.DB, _ uint64, reservation MediaReservation, _ string) error {
 	if m.steps != nil {
 		*m.steps = append(*m.steps, "ensure")
 	}
-	return m.ensureErr
+	if m.ensureErr != nil {
+		return m.ensureErr
+	}
+	keep := make(map[uint64]struct{}, len(reservation.InternalAssetIDs))
+	for _, internalID := range reservation.InternalAssetIDs {
+		keep[internalID] = struct{}{}
+	}
+	for _, internalID := range m.liveIDs {
+		if _, retained := keep[internalID]; !retained {
+			m.revokedIDs = append(m.revokedIDs, internalID)
+		}
+	}
+	m.liveIDs = append([]uint64(nil), reservation.InternalAssetIDs...)
+	return nil
 }
 
 func (m *submissionMediaStub) Cancel(context.Context, uint64, MediaReservation) error {
@@ -496,7 +559,7 @@ func TestSubmitMediaLifecycleCancelsReservationWhenSaveFails(t *testing.T) {
 	}
 }
 
-func TestSubmitMediaLifecycleCommitConflictDoesNotReportSuccess(t *testing.T) {
+func TestSubmitMediaLifecycleCommitConflictRollsBackSubmission(t *testing.T) {
 	steps := make([]string, 0, 4)
 	repo := newMemoryRepository()
 	repo.steps = &steps
@@ -510,11 +573,11 @@ func TestSubmitMediaLifecycleCommitConflictDoesNotReportSuccess(t *testing.T) {
 	if strings.Join(steps, ",") != "reserve,save,ensure,cancel" || !media.cancelled {
 		t.Fatalf("steps=%v cancelled=%v", steps, media.cancelled)
 	}
-	// The application transaction is durable before the cross-domain binding.
-	// The caller gets a conflict (never false success), and the pending row is
-	// retained for an operator-safe reconciliation instead of being deleted.
-	if current, found, findErr := repo.FindCurrent(context.Background(), 41, RoleRider); findErr != nil || !found || current.Status != StatusPending {
-		t.Fatalf("saved boundary found=%v current=%+v err=%v", found, current, findErr)
+	if current, found, findErr := repo.FindCurrent(context.Background(), 41, RoleRider); findErr != nil || found || current.ID != 0 {
+		t.Fatalf("failed media commit left application: found=%v current=%+v err=%v", found, current, findErr)
+	}
+	if len(repo.events) != 0 {
+		t.Fatalf("failed media commit left events: %+v", repo.events)
 	}
 }
 
@@ -530,6 +593,51 @@ func TestSubmitMediaLifecycleMapsOwnershipConflictAndSkipsSave(t *testing.T) {
 	}
 	if strings.Join(steps, ",") != "reserve" {
 		t.Fatalf("steps=%v", steps)
+	}
+}
+
+func TestSubmitResubmissionReplacesLiveProofSetWithoutAccumulation(t *testing.T) {
+	const (
+		assetA = "01J00000000000000000000011"
+		assetB = "01J00000000000000000000012"
+		assetC = "01J00000000000000000000013"
+	)
+	repo := newMemoryRepository()
+	media := &submissionMediaStub{}
+	service := NewService(repo, media, fixedClock)
+	input := validRiderInput()
+	input.AssetPublicIDs = []string{assetA, assetB}
+	first, err := service.Submit(context.Background(), 41, RoleRider, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	repo.reject(41, RoleRider, 7, "换一张")
+	input.AssetPublicIDs = []string{assetB, assetC}
+	input.ExpectedRowVersion = 2
+	if _, err := service.Submit(context.Background(), 41, RoleRider, input); err != nil {
+		t.Fatal(err)
+	}
+	wantBC := []uint64{media.assetIDs[assetB], media.assetIDs[assetC]}
+	if !reflect.DeepEqual(media.liveIDs, wantBC) || !reflect.DeepEqual(media.revokedIDs, []uint64{media.assetIDs[assetA]}) {
+		t.Fatalf("A+B -> B+C live=%v revoked=%v ids=%v", media.liveIDs, media.revokedIDs, media.assetIDs)
+	}
+	if media.existingID != first.ApplicationPublicID {
+		t.Fatalf("existing reference=%q want=%q", media.existingID, first.ApplicationPublicID)
+	}
+
+	repo.reject(41, RoleRider, 7, "再换一张")
+	input.AssetPublicIDs = []string{assetC}
+	input.ExpectedRowVersion = 4
+	if _, err := service.Submit(context.Background(), 41, RoleRider, input); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(media.liveIDs, []uint64{media.assetIDs[assetC]}) ||
+		!reflect.DeepEqual(media.revokedIDs, []uint64{media.assetIDs[assetA], media.assetIDs[assetB]}) {
+		t.Fatalf("third submission accumulated live references: live=%v revoked=%v", media.liveIDs, media.revokedIDs)
+	}
+	if len(repo.events) != 3 {
+		t.Fatalf("review audit events were removed: %+v", repo.events)
 	}
 }
 

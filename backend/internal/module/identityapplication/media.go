@@ -8,6 +8,7 @@ import (
 	"time"
 
 	coremedia "campus-circle/backend/internal/module/media"
+	"gorm.io/gorm"
 )
 
 const (
@@ -22,8 +23,9 @@ var (
 )
 
 type MediaReservation struct {
-	Token          string
-	AssetPublicIDs []string
+	Token            string
+	AssetPublicIDs   []string
+	InternalAssetIDs []uint64
 }
 
 // ApplicationMedia is the private media boundary used by identity applications.
@@ -34,6 +36,7 @@ type ApplicationMedia interface {
 	ReserveForApplication(context.Context, uint64, string, []string) (MediaReservation, error)
 	Commit(context.Context, uint64, MediaReservation, string) error
 	EnsureCommitted(context.Context, uint64, MediaReservation, string) error
+	EnsureCommittedInTransaction(context.Context, *gorm.DB, uint64, MediaReservation, string) error
 	Cancel(context.Context, uint64, MediaReservation) error
 	ResolveAdminProofs(context.Context, string, []string) ([]ProofAssetView, error)
 }
@@ -104,13 +107,21 @@ func (m *CoreApplicationMedia) reserve(ctx context.Context, ownerID uint64, exis
 		_ = m.bindings.Cancel(ctx, ownerID, token)
 		return MediaReservation{}, errors.Join(ErrProofMediaUnavailable, coremedia.ErrBindingMismatch)
 	}
+	internalAssetIDs := make([]uint64, len(value.References))
+	seenInternalIDs := make(map[uint64]struct{}, len(value.References))
 	for index, reference := range value.References {
 		if reference.InternalID == 0 || reference.AssetPublicID != ordered[index] || reference.Slot != uint16(index) {
 			_ = m.bindings.Cancel(ctx, ownerID, token)
 			return MediaReservation{}, errors.Join(ErrProofMediaUnavailable, coremedia.ErrBindingMismatch)
 		}
+		if _, duplicate := seenInternalIDs[reference.InternalID]; duplicate {
+			_ = m.bindings.Cancel(ctx, ownerID, token)
+			return MediaReservation{}, errors.Join(ErrProofMediaUnavailable, coremedia.ErrBindingMismatch)
+		}
+		seenInternalIDs[reference.InternalID] = struct{}{}
+		internalAssetIDs[index] = reference.InternalID
 	}
-	return MediaReservation{Token: token, AssetPublicIDs: ordered}, nil
+	return MediaReservation{Token: token, AssetPublicIDs: ordered, InternalAssetIDs: internalAssetIDs}, nil
 }
 
 func (m *CoreApplicationMedia) Commit(ctx context.Context, ownerID uint64, reservation MediaReservation, applicationPublicID string) error {
@@ -127,6 +138,39 @@ func (m *CoreApplicationMedia) EnsureCommitted(ctx context.Context, ownerID uint
 		return err
 	}
 	return m.bindings.EnsureCommitted(ctx, input)
+}
+
+func (m *CoreApplicationMedia) EnsureCommittedInTransaction(ctx context.Context, tx *gorm.DB, ownerID uint64, reservation MediaReservation, applicationPublicID string) error {
+	if tx == nil {
+		return ErrProofMediaUnavailable
+	}
+	input, err := proofBindingCommitInput(ownerID, reservation, applicationPublicID)
+	if err != nil {
+		return err
+	}
+	keep, err := validateReservationInternalIDs(reservation.InternalAssetIDs, len(input.OrderedAssetPublicIDs))
+	if err != nil {
+		return err
+	}
+	repository := coremedia.NewReferenceBindingRepository(tx)
+	bindings, err := coremedia.NewReferenceBindingService(repository, m.now)
+	if err != nil {
+		return err
+	}
+	if err := bindings.EnsureCommitted(ctx, input); err != nil {
+		return err
+	}
+	if err := bindings.Revoke(ctx, coremedia.PurposeIdentityApplication, applicationPublicID, keep); err != nil {
+		return err
+	}
+	exact, err := repository.ExactCommittedBinding(ctx, input)
+	if err != nil {
+		return err
+	}
+	if !exact {
+		return coremedia.ErrBindingMismatch
+	}
+	return assertExactLiveProofReferences(ctx, tx, applicationPublicID, keep)
 }
 
 func (m *CoreApplicationMedia) Cancel(ctx context.Context, ownerID uint64, reservation MediaReservation) error {
@@ -217,6 +261,46 @@ func proofBindingCommitInput(ownerID uint64, reservation MediaReservation, appli
 		ReferenceID:           applicationPublicID,
 		OrderedAssetPublicIDs: ordered,
 	}, nil
+}
+
+func validateReservationInternalIDs(values []uint64, expected int) ([]uint64, error) {
+	if expected <= 0 || len(values) != expected {
+		return nil, ErrProofMediaUnavailable
+	}
+	ordered := append([]uint64(nil), values...)
+	seen := make(map[uint64]struct{}, len(ordered))
+	for _, value := range ordered {
+		if value == 0 {
+			return nil, ErrProofMediaUnavailable
+		}
+		if _, duplicate := seen[value]; duplicate {
+			return nil, ErrProofMediaUnavailable
+		}
+		seen[value] = struct{}{}
+	}
+	return ordered, nil
+}
+
+func assertExactLiveProofReferences(ctx context.Context, tx *gorm.DB, applicationPublicID string, internalAssetIDs []uint64) error {
+	var references []coremedia.AssetReference
+	if err := tx.WithContext(ctx).
+		Where("reference_type = ? AND reference_id = ? AND status IN ?", coremedia.PurposeIdentityApplication, applicationPublicID,
+			[]coremedia.ReferenceStatus{coremedia.ReferencePending, coremedia.ReferenceActive}).
+		Order("slot ASC, id ASC").Find(&references).Error; err != nil {
+		return err
+	}
+	if len(references) != len(internalAssetIDs) {
+		return coremedia.ErrBindingMismatch
+	}
+	for index, reference := range references {
+		if reference.AssetID != internalAssetIDs[index] || reference.Slot != uint16(index) ||
+			reference.ReferenceType != coremedia.PurposeIdentityApplication || reference.ReferenceID != applicationPublicID ||
+			reference.RevocationFence != nil || reference.ParentVisibility != coremedia.ParentHidden ||
+			(reference.Status != coremedia.ReferencePending && reference.Status != coremedia.ReferenceActive) {
+			return coremedia.ErrBindingMismatch
+		}
+	}
+	return nil
 }
 
 func mapProofSubmissionMediaError(err error) error {

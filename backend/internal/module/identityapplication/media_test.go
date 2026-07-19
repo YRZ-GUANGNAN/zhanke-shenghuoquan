@@ -26,6 +26,7 @@ type applicationBindingStub struct {
 	reserveErr   error
 	commitErr    error
 	cancelErr    error
+	duplicateIDs bool
 }
 
 func (s *applicationBindingStub) Reserve(_ context.Context, input coremedia.BindingReserveInput) (coremedia.BindingReservation, error) {
@@ -35,7 +36,11 @@ func (s *applicationBindingStub) Reserve(_ context.Context, input coremedia.Bind
 	}
 	references := make([]coremedia.BindingAsset, len(input.OrderedAssetPublicIDs))
 	for index, assetID := range input.OrderedAssetPublicIDs {
-		references[index] = coremedia.BindingAsset{InternalID: uint64(index + 1), AssetPublicID: assetID, Slot: uint16(index)}
+		internalID := uint64(index + 1)
+		if s.duplicateIDs {
+			internalID = 1
+		}
+		references[index] = coremedia.BindingAsset{InternalID: internalID, AssetPublicID: assetID, Slot: uint16(index)}
 	}
 	return coremedia.BindingReservation{Token: input.Token, References: references}, nil
 }
@@ -133,7 +138,8 @@ func TestApplicationMediaReserveCommitCancelUsePrivateCoordinates(t *testing.T) 
 		!reflect.DeepEqual(bindings.reserveInput.OrderedAssetPublicIDs, []string{proofAssetID2, proofAssetID1}) ||
 		bindings.reserveInput.ExpiresAt != now.Add(identityMediaReservationTTL) ||
 		len(reservation.Token) != len("m10_")+26 || reservation.Token[:4] != "m10_" ||
-		!reflect.DeepEqual(reservation.AssetPublicIDs, []string{proofAssetID2, proofAssetID1}) {
+		!reflect.DeepEqual(reservation.AssetPublicIDs, []string{proofAssetID2, proofAssetID1}) ||
+		!reflect.DeepEqual(reservation.InternalAssetIDs, []uint64{1, 2}) {
 		t.Fatalf("reserve input=%+v reservation=%+v", bindings.reserveInput, reservation)
 	}
 
@@ -167,6 +173,9 @@ func TestApplicationMediaReserveCommitCancelUsePrivateCoordinates(t *testing.T) 
 	if bindings.reserveInput.ExistingReferenceID != proofAppID1 {
 		t.Fatalf("existing reference=%q", bindings.reserveInput.ExistingReferenceID)
 	}
+	if err := adapter.EnsureCommittedInTransaction(context.Background(), nil, 41, reservation, proofAppID1); !errors.Is(err, ErrProofMediaUnavailable) {
+		t.Fatalf("nil transaction err=%v", err)
+	}
 }
 
 func TestApplicationMediaReservePropagatesOwnerMismatch(t *testing.T) {
@@ -181,6 +190,20 @@ func TestApplicationMediaReservePropagatesOwnerMismatch(t *testing.T) {
 	}
 	if bindings.reserveInput.OwnerID != 92 {
 		t.Fatalf("owner=%d", bindings.reserveInput.OwnerID)
+	}
+}
+
+func TestApplicationMediaReserveRejectsDuplicateInternalAssetIDs(t *testing.T) {
+	bindings := &applicationBindingStub{duplicateIDs: true}
+	adapter, err := NewApplicationMedia(bindings, &proofRepositoryStub{}, &proofSignerStub{}, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := adapter.Reserve(context.Background(), 41, []string{proofAssetID1, proofAssetID2}); !errors.Is(err, coremedia.ErrBindingMismatch) {
+		t.Fatalf("err=%v", err)
+	}
+	if bindings.cancelOwner != 41 || bindings.cancelToken == "" {
+		t.Fatalf("invalid reservation was not cancelled: owner=%d token=%q", bindings.cancelOwner, bindings.cancelToken)
 	}
 }
 

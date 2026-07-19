@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	coremedia "campus-circle/backend/internal/module/media"
 	mysqlDriver "github.com/go-sql-driver/mysql"
 	gormMySQL "gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -23,6 +24,198 @@ const (
 	mysqlAssetC = "01ARZ3NDEKTSV4RRFFQ69G5FAX"
 	mysqlAssetD = "01ARZ3NDEKTSV4RRFFQ69G5FAY"
 )
+
+type failAfterTransactionalMediaCommit struct {
+	ApplicationMedia
+	err error
+}
+
+func (m *failAfterTransactionalMediaCommit) EnsureCommittedInTransaction(ctx context.Context, tx *gorm.DB, ownerID uint64, reservation MediaReservation, applicationPublicID string) error {
+	if err := m.ApplicationMedia.EnsureCommittedInTransaction(ctx, tx, ownerID, reservation, applicationPublicID); err != nil {
+		return err
+	}
+	return m.err
+}
+
+func TestGormRepositoryMediaBindingAtomicityAgainstMySQL(t *testing.T) {
+	db := requireIdentityApplicationMySQL(t)
+	now := time.Now().UTC()
+	for index, fixture := range []struct {
+		ownerID uint64
+		assetID string
+		projID  string
+	}{
+		{ownerID: 71, assetID: mysqlAssetA, projID: "01ARZ3NDEKTSV4RRFFQ69G5FB2"},
+		{ownerID: 71, assetID: mysqlAssetB, projID: "01ARZ3NDEKTSV4RRFFQ69G5FB3"},
+		{ownerID: 71, assetID: mysqlAssetC, projID: "01ARZ3NDEKTSV4RRFFQ69G5FB4"},
+		{ownerID: 72, assetID: mysqlAssetD, projID: "01ARZ3NDEKTSV4RRFFQ69G5FB5"},
+	} {
+		seedIdentityProofAsset(t, db, fixture.ownerID, fixture.assetID, fixture.projID, now.Add(time.Duration(index)*time.Millisecond))
+	}
+	bindingService, err := coremedia.NewReferenceBindingService(coremedia.NewReferenceBindingRepository(db), func() time.Time { return now })
+	if err != nil {
+		t.Fatal(err)
+	}
+	applicationMedia, err := NewApplicationMedia(bindingService, coremedia.NewRepository(db), &proofSignerStub{}, func() time.Time { return now })
+	if err != nil {
+		t.Fatal(err)
+	}
+	repository := NewRepository(db)
+	service := NewService(repository, applicationMedia, func() time.Time { return now })
+	input := SubmitInput{RealName: "原子用户", Phone: "13800138000", AssetPublicIDs: []string{mysqlAssetA, mysqlAssetB}}
+	first, err := service.Submit(context.Background(), 71, RoleRider, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertExactLiveMySQLProofs(t, db, first.ApplicationPublicID, []string{mysqlAssetA, mysqlAssetB})
+
+	markMySQLApplicationRejected(t, db, first.ID, 1, 2, now.Add(time.Minute))
+	now = now.Add(2 * time.Minute)
+	input.AssetPublicIDs = []string{mysqlAssetB, mysqlAssetC}
+	input.ExpectedRowVersion = 2
+	second, err := service.Submit(context.Background(), 71, RoleRider, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertExactLiveMySQLProofs(t, db, first.ApplicationPublicID, []string{mysqlAssetB, mysqlAssetC})
+	assertMySQLProofRevoked(t, db, first.ApplicationPublicID, mysqlAssetA)
+
+	markMySQLApplicationRejected(t, db, first.ID, second.RowVersion, 4, now.Add(time.Minute))
+	now = now.Add(2 * time.Minute)
+	input.AssetPublicIDs = []string{mysqlAssetC}
+	input.ExpectedRowVersion = 4
+	if _, err := service.Submit(context.Background(), 71, RoleRider, input); err != nil {
+		t.Fatal(err)
+	}
+	assertExactLiveMySQLProofs(t, db, first.ApplicationPublicID, []string{mysqlAssetC})
+	assertMySQLProofRevoked(t, db, first.ApplicationPublicID, mysqlAssetA)
+	assertMySQLProofRevoked(t, db, first.ApplicationPublicID, mysqlAssetB)
+	assertMySQLCount(t, db, 3, &ApplicationEvent{}, "application_id = ?", first.ID)
+
+	beforeApplications := mysqlModelCount(t, db, &Application{})
+	beforeAssets := mysqlModelCount(t, db, &ApplicationAsset{})
+	beforeEvents := mysqlModelCount(t, db, &ApplicationEvent{})
+	failingMedia := &failAfterTransactionalMediaCommit{ApplicationMedia: applicationMedia, err: coremedia.ErrBindingMismatch}
+	failingService := NewService(repository, failingMedia, func() time.Time { return now })
+	failedInput := SubmitInput{RealName: "回滚用户", Phone: "13900139000", AssetPublicIDs: []string{mysqlAssetD}}
+	if _, err := failingService.Submit(context.Background(), 72, RoleRider, failedInput); !errors.Is(err, ErrProofMediaConflict) {
+		t.Fatalf("transactional media failure err=%v", err)
+	}
+	if got := mysqlModelCount(t, db, &Application{}); got != beforeApplications {
+		t.Fatalf("failed commit left application rows: got=%d want=%d", got, beforeApplications)
+	}
+	if got := mysqlModelCount(t, db, &ApplicationAsset{}); got != beforeAssets {
+		t.Fatalf("failed commit left application asset rows: got=%d want=%d", got, beforeAssets)
+	}
+	if got := mysqlModelCount(t, db, &ApplicationEvent{}); got != beforeEvents {
+		t.Fatalf("failed commit left application event rows: got=%d want=%d", got, beforeEvents)
+	}
+	var failedReferences int64
+	if err := db.Model(&coremedia.AssetReference{}).Joins("JOIN media_assets a ON a.id = media_asset_references.asset_id").
+		Where("a.owner_id = ?", 72).Count(&failedReferences).Error; err != nil {
+		t.Fatal(err)
+	}
+	if failedReferences != 0 {
+		t.Fatalf("failed transaction left media references: %d", failedReferences)
+	}
+	var failedReservation struct {
+		Token     string     `gorm:"column:reservation_token"`
+		ExpiresAt *time.Time `gorm:"column:reservation_expires_at"`
+	}
+	if err := db.Table("media_assets").Select("reservation_token, reservation_expires_at").
+		Where("asset_public_id = ?", mysqlAssetD).Take(&failedReservation).Error; err != nil {
+		t.Fatal(err)
+	}
+	if failedReservation.Token != "" || failedReservation.ExpiresAt != nil {
+		t.Fatalf("failed transaction reservation was not cancelled: %+v", failedReservation)
+	}
+}
+
+func seedIdentityProofAsset(t *testing.T, db *gorm.DB, ownerID uint64, assetPublicID, projectionID string, now time.Time) {
+	t.Helper()
+	finalKey := "final/identity/" + assetPublicID + ".webp"
+	finalVersion := "version-" + assetPublicID
+	asset := coremedia.Asset{
+		AssetPublicID: assetPublicID, OwnerID: ownerID, Purpose: coremedia.PurposeIdentityApplication,
+		StorageStage: coremedia.StorageStageFinal, ReviewStatus: coremedia.ReviewApproved,
+		TechnicalStatus: coremedia.TechnicalFinalReady, VerifiedMIME: "image/webp", ByteSize: 1024,
+		Width: 640, Height: 640, FinalKey: &finalKey, FinalVersionID: &finalVersion,
+		AppliedDecisionVersion: 1, ProjectedDecision: coremedia.ReviewApproved,
+		IdempotencyKey: "identity-proof-" + assetPublicID, RowVersion: 1, CreatedAt: now, UpdatedAt: now,
+	}
+	if err := db.Create(&asset).Error; err != nil {
+		t.Fatal(err)
+	}
+	projection := coremedia.ReviewProjection{
+		ProjectionID: projectionID, AssetID: asset.ID, Status: coremedia.ProjectionApproved,
+		AppliedDecisionVersion: 1, FailureCode: "", RowVersion: 1, CreatedAt: now, UpdatedAt: now,
+	}
+	if err := db.Create(&projection).Error; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func markMySQLApplicationRejected(t *testing.T, db *gorm.DB, applicationID, expectedVersion, nextVersion uint64, now time.Time) {
+	t.Helper()
+	result := db.Model(&Application{}).Where("id = ? AND status = ? AND row_version = ?", applicationID, StatusPending, expectedVersion).
+		Updates(map[string]any{"status": StatusRejected, "review_reason": "补充证明", "row_version": nextVersion, "updated_at": now})
+	if result.Error != nil || result.RowsAffected != 1 {
+		t.Fatalf("mark rejected rows=%d err=%v", result.RowsAffected, result.Error)
+	}
+}
+
+func assertExactLiveMySQLProofs(t *testing.T, db *gorm.DB, applicationPublicID string, wantAssetPublicIDs []string) {
+	t.Helper()
+	type liveReference struct {
+		AssetPublicID string                     `gorm:"column:asset_public_id"`
+		Slot          uint16                     `gorm:"column:slot"`
+		Status        coremedia.ReferenceStatus  `gorm:"column:status"`
+		Visibility    coremedia.ParentVisibility `gorm:"column:parent_visibility"`
+		Fence         *string                    `gorm:"column:revocation_fence"`
+	}
+	var references []liveReference
+	if err := db.Table("media_asset_references AS r").
+		Select("a.asset_public_id, r.slot, r.status, r.parent_visibility, r.revocation_fence").
+		Joins("JOIN media_assets AS a ON a.id = r.asset_id").
+		Where("r.reference_type = ? AND r.reference_id = ? AND r.status IN ?", coremedia.PurposeIdentityApplication,
+			applicationPublicID, []coremedia.ReferenceStatus{coremedia.ReferencePending, coremedia.ReferenceActive}).
+		Order("r.slot ASC, r.id ASC").Scan(&references).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(references) != len(wantAssetPublicIDs) {
+		t.Fatalf("live references=%+v want=%v", references, wantAssetPublicIDs)
+	}
+	for index, reference := range references {
+		if reference.AssetPublicID != wantAssetPublicIDs[index] || reference.Slot != uint16(index) ||
+			reference.Visibility != coremedia.ParentHidden || reference.Fence != nil ||
+			(reference.Status != coremedia.ReferencePending && reference.Status != coremedia.ReferenceActive) {
+			t.Fatalf("live reference[%d]=%+v want asset=%s slot=%d", index, reference, wantAssetPublicIDs[index], index)
+		}
+	}
+}
+
+func assertMySQLProofRevoked(t *testing.T, db *gorm.DB, applicationPublicID, assetPublicID string) {
+	t.Helper()
+	var references []coremedia.AssetReference
+	if err := db.Model(&coremedia.AssetReference{}).Joins("JOIN media_assets a ON a.id = media_asset_references.asset_id").
+		Where("media_asset_references.reference_type = ? AND media_asset_references.reference_id = ? AND a.asset_public_id = ?",
+			coremedia.PurposeIdentityApplication, applicationPublicID, assetPublicID).Find(&references).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(references) != 1 || references[0].Status != coremedia.ReferenceRevoked || references[0].RevocationFence == nil ||
+		references[0].ParentVisibility != coremedia.ParentHidden {
+		t.Fatalf("asset %s references=%+v", assetPublicID, references)
+	}
+}
+
+func mysqlModelCount(t *testing.T, db *gorm.DB, model any) int64 {
+	t.Helper()
+	var count int64
+	if err := db.Model(model).Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	return count
+}
 
 func TestGormRepositoryMySQLContract(t *testing.T) {
 	db := requireIdentityApplicationMySQL(t)
@@ -100,7 +293,7 @@ func TestGormRepositoryMySQLContract(t *testing.T) {
 	stale.RowVersion = 4
 	stale.SubmittedAt = staleBase.Add(time.Hour)
 	stale.UpdatedAt = stale.SubmittedAt
-	if err := repository.SaveSubmission(ctx, &stale, []string{mysqlAssetD}, EventResubmitted, 3); !errors.Is(err, ErrVersionConflict) {
+	if err := repository.SaveSubmission(ctx, &stale, []string{mysqlAssetD}, EventResubmitted, 3, func(context.Context, *gorm.DB) error { return nil }); !errors.Is(err, ErrVersionConflict) {
 		t.Fatalf("stale CAS err=%v", err)
 	}
 	unchanged, found, err := repository.FindCurrent(ctx, 41, RoleRider)
@@ -125,7 +318,7 @@ func TestGormRepositoryMySQLContract(t *testing.T) {
 		CreatedAt:           rollbackTime,
 		UpdatedAt:           rollbackTime,
 	}
-	if err := repository.SaveSubmission(ctx, &rollbackApplication, []string{mysqlAssetA, mysqlAssetA}, EventSubmitted, 0); err == nil {
+	if err := repository.SaveSubmission(ctx, &rollbackApplication, []string{mysqlAssetA, mysqlAssetA}, EventSubmitted, 0, func(context.Context, *gorm.DB) error { return nil }); err == nil {
 		t.Fatal("duplicate asset transaction unexpectedly succeeded")
 	}
 	assertMySQLCount(t, db, 0, &Application{}, "user_id = ?", 99)
@@ -311,6 +504,16 @@ func requireIdentityApplicationMySQL(t *testing.T) *gorm.DB {
 	})
 	if err != nil {
 		t.Fatalf("open GORM temporary database: %v", err)
+	}
+	if err := db.AutoMigrate(&coremedia.Asset{}, &coremedia.ReviewProjection{}, &coremedia.AssetReference{}); err != nil {
+		t.Fatalf("create media binding test schema: %v", err)
+	}
+	if err := db.Exec(`ALTER TABLE media_assets
+		ADD COLUMN public_id CHAR(32) NULL,
+		ADD COLUMN reservation_token CHAR(32) NOT NULL DEFAULT '',
+		ADD COLUMN reservation_expires_at DATETIME(3) NULL,
+		ADD INDEX idx_media_reservation (reservation_token)`).Error; err != nil {
+		t.Fatalf("complete media binding test schema: %v", err)
 	}
 	return db
 }
