@@ -6,8 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
+
+	coremedia "campus-circle/backend/internal/module/media"
 )
 
 var fixedTime = time.Date(2026, 7, 19, 8, 30, 0, 0, time.UTC)
@@ -18,6 +21,8 @@ type memoryRepository struct {
 	nextID       uint64
 	applications map[string]Application
 	events       []ApplicationEvent
+	saveErr      error
+	steps        *[]string
 }
 
 func newMemoryRepository() *memoryRepository {
@@ -44,6 +49,12 @@ func (r *memoryRepository) ListCurrent(_ context.Context, userID uint64) ([]Appl
 }
 
 func (r *memoryRepository) SaveSubmission(_ context.Context, value *Application, assetIDs []string, eventType EventType, expectedRowVersion uint64) error {
+	if r.steps != nil {
+		*r.steps = append(*r.steps, "save")
+	}
+	if r.saveErr != nil {
+		return r.saveErr
+	}
 	key := currentKey(value.UserID, value.Role)
 	current, exists := r.applications[key]
 	if !exists {
@@ -121,7 +132,8 @@ func cloneApplication(value Application) Application {
 
 func TestSubmitRejectAndResubmit(t *testing.T) {
 	repo := newMemoryRepository()
-	service := NewService(repo, nil, fixedClock)
+	media := &submissionMediaStub{}
+	service := NewService(repo, media, fixedClock)
 
 	first, err := service.Submit(context.Background(), 41, RoleRider, SubmitInput{
 		RealName:       "  张同学  ",
@@ -157,11 +169,14 @@ func TestSubmitRejectAndResubmit(t *testing.T) {
 	if len(repo.events) != 2 || repo.events[1].EventType != EventResubmitted {
 		t.Fatalf("resubmit event=%+v", repo.events)
 	}
+	if media.existingID != first.ApplicationPublicID {
+		t.Fatalf("resubmit existing reference=%q want=%q", media.existingID, first.ApplicationPublicID)
+	}
 }
 
 func TestSubmitForbidsApprovedApplication(t *testing.T) {
 	repo := newMemoryRepository()
-	service := NewService(repo, nil, fixedClock)
+	service := NewService(repo, &submissionMediaStub{}, fixedClock)
 	if _, err := service.Submit(context.Background(), 41, RoleRider, validRiderInput()); err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +191,7 @@ func TestSubmitForbidsApprovedApplication(t *testing.T) {
 func TestSubmitTerminalStatePrecedesPayloadValidation(t *testing.T) {
 	t.Run("pending", func(t *testing.T) {
 		repo := newMemoryRepository()
-		service := NewService(repo, nil, fixedClock)
+		service := NewService(repo, &submissionMediaStub{}, fixedClock)
 		if _, err := service.Submit(context.Background(), 41, RoleRider, validRiderInput()); err != nil {
 			t.Fatal(err)
 		}
@@ -189,7 +204,7 @@ func TestSubmitTerminalStatePrecedesPayloadValidation(t *testing.T) {
 
 	t.Run("approved", func(t *testing.T) {
 		repo := newMemoryRepository()
-		service := NewService(repo, nil, fixedClock)
+		service := NewService(repo, &submissionMediaStub{}, fixedClock)
 		if _, err := service.Submit(context.Background(), 41, RoleRider, validRiderInput()); err != nil {
 			t.Fatal(err)
 		}
@@ -204,7 +219,7 @@ func TestSubmitTerminalStatePrecedesPayloadValidation(t *testing.T) {
 
 func TestSubmitRequiresMatchingRejectedVersion(t *testing.T) {
 	repo := newMemoryRepository()
-	service := NewService(repo, nil, fixedClock)
+	service := NewService(repo, &submissionMediaStub{}, fixedClock)
 	if _, err := service.Submit(context.Background(), 41, RoleRider, validRiderInput()); err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +236,7 @@ func TestSubmitRequiresMatchingRejectedVersion(t *testing.T) {
 }
 
 func TestSubmitRejectsVersionOnFirstSubmission(t *testing.T) {
-	service := NewService(newMemoryRepository(), nil, fixedClock)
+	service := NewService(newMemoryRepository(), &submissionMediaStub{}, fixedClock)
 	input := validRiderInput()
 	input.ExpectedRowVersion = 1
 	if _, err := service.Submit(context.Background(), 41, RoleRider, input); !errors.Is(err, ErrVersionConflict) {
@@ -230,7 +245,7 @@ func TestSubmitRejectsVersionOnFirstSubmission(t *testing.T) {
 }
 
 func TestValidationRejectsInvalidRoleAndUser(t *testing.T) {
-	service := NewService(newMemoryRepository(), nil, fixedClock)
+	service := NewService(newMemoryRepository(), &submissionMediaStub{}, fixedClock)
 	if _, err := service.Submit(context.Background(), 41, Role("student"), validRiderInput()); !errors.Is(err, ErrInvalidInput) || !errors.Is(err, ErrInvalidRole) {
 		t.Fatalf("invalid role err=%v", err)
 	}
@@ -240,7 +255,7 @@ func TestValidationRejectsInvalidRoleAndUser(t *testing.T) {
 }
 
 func TestValidationRequiresMerchantFields(t *testing.T) {
-	service := NewService(newMemoryRepository(), nil, fixedClock)
+	service := NewService(newMemoryRepository(), &submissionMediaStub{}, fixedClock)
 	base := SubmitInput{
 		RealName: "负责人", Phone: "13800138000", MerchantName: "校内店", MerchantAddress: "一号楼",
 		AssetPublicIDs: []string{"01ARZ3NDEKTSV4RRFFQ69G5FAV"},
@@ -271,7 +286,7 @@ func TestValidationRequiresMerchantFields(t *testing.T) {
 }
 
 func TestValidationRejectsInvalidPhone(t *testing.T) {
-	service := NewService(newMemoryRepository(), nil, fixedClock)
+	service := NewService(newMemoryRepository(), &submissionMediaStub{}, fixedClock)
 	for _, phone := range []string{"", "12800138000", "1380013800", "138001380000", "1380013800a", "+8613800138000"} {
 		input := validRiderInput()
 		input.Phone = phone
@@ -282,7 +297,7 @@ func TestValidationRejectsInvalidPhone(t *testing.T) {
 }
 
 func TestValidationProofCountDuplicateAndULID(t *testing.T) {
-	service := NewService(newMemoryRepository(), nil, fixedClock)
+	service := NewService(newMemoryRepository(), &submissionMediaStub{}, fixedClock)
 	validIDs := []string{
 		"01ARZ3NDEKTSV4RRFFQ69G5FAV",
 		"01ARZ3NDEKTSV4RRFFQ69G5FAW",
@@ -319,7 +334,7 @@ func TestValidationProofCountDuplicateAndULID(t *testing.T) {
 }
 
 func TestValidationRejectsBlankOrOversizedNames(t *testing.T) {
-	service := NewService(newMemoryRepository(), nil, fixedClock)
+	service := NewService(newMemoryRepository(), &submissionMediaStub{}, fixedClock)
 	input := validRiderInput()
 	input.RealName = " "
 	if _, err := service.Submit(context.Background(), 41, RoleRider, input); !errors.Is(err, ErrInvalidInput) {
@@ -392,6 +407,129 @@ func TestSaveSubmissionRejectsWrongEventType(t *testing.T) {
 	}
 	if err := repository.SaveSubmission(context.Background(), &existing, []string{"01ARZ3NDEKTSV4RRFFQ69G5FAV"}, EventRejected, 2); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("existing application accepted rejected event: %v", err)
+	}
+}
+
+type submissionMediaStub struct {
+	reservation MediaReservation
+	reserveErr  error
+	ensureErr   error
+	cancelErr   error
+	steps       *[]string
+	cancelled   bool
+	existingID  string
+}
+
+func (m *submissionMediaStub) Reserve(_ context.Context, _ uint64, assetIDs []string) (MediaReservation, error) {
+	if m.steps != nil {
+		*m.steps = append(*m.steps, "reserve")
+	}
+	if m.reserveErr != nil {
+		return MediaReservation{}, m.reserveErr
+	}
+	value := m.reservation
+	if value.Token == "" {
+		value.Token = "m10_01J00000000000000000000005"
+	}
+	if len(value.AssetPublicIDs) == 0 {
+		value.AssetPublicIDs = append([]string(nil), assetIDs...)
+	}
+	return value, nil
+}
+
+func (m *submissionMediaStub) ReserveForApplication(ctx context.Context, ownerID uint64, applicationPublicID string, assetIDs []string) (MediaReservation, error) {
+	m.existingID = applicationPublicID
+	return m.Reserve(ctx, ownerID, assetIDs)
+}
+
+func (m *submissionMediaStub) Commit(context.Context, uint64, MediaReservation, string) error {
+	panic("Submit must use EnsureCommitted")
+}
+
+func (m *submissionMediaStub) EnsureCommitted(_ context.Context, _ uint64, _ MediaReservation, _ string) error {
+	if m.steps != nil {
+		*m.steps = append(*m.steps, "ensure")
+	}
+	return m.ensureErr
+}
+
+func (m *submissionMediaStub) Cancel(context.Context, uint64, MediaReservation) error {
+	if m.steps != nil {
+		*m.steps = append(*m.steps, "cancel")
+	}
+	m.cancelled = true
+	return m.cancelErr
+}
+
+func (m *submissionMediaStub) ResolveAdminProofs(context.Context, string, []string) ([]ProofAssetView, error) {
+	return nil, nil
+}
+
+func TestSubmitMediaLifecycleReserveSaveEnsureCommitted(t *testing.T) {
+	steps := make([]string, 0, 3)
+	repo := newMemoryRepository()
+	repo.steps = &steps
+	media := &submissionMediaStub{steps: &steps}
+	service := NewService(repo, media, fixedClock)
+
+	value, err := service.Submit(context.Background(), 41, RoleRider, validRiderInput())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(steps, ",") != "reserve,save,ensure" || media.cancelled || value.Status != StatusPending {
+		t.Fatalf("steps=%v cancelled=%v value=%+v", steps, media.cancelled, value)
+	}
+}
+
+func TestSubmitMediaLifecycleCancelsReservationWhenSaveFails(t *testing.T) {
+	steps := make([]string, 0, 3)
+	repo := newMemoryRepository()
+	repo.steps, repo.saveErr = &steps, ErrVersionConflict
+	media := &submissionMediaStub{steps: &steps}
+	service := NewService(repo, media, fixedClock)
+
+	if _, err := service.Submit(context.Background(), 41, RoleRider, validRiderInput()); !errors.Is(err, ErrVersionConflict) {
+		t.Fatalf("err=%v", err)
+	}
+	if strings.Join(steps, ",") != "reserve,save,cancel" || !media.cancelled {
+		t.Fatalf("steps=%v cancelled=%v", steps, media.cancelled)
+	}
+}
+
+func TestSubmitMediaLifecycleCommitConflictDoesNotReportSuccess(t *testing.T) {
+	steps := make([]string, 0, 4)
+	repo := newMemoryRepository()
+	repo.steps = &steps
+	media := &submissionMediaStub{steps: &steps, ensureErr: ErrProofMediaConflict}
+	service := NewService(repo, media, fixedClock)
+
+	value, err := service.Submit(context.Background(), 41, RoleRider, validRiderInput())
+	if !errors.Is(err, ErrProofMediaConflict) || value.ApplicationPublicID != "" {
+		t.Fatalf("value=%+v err=%v", value, err)
+	}
+	if strings.Join(steps, ",") != "reserve,save,ensure,cancel" || !media.cancelled {
+		t.Fatalf("steps=%v cancelled=%v", steps, media.cancelled)
+	}
+	// The application transaction is durable before the cross-domain binding.
+	// The caller gets a conflict (never false success), and the pending row is
+	// retained for an operator-safe reconciliation instead of being deleted.
+	if current, found, findErr := repo.FindCurrent(context.Background(), 41, RoleRider); findErr != nil || !found || current.Status != StatusPending {
+		t.Fatalf("saved boundary found=%v current=%+v err=%v", found, current, findErr)
+	}
+}
+
+func TestSubmitMediaLifecycleMapsOwnershipConflictAndSkipsSave(t *testing.T) {
+	steps := make([]string, 0, 1)
+	repo := newMemoryRepository()
+	repo.steps = &steps
+	media := &submissionMediaStub{steps: &steps, reserveErr: coremedia.ErrBindingInvalidAsset}
+	service := NewService(repo, media, fixedClock)
+
+	if _, err := service.Submit(context.Background(), 41, RoleRider, validRiderInput()); !errors.Is(err, ErrProofMediaConflict) {
+		t.Fatalf("err=%v", err)
+	}
+	if strings.Join(steps, ",") != "reserve" {
+		t.Fatalf("steps=%v", steps)
 	}
 }
 

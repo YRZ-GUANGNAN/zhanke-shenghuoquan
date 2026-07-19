@@ -33,6 +33,7 @@ import (
 	"campus-circle/backend/internal/module/admin/takeoutrider"
 	"campus-circle/backend/internal/module/community"
 	"campus-circle/backend/internal/module/delivery"
+	"campus-circle/backend/internal/module/identityapplication"
 	"campus-circle/backend/internal/module/im"
 	coremedia "campus-circle/backend/internal/module/media"
 	"campus-circle/backend/internal/module/media/miniappflow"
@@ -130,6 +131,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("configure Module 10 reference binding: %v", err)
 	}
+	identityApplicationMedia, err := identityapplication.NewApplicationMedia(bindingService, mediaRepository, completionStore, nil)
+	if err != nil {
+		log.Fatalf("configure identity application proof media: %v", err)
+	}
+	identityApplicationService := identityapplication.NewService(
+		identityapplication.NewRepository(db), identityApplicationMedia, nil,
+	)
 	feedbackMedia, err := user.NewCoreFeedbackMedia(bindingService)
 	if err != nil {
 		log.Fatalf("configure feedback media binding: %v", err)
@@ -348,7 +356,10 @@ func main() {
 	})
 
 	api := router.Group("/api/v1")
-	user.NewHandler(userService, mediaService).Register(api.Group("/auth"))
+	authRoutes := api.Group("/auth")
+	user.NewHandler(userService, mediaService).Register(authRoutes)
+	identityApplicationRoutes := authRoutes.Group("", userService.AuthRequired(), user.UnmutedRequired())
+	identityapplication.NewHandler(identityApplicationService).RegisterUser(identityApplicationRoutes)
 	legacymedia.NewHandler(mediaService, cfg.WechatCallbackToken, userService.AuthRequired(), user.UnmutedRequired(), func(c *gin.Context) (uint, string) {
 		value := user.CurrentUser(c)
 		return value.ID, value.OpenID

@@ -20,6 +20,7 @@ const (
 type applicationBindingStub struct {
 	reserveInput coremedia.BindingReserveInput
 	commitInput  coremedia.BindingCommitInput
+	ensureInput  coremedia.BindingCommitInput
 	cancelOwner  uint64
 	cancelToken  string
 	reserveErr   error
@@ -41,6 +42,11 @@ func (s *applicationBindingStub) Reserve(_ context.Context, input coremedia.Bind
 
 func (s *applicationBindingStub) Commit(_ context.Context, input coremedia.BindingCommitInput) error {
 	s.commitInput = input
+	return s.commitErr
+}
+
+func (s *applicationBindingStub) EnsureCommitted(_ context.Context, input coremedia.BindingCommitInput) error {
+	s.ensureInput = input
 	return s.commitErr
 }
 
@@ -134,6 +140,14 @@ func TestApplicationMediaReserveCommitCancelUsePrivateCoordinates(t *testing.T) 
 	if err := adapter.Commit(context.Background(), 41, reservation, proofAppID1); err != nil {
 		t.Fatal(err)
 	}
+	if err := adapter.EnsureCommitted(context.Background(), 41, reservation, proofAppID1); err != nil {
+		t.Fatal(err)
+	}
+	if bindings.ensureInput.OwnerID != 41 || bindings.ensureInput.Token != reservation.Token ||
+		bindings.ensureInput.ReferenceType != coremedia.PurposeIdentityApplication || bindings.ensureInput.ReferenceID != proofAppID1 ||
+		!reflect.DeepEqual(bindings.ensureInput.OrderedAssetPublicIDs, reservation.AssetPublicIDs) {
+		t.Fatalf("ensure input=%+v", bindings.ensureInput)
+	}
 	if bindings.commitInput.OwnerID != 41 || bindings.commitInput.Token != reservation.Token ||
 		bindings.commitInput.ReferenceType != coremedia.PurposeIdentityApplication || bindings.commitInput.ReferenceID != proofAppID1 ||
 		!reflect.DeepEqual(bindings.commitInput.OrderedAssetPublicIDs, reservation.AssetPublicIDs) {
@@ -145,6 +159,13 @@ func TestApplicationMediaReserveCommitCancelUsePrivateCoordinates(t *testing.T) 
 	}
 	if bindings.cancelOwner != 41 || bindings.cancelToken != reservation.Token {
 		t.Fatalf("cancel owner=%d token=%q", bindings.cancelOwner, bindings.cancelToken)
+	}
+
+	if _, err := adapter.ReserveForApplication(context.Background(), 41, proofAppID1, []string{proofAssetID1}); err != nil {
+		t.Fatal(err)
+	}
+	if bindings.reserveInput.ExistingReferenceID != proofAppID1 {
+		t.Fatalf("existing reference=%q", bindings.reserveInput.ExistingReferenceID)
 	}
 }
 

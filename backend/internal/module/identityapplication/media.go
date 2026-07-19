@@ -16,7 +16,10 @@ const (
 	maxIdentityProofAssets      = 6
 )
 
-var ErrProofMediaUnavailable = errors.New("identity application proof media unavailable")
+var (
+	ErrProofMediaUnavailable = errors.New("identity application proof media unavailable")
+	ErrProofMediaConflict    = errors.New("identity application proof media conflict")
+)
 
 type MediaReservation struct {
 	Token          string
@@ -28,7 +31,9 @@ type MediaReservation struct {
 // never be signed without proving its exact application binding.
 type ApplicationMedia interface {
 	Reserve(context.Context, uint64, []string) (MediaReservation, error)
+	ReserveForApplication(context.Context, uint64, string, []string) (MediaReservation, error)
 	Commit(context.Context, uint64, MediaReservation, string) error
+	EnsureCommitted(context.Context, uint64, MediaReservation, string) error
 	Cancel(context.Context, uint64, MediaReservation) error
 	ResolveAdminProofs(context.Context, string, []string) ([]ProofAssetView, error)
 }
@@ -36,6 +41,7 @@ type ApplicationMedia interface {
 type referenceBindingGateway interface {
 	Reserve(context.Context, coremedia.BindingReserveInput) (coremedia.BindingReservation, error)
 	Commit(context.Context, coremedia.BindingCommitInput) error
+	EnsureCommitted(context.Context, coremedia.BindingCommitInput) error
 	Cancel(context.Context, uint64, string) error
 }
 
@@ -63,6 +69,17 @@ func NewApplicationMedia(bindings referenceBindingGateway, repository proofMedia
 }
 
 func (m *CoreApplicationMedia) Reserve(ctx context.Context, ownerID uint64, assetPublicIDs []string) (MediaReservation, error) {
+	return m.reserve(ctx, ownerID, "", assetPublicIDs)
+}
+
+func (m *CoreApplicationMedia) ReserveForApplication(ctx context.Context, ownerID uint64, applicationPublicID string, assetPublicIDs []string) (MediaReservation, error) {
+	if !validULID(applicationPublicID) {
+		return MediaReservation{}, ErrProofMediaUnavailable
+	}
+	return m.reserve(ctx, ownerID, applicationPublicID, assetPublicIDs)
+}
+
+func (m *CoreApplicationMedia) reserve(ctx context.Context, ownerID uint64, existingReferenceID string, assetPublicIDs []string) (MediaReservation, error) {
 	ordered, err := validateProofAssetIDs(assetPublicIDs)
 	if err != nil || ownerID == 0 {
 		return MediaReservation{}, ErrProofMediaUnavailable
@@ -78,6 +95,7 @@ func (m *CoreApplicationMedia) Reserve(ctx context.Context, ownerID uint64, asse
 		OrderedAssetPublicIDs: ordered,
 		Token:                 token,
 		ExpiresAt:             m.now().UTC().Add(identityMediaReservationTTL),
+		ExistingReferenceID:   existingReferenceID,
 	})
 	if err != nil {
 		return MediaReservation{}, err
@@ -96,17 +114,19 @@ func (m *CoreApplicationMedia) Reserve(ctx context.Context, ownerID uint64, asse
 }
 
 func (m *CoreApplicationMedia) Commit(ctx context.Context, ownerID uint64, reservation MediaReservation, applicationPublicID string) error {
-	ordered, err := validateProofAssetIDs(reservation.AssetPublicIDs)
-	if err != nil || ownerID == 0 || !validMediaReservationToken(reservation.Token) || !validULID(applicationPublicID) {
-		return ErrProofMediaUnavailable
+	input, err := proofBindingCommitInput(ownerID, reservation, applicationPublicID)
+	if err != nil {
+		return err
 	}
-	return m.bindings.Commit(ctx, coremedia.BindingCommitInput{
-		OwnerID:               ownerID,
-		Token:                 reservation.Token,
-		ReferenceType:         coremedia.PurposeIdentityApplication,
-		ReferenceID:           applicationPublicID,
-		OrderedAssetPublicIDs: ordered,
-	})
+	return m.bindings.Commit(ctx, input)
+}
+
+func (m *CoreApplicationMedia) EnsureCommitted(ctx context.Context, ownerID uint64, reservation MediaReservation, applicationPublicID string) error {
+	input, err := proofBindingCommitInput(ownerID, reservation, applicationPublicID)
+	if err != nil {
+		return err
+	}
+	return m.bindings.EnsureCommitted(ctx, input)
 }
 
 func (m *CoreApplicationMedia) Cancel(ctx context.Context, ownerID uint64, reservation MediaReservation) error {
@@ -183,6 +203,32 @@ func validateProofAssetIDs(values []string) ([]string, error) {
 		ordered[index] = value
 	}
 	return ordered, nil
+}
+
+func proofBindingCommitInput(ownerID uint64, reservation MediaReservation, applicationPublicID string) (coremedia.BindingCommitInput, error) {
+	ordered, err := validateProofAssetIDs(reservation.AssetPublicIDs)
+	if err != nil || ownerID == 0 || !validMediaReservationToken(reservation.Token) || !validULID(applicationPublicID) {
+		return coremedia.BindingCommitInput{}, ErrProofMediaUnavailable
+	}
+	return coremedia.BindingCommitInput{
+		OwnerID:               ownerID,
+		Token:                 reservation.Token,
+		ReferenceType:         coremedia.PurposeIdentityApplication,
+		ReferenceID:           applicationPublicID,
+		OrderedAssetPublicIDs: ordered,
+	}, nil
+}
+
+func mapProofSubmissionMediaError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, ErrProofMediaConflict) || errors.Is(err, coremedia.ErrBindingInvalidAsset) ||
+		errors.Is(err, coremedia.ErrBindingConflict) || errors.Is(err, coremedia.ErrBindingMismatch) ||
+		errors.Is(err, coremedia.ErrBindingLegacySet) {
+		return errors.Join(ErrProofMediaConflict, err)
+	}
+	return err
 }
 
 func validMediaReservationToken(token string) bool {

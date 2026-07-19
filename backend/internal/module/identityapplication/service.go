@@ -32,13 +32,49 @@ type Service struct {
 	now   func() time.Time
 }
 
-// NewService retains the typed private-media dependency for the submission
-// transaction wired by the HTTP task. Submission validation does not use it yet.
 func NewService(repo Repository, applicationMedia ApplicationMedia, now func() time.Time) *Service {
 	if now == nil {
 		now = time.Now
 	}
 	return &Service{repo: repo, media: applicationMedia, now: now}
+}
+
+func (s *Service) ListMine(ctx context.Context, userID uint64) ([]ApplicationView, error) {
+	if userID == 0 {
+		return nil, invalidInput("user id is required")
+	}
+	if s == nil || s.repo == nil {
+		return nil, errors.New("identity application repository is required")
+	}
+	values, err := s.repo.ListCurrent(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	views := make([]ApplicationView, len(values))
+	for index := range values {
+		views[index] = toApplicationView(values[index])
+	}
+	return views, nil
+}
+
+func (s *Service) GetMine(ctx context.Context, userID uint64, role Role) (ApplicationView, error) {
+	if userID == 0 {
+		return ApplicationView{}, invalidInput("user id is required")
+	}
+	if !role.Valid() {
+		return ApplicationView{}, errors.Join(ErrInvalidInput, ErrInvalidRole)
+	}
+	if s == nil || s.repo == nil {
+		return ApplicationView{}, errors.New("identity application repository is required")
+	}
+	value, found, err := s.repo.FindCurrent(ctx, userID, role)
+	if err != nil {
+		return ApplicationView{}, err
+	}
+	if !found {
+		return ApplicationView{}, ErrApplicationNotFound
+	}
+	return toApplicationView(value), nil
 }
 
 func (s *Service) Submit(ctx context.Context, userID uint64, role Role, input SubmitInput) (ApplicationView, error) {
@@ -74,6 +110,9 @@ func (s *Service) Submit(ctx context.Context, userID uint64, role Role, input Su
 		return ApplicationView{}, err
 	}
 	now := s.now().UTC()
+	var value Application
+	eventType := EventSubmitted
+	expectedRowVersion := uint64(0)
 
 	if !found {
 		if normalized.ExpectedRowVersion != 0 {
@@ -83,7 +122,7 @@ func (s *Service) Submit(ctx context.Context, userID uint64, role Role, input Su
 		if err != nil {
 			return ApplicationView{}, fmt.Errorf("generate identity application id: %w", err)
 		}
-		value := Application{
+		value = Application{
 			ApplicationPublicID: publicID,
 			UserID:              userID,
 			Role:                role,
@@ -97,31 +136,53 @@ func (s *Service) Submit(ctx context.Context, userID uint64, role Role, input Su
 			CreatedAt:           now,
 			UpdatedAt:           now,
 		}
-		if err := s.repo.SaveSubmission(ctx, &value, normalized.AssetPublicIDs, EventSubmitted, 0); err != nil {
-			return ApplicationView{}, err
+	} else {
+		if normalized.ExpectedRowVersion == 0 || normalized.ExpectedRowVersion != current.RowVersion {
+			return ApplicationView{}, ErrVersionConflict
 		}
-		return toApplicationView(value), nil
+
+		current.Status = StatusPending
+		current.RealName = normalized.RealName
+		current.Phone = normalized.Phone
+		current.MerchantName = normalized.MerchantName
+		current.MerchantAddress = normalized.MerchantAddress
+		current.ReviewReason = ""
+		current.ReviewerUserID = nil
+		current.ReviewedAt = nil
+		current.SubmittedAt = now
+		current.RowVersion++
+		current.UpdatedAt = now
+		value = current
+		eventType = EventResubmitted
+		expectedRowVersion = normalized.ExpectedRowVersion
 	}
 
-	if normalized.ExpectedRowVersion == 0 || normalized.ExpectedRowVersion != current.RowVersion {
-		return ApplicationView{}, ErrVersionConflict
+	if s.media == nil {
+		return ApplicationView{}, errors.New("identity application media is required")
 	}
+	var reservation MediaReservation
+	if found {
+		reservation, err = s.media.ReserveForApplication(ctx, userID, value.ApplicationPublicID, normalized.AssetPublicIDs)
+	} else {
+		reservation, err = s.media.Reserve(ctx, userID, normalized.AssetPublicIDs)
+	}
+	if err != nil {
+		return ApplicationView{}, mapProofSubmissionMediaError(err)
+	}
+	if err := s.repo.SaveSubmission(ctx, &value, normalized.AssetPublicIDs, eventType, expectedRowVersion); err != nil {
+		return ApplicationView{}, s.cancelMediaAfterFailure(ctx, userID, reservation, err)
+	}
+	if err := s.media.EnsureCommitted(ctx, userID, reservation, value.ApplicationPublicID); err != nil {
+		return ApplicationView{}, s.cancelMediaAfterFailure(ctx, userID, reservation, mapProofSubmissionMediaError(err))
+	}
+	return toApplicationView(value), nil
+}
 
-	current.Status = StatusPending
-	current.RealName = normalized.RealName
-	current.Phone = normalized.Phone
-	current.MerchantName = normalized.MerchantName
-	current.MerchantAddress = normalized.MerchantAddress
-	current.ReviewReason = ""
-	current.ReviewerUserID = nil
-	current.ReviewedAt = nil
-	current.SubmittedAt = now
-	current.RowVersion++
-	current.UpdatedAt = now
-	if err := s.repo.SaveSubmission(ctx, &current, normalized.AssetPublicIDs, EventResubmitted, normalized.ExpectedRowVersion); err != nil {
-		return ApplicationView{}, err
+func (s *Service) cancelMediaAfterFailure(ctx context.Context, userID uint64, reservation MediaReservation, primary error) error {
+	if cancelErr := s.media.Cancel(ctx, userID, reservation); cancelErr != nil {
+		return errors.Join(primary, fmt.Errorf("cancel identity application media: %w", cancelErr))
 	}
-	return toApplicationView(current), nil
+	return primary
 }
 
 func normalizeSubmitInput(userID uint64, role Role, input SubmitInput) (SubmitInput, error) {

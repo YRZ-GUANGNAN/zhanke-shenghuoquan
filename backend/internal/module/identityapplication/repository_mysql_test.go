@@ -30,7 +30,7 @@ func TestGormRepositoryMySQLContract(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2026, 7, 19, 10, 0, 0, 123000000, time.UTC)
 	firstSubmittedAt := now
-	service := NewService(repository, nil, func() time.Time { return now })
+	service := NewService(repository, &submissionMediaStub{}, func() time.Time { return now })
 
 	first, err := service.Submit(ctx, 41, RoleRider, SubmitInput{
 		RealName: "张同学", Phone: "13800138000", AssetPublicIDs: []string{mysqlAssetA},
