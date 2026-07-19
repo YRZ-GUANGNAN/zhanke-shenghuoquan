@@ -60,16 +60,19 @@ for (const lock of ['uploadLockRef', 'submitLockRef']) {
   if (acquire < 0 || firstAwait < acquire) throw new Error(`${lock} must be acquired before the first await`)
 }
 
-const cancelStart = page.indexOf('  const restoreAfterNavigationFailure = () => {')
+const cancelStart = page.indexOf('  const restoreAfterNavigationFailure = (cancelGeneration: number) => {')
 const cancelEnd = page.indexOf('\n\n  if (!role || !copy)', cancelStart)
 const cancelAndBack = page.slice(cancelStart, cancelEnd)
 const cancelRequirements = [
-  'const restoreAfterNavigationFailure = () => {',
+  'const restoreAfterNavigationFailure = (cancelGeneration: number) => {',
+  'operationGenerationRef.current !== cancelGeneration',
   'leavingRef.current = false',
+  'setLoading(false)',
+  'void loadApplication()',
   "setProgress('')",
   'await Taro.navigateBack()',
   "await Taro.reLaunch({ url: '/pages/profile/index' })",
-  'finally {\n        restoreAfterNavigationFailure()'
+  'restoreAfterNavigationFailure(cancelGeneration)'
 ]
 
 for (const fragment of cancelRequirements) {
@@ -82,43 +85,63 @@ if (toastAttempt < 0 || navigateAttempt < toastAttempt || !cancelAndBack.slice(t
   throw new Error('cancelAndBack must continue to navigateBack when cancellation toast fails')
 }
 
-const restoreAttempt = cancelAndBack.indexOf('restoreAfterNavigationFailure()', navigateAttempt)
 const relaunchAttempt = cancelAndBack.indexOf("await Taro.reLaunch({ url: '/pages/profile/index' })")
-if (restoreAttempt < navigateAttempt || relaunchAttempt < restoreAttempt) {
-  throw new Error('cancelAndBack must restore interaction before the profile reLaunch fallback')
+const restoreAttempt = cancelAndBack.indexOf('restoreAfterNavigationFailure(cancelGeneration)', relaunchAttempt)
+if (relaunchAttempt < navigateAttempt || restoreAttempt < relaunchAttempt) {
+  throw new Error('cancelAndBack must restore only after both navigation attempts fail')
+}
+if (cancelAndBack.includes('finally {')) {
+  throw new Error('cancelAndBack must not restore the old page from finally')
 }
 
-function simulateCancelAndBack({ toastFails = false, navigateFails = false, relaunchFails = false }) {
+function simulateCancelAndBack({ toastFails = false, navigateFails = false, relaunchFails = false, startNewOperation = false }) {
   const state = {
     generation: 7,
+    loadSequence: 1,
     leaving: false,
     uploadLock: true,
     submitLock: true,
     uploading: true,
     submitting: true,
+    loading: true,
     progress: '处理中',
     navigateAttempts: 0,
-    relaunchAttempts: 0
+    relaunchAttempts: 0,
+    reloads: 0,
+    interactiveDuringRelaunch: null
   }
-  const restore = () => {
+  const restore = (cancelGeneration) => {
+    if (state.generation !== cancelGeneration || !state.leaving) return false
     state.leaving = false
     state.uploadLock = false
     state.submitLock = false
     state.uploading = false
     state.submitting = false
+    state.loading = false
     state.progress = ''
+    state.loadSequence += 1
+    state.reloads += 1
+    state.loading = true
+    return true
   }
 
   state.leaving = true
-  state.generation += 1
+  const cancelGeneration = ++state.generation
+  state.loadSequence += 1
   state.uploadLock = false
   state.submitLock = false
   if (toastFails) state.progress = '提示失败'
   state.navigateAttempts += 1
   if (!navigateFails) return state
-  restore()
+  state.interactiveDuringRelaunch = !state.leaving && !state.uploadLock && !state.submitLock
   state.relaunchAttempts += 1
-  if (relaunchFails) restore()
+  if (!relaunchFails) return state
+  restore(cancelGeneration)
+  if (startNewOperation) {
+    state.generation += 1
+    state.uploadLock = true
+    state.uploading = true
+  }
   return state
 }
 
@@ -126,19 +149,24 @@ const toastFailure = simulateCancelAndBack({ toastFails: true })
 assert.equal(toastFailure.navigateAttempts, 1)
 assert.equal(toastFailure.leaving, true)
 assert.equal(toastFailure.generation, 8)
+assert.equal(toastFailure.loadSequence, 2)
 
-for (const result of [
-  simulateCancelAndBack({ navigateFails: true }),
-  simulateCancelAndBack({ navigateFails: true, relaunchFails: true })
-]) {
-  assert.equal(result.relaunchAttempts, 1)
-  assert.equal(result.leaving, false)
-  assert.equal(result.uploadLock, false)
-  assert.equal(result.submitLock, false)
-  assert.equal(result.uploading, false)
-  assert.equal(result.submitting, false)
-  assert.equal(result.progress, '')
-  assert.equal(result.generation, 8)
-}
+const relaunchSuccess = simulateCancelAndBack({ navigateFails: true })
+assert.equal(relaunchSuccess.relaunchAttempts, 1)
+assert.equal(relaunchSuccess.interactiveDuringRelaunch, false)
+assert.equal(relaunchSuccess.leaving, true)
+assert.equal(relaunchSuccess.reloads, 0)
+
+const totalFailure = simulateCancelAndBack({ navigateFails: true, relaunchFails: true })
+assert.equal(totalFailure.interactiveDuringRelaunch, false)
+assert.equal(totalFailure.leaving, false)
+assert.equal(totalFailure.loading, true)
+assert.equal(totalFailure.loadSequence, 3)
+assert.equal(totalFailure.reloads, 1)
+
+const newOperation = simulateCancelAndBack({ navigateFails: true, relaunchFails: true, startNewOperation: true })
+assert.equal(newOperation.uploadLock, true)
+assert.equal(newOperation.uploading, true)
+assert.equal(newOperation.generation, 9)
 
 console.log('identity application contract: ok')

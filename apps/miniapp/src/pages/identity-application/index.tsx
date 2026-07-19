@@ -287,21 +287,27 @@ function IdentityApplicationContent() {
     }
   }
 
-  const restoreAfterNavigationFailure = () => {
-    if (!mountedRef.current) return
+  const restoreAfterNavigationFailure = (cancelGeneration: number) => {
+    if (!mountedRef.current || !leavingRef.current || operationGenerationRef.current !== cancelGeneration) return false
     leavingRef.current = false
     uploadLockRef.current = false
     submitLockRef.current = false
     setUploading(false)
     setSubmitting(false)
     setProgress('')
+    setLoading(false)
+    void loadApplication()
+    return true
   }
 
   const cancelAndBack = async () => {
-    if (leavingRef.current) return
+    if (!mountedRef.current || leavingRef.current) return
     const cancelling = uploadLockRef.current || submitLockRef.current
     leavingRef.current = true
-    operationGenerationRef.current += 1
+    const cancelGeneration = ++operationGenerationRef.current
+    const isCancelCurrent = () => mountedRef.current
+      && leavingRef.current
+      && operationGenerationRef.current === cancelGeneration
     loadSequenceRef.current += 1
     uploadLockRef.current = false
     submitLockRef.current = false
@@ -317,26 +323,23 @@ function IdentityApplicationContent() {
         // 提示失败不能阻止返回流程。
       }
     }
-    if (!mountedRef.current) return
+    if (!isCancelCurrent()) return
     try {
       await Taro.navigateBack()
+      return
     } catch {
-      if (!mountedRef.current) return
-      restoreAfterNavigationFailure()
-      try {
-        await Taro.reLaunch({ url: '/pages/profile/index' })
-      } catch {
-        if (mountedRef.current) {
-          try {
-            await Taro.showToast({ title: '返回失败，请重试', icon: 'none' })
-          } catch {
-            // 最终提示也失败时仍由 finally 恢复交互状态。
-          }
-        }
-      } finally {
-        restoreAfterNavigationFailure()
-      }
     }
+    if (!isCancelCurrent()) return
+    try {
+      await Taro.reLaunch({ url: '/pages/profile/index' })
+      return
+    } catch {
+      // 两种导航都失败后才允许恢复旧页交互。
+    }
+    if (!isCancelCurrent() || !restoreAfterNavigationFailure(cancelGeneration)) return
+    void Taro.showToast({ title: '返回失败，请重试', icon: 'none' }).catch(() => {
+      // 最终提示失败不再触碰已恢复页面的任何状态。
+    })
   }
 
   if (!role || !copy) {
