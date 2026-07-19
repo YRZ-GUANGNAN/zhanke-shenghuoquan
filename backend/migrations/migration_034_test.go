@@ -93,6 +93,12 @@ func TestMigration034IsGuardedForRepeatApplication(t *testing.T) {
 	assertMigration034Order(t, source, "migration 034 unsupported media reference type", "CREATE TABLE identity_applications")
 	assertMigration034Order(t, source, "ADD CONSTRAINT chk_media_asset_purpose_identity_application_guard", "DROP CHECK chk_media_asset_purpose")
 	assertMigration034Order(t, source, "ADD CONSTRAINT chk_media_reference_type_identity_application_guard", "DROP CHECK chk_media_reference_type")
+	if strings.Contains(source, "AND LEFT(LOWER(") {
+		t.Fatal("migration 034 canonical checks must use exact normalized-expression allowlists")
+	}
+	if !strings.Contains(source, "'reference_typein''post'',''product'',''avatar'',''dish'',''merchant_logo'',''delivery_proof'',''delivery_im'',''feedback''") {
+		t.Fatal("migration 034 must allow the exact migration 033 reference-type canonical expression")
+	}
 }
 
 func TestMigration034MySQLIsIdempotentAndBackfillsOnlyRealQualifiedUsers(t *testing.T) {
@@ -228,6 +234,25 @@ func TestMigration034MySQLRejectsMisbindingCanonicalAndGuardChecksBeforeDDL(t *t
 			columnName: "reference_type",
 		},
 		{
+			name: "asset_canonical_mixes_unrelated_column",
+			setup: []string{`ALTER TABLE media_assets ADD CONSTRAINT chk_media_asset_purpose
+				CHECK (purpose IN ('post','product','avatar','dish','merchant_logo','delivery_proof','delivery_im','feedback','identity_application')
+				AND other_flag IN (0,1))`},
+			want:       "migration 034 media purpose canonical constraint mismatch",
+			columnName: "purpose",
+		},
+		{
+			name: "reference_canonical_mixes_unrelated_column",
+			setup: []string{
+				`ALTER TABLE media_asset_references DROP CHECK chk_media_reference_type`,
+				`ALTER TABLE media_asset_references ADD CONSTRAINT chk_media_reference_type
+				CHECK (reference_type IN ('post','product','avatar','dish','merchant_logo','delivery_proof','delivery_im','feedback')
+				AND other_flag IN (0,1))`,
+			},
+			want:       "migration 034 media reference type canonical constraint mismatch",
+			columnName: "reference_type",
+		},
+		{
 			name: "asset_guard_missing_identity_application",
 			setup: []string{`ALTER TABLE media_assets
 				ADD CONSTRAINT chk_media_asset_purpose_identity_application_guard
@@ -274,6 +299,28 @@ func TestMigration034MySQLPreservesUnrelatedMediaChecks(t *testing.T) {
 		WHERE constraint_schema=DATABASE() AND constraint_name IN (
 			'chk_media_asset_other_flag','chk_media_reference_other_flag'
 		) AND constraint_type='CHECK'`)
+}
+
+func TestMigration034MySQLAllowsWhitelistedCanonicalChecks(t *testing.T) {
+	db := newMigration034Database(t)
+	createMigration034BaseSchema(t, db)
+	mustExec034(t, db, `ALTER TABLE media_assets ADD CONSTRAINT chk_media_asset_purpose
+		CHECK (purpose IN ('post','product','avatar','dish','merchant_logo','delivery_proof','delivery_im','feedback','identity_application'))`)
+
+	// The base reference canonical is migration 033's exact set. The first run
+	// upgrades it; the second run proves the migration 034 canonical also passes.
+	applyMigration034(t, db)
+	applyMigration034(t, db)
+
+	assertCount034(t, db, 2, `SELECT COUNT(*) FROM information_schema.table_constraints
+		WHERE constraint_schema=DATABASE() AND constraint_name IN (
+			'chk_media_asset_purpose','chk_media_reference_type'
+		) AND constraint_type='CHECK'`)
+	assertCount034(t, db, 2, `SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema=DATABASE()
+		  AND ((table_name='media_assets' AND column_name='purpose')
+		    OR (table_name='media_asset_references' AND column_name='reference_type'))
+		  AND character_maximum_length=24`)
 }
 
 func TestMigration034MySQLConvergesFromRecoverablePartialState(t *testing.T) {

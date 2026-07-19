@@ -115,8 +115,9 @@ BEGIN
       AND table_constraint.table_name='media_assets'
       AND table_constraint.constraint_name='chk_media_asset_purpose'
       AND table_constraint.constraint_type='CHECK'
-      AND LEFT(LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
-        check_constraint.check_clause,'`',''),' ',''),CHAR(9),''),CHAR(10),''),CHAR(13),''),'(',''),')',''),'_utf8mb4','')),9)='purposein'
+      AND LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+        check_constraint.check_clause,'`',''),' ',''),CHAR(9),''),CHAR(10),''),CHAR(13),''),'(',''),')',''),'_utf8mb4',''))
+        = 'purposein''post'',''product'',''avatar'',''dish'',''merchant_logo'',''delivery_proof'',''delivery_im'',''feedback'',''identity_application'''
   ) THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'migration 034 media purpose canonical constraint mismatch';
   END IF;
@@ -134,8 +135,11 @@ BEGIN
       AND table_constraint.table_name='media_asset_references'
       AND table_constraint.constraint_name='chk_media_reference_type'
       AND table_constraint.constraint_type='CHECK'
-      AND LEFT(LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
-        check_constraint.check_clause,'`',''),' ',''),CHAR(9),''),CHAR(10),''),CHAR(13),''),'(',''),')',''),'_utf8mb4','')),16)='reference_typein'
+      AND LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+        check_constraint.check_clause,'`',''),' ',''),CHAR(9),''),CHAR(10),''),CHAR(13),''),'(',''),')',''),'_utf8mb4','')) IN (
+          'reference_typein''post'',''product'',''avatar'',''dish'',''merchant_logo'',''delivery_proof'',''delivery_im'',''feedback''',
+          'reference_typein''post'',''product'',''avatar'',''dish'',''merchant_logo'',''delivery_proof'',''delivery_im'',''feedback'',''identity_application'''
+        )
   ) THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'migration 034 media reference type canonical constraint mismatch';
   END IF;
