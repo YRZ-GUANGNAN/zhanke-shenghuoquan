@@ -50,8 +50,10 @@ for (const value of [
   'pages/home/index',
   'pages/store/index?id=1&name=hello+world',
   'pages/store/index?id=1&name=hello%20world',
+  'pages/store/index?discount=50%25',
   'pages/home/index?redirect=pages/detail/index',
   'pages/home/index?redirect=pages%2Fdetail%2Findex',
+  'pages/home/index?target=pages/detail/index',
   'pages/%E5%95%86%E5%AE%B6/index'
 ]) {
   assert.equal(navigationValidation.validMiniProgramPath(value), true, `expected valid mini-program path: ${value}`)
@@ -62,6 +64,15 @@ for (const value of [
   'pages\\home\\index', 'pages/home/index#fragment', 'pages/home/%zz',
   'pages/home/index?value=%zz',
   'pages/home/index?redirect=pages%252Fdetail', 'pages/home/index?redirect=https://evil.example',
+  'pages/home/index?redirect=custom:pages/detail/index',
+  'pages/home/index?redirect=javascript:alert(1)',
+  'pages/home/index?redirect=%2Fpages/detail/index',
+  'pages/home/index?redirect=%252G',
+  'pages/home/index?path=%2Fpages/detail/index',
+  'pages/home/index?url=custom:pages/detail/index',
+  'pages/home/index?target=pages/../detail/index',
+  'pages/home/index?page=pages//detail/index',
+  'pages/home/index?route=pages%5Cdetail%5Cindex',
   'pages/home/index\u0000'
 ]) {
   assert.equal(navigationValidation.validMiniProgramPath(value), false, `expected invalid mini-program path: ${value}`)
