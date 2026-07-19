@@ -14,6 +14,36 @@ export interface IdentitySummary {
   identities: IdentityAvailability[]
 }
 
+export type IdentityApplicationRole = 'rider' | 'merchant'
+
+export type IdentityApplicationStatus = 'pending' | 'approved' | 'rejected'
+
+export interface IdentityApplicationView {
+  applicationId: string
+  userId: string
+  role: IdentityApplicationRole
+  status: IdentityApplicationStatus
+  realName: string
+  phone: string
+  merchantName: string
+  merchantAddress: string
+  assetIds: string[]
+  reviewReason: string
+  reviewerUserId?: string
+  submittedAt: string
+  reviewedAt?: string
+  rowVersion: number
+}
+
+export interface IdentityApplicationSubmitInput {
+  realName: string
+  phone: string
+  merchantName: string
+  merchantAddress: string
+  assetIds: string[]
+  expectedRowVersion: number
+}
+
 // A: UserProfile; B: CommunityPost; C: Product; D: ToolLink.
 // E uses SDK-specific types in services/e-im.ts; F exists only in apps/admin.
 

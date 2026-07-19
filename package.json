@@ -19,6 +19,7 @@
     "check:external-takeout-directory": "node scripts/check-external-takeout-directory.cjs",
     "check:miniapp-domain-search": "node scripts/check-miniapp-domain-search.cjs",
 		"check:miniapp-settings-contract": "node scripts/check-miniapp-settings-contract.cjs",
+    "check:identity-application-contract": "node scripts/check-identity-application-contract.cjs",
     "check:miniapp-publish-contract": "node scripts/check-miniapp-publish-contract.cjs",
     "check:miniapp-static-routes": "node scripts/check-miniapp-static-routes.cjs",
     "check:miniapp-business-closure": "node scripts/check-miniapp-business-closure.cjs",
@@ -28,7 +29,7 @@
     "build:admin": "npm --workspace apps/admin run build",
     "build": "npm run build:miniapp && npm run build:admin",
     "typecheck": "npm --workspace apps/admin run typecheck && npm --workspace apps/miniapp run typecheck",
-	"verify": "npm run check:external-takeout-directory && npm run check:miniapp-static-routes && npm run check:miniapp-business-closure && npm run check:boundaries && npm run check:miniapp-publish-contract && npm run check:miniapp-domain-search && npm run check:miniapp-settings-contract && npm run typecheck && npm run test:backend"
+	"verify": "npm run check:external-takeout-directory && npm run check:miniapp-static-routes && npm run check:miniapp-business-closure && npm run check:boundaries && npm run check:miniapp-publish-contract && npm run check:miniapp-domain-search && npm run check:miniapp-settings-contract && npm run check:identity-application-contract && npm run typecheck && npm run test:backend"
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",

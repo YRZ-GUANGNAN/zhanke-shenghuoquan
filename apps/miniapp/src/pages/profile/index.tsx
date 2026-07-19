@@ -119,6 +119,10 @@ function ProfileContent() {
     }
     const availability = identity?.identities.find((item) => item.identity === role.key)
     if (!availability?.available) {
+      if (role.key === 'rider' || role.key === 'merchant') {
+        void Taro.navigateTo({ url: `/pages/identity-application/index?role=${role.key}` })
+        return
+      }
       showPlaceholder(unavailableMessage(availability))
       return
     }

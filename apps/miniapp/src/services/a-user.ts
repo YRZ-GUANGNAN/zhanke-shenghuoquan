@@ -1,5 +1,12 @@
 // Domain A client: WeChat login, profile and runtime identity.
-import type { IdentityRoleKey, IdentitySummary, UserProfile } from '../types'
+import type {
+  IdentityApplicationRole,
+  IdentityApplicationSubmitInput,
+  IdentityApplicationView,
+  IdentityRoleKey,
+  IdentitySummary,
+  UserProfile
+} from '../types'
 import { request } from './api'
 
 interface BackendUser {
@@ -96,6 +103,22 @@ export async function currentIdentity(): Promise<IdentitySummary> {
 
 export async function switchIdentity(identity: IdentityRoleKey): Promise<IdentitySummary> {
   return request('/auth/identity', { url: '', method: 'POST', data: { identity } })
+}
+
+export async function getIdentityApplication(role: IdentityApplicationRole): Promise<IdentityApplicationView> {
+  return request(`/auth/identity-applications/${role}`)
+}
+
+export async function submitIdentityApplication(
+  role: IdentityApplicationRole,
+  input: IdentityApplicationSubmitInput
+): Promise<IdentityApplicationView> {
+  return request(`/auth/identity-applications/${role}`, {
+    url: '',
+    method: 'PUT',
+    data: input,
+    timeout: 20000
+  })
 }
 
 export async function getUserSettings(): Promise<UserSettingsView> {

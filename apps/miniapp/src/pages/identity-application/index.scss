@@ -1,0 +1,361 @@
+@use '../../styles/design-tokens.scss' as *;
+
+.identity-application-page {
+  min-height: 100vh;
+  padding-bottom: calc(72rpx + env(safe-area-inset-bottom));
+  background: $bg-app;
+  color: $text-primary;
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+}
+
+.identity-application-nav {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 184rpx;
+  padding: 0 36rpx 34rpx;
+  box-sizing: border-box;
+  background: $bg-surface;
+  box-shadow: $shadow-header;
+}
+
+.identity-application-nav__back {
+  position: absolute;
+  left: 36rpx;
+  bottom: 22rpx;
+  width: 58rpx;
+  height: 58rpx;
+  color: $text-strong;
+  font-size: 54rpx;
+  line-height: 1;
+}
+
+.identity-application-nav__title {
+  color: $text-strong;
+  font-size: 32rpx;
+  font-weight: 800;
+}
+
+.identity-application-content {
+  padding: 30rpx 30rpx 0;
+}
+
+.identity-application-intro {
+  padding: 30rpx 32rpx;
+  border-radius: 28rpx;
+  background: $gradient-primary;
+  box-shadow: 0 18rpx 34rpx -18rpx rgba(33, 104, 184, .52);
+}
+
+.identity-application-intro__title,
+.identity-application-intro__copy {
+  display: block;
+  color: $text-on-color;
+}
+
+.identity-application-intro__title {
+  font-size: 34rpx;
+  font-weight: 800;
+}
+
+.identity-application-intro__copy {
+  margin-top: 14rpx;
+  color: rgba(255, 255, 255, .86);
+  font-size: 24rpx;
+  line-height: 1.5;
+}
+
+.identity-application-card {
+  margin-top: 24rpx;
+  border-radius: 26rpx;
+  background: $bg-surface;
+  box-shadow: $shadow-card;
+}
+
+.identity-application-card__title {
+  display: block;
+  color: $text-strong;
+  font-size: 29rpx;
+  font-weight: 800;
+}
+
+.identity-application-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24rpx;
+}
+
+.identity-application-card__hint {
+  display: block;
+  margin-top: 10rpx;
+  color: $text-tertiary;
+  font-size: 22rpx;
+}
+
+.identity-application-card__count {
+  color: $brand-primary;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.identity-application-status {
+  padding: 28rpx 30rpx;
+  border: 1rpx solid $divider-nav;
+}
+
+.identity-application-status__badge {
+  display: inline-flex;
+  padding: 7rpx 16rpx;
+  border-radius: 999rpx;
+  color: $brand-primary;
+  font-size: 21rpx;
+  font-weight: 700;
+  background: $brand-tint;
+}
+
+.identity-application-status__title,
+.identity-application-status__copy {
+  display: block;
+}
+
+.identity-application-status__title {
+  margin-top: 18rpx;
+  color: $text-strong;
+  font-size: 29rpx;
+  font-weight: 800;
+}
+
+.identity-application-status__copy {
+  margin-top: 12rpx;
+  color: $text-secondary;
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.identity-application-status--approved .identity-application-status__badge {
+  color: #257755;
+  background: #E7F7EF;
+}
+
+.identity-application-status--rejected .identity-application-status__badge {
+  color: #B64A42;
+  background: #FFF0EE;
+}
+
+.identity-application-form {
+  overflow: hidden;
+  padding: 30rpx;
+}
+
+.identity-application-form--readonly {
+  opacity: .92;
+}
+
+.identity-application-field {
+  display: flex;
+  align-items: center;
+  min-height: 96rpx;
+  border-bottom: 1rpx solid $divider-nav;
+}
+
+.identity-application-field--last {
+  border-bottom: 0;
+}
+
+.identity-application-field__label {
+  flex: 0 0 154rpx;
+  color: $text-secondary;
+  font-size: 25rpx;
+}
+
+.identity-application-field__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: $text-strong;
+  font-size: 27rpx;
+  text-align: right;
+}
+
+.identity-application-proofs {
+  padding: 30rpx;
+}
+
+.identity-application-proof-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18rpx;
+  margin-top: 26rpx;
+}
+
+.identity-application-proof,
+.identity-application-add {
+  overflow: hidden;
+  min-height: 250rpx;
+  border: 1rpx solid $divider-nav;
+  border-radius: 20rpx;
+  background: $bg-screen;
+}
+
+.identity-application-proof__preview {
+  height: 170rpx;
+  overflow: hidden;
+  background: $brand-tint;
+}
+
+.identity-application-proof__preview image {
+  width: 100%;
+  height: 100%;
+}
+
+.identity-application-proof__private {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10rpx;
+  height: 100%;
+  color: $text-tertiary;
+  font-size: 23rpx;
+  background: $placeholder-stripe;
+}
+
+.identity-application-proof__state {
+  display: block;
+  min-height: 54rpx;
+  padding: 14rpx 16rpx 4rpx;
+  color: $text-secondary;
+  font-size: 20rpx;
+  line-height: 1.35;
+}
+
+.identity-application-proof--failed .identity-application-proof__state {
+  color: #B64A42;
+}
+
+.identity-application-proof__remove {
+  padding: 8rpx 16rpx 14rpx;
+  color: #B64A42;
+  font-size: 21rpx;
+  text-align: right;
+}
+
+.identity-application-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  border-style: dashed;
+  border-color: $text-muted;
+  color: $text-tertiary;
+  font-size: 23rpx;
+}
+
+.identity-application-add__plus {
+  color: $brand-primary;
+  font-size: 52rpx;
+  line-height: 1;
+}
+
+.identity-application-add--disabled,
+.identity-application-submit--disabled {
+  opacity: .52;
+}
+
+.identity-application-progress,
+.identity-application-privacy {
+  display: block;
+  margin-top: 18rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+}
+
+.identity-application-progress {
+  color: $brand-primary;
+}
+
+.identity-application-privacy {
+  color: $text-tertiary;
+}
+
+.identity-application-submit,
+.identity-application-secondary,
+.identity-application-state__action,
+.identity-application-inline-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 22rpx;
+  font-size: 28rpx;
+  font-weight: 800;
+}
+
+.identity-application-submit {
+  height: 94rpx;
+  margin-top: 34rpx;
+  color: $text-on-color;
+  background: $gradient-primary;
+  box-shadow: 0 18rpx 32rpx -14rpx rgba(33, 104, 184, .55);
+}
+
+.identity-application-secondary {
+  height: 88rpx;
+  margin-top: 28rpx;
+  border: 1rpx solid $divider-nav;
+  color: $brand-primary;
+  background: $bg-surface;
+}
+
+.identity-application-state-card {
+  padding: 34rpx;
+  color: $text-secondary;
+  font-size: 25rpx;
+  text-align: center;
+}
+
+.identity-application-state-card__error {
+  display: block;
+  color: #B64A42;
+  line-height: 1.5;
+}
+
+.identity-application-inline-action {
+  width: 200rpx;
+  height: 64rpx;
+  margin: 24rpx auto 0;
+  color: $brand-primary;
+  background: $brand-tint;
+  font-size: 24rpx;
+}
+
+.identity-application-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 280rpx 60rpx 0;
+  text-align: center;
+}
+
+.identity-application-state__title {
+  color: $text-strong;
+  font-size: 34rpx;
+  font-weight: 800;
+}
+
+.identity-application-state__copy {
+  margin-top: 18rpx;
+  color: $text-secondary;
+  font-size: 25rpx;
+}
+
+.identity-application-state__action {
+  width: 240rpx;
+  height: 78rpx;
+  margin-top: 36rpx;
+  color: $text-on-color;
+  background: $gradient-primary;
+}

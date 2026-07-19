@@ -10,6 +10,7 @@ export default defineAppConfig({
     'pages/secondhand-detail/index',
     'pages/secondhand-chat/index',
     'pages/profile/index',
+    'pages/identity-application/index',
     'pages/user-profile/index',
     'pages/my-content/index',
     'pages/edit-profile/index',
