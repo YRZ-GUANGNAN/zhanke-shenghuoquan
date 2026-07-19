@@ -22,13 +22,14 @@ func fixedClock() time.Time { return fixedTime }
 type memoryRepository struct {
 	nextID       uint64
 	applications map[string]Application
+	grants       map[string]IdentityGrant
 	events       []ApplicationEvent
 	saveErr      error
 	steps        *[]string
 }
 
 func newMemoryRepository() *memoryRepository {
-	return &memoryRepository{nextID: 1, applications: make(map[string]Application)}
+	return &memoryRepository{nextID: 1, applications: make(map[string]Application), grants: make(map[string]IdentityGrant)}
 }
 
 func currentKey(userID uint64, role Role) string {
@@ -116,8 +117,111 @@ func (r *memoryRepository) ListAdmin(context.Context, AdminListFilter) ([]Applic
 	return nil, 0, nil
 }
 
-func (r *memoryRepository) FindDetail(context.Context, string) (ApplicationDetail, error) {
-	return ApplicationDetail{}, ErrApplicationNotFound
+func (r *memoryRepository) FindDetail(_ context.Context, applicationPublicID string) (ApplicationDetail, error) {
+	var value Application
+	found := false
+	for _, candidate := range r.applications {
+		if candidate.ApplicationPublicID == applicationPublicID {
+			value, found = cloneApplication(candidate), true
+			break
+		}
+	}
+	if !found {
+		return ApplicationDetail{}, ErrApplicationNotFound
+	}
+	events := make([]ApplicationEventView, 0)
+	for _, event := range r.events {
+		if event.ApplicationID != value.ID {
+			continue
+		}
+		events = append(events, ApplicationEventView{
+			EventPublicID: event.EventPublicID,
+			ActorUserID:   strconv.FormatUint(event.ActorUserID, 10),
+			EventType:     event.EventType,
+			Status:        event.Status,
+			Reason:        event.Reason,
+			CreatedAt:     event.CreatedAt,
+		})
+	}
+	return ApplicationDetail{ApplicationView: toApplicationView(value), Events: events}, nil
+}
+
+func (r *memoryRepository) Approve(ctx context.Context, input DecisionInput, commit ApprovalCommit) (Application, error) {
+	if commit == nil {
+		return Application{}, ErrInvalidInput
+	}
+	return r.decide(ctx, input, StatusApproved, EventApproved, commit)
+}
+
+func (r *memoryRepository) Reject(ctx context.Context, input DecisionInput) (Application, error) {
+	return r.decide(ctx, input, StatusRejected, EventRejected, nil)
+}
+
+func (r *memoryRepository) decide(ctx context.Context, input DecisionInput, status Status, eventType EventType, commit ApprovalCommit) (Application, error) {
+	var key string
+	var value Application
+	found := false
+	for candidateKey, candidate := range r.applications {
+		if candidate.ApplicationPublicID == input.ApplicationPublicID {
+			key, value, found = candidateKey, cloneApplication(candidate), true
+			break
+		}
+	}
+	if !found {
+		return Application{}, ErrApplicationNotFound
+	}
+	if value.UserID == input.ReviewerUserID {
+		return Application{}, ErrSelfReview
+	}
+	if value.Status != StatusPending || value.RowVersion != input.ExpectedRowVersion {
+		return Application{}, ErrDecisionConflict
+	}
+	originalApplications := cloneApplicationMap(r.applications)
+	originalGrants := cloneGrantMap(r.grants)
+	originalEvents := append([]ApplicationEvent(nil), r.events...)
+	if status == StatusApproved {
+		sourceID := value.ID
+		grant := IdentityGrant{
+			UserID: value.UserID, Role: value.Role, Status: GrantActive,
+			SourceApplicationID: &sourceID, GrantedAt: input.DecidedAt,
+			RowVersion: 1, CreatedAt: input.DecidedAt, UpdatedAt: input.DecidedAt,
+		}
+		if current, ok := r.grants[key]; ok {
+			grant.ID = current.ID
+			grant.CreatedAt = current.CreatedAt
+			grant.RowVersion = current.RowVersion + 1
+		}
+		r.grants[key] = grant
+		if err := commit(ctx, nil, ApprovedIdentity{UserID: value.UserID, Role: value.Role, RealName: value.RealName, Phone: value.Phone}); err != nil {
+			r.applications, r.grants, r.events = originalApplications, originalGrants, originalEvents
+			return Application{}, err
+		}
+	}
+	value.Status = status
+	value.ReviewReason = input.Reason
+	reviewerID := input.ReviewerUserID
+	value.ReviewerUserID = &reviewerID
+	reviewedAt := input.DecidedAt
+	value.ReviewedAt = &reviewedAt
+	value.RowVersion++
+	value.UpdatedAt = input.DecidedAt
+	r.applications[key] = cloneApplication(value)
+	r.events = append(r.events, ApplicationEvent{
+		ID: uint64(len(r.events) + 1), ApplicationID: value.ID,
+		ActorUserID: input.ReviewerUserID, EventType: eventType,
+		Status: status, Reason: input.Reason, CreatedAt: input.DecidedAt,
+	})
+	return value, nil
+}
+
+func (r *memoryRepository) hasGrant(userID uint64, role Role) bool {
+	_, ok := r.grants[currentKey(userID, role)]
+	return ok
+}
+
+func (r *memoryRepository) grant(userID uint64, role Role) (IdentityGrant, bool) {
+	value, ok := r.grants[currentKey(userID, role)]
+	return cloneGrant(value), ok
 }
 
 func (r *memoryRepository) reject(userID uint64, role Role, reviewerID uint64, reason string) {
@@ -150,6 +254,22 @@ func cloneApplicationMap(values map[string]Application) map[string]Application {
 	cloned := make(map[string]Application, len(values))
 	for key, value := range values {
 		cloned[key] = cloneApplication(value)
+	}
+	return cloned
+}
+
+func cloneGrant(value IdentityGrant) IdentityGrant {
+	if value.SourceApplicationID != nil {
+		sourceID := *value.SourceApplicationID
+		value.SourceApplicationID = &sourceID
+	}
+	return value
+}
+
+func cloneGrantMap(values map[string]IdentityGrant) map[string]IdentityGrant {
+	cloned := make(map[string]IdentityGrant, len(values))
+	for key, value := range values {
+		cloned[key] = cloneGrant(value)
 	}
 	return cloned
 }
@@ -440,17 +560,21 @@ func TestSaveSubmissionRejectsWrongEventType(t *testing.T) {
 }
 
 type submissionMediaStub struct {
-	reservation  MediaReservation
-	reserveErr   error
-	ensureErr    error
-	cancelErr    error
-	steps        *[]string
-	cancelled    bool
-	cancelCtxErr error
-	existingID   string
-	assetIDs     map[string]uint64
-	liveIDs      []uint64
-	revokedIDs   []uint64
+	reservation   MediaReservation
+	reserveErr    error
+	ensureErr     error
+	cancelErr     error
+	steps         *[]string
+	cancelled     bool
+	cancelCtxErr  error
+	existingID    string
+	assetIDs      map[string]uint64
+	liveIDs       []uint64
+	revokedIDs    []uint64
+	resolveAppID  string
+	resolveIDs    []string
+	resolveProofs []ProofAssetView
+	resolveErr    error
 }
 
 func (m *submissionMediaStub) Reserve(_ context.Context, _ uint64, assetIDs []string) (MediaReservation, error) {
@@ -526,8 +650,10 @@ func (m *submissionMediaStub) Cancel(ctx context.Context, _ uint64, _ MediaReser
 	return m.cancelErr
 }
 
-func (m *submissionMediaStub) ResolveAdminProofs(context.Context, string, []string) ([]ProofAssetView, error) {
-	return nil, nil
+func (m *submissionMediaStub) ResolveAdminProofs(_ context.Context, applicationPublicID string, assetIDs []string) ([]ProofAssetView, error) {
+	m.resolveAppID = applicationPublicID
+	m.resolveIDs = append([]string(nil), assetIDs...)
+	return append([]ProofAssetView(nil), m.resolveProofs...), m.resolveErr
 }
 
 func TestSubmitMediaLifecycleReserveSaveEnsureCommitted(t *testing.T) {
@@ -673,4 +799,156 @@ func repeatRune(value rune, count int) string {
 		runes[index] = value
 	}
 	return string(runes)
+}
+
+type approvalProvisionerStub struct {
+	calls []ApprovedIdentity
+	err   error
+}
+
+func (p *approvalProvisionerStub) ProvisionApproved(_ context.Context, _ *gorm.DB, value ApprovedIdentity) error {
+	p.calls = append(p.calls, value)
+	return p.err
+}
+
+func TestApproveForbidsSelfReviewAndProvisionFailureIsAtomic(t *testing.T) {
+	repo := newMemoryRepository()
+	provisioner := &approvalProvisionerStub{}
+	service := NewService(repo, &submissionMediaStub{}, fixedClock, provisioner)
+	pending, err := service.Submit(context.Background(), 41, RoleRider, validRiderInput())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := service.Approve(context.Background(), 41, pending.ApplicationPublicID, pending.RowVersion); !errors.Is(err, ErrSelfReview) {
+		t.Fatalf("self review err=%v", err)
+	}
+	current, _, _ := repo.FindCurrent(context.Background(), 41, RoleRider)
+	if current.Status != StatusPending || current.RowVersion != 1 {
+		t.Fatalf("self review mutated application: %+v", current)
+	}
+
+	provisioner.err = errors.New("rider provisioning failed")
+	if _, err := service.Approve(context.Background(), 7, pending.ApplicationPublicID, pending.RowVersion); err == nil {
+		t.Fatal("provision failure was accepted")
+	}
+	current, _, _ = repo.FindCurrent(context.Background(), 41, RoleRider)
+	if current.Status != StatusPending || current.RowVersion != 1 || repo.hasGrant(41, RoleRider) {
+		t.Fatalf("failed approval left partial state: app=%+v grants=%+v", current, repo.grants)
+	}
+	if len(repo.events) != 1 || repo.events[0].EventType != EventSubmitted {
+		t.Fatalf("failed approval left event: %+v", repo.events)
+	}
+}
+
+func TestApproveRiderAndMerchantWritesGrantAndImmutableEvent(t *testing.T) {
+	repo := newMemoryRepository()
+	provisioner := &approvalProvisionerStub{}
+	service := NewService(repo, &submissionMediaStub{}, fixedClock, provisioner)
+	rider, err := service.Submit(context.Background(), 41, RoleRider, validRiderInput())
+	if err != nil {
+		t.Fatal(err)
+	}
+	merchantInput := SubmitInput{
+		RealName: "负责人", Phone: "13900139000", MerchantName: "校园店", MerchantAddress: "一号楼",
+		AssetPublicIDs: []string{"01ARZ3NDEKTSV4RRFFQ69G5FAW"},
+	}
+	merchant, err := service.Submit(context.Background(), 42, RoleMerchant, merchantInput)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	approvedRider, err := service.Approve(context.Background(), 7, rider.ApplicationPublicID, rider.RowVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if approvedRider.Status != StatusApproved || approvedRider.RowVersion != 2 || approvedRider.ReviewerUserID == nil || *approvedRider.ReviewerUserID != "7" {
+		t.Fatalf("approved rider=%+v", approvedRider)
+	}
+	if len(provisioner.calls) != 1 || provisioner.calls[0].UserID != 41 || provisioner.calls[0].Role != RoleRider {
+		t.Fatalf("provision calls=%+v", provisioner.calls)
+	}
+	if grant, ok := repo.grant(41, RoleRider); !ok || grant.Status != GrantActive || grant.SourceApplicationID == nil || *grant.SourceApplicationID != rider.ID {
+		t.Fatalf("rider grant=%+v found=%v", grant, ok)
+	}
+
+	approvedMerchant, err := service.Approve(context.Background(), 7, merchant.ApplicationPublicID, merchant.RowVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if approvedMerchant.Status != StatusApproved || len(provisioner.calls) != 1 {
+		t.Fatalf("merchant=%+v provision calls=%+v", approvedMerchant, provisioner.calls)
+	}
+	if grant, ok := repo.grant(42, RoleMerchant); !ok || grant.Status != GrantActive || grant.SourceApplicationID == nil || *grant.SourceApplicationID != merchant.ID {
+		t.Fatalf("merchant grant=%+v found=%v", grant, ok)
+	}
+	if len(repo.events) != 4 || repo.events[2].EventType != EventApproved || repo.events[2].ActorUserID != 7 || repo.events[3].EventType != EventApproved {
+		t.Fatalf("decision events=%+v", repo.events)
+	}
+}
+
+func TestRejectRequiresReasonAndDecisionConflictsAreRecognizable(t *testing.T) {
+	repo := newMemoryRepository()
+	service := NewService(repo, &submissionMediaStub{}, fixedClock, &approvalProvisionerStub{})
+	pending, err := service.Submit(context.Background(), 41, RoleRider, validRiderInput())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := service.Reject(context.Background(), 7, pending.ApplicationPublicID, pending.RowVersion, "  "); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("blank reason err=%v", err)
+	}
+	if _, err := service.Reject(context.Background(), 7, pending.ApplicationPublicID, pending.RowVersion, repeatRune('拒', 501)); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("oversized reason err=%v", err)
+	}
+	if _, err := service.Reject(context.Background(), 7, pending.ApplicationPublicID, pending.RowVersion+1, "资料不清晰"); !errors.Is(err, ErrDecisionConflict) {
+		t.Fatalf("stale reject err=%v", err)
+	}
+	rejected, err := service.Reject(context.Background(), 7, pending.ApplicationPublicID, pending.RowVersion, " 资料不清晰 ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rejected.Status != StatusRejected || rejected.ReviewReason != "资料不清晰" || rejected.RowVersion != 2 || rejected.ReviewerUserID == nil || *rejected.ReviewerUserID != "7" {
+		t.Fatalf("rejected=%+v", rejected)
+	}
+	if _, err := service.Reject(context.Background(), 8, pending.ApplicationPublicID, pending.RowVersion, "重复处理"); !errors.Is(err, ErrDecisionConflict) {
+		t.Fatalf("repeated reject err=%v", err)
+	}
+	if _, err := service.Approve(context.Background(), 8, pending.ApplicationPublicID, pending.RowVersion); !errors.Is(err, ErrDecisionConflict) {
+		t.Fatalf("approve after reject err=%v", err)
+	}
+	if repo.hasGrant(41, RoleRider) {
+		t.Fatalf("reject wrote grant: %+v", repo.grants)
+	}
+}
+
+func TestAdminDetailResolvesExactPrivateProofsWhileListDoesNotSign(t *testing.T) {
+	repo := newMemoryRepository()
+	media := &submissionMediaStub{resolveProofs: []ProofAssetView{{AssetID: proofAssetID1, URL: "https://private.example/signed", ExpiresAt: fixedTime.Add(5 * time.Minute)}}}
+	service := NewService(repo, media, fixedClock, &approvalProvisionerStub{})
+	pending, err := service.Submit(context.Background(), 41, RoleRider, validRiderInput())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	list, err := service.ListAdmin(context.Background(), AdminListFilter{Role: RoleRider, Status: StatusPending, Page: 1, PageSize: 20})
+	if err != nil || list.Total != 0 {
+		// The memory list implementation is intentionally empty; this assertion
+		// only proves list never asks the private-media adapter to sign.
+		t.Fatalf("list=%+v err=%v", list, err)
+	}
+	if media.resolveAppID != "" || len(media.resolveIDs) != 0 {
+		t.Fatalf("admin list signed private proofs: app=%s ids=%v", media.resolveAppID, media.resolveIDs)
+	}
+
+	detail, err := service.GetAdmin(context.Background(), pending.ApplicationPublicID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if media.resolveAppID != pending.ApplicationPublicID || !reflect.DeepEqual(media.resolveIDs, pending.AssetPublicIDs) {
+		t.Fatalf("resolve app=%q ids=%v want app=%q ids=%v", media.resolveAppID, media.resolveIDs, pending.ApplicationPublicID, pending.AssetPublicIDs)
+	}
+	if len(detail.Proofs) != 1 || detail.Proofs[0].URL != "https://private.example/signed" {
+		t.Fatalf("detail proofs=%+v", detail.Proofs)
+	}
 }

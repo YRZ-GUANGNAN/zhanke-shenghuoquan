@@ -12,6 +12,7 @@ import (
 	"time"
 
 	coremedia "campus-circle/backend/internal/module/media"
+	"campus-circle/backend/internal/module/takeout"
 	mysqlDriver "github.com/go-sql-driver/mysql"
 	gormMySQL "gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -398,6 +399,84 @@ func TestGormRepositoryMySQLContract(t *testing.T) {
 	}
 }
 
+func TestGormRepositoryDecisionAtomicityAgainstMySQL(t *testing.T) {
+	db := requireIdentityApplicationMySQL(t)
+	ctx := context.Background()
+	now := time.Date(2026, 7, 19, 12, 0, 0, 0, time.UTC)
+	repository := NewRepository(db)
+	submissionService := NewService(repository, &submissionMediaStub{}, func() time.Time { return now })
+
+	riderApplication := submitMySQLApplication(t, submissionService, 81, RoleRider, "真实骑手")
+	provisioner := ApprovalProvisionerFunc(func(ctx context.Context, tx *gorm.DB, approved ApprovedIdentity) error {
+		riders, err := takeout.NewRiderIdentityService(takeout.NewRepository(tx), func() time.Time { return now })
+		if err != nil {
+			return err
+		}
+		_, err = riders.RegisterApproved(ctx, approved.UserID, approved.RealName, approved.Phone)
+		return err
+	})
+	decisionService := NewService(repository, &submissionMediaStub{}, func() time.Time { return now }, provisioner)
+	if _, err := decisionService.Approve(ctx, 81, riderApplication.ApplicationPublicID, riderApplication.RowVersion); !errors.Is(err, ErrSelfReview) {
+		t.Fatalf("self review err=%v", err)
+	}
+	approved, err := decisionService.Approve(ctx, 7, riderApplication.ApplicationPublicID, riderApplication.RowVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if approved.Status != StatusApproved || approved.RowVersion != 2 || approved.ReviewerUserID == nil || *approved.ReviewerUserID != "7" {
+		t.Fatalf("approved=%+v", approved)
+	}
+	assertMySQLCount(t, db, 1, &IdentityGrant{}, "user_id = ? AND role = ? AND status = ? AND source_application_id = ?", 81, RoleRider, GrantActive, riderApplication.ID)
+	assertMySQLCount(t, db, 1, &takeout.Rider{}, "rider_user_id = ? AND status = ?", 81, takeout.RiderActive)
+	assertMySQLCount(t, db, 1, &ApplicationEvent{}, "application_id = ? AND event_type = ? AND actor_user_id = ?", riderApplication.ID, EventApproved, 7)
+	if _, err := decisionService.Approve(ctx, 8, riderApplication.ApplicationPublicID, riderApplication.RowVersion); !errors.Is(err, ErrDecisionConflict) {
+		t.Fatalf("repeated approval err=%v", err)
+	}
+
+	now = now.Add(time.Minute)
+	failingApplication := submitMySQLApplication(t, submissionService, 82, RoleRider, "回滚骑手")
+	failingService := NewService(repository, &submissionMediaStub{}, func() time.Time { return now }, ApprovalProvisionerFunc(
+		func(ctx context.Context, tx *gorm.DB, approved ApprovedIdentity) error {
+			riders, err := takeout.NewRiderIdentityService(takeout.NewRepository(tx), func() time.Time { return now })
+			if err != nil {
+				return err
+			}
+			if _, err := riders.RegisterApproved(ctx, approved.UserID, approved.RealName, approved.Phone); err != nil {
+				return err
+			}
+			return errors.New("force decision rollback")
+		},
+	))
+	if _, err := failingService.Approve(ctx, 7, failingApplication.ApplicationPublicID, failingApplication.RowVersion); err == nil {
+		t.Fatal("failing provisioner was accepted")
+	}
+	current, found, err := repository.FindCurrent(ctx, 82, RoleRider)
+	if err != nil || !found || current.Status != StatusPending || current.RowVersion != 1 {
+		t.Fatalf("failed decision changed application: found=%v value=%+v err=%v", found, current, err)
+	}
+	assertMySQLCount(t, db, 0, &IdentityGrant{}, "user_id = ? AND role = ?", 82, RoleRider)
+	assertMySQLCount(t, db, 0, &takeout.Rider{}, "rider_user_id = ?", 82)
+	assertMySQLCount(t, db, 0, &ApplicationEvent{}, "application_id = ? AND event_type = ?", failingApplication.ID, EventApproved)
+
+	now = now.Add(time.Minute)
+	merchantApplication := submitMySQLApplication(t, submissionService, 83, RoleMerchant, "商家负责人")
+	merchantApproved, err := decisionService.Approve(ctx, 7, merchantApplication.ApplicationPublicID, merchantApplication.RowVersion)
+	if err != nil || merchantApproved.Status != StatusApproved {
+		t.Fatalf("merchant approval=%+v err=%v", merchantApproved, err)
+	}
+	assertMySQLCount(t, db, 1, &IdentityGrant{}, "user_id = ? AND role = ? AND source_application_id = ?", 83, RoleMerchant, merchantApplication.ID)
+	assertMySQLCount(t, db, 0, &takeout.Rider{}, "rider_user_id = ?", 83)
+
+	now = now.Add(time.Minute)
+	rejectedApplication := submitMySQLApplication(t, submissionService, 84, RoleMerchant, "拒绝商家")
+	rejected, err := decisionService.Reject(ctx, 7, rejectedApplication.ApplicationPublicID, rejectedApplication.RowVersion, " 证明模糊 ")
+	if err != nil || rejected.Status != StatusRejected || rejected.ReviewReason != "证明模糊" || rejected.RowVersion != 2 {
+		t.Fatalf("rejected=%+v err=%v", rejected, err)
+	}
+	assertMySQLCount(t, db, 0, &IdentityGrant{}, "user_id = ? AND role = ?", 84, RoleMerchant)
+	assertMySQLCount(t, db, 1, &ApplicationEvent{}, "application_id = ? AND event_type = ? AND actor_user_id = ?", rejectedApplication.ID, EventRejected, 7)
+}
+
 func submitMySQLApplication(t *testing.T, service *Service, userID uint64, role Role, name string) ApplicationView {
 	t.Helper()
 	input := SubmitInput{RealName: name, Phone: "13800138000", AssetPublicIDs: []string{mysqlAssetA}}
@@ -505,7 +584,7 @@ func requireIdentityApplicationMySQL(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open GORM temporary database: %v", err)
 	}
-	if err := db.AutoMigrate(&coremedia.Asset{}, &coremedia.ReviewProjection{}, &coremedia.AssetReference{}); err != nil {
+	if err := db.AutoMigrate(&IdentityGrant{}, &takeout.Rider{}, &coremedia.Asset{}, &coremedia.ReviewProjection{}, &coremedia.AssetReference{}); err != nil {
 		t.Fatalf("create media binding test schema: %v", err)
 	}
 	if err := db.Exec(`ALTER TABLE media_assets

@@ -27,21 +27,153 @@ var (
 	ErrApplicationPending  = errors.New("identity application is pending")
 	ErrApplicationApproved = errors.New("identity application is approved")
 	ErrVersionConflict     = errors.New("identity application version conflict")
+	ErrDecisionConflict    = errors.New("identity application decision conflict")
+	ErrSelfReview          = errors.New("identity application self review is forbidden")
 
 	mainlandPhonePattern = regexp.MustCompile(`^1[3-9][0-9]{9}$`)
 )
 
 type Service struct {
-	repo  Repository
-	media ApplicationMedia
-	now   func() time.Time
+	repo        Repository
+	media       ApplicationMedia
+	now         func() time.Time
+	provisioner ApprovalProvisioner
 }
 
-func NewService(repo Repository, applicationMedia ApplicationMedia, now func() time.Time) *Service {
+type ApprovalProvisioner interface {
+	ProvisionApproved(context.Context, *gorm.DB, ApprovedIdentity) error
+}
+
+type ApprovalProvisionerFunc func(context.Context, *gorm.DB, ApprovedIdentity) error
+
+func (f ApprovalProvisionerFunc) ProvisionApproved(ctx context.Context, tx *gorm.DB, value ApprovedIdentity) error {
+	return f(ctx, tx, value)
+}
+
+func NewService(repo Repository, applicationMedia ApplicationMedia, now func() time.Time, provisioners ...ApprovalProvisioner) *Service {
 	if now == nil {
 		now = time.Now
 	}
-	return &Service{repo: repo, media: applicationMedia, now: now}
+	var provisioner ApprovalProvisioner
+	if len(provisioners) > 0 {
+		provisioner = provisioners[0]
+	}
+	return &Service{repo: repo, media: applicationMedia, now: now, provisioner: provisioner}
+}
+
+func (s *Service) ListAdmin(ctx context.Context, filter AdminListFilter) (AdminListView, error) {
+	if s == nil || s.repo == nil {
+		return AdminListView{}, errors.New("identity application repository is required")
+	}
+	if filter.Role != "" && !filter.Role.Valid() {
+		return AdminListView{}, errors.Join(ErrInvalidInput, ErrInvalidRole)
+	}
+	if filter.Status != "" && !filter.Status.Valid() {
+		return AdminListView{}, invalidInput("invalid application status")
+	}
+	if filter.Page < 1 || filter.PageSize < 1 || filter.PageSize > 100 {
+		return AdminListView{}, invalidInput("invalid pagination")
+	}
+	values, total, err := s.repo.ListAdmin(ctx, filter)
+	if err != nil {
+		return AdminListView{}, err
+	}
+	items := make([]ApplicationView, len(values))
+	for index := range values {
+		items[index] = toApplicationView(values[index])
+	}
+	return AdminListView{Items: items, Total: total, Page: filter.Page, PageSize: filter.PageSize}, nil
+}
+
+func (s *Service) GetAdmin(ctx context.Context, applicationPublicID string) (ApplicationDetail, error) {
+	applicationPublicID = strings.TrimSpace(applicationPublicID)
+	if !validULID(applicationPublicID) {
+		return ApplicationDetail{}, invalidInput("invalid application id")
+	}
+	if s == nil || s.repo == nil {
+		return ApplicationDetail{}, errors.New("identity application repository is required")
+	}
+	detail, err := s.repo.FindDetail(ctx, applicationPublicID)
+	if err != nil {
+		return ApplicationDetail{}, err
+	}
+	if s.media == nil {
+		return ApplicationDetail{}, errors.New("identity application media is required")
+	}
+	proofs, err := s.media.ResolveAdminProofs(ctx, applicationPublicID, detail.AssetPublicIDs)
+	if err != nil {
+		return ApplicationDetail{}, err
+	}
+	detail.Proofs = proofs
+	return detail, nil
+}
+
+func (s *Service) Approve(ctx context.Context, reviewerUserID uint64, applicationPublicID string, expectedRowVersion uint64) (ApplicationView, error) {
+	if s == nil || s.repo == nil {
+		return ApplicationView{}, errors.New("identity application repository is required")
+	}
+	input, err := normalizeDecisionInput(reviewerUserID, applicationPublicID, expectedRowVersion, "", false, s.now)
+	if err != nil {
+		return ApplicationView{}, err
+	}
+	commit := func(commitContext context.Context, tx *gorm.DB, approved ApprovedIdentity) error {
+		if approved.Role != RoleRider {
+			return nil
+		}
+		if s.provisioner == nil {
+			return errors.New("approved rider provisioner is required")
+		}
+		return s.provisioner.ProvisionApproved(commitContext, tx, approved)
+	}
+	value, err := s.repo.Approve(ctx, input, commit)
+	if err != nil {
+		return ApplicationView{}, err
+	}
+	return toApplicationView(value), nil
+}
+
+func (s *Service) Reject(ctx context.Context, reviewerUserID uint64, applicationPublicID string, expectedRowVersion uint64, reason string) (ApplicationView, error) {
+	if s == nil || s.repo == nil {
+		return ApplicationView{}, errors.New("identity application repository is required")
+	}
+	input, err := normalizeDecisionInput(reviewerUserID, applicationPublicID, expectedRowVersion, reason, true, s.now)
+	if err != nil {
+		return ApplicationView{}, err
+	}
+	value, err := s.repo.Reject(ctx, input)
+	if err != nil {
+		return ApplicationView{}, err
+	}
+	return toApplicationView(value), nil
+}
+
+func normalizeDecisionInput(
+	reviewerUserID uint64,
+	applicationPublicID string,
+	expectedRowVersion uint64,
+	reason string,
+	requireReason bool,
+	now func() time.Time,
+) (DecisionInput, error) {
+	applicationPublicID = strings.TrimSpace(applicationPublicID)
+	reason = strings.TrimSpace(reason)
+	if reviewerUserID == 0 || !validULID(applicationPublicID) || expectedRowVersion == 0 {
+		return DecisionInput{}, invalidInput("reviewer, application id, and expected version are required")
+	}
+	if requireReason {
+		if reason == "" || utf8.RuneCountInString(reason) > 500 {
+			return DecisionInput{}, invalidInput("review reason must contain 1-500 characters")
+		}
+	} else if reason != "" {
+		return DecisionInput{}, invalidInput("approval reason must be empty")
+	}
+	if now == nil {
+		now = time.Now
+	}
+	return DecisionInput{
+		ReviewerUserID: reviewerUserID, ApplicationPublicID: applicationPublicID,
+		ExpectedRowVersion: expectedRowVersion, Reason: reason, DecidedAt: now().UTC(),
+	}, nil
 }
 
 func (s *Service) ListMine(ctx context.Context, userID uint64) ([]ApplicationView, error) {

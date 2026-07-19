@@ -10,6 +10,7 @@ import (
 
 	mysqlDriver "github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type Repository interface {
@@ -18,9 +19,12 @@ type Repository interface {
 	SaveSubmission(context.Context, *Application, []string, EventType, uint64, SubmissionCommit) error
 	ListAdmin(context.Context, AdminListFilter) ([]Application, int64, error)
 	FindDetail(context.Context, string) (ApplicationDetail, error)
+	Approve(context.Context, DecisionInput, ApprovalCommit) (Application, error)
+	Reject(context.Context, DecisionInput) (Application, error)
 }
 
 type SubmissionCommit func(context.Context, *gorm.DB) error
+type ApprovalCommit func(context.Context, *gorm.DB, ApprovedIdentity) error
 
 type GormRepository struct{ db *gorm.DB }
 
@@ -109,18 +113,7 @@ func (r *GormRepository) SaveSubmission(ctx context.Context, value *Application,
 			}
 		}
 
-		snapshot, err := json.Marshal(applicationSnapshot{
-			ApplicationPublicID: value.ApplicationPublicID,
-			UserID:              value.UserID,
-			Role:                value.Role,
-			Status:              value.Status,
-			RealName:            value.RealName,
-			Phone:               value.Phone,
-			MerchantName:        value.MerchantName,
-			MerchantAddress:     value.MerchantAddress,
-			AssetPublicIDs:      append([]string(nil), assetIDs...),
-			RowVersion:          value.RowVersion,
-		})
+		snapshot, err := json.Marshal(snapshotApplication(*value, assetIDs))
 		if err != nil {
 			return err
 		}
@@ -146,6 +139,148 @@ func (r *GormRepository) SaveSubmission(ctx context.Context, value *Application,
 		value.Assets = assets
 		return nil
 	})
+}
+
+func (r *GormRepository) Approve(ctx context.Context, input DecisionInput, commit ApprovalCommit) (Application, error) {
+	if commit == nil || input.Reason != "" {
+		return Application{}, ErrInvalidInput
+	}
+	return r.decide(ctx, input, StatusApproved, EventApproved, commit)
+}
+
+func (r *GormRepository) Reject(ctx context.Context, input DecisionInput) (Application, error) {
+	if input.Reason == "" {
+		return Application{}, ErrInvalidInput
+	}
+	return r.decide(ctx, input, StatusRejected, EventRejected, nil)
+}
+
+func (r *GormRepository) decide(
+	ctx context.Context,
+	input DecisionInput,
+	status Status,
+	eventType EventType,
+	commit ApprovalCommit,
+) (Application, error) {
+	if r == nil || r.db == nil || input.ReviewerUserID == 0 || !validULID(input.ApplicationPublicID) ||
+		input.ExpectedRowVersion == 0 || input.DecidedAt.IsZero() ||
+		(status != StatusApproved && status != StatusRejected) ||
+		(eventType != EventApproved && eventType != EventRejected) {
+		return Application{}, ErrInvalidInput
+	}
+	var result Application
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := r.withAssets(tx.Clauses(clause.Locking{Strength: "UPDATE"})).
+			Where("application_public_id = ?", input.ApplicationPublicID).
+			Take(&result).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrApplicationNotFound
+			}
+			return err
+		}
+		if result.UserID == input.ReviewerUserID {
+			return ErrSelfReview
+		}
+		if result.Status != StatusPending || result.RowVersion != input.ExpectedRowVersion {
+			return ErrDecisionConflict
+		}
+
+		if status == StatusApproved {
+			grant := IdentityGrant{
+				UserID: result.UserID, Role: result.Role, Status: GrantActive,
+				SourceApplicationID: &result.ID, GrantedAt: input.DecidedAt,
+				RowVersion: 1, CreatedAt: input.DecidedAt, UpdatedAt: input.DecidedAt,
+			}
+			if err := tx.Clauses(clause.OnConflict{
+				Columns: []clause.Column{{Name: "user_id"}, {Name: "role"}},
+				DoUpdates: clause.Assignments(map[string]any{
+					"status": GrantActive, "source_application_id": result.ID,
+					"granted_at": input.DecidedAt, "updated_at": input.DecidedAt,
+					"row_version": gorm.Expr("row_version + 1"),
+				}),
+			}).Create(&grant).Error; err != nil {
+				return mapDecisionWriteError(err)
+			}
+			approved := ApprovedIdentity{
+				UserID: result.UserID, Role: result.Role,
+				RealName: result.RealName, Phone: result.Phone,
+			}
+			if err := commit(ctx, tx, approved); err != nil {
+				return err
+			}
+		}
+
+		nextVersion := result.RowVersion + 1
+		update := tx.Model(&Application{}).
+			Where("id = ? AND status = ? AND row_version = ?", result.ID, StatusPending, input.ExpectedRowVersion).
+			Updates(map[string]any{
+				"status": status, "review_reason": input.Reason,
+				"reviewer_user_id": input.ReviewerUserID, "reviewed_at": input.DecidedAt,
+				"row_version": nextVersion, "updated_at": input.DecidedAt,
+			})
+		if update.Error != nil {
+			return mapDecisionWriteError(update.Error)
+		}
+		if update.RowsAffected != 1 {
+			return ErrDecisionConflict
+		}
+		result.Status = status
+		result.ReviewReason = input.Reason
+		reviewerID := input.ReviewerUserID
+		result.ReviewerUserID = &reviewerID
+		reviewedAt := input.DecidedAt
+		result.ReviewedAt = &reviewedAt
+		result.RowVersion = nextVersion
+		result.UpdatedAt = input.DecidedAt
+
+		snapshot, err := json.Marshal(snapshotApplication(result, applicationAssetPublicIDs(result.Assets)))
+		if err != nil {
+			return err
+		}
+		eventID, err := newULIDAt(input.DecidedAt, rand.Reader)
+		if err != nil {
+			return err
+		}
+		event := ApplicationEvent{
+			EventPublicID: eventID, ApplicationID: result.ID,
+			ActorUserID: input.ReviewerUserID, EventType: eventType,
+			Status: status, Reason: input.Reason, SnapshotJSON: snapshot,
+			CreatedAt: input.DecidedAt,
+		}
+		return mapDecisionWriteError(tx.Create(&event).Error)
+	})
+	return result, err
+}
+
+func snapshotApplication(value Application, assetIDs []string) applicationSnapshot {
+	var reviewerUserID *string
+	if value.ReviewerUserID != nil {
+		formatted := strconv.FormatUint(*value.ReviewerUserID, 10)
+		reviewerUserID = &formatted
+	}
+	return applicationSnapshot{
+		ApplicationPublicID: value.ApplicationPublicID,
+		UserID:              strconv.FormatUint(value.UserID, 10),
+		Role:                value.Role,
+		Status:              value.Status,
+		RealName:            value.RealName,
+		Phone:               value.Phone,
+		MerchantName:        value.MerchantName,
+		MerchantAddress:     value.MerchantAddress,
+		AssetPublicIDs:      append([]string(nil), assetIDs...),
+		ReviewReason:        value.ReviewReason,
+		ReviewerUserID:      reviewerUserID,
+		ReviewedAt:          value.ReviewedAt,
+		RowVersion:          value.RowVersion,
+	}
+}
+
+func applicationAssetPublicIDs(assets []ApplicationAsset) []string {
+	values := make([]string, len(assets))
+	for index := range assets {
+		values[index] = assets[index].AssetPublicID
+	}
+	return values
 }
 
 func (r *GormRepository) ListAdmin(ctx context.Context, filter AdminListFilter) ([]Application, int64, error) {
@@ -246,6 +381,17 @@ func mapSubmissionWriteError(err error) error {
 	}
 	if strings.Contains(strings.ToLower(err.Error()), "duplicate") {
 		return ErrVersionConflict
+	}
+	return err
+}
+
+func mapDecisionWriteError(err error) error {
+	if err == nil {
+		return nil
+	}
+	var mysqlErr *mysqlDriver.MySQLError
+	if errors.As(err, &mysqlErr) && (mysqlErr.Number == 1062 || mysqlErr.Number == 1213 || mysqlErr.Number == 1205) {
+		return errors.Join(ErrDecisionConflict, err)
 	}
 	return err
 }

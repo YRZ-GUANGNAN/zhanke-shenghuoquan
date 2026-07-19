@@ -50,6 +50,21 @@ type SubmitInput struct {
 	ExpectedRowVersion uint64
 }
 
+type DecisionInput struct {
+	ReviewerUserID      uint64
+	ApplicationPublicID string
+	ExpectedRowVersion  uint64
+	Reason              string
+	DecidedAt           time.Time
+}
+
+type ApprovedIdentity struct {
+	UserID   uint64
+	Role     Role
+	RealName string
+	Phone    string
+}
+
 type Application struct {
 	ID                  uint64             `gorm:"column:id;primaryKey"`
 	ApplicationPublicID string             `gorm:"column:application_public_id;type:char(26);not null;uniqueIndex:uq_identity_application_public_id"`
@@ -156,17 +171,27 @@ type AdminListFilter struct {
 	PageSize int
 }
 
+type AdminListView struct {
+	Items    []ApplicationView `json:"items"`
+	Total    int64             `json:"total"`
+	Page     int               `json:"page"`
+	PageSize int               `json:"pageSize"`
+}
+
 type applicationSnapshot struct {
-	ApplicationPublicID string   `json:"applicationId"`
-	UserID              uint64   `json:"userId"`
-	Role                Role     `json:"role"`
-	Status              Status   `json:"status"`
-	RealName            string   `json:"realName"`
-	Phone               string   `json:"phone"`
-	MerchantName        string   `json:"merchantName"`
-	MerchantAddress     string   `json:"merchantAddress"`
-	AssetPublicIDs      []string `json:"assetIds"`
-	RowVersion          uint64   `json:"rowVersion"`
+	ApplicationPublicID string     `json:"applicationId"`
+	UserID              string     `json:"userId"`
+	Role                Role       `json:"role"`
+	Status              Status     `json:"status"`
+	RealName            string     `json:"realName"`
+	Phone               string     `json:"phone"`
+	MerchantName        string     `json:"merchantName"`
+	MerchantAddress     string     `json:"merchantAddress"`
+	AssetPublicIDs      []string   `json:"assetIds"`
+	ReviewReason        string     `json:"reviewReason"`
+	ReviewerUserID      *string    `json:"reviewerUserId,omitempty"`
+	ReviewedAt          *time.Time `json:"reviewedAt,omitempty"`
+	RowVersion          uint64     `json:"rowVersion"`
 }
 
 func toApplicationView(value Application) ApplicationView {
