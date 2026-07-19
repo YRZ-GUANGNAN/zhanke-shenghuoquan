@@ -12,8 +12,9 @@
 
 .student-profile-hero {
   position: relative;
-  min-height: 318rpx;
-  padding: var(--capsule-safe-bottom, 112rpx) 36rpx 78rpx;
+  min-height: 0;
+  padding: 0 36rpx 78rpx;
+  box-sizing: border-box;
   overflow: hidden;
   background: $gradient-primary;
   cursor: pointer;
@@ -61,6 +62,7 @@
   display: flex;
   align-items: center;
   gap: 24rpx;
+  min-height: 48px;
 }
 
 .student-profile-user__avatar {

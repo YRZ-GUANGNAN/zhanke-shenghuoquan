@@ -11,8 +11,9 @@
 
 .rider-wallet-hero {
   position: relative;
-  min-height: 438rpx;
-  padding: 68rpx 58rpx 54rpx;
+  min-height: 0;
+  padding: 0 58rpx 54rpx;
+  box-sizing: border-box;
   overflow: hidden;
   background: linear-gradient(145deg, #3489df 0%, #2777cd 54%, #2169b9 100%);
   color: #fff;
@@ -45,7 +46,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 54rpx;
+  min-height: 48px;
+  height: auto;
 }
 
 .rider-wallet-nav__back,

@@ -12,7 +12,7 @@
 
 .public-profile-hero {
   flex: 0 0 auto;
-  padding: 86rpx 30rpx 34rpx;
+  padding: 0 30rpx 34rpx;
   background: $brand-primary;
   color: $text-on-color;
   box-sizing: border-box;
@@ -22,7 +22,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 54rpx;
+  min-height: 48px;
+  height: auto;
 }
 
 .public-profile-nav__back {
@@ -54,7 +55,7 @@
   color: $text-on-color;
   font-size: 30rpx;
   line-height: 1;
-  margin-right: calc(var(--capsule-safe-right, 96px) - 30rpx);
+  margin-right: 0;
 }
 
 .public-profile-user {

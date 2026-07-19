@@ -13,7 +13,9 @@ page {
 }
 
 .merchant-wallet-page {
-  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
   background: $bg-app;
   color: $text-primary;
   overflow: hidden;
@@ -21,8 +23,9 @@ page {
 
 .merchant-wallet-hero {
   position: relative;
-  height: 528rpx;
-  padding: 92rpx 36rpx 0;
+  flex: 0 0 auto;
+  height: auto;
+  padding: 0 36rpx 54rpx;
   box-sizing: border-box;
   overflow: hidden;
   background: $gradient-primary;
@@ -52,7 +55,8 @@ page {
 .merchant-wallet-nav {
   position: relative;
   z-index: 1;
-  height: 60rpx;
+  min-height: 48px;
+  height: auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -141,7 +145,9 @@ page {
 }
 
 .merchant-wallet-scroll {
-  height: calc(100vh - 528rpx);
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
   margin-top: 0;
   box-sizing: border-box;
 }

@@ -3,6 +3,7 @@ import { Text, View } from '@tarojs/components'
 import { useDidShow } from '@tarojs/taro'
 import IdentitySwitchModal from '../../components/IdentitySwitchModal'
 import AppIcon from '../../components/app-icon'
+import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import StudentBottomNav from '../../components/student-bottom-nav'
 import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
@@ -164,6 +165,7 @@ function ProfileContent() {
       <View className='student-profile-hero' onClick={openProfileEditor}>
         <View className='student-profile-hero__orb student-profile-hero__orb--small' />
         <View className='student-profile-hero__orb student-profile-hero__orb--large' />
+        <CapsuleSystemRow />
         <View className='student-profile-user'>
           <View className='student-profile-user__avatar'>
             <Text>{profile.nickname.trim().slice(0, 1) || '同'}</Text>

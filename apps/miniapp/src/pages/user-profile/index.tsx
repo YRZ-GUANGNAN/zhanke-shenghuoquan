@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
+import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import { blockUser } from '../../services/a-user'
 import {
   getPublicCommunityProfile,
@@ -185,6 +186,7 @@ export default function UserProfilePage() {
   return (
     <View className='public-profile-page' style={getCapsuleSafeStyle()}>
       <View className='public-profile-hero'>
+        <CapsuleSystemRow />
         <View className='public-profile-nav'>
           <View className='public-profile-nav__back' onClick={() => void Taro.navigateBack().catch(() => Taro.redirectTo({ url: '/pages/home/index' }))} />
           <View className='public-profile-nav__more' onClick={() => setMenuVisible(true)}><Text>•••</Text></View>

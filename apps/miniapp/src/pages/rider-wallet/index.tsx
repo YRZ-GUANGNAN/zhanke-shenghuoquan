@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Text, View } from '@tarojs/components'
+import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import Taro from '../../services/taro'
 import './index.scss'
 
@@ -59,6 +60,7 @@ export default function RiderWalletPage() {
         <View className='rider-wallet-hero__orb rider-wallet-hero__orb--one' />
         <View className='rider-wallet-hero__orb rider-wallet-hero__orb--two' />
 
+        <CapsuleSystemRow />
         <View className='rider-wallet-nav'>
           <View className='rider-wallet-nav__back' onClick={() => void Taro.navigateBack()}>
             <Text>‹</Text>

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
 import IdentitySwitchModal from '../../components/IdentitySwitchModal'
+import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
 import Taro from '../../services/taro'
@@ -282,6 +283,7 @@ function MerchantHomeContent() {
       <View className='merchant-home-hero'>
         <View className='merchant-home-hero__orb merchant-home-hero__orb--left' />
         <View className='merchant-home-hero__orb merchant-home-hero__orb--right' />
+        <CapsuleSystemRow />
         <View className='merchant-home-header'>
           <View className='merchant-home-shop'>
             <View className='merchant-home-shop__avatar'>

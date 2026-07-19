@@ -13,7 +13,9 @@ page {
 }
 
 .merchant-home-page {
-  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
   background: $bg-app;
   color: $text-primary;
   overflow: hidden;
@@ -21,8 +23,9 @@ page {
 
 .merchant-home-hero {
   position: relative;
-  height: 376rpx;
-  padding: 104rpx 34rpx 0;
+  flex: 0 0 auto;
+  height: auto;
+  padding: 0 34rpx 54rpx;
   box-sizing: border-box;
   overflow: hidden;
   background: $gradient-primary;
@@ -56,7 +59,8 @@ page {
   align-items: flex-start;
   justify-content: space-between;
   gap: 18rpx;
-  padding-right: calc(var(--capsule-safe-right, 96px) - 34rpx);
+  min-height: 48px;
+  padding-right: 0;
 }
 
 .merchant-home-shop {
@@ -202,6 +206,7 @@ page {
 .merchant-home-shortcuts {
   position: relative;
   z-index: 3;
+  flex: 0 0 auto;
   margin: -54rpx 34rpx 0;
   height: 150rpx;
   border-radius: 22rpx;
@@ -250,6 +255,7 @@ page {
 .merchant-home-tabs {
   position: relative;
   z-index: 1;
+  flex: 0 0 auto;
   height: 106rpx;
   padding: 24rpx 38rpx 0;
   box-sizing: border-box;
@@ -308,7 +314,9 @@ page {
 }
 
 .merchant-home-orders {
-  height: calc(100vh - 578rpx);
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
   box-sizing: border-box;
 }
 

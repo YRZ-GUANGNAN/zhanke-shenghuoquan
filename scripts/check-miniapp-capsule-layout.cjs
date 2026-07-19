@@ -122,6 +122,13 @@ for (const pageName of mainPages) {
   assert.doesNotMatch(style, /--capsule-safe-right/, `${pageName} must not squeeze business navigation beside the capsule`)
 }
 
+const heroPages = ['profile', 'user-profile', 'merchant-home', 'merchant-wallet', 'rider-wallet']
+
+for (const pageName of heroPages) {
+  const source = fs.readFileSync(path.join(miniappPagesRoot, pageName, 'index.tsx'), 'utf8')
+  assert.match(source, /CapsuleSystemRow/, `${pageName} must use CapsuleSystemRow`)
+}
+
 assert.equal(fs.existsSync(path.join(miniappPagesRoot, 'home', 'header-layout.ts')), false)
 const studentTakeoutSource = fs.readFileSync(path.join(miniappPagesRoot, 'student-takeout', 'index.tsx'), 'utf8')
 const studentTakeoutStyle = fs.readFileSync(path.join(miniappPagesRoot, 'student-takeout', 'index.scss'), 'utf8')

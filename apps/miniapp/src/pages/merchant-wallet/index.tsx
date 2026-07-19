@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
+import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import Taro from '../../services/taro'
 import './index.scss'
 
@@ -75,6 +76,7 @@ export default function MerchantWalletPage() {
       <View className='merchant-wallet-hero'>
         <View className='merchant-wallet-hero__orb merchant-wallet-hero__orb--left' />
         <View className='merchant-wallet-hero__orb merchant-wallet-hero__orb--right' />
+        <CapsuleSystemRow />
         <View className='merchant-wallet-nav'>
           <View className='merchant-wallet-nav__back' onClick={() => Taro.navigateBack()}>
             <Text>‹</Text>
