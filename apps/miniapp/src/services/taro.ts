@@ -1,5 +1,28 @@
 import TaroRuntime from '@tarojs/taro'
 
+export interface MenuButtonRect {
+  top: number
+  right: number
+  bottom: number
+  left: number
+  width: number
+  height: number
+}
+
+export interface WindowInfo {
+  windowWidth: number
+  statusBarHeight: number
+  pixelRatio: number
+  safeArea?: {
+    top: number
+    right: number
+    bottom: number
+    left: number
+    width: number
+    height: number
+  }
+}
+
 interface NavigateOptions {
   url: string
 }
@@ -77,6 +100,8 @@ interface TaroFacade {
 		applyUpdate(): void
 	}
 	getAccountInfoSync(): { miniProgram: { appId: string; envVersion: string; version: string } }
+  getMenuButtonBoundingClientRect(): MenuButtonRect
+  getWindowInfo(): WindowInfo
 }
 
 export default TaroRuntime as unknown as TaroFacade

@@ -29,8 +29,11 @@ for (const [relative, token] of mustContain) {
 }
 
 const home = fs.readFileSync(path.join(src, 'pages/home/index.tsx'), 'utf8')
-if (/HomeTab\s*=.*tools|静态占位|showTodoToast/.test(home)) {
-  violations.push('pages/home/index.tsx: fake tool tab is registered')
+if (/静态占位|showTodoToast|特价影票|学生兼职|校园群聊|校园地图/.test(home)) {
+  violations.push('pages/home/index.tsx: static fake tools must not be registered')
+}
+if (/HomeTab\s*=.*tools/.test(home) && !home.includes('listNavigationItems')) {
+  violations.push('pages/home/index.tsx: tools tab must consume the real navigation service')
 }
 
 const identityGuard = fs.readFileSync(path.join(src, 'hooks/use-identity-guard.ts'), 'utf8')

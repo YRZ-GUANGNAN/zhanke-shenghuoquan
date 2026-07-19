@@ -33,6 +33,29 @@ declare module '@tarojs/taro' {
     router: Router
   }
 
+  interface MenuButtonRect {
+    top: number
+    right: number
+    bottom: number
+    left: number
+    width: number
+    height: number
+  }
+
+  interface WindowInfo {
+    windowWidth: number
+    statusBarHeight: number
+    pixelRatio: number
+    safeArea?: {
+      top: number
+      right: number
+      bottom: number
+      left: number
+      width: number
+      height: number
+    }
+  }
+
   interface TaroStatic {
     navigateTo(options: NavigateOptions): Promise<unknown>
     redirectTo(options: NavigateOptions): Promise<unknown>
@@ -51,5 +74,7 @@ declare module '@tarojs/taro' {
     compressImage(options: { src: string; quality: number; compressedWidth?: number; compressedHeight?: number; format?: 'webp' }): Promise<{ tempFilePath: string }>
     getFileInfo(options: { filePath: string; digestAlgorithm?: 'md5' | 'sha1' }): Promise<{ size: number; digest: string }>
     getFileSystemManager(): { readFileSync(filePath: string): ArrayBuffer | ArrayBufferView | string }
+    getMenuButtonBoundingClientRect(): MenuButtonRect
+    getWindowInfo(): WindowInfo
   }
 }

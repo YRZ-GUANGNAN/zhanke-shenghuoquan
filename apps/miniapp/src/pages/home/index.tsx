@@ -4,16 +4,18 @@ import { Image, Text, View } from '@tarojs/components'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import StudentBottomNav from '../../components/student-bottom-nav'
 import { useIdentityGuard } from '../../hooks/use-identity-guard'
-import type { CommunityPost, Product } from '../../types'
+import type { CommunityPost, Product, ToolLink } from '../../types'
 import { isApiError } from '../../services/api'
 import { getCommunityPostsPage, type PageResult } from '../../services/b-community'
 import { getProduct, getProductsPage, type IMConversationContext, type ProductPageResult } from '../../services/c-trade'
 import { listIMConversations } from '../../services/e-im'
+import { listNavigationItems } from '../../services/d-navigation'
 import { requestWithSingleSessionRecovery } from '../../services/session-recovery'
 import Taro from '../../services/taro'
+import { calculateHomeHeaderLayout } from './header-layout'
 import './index.scss'
 
-type HomeTab = 'messages' | 'discover'
+type HomeTab = 'messages' | 'discover' | 'tools'
 
 type DiscoverCard = {
   id: string
@@ -38,16 +40,27 @@ type RuntimeIntersectionObserver = {
   disconnect(): void
 }
 
+type RuntimeSelectorQuery = {
+  in(component: object): RuntimeSelectorQuery
+  select(selector: string): {
+    boundingClientRect(callback: (rect: object | null) => void): RuntimeSelectorQuery
+  }
+  exec(): void
+}
+
 type ObserverRuntime = {
   getCurrentInstance(): { page?: object }
   createIntersectionObserver(page: object, options: { thresholds: number[] }): RuntimeIntersectionObserver
+  createSelectorQuery(): RuntimeSelectorQuery
+  nextTick(callback: () => void): void
 }
 
 const observerRuntime = TaroRuntime as unknown as ObserverRuntime
 
 const tabs: Array<{ key: HomeTab; label: string }> = [
   { key: 'messages', label: '私信' },
-  { key: 'discover', label: '发现' }
+  { key: 'discover', label: '发现' },
+  { key: 'tools', label: '工具' }
 ]
 
 const tones: DiscoverCard['tone'][] = ['peach', 'sky', 'mint', 'lilac', 'lemon', 'cyan']
@@ -128,8 +141,16 @@ type ConversationItem = {
 }
 
 type ConversationStatus = 'idle' | 'loading' | 'empty' | 'ready' | 'error'
+type ToolStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'error'
 
 function HomeContent() {
+  const [headerLayout] = useState(() => {
+    try {
+      return calculateHomeHeaderLayout(Taro.getWindowInfo(), Taro.getMenuButtonBoundingClientRect())
+    } catch {
+      return { top: 20, minHeight: 64, right: 96 }
+    }
+  })
   const [activeTab, setActiveTab] = useState<HomeTab>('discover')
   const [postCards, setPostCards] = useState<DiscoverCard[]>([])
   const [productCards, setProductCards] = useState<DiscoverCard[]>([])
@@ -139,18 +160,26 @@ function HomeContent() {
   const [failedImageKeys, setFailedImageKeys] = useState<Set<string>>(() => new Set())
   const [conversationItems, setConversationItems] = useState<ConversationItem[]>([])
   const [conversationStatus, setConversationStatus] = useState<ConversationStatus>('idle')
+  const [tools, setTools] = useState<ToolLink[]>([])
+  const [toolStatus, setToolStatus] = useState<ToolStatus>('idle')
   const sourceRef = useRef({ communityPage: 0, tradePage: 0, communityTotal: 0, tradeTotal: 0 })
   const loadingRef = useRef(false)
   const mountedRef = useRef(true)
   const discoverRequestVersion = useRef(0)
   const conversationLoadingRef = useRef(false)
   const conversationRequestVersion = useRef(0)
+  const toolLoadingRef = useRef(false)
   const cards = useMemo(
     () => interleaveCards(postCards, productCards),
     [postCards, productCards]
   )
   const columns = useMemo(() => splitCards(cards), [cards])
   const identityAllowed = useIdentityGuard('student')
+  const headerStyle = {
+    '--home-header-top': `${headerLayout.top}px`,
+    '--home-header-height': `${headerLayout.minHeight}px`,
+    '--home-header-right': `${headerLayout.right}px`
+  } as React.CSSProperties
 
   const loadDiscover = useCallback(async (
     reset = false,
@@ -272,6 +301,24 @@ function HomeContent() {
     }
   }, [])
 
+  const loadTools = useCallback(async () => {
+    if (!mountedRef.current || toolLoadingRef.current) return
+    toolLoadingRef.current = true
+    setToolStatus('loading')
+    try {
+      const values = await listNavigationItems()
+      if (!mountedRef.current) return
+      setTools(values)
+      setToolStatus(values.length > 0 ? 'ready' : 'empty')
+    } catch {
+      if (!mountedRef.current) return
+      setTools([])
+      setToolStatus('error')
+    } finally {
+      toolLoadingRef.current = false
+    }
+  }, [])
+
   useEffect(() => {
     mountedRef.current = true
     return () => {
@@ -280,6 +327,7 @@ function HomeContent() {
       loadingRef.current = false
       conversationRequestVersion.current += 1
       conversationLoadingRef.current = false
+      toolLoadingRef.current = false
     }
   }, [])
 
@@ -290,6 +338,10 @@ function HomeContent() {
   useEffect(() => {
     if (activeTab === 'messages' && conversationStatus === 'idle') void loadConversations()
   }, [activeTab, conversationStatus, loadConversations])
+
+  useEffect(() => {
+    if (activeTab === 'tools' && toolStatus === 'idle') void loadTools()
+  }, [activeTab, loadTools, toolStatus])
 
   useDidShow(() => {
     if (activeTab === 'messages') void loadConversations()
@@ -304,11 +356,27 @@ function HomeContent() {
     ) return undefined
     const page = observerRuntime.getCurrentInstance().page
     if (!page) return undefined
-    const observer = observerRuntime.createIntersectionObserver(page, { thresholds: [0] })
-    observer.relativeTo('.student-home-content').observe('#home-discover-sentinel', (entry) => {
-      if (entry.intersectionRatio > 0) void loadDiscover(false)
+    let disposed = false
+    let observer: RuntimeIntersectionObserver | null = null
+    observerRuntime.nextTick(() => {
+      if (disposed) return
+      observerRuntime.createSelectorQuery()
+        .in(page)
+        .select('#home-discover-sentinel')
+        .boundingClientRect((rect) => {
+          if (!rect) return
+          if (disposed) return
+          observer = observerRuntime.createIntersectionObserver(page, { thresholds: [0] })
+          observer.relativeTo('.student-home-content').observe('#home-discover-sentinel', (entry) => {
+            if (entry.intersectionRatio > 0) void loadDiscover(false)
+          })
+        })
+        .exec()
     })
-    return () => observer.disconnect()
+    return () => {
+      disposed = true
+      observer?.disconnect()
+    }
   }, [activeTab, initialStatus, loadDiscover, sourceError.community, sourceError.trade])
 
   const openSearch = () => {
@@ -320,6 +388,19 @@ function HomeContent() {
       ? `/pages/secondhand-detail/index?id=${encodeURIComponent(card.id)}`
       : `/pages/post-detail/index?id=${encodeURIComponent(card.id)}`
     void Taro.navigateTo({ url })
+  }
+
+  const openTool = async (tool: ToolLink) => {
+    if (!tool.appId || !tool.path) return
+    try {
+      await Taro.navigateToMiniProgram({ appId: tool.appId, path: tool.path })
+    } catch (error) {
+      try {
+        await Taro.showToast({ title: error instanceof Error ? error.message : '工具打开失败', icon: 'none' })
+      } catch {
+        // Toast failures must not escape from the fire-and-forget click handler.
+      }
+    }
   }
 
   const renderDiscoverCard = (card: DiscoverCard) => {
@@ -391,7 +472,7 @@ function HomeContent() {
 
   return (
     <View className='page student-home-page'>
-      <View className='student-home-header'>
+      <View className='student-home-header' style={headerStyle}>
         <View className='student-home-header__tabs'>
           {tabs.map((tab) => (
             <View
@@ -467,6 +548,28 @@ function HomeContent() {
               ) : null}
               <View id='home-discover-sentinel' className='student-discover-sentinel' />
             </>
+          )
+        )}
+
+        {activeTab === 'tools' && (
+          toolStatus === 'ready' ? (
+            <View className='student-tools-grid'>
+              {tools.map((tool) => (
+                <View key={tool.id} className='student-tool-card' onClick={() => void openTool(tool)}>
+                  <View className='student-tool-card__icon' style={{ color: tool.color }}><Text>{tool.iconText}</Text></View>
+                  <Text className='student-tool-card__label'>{tool.title}</Text>
+                  <Text className='student-tool-card__sub'>{tool.subtitle}</Text>
+                </View>
+              ))}
+            </View>
+          ) : toolStatus === 'error' ? (
+            <View className='student-tool-state student-tool-state--retry' onClick={() => void loadTools()}>
+              <Text>工具加载失败，点击重试</Text>
+            </View>
+          ) : toolStatus === 'empty' ? (
+            <View className='student-tool-state'><Text>暂无可用工具</Text></View>
+          ) : (
+            <View className='student-tool-state'><Text>正在加载真实工具...</Text></View>
           )
         )}
 

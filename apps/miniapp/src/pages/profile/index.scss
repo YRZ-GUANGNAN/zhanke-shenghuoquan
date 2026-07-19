@@ -16,6 +16,11 @@
   padding: 112rpx 36rpx 78rpx;
   overflow: hidden;
   background: $gradient-primary;
+  cursor: pointer;
+}
+
+.student-profile-hero:active {
+  opacity: .98;
 }
 
 .student-profile-hero::after {

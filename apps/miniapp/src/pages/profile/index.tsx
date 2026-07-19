@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { Text, View } from '@tarojs/components'
 import { useDidShow } from '@tarojs/taro'
 import IdentitySwitchModal from '../../components/IdentitySwitchModal'
@@ -85,6 +85,7 @@ function ProfileContent() {
   const [switching, setSwitching] = useState(false)
   const [switchError, setSwitchError] = useState('')
 	const [contentCounts, setContentCounts] = useState({ favorites: 0, posts: 0, comments: 0, items: 0 })
+  const profileNavigationLockRef = useRef(false)
   const profile = useSessionStore((state) => state.profile)
   const identity = useSessionStore((state) => state.identity)
   const refreshIdentity = useSessionStore((state) => state.refreshIdentity)
@@ -94,6 +95,7 @@ function ProfileContent() {
   const identityAllowed = useIdentityGuard('student')
 
   useDidShow(() => {
+    profileNavigationLockRef.current = false
     void refreshIdentity().catch(() => {
       // Keep the last known summary for transient failures. A 401 is handled
       // centrally by the session store and returns the app to login state.
@@ -130,6 +132,14 @@ function ProfileContent() {
     setPendingRole(role.key)
   }
 
+  const openProfileEditor = () => {
+    if (profileNavigationLockRef.current) return
+    profileNavigationLockRef.current = true
+    void Taro.navigateTo({ url: '/pages/edit-profile/index' }).catch(() => {
+      profileNavigationLockRef.current = false
+    })
+  }
+
   const confirmRoleSwitch = async () => {
     if (!pendingRole || switching) return
     const target = pendingRole
@@ -150,7 +160,7 @@ function ProfileContent() {
 
   return (
     <View className='student-profile-page'>
-      <View className='student-profile-hero'>
+      <View className='student-profile-hero' onClick={openProfileEditor}>
         <View className='student-profile-hero__orb student-profile-hero__orb--small' />
         <View className='student-profile-hero__orb student-profile-hero__orb--large' />
         <View className='student-profile-user'>
@@ -166,7 +176,7 @@ function ProfileContent() {
               用户号：{profile.id || '--'} · {profile.campus || profile.school || '校园用户'}
             </Text>
           </View>
-          <View className='student-profile-user__edit' onClick={() => void Taro.navigateTo({ url: '/pages/edit-profile/index' })}>
+          <View className='student-profile-user__edit'>
             <Text>编辑资料</Text>
           </View>
         </View>

@@ -8,12 +8,30 @@ export interface ExternalTakeoutSearchPage{items:ExternalTakeoutMerchantLink[];p
 interface BackendItem{id:number|string;title:string;subtitle:string;iconText:string;appId:string;path:string;color:string;sort:number;operatingStatus:NavigationOperatingStatus}
 interface BackendCategory{id:number|string;name:string;systemKey?:string;sort:number;items:BackendItem[]}
 const externalTakeoutSystemKey='external_takeout_merchants' as const
+const placeholderAppIDs=new Set(['legacy-missing-appid','wx0000000000000000'])
+const miniProgramAppIDPattern=/^wx[a-zA-Z0-9]{16}$/
+const miniProgramPathPattern=/^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))(?!.*\/\/)[a-zA-Z0-9_\-/]+(?:\?[a-zA-Z0-9_%=&.\-]+)?$/
+
+export function validMiniProgramAppID(value:string):boolean{
+	if(typeof value!=='string')return false
+	const normalized=value.trim()
+	return miniProgramAppIDPattern.test(normalized)&&!placeholderAppIDs.has(normalized)
+}
+
+export function validMiniProgramPath(value:string):boolean{
+	return typeof value==='string'&&miniProgramPathPattern.test(value.trim())
+}
+
+function isRealTool(item:BackendItem):boolean{
+	return validMiniProgramAppID(item.appId)&&validMiniProgramPath(item.path)
+}
+
 export function listNavigationCategories():Promise<BackendCategory[]>{return request<BackendCategory[]>('/navigation/categories')}
 export async function listNavigationItems():Promise<ToolLink[]>{
 	const categories=await listNavigationCategories()
 	return categories
 		.filter((category)=>category.systemKey!==externalTakeoutSystemKey)
-		.reduce<ToolLink[]>((all,category)=>all.concat(category.items.map((item)=>({id:String(item.id),title:item.title,subtitle:item.subtitle,iconText:item.iconText,appId:item.appId,path:item.path,color:item.color}))),[])
+		.reduce<ToolLink[]>((all,category)=>all.concat(category.items.filter(isRealTool).map((item)=>({id:String(item.id),title:item.title,subtitle:item.subtitle,iconText:item.iconText,appId:item.appId.trim(),path:item.path.trim(),color:item.color}))),[])
 }
 export async function listExternalTakeoutMerchants():Promise<ExternalTakeoutMerchantLink[]>{
 	const categories=await listNavigationCategories()
