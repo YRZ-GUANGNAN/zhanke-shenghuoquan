@@ -34,11 +34,12 @@
 
 - `backend/.env` 已存在；
 - `APP_ENV=dev`；
-- `WECHAT_APP_ID=wx0dacef976daa8e55`，与 MiniApp 工程一致；
+- `WECHAT_APP_ID=wx961bc6699396f25b`，与 MiniApp 工程一致；
 - `ALLOW_MOCK_WECHAT_LOGIN=false`；
 - `WECHAT_APP_SECRET` 已存在，但本报告和日志均未记录其值；
 - `MEDIA_PUBLIC_BASE_URL=https://zhanduiwang.top`，公开健康检查返回 HTTP 200；
 - 当前代码已使用上述配置启动，`http://127.0.0.1:8080/healthz` 返回正常。
+- 使用不可登录的测试 code 直接调用微信 `code2Session` 返回 `40029` 而非 `40125`，证明 AppID/AppSecret 组合已被微信接受；测试请求未产生 OpenID 或用户数据。
 
 因此当前环境已退出 mock 登录模式，但必须完成两次真实登录并比较页面用户号，才能认定真实微信账号验收通过。
 
