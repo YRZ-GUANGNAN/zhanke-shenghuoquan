@@ -104,6 +104,18 @@ func TestRealWechatConfigurationDefaultsMockFallbackToDisabled(t *testing.T) {
 	}
 }
 
+func TestRealWechatConfigurationRejectsMockWithCredentialsInDev(t *testing.T) {
+	t.Setenv("APP_ENV", "dev")
+	t.Setenv("JWT_SECRET", strings.Repeat("s", 32))
+	t.Setenv("WECHAT_APP_ID", "wx0dacef976daa8e55")
+	t.Setenv("WECHAT_APP_SECRET", "test-secret-not-for-production")
+	t.Setenv("ALLOW_MOCK_WECHAT_LOGIN", "true")
+
+	if _, err := Load(); err == nil {
+		t.Fatal("dev configuration accepted real WeChat credentials with mock login enabled")
+	}
+}
+
 func TestLegacyTakeoutDisabledDoesNotRequireWechatPayCredentials(t *testing.T) {
 	cfg := validConfig()
 	cfg.EnableLegacyTakeout = false

@@ -121,6 +121,9 @@ func (c Config) Validate() error {
 	if (c.WechatAppID == "") != (c.WechatAppSecret == "") {
 		return errors.New("WECHAT_APP_ID and WECHAT_APP_SECRET must be configured together")
 	}
+	if c.AllowMockWechat && (c.WechatAppID != "" || c.WechatAppSecret != "") {
+		return errors.New("mock WeChat login cannot be enabled with real WeChat credentials")
+	}
 	if c.WechatPayAnyCoreCredentialSet() && !c.WechatPayCoreConfigured() {
 		return errors.New("WeChat Pay core credentials must be configured together")
 	}
