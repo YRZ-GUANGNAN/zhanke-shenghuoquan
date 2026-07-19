@@ -440,16 +440,17 @@ func TestSaveSubmissionRejectsWrongEventType(t *testing.T) {
 }
 
 type submissionMediaStub struct {
-	reservation MediaReservation
-	reserveErr  error
-	ensureErr   error
-	cancelErr   error
-	steps       *[]string
-	cancelled   bool
-	existingID  string
-	assetIDs    map[string]uint64
-	liveIDs     []uint64
-	revokedIDs  []uint64
+	reservation  MediaReservation
+	reserveErr   error
+	ensureErr    error
+	cancelErr    error
+	steps        *[]string
+	cancelled    bool
+	cancelCtxErr error
+	existingID   string
+	assetIDs     map[string]uint64
+	liveIDs      []uint64
+	revokedIDs   []uint64
 }
 
 func (m *submissionMediaStub) Reserve(_ context.Context, _ uint64, assetIDs []string) (MediaReservation, error) {
@@ -516,11 +517,12 @@ func (m *submissionMediaStub) EnsureCommittedInTransaction(_ context.Context, _ 
 	return nil
 }
 
-func (m *submissionMediaStub) Cancel(context.Context, uint64, MediaReservation) error {
+func (m *submissionMediaStub) Cancel(ctx context.Context, _ uint64, _ MediaReservation) error {
 	if m.steps != nil {
 		*m.steps = append(*m.steps, "cancel")
 	}
 	m.cancelled = true
+	m.cancelCtxErr = ctx.Err()
 	return m.cancelErr
 }
 
@@ -556,6 +558,22 @@ func TestSubmitMediaLifecycleCancelsReservationWhenSaveFails(t *testing.T) {
 	}
 	if strings.Join(steps, ",") != "reserve,save,cancel" || !media.cancelled {
 		t.Fatalf("steps=%v cancelled=%v", steps, media.cancelled)
+	}
+}
+
+func TestSubmitMediaLifecycleCancelsReservationAfterRequestContextCancellation(t *testing.T) {
+	repo := newMemoryRepository()
+	repo.saveErr = context.Canceled
+	media := &submissionMediaStub{}
+	service := NewService(repo, media, fixedClock)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if _, err := service.Submit(ctx, 41, RoleRider, validRiderInput()); !errors.Is(err, context.Canceled) {
+		t.Fatalf("submit err=%v", err)
+	}
+	if !media.cancelled || media.cancelCtxErr != nil {
+		t.Fatalf("cleanup reused cancelled request context: cancelled=%v contextErr=%v", media.cancelled, media.cancelCtxErr)
 	}
 }
 

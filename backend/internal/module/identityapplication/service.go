@@ -15,7 +15,10 @@ import (
 	"gorm.io/gorm"
 )
 
-const ulidAlphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+const (
+	ulidAlphabet             = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+	mediaCancellationTimeout = 5 * time.Second
+)
 
 var (
 	ErrInvalidInput        = errors.New("invalid identity application input")
@@ -183,7 +186,9 @@ func (s *Service) Submit(ctx context.Context, userID uint64, role Role, input Su
 }
 
 func (s *Service) cancelMediaAfterFailure(ctx context.Context, userID uint64, reservation MediaReservation, primary error) error {
-	if cancelErr := s.media.Cancel(ctx, userID, reservation); cancelErr != nil {
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), mediaCancellationTimeout)
+	defer cancel()
+	if cancelErr := s.media.Cancel(cleanupCtx, userID, reservation); cancelErr != nil {
 		return errors.Join(primary, fmt.Errorf("cancel identity application media: %w", cancelErr))
 	}
 	return primary
