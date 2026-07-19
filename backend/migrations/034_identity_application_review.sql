@@ -154,6 +154,10 @@ BEGIN
       media_asset_purpose_guard_clause=REPLACE(REPLACE(REPLACE(REPLACE(media_asset_purpose_guard_clause,' ',''),CHAR(9),''),CHAR(10),''),CHAR(13),''),
       media_reference_type_canonical_clause=REPLACE(REPLACE(REPLACE(REPLACE(media_reference_type_canonical_clause,' ',''),CHAR(9),''),CHAR(10),''),CHAR(13),''),
       media_reference_type_guard_clause=REPLACE(REPLACE(REPLACE(REPLACE(media_reference_type_guard_clause,' ',''),CHAR(9),''),CHAR(10),''),CHAR(13),'');
+  SET media_asset_purpose_canonical_clause=REPLACE(media_asset_purpose_canonical_clause,CONCAT(CHAR(92),CHAR(39)),CHAR(39)),
+      media_asset_purpose_guard_clause=REPLACE(media_asset_purpose_guard_clause,CONCAT(CHAR(92),CHAR(39)),CHAR(39)),
+      media_reference_type_canonical_clause=REPLACE(media_reference_type_canonical_clause,CONCAT(CHAR(92),CHAR(39)),CHAR(39)),
+      media_reference_type_guard_clause=REPLACE(media_reference_type_guard_clause,CONCAT(CHAR(92),CHAR(39)),CHAR(39));
   SET media_asset_purpose_canonical_clause=REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
         media_asset_purpose_canonical_clause,'(_utf8mb4''','('''),',_utf8mb4''',','''),'(_utf8mb3''','('''),',_utf8mb3''',','''),'(_utf8''','('''),',_utf8''',','''),
       media_asset_purpose_guard_clause=REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(

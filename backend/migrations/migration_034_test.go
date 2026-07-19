@@ -122,6 +122,10 @@ func TestMigration034IsGuardedForRepeatApplication(t *testing.T) {
 			t.Fatalf("migration 034 missing semantic-safe normalization %q", required)
 		}
 	}
+	if count := strings.Count(source, "CONCAT(CHAR(92),CHAR(39))"); count != 4 {
+		t.Fatalf("migration 034 must normalize MySQL information_schema escaped quotes for all four clauses, count=%d", count)
+	}
+	assertMigration034Order(t, source, "CONCAT(CHAR(92),CHAR(39))", "'(_utf8mb4''','('''")
 	if !strings.Contains(source, "'reference_typein''post'',''product'',''avatar'',''dish'',''merchant_logo'',''delivery_proof'',''delivery_im'',''feedback''") {
 		t.Fatal("migration 034 must allow the exact migration 033 reference-type canonical expression")
 	}
