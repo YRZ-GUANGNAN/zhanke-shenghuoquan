@@ -1,14 +1,17 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { AdminAPIError, adminAPI } from './services/f-admin'
 import type {
   IdentityApplicationAdminList,
   IdentityApplicationDetail,
   IdentityApplicationQuery,
   IdentityApplicationRole,
+  IdentityApplicationRow,
   IdentityApplicationStatus,
 } from './types'
 
 const pageSize = 20
+const proofRefreshLeadTimeMs = 5_000
+const proofExpiredMessage = '证明链接已过期，请重新加载'
 const emptyPage = (): IdentityApplicationAdminList => ({ items: [], page: 1, pageSize, total: 0 })
 const roleLabel = (role: IdentityApplicationRole) => role === 'rider' ? '骑手' : '商家'
 const statusLabel = (status: IdentityApplicationStatus) => ({ pending: '待审核', approved: '已通过', rejected: '已拒绝' })[status]
@@ -16,6 +19,27 @@ const eventLabel = (event: 'submitted' | 'resubmitted' | 'approved' | 'rejected'
 const badgeStatus = (status: IdentityApplicationStatus) => ({ pending: 'pending', approved: 'active', rejected: 'failed' })[status]
 const displayTime = (value?: string) => value ? new Date(value).toLocaleString('zh-CN') : '—'
 const errorMessage = (reason: unknown) => reason instanceof Error ? reason.message : '操作失败，请重试'
+
+export function earliestProofExpiry(proofs: IdentityApplicationDetail['proofs']): number | null {
+  if (!proofs?.length) return null
+  return proofs.reduce((earliest, proof) => {
+    const value = Date.parse(proof.expiresAt)
+    return Math.min(earliest, Number.isFinite(value) ? value : 0)
+  }, Number.POSITIVE_INFINITY)
+}
+
+export function mergeDecisionRow(current: IdentityApplicationDetail | null, decision: IdentityApplicationRow): IdentityApplicationDetail | null {
+  if (!current || current.applicationId !== decision.applicationId) return current
+  return { ...current, ...decision, proofs: [...(current.proofs ?? [])], events: current.events }
+}
+
+function usableDetail(value: IdentityApplicationDetail, now = Date.now()): { value: IdentityApplicationDetail; expired: boolean } {
+  const expiresAt = earliestProofExpiry(value.proofs)
+  if (expiresAt !== null && expiresAt <= now + proofRefreshLeadTimeMs) {
+    return { value: { ...value, proofs: [] }, expired: true }
+  }
+  return { value, expired: false }
+}
 
 function Panel({ title, actions, children }: { title: string; actions?: ReactNode; children: ReactNode }) {
   return <section className='panel delivery-panel'><header className='delivery-header'><h2>{title}</h2>{actions}</header>{children}</section>
@@ -35,43 +59,108 @@ export function IdentityApplications() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
+  const listRequestSequenceRef = useRef(0)
+  const detailRequestSequenceRef = useRef(0)
+  const proofRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const load = useCallback(async () => {
+  const clearProofRefreshTimer = useCallback(() => {
+    if (proofRefreshTimerRef.current !== null) {
+      clearTimeout(proofRefreshTimerRef.current)
+      proofRefreshTimerRef.current = null
+    }
+  }, [])
+
+  const load = useCallback(async ({ silent = false }: { silent?: boolean } = {}): Promise<boolean> => {
+    const requestId = ++listRequestSequenceRef.current
     setLoading(true)
-    setError('')
+    if (!silent) setError('')
     const query: IdentityApplicationQuery = { page, pageSize }
     if (role) query.role = role
     if (status) query.status = status
     try {
-      setData(await adminAPI.listIdentityApplications(query))
+      const next = await adminAPI.listIdentityApplications(query)
+      if (requestId !== listRequestSequenceRef.current) return true
+      setData(next)
+      return true
     } catch (loadError) {
-      setError(errorMessage(loadError))
+      if (requestId !== listRequestSequenceRef.current) return true
+      if (!silent) setError(errorMessage(loadError))
+      return false
     } finally {
-      setLoading(false)
+      if (requestId === listRequestSequenceRef.current) setLoading(false)
     }
   }, [page, role, status])
 
-  const inspect = useCallback(async (applicationId: string) => {
-    setError('')
+  const fetchDetail = useCallback(async (
+    applicationId: string,
+    mode: 'inspect' | 'decision' | 'proof' | 'conflict',
+    decision?: IdentityApplicationRow,
+  ): Promise<boolean> => {
+    clearProofRefreshTimer()
+    const requestId = ++detailRequestSequenceRef.current
+    if (mode === 'inspect') {
+      setSelected(null)
+      setReason('')
+      setError('')
+    }
     try {
       const detail = await adminAPI.identityApplication(applicationId)
-      setSelected(detail)
-      setReason('')
+      if (requestId !== detailRequestSequenceRef.current) return true
+      const prepared = usableDetail(detail)
+      setSelected(current => {
+        if (mode === 'proof' && current?.applicationId !== applicationId) return current
+        if (mode === 'decision' && decision) {
+          const refreshed = detail.status === 'pending'
+            ? { ...detail, ...decision, proofs: detail.proofs, events: detail.events }
+            : detail
+          return usableDetail(refreshed).value
+        }
+        return prepared.value
+      })
+      if (prepared.expired) setError(proofExpiredMessage)
+      else if (mode === 'proof') setError(current => current === proofExpiredMessage ? '' : current)
+      return true
     } catch (detailError) {
-      setError(errorMessage(detailError))
+      if (requestId !== detailRequestSequenceRef.current) return true
+      if (mode === 'proof') {
+        setSelected(current => current?.applicationId === applicationId ? { ...current, proofs: [] } : current)
+        setError(proofExpiredMessage)
+      } else if (mode === 'inspect') {
+        setError(errorMessage(detailError))
+      }
+      return false
     }
-  }, [])
+  }, [clearProofRefreshTimer])
+
+  const inspect = useCallback((applicationId: string) => fetchDetail(applicationId, 'inspect'), [fetchDetail])
 
   useEffect(() => { void load() }, [load])
 
-  const refreshAfterConflict = async (applicationId: string) => {
-    await load()
-    try {
-      setSelected(await adminAPI.identityApplication(applicationId))
-      setReason('')
-    } catch {
-      setSelected(null)
-    }
+  useEffect(() => {
+    clearProofRefreshTimer()
+    if (!selected) return
+    const expiresAt = earliestProofExpiry(selected.proofs)
+    if (expiresAt === null) return
+    const applicationId = selected.applicationId
+    const delay = Math.max(0, expiresAt - Date.now() - proofRefreshLeadTimeMs)
+    proofRefreshTimerRef.current = setTimeout(() => {
+      setSelected(current => current?.applicationId === applicationId ? { ...current, proofs: [] } : current)
+      void fetchDetail(applicationId, 'proof')
+    }, delay)
+    return clearProofRefreshTimer
+  }, [clearProofRefreshTimer, fetchDetail, selected])
+
+  useEffect(() => () => {
+    listRequestSequenceRef.current += 1
+    detailRequestSequenceRef.current += 1
+    clearProofRefreshTimer()
+  }, [clearProofRefreshTimer])
+
+  const closeDetail = () => {
+    detailRequestSequenceRef.current += 1
+    clearProofRefreshTimer()
+    setSelected(null)
+    setReason('')
   }
 
   const decide = async (action: 'approve' | 'reject') => {
@@ -85,18 +174,28 @@ export function IdentityApplications() {
     setBusy(true)
     setError('')
     try {
-      if (action === 'approve') {
-        await adminAPI.approveIdentityApplication(selected.applicationId, selected.rowVersion)
-      } else {
-        await adminAPI.rejectIdentityApplication(selected.applicationId, selected.rowVersion, normalizedReason)
-      }
-      await load()
-      setSelected(await adminAPI.identityApplication(selected.applicationId))
+      const decisionResult = action === 'approve'
+        ? await adminAPI.approveIdentityApplication(selected.applicationId, selected.rowVersion)
+        : await adminAPI.rejectIdentityApplication(selected.applicationId, selected.rowVersion, normalizedReason)
+      setSelected(current => mergeDecisionRow(current, decisionResult))
       setReason('')
+      const [listRefreshed, detailRefreshed] = await Promise.all([
+        load({ silent: true }),
+        fetchDetail(decisionResult.applicationId, 'decision', decisionResult),
+      ])
+      if (!listRefreshed || !detailRefreshed) setError('审核已完成，但刷新失败，请重新加载')
     } catch (decisionError) {
       if (decisionError instanceof AdminAPIError && decisionError.status === 409) {
-        await refreshAfterConflict(selected.applicationId)
-        setError('该申请已被其他管理员处理')
+        const applicationId = selected.applicationId
+        detailRequestSequenceRef.current += 1
+        clearProofRefreshTimer()
+        setSelected(null)
+        setReason('')
+        const [listRefreshed, detailRefreshed] = await Promise.all([
+          load({ silent: true }),
+          fetchDetail(applicationId, 'conflict'),
+        ])
+        setError(listRefreshed && detailRefreshed ? '该申请已被其他管理员处理' : '该申请已被其他管理员处理，刷新失败，请重新加载')
       } else {
         setError(errorMessage(decisionError))
       }
@@ -130,7 +229,7 @@ export function IdentityApplications() {
         <button disabled={data.page >= pageCount || loading} onClick={() => setPage(data.page + 1)}>下一页</button>
       </div>
     </Panel>
-    {selected && <ApplicationDetail value={selected} reason={reason} setReason={setReason} busy={busy} close={() => { setSelected(null); setReason('') }} decide={decide} />}
+    {selected && <ApplicationDetail value={selected} reason={reason} setReason={setReason} busy={busy} close={closeDetail} decide={decide} />}
   </div>
 }
 
