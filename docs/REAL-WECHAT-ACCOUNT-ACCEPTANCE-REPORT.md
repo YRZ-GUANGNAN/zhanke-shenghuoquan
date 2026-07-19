@@ -34,7 +34,7 @@
 
 - `backend/.env` 已存在；
 - `APP_ENV=dev`；
-- `WECHAT_APP_ID=wx961bc6699396f25b`，与 MiniApp 工程一致；
+- `WECHAT_APP_ID=wx0dacef976daa8e55`，与 MiniApp 工程一致；
 - `ALLOW_MOCK_WECHAT_LOGIN=false`；
 - `WECHAT_APP_SECRET` 已存在，但本报告和日志均未记录其值；
 - `MEDIA_PUBLIC_BASE_URL=https://zhanduiwang.top`，公开健康检查返回 HTTP 200；
