@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 
 	mysqlDriver "github.com/go-sql-driver/mysql"
@@ -44,7 +45,13 @@ func (r *GormRepository) ListCurrent(ctx context.Context, userID uint64) ([]Appl
 }
 
 func (r *GormRepository) SaveSubmission(ctx context.Context, value *Application, assetIDs []string, eventType EventType, expectedRowVersion uint64) error {
-	if value == nil || value.UserID == 0 || !value.Role.Valid() || value.Status != StatusPending || !eventType.Valid() {
+	if value == nil || value.UserID == 0 || !value.Role.Valid() || value.Status != StatusPending {
+		return ErrInvalidInput
+	}
+	if value.ID == 0 && eventType != EventSubmitted {
+		return ErrInvalidInput
+	}
+	if value.ID != 0 && eventType != EventResubmitted {
 		return ErrInvalidInput
 	}
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -189,7 +196,7 @@ func (r *GormRepository) FindDetail(ctx context.Context, applicationPublicID str
 	for index := range events {
 		eventViews[index] = ApplicationEventView{
 			EventPublicID: events[index].EventPublicID,
-			ActorUserID:   events[index].ActorUserID,
+			ActorUserID:   strconv.FormatUint(events[index].ActorUserID, 10),
 			EventType:     events[index].EventType,
 			Status:        events[index].Status,
 			Reason:        events[index].Reason,

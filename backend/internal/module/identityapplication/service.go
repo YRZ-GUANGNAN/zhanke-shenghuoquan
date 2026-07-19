@@ -42,15 +42,34 @@ func NewService(repo Repository, _ any, now func() time.Time) *Service {
 }
 
 func (s *Service) Submit(ctx context.Context, userID uint64, role Role, input SubmitInput) (ApplicationView, error) {
-	normalized, err := normalizeSubmitInput(userID, role, input)
-	if err != nil {
-		return ApplicationView{}, err
+	if userID == 0 {
+		return ApplicationView{}, invalidInput("user id is required")
+	}
+	if !role.Valid() {
+		return ApplicationView{}, errors.Join(ErrInvalidInput, ErrInvalidRole)
 	}
 	if s == nil || s.repo == nil {
 		return ApplicationView{}, errors.New("identity application repository is required")
 	}
 
 	current, found, err := s.repo.FindCurrent(ctx, userID, role)
+	if err != nil {
+		return ApplicationView{}, err
+	}
+	if found {
+		switch current.Status {
+		case StatusPending:
+			return ApplicationView{}, ErrApplicationPending
+		case StatusApproved:
+			return ApplicationView{}, ErrApplicationApproved
+		case StatusRejected:
+			// A rejected application is the only state that may be resubmitted.
+		default:
+			return ApplicationView{}, fmt.Errorf("invalid stored identity application status %q", current.Status)
+		}
+	}
+
+	normalized, err := normalizeSubmitInput(userID, role, input)
 	if err != nil {
 		return ApplicationView{}, err
 	}
@@ -84,16 +103,6 @@ func (s *Service) Submit(ctx context.Context, userID uint64, role Role, input Su
 		return toApplicationView(value), nil
 	}
 
-	switch current.Status {
-	case StatusPending:
-		return ApplicationView{}, ErrApplicationPending
-	case StatusApproved:
-		return ApplicationView{}, ErrApplicationApproved
-	case StatusRejected:
-		// A rejected application is the only state that may be resubmitted.
-	default:
-		return ApplicationView{}, fmt.Errorf("invalid stored identity application status %q", current.Status)
-	}
 	if normalized.ExpectedRowVersion == 0 || normalized.ExpectedRowVersion != current.RowVersion {
 		return ApplicationView{}, ErrVersionConflict
 	}

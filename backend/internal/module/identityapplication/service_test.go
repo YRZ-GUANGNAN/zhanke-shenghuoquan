@@ -2,8 +2,10 @@ package identityapplication
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -171,6 +173,35 @@ func TestSubmitForbidsApprovedApplication(t *testing.T) {
 	}
 }
 
+func TestSubmitTerminalStatePrecedesPayloadValidation(t *testing.T) {
+	t.Run("pending", func(t *testing.T) {
+		repo := newMemoryRepository()
+		service := NewService(repo, nil, fixedClock)
+		if _, err := service.Submit(context.Background(), 41, RoleRider, validRiderInput()); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := service.Submit(context.Background(), 41, RoleRider, SubmitInput{
+			RealName: "重复", Phone: "13800138000", ExpectedRowVersion: 1,
+		}); !errors.Is(err, ErrApplicationPending) {
+			t.Fatalf("pending state must precede missing asset validation: %v", err)
+		}
+	})
+
+	t.Run("approved", func(t *testing.T) {
+		repo := newMemoryRepository()
+		service := NewService(repo, nil, fixedClock)
+		if _, err := service.Submit(context.Background(), 41, RoleRider, validRiderInput()); err != nil {
+			t.Fatal(err)
+		}
+		repo.approve(41, RoleRider)
+		if _, err := service.Submit(context.Background(), 41, RoleRider, SubmitInput{
+			RealName: "重复", Phone: "13800138000", ExpectedRowVersion: 2,
+		}); !errors.Is(err, ErrApplicationApproved) {
+			t.Fatalf("approved state must precede missing asset validation: %v", err)
+		}
+	})
+}
+
 func TestSubmitRequiresMatchingRejectedVersion(t *testing.T) {
 	repo := newMemoryRepository()
 	service := NewService(repo, nil, fixedClock)
@@ -310,6 +341,57 @@ func TestValidationRejectsBlankOrOversizedNames(t *testing.T) {
 	merchant.MerchantAddress = repeatRune('址', 241)
 	if _, err := service.Submit(context.Background(), 41, RoleMerchant, merchant); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("long merchant address err=%v", err)
+	}
+}
+
+func TestApplicationViewSerializesUserIDsAsStrings(t *testing.T) {
+	const largeUserID = uint64(9007199254740993)
+	reviewerID := largeUserID + 1
+	wantUserID := strconv.FormatUint(largeUserID, 10)
+	wantReviewerID := strconv.FormatUint(reviewerID, 10)
+	view := toApplicationView(Application{UserID: largeUserID, ReviewerUserID: &reviewerID})
+	if view.UserID != wantUserID || view.ReviewerUserID == nil || *view.ReviewerUserID != wantReviewerID {
+		t.Fatalf("view ids=%v/%v", view.UserID, view.ReviewerUserID)
+	}
+	event := ApplicationEventView{ActorUserID: wantUserID}
+
+	payload, err := json.Marshal(struct {
+		Application ApplicationView      `json:"application"`
+		Event       ApplicationEventView `json:"event"`
+	}{Application: view, Event: event})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded struct {
+		Application struct {
+			UserID         string  `json:"userId"`
+			ReviewerUserID *string `json:"reviewerUserId"`
+		} `json:"application"`
+		Event struct {
+			ActorUserID string `json:"actorUserId"`
+		} `json:"event"`
+	}
+	if err := json.Unmarshal(payload, &decoded); err != nil {
+		t.Fatalf("user ids were not encoded as JSON strings: %s: %v", payload, err)
+	}
+	if decoded.Application.UserID != wantUserID || decoded.Application.ReviewerUserID == nil ||
+		*decoded.Application.ReviewerUserID != wantReviewerID || decoded.Event.ActorUserID != wantUserID {
+		t.Fatalf("decoded=%+v payload=%s", decoded, payload)
+	}
+}
+
+func TestSaveSubmissionRejectsWrongEventType(t *testing.T) {
+	repository := NewRepository(nil)
+	created := Application{UserID: 41, Role: RoleRider, Status: StatusPending, RowVersion: 1}
+	if err := repository.SaveSubmission(context.Background(), &created, []string{"01ARZ3NDEKTSV4RRFFQ69G5FAV"}, EventApproved, 0); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("new application accepted approved event: %v", err)
+	}
+	existing := Application{ID: 7, UserID: 41, Role: RoleRider, Status: StatusPending, RowVersion: 3}
+	if err := repository.SaveSubmission(context.Background(), &existing, []string{"01ARZ3NDEKTSV4RRFFQ69G5FAV"}, EventSubmitted, 2); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("existing application accepted submitted event: %v", err)
+	}
+	if err := repository.SaveSubmission(context.Background(), &existing, []string{"01ARZ3NDEKTSV4RRFFQ69G5FAV"}, EventRejected, 2); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("existing application accepted rejected event: %v", err)
 	}
 }
 

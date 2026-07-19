@@ -5,6 +5,7 @@ package identityapplication
 
 import (
 	"encoding/json"
+	"strconv"
 	"time"
 )
 
@@ -112,7 +113,7 @@ func (IdentityGrant) TableName() string { return "user_identity_grants" }
 type ApplicationView struct {
 	ID                  uint64           `json:"-"`
 	ApplicationPublicID string           `json:"applicationId"`
-	UserID              uint64           `json:"userId"`
+	UserID              string           `json:"userId"`
 	Role                Role             `json:"role"`
 	Status              Status           `json:"status"`
 	RealName            string           `json:"realName"`
@@ -122,7 +123,7 @@ type ApplicationView struct {
 	AssetPublicIDs      []string         `json:"assetIds"`
 	Proofs              []ProofAssetView `json:"proofs,omitempty"`
 	ReviewReason        string           `json:"reviewReason"`
-	ReviewerUserID      *uint64          `json:"reviewerUserId,omitempty"`
+	ReviewerUserID      *string          `json:"reviewerUserId,omitempty"`
 	SubmittedAt         time.Time        `json:"submittedAt"`
 	ReviewedAt          *time.Time       `json:"reviewedAt,omitempty"`
 	RowVersion          uint64           `json:"rowVersion"`
@@ -136,7 +137,7 @@ type ProofAssetView struct {
 
 type ApplicationEventView struct {
 	EventPublicID string    `json:"eventId"`
-	ActorUserID   uint64    `json:"actorUserId"`
+	ActorUserID   string    `json:"actorUserId"`
 	EventType     EventType `json:"eventType"`
 	Status        Status    `json:"status"`
 	Reason        string    `json:"reason"`
@@ -173,10 +174,15 @@ func toApplicationView(value Application) ApplicationView {
 	for index := range value.Assets {
 		assetIDs[index] = value.Assets[index].AssetPublicID
 	}
+	var reviewerUserID *string
+	if value.ReviewerUserID != nil {
+		formatted := strconv.FormatUint(*value.ReviewerUserID, 10)
+		reviewerUserID = &formatted
+	}
 	return ApplicationView{
 		ID:                  value.ID,
 		ApplicationPublicID: value.ApplicationPublicID,
-		UserID:              value.UserID,
+		UserID:              strconv.FormatUint(value.UserID, 10),
 		Role:                value.Role,
 		Status:              value.Status,
 		RealName:            value.RealName,
@@ -185,7 +191,7 @@ func toApplicationView(value Application) ApplicationView {
 		MerchantAddress:     value.MerchantAddress,
 		AssetPublicIDs:      assetIDs,
 		ReviewReason:        value.ReviewReason,
-		ReviewerUserID:      value.ReviewerUserID,
+		ReviewerUserID:      reviewerUserID,
 		SubmittedAt:         value.SubmittedAt,
 		ReviewedAt:          value.ReviewedAt,
 		RowVersion:          value.RowVersion,
