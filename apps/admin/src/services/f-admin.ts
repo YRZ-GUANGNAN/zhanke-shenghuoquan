@@ -1,5 +1,5 @@
 // Domain F client: management and the unified review workflow only.
-import type { ExternalTakeoutMerchant, ExternalTakeoutMerchantDirectory, ExternalTakeoutMerchantInput, ExternalTakeoutOperatingStatus, MediaAssetDetail, MediaAssetRow, MediaDeadletters, MediaDecisionRow, MediaEventRow, MediaGCJobRow, MediaQuery, MediaSummary, NavigationCategory, Page, PostRow, ProductRow, ReportRow, ReviewTask, Stats, UserRow } from '../types'
+import type { ExternalTakeoutMerchant, ExternalTakeoutMerchantDirectory, ExternalTakeoutMerchantInput, ExternalTakeoutOperatingStatus, IdentityApplicationAdminList, IdentityApplicationDetail, IdentityApplicationQuery, IdentityApplicationRow, MediaAssetDetail, MediaAssetRow, MediaDeadletters, MediaDecisionRow, MediaEventRow, MediaGCJobRow, MediaQuery, MediaSummary, NavigationCategory, Page, PostRow, ProductRow, ReportRow, ReviewTask, Stats, UserRow } from '../types'
 const base='/api/v1'
 export class AdminAPIError extends Error {
 	constructor(message:string,readonly status:number){super(message);this.name='AdminAPIError'}
@@ -27,12 +27,17 @@ async function api<T>(path:string,init:RequestInit={}):Promise<T>{
 	return body.data as T
 }
 function queryString(query:MediaQuery={}){const params=new URLSearchParams();Object.entries(query).forEach(([key,value])=>{if(value!==undefined&&value!=='')params.set(key,String(value))});const value=params.toString();return value?`?${value}`:''}
+function identityQueryString(query:IdentityApplicationQuery={}){const params=new URLSearchParams();Object.entries(query).forEach(([key,value])=>{if(value!==undefined&&value!=='')params.set(key,String(value))});const value=params.toString();return value?`?${value}`:''}
 export const adminAPI={
 	stats:()=>api<Stats>('/admin/stats'),
 	reviews:(status='')=>api<Page<ReviewTask>>(`/admin/reviews${status?`?status=${status}`:''}`),
 	startReview:(id:number)=>api<ReviewTask>(`/admin/reviews/${id}/start`,{method:'POST'}),
 	decideReview:(id:number,decision:'approve'|'reject',reason='')=>api<ReviewTask>(`/admin/reviews/${id}/${decision}`,{method:'POST',body:JSON.stringify({reason})}),
 	users:()=>api<Page<UserRow>>('/admin/users'),
+	listIdentityApplications:(query:IdentityApplicationQuery={})=>api<IdentityApplicationAdminList>(`/admin/identity-applications${identityQueryString(query)}`),
+	identityApplication:(applicationId:string)=>api<IdentityApplicationDetail>(`/admin/identity-applications/${encodeURIComponent(applicationId)}`),
+	approveIdentityApplication:(applicationId:string,expectedRowVersion:number)=>api<IdentityApplicationRow>(`/admin/identity-applications/${encodeURIComponent(applicationId)}/approve`,{method:'POST',body:JSON.stringify({expectedRowVersion})}),
+	rejectIdentityApplication:(applicationId:string,expectedRowVersion:number,reason:string)=>api<IdentityApplicationRow>(`/admin/identity-applications/${encodeURIComponent(applicationId)}/reject`,{method:'POST',body:JSON.stringify({expectedRowVersion,reason})}),
 	updateUserStatus:(id:number,status:UserRow['status'])=>api(`/admin/users/${id}/status`,{method:'PATCH',body:JSON.stringify({status})}),
 	updateUserRole:(id:number,role:UserRow['role'])=>api(`/admin/users/${id}/role`,{method:'PATCH',body:JSON.stringify({role})}),
 	posts:()=>api<Page<PostRow>>('/admin/posts'),

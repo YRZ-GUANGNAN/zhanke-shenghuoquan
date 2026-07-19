@@ -5,6 +5,7 @@ import { MediaConsole } from './MediaConsole'
 import { DeliveryConsole } from './DeliveryConsole'
 import { TakeoutConsole } from './TakeoutConsole'
 import { ExternalTakeoutMerchants } from './ExternalTakeoutMerchants'
+import { IdentityApplications } from './IdentityApplications'
 import { legacyTakeoutEnabled } from './feature-flags'
 import type { AdminSection, NavigationCategory, Page, PostRow, ProductRow, ReportRow, ReviewTask, Stats, UserRow } from './types'
 
@@ -13,6 +14,7 @@ const nav:Array<{key:AdminSection;label:string;icon:string}>=[
 	{key:'delivery',label:'配送运营',icon:'D'},
 	...(legacyTakeoutEnabled?[{key:'takeout' as const,label:'外卖运营',icon:'G'}]:[]),
 	{key:'dashboard',label:'数据统计',icon:'D'},{key:'users',label:'用户管理',icon:'A'},
+	{key:'identities',label:'身份审核',icon:'I'},
 	{key:'moderation',label:'统一审核',icon:'F'},{key:'community',label:'帖子管理',icon:'B'},
 	{key:'trade',label:'商品管理',icon:'C'},{key:'reports',label:'举报审核',icon:'R'},
 	{key:'navigation',label:'导航管理',icon:'D'}
@@ -41,6 +43,6 @@ function TakedownPosts(){const[data,setData]=useState<Page<PostRow>|null>(null);
 
 function TakedownProducts(){const[data,setData]=useState<Page<ProductRow>|null>(null);const[error,setError]=useState('');const[busy,setBusy]=useState<number|null>(null);const load=useCallback(()=>adminAPI.products().then(setData).catch(e=>setError(String(e))),[]);useEffect(()=>{void load()},[load]);const takedown=async(row:ProductRow)=>{const reason=takedownReason('商品',row.title);if(reason===null)return;setBusy(row.id);setError('');try{await adminAPI.takedownProduct(row.id,reason);await load()}catch(e){setError(String(e))}finally{setBusy(null)}};return <Panel title="商品管理"><>{error&&<div className="content-takedown-error" role="alert">{error}</div>}<table><thead><tr><th>商品</th><th>卖家</th><th>价格</th><th>业务状态</th><th>审核状态</th><th>操作</th></tr></thead><tbody>{(data?.items||[]).map(row=><tr key={row.id}><td><strong>{row.title}</strong><span>#{row.id}</span></td><td>{row.seller.nickname}</td><td>¥{(row.price/100).toFixed(2)}</td><td>{row.status}</td><td>{row.reviewStatus}</td><td>{row.reviewStatus==='approved'?<button className="content-takedown-button" disabled={busy===row.id} onClick={()=>void takedown(row)}>{busy===row.id?'下架中…':'下架'}</button>:<span>不可下架</span>}</td></tr>)}</tbody></table></></Panel>}
 
-function Content(){const section=useAdminStore(s=>s.section);if(section==='dashboard')return <Dashboard/>;if(section==='users')return <Users/>;if(section==='moderation')return <Reviews/>;if(section==='media')return <MediaConsole/>;if(section==='delivery')return <DeliveryConsole/>;if(section==='takeout'&&legacyTakeoutEnabled)return <TakeoutConsole/>;if(section==='community')return <TakedownPosts/>;if(section==='trade')return <TakedownProducts/>;if(section==='reports')return <Reports/>;return <Navigation/>}
+function Content(){const section=useAdminStore(s=>s.section);if(section==='dashboard')return <Dashboard/>;if(section==='users')return <Users/>;if(section==='identities')return <IdentityApplications/>;if(section==='moderation')return <Reviews/>;if(section==='media')return <MediaConsole/>;if(section==='delivery')return <DeliveryConsole/>;if(section==='takeout'&&legacyTakeoutEnabled)return <TakeoutConsole/>;if(section==='community')return <TakedownPosts/>;if(section==='trade')return <TakedownProducts/>;if(section==='reports')return <Reports/>;return <Navigation/>}
 
 export default function App(){const section=useAdminStore(s=>s.section);const setSection=useAdminStore(s=>s.setSection);const active=nav.find(item=>item.key===section);return <div className="app-shell"><aside className="sidebar"><div className="brand"><div className="brand__logo">F</div><div><strong>校园系统</strong><span>收敛管理后台</span></div></div><nav>{nav.map(item=><button key={item.key} type="button" className={section===item.key?'active':''} onClick={()=>setSection(item.key)}><span>{item.icon}</span>{item.label}</button>)}</nav></aside><main className="main"><header className="topbar"><div><span className="eyebrow">{section==='takeout'?'业务域 G':section==='delivery'?'配送域 D':'业务域 F'}</span><h1>{active?.label}</h1></div></header><Content/></main></div>}

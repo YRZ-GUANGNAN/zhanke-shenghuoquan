@@ -1,5 +1,5 @@
 // Domain F presentation contracts. Admin never queries domain databases directly.
-export type AdminSection = 'dashboard' | 'users' | 'moderation' | 'media' | 'delivery' | 'takeout' | 'community' | 'trade' | 'reports' | 'navigation'
+export type AdminSection = 'dashboard' | 'users' | 'identities' | 'moderation' | 'media' | 'delivery' | 'takeout' | 'community' | 'trade' | 'reports' | 'navigation'
 export interface Page<T>{items:T[];page:number;pageSize:number;total:number}
 export interface ReviewTask{id:number;objectType:'post'|'comment'|'product'|'report';objectId:number;risk:string;status:'submitted'|'reviewing'|'approved'|'rejected';reason:string;createdAt:string}
 export interface UserRow{id:number;nickname:string;school:string;campus:string;role:'user'|'admin'|'superadmin';status:'active'|'muted'|'banned'}
@@ -14,6 +14,16 @@ export interface ExternalTakeoutMerchant{id:number;title:string;subtitle:string;
 export interface ExternalTakeoutMerchantDirectory{categoryEnabled:boolean;items:ExternalTakeoutMerchant[]}
 export interface ExternalTakeoutMerchantInput{title:string;subtitle:string;iconText:string;appId:string;path:string;color:string;sort:number}
 export interface Stats{totals:{users:number;posts:number;products:number;pendingReview:number};today:{users:number;posts:number;products:number}}
+
+export type IdentityApplicationRole='rider'|'merchant'
+export type IdentityApplicationStatus='pending'|'approved'|'rejected'
+export type IdentityApplicationEventType='submitted'|'resubmitted'|'approved'|'rejected'
+export interface IdentityApplicationProof{assetId:string;url:string;expiresAt:string}
+export interface IdentityApplicationEvent{eventId:string;eventType:IdentityApplicationEventType;actorUserId:string;status:IdentityApplicationStatus;reason:string;createdAt:string}
+export interface IdentityApplicationRow{applicationId:string;userId:string;role:IdentityApplicationRole;status:IdentityApplicationStatus;realName:string;phone:string;merchantName:string;merchantAddress:string;assetIds:string[];proofs?:IdentityApplicationProof[];reviewReason:string;reviewerUserId?:string;submittedAt:string;reviewedAt?:string;rowVersion:number}
+export interface IdentityApplicationDetail extends IdentityApplicationRow{events:IdentityApplicationEvent[]}
+export interface IdentityApplicationQuery{page?:number;pageSize?:number;role?:IdentityApplicationRole;status?:IdentityApplicationStatus}
+export interface IdentityApplicationAdminList{items:IdentityApplicationRow[];page:number;pageSize:number;total:number}
 
 export interface MediaQuery{page?:number;pageSize?:number;assetId?:string;status?:string;reviewStatus?:string;purpose?:string;taskId?:string;operation?:string;kind?:string;from?:string;to?:string}
 export interface MediaSummary{assets:number;pendingReview:number;consumerDeadletters:number;gcDeadletters:number}
