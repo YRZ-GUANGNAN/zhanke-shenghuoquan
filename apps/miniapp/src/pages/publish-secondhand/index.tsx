@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react'
 import { Image, Input, ScrollView, Text, Textarea, View } from '@tarojs/components'
+import CapsulePageHeader from '../../components/capsule-page-header'
 import { isApiError } from '../../services/api'
 import { createProduct } from '../../services/c-trade'
 import { createClientRequestId } from '../../services/client-request-id'
@@ -139,13 +140,14 @@ export default function PublishSecondhandPage() {
 
   return (
     <View className='publish-secondhand-page'>
-      <View className='publish-secondhand-nav'>
-        <View className='publish-secondhand-nav__back' onClick={() => void Taro.navigateBack()}>
-          <Text>‹</Text>
-        </View>
-        <Text className='publish-secondhand-nav__title'>发布二手</Text>
-        <View className='publish-secondhand-nav__spacer' />
-      </View>
+      <CapsulePageHeader
+        title='发布二手'
+        left={
+          <View className='publish-secondhand-nav__back' onClick={() => void Taro.navigateBack()}>
+            <Text>‹</Text>
+          </View>
+        }
+      />
 
       <ScrollView scrollY className='publish-secondhand-scroll' enhanced showScrollbar={false}>
         <View className='publish-secondhand-upload-card'>

@@ -2,46 +2,34 @@
 
 .post-detail-page {
   position: relative;
+  height: 100vh;
   min-height: 100vh;
+  padding-top: var(--capsule-total-header-height);
+  box-sizing: border-box;
   overflow: hidden;
   background: $bg-surface;
   color: $text-strong;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
 }
 
-.post-detail-nav {
+.capsule-page-header.post-detail-nav {
   position: fixed;
   top: 0;
-  left: 0;
   right: 0;
+  left: 0;
   z-index: 20;
-  display: flex;
-  align-items: center;
-  height: 184px;
-  padding: 92px 28px 20px;
-  box-sizing: border-box;
   background: rgba($bg-surface, .98);
-  border-bottom: 1px solid $divider-hairline;
 }
 
 .post-detail-nav__back {
   width: 44px;
   height: 44px;
-  margin-right: 16px;
-  border-radius: 22px;
-  position: relative;
-
-  &::before {
-    content: '';
-    position: absolute;
-    left: 16px;
-    top: 12px;
-    width: 16px;
-    height: 16px;
-    border-left: 4px solid $text-strong;
-    border-bottom: 4px solid $text-strong;
-    transform: rotate(45deg);
-  }
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  color: $text-strong;
+  font-size: 34px;
+  line-height: 1;
 }
 
 .post-detail-author {
@@ -55,14 +43,20 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 52px;
-  height: 52px;
-  margin-right: 14px;
+  width: 34px;
+  height: 34px;
+  margin-right: 10px;
   border-radius: 50%;
   background: rgba($like-active, .72);
   color: $text-on-color;
-  font-size: 22px;
+  font-size: 15px;
   font-weight: 700;
+  overflow: hidden;
+}
+
+.post-detail-author__avatar image {
+  width: 100%;
+  height: 100%;
 }
 
 .post-detail-author__main {
@@ -72,29 +66,37 @@
 }
 
 .post-detail-author__name {
+  display: block;
+  overflow: hidden;
   color: $text-strong;
-  font-size: 24px;
+  font-size: 15px;
   font-weight: 800;
   line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .post-detail-author__meta {
-  margin-top: 4px;
+  display: block;
+  overflow: hidden;
+  margin-top: 2px;
   color: $text-tertiary;
-  font-size: 18px;
+  font-size: 11px;
   line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .post-detail-follow {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 82px;
+  width: 72px;
   height: 44px;
   border-radius: 22px;
   background: $brand-primary;
   color: $text-on-color;
-  font-size: 20px;
+  font-size: 14px;
   font-weight: 700;
   box-shadow: 0 10px 24px rgba($brand-primary, .22);
 }
@@ -106,8 +108,7 @@
 }
 
 .post-detail-scroll {
-  height: 100vh;
-  padding-top: 184px;
+  height: 100%;
   padding-bottom: 116px;
   box-sizing: border-box;
   overflow-y: auto;

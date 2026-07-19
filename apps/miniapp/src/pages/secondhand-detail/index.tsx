@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
+import CapsulePageHeader from '../../components/capsule-page-header'
 import { isApiError } from '../../services/api'
 import { contactSeller, getProduct, getTradeViewerState, setProductFavorited } from '../../services/c-trade'
 import Taro from '../../services/taro'
@@ -157,10 +158,10 @@ export default function SecondhandDetailPage() {
 
   return (
     <View className='secondhand-detail-page'>
-      <View className='secondhand-detail-header'>
-        <View className='secondhand-detail-header__back' onClick={goBack} />
-        <Text className='secondhand-detail-header__title'>宝贝详情</Text>
-      </View>
+      <CapsulePageHeader
+        title='宝贝详情'
+        left={<View className='secondhand-detail-header__back' onClick={goBack} />}
+      />
 
       <ScrollView className='secondhand-detail-scroll' scrollY enhanced showScrollbar={false}>
         {status !== 'ready' || !product ? renderState() : (

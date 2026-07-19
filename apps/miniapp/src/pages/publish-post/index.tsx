@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Input, Text, Textarea, View } from '@tarojs/components'
+import CapsulePageHeader from '../../components/capsule-page-header'
 import Taro from '../../services/taro'
 import { isApiError } from '../../services/api'
 import {
@@ -170,16 +171,18 @@ export default function PublishPostPage() {
 
   return (
     <View className='publish-post-page' style={getCapsuleSafeStyle()}>
-      <View className='publish-post-nav'>
-        <Text className='publish-post-nav__side' onClick={() => void Taro.navigateBack()}>取消</Text>
-        <Text className='publish-post-nav__title'>发布帖子</Text>
-        <Text
-          className={`publish-post-nav__publish${canPublish ? ' publish-post-nav__publish--active' : ''}`}
-          onClick={() => void handlePublish()}
-        >
-          {submitting ? '发布中' : '发布'}
-        </Text>
-      </View>
+      <CapsulePageHeader
+        title='发布帖子'
+        left={<Text className='publish-post-nav__side' onClick={() => void Taro.navigateBack()}>取消</Text>}
+        right={
+          <Text
+            className={`publish-post-nav__publish${canPublish ? ' publish-post-nav__publish--active' : ''}`}
+            onClick={() => void handlePublish()}
+          >
+            {submitting ? '发布中' : '发布'}
+          </Text>
+        }
+      />
 
       <View className='publish-post-body'>
         <View className='publish-post-upload' onClick={() => void handlePickImages()}>

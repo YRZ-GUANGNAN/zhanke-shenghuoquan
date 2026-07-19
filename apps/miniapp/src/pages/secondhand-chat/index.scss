@@ -12,34 +12,20 @@
   font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 }
 
-.secondhand-chat-header {
-  position: relative;
-  z-index: 6;
-  flex: 0 0 auto;
-  display: grid;
-  grid-template-columns: 42rpx 1fr 92rpx;
-  align-items: center;
-  gap: 18rpx;
-  height: 164rpx;
-  padding: 58rpx var(--capsule-safe-right, 34rpx) 22rpx 34rpx;
-  background: $bg-surface;
-  box-shadow: $shadow-header;
-}
-
 .secondhand-chat-header__back {
   position: relative;
-  width: 42rpx;
-  height: 42rpx;
+  width: 44px;
+  height: 44px;
 }
 
 .secondhand-chat-header__back::before {
   position: absolute;
-  top: 10rpx;
-  left: 12rpx;
-  width: 18rpx;
-  height: 18rpx;
-  border-bottom: 4rpx solid $text-strong;
-  border-left: 4rpx solid $text-strong;
+  top: 13px;
+  left: 15px;
+  width: 14px;
+  height: 14px;
+  border-bottom: 3px solid $text-strong;
+  border-left: 3px solid $text-strong;
   content: '';
   transform: rotate(45deg);
 }
@@ -113,7 +99,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 48rpx;
+  min-width: 92rpx;
+  min-height: 44px;
   border: 1rpx solid $divider-nav;
   border-radius: 999rpx;
   background: $bg-surface;

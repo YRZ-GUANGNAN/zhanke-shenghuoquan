@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Image, Input, ScrollView, Text, View } from '@tarojs/components'
 import AppIcon from '../../components/app-icon'
+import CapsulePageHeader from '../../components/capsule-page-header'
 import { isApiError } from '../../services/api'
 import { contactSeller, getProduct, type IMConversationContext } from '../../services/c-trade'
 import {
@@ -227,30 +228,35 @@ export default function SecondhandChatPage() {
 
   return (
     <View className='secondhand-chat-page' style={getCapsuleSafeStyle()}>
-      <View className='secondhand-chat-header'>
-        <View className='secondhand-chat-header__back' onClick={goBack} />
-        <View className='secondhand-chat-seller' onClick={canOpenSellerProfile ? openSellerProfile : undefined}>
-          <View className='secondhand-chat-seller__avatar'>
-            {peerAvatarImage ? (
-              <Image className='secondhand-chat-seller__avatar-image' src={peerAvatarImage} mode='aspectFill' />
-            ) : (
-              <Text>{peerAvatar}</Text>
-            )}
+      <CapsulePageHeader
+        variant='standard'
+        left={<View className='secondhand-chat-header__back' onClick={goBack} />}
+        center={
+          <View className='secondhand-chat-seller' onClick={canOpenSellerProfile ? openSellerProfile : undefined}>
+            <View className='secondhand-chat-seller__avatar'>
+              {peerAvatarImage ? (
+                <Image className='secondhand-chat-seller__avatar-image' src={peerAvatarImage} mode='aspectFill' />
+              ) : (
+                <Text>{peerAvatar}</Text>
+              )}
+            </View>
+            <View className='secondhand-chat-seller__meta'>
+              <Text className='secondhand-chat-seller__name'>{status === 'loading' ? '正在连接私信' : peerName}</Text>
+              <Text className='secondhand-chat-seller__state'>
+                {status === 'ready' ? peerState : status === 'error' ? '连接失败' : '安全初始化中'}
+              </Text>
+            </View>
           </View>
-          <View className='secondhand-chat-seller__meta'>
-            <Text className='secondhand-chat-seller__name'>{status === 'loading' ? '正在连接私信' : peerName}</Text>
-            <Text className='secondhand-chat-seller__state'>
-              {status === 'ready' ? peerState : status === 'error' ? '连接失败' : '安全初始化中'}
-            </Text>
+        }
+        right={
+          <View
+            className={`secondhand-chat-header__home ${canOpenSellerProfile ? '' : 'secondhand-chat-header__home--disabled'}`}
+            onClick={canOpenSellerProfile ? openSellerProfile : undefined}
+          >
+            <Text>{canOpenSellerProfile ? '主页' : '交易中'}</Text>
           </View>
-        </View>
-        <View
-          className={`secondhand-chat-header__home ${canOpenSellerProfile ? '' : 'secondhand-chat-header__home--disabled'}`}
-          onClick={canOpenSellerProfile ? openSellerProfile : undefined}
-        >
-          <Text>{canOpenSellerProfile ? '主页' : '交易中'}</Text>
-        </View>
-      </View>
+        }
+      />
 
       <View className='secondhand-chat-product'>
         <View className='secondhand-chat-product__image'>

@@ -1,5 +1,6 @@
 import React from 'react'
 import { Text, View } from '@tarojs/components'
+import CapsulePageHeader from '../../components/capsule-page-header'
 import Taro from '../../services/taro'
 import './index.scss'
 
@@ -41,13 +42,14 @@ export default function PublishEntryPage() {
 
   return (
     <View className='publish-entry-page'>
-      <View className='publish-entry-topbar'>
-        <View className='publish-entry-topbar__back' onClick={() => Taro.navigateBack()}>
-          <Text>‹</Text>
-        </View>
-        <Text className='publish-entry-topbar__title'>发布</Text>
-        <View className='publish-entry-topbar__ghost' />
-      </View>
+      <CapsulePageHeader
+        title='发布'
+        left={
+          <View className='publish-entry-topbar__back' onClick={() => void Taro.navigateBack()}>
+            <Text>‹</Text>
+          </View>
+        }
+      />
 
       <View className='publish-entry-hero'>
         <View className='publish-entry-hero__orb publish-entry-hero__orb--large' />

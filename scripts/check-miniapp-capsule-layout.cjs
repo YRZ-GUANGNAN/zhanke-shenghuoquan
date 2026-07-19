@@ -97,4 +97,27 @@ for (const pageName of standardPages) {
   assert.match(source, /CapsulePageHeader/, `${pageName} must use CapsulePageHeader`)
 }
 
+const publishingAndDetailPages = [
+  'publish-entry',
+  'publish-post',
+  'publish-secondhand',
+  'post-detail',
+  'secondhand-detail',
+  'secondhand-chat',
+]
+
+for (const pageName of publishingAndDetailPages) {
+  const source = fs.readFileSync(path.join(miniappPagesRoot, pageName, 'index.tsx'), 'utf8')
+  const style = fs.readFileSync(path.join(miniappPagesRoot, pageName, 'index.scss'), 'utf8')
+  assert.match(source, /CapsulePageHeader/, `${pageName} must use CapsulePageHeader`)
+  assert.doesNotMatch(style, /--capsule-safe-right/, `${pageName} must not squeeze business navigation beside the capsule`)
+}
+
+const postDetailSource = fs.readFileSync(path.join(miniappPagesRoot, 'post-detail', 'index.tsx'), 'utf8')
+const postDetailStyle = fs.readFileSync(path.join(miniappPagesRoot, 'post-detail', 'index.scss'), 'utf8')
+assert.match(postDetailSource, /style=\{getCapsuleSafeStyle\(\)\}/)
+assert.match(postDetailStyle, /padding-top:\s*var\(--capsule-total-header-height\)/)
+assert.match(postDetailStyle, /\.capsule-page-header\.post-detail-nav[\s\S]*position:\s*fixed/)
+assert.doesNotMatch(postDetailStyle, /184px/)
+
 console.log('miniapp capsule geometry: ok')

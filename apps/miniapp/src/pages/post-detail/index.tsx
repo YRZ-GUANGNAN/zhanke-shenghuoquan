@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Image, Input, Text, View } from '@tarojs/components'
+import CapsulePageHeader from '../../components/capsule-page-header'
 import Taro from '../../services/taro'
 import type { CommunityComment, CommunityPost } from '../../types'
 import {
@@ -11,6 +12,7 @@ import {
   setPostLiked,
   setUserFollowing,
 } from '../../services/b-community'
+import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import './index.scss'
 
 const DEMO_POST: CommunityPost = {
@@ -152,22 +154,28 @@ export default function PostDetailPage() {
   }
 
   return (
-    <View className="post-detail-page">
-      <View className="post-detail-nav">
-        <Text className="post-detail-nav__back" onClick={() => void Taro.navigateBack()}>
-          ‹
-        </Text>
-        <View className="post-detail-author">
-          <View className="post-detail-author__avatar">{post.avatar ? <Image src={post.avatar} mode="aspectFill" /> : post.author.slice(0, 1)}</View>
-          <View className="post-detail-author__main">
-            <Text className="post-detail-author__name">{post.author}</Text>
-            <Text className="post-detail-author__meta">{post.school}</Text>
+    <View className="post-detail-page" style={getCapsuleSafeStyle()}>
+      <CapsulePageHeader
+        className='post-detail-nav'
+        variant='standard'
+        left={<Text className='post-detail-nav__back' onClick={() => void Taro.navigateBack()}>‹</Text>}
+        center={
+          <View className='post-detail-author'>
+            <View className='post-detail-author__avatar'>
+              {post.avatar ? <Image src={post.avatar} mode='aspectFill' /> : post.author.slice(0, 1)}
+            </View>
+            <View className='post-detail-author__main'>
+              <Text className='post-detail-author__name'>{post.author}</Text>
+              <Text className='post-detail-author__meta'>{post.school}</Text>
+            </View>
           </View>
-        </View>
-        <Text className={`post-detail-follow${following ? ' post-detail-follow--active' : ''}`} onClick={handleFollow}>
-          {following ? '已关注' : '关注'}
-        </Text>
-      </View>
+        }
+        right={
+          <Text className={`post-detail-follow${following ? ' post-detail-follow--active' : ''}`} onClick={handleFollow}>
+            {following ? '已关注' : '关注'}
+          </Text>
+        }
+      />
 
       {error ? (
         <View className="post-detail-state post-detail-state--retry">

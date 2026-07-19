@@ -3,53 +3,26 @@
 .publish-entry-page {
   min-height: 100vh;
   box-sizing: border-box;
-  padding: 96rpx 32rpx 48rpx;
+  padding: 0 0 48rpx;
   background: $bg-app;
   color: $text-strong;
   overflow: hidden;
 }
 
-.publish-entry-topbar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 10;
+.publish-entry-topbar__back {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  height: 96rpx;
-  padding: 0 32rpx;
-  box-sizing: border-box;
-  background: rgba(247, 248, 250, .94);
-  backdrop-filter: blur(18rpx);
-  border-bottom: 1rpx solid $divider-nav;
-
-  &__back,
-  &__ghost {
-    width: 64rpx;
-    height: 64rpx;
-  }
-
-  &__back {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    color: $text-strong;
-    font-size: 54rpx;
-    line-height: 1;
-  }
-
-  &__title {
-    font-size: 34rpx;
-    font-weight: 800;
-    letter-spacing: .04em;
-  }
+  justify-content: flex-start;
+  width: 44px;
+  height: 44px;
+  color: $text-strong;
+  font-size: 54rpx;
+  line-height: 1;
 }
 
 .publish-entry-hero {
   position: relative;
-  margin-top: 24rpx;
+  margin: 24rpx 32rpx 0;
   padding: 44rpx 40rpx 42rpx;
   border-radius: 36rpx;
   background: $gradient-primary;
@@ -108,7 +81,7 @@
 }
 
 .publish-entry-list {
-  margin-top: 28rpx;
+  margin: 28rpx 32rpx 0;
   display: flex;
   flex-direction: column;
   gap: 22rpx;
@@ -195,7 +168,7 @@
 }
 
 .publish-entry-note {
-  margin-top: 28rpx;
+  margin: 28rpx 32rpx 0;
   display: flex;
   align-items: flex-start;
   gap: 14rpx;

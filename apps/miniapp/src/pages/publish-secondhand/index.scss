@@ -11,6 +11,9 @@ page {
 }
 
 .publish-secondhand-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
   min-height: 100vh;
   overflow: hidden;
   background: $bg-app;
@@ -18,41 +21,20 @@ page {
   font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 }
 
-.publish-secondhand-nav {
-  height: 168rpx;
-  padding: 88rpx 34rpx 0;
-  box-sizing: border-box;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  background: $bg-surface;
-  border-bottom: 1rpx solid $divider-nav;
-}
-
-.publish-secondhand-nav__back,
-.publish-secondhand-nav__spacer {
-  width: 64rpx;
-  height: 64rpx;
+.publish-secondhand-nav__back {
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
-}
-
-.publish-secondhand-nav__back {
+  justify-content: flex-start;
   color: $text-strong;
   font-size: 52rpx;
   line-height: 1;
 }
 
-.publish-secondhand-nav__title {
-  padding-top: 10rpx;
-  color: $text-strong;
-  font-size: 32rpx;
-  font-weight: 850;
-  line-height: 1;
-}
-
 .publish-secondhand-scroll {
-  height: calc(100vh - 168rpx - 142rpx);
+  flex: 1 1 auto;
+  min-height: 0;
   box-sizing: border-box;
 }
 
@@ -319,6 +301,7 @@ page {
 }
 
 .publish-secondhand-footer {
+  flex: 0 0 auto;
   height: 142rpx;
   padding: 20rpx 28rpx calc(16rpx + env(safe-area-inset-bottom));
   border-top: 1rpx solid $divider-nav;

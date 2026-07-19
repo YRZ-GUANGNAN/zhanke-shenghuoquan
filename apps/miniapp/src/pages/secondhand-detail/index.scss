@@ -12,44 +12,22 @@
   font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 }
 
-.secondhand-detail-header {
-  position: relative;
-  z-index: 8;
-  flex: 0 0 auto;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  height: 168rpx;
-  padding: 0 36rpx 28rpx;
-  border-bottom: 1rpx solid $divider-nav;
-  background: $bg-surface;
-}
-
 .secondhand-detail-header__back {
-  position: absolute;
-  left: 36rpx;
-  bottom: 31rpx;
-  width: 38rpx;
-  height: 38rpx;
+  position: relative;
+  width: 44px;
+  height: 44px;
 }
 
 .secondhand-detail-header__back::before {
   position: absolute;
-  top: 8rpx;
-  left: 11rpx;
-  width: 18rpx;
-  height: 18rpx;
-  border-bottom: 4rpx solid $text-strong;
-  border-left: 4rpx solid $text-strong;
+  top: 13px;
+  left: 15px;
+  width: 14px;
+  height: 14px;
+  border-bottom: 3px solid $text-strong;
+  border-left: 3px solid $text-strong;
   content: '';
   transform: rotate(45deg);
-}
-
-.secondhand-detail-header__title {
-  color: $text-strong;
-  font-size: 31rpx;
-  font-weight: 900;
-  line-height: 1;
 }
 
 .secondhand-detail-scroll {

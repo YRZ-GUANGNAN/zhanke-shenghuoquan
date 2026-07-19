@@ -11,44 +11,19 @@ page {
   box-sizing: border-box;
 }
 
-.publish-post-nav {
-  position: relative;
-  height: 184rpx;
-  padding: 84rpx var(--capsule-safe-right, 32rpx) 0 32rpx;
+.publish-post-nav__side {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  box-sizing: border-box;
-  border-bottom: 1rpx solid $divider-nav;
-  background: $bg-surface;
-}
-
-.publish-post-nav__side {
-  position: relative;
-  z-index: 1;
+  min-width: 44px;
+  min-height: 44px;
   font-size: 30rpx;
-  line-height: 64rpx;
+  line-height: 1;
   color: $text-secondary;
 }
 
-.publish-post-nav__title {
-  position: absolute;
-  right: 0;
-  bottom: 18rpx;
-  left: 0;
-  text-align: center;
-  font-size: 34rpx;
-  line-height: 64rpx;
-  font-weight: 800;
-  color: $text-strong;
-  pointer-events: none;
-}
-
 .publish-post-nav__publish {
-  position: relative;
-  z-index: 1;
   min-width: 104rpx;
-  height: 60rpx;
+  min-height: 44px;
   padding: 0 30rpx;
   border-radius: 999rpx;
   display: flex;
