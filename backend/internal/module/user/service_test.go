@@ -4,19 +4,24 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	mysqlDriver "github.com/go-sql-driver/mysql"
 )
 
 const testSecret = "test-secret-that-is-longer-than-thirty-two-characters"
 
 type memoryRepository struct {
-	users map[uint]User
+	users     map[uint]User
+	createErr error
 }
 
 func newMemoryRepository(values ...User) *memoryRepository {
@@ -55,11 +60,76 @@ func (r *memoryRepository) FindProfiles(_ context.Context, ids []uint) (map[uint
 }
 
 func (r *memoryRepository) Create(_ context.Context, value *User) error {
+	if r.createErr != nil {
+		return r.createErr
+	}
 	if value.ID == 0 {
 		value.ID = uint(len(r.users) + 1)
 	}
 	r.users[value.ID] = *value
 	return nil
+}
+
+type concurrentFirstLoginRepository struct {
+	*memoryRepository
+	mu                 sync.Mutex
+	initialFinds       int
+	initialFindBarrier chan struct{}
+	createCalls        int
+}
+
+func newConcurrentFirstLoginRepository() *concurrentFirstLoginRepository {
+	return &concurrentFirstLoginRepository{
+		memoryRepository:   newMemoryRepository(),
+		initialFindBarrier: make(chan struct{}),
+	}
+}
+
+func (r *concurrentFirstLoginRepository) FindByOpenID(ctx context.Context, openID string) (User, error) {
+	r.mu.Lock()
+	if r.initialFinds < 2 {
+		r.initialFinds++
+		if r.initialFinds == 2 {
+			close(r.initialFindBarrier)
+		}
+		barrier := r.initialFindBarrier
+		r.mu.Unlock()
+		select {
+		case <-barrier:
+			return User{}, ErrNotFound
+		case <-ctx.Done():
+			return User{}, ctx.Err()
+		}
+	}
+	defer r.mu.Unlock()
+	for _, value := range r.users {
+		if value.OpenID == openID {
+			return value, nil
+		}
+	}
+	return User{}, ErrNotFound
+}
+
+func (r *concurrentFirstLoginRepository) Create(_ context.Context, value *User) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.createCalls++
+	for _, existing := range r.users {
+		if existing.OpenID == value.OpenID {
+			return ErrOpenIDConflict
+		}
+	}
+	if value.ID == 0 {
+		value.ID = uint(len(r.users) + 1)
+	}
+	r.users[value.ID] = *value
+	return nil
+}
+
+func (r *concurrentFirstLoginRepository) snapshot() (users int, createCalls int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.users), r.createCalls
 }
 
 func (r *memoryRepository) UpdateProfile(_ context.Context, id uint, profile Profile) error {
@@ -282,6 +352,91 @@ func TestRealWechatLoginMapsSameOpenIDToStableUser(t *testing.T) {
 	}
 }
 
+func TestConcurrentRealWechatFirstLoginReusesWinningOpenIDUser(t *testing.T) {
+	const openID = "concurrent-real-openid"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]string{"openid": openID})
+	}))
+	defer server.Close()
+
+	repo := newConcurrentFirstLoginRepository()
+	service := NewService(repo, testSecret, "wx-real-app", "real-secret", false, WithWechatAPIBase(server.URL))
+	type outcome struct {
+		result LoginResult
+		err    error
+	}
+	outcomes := make(chan outcome, 2)
+	start := make(chan struct{})
+	var workers sync.WaitGroup
+	for _, code := range []string{"code-one", "code-two"} {
+		workers.Add(1)
+		go func(code string) {
+			defer workers.Done()
+			<-start
+			result, err := service.WechatLogin(context.Background(), LoginInput{Code: code})
+			outcomes <- outcome{result: result, err: err}
+		}(code)
+	}
+	close(start)
+	workers.Wait()
+	close(outcomes)
+
+	var userID uint
+	for result := range outcomes {
+		if result.err != nil {
+			t.Fatalf("concurrent login failed: %v", result.err)
+		}
+		if result.result.User.ID == 0 || result.result.User.OpenID != openID {
+			t.Fatalf("unexpected user: %+v", result.result.User)
+		}
+		if userID == 0 {
+			userID = result.result.User.ID
+		} else if result.result.User.ID != userID {
+			t.Fatalf("concurrent logins returned different users: first=%d second=%d", userID, result.result.User.ID)
+		}
+	}
+	users, createCalls := repo.snapshot()
+	if users != 1 || createCalls != 2 {
+		t.Fatalf("users=%d createCalls=%d", users, createCalls)
+	}
+}
+
+func TestWechatLoginDoesNotSwallowNonConflictCreateError(t *testing.T) {
+	createErr := errors.New("database unavailable")
+	repo := newMemoryRepository()
+	repo.createErr = createErr
+	service := NewService(repo, testSecret, "", "", true)
+	_, err := service.WechatLogin(context.Background(), LoginInput{Code: "create-error"})
+	if !errors.Is(err, createErr) {
+		t.Fatalf("err=%v want wrapped create error", err)
+	}
+}
+
+func TestUserCreateErrorOnlyClassifiesOpenIDUniqueConflict(t *testing.T) {
+	openIDConflict := fmt.Errorf("wrapped: %w", &mysqlDriver.MySQLError{
+		Number:  1062,
+		Message: "Duplicate entry 'real-openid' for key 'users.open_id'",
+	})
+	if !errors.Is(mapUserCreateError(openIDConflict), ErrOpenIDConflict) {
+		t.Fatalf("OpenID conflict was not classified")
+	}
+	for _, test := range []struct {
+		name string
+		err  error
+	}{
+		{name: "phone unique conflict", err: &mysqlDriver.MySQLError{Number: 1062, Message: "Duplicate entry '13800000000' for key 'users.uq_users_phone'"}},
+		{name: "primary key conflict", err: &mysqlDriver.MySQLError{Number: 1062, Message: "Duplicate entry '1' for key 'PRIMARY'"}},
+		{name: "other mysql error", err: &mysqlDriver.MySQLError{Number: 1048, Message: "Column cannot be null"}},
+		{name: "generic error", err: errors.New("database unavailable")},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := mapUserCreateError(test.err); !errors.Is(got, test.err) || errors.Is(got, ErrOpenIDConflict) {
+				t.Fatalf("got=%v want original error", got)
+			}
+		})
+	}
+}
+
 func TestWechatAPIBaseDefaultsAndIgnoresEmptyOverride(t *testing.T) {
 	service := NewService(newMemoryRepository(), testSecret, "wx-real-app", "real-secret", false, WithWechatAPIBase("  ///  "))
 	if service.wechatAPIBase != defaultWechatAPIBase {
@@ -332,6 +487,46 @@ func TestRealWechatCodeExchangeFailuresAreSafe(t *testing.T) {
 				t.Fatalf("wechat errmsg was not bounded: length=%d", len(err.Error()))
 			}
 		})
+	}
+}
+
+func TestRealWechatErrcodeNeverReflectsRequestOrUpstreamMessage(t *testing.T) {
+	const (
+		appSecret = "real secret+/encoded="
+		loginCode = "code with ?&+/"
+	)
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fullRequestURL := server.URL + r.URL.RequestURI()
+		reflected := strings.Join([]string{
+			"upstream reflected request",
+			appSecret,
+			url.QueryEscape(appSecret),
+			loginCode,
+			url.QueryEscape(loginCode),
+			fullRequestURL,
+		}, " | ")
+		_ = json.NewEncoder(w).Encode(map[string]any{"errcode": 40029, "errmsg": reflected})
+	}))
+	defer server.Close()
+
+	service := NewService(newMemoryRepository(), testSecret, "wx-real-app", appSecret, false, WithWechatAPIBase(server.URL))
+	_, err := service.WechatLogin(context.Background(), LoginInput{Code: loginCode})
+	const want = "wechat login: wechat code exchange errcode 40029"
+	if err == nil || err.Error() != want {
+		t.Fatalf("err=%v want=%q", err, want)
+	}
+	for _, forbidden := range []string{
+		appSecret,
+		url.QueryEscape(appSecret),
+		loginCode,
+		url.QueryEscape(loginCode),
+		server.URL,
+		"upstream reflected request",
+	} {
+		if strings.Contains(err.Error(), forbidden) {
+			t.Fatalf("sensitive upstream content %q leaked in %q", forbidden, err.Error())
+		}
 	}
 }
 

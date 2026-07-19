@@ -26,11 +26,10 @@ type LoginResult struct {
 }
 
 const (
-	accessTokenTTL             = 15 * time.Minute
-	localMockTokenTTL          = 12 * time.Hour
-	productionAppEnv           = "prod"
-	defaultWechatAPIBase       = "https://api.weixin.qq.com"
-	maxWechatErrorMessageRunes = 256
+	accessTokenTTL       = 15 * time.Minute
+	localMockTokenTTL    = 12 * time.Hour
+	productionAppEnv     = "prod"
+	defaultWechatAPIBase = "https://api.weixin.qq.com"
 )
 
 var (
@@ -118,7 +117,13 @@ func (s *Service) WechatLogin(ctx context.Context, input LoginInput) (LoginResul
 			CurrentIdentity: IdentityStudent, Role: RoleUser, Status: StatusActive, TokenVersion: 1,
 		}
 		if err := s.repo.Create(ctx, &value); err != nil {
-			return LoginResult{}, fmt.Errorf("create user: %w", err)
+			if !errors.Is(err, ErrOpenIDConflict) {
+				return LoginResult{}, fmt.Errorf("create user: %w", err)
+			}
+			value, err = s.repo.FindByOpenID(ctx, openID)
+			if err != nil {
+				return LoginResult{}, fmt.Errorf("find user after create conflict: %w", err)
+			}
 		}
 	} else if err != nil {
 		return LoginResult{}, err
@@ -184,34 +189,17 @@ func (s *Service) exchangeCode(ctx context.Context, code string) (string, error)
 	var result struct {
 		OpenID  string `json:"openid"`
 		ErrCode int    `json:"errcode"`
-		ErrMsg  string `json:"errmsg"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 32<<10)).Decode(&result); err != nil {
 		return "", errors.New("wechat code exchange returned invalid JSON")
 	}
 	if result.ErrCode != 0 {
-		message := sanitizeWechatErrorMessage(result.ErrMsg, s.wechatSecret)
-		if message == "" {
-			return "", fmt.Errorf("wechat code exchange errcode %d", result.ErrCode)
-		}
-		return "", fmt.Errorf("wechat code exchange errcode %d: %s", result.ErrCode, message)
+		return "", fmt.Errorf("wechat code exchange errcode %d", result.ErrCode)
 	}
 	if result.OpenID == "" {
 		return "", errors.New("wechat code exchange returned empty openid")
 	}
 	return result.OpenID, nil
-}
-
-func sanitizeWechatErrorMessage(message, secret string) string {
-	message = strings.Join(strings.Fields(strings.TrimSpace(message)), " ")
-	if secret != "" {
-		message = strings.ReplaceAll(message, secret, "[redacted]")
-	}
-	runes := []rune(message)
-	if len(runes) > maxWechatErrorMessageRunes {
-		message = string(runes[:maxWechatErrorMessageRunes])
-	}
-	return message
 }
 
 func (s *Service) Get(ctx context.Context, id uint) (User, error) { return s.repo.FindByID(ctx, id) }

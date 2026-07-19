@@ -3,13 +3,18 @@ package user
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
+	mysqlDriver "github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
-var ErrNotFound = errors.New("user not found")
+var (
+	ErrNotFound       = errors.New("user not found")
+	ErrOpenIDConflict = errors.New("user openid already exists")
+)
 
 type settingsRepository interface {
 	GetOrCreateSettings(context.Context, uint) (UserSettings, error)
@@ -81,7 +86,48 @@ func (r *GormRepository) FindProfiles(ctx context.Context, ids []uint) (map[uint
 }
 
 func (r *GormRepository) Create(ctx context.Context, value *User) error {
-	return r.db.WithContext(ctx).Create(value).Error
+	return mapUserCreateError(r.db.WithContext(ctx).Create(value).Error)
+}
+
+func mapUserCreateError(err error) error {
+	if err == nil {
+		return nil
+	}
+	var mysqlErr *mysqlDriver.MySQLError
+	if !errors.As(err, &mysqlErr) || mysqlErr.Number != 1062 {
+		return err
+	}
+	switch mysqlDuplicateKeyName(mysqlErr.Message) {
+	case "open_id", "idx_users_open_id", "uq_users_open_id":
+		return ErrOpenIDConflict
+	default:
+		return err
+	}
+}
+
+func mysqlDuplicateKeyName(message string) string {
+	const marker = "for key "
+	markerIndex := strings.LastIndex(strings.ToLower(message), marker)
+	if markerIndex < 0 {
+		return ""
+	}
+	keyPart := strings.TrimSpace(message[markerIndex+len(marker):])
+	if keyPart == "" {
+		return ""
+	}
+	key := keyPart
+	if quote := keyPart[0]; quote == '\'' || quote == '`' || quote == '"' {
+		if closingIndex := strings.IndexByte(keyPart[1:], quote); closingIndex >= 0 {
+			key = keyPart[1 : closingIndex+1]
+		}
+	} else if fields := strings.Fields(keyPart); len(fields) > 0 {
+		key = fields[0]
+	}
+	key = strings.Trim(key, "`'\"")
+	if dotIndex := strings.LastIndexByte(key, '.'); dotIndex >= 0 {
+		key = key[dotIndex+1:]
+	}
+	return strings.ToLower(key)
 }
 
 func (r *GormRepository) UpdateProfile(ctx context.Context, id uint, profile Profile) error {
