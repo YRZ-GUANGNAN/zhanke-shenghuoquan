@@ -13,19 +13,20 @@ import (
 type Purpose string
 
 const (
-	PurposePost          Purpose = "post"
-	PurposeProduct       Purpose = "product"
-	PurposeAvatar        Purpose = "avatar"
-	PurposeDish          Purpose = "dish"
-	PurposeMerchantLogo  Purpose = "merchant_logo"
-	PurposeDeliveryProof Purpose = "delivery_proof"
-	PurposeDeliveryIM    Purpose = "delivery_im"
-	PurposeFeedback      Purpose = "feedback"
+	PurposePost                Purpose = "post"
+	PurposeProduct             Purpose = "product"
+	PurposeAvatar              Purpose = "avatar"
+	PurposeDish                Purpose = "dish"
+	PurposeMerchantLogo        Purpose = "merchant_logo"
+	PurposeDeliveryProof       Purpose = "delivery_proof"
+	PurposeDeliveryIM          Purpose = "delivery_im"
+	PurposeFeedback            Purpose = "feedback"
+	PurposeIdentityApplication Purpose = "identity_application"
 )
 
 func (v Purpose) Valid() bool {
 	switch v {
-	case PurposePost, PurposeProduct, PurposeAvatar, PurposeDish, PurposeMerchantLogo, PurposeDeliveryProof, PurposeDeliveryIM, PurposeFeedback:
+	case PurposePost, PurposeProduct, PurposeAvatar, PurposeDish, PurposeMerchantLogo, PurposeDeliveryProof, PurposeDeliveryIM, PurposeFeedback, PurposeIdentityApplication:
 		return true
 	default:
 		return false
@@ -117,7 +118,7 @@ type Asset struct {
 	ID                     uint64          `gorm:"column:id;primaryKey"`
 	AssetPublicID          string          `gorm:"column:asset_public_id;size:26;not null;uniqueIndex:uq_media_asset_public_id_v11"`
 	OwnerID                uint64          `gorm:"column:owner_id;not null;uniqueIndex:uq_media_owner_idempotency_v11,priority:1"`
-	Purpose                Purpose         `gorm:"column:purpose;size:16;not null"`
+	Purpose                Purpose         `gorm:"column:purpose;size:24;not null"`
 	StorageStage           StorageStage    `gorm:"column:storage_stage;size:16;not null"`
 	ReviewStatus           ReviewStatus    `gorm:"column:review_status;size:16;not null"`
 	TechnicalStatus        TechnicalStatus `gorm:"column:technical_status;size:24;not null;index:idx_media_technical_upload_v11,priority:1;index:idx_media_review_deadline_v11,priority:1;index:idx_media_delete_status_v11,priority:1"`
@@ -166,7 +167,7 @@ func (a Asset) ValidateNew() error {
 type AssetReference struct {
 	ID               uint64           `gorm:"column:id;primaryKey"`
 	AssetID          uint64           `gorm:"column:asset_id;not null;uniqueIndex:uq_media_reference_asset_slot,priority:1;index:idx_media_reference_asset_status,priority:1"`
-	ReferenceType    Purpose          `gorm:"column:reference_type;size:16;not null;uniqueIndex:uq_media_reference_slot,priority:1;uniqueIndex:uq_media_reference_asset_slot,priority:2;index:idx_media_reference_parent_status,priority:1"`
+	ReferenceType    Purpose          `gorm:"column:reference_type;size:24;not null;uniqueIndex:uq_media_reference_slot,priority:1;uniqueIndex:uq_media_reference_asset_slot,priority:2;index:idx_media_reference_parent_status,priority:1"`
 	ReferenceID      string           `gorm:"column:reference_id;size:64;not null;uniqueIndex:uq_media_reference_slot,priority:2;uniqueIndex:uq_media_reference_asset_slot,priority:3;index:idx_media_reference_parent_status,priority:2"`
 	Slot             uint16           `gorm:"column:slot;not null;uniqueIndex:uq_media_reference_slot,priority:3;uniqueIndex:uq_media_reference_asset_slot,priority:4"`
 	Status           ReferenceStatus  `gorm:"column:status;size:16;not null;index:idx_media_reference_asset_status,priority:2;index:idx_media_reference_parent_status,priority:3"`

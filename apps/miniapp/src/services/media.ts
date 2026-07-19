@@ -1,7 +1,7 @@
 import Taro from './taro'
 import { request } from './api'
 
-export type MediaPurpose = 'post_image' | 'product_image' | 'avatar' | 'dish' | 'merchant_logo' | 'delivery_proof' | 'delivery_im' | 'feedback'
+export type MediaPurpose = 'post_image' | 'product_image' | 'avatar' | 'dish' | 'merchant_logo' | 'delivery_proof' | 'delivery_im' | 'feedback' | 'identity_application'
 export type MediaClientState =
   | 'waiting_upload'
   | 'processing'
@@ -16,7 +16,7 @@ export type MediaClientState =
 export interface MediaStatus {
   assetId: string
   ticketId: string
-  purpose: 'post' | 'product' | 'avatar' | 'dish' | 'merchant_logo' | 'delivery_proof' | 'delivery_im' | 'feedback'
+  purpose: 'post' | 'product' | 'avatar' | 'dish' | 'merchant_logo' | 'delivery_proof' | 'delivery_im' | 'feedback' | 'identity_application'
   state: MediaClientState
   technicalStatus: string
   reviewStatus: string
@@ -71,7 +71,8 @@ const MAX_EDGE: Record<MediaPurpose, number> = {
   merchant_logo: 1024,
   delivery_proof: 1920,
   delivery_im: 1920,
-	feedback: 1920
+  feedback: 1920,
+  identity_application: 1920
 }
 const DELIVERY_PROOF_MAX_BYTES = 5 * 1024 * 1024
 
@@ -222,14 +223,15 @@ function readFileBytes(path: string): ArrayBuffer {
   return copy.buffer
 }
 
-function domainPurpose(value: MediaPurpose): 'post' | 'product' | 'avatar' | 'dish' | 'merchant_logo' | 'delivery_proof' | 'delivery_im' | 'feedback' {
+function domainPurpose(value: MediaPurpose): 'post' | 'product' | 'avatar' | 'dish' | 'merchant_logo' | 'delivery_proof' | 'delivery_im' | 'feedback' | 'identity_application' {
   if (value === 'post_image') return 'post'
   if (value === 'product_image') return 'product'
   if (value === 'dish') return 'dish'
   if (value === 'merchant_logo') return 'merchant_logo'
   if (value === 'delivery_proof') return 'delivery_proof'
   if (value === 'delivery_im') return 'delivery_im'
-	if (value === 'feedback') return 'feedback'
+  if (value === 'feedback') return 'feedback'
+  if (value === 'identity_application') return 'identity_application'
   return 'avatar'
 }
 

@@ -1,0 +1,228 @@
+package identityapplication
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	coremedia "campus-circle/backend/internal/module/media"
+)
+
+const (
+	identityMediaReservationTTL = 15 * time.Minute
+	identityProofURLTTL         = 5 * time.Minute
+	maxIdentityProofAssets      = 6
+)
+
+var ErrProofMediaUnavailable = errors.New("identity application proof media unavailable")
+
+type MediaReservation struct {
+	Token          string
+	AssetPublicIDs []string
+}
+
+// ApplicationMedia is the private media boundary used by identity applications.
+// Admin proof resolution requires the current application ID so an asset ID can
+// never be signed without proving its exact application binding.
+type ApplicationMedia interface {
+	Reserve(context.Context, uint64, []string) (MediaReservation, error)
+	Commit(context.Context, uint64, MediaReservation, string) error
+	Cancel(context.Context, uint64, MediaReservation) error
+	ResolveAdminProofs(context.Context, string, []string) ([]ProofAssetView, error)
+}
+
+type referenceBindingGateway interface {
+	Reserve(context.Context, coremedia.BindingReserveInput) (coremedia.BindingReservation, error)
+	Commit(context.Context, coremedia.BindingCommitInput) error
+	Cancel(context.Context, uint64, string) error
+}
+
+type proofMediaRepository interface {
+	FindAsset(context.Context, string) (coremedia.Asset, error)
+	FindReferenceByCoordinates(context.Context, uint64, coremedia.Purpose, string, uint16) (coremedia.AssetReference, error)
+	FindGatewayAssetSnapshots(context.Context, string) ([]coremedia.GatewaySnapshot, error)
+}
+
+type CoreApplicationMedia struct {
+	bindings   referenceBindingGateway
+	repository proofMediaRepository
+	signer     coremedia.DisplayURLSigner
+	now        func() time.Time
+}
+
+func NewApplicationMedia(bindings referenceBindingGateway, repository proofMediaRepository, signer coremedia.DisplayURLSigner, now func() time.Time) (*CoreApplicationMedia, error) {
+	if bindings == nil || repository == nil || signer == nil {
+		return nil, ErrProofMediaUnavailable
+	}
+	if now == nil {
+		now = time.Now
+	}
+	return &CoreApplicationMedia{bindings: bindings, repository: repository, signer: signer, now: now}, nil
+}
+
+func (m *CoreApplicationMedia) Reserve(ctx context.Context, ownerID uint64, assetPublicIDs []string) (MediaReservation, error) {
+	ordered, err := validateProofAssetIDs(assetPublicIDs)
+	if err != nil || ownerID == 0 {
+		return MediaReservation{}, ErrProofMediaUnavailable
+	}
+	operationID, err := coremedia.NewULID()
+	if err != nil {
+		return MediaReservation{}, err
+	}
+	token := "m10_" + operationID
+	value, err := m.bindings.Reserve(ctx, coremedia.BindingReserveInput{
+		OwnerID:               ownerID,
+		Purpose:               coremedia.PurposeIdentityApplication,
+		OrderedAssetPublicIDs: ordered,
+		Token:                 token,
+		ExpiresAt:             m.now().UTC().Add(identityMediaReservationTTL),
+	})
+	if err != nil {
+		return MediaReservation{}, err
+	}
+	if value.Token != token || len(value.References) != len(ordered) {
+		_ = m.bindings.Cancel(ctx, ownerID, token)
+		return MediaReservation{}, errors.Join(ErrProofMediaUnavailable, coremedia.ErrBindingMismatch)
+	}
+	for index, reference := range value.References {
+		if reference.InternalID == 0 || reference.AssetPublicID != ordered[index] || reference.Slot != uint16(index) {
+			_ = m.bindings.Cancel(ctx, ownerID, token)
+			return MediaReservation{}, errors.Join(ErrProofMediaUnavailable, coremedia.ErrBindingMismatch)
+		}
+	}
+	return MediaReservation{Token: token, AssetPublicIDs: ordered}, nil
+}
+
+func (m *CoreApplicationMedia) Commit(ctx context.Context, ownerID uint64, reservation MediaReservation, applicationPublicID string) error {
+	ordered, err := validateProofAssetIDs(reservation.AssetPublicIDs)
+	if err != nil || ownerID == 0 || !validMediaReservationToken(reservation.Token) || !validULID(applicationPublicID) {
+		return ErrProofMediaUnavailable
+	}
+	return m.bindings.Commit(ctx, coremedia.BindingCommitInput{
+		OwnerID:               ownerID,
+		Token:                 reservation.Token,
+		ReferenceType:         coremedia.PurposeIdentityApplication,
+		ReferenceID:           applicationPublicID,
+		OrderedAssetPublicIDs: ordered,
+	})
+}
+
+func (m *CoreApplicationMedia) Cancel(ctx context.Context, ownerID uint64, reservation MediaReservation) error {
+	if ownerID == 0 || !validMediaReservationToken(reservation.Token) {
+		return ErrProofMediaUnavailable
+	}
+	return m.bindings.Cancel(ctx, ownerID, reservation.Token)
+}
+
+func (m *CoreApplicationMedia) ResolveAdminProofs(ctx context.Context, applicationPublicID string, assetPublicIDs []string) ([]ProofAssetView, error) {
+	if !validULID(applicationPublicID) {
+		return nil, ErrProofMediaUnavailable
+	}
+	ordered, err := validateProofAssetIDs(assetPublicIDs)
+	if err != nil {
+		return nil, ErrProofMediaUnavailable
+	}
+
+	type finalObject struct {
+		assetID string
+		key     string
+		version string
+	}
+	objects := make([]finalObject, 0, len(ordered))
+	for index, assetPublicID := range ordered {
+		asset, findErr := m.repository.FindAsset(ctx, assetPublicID)
+		if findErr != nil || !validAdminProofAsset(asset, assetPublicID) {
+			return nil, proofUnavailable(findErr)
+		}
+		snapshots, findErr := m.repository.FindGatewayAssetSnapshots(ctx, assetPublicID)
+		if findErr != nil || len(snapshots) == 0 || !validAdminProofSnapshot(snapshots[0], assetPublicID) {
+			return nil, proofUnavailable(findErr)
+		}
+		reference, findErr := m.repository.FindReferenceByCoordinates(
+			ctx, asset.ID, coremedia.PurposeIdentityApplication, applicationPublicID, uint16(index),
+		)
+		if findErr != nil || !validAdminProofReference(reference, asset.ID, applicationPublicID, uint16(index)) {
+			return nil, proofUnavailable(findErr)
+		}
+		objects = append(objects, finalObject{
+			assetID: assetPublicID,
+			key:     strings.TrimSpace(*asset.FinalKey),
+			version: strings.TrimSpace(*asset.FinalVersionID),
+		})
+	}
+
+	expiresAt := m.now().UTC().Add(identityProofURLTTL)
+	proofs := make([]ProofAssetView, 0, len(objects))
+	for _, object := range objects {
+		url, signErr := m.signer.SignedGetURL(ctx, object.key, object.version, identityProofURLTTL)
+		if signErr != nil || strings.TrimSpace(url) == "" {
+			return nil, proofUnavailable(signErr)
+		}
+		proofs = append(proofs, ProofAssetView{AssetID: object.assetID, URL: url, ExpiresAt: expiresAt})
+	}
+	return proofs, nil
+}
+
+func validateProofAssetIDs(values []string) ([]string, error) {
+	if len(values) == 0 || len(values) > maxIdentityProofAssets {
+		return nil, ErrProofMediaUnavailable
+	}
+	ordered := make([]string, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for index, value := range values {
+		value = strings.TrimSpace(value)
+		if !validULID(value) {
+			return nil, ErrProofMediaUnavailable
+		}
+		if _, duplicate := seen[value]; duplicate {
+			return nil, ErrProofMediaUnavailable
+		}
+		seen[value] = struct{}{}
+		ordered[index] = value
+	}
+	return ordered, nil
+}
+
+func validMediaReservationToken(token string) bool {
+	return strings.HasPrefix(token, "m10_") && validULID(strings.TrimPrefix(token, "m10_"))
+}
+
+func validAdminProofAsset(asset coremedia.Asset, requestedPublicID string) bool {
+	return asset.ID != 0 && asset.AssetPublicID == requestedPublicID &&
+		asset.Purpose == coremedia.PurposeIdentityApplication &&
+		asset.StorageStage == coremedia.StorageStageFinal &&
+		asset.TechnicalStatus == coremedia.TechnicalFinalReady &&
+		asset.FinalKey != nil && strings.TrimSpace(*asset.FinalKey) != "" &&
+		asset.FinalVersionID != nil && strings.TrimSpace(*asset.FinalVersionID) != "" &&
+		asset.DeleteRequestedAt == nil && asset.DeletedAt == nil
+}
+
+func validAdminProofSnapshot(snapshot coremedia.GatewaySnapshot, requestedPublicID string) bool {
+	return snapshot.AssetPublicID == requestedPublicID &&
+		snapshot.Purpose == coremedia.PurposeIdentityApplication &&
+		snapshot.StorageStage == coremedia.StorageStageFinal &&
+		snapshot.TechnicalStatus == coremedia.TechnicalFinalReady &&
+		snapshot.FinalIdentityReady && !snapshot.DeleteRequested &&
+		snapshot.ProjectionStatus == coremedia.ProjectionApproved
+}
+
+func validAdminProofReference(reference coremedia.AssetReference, assetID uint64, applicationPublicID string, slot uint16) bool {
+	return reference.ID != 0 && reference.AssetID == assetID &&
+		reference.ReferenceType == coremedia.PurposeIdentityApplication &&
+		reference.ReferenceID == applicationPublicID && reference.Slot == slot &&
+		(reference.Status == coremedia.ReferencePending || reference.Status == coremedia.ReferenceActive) &&
+		reference.ParentVisibility == coremedia.ParentHidden && reference.RevocationFence == nil
+}
+
+func proofUnavailable(cause error) error {
+	if cause == nil {
+		return ErrProofMediaUnavailable
+	}
+	return fmt.Errorf("%w: %v", ErrProofMediaUnavailable, cause)
+}
+
+var _ ApplicationMedia = (*CoreApplicationMedia)(nil)
+var _ referenceBindingGateway = (*coremedia.ReferenceBindingService)(nil)
+var _ proofMediaRepository = (*coremedia.GormRepository)(nil)

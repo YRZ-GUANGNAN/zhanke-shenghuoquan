@@ -27,18 +27,18 @@ var (
 )
 
 type Service struct {
-	repo Repository
-	now  func() time.Time
+	repo  Repository
+	media ApplicationMedia
+	now   func() time.Time
 }
 
-// NewService retains a media dependency slot because Task 3 wires the private
-// proof reservation adapter into the same service. Submission validation and
-// persistence do not use that dependency yet.
-func NewService(repo Repository, _ any, now func() time.Time) *Service {
+// NewService retains the typed private-media dependency for the submission
+// transaction wired by the HTTP task. Submission validation does not use it yet.
+func NewService(repo Repository, applicationMedia ApplicationMedia, now func() time.Time) *Service {
 	if now == nil {
 		now = time.Now
 	}
-	return &Service{repo: repo, now: now}
+	return &Service{repo: repo, media: applicationMedia, now: now}
 }
 
 func (s *Service) Submit(ctx context.Context, userID uint64, role Role, input SubmitInput) (ApplicationView, error) {
