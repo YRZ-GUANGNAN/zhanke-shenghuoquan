@@ -16,15 +16,19 @@
   position: relative;
   z-index: 6;
   flex: 0 0 auto;
-  padding: 112rpx var(--capsule-safe-right, 28rpx) 22rpx 28rpx;
+  padding: 0 0 22rpx;
   background: $bg-surface;
   box-shadow: $shadow-header;
 }
 
 .student-secondhand-header__title-row {
-  display: flex;
-  align-items: center;
+  box-shadow: none;
+}
+
+.student-secondhand-header__title-row .capsule-page-header__business-row {
   gap: 20rpx;
+  padding-right: 28rpx;
+  padding-left: 28rpx;
 }
 
 .student-secondhand-header__title {
@@ -81,7 +85,7 @@
 }
 
 .student-secondhand-categories {
-  margin: 24rpx -28rpx 0;
+  margin: 24rpx 0 0;
   white-space: nowrap;
 }
 

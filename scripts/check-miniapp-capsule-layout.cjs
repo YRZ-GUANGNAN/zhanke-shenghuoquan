@@ -113,6 +113,22 @@ for (const pageName of publishingAndDetailPages) {
   assert.doesNotMatch(style, /--capsule-safe-right/, `${pageName} must not squeeze business navigation beside the capsule`)
 }
 
+const mainPages = ['home', 'search', 'student-secondhand', 'student-takeout']
+
+for (const pageName of mainPages) {
+  const source = fs.readFileSync(path.join(miniappPagesRoot, pageName, 'index.tsx'), 'utf8')
+  const style = fs.readFileSync(path.join(miniappPagesRoot, pageName, 'index.scss'), 'utf8')
+  assert.match(source, /CapsulePageHeader/, `${pageName} must use CapsulePageHeader`)
+  assert.doesNotMatch(style, /--capsule-safe-right/, `${pageName} must not squeeze business navigation beside the capsule`)
+}
+
+assert.equal(fs.existsSync(path.join(miniappPagesRoot, 'home', 'header-layout.ts')), false)
+const studentTakeoutSource = fs.readFileSync(path.join(miniappPagesRoot, 'student-takeout', 'index.tsx'), 'utf8')
+const studentTakeoutStyle = fs.readFileSync(path.join(miniappPagesRoot, 'student-takeout', 'index.scss'), 'utf8')
+assert.match(studentTakeoutSource, /style=\{getCapsuleSafeStyle\(\)\}/)
+assert.match(studentTakeoutStyle, /calc\(var\(--capsule-total-header-height\)/)
+assert.doesNotMatch(studentTakeoutStyle, /204rpx/)
+
 const postDetailSource = fs.readFileSync(path.join(miniappPagesRoot, 'post-detail', 'index.tsx'), 'utf8')
 const postDetailStyle = fs.readFileSync(path.join(miniappPagesRoot, 'post-detail', 'index.scss'), 'utf8')
 assert.match(postDetailSource, /style=\{getCapsuleSafeStyle\(\)\}/)

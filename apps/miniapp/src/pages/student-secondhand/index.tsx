@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
 import StudentBottomNav from '../../components/student-bottom-nav'
+import CapsulePageHeader from '../../components/capsule-page-header'
 import { getProductsPage } from '../../services/c-trade'
 import Taro from '../../services/taro'
 import type { Product } from '../../types'
@@ -221,13 +222,18 @@ export default function StudentSecondhandPage() {
   return (
     <View className='student-secondhand-page' style={getCapsuleSafeStyle()}>
       <View className='student-secondhand-header'>
-        <View className='student-secondhand-header__title-row'>
-          <Text className='student-secondhand-header__title'>二手集市</Text>
-          <View className='student-secondhand-search' onClick={openSearch}>
-            <View className='student-secondhand-search__icon' />
-            <Text>搜二手好物</Text>
-          </View>
-        </View>
+        <CapsulePageHeader
+          variant='search'
+          className='student-secondhand-header__title-row'
+          left={<Text className='student-secondhand-header__title'>二手集市</Text>}
+          center={
+            <View className='student-secondhand-search' onClick={openSearch}>
+              <View className='student-secondhand-search__icon' />
+              <Text>搜二手好物</Text>
+            </View>
+          }
+          divider={false}
+        />
 
         <ScrollView className='student-secondhand-categories' scrollX enhanced showScrollbar={false}>
           <View className='student-secondhand-categories__inner'>

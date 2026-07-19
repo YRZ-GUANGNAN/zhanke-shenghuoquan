@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Input, Text, View } from '@tarojs/components'
+import CapsulePageHeader from '../../components/capsule-page-header'
 import type { CommunityPost, Product } from '../../types'
 import Taro from '../../services/taro'
 import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
@@ -205,10 +206,11 @@ export default function SearchPage() {
   if (!scope || !copy) {
     return (
       <View className='student-search-page' style={getCapsuleSafeStyle()}>
-        <View className='student-search-header'>
-          <View className='student-search-back' onClick={() => void Taro.navigateBack()} />
-          <Text className='student-search-header__title'>搜索入口无效</Text>
-        </View>
+        <CapsulePageHeader
+          className='student-search-header'
+          title='搜索入口无效'
+          left={<View className='student-search-back' onClick={() => void Taro.navigateBack()} />}
+        />
         <View className='student-search-invalid'>请从帖子、二手或外卖页面重新进入搜索。</View>
       </View>
     )
@@ -216,21 +218,25 @@ export default function SearchPage() {
 
   return (
     <View className='student-search-page' style={getCapsuleSafeStyle()}>
-      <View className='student-search-header'>
-        <View className='student-search-back' onClick={() => void Taro.navigateBack()} />
-        <View className='student-search-box'>
-          <View className='student-search-box__icon' />
-          <Input
-            className='student-search-box__input'
-            value={keyword}
-            placeholder={copy.placeholder}
-            confirmType='search'
-            onInput={(event) => setKeyword(event.detail.value)}
-            onConfirm={() => void submitSearch()}
-          />
-        </View>
-        <Text className='student-search-submit' onClick={() => void submitSearch()}>{loading ? '搜索中' : '搜索'}</Text>
-      </View>
+      <CapsulePageHeader
+        variant='search'
+        className='student-search-header'
+        left={<View className='student-search-back' onClick={() => void Taro.navigateBack()} />}
+        center={
+          <View className='student-search-box'>
+            <View className='student-search-box__icon' />
+            <Input
+              className='student-search-box__input'
+              value={keyword}
+              placeholder={copy.placeholder}
+              confirmType='search'
+              onInput={(event) => setKeyword(event.detail.value)}
+              onConfirm={() => void submitSearch()}
+            />
+          </View>
+        }
+        right={<Text className='student-search-submit' onClick={() => void submitSearch()}>{loading ? '搜索中' : '搜索'}</Text>}
+      />
 
       <View className='student-search-content'>
         {!hasSearched && (

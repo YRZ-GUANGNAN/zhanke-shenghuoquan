@@ -8,14 +8,7 @@
 }
 
 .student-search-header {
-  box-sizing: border-box;
-  min-height: 176rpx;
-  padding: 96rpx var(--capsule-safe-right, 28rpx) 20rpx 28rpx;
-  display: flex;
-  align-items: center;
-  gap: 18rpx;
-  background: $bg-surface;
-  border-bottom: 1rpx solid $divider-nav;
+  box-shadow: $shadow-header;
 }
 
 .student-search-back {
@@ -36,11 +29,6 @@
     border-radius: 2rpx;
     transform: rotate(45deg);
   }
-}
-
-.student-search-header__title {
-  font-size: 32rpx;
-  font-weight: 700;
 }
 
 .student-search-box {

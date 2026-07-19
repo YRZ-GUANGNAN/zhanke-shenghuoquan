@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import TaroRuntime, { useDidShow } from '@tarojs/taro'
 import { Image, Text, View } from '@tarojs/components'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import StudentBottomNav from '../../components/student-bottom-nav'
+import CapsulePageHeader from '../../components/capsule-page-header'
 import { useIdentityGuard } from '../../hooks/use-identity-guard'
 import type { CommunityPost, Product, ToolLink } from '../../types'
 import { isApiError } from '../../services/api'
@@ -12,7 +13,6 @@ import { listIMConversations } from '../../services/e-im'
 import { listNavigationItems } from '../../services/d-navigation'
 import { requestWithSingleSessionRecovery } from '../../services/session-recovery'
 import Taro from '../../services/taro'
-import { calculateHomeHeaderLayout } from './header-layout'
 import './index.scss'
 
 type HomeTab = 'messages' | 'discover' | 'tools'
@@ -144,13 +144,6 @@ type ConversationStatus = 'idle' | 'loading' | 'empty' | 'ready' | 'error'
 type ToolStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'error'
 
 function HomeContent() {
-  const [headerLayout] = useState(() => {
-    try {
-      return calculateHomeHeaderLayout(Taro.getWindowInfo(), Taro.getMenuButtonBoundingClientRect())
-    } catch {
-      return { top: 20, minHeight: 64, right: 96 }
-    }
-  })
   const [activeTab, setActiveTab] = useState<HomeTab>('discover')
   const [postCards, setPostCards] = useState<DiscoverCard[]>([])
   const [productCards, setProductCards] = useState<DiscoverCard[]>([])
@@ -175,11 +168,6 @@ function HomeContent() {
   )
   const columns = useMemo(() => splitCards(cards), [cards])
   const identityAllowed = useIdentityGuard('student')
-  const headerStyle = {
-    '--home-header-top': `${headerLayout.top}px`,
-    '--home-header-height': `${headerLayout.minHeight}px`,
-    '--home-header-right': `${headerLayout.right}px`
-  } as React.CSSProperties
 
   const loadDiscover = useCallback(async (
     reset = false,
@@ -472,20 +460,24 @@ function HomeContent() {
 
   return (
     <View className='page student-home-page'>
-      <View className='student-home-header' style={headerStyle}>
-        <View className='student-home-header__tabs'>
-          {tabs.map((tab) => (
-            <View
-              key={tab.key}
-              className={`student-home-header__tab ${activeTab === tab.key ? 'student-home-header__tab--active' : ''}`}
-              onClick={() => setActiveTab(tab.key)}
-            >
-              <Text>{tab.label}</Text>
-            </View>
-          ))}
-        </View>
-        <View className='student-home-header__search' onClick={openSearch} />
-      </View>
+      <CapsulePageHeader
+        variant='tabs'
+        className='student-home-header'
+        center={
+          <View className='student-home-header__tabs'>
+            {tabs.map((tab) => (
+              <View
+                key={tab.key}
+                className={`student-home-header__tab ${activeTab === tab.key ? 'student-home-header__tab--active' : ''}`}
+                onClick={() => setActiveTab(tab.key)}
+              >
+                <Text>{tab.label}</Text>
+              </View>
+            ))}
+          </View>
+        }
+        right={<View className='student-home-header__search' onClick={openSearch} />}
+      />
 
       <View className='student-home-content'>
         {activeTab === 'messages' && (

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDidShow } from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
 import StudentBottomNav from '../../components/student-bottom-nav'
+import CapsulePageHeader from '../../components/capsule-page-header'
 import {
   listExternalTakeoutMerchants,
   type ExternalTakeoutMerchantLink,
@@ -66,16 +67,21 @@ export default function StudentTakeoutPage() {
   return (
     <View className='student-takeout-page' style={getCapsuleSafeStyle()}>
       <View className='student-takeout-header'>
-        <View className='student-takeout-header__row'>
-          <Text className='student-takeout-header__title'>外卖</Text>
-          <View
-            className='student-takeout-search'
-            onClick={() => void Taro.navigateTo({ url: '/pages/search/index?scope=takeout' })}
-          >
-            <View className='student-takeout-search__icon' />
-            <Text>搜索商家</Text>
-          </View>
-        </View>
+        <CapsulePageHeader
+          variant='search'
+          className='student-takeout-header__row'
+          left={<Text className='student-takeout-header__title'>外卖</Text>}
+          center={
+            <View
+              className='student-takeout-search'
+              onClick={() => void Taro.navigateTo({ url: '/pages/search/index?scope=takeout' })}
+            >
+              <View className='student-takeout-search__icon' />
+              <Text>搜索商家</Text>
+            </View>
+          }
+          divider={false}
+        />
         <Text className='student-takeout-header__subtitle'>校内合作商家 · 点击进入对应商家小程序</Text>
       </View>
 

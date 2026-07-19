@@ -14,22 +14,19 @@
 }
 
 .student-home-header {
-  position: relative;
   z-index: 5;
-  flex: 0 0 auto;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  min-height: var(--home-header-height, 64px);
-  padding: var(--home-header-top, 20px) var(--home-header-right, 96px) 0 36rpx;
-  background: $bg-surface;
   box-shadow: $shadow-header;
 }
 
+.student-home-header .capsule-page-header__business-row {
+  padding-right: 36rpx;
+  padding-left: 36rpx;
+}
+
 .student-home-header__tabs {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   display: flex;
-  align-items: flex-end;
+  align-items: stretch;
   min-width: 0;
   gap: 48rpx;
 }
@@ -39,8 +36,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 72rpx;
-  padding: 16rpx 4rpx 24rpx;
+  min-height: 44px;
+  padding: 0 4rpx;
   color: $text-tertiary;
   font-size: 32rpx;
   font-weight: 500;
@@ -53,7 +50,7 @@
 
 .student-home-header__tab--active::after {
   position: absolute;
-  bottom: 12rpx;
+  bottom: 2px;
   left: 50%;
   width: 40rpx;
   height: 6rpx;
@@ -65,10 +62,9 @@
 
 .student-home-header__search {
   position: relative;
-  flex: 0 0 68rpx;
-  width: 68rpx;
-  height: 68rpx;
-  margin-bottom: 16rpx;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
 }
 
@@ -78,14 +74,14 @@
   }
 
   .student-home-header__search {
-    margin-left: 12rpx;
+    margin-left: 0;
   }
 }
 
 .student-home-header__search::before {
   position: absolute;
-  top: 18rpx;
-  left: 18rpx;
+  top: 12px;
+  left: 11px;
   width: 24rpx;
   height: 24rpx;
   border: 4rpx solid $text-strong;
@@ -95,8 +91,8 @@
 
 .student-home-header__search::after {
   position: absolute;
-  top: 43rpx;
-  left: 43rpx;
+  top: 25px;
+  left: 24px;
   width: 18rpx;
   height: 4rpx;
   border-radius: 4rpx;
