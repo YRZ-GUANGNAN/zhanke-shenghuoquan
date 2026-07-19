@@ -7,7 +7,6 @@ const tabs: Array<{ key: TabKey; label: string; icon: string; url: string }> = [
   { key: 'home', label: '首页', icon: 'S', url: '/pages/home/index' },
   { key: 'takeout', label: '外卖', icon: 'F', url: '/pages/student-takeout/index' },
   { key: 'market', label: '二手', icon: 'M', url: '/pages/student-secondhand/index' },
-  { key: 'tools', label: '工具', icon: 'T', url: '/pages/tools/index' },
   { key: 'profile', label: '我的', icon: 'U', url: '/pages/profile/index' }
 ]
 
