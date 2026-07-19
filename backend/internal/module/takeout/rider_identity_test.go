@@ -11,6 +11,7 @@ type riderIdentityRepositoryStub struct {
 	value   Rider
 	findErr error
 	created *Rider
+	locked  bool
 }
 
 func (r *riderIdentityRepositoryStub) CreateRider(_ context.Context, value *Rider) error {
@@ -22,6 +23,11 @@ func (r *riderIdentityRepositoryStub) CreateRider(_ context.Context, value *Ride
 }
 
 func (r *riderIdentityRepositoryStub) FindRider(context.Context, uint64) (Rider, error) {
+	return r.value, r.findErr
+}
+
+func (r *riderIdentityRepositoryStub) FindRiderForUpdate(context.Context, uint64) (Rider, error) {
+	r.locked = true
 	return r.value, r.findErr
 }
 
@@ -50,12 +56,16 @@ func TestRiderIdentityServiceHasNoOrderDependency(t *testing.T) {
 }
 
 func TestRiderIdentityRegistrationIsIdempotentAndValidated(t *testing.T) {
-	existing := Rider{RiderUserID: 702, Status: RiderSuspended, RowVersion: 3}
+	existing := Rider{RiderUserID: 702, Status: RiderActive, RowVersion: 3}
 	repository := &riderIdentityRepositoryStub{value: existing}
 	service, _ := NewRiderIdentityService(repository, time.Now)
 	value, err := service.RegisterApproved(context.Background(), 702, "Different", "13900000000")
-	if err != nil || value.Status != RiderSuspended || repository.created != nil {
+	if err != nil || value.Status != RiderActive || repository.created != nil || !repository.locked {
 		t.Fatalf("idempotent registration=%#v err=%v", value, err)
+	}
+	repository.value.Status = RiderSuspended
+	if _, err := service.RegisterApproved(context.Background(), 702, "Different", "13900000000"); !errors.Is(err, ErrRiderUnavailable) {
+		t.Fatalf("suspended rider approval returned %v", err)
 	}
 	repository.findErr = ErrNotFound
 	if _, err := service.RegisterApproved(context.Background(), 703, "", ""); !errors.Is(err, ErrInvalidRecord) {

@@ -12,6 +12,7 @@ import (
 type RiderIdentityRepository interface {
 	CreateRider(context.Context, *Rider) error
 	FindRider(context.Context, uint64) (Rider, error)
+	FindRiderForUpdate(context.Context, uint64) (Rider, error)
 }
 
 type RiderIdentityService struct {
@@ -55,7 +56,10 @@ func (s *RiderIdentityService) RegisterApproved(
 	if riderUserID == 0 {
 		return Rider{}, ErrInvalidRecord
 	}
-	if existing, err := s.repository.FindRider(ctx, riderUserID); err == nil {
+	if existing, err := s.repository.FindRiderForUpdate(ctx, riderUserID); err == nil {
+		if existing.Status != RiderActive {
+			return Rider{}, ErrRiderUnavailable
+		}
 		return existing, nil
 	} else if !errors.Is(err, ErrNotFound) {
 		return Rider{}, err
@@ -77,7 +81,10 @@ func (s *RiderIdentityService) RegisterApproved(
 		return Rider{}, err
 	}
 	if err := s.repository.CreateRider(ctx, &value); err != nil {
-		if existing, findErr := s.repository.FindRider(ctx, riderUserID); findErr == nil {
+		if existing, findErr := s.repository.FindRiderForUpdate(ctx, riderUserID); findErr == nil {
+			if existing.Status != RiderActive {
+				return Rider{}, ErrRiderUnavailable
+			}
 			return existing, nil
 		}
 		return Rider{}, err

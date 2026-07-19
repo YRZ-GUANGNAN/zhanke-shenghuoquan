@@ -27,6 +27,9 @@ func newIdentityApplicationApprovalProvisioner(now func() time.Time) identityapp
 			return err
 		}
 		_, err = riders.RegisterApproved(ctx, approved.UserID, approved.RealName, approved.Phone)
+		if errors.Is(err, takeout.ErrRiderUnavailable) {
+			return identityapplication.ErrDecisionConflict
+		}
 		return err
 	})
 }

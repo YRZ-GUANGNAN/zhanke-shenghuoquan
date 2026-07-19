@@ -552,6 +552,13 @@ func (r *GormRepository) FindRider(ctx context.Context, riderUserID uint64) (Rid
 	return value, normalizeNotFound(err)
 }
 
+func (r *GormRepository) FindRiderForUpdate(ctx context.Context, riderUserID uint64) (Rider, error) {
+	var value Rider
+	err := r.db.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("rider_user_id = ?", riderUserID).First(&value).Error
+	return value, normalizeNotFound(err)
+}
+
 func (r *GormRepository) TransitionRiderStatus(
 	ctx context.Context,
 	riderUserID, expectedRowVersion uint64,
