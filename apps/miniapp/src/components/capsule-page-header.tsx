@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { cloneElement, isValidElement, type ReactNode } from 'react'
 import { Text, View } from '@tarojs/components'
 import { getCapsuleSafeStyle } from '../utils/capsule-safe'
 import './capsule-page-header.scss'
@@ -17,6 +17,12 @@ interface CapsulePageHeaderProps {
   center?: ReactNode
   right?: ReactNode
   divider?: boolean
+}
+
+function addSlotContentClass(content: ReactNode) {
+  if (!isValidElement<{ className?: string }>(content)) return content
+  const className = `${content.props.className ?? ''} capsule-page-header__slot-content`.trim()
+  return cloneElement(content, { className })
 }
 
 export function CapsuleSystemRow({ className = '' }: CapsuleSystemRowProps) {
@@ -44,10 +50,10 @@ export default function CapsulePageHeader({
     >
       <View className='capsule-page-header__system-row' />
       <View className={`capsule-page-header__business-row capsule-page-header__business-row--${variant}`}>
-        {left ? <View className='capsule-page-header__slot capsule-page-header__slot--left'>{left}</View> : null}
+        {left ? <View className='capsule-page-header__slot capsule-page-header__slot--left'>{addSlotContentClass(left)}</View> : null}
         {title ? <Text className='capsule-page-header__title'>{title}</Text> : null}
         {center ? <View className='capsule-page-header__center'>{center}</View> : null}
-        {right ? <View className='capsule-page-header__slot capsule-page-header__slot--right'>{right}</View> : null}
+        {right ? <View className='capsule-page-header__slot capsule-page-header__slot--right'>{addSlotContentClass(right)}</View> : null}
       </View>
     </View>
   )
