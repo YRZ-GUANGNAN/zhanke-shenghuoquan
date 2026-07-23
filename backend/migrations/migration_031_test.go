@@ -38,6 +38,7 @@ func TestMigration031SourceContract(t *testing.T) {
 		"CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin",
 		"character_set_name='utf8mb4'", "collation_name='utf8mb4_0900_bin'",
 		"HEX(column_default)=HEX('open')",
+		"CONCAT(CHAR(92),CHAR(39))",
 	} {
 		if !strings.Contains(text, token) {
 			t.Fatalf("migration 031 missing %q", token)
@@ -849,10 +850,20 @@ func assertMigration031Signature(t *testing.T, db *sql.DB) {
 		WHERE tc.constraint_schema=DATABASE() AND tc.table_name='navigation_items'
 		  AND tc.constraint_name='chk_navigation_items_operating_status'
 		  AND tc.constraint_type='CHECK' AND tc.enforced='YES'
-		  AND LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(cc.check_clause,CHAR(96),''),' ',''),'(',''),')',''),'_utf8mb4',''))
+		  AND REPLACE(
+		    LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(cc.check_clause,CHAR(96),''),' ',''),'(',''),')',''),'_utf8mb4','')),
+		    CONCAT(CHAR(92),CHAR(39)),
+		    CHAR(39)
+		  )
 		    = CONCAT('operating_statusin',CHAR(39),'open',CHAR(39),',',CHAR(39),'resting',CHAR(39))
-		  AND LOCATE(HEX(CONCAT(CHAR(39),'open',CHAR(39))),HEX(cc.check_clause)) > 0
-		  AND LOCATE(HEX(CONCAT(CHAR(39),'resting',CHAR(39))),HEX(cc.check_clause)) > 0`)
+		  AND LOCATE(
+		    HEX(CONCAT(CHAR(39),'open',CHAR(39))),
+		    HEX(REPLACE(cc.check_clause,CONCAT(CHAR(92),CHAR(39)),CHAR(39)))
+		  ) > 0
+		  AND LOCATE(
+		    HEX(CONCAT(CHAR(39),'resting',CHAR(39))),
+		    HEX(REPLACE(cc.check_clause,CONCAT(CHAR(92),CHAR(39)),CHAR(39)))
+		  ) > 0`)
 	assertIndexShape031(t, db, "navigation_items", "uq_navigation_items_category_target", []string{"category_id", "app_id", "path"}, true)
 }
 

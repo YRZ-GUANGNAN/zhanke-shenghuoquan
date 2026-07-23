@@ -215,10 +215,20 @@ BEGIN
     AND table_constraint.constraint_name='chk_navigation_items_operating_status'
     AND table_constraint.constraint_type='CHECK'
     AND table_constraint.enforced='YES'
-    AND LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(check_constraint.check_clause,'`',''),' ',''),'(',''),')',''),'_utf8mb4',''))
+    AND REPLACE(
+      LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(check_constraint.check_clause,'`',''),' ',''),'(',''),')',''),'_utf8mb4','')),
+      CONCAT(CHAR(92),CHAR(39)),
+      CHAR(39)
+    )
       = CONCAT('operating_statusin',CHAR(39),'open',CHAR(39),',',CHAR(39),'resting',CHAR(39))
-    AND LOCATE(HEX(CONCAT(CHAR(39),'open',CHAR(39))),HEX(check_constraint.check_clause)) > 0
-    AND LOCATE(HEX(CONCAT(CHAR(39),'resting',CHAR(39))),HEX(check_constraint.check_clause)) > 0;
+    AND LOCATE(
+      HEX(CONCAT(CHAR(39),'open',CHAR(39))),
+      HEX(REPLACE(check_constraint.check_clause,CONCAT(CHAR(92),CHAR(39)),CHAR(39)))
+    ) > 0
+    AND LOCATE(
+      HEX(CONCAT(CHAR(39),'resting',CHAR(39))),
+      HEX(REPLACE(check_constraint.check_clause,CONCAT(CHAR(92),CHAR(39)),CHAR(39)))
+    ) > 0;
   IF signature_ok <> 1 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'migration 031 signature mismatch';
   END IF;
