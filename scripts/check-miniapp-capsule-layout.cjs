@@ -176,4 +176,20 @@ assert.match(postDetailStyle, /padding-top:\s*var\(--capsule-total-header-height
 assert.match(postDetailStyle, /\.capsule-page-header\.post-detail-nav[\s\S]*position:\s*fixed/)
 assert.doesNotMatch(postDetailStyle, /184px/)
 
+const homeStyle = fs.readFileSync(path.join(miniappPagesRoot, 'home', 'index.scss'), 'utf8')
+assert.match(homeStyle, /\.student-home-header__search::before[\s\S]*width:\s*14px/)
+assert.match(homeStyle, /\.student-home-header__search::after[\s\S]*width:\s*8px/)
+assert.doesNotMatch(
+  homeStyle.match(/\.student-home-header__search::(?:before|after)[\s\S]*?(?=\n\})/g)?.join('\n') || '',
+  /\d+rpx/,
+  'search icon geometry must not mix rpx and px',
+)
+
+const editProfileSource = fs.readFileSync(path.join(miniappPagesRoot, 'edit-profile', 'index.tsx'), 'utf8')
+const editProfileStyle = fs.readFileSync(path.join(miniappPagesRoot, 'edit-profile', 'index.scss'), 'utf8')
+assert.match(editProfileSource, /edit-profile-nav__action/)
+assert.match(editProfileSource, /edit-profile-nav__save/)
+assert.match(editProfileStyle, /min-width:\s*64px/)
+assert.match(editProfileStyle, /white-space:\s*nowrap/)
+
 console.log('miniapp capsule geometry: ok')

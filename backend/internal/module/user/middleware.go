@@ -37,6 +37,28 @@ func (s *Service) AuthRequired() gin.HandlerFunc {
 	}
 }
 
+func (s *Service) IdentityRequired(expected Identity) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !expected.Valid() || expected == IdentityStudent {
+			response.Fail(c, http.StatusInternalServerError, "invalid required identity")
+			c.Abort()
+			return
+		}
+		summary, err := s.IdentitySummary(c, CurrentUserID(c))
+		if err != nil {
+			response.Fail(c, http.StatusInternalServerError, "get identity failed")
+			c.Abort()
+			return
+		}
+		if summary.CurrentIdentity != expected || !identityAvailable(summary.Identities, expected) {
+			response.Fail(c, http.StatusForbidden, "approved identity required")
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
 func AdminRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		value := CurrentUser(c)

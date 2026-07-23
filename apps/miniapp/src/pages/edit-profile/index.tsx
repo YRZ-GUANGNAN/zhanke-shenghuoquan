@@ -55,8 +55,16 @@ export default function EditProfilePage() {
     <View className='edit-profile-page'>
       <CapsulePageHeader
         title='编辑资料'
-        left={<Text className='edit-profile-nav__action' onClick={() => void Taro.navigateBack()}>取消</Text>}
-        right={<Text className='edit-profile-nav__save' onClick={() => void save()}>{saving ? '保存中' : '保存'}</Text>}
+        left={(
+          <View className='edit-profile-nav__action' onClick={() => void Taro.navigateBack()}>
+            <Text>取消</Text>
+          </View>
+        )}
+        right={(
+          <View className={`edit-profile-nav__save ${saving ? 'edit-profile-nav__save--disabled' : ''}`} onClick={() => void save()}>
+            <Text>{saving ? '保存中' : '保存'}</Text>
+          </View>
+        )}
       />
 
       <View className='edit-profile-content'>

@@ -21,6 +21,47 @@ page {
   overflow: hidden;
 }
 
+.merchant-home-page--review {
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+.merchant-home-review {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48rpx;
+  text-align: center;
+}
+
+.merchant-home-review__title {
+  color: $text-primary;
+  font-size: 36rpx;
+  font-weight: 700;
+}
+
+.merchant-home-review__message {
+  max-width: 560rpx;
+  margin-top: 20rpx;
+  color: $text-secondary;
+  font-size: 28rpx;
+  line-height: 1.6;
+}
+
+.merchant-home-review__action {
+  min-width: 240rpx;
+  margin-top: 40rpx;
+  padding: 24rpx 36rpx;
+  border-radius: 999rpx;
+  background: $brand-primary;
+  color: $text-on-color;
+  font-size: 28rpx;
+  font-weight: 600;
+  box-sizing: border-box;
+}
+
 .merchant-home-hero {
   position: relative;
   flex: 0 0 auto;

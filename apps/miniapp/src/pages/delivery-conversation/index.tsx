@@ -182,7 +182,7 @@ export default function DeliveryConversationPage() {
     }
   }
 
-  const fallback = identity === 'merchant' ? '/pages/delivery-merchant/index' : '/pages/delivery-rider/index'
+  const fallback = identity === 'merchant' ? '/pages/merchant-home/index' : '/pages/delivery-rider/index'
   const goBack = () => {
     void Taro.navigateBack().catch(() => Taro.redirectTo({ url: fallback }))
   }

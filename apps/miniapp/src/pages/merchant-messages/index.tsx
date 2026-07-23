@@ -1,143 +1,133 @@
-import React, { useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
+import RuntimeSessionGate from '../../components/runtime-session-gate'
+import { useIdentityGuard } from '../../hooks/use-identity-guard'
+import {
+  getDeliveryConversationUnread,
+  listDeliveryConversations,
+  type DeliveryConversation,
+} from '../../services/delivery-im'
 import Taro from '../../services/taro'
 import './index.scss'
 
-type MerchantMessageKind = 'rider' | 'order' | 'wallet' | 'ops'
-
-interface MerchantMessage {
-  id: string
-  kind: MerchantMessageKind
-  title: string
-  time: string
-  preview: string
-  avatar?: string
-  tag?: string
-  unread?: boolean
+const statusCopy: Record<DeliveryConversation['status'], string> = {
+  provisioning: '会话准备中',
+  active: '可发送消息',
+  read_only: '只读会话',
+  revoking: '会话正在关闭',
+  revoked: '会话已关闭',
+  failed: '会话创建失败',
 }
 
-const messages: MerchantMessage[] = [
-  {
-    id: 'rider-li',
-    kind: 'rider',
-    title: '李伟',
-    tag: '骑手',
-    time: '12:41',
-    preview: '#B1079 已取货,正在配送中',
-    avatar: '李',
-    unread: true
-  },
-  {
-    id: 'rider-zhang',
-    kind: 'rider',
-    title: '张强',
-    tag: '骑手',
-    time: '12:28',
-    preview: '我到店了,B1077 在哪个取餐口?',
-    avatar: '张',
-    unread: true
-  },
-  {
-    id: 'order',
-    kind: 'order',
-    title: '订单通知',
-    time: '12:47',
-    preview: '#B1085 已进入抢单池,等待骑手接单',
-    unread: true
-  },
-  {
-    id: 'wallet',
-    kind: 'wallet',
-    title: '钱包通知',
-    time: '09:20',
-    preview: '充值 ¥100.00 已到账,当前余额 ¥86.50'
-  },
-  {
-    id: 'ops',
-    kind: 'ops',
-    title: '平台运营',
-    time: '昨天',
-    preview: '七月配送高峰提示:午间 12:00–13:00 建议提...'
+function formatTime(value: string) {
+  return value.replace('T', ' ').slice(0, 16)
+}
+
+function MerchantMessagesContent() {
+  const identityAllowed = useIdentityGuard('merchant')
+  const [items, setItems] = useState<DeliveryConversation[]>([])
+  const [unreadById, setUnreadById] = useState<Record<string, number>>({})
+  const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState('')
+
+  const loadMessages = useCallback(async () => {
+    if (!identityAllowed || loading) return
+    setLoading(true)
+    setLoadError('')
+    try {
+      const result = await listDeliveryConversations(1, 30)
+      setItems(result.items)
+      const unreadEntries = await Promise.all(result.items.map(async (item) => {
+        try {
+          const count = await getDeliveryConversationUnread(item.tencentConversationId)
+          return [item.conversationPublicId, count] as const
+        } catch {
+          return [item.conversationPublicId, 0] as const
+        }
+      }))
+      setUnreadById(unreadEntries.reduce<Record<string, number>>((result, [id, count]) => {
+        result[id] = count
+        return result
+      }, {}))
+    } catch (error) {
+      setItems([])
+      setUnreadById({})
+      setLoadError(error instanceof Error ? error.message : '消息加载失败')
+    } finally {
+      setLoading(false)
+    }
+  }, [identityAllowed, loading])
+
+  useEffect(() => {
+    if (identityAllowed) void loadMessages()
+  }, [identityAllowed]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const openConversation = (item: DeliveryConversation) => {
+    void Taro.navigateTo({
+      url: `/pages/delivery-conversation/index?orderId=${encodeURIComponent(item.deliveryOrderPublicId)}&role=merchant`,
+    })
   }
-]
 
-function handleBack() {
-  void Taro.navigateBack()
-}
-
-function messageToast(kind: MerchantMessageKind) {
-  const title = kind === 'rider' ? '私聊静态占位' : '通知详情静态占位'
-  void Taro.showToast({ title, icon: 'none', duration: 1400 })
-}
-
-function openMerchantConversation(message: MerchantMessage) {
-  if (message.kind !== 'rider') {
-    messageToast(message.kind)
-    return
-  }
-  const orderId = message.id === 'rider-zhang' ? 'B1077' : 'B1079'
-  void Taro.navigateTo({
-    url: `/pages/delivery-conversation/index?orderId=${encodeURIComponent(orderId)}&role=merchant`
-  })
-}
-
-export default function MerchantMessagesPage() {
-  const [readIds, setReadIds] = useState<string[]>([])
-  const unreadIds = useMemo(
-    () => messages.filter((item) => item.unread && !readIds.includes(item.id)).map((item) => item.id),
-    [readIds]
-  )
-
-  function markAllRead() {
-    setReadIds(messages.map((item) => item.id))
-    void Taro.showToast({ title: '已全部标为已读', icon: 'none', duration: 1200 })
-  }
+  if (!identityAllowed) return <View className='merchant-messages-page' />
 
   return (
     <View className='merchant-messages-page'>
       <CapsulePageHeader
         className='merchant-messages-nav'
         title='消息'
-        left={<View className='merchant-messages-nav__back' onClick={handleBack}><Text>‹</Text></View>}
+        left={<View className='merchant-messages-nav__back' onClick={() => void Taro.navigateBack()}><Text>‹</Text></View>}
         right={(
-          <Text
-            className={`merchant-messages-nav__read ${unreadIds.length === 0 ? 'merchant-messages-nav__read--muted' : ''}`}
-            onClick={markAllRead}
-          >
-            全部已读
+          <Text className='merchant-messages-nav__read' onClick={() => void loadMessages()}>
+            刷新
           </Text>
         )}
       />
 
       <ScrollView className='merchant-messages-scroll' scrollY enhanced showScrollbar={false}>
         <View className='merchant-messages-card'>
-          {messages.map((item) => {
-            const hasUnread = item.unread && !readIds.includes(item.id)
+          {loading ? <Text className='merchant-messages-card__footer'>正在加载真实配送会话…</Text> : null}
+          {!loading && loadError ? (
+            <Text className='merchant-messages-card__footer' onClick={() => void loadMessages()}>
+              {loadError}，点击重试
+            </Text>
+          ) : null}
+          {!loading && !loadError && items.length === 0 ? (
+            <Text className='merchant-messages-card__footer'>当前没有配送会话</Text>
+          ) : null}
+          {items.map((item) => {
+            const unread = unreadById[item.conversationPublicId] || 0
             return (
-              <View key={item.id} className='merchant-message-item' onClick={() => openMerchantConversation(item)}>
-                <View className={`merchant-message-item__avatar merchant-message-item__avatar--${item.kind}`}>
-                  {item.kind === 'rider' ? <Text>{item.avatar}</Text> : <Text>▵</Text>}
-                  {hasUnread && <View className='merchant-message-item__dot' />}
+              <View key={item.conversationPublicId} className='merchant-message-item' onClick={() => openConversation(item)}>
+                <View className='merchant-message-item__avatar merchant-message-item__avatar--rider'>
+                  <Text>聊</Text>
+                  {unread > 0 ? <View className='merchant-message-item__dot' /> : null}
                 </View>
                 <View className='merchant-message-item__body'>
                   <View className='merchant-message-item__top'>
                     <View className='merchant-message-item__title-row'>
-                      <Text className='merchant-message-item__title'>{item.title}</Text>
-                      {item.tag && <Text className='merchant-message-item__tag'>{item.tag}</Text>}
+                      <Text className='merchant-message-item__title'>配送单 #{item.deliveryOrderPublicId}</Text>
+                      <Text className='merchant-message-item__tag'>{item.canSend ? '可私聊' : '只读'}</Text>
                     </View>
-                    <Text className='merchant-message-item__time'>{item.time}</Text>
+                    <Text className='merchant-message-item__time'>{formatTime(item.updatedAt)}</Text>
                   </View>
-                  <Text className={`merchant-message-item__preview ${hasUnread ? 'merchant-message-item__preview--unread' : ''}`}>
-                    {item.preview}
+                  <Text className={`merchant-message-item__preview ${unread > 0 ? 'merchant-message-item__preview--unread' : ''}`}>
+                    {unread > 0 ? `${unread} 条未读消息` : statusCopy[item.status]}
                   </Text>
                 </View>
               </View>
             )
           })}
-          <Text className='merchant-messages-card__footer'>仅展示最近 30 天消息</Text>
         </View>
       </ScrollView>
     </View>
+  )
+}
+
+export default function MerchantMessagesPage() {
+  return (
+    <RuntimeSessionGate preserveAuthenticatedChildrenDuringRetry>
+      <MerchantMessagesContent />
+    </RuntimeSessionGate>
   )
 }

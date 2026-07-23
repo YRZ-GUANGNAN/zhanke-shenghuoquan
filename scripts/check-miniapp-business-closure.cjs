@@ -22,7 +22,12 @@ const mustContain = [
   ['pages/edit-profile/index.tsx', 'updateProfile'],
   ['pages/delivery-rider/index.tsx', 'listClaimableDeliveryOrders'],
   ['pages/delivery-conversation/index.tsx', 'loadDeliveryTencentMessages'],
-  ['pages/delivery-merchant/index.tsx', "useIdentityGuard('merchant')"]
+  ['pages/merchant-home/index.tsx', 'listMerchantDeliveryOrders'],
+  ['pages/merchant-home/index.tsx', 'getDeliveryWallet'],
+  ['pages/merchant-publish/index.tsx', 'createMerchantDeliveryOrder'],
+  ['pages/merchant-wallet/index.tsx', 'listDeliveryWalletLedger'],
+  ['pages/merchant-messages/index.tsx', 'listDeliveryConversations'],
+  ['pages/merchant-order-detail/index.tsx', 'getMerchantDeliveryOrder']
 ]
 for (const [relative, token] of mustContain) {
   const source = fs.readFileSync(path.join(src, relative), 'utf8')
@@ -39,8 +44,37 @@ for (const violation of homeToolsDataFlowViolations(home)) {
 assertSyntheticStaticToolsRejected(home)
 
 const identityGuard = fs.readFileSync(path.join(src, 'hooks/use-identity-guard.ts'), 'utf8')
-if (!identityGuard.includes("merchant: '/pages/delivery-merchant/index'")) {
-  violations.push('merchant identity must route to the real delivery merchant workbench')
+if (!identityGuard.includes("merchant: '/pages/merchant-home/index'")) {
+  violations.push('merchant identity must route to the new real-data merchant workbench')
+}
+const merchantHome = fs.readFileSync(path.join(src, 'pages/merchant-home/index.tsx'), 'utf8')
+for (const token of [
+  "getIdentityApplication('merchant')",
+  "applicationResult.value.status !== 'approved'",
+  "setApprovalState('blocked')"
+]) {
+  if (!merchantHome.includes(token)) {
+    violations.push(`pages/merchant-home/index.tsx: missing reviewed application gate ${token}`)
+  }
+}
+
+const merchantPages = [
+  'merchant-home',
+  'merchant-publish',
+  'merchant-wallet',
+  'merchant-messages',
+  'merchant-order-detail'
+]
+for (const pageName of merchantPages) {
+  const route = `pages/${pageName}/index`
+  if (!routes.includes(route)) violations.push(`${route}: new merchant page must be registered`)
+  const source = fs.readFileSync(path.join(src, `${route}.tsx`), 'utf8')
+  if (!source.includes("useIdentityGuard('merchant')")) {
+    violations.push(`${route}: direct route must require approved merchant identity`)
+  }
+  if (/delivery-static-data|StaticDeliveryOrder|resolveStaticDeliveryOrder|initialLedger|pendingOrders|deliveringOrders|completedOrders/.test(source)) {
+    violations.push(`${route}: static merchant fixtures must be removed`)
+  }
 }
 
 const communityClient = fs.readFileSync(path.join(src, 'services/b-community.ts'), 'utf8')

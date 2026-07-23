@@ -6,7 +6,7 @@ import type { IdentityRoleKey } from '../types'
 const routeForIdentity: Record<IdentityRoleKey, string> = {
   student: '/pages/profile/index',
   rider: '/pages/delivery-rider/index',
-  merchant: '/pages/delivery-merchant/index'
+  merchant: '/pages/merchant-home/index'
 }
 
 export function identityRoute(identity: IdentityRoleKey): string {
@@ -17,7 +17,10 @@ export function useIdentityGuard(expected: IdentityRoleKey): boolean {
   const status = useSessionStore((state) => state.status)
   const identity = useSessionStore((state) => state.identity)
   const redirected = useRef(false)
-  const allowed = status === 'authenticated' && identity?.currentIdentity === expected
+  const availability = identity?.identities.find((item) => item.identity === expected)
+  const allowed = status === 'authenticated'
+    && identity?.currentIdentity === expected
+    && (expected === 'student' || availability?.available === true)
 
   useEffect(() => {
     if (allowed) {

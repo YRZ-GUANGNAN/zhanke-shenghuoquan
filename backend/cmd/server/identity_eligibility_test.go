@@ -38,8 +38,12 @@ func grantKey(userID uint64, role identityapplication.Role) string {
 }
 
 func activeGrant(userID uint64, role identityapplication.Role) stubGrantFinder {
+	sourceApplicationID := userID + 1000
 	return stubGrantFinder{grants: map[string]identityapplication.IdentityGrant{
-		grantKey(userID, role): {UserID: userID, Role: role, Status: identityapplication.GrantActive},
+		grantKey(userID, role): {
+			UserID: userID, Role: role, Status: identityapplication.GrantActive,
+			SourceApplicationID: &sourceApplicationID,
+		},
 	}}
 }
 
@@ -111,6 +115,15 @@ func TestMerchantRequiresActiveGrant(t *testing.T) {
 	active, err := newDeliveryIdentityEligibility(true, nil, activeGrant(88, identityapplication.RoleMerchant)).MerchantEligible(context.Background(), 88)
 	if err != nil || !active.Available || active.Status != "active" {
 		t.Fatalf("active=%+v err=%v", active, err)
+	}
+	legacyGrant := stubGrantFinder{grants: map[string]identityapplication.IdentityGrant{
+		grantKey(88, identityapplication.RoleMerchant): {
+			UserID: 88, Role: identityapplication.RoleMerchant, Status: identityapplication.GrantActive,
+		},
+	}}
+	legacy, err := newDeliveryIdentityEligibility(true, nil, legacyGrant).MerchantEligible(context.Background(), 88)
+	if err != nil || legacy.Available || legacy.Status != "missing" {
+		t.Fatalf("legacy grant without reviewed application=%+v err=%v", legacy, err)
 	}
 	suspendedFinder := stubGrantFinder{grants: map[string]identityapplication.IdentityGrant{
 		grantKey(88, identityapplication.RoleMerchant): {UserID: 88, Role: identityapplication.RoleMerchant, Status: identityapplication.GrantSuspended},

@@ -1,212 +1,125 @@
-import React, { useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
 import IdentitySwitchModal from '../../components/IdentitySwitchModal'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
+import { getIdentityApplication } from '../../services/a-user'
+import {
+  centsToYuan,
+  listMerchantDeliveryOrders,
+  type DeliveryStatus,
+  type MerchantDeliveryOrder,
+} from '../../services/delivery-merchant'
+import { getDeliveryWallet } from '../../services/delivery-payment'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
 import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import './index.scss'
 
 type MerchantTabKey = 'pending' | 'delivering' | 'completed'
-type OrderStatusKind = 'waiting' | 'delivering' | 'pickup' | 'completed'
+type Settled<T> = { ok: true; value: T } | { ok: false; error: unknown }
+type ApprovalState = 'checking' | 'approved' | 'blocked'
 
-interface RiderInfo {
-  name: string
-  phone: string
-  avatar: string
-}
-
-interface MerchantOrder {
-  id: string
-  orderTime: string
-  deliveredTime?: string
-  statusKind: OrderStatusKind
-  statusText: string
-  pickupName: string
-  destination: string
-  customerName: string
-  customerPhone: string
-  remark?: string
-  fee: string
-  rider?: RiderInfo
-}
-
-const tabs: Array<{ key: MerchantTabKey; label: string; count?: number }> = [
-  { key: 'pending', label: '待接单', count: 2 },
-  { key: 'delivering', label: '配送中', count: 2 },
-  { key: 'completed', label: '已完成' }
-]
-
-const pendingOrders: MerchantOrder[] = [
-  {
-    id: 'B1085',
-    orderTime: '12:47下单',
-    statusKind: 'waiting',
-    statusText: '待骑手接单',
-    pickupName: '茶知味·大学城店',
-    destination: '12栋 3楼 305室',
-    customerName: '陈同学',
-    customerPhone: '159 2201 8834',
-    remark: '放宿舍楼下取餐架就行',
-    fee: '1.5'
-  },
-  {
-    id: 'B1083',
-    orderTime: '12:44下单',
-    statusKind: 'waiting',
-    statusText: '待骑手接单',
-    pickupName: '茶知味·大学城店',
-    destination: '6栋 5楼 512室',
-    customerName: '吴同学',
-    customerPhone: '188 5530 2217',
-    fee: '1.5'
+async function settle<T>(promise: Promise<T>): Promise<Settled<T>> {
+  try {
+    return { ok: true, value: await promise }
+  } catch (error) {
+    return { ok: false, error }
   }
-]
-
-const deliveringOrders: MerchantOrder[] = [
-  {
-    id: 'B1079',
-    orderTime: '12:31下单',
-    statusKind: 'delivering',
-    statusText: '配送中',
-    pickupName: '茶知味·大学城店',
-    destination: '3栋 4楼 412室',
-    customerName: '林同学',
-    customerPhone: '138 6620 2048',
-    remark: '到楼下打电话',
-    fee: '1.5',
-    rider: {
-      name: '李伟',
-      phone: '137 5560 8814',
-      avatar: '李'
-    }
-  },
-  {
-    id: 'B1077',
-    orderTime: '12:26下单',
-    statusKind: 'pickup',
-    statusText: '待取货',
-    pickupName: '茶知味·大学城店',
-    destination: '7栋 2楼 205室',
-    customerName: '黄同学',
-    customerPhone: '176 3380 0093',
-    fee: '1.5',
-    rider: {
-      name: '张强',
-      phone: '150 2318 7745',
-      avatar: '张'
-    }
-  }
-]
-
-const completedOrders: MerchantOrder[] = [
-  {
-    id: 'B1071',
-    orderTime: '11:52下单',
-    deliveredTime: '12:05送达',
-    statusKind: 'completed',
-    statusText: '已完成',
-    pickupName: '茶知味·大学城店',
-    destination: '9栋 5楼 523室',
-    customerName: '刘同学',
-    customerPhone: '133 9014 4501',
-    fee: '1.5'
-  },
-  {
-    id: 'B1066',
-    orderTime: '11:20下单',
-    deliveredTime: '11:38送达',
-    statusKind: 'completed',
-    statusText: '已完成',
-    pickupName: '茶知味·大学城店',
-    destination: '5栋 1楼 101室',
-    customerName: '赵同学',
-    customerPhone: '186 7712 3066',
-    remark: '不要辣',
-    fee: '1.5'
-  }
-]
-
-const orderGroups: Record<MerchantTabKey, MerchantOrder[]> = {
-  pending: pendingOrders,
-  delivering: deliveringOrders,
-  completed: completedOrders
 }
 
-const shortcuts = [
-  { key: 'publish', label: '发布配送单', icon: '+' },
-  { key: 'recharge', label: '充值', icon: '↟' },
-  { key: 'bill', label: '账单', icon: '▤' },
-  { key: 'message', label: '消息', icon: '□' }
+const tabCopy: Array<{ key: MerchantTabKey; label: string }> = [
+  { key: 'pending', label: '待接单' },
+  { key: 'delivering', label: '配送中' },
+  { key: 'completed', label: '已完成' },
 ]
 
-function showPlaceholder(title: string) {
-  void Taro.showToast({ title, icon: 'none', duration: 1400 })
+const statusCopy: Record<DeliveryStatus, string> = {
+  pending_fee_payment: '待支付配送费',
+  payment_failed: '支付失败',
+  ready_for_claim: '待骑手接单',
+  claimed: '骑手已接单',
+  to_pickup: '骑手前往取货',
+  picked_up: '骑手已取货',
+  delivering: '配送中',
+  delivered: '已完成',
+  cancelled: '已取消',
 }
 
-function openMerchantConversation(orderId = 'B1079') {
+function orderTab(status: DeliveryStatus): MerchantTabKey {
+  if (status === 'delivered' || status === 'cancelled') return 'completed'
+  if (status === 'claimed' || status === 'to_pickup' || status === 'picked_up' || status === 'delivering') {
+    return 'delivering'
+  }
+  return 'pending'
+}
+
+function orderTone(status: DeliveryStatus): 'waiting' | 'pickup' | 'delivering' | 'completed' {
+  if (status === 'delivered' || status === 'cancelled') return 'completed'
+  if (status === 'picked_up' || status === 'delivering') return 'delivering'
+  if (status === 'claimed' || status === 'to_pickup') return 'pickup'
+  return 'waiting'
+}
+
+function formatTime(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value.replace('T', ' ').slice(0, 16)
+  return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+function createdToday(value: string): boolean {
+  const date = new Date(value)
+  const now = new Date()
+  return !Number.isNaN(date.getTime())
+    && date.getFullYear() === now.getFullYear()
+    && date.getMonth() === now.getMonth()
+    && date.getDate() === now.getDate()
+}
+
+function openConversation(order: MerchantDeliveryOrder) {
+  if (!order.riderUserId) {
+    void Taro.showToast({ title: '骑手接单后才能进入私聊', icon: 'none' })
+    return
+  }
   void Taro.navigateTo({
-    url: `/pages/delivery-conversation/index?orderId=${encodeURIComponent(orderId)}&role=merchant`
+    url: `/pages/delivery-conversation/index?orderId=${encodeURIComponent(order.deliveryOrderPublicId)}&role=merchant`,
   })
 }
 
-function handleShortcutClick(key: string, label: string) {
-  if (key === 'publish') {
-    void Taro.navigateTo({ url: '/pages/merchant-publish/index' })
-    return
-  }
-  if (key === 'recharge' || key === 'bill') {
-    void Taro.navigateTo({ url: '/pages/merchant-wallet/index' })
-    return
-  }
-  if (key === 'message') {
-    void Taro.navigateTo({ url: '/pages/merchant-messages/index' })
-    return
-  }
-  showPlaceholder(`${label}静态占位`)
-}
-
-function openOrderDetail(orderId: string) {
+function openOrderDetail(order: MerchantDeliveryOrder) {
   void Taro.navigateTo({
-    url: `/pages/merchant-order-detail/index?orderId=${encodeURIComponent(orderId)}&role=merchant`
+    url: `/pages/merchant-order-detail/index?orderId=${encodeURIComponent(order.deliveryOrderPublicId)}`,
   })
 }
 
-function OrderCard({ order, mode }: { order: MerchantOrder; mode: MerchantTabKey }) {
-  const timeText = order.deliveredTime
-    ? `#${order.id} · ${order.orderTime} · ${order.deliveredTime}`
-    : `#${order.id} · ${order.orderTime}`
-
+function OrderCard({ order }: { order: MerchantDeliveryOrder }) {
+  const tone = orderTone(order.status)
   return (
     <View className='merchant-order-card'>
       <View className='merchant-order-card__top'>
-        <Text className='merchant-order-card__serial'>{timeText}</Text>
-        <Text className={`merchant-order-card__status merchant-order-card__status--${order.statusKind}`}>
-          {order.statusText}
+        <Text className='merchant-order-card__serial'>
+          #{order.deliveryOrderPublicId} · {formatTime(order.createdAt)}
+        </Text>
+        <Text className={`merchant-order-card__status merchant-order-card__status--${tone}`}>
+          {statusCopy[order.status]}
         </Text>
       </View>
 
-      {order.rider && (
+      {order.riderUserId ? (
         <View className='merchant-order-rider'>
-          <View className='merchant-order-rider__avatar'>
-            <Text>{order.rider.avatar}</Text>
-          </View>
+          <View className='merchant-order-rider__avatar'><Text>骑</Text></View>
           <View className='merchant-order-rider__main'>
-            <Text className='merchant-order-rider__name'>{order.rider.name} · 骑手</Text>
-            <Text className='merchant-order-rider__phone'>{order.rider.phone}</Text>
+            <Text className='merchant-order-rider__name'>骑手 #{order.riderUserId}</Text>
+            <Text className='merchant-order-rider__phone'>已参与本配送单</Text>
           </View>
           <View className='merchant-order-rider__actions'>
-            <View className='merchant-order-rider__circle' onClick={() => openMerchantConversation(order.id)}>
-              <Text>□</Text>
-            </View>
-            <View className='merchant-order-rider__circle' onClick={() => showPlaceholder('电话静态占位')}>
-              <Text>⌕</Text>
+            <View className='merchant-order-rider__circle' onClick={() => openConversation(order)}>
+              <Text>聊</Text>
             </View>
           </View>
         </View>
-      )}
+      ) : null}
 
       <View className='merchant-order-route'>
         <View className='merchant-order-route__rail'>
@@ -215,35 +128,33 @@ function OrderCard({ order, mode }: { order: MerchantOrder; mode: MerchantTabKey
           <View className='merchant-order-route__dot merchant-order-route__dot--dropoff' />
         </View>
         <View className='merchant-order-route__body'>
-          <Text className='merchant-order-route__label'>取货点 · 本店</Text>
-          <Text className='merchant-order-route__place'>{order.pickupName}</Text>
-          <Text className='merchant-order-route__label merchant-order-route__label--dropoff'>送达点</Text>
-          <Text className='merchant-order-route__place'>{order.destination}</Text>
+          <Text className='merchant-order-route__label'>取货点</Text>
+          <Text className='merchant-order-route__place'>{order.pickupAddress}</Text>
           <Text className='merchant-order-route__contact'>
-            {order.customerName} · {order.customerPhone}
+            {order.pickupContactName} · {order.pickupContactPhone}
+          </Text>
+          <Text className='merchant-order-route__label merchant-order-route__label--dropoff'>送达点</Text>
+          <Text className='merchant-order-route__place'>{order.deliveryAddress}</Text>
+          <Text className='merchant-order-route__contact'>
+            {order.recipientName} · {order.recipientPhone}
           </Text>
         </View>
       </View>
 
-      {order.remark && (
+      {order.remark ? (
         <View className='merchant-order-remark'>
           <Text className='merchant-order-remark__label'>备注</Text>
           <Text>{order.remark}</Text>
         </View>
-      )}
+      ) : null}
 
       <View className='merchant-order-card__footer'>
         <View className='merchant-order-fee'>
           <Text className='merchant-order-fee__label'>配送费</Text>
-          <Text className='merchant-order-fee__amount'>¥{order.fee}</Text>
+          <Text className='merchant-order-fee__amount'>¥{centsToYuan(order.deliveryFeeCents)}</Text>
         </View>
         <View className='merchant-order-card__buttons'>
-          {mode === 'pending' && (
-            <View className='merchant-order-button merchant-order-button--ghost' onClick={() => showPlaceholder('取消并退款静态占位')}>
-              <Text>取消并退款</Text>
-            </View>
-          )}
-          <View className='merchant-order-button merchant-order-button--primary' onClick={() => openOrderDetail(order.id)}>
+          <View className='merchant-order-button merchant-order-button--primary' onClick={() => openOrderDetail(order)}>
             <Text>详情</Text>
           </View>
         </View>
@@ -254,12 +165,73 @@ function OrderCard({ order, mode }: { order: MerchantOrder; mode: MerchantTabKey
 
 function MerchantHomeContent() {
   const [activeTab, setActiveTab] = useState<MerchantTabKey>('pending')
+  const [orders, setOrders] = useState<MerchantDeliveryOrder[]>([])
+  const [balanceCents, setBalanceCents] = useState<number | null>(null)
+  const [merchantName, setMerchantName] = useState('')
+  const [merchantAddress, setMerchantAddress] = useState('')
+  const [approvalState, setApprovalState] = useState<ApprovalState>('checking')
+  const [approvalMessage, setApprovalMessage] = useState('正在核验商家审核状态…')
+  const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState('')
   const [showStudentSwitch, setShowStudentSwitch] = useState(false)
   const [switchingIdentity, setSwitchingIdentity] = useState(false)
   const [switchIdentityError, setSwitchIdentityError] = useState('')
+  const profile = useSessionStore((state) => state.profile)
   const switchIdentity = useSessionStore((state) => state.switchIdentity)
   const identityAllowed = useIdentityGuard('merchant')
-  const currentOrders = useMemo(() => orderGroups[activeTab], [activeTab])
+
+  const loadWorkbench = useCallback(async () => {
+    if (!identityAllowed || loading) return
+    setLoading(true)
+    setLoadError('')
+    setApprovalState('checking')
+    setApprovalMessage('正在核验商家审核状态…')
+    const applicationResult = await settle(getIdentityApplication('merchant'))
+    if (!applicationResult.ok) {
+      setApprovalState('blocked')
+      setApprovalMessage('暂时无法确认商家审核状态，请返回“我的”重新进入')
+      setLoading(false)
+      return
+    }
+    if (applicationResult.value.status !== 'approved') {
+      setApprovalState('blocked')
+      setApprovalMessage(
+        applicationResult.value.status === 'pending'
+          ? '商家申请正在审核中，审核通过后才能进入'
+          : '商家申请未通过，请修改资料后重新提交'
+      )
+      setLoading(false)
+      return
+    }
+    setMerchantName(applicationResult.value.merchantName)
+    setMerchantAddress(applicationResult.value.merchantAddress)
+    setApprovalState('approved')
+    const [ordersResult, walletResult] = await Promise.all([
+      settle(listMerchantDeliveryOrders(1, 100)),
+      settle(getDeliveryWallet()),
+    ])
+    if (ordersResult.ok) {
+      setOrders(ordersResult.value.items)
+    } else {
+      setOrders([])
+      setLoadError(ordersResult.error instanceof Error ? ordersResult.error.message : '配送单加载失败')
+    }
+    setBalanceCents(walletResult.ok ? walletResult.value.availableBalanceCents : null)
+    setLoading(false)
+  }, [identityAllowed, loading])
+
+  useEffect(() => {
+    if (identityAllowed) void loadWorkbench()
+  }, [identityAllowed]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const groupedOrders = useMemo(() => ({
+    pending: orders.filter((item) => orderTab(item.status) === 'pending'),
+    delivering: orders.filter((item) => orderTab(item.status) === 'delivering'),
+    completed: orders.filter((item) => orderTab(item.status) === 'completed'),
+  }), [orders])
+  const todayCount = useMemo(() => orders.filter((item) => createdToday(item.createdAt)).length, [orders])
+  const shopName = merchantName || profile.nickname || '已认证商家'
+  const shopAddress = merchantAddress || profile.campus || profile.school || '商家资料已通过审核'
 
   const confirmStudentSwitch = async () => {
     if (switchingIdentity) return
@@ -277,6 +249,24 @@ function MerchantHomeContent() {
   }
 
   if (!identityAllowed) return <View className='merchant-home-page' />
+  if (approvalState !== 'approved') {
+    return (
+      <View className='merchant-home-page merchant-home-page--review' style={getCapsuleSafeStyle()}>
+        <CapsuleSystemRow />
+        <View className='merchant-home-review'>
+          <Text className='merchant-home-review__title'>
+            {approvalState === 'checking' ? '正在核验商家资格' : '暂时无法进入商家端'}
+          </Text>
+          <Text className='merchant-home-review__message'>{approvalMessage}</Text>
+          {approvalState === 'blocked' ? (
+            <View className='merchant-home-review__action' onClick={() => void Taro.reLaunch({ url: '/pages/profile/index' })}>
+              <Text>返回我的</Text>
+            </View>
+          ) : null}
+        </View>
+      </View>
+    )
+  }
 
   return (
     <View className='merchant-home-page' style={getCapsuleSafeStyle()}>
@@ -286,17 +276,15 @@ function MerchantHomeContent() {
         <CapsuleSystemRow />
         <View className='merchant-home-header'>
           <View className='merchant-home-shop'>
-            <View className='merchant-home-shop__avatar'>
-              <Text>茶</Text>
-            </View>
+            <View className='merchant-home-shop__avatar'><Text>{shopName.slice(0, 1)}</Text></View>
             <View className='merchant-home-shop__main'>
               <View className='merchant-home-shop__name-row'>
-                <Text className='merchant-home-shop__name'>茶知味·大学城店</Text>
-                <Text className='merchant-home-shop__badge'>商家</Text>
+                <Text className='merchant-home-shop__name'>{shopName}</Text>
+                <Text className='merchant-home-shop__badge'>已审核</Text>
               </View>
               <View className='merchant-home-shop__status'>
                 <View className='merchant-home-shop__green-dot' />
-                <Text>营业中 · 大学城二食堂</Text>
+                <Text>{shopAddress}</Text>
               </View>
             </View>
           </View>
@@ -311,15 +299,17 @@ function MerchantHomeContent() {
         <View className='merchant-home-metrics'>
           <View className='merchant-home-wallet'>
             <Text className='merchant-home-wallet__label'>钱包余额（元）</Text>
-            <Text className='merchant-home-wallet__amount'>¥86.50</Text>
+            <Text className='merchant-home-wallet__amount'>
+              {balanceCents == null ? '--' : `¥${centsToYuan(balanceCents)}`}
+            </Text>
           </View>
           <View className='merchant-home-counts'>
             <View className='merchant-home-counts__item'>
-              <Text className='merchant-home-counts__value'>12</Text>
+              <Text className='merchant-home-counts__value'>{todayCount}</Text>
               <Text className='merchant-home-counts__label'>今日单量</Text>
             </View>
             <View className='merchant-home-counts__item'>
-              <Text className='merchant-home-counts__value'>2</Text>
+              <Text className='merchant-home-counts__value'>{groupedOrders.delivering.length}</Text>
               <Text className='merchant-home-counts__label'>配送中</Text>
             </View>
           </View>
@@ -327,8 +317,13 @@ function MerchantHomeContent() {
       </View>
 
       <View className='merchant-home-shortcuts'>
-        {shortcuts.map((item, index) => (
-          <View key={item.key} className='merchant-home-shortcut' onClick={() => handleShortcutClick(item.key, item.label)}>
+        {[
+          { key: 'publish', label: '发布配送单', icon: '+', url: '/pages/merchant-publish/index' },
+          { key: 'wallet', label: '钱包', icon: '¥', url: '/pages/merchant-wallet/index' },
+          { key: 'bill', label: '账单', icon: '账', url: '/pages/merchant-wallet/index' },
+          { key: 'message', label: '消息', icon: '聊', url: '/pages/merchant-messages/index' },
+        ].map((item, index) => (
+          <View key={item.key} className='merchant-home-shortcut' onClick={() => void Taro.navigateTo({ url: item.url })}>
             <View className={`merchant-home-shortcut__icon ${index === 0 ? 'merchant-home-shortcut__icon--primary' : ''}`}>
               <Text>{item.icon}</Text>
             </View>
@@ -338,24 +333,32 @@ function MerchantHomeContent() {
       </View>
 
       <View className='merchant-home-tabs'>
-        {tabs.map((tab) => (
+        {tabCopy.map((tab) => (
           <View
             key={tab.key}
             className={`merchant-home-tab ${activeTab === tab.key ? 'merchant-home-tab--active' : ''}`}
             onClick={() => setActiveTab(tab.key)}
           >
             <Text className='merchant-home-tab__label'>{tab.label}</Text>
-            {tab.count ? <Text className={`merchant-home-tab__count merchant-home-tab__count--${tab.key}`}>{tab.count}</Text> : null}
+            <Text className={`merchant-home-tab__count merchant-home-tab__count--${tab.key}`}>
+              {groupedOrders[tab.key].length}
+            </Text>
           </View>
         ))}
       </View>
 
       <ScrollView scrollY className='merchant-home-orders' enhanced showScrollbar={false}>
         <View className='merchant-home-orders__inner'>
-          {currentOrders.map((order) => (
-            <OrderCard key={order.id} order={order} mode={activeTab} />
-          ))}
-          <Text className='merchant-home-orders__end'>— 到底了 —</Text>
+          {loading ? <Text className='merchant-home-orders__end'>正在加载真实配送单…</Text> : null}
+          {!loading && loadError ? (
+            <Text className='merchant-home-orders__end' onClick={() => void loadWorkbench()}>
+              {loadError}，点击重试
+            </Text>
+          ) : null}
+          {!loading && !loadError && groupedOrders[activeTab].length === 0 ? (
+            <Text className='merchant-home-orders__end'>当前没有{tabCopy.find((item) => item.key === activeTab)?.label}配送单</Text>
+          ) : null}
+          {groupedOrders[activeTab].map((order) => <OrderCard key={order.deliveryOrderPublicId} order={order} />)}
         </View>
       </ScrollView>
 
@@ -374,7 +377,7 @@ function MerchantHomeContent() {
 
 export default function MerchantHomePage() {
   return (
-    <RuntimeSessionGate>
+    <RuntimeSessionGate preserveAuthenticatedChildrenDuringRetry>
       <MerchantHomeContent />
     </RuntimeSessionGate>
   )

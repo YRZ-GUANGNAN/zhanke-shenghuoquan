@@ -81,6 +81,11 @@ func (e *deliveryIdentityEligibility) activeGrant(ctx context.Context, userID ui
 	}
 	switch grant.Status {
 	case identityapplication.GrantActive:
+		if grant.SourceApplicationID == nil || *grant.SourceApplicationID == 0 {
+			return user.IdentityEligibilityResult{
+				Available: false, Reason: string(role) + " approval source required", Status: "missing",
+			}, false, nil
+		}
 		return user.IdentityEligibilityResult{Available: true, Status: string(grant.Status)}, true, nil
 	case identityapplication.GrantSuspended:
 		return user.IdentityEligibilityResult{

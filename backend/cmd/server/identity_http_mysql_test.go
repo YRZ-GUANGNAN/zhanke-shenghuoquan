@@ -103,9 +103,11 @@ func TestUI21AIdentityRealHTTPMySQL(t *testing.T) {
 		t.Fatalf("missing merchant grant switch status=%d", status)
 	}
 	now := time.Now().UTC()
+	merchantApplicationID := uint64(login.User.ID) + 1000
 	if err := db.Create(&identityapplication.IdentityGrant{
 		UserID: uint64(login.User.ID), Role: identityapplication.RoleMerchant, Status: identityapplication.GrantActive,
-		GrantedAt: now, RowVersion: 1, CreatedAt: now, UpdatedAt: now,
+		SourceApplicationID: &merchantApplicationID,
+		GrantedAt:           now, RowVersion: 1, CreatedAt: now, UpdatedAt: now,
 	}).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -121,9 +123,11 @@ func TestUI21AIdentityRealHTTPMySQL(t *testing.T) {
 	}).Error; err != nil {
 		t.Fatal(err)
 	}
+	riderApplicationID := uint64(login.User.ID) + 2000
 	if err := db.Create(&identityapplication.IdentityGrant{
 		UserID: uint64(login.User.ID), Role: identityapplication.RoleRider, Status: identityapplication.GrantActive,
-		GrantedAt: now, RowVersion: 1, CreatedAt: now, UpdatedAt: now,
+		SourceApplicationID: &riderApplicationID,
+		GrantedAt:           now, RowVersion: 1, CreatedAt: now, UpdatedAt: now,
 	}).Error; err != nil {
 		t.Fatal(err)
 	}

@@ -76,9 +76,13 @@ function handleSettingClick(item: SettingItem) {
 function unavailableMessage(value?: IdentityAvailability): string {
   if (!value) return '该身份暂不可用'
   if (value.status === 'disabled') return '配送功能当前未开放'
+  if (value.status === 'pending') return '身份申请正在审核，请耐心等待'
+  if (value.status === 'rejected') return '身份申请未通过，可修改资料后重新提交'
   if (value.status === 'resting') return '骑手当前为休息状态，请先恢复接单'
-  if (value.status === 'suspended') return '骑手身份已暂停，请联系平台'
-  if (value.status === 'missing') return value.identity === 'rider' ? '请先申请开通骑手身份' : '该身份暂不可用'
+  if (value.status === 'suspended') return '该身份已暂停，请联系平台'
+  if (value.status === 'missing') return value.identity === 'rider'
+    ? '请先申请骑手身份，审核通过后才能进入'
+    : '请先申请商家身份，审核通过后才能进入'
   return value.reason || '该身份暂不可用'
 }
 

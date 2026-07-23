@@ -532,7 +532,11 @@ func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, user
 	currentUserID := func(c *gin.Context) uint64 {
 		return uint64(user.CurrentUserID(c))
 	}
-	merchantRoutes := api.Group("/delivery/merchant", userService.AuthRequired())
+	merchantRoutes := api.Group(
+		"/delivery/merchant",
+		userService.AuthRequired(),
+		userService.IdentityRequired(user.IdentityMerchant),
+	)
 	deliverymerchant.NewHandler(runtime.dispatch, currentUserID, runtime.allowMockConfirm).Register(merchantRoutes)
 	var paymentHandler *deliverypayment.Handler
 	if runtime.funds != nil {

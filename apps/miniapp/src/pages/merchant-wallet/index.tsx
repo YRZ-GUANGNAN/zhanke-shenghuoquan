@@ -1,75 +1,103 @@
-import React, { useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
+import RuntimeSessionGate from '../../components/runtime-session-gate'
+import { useIdentityGuard } from '../../hooks/use-identity-guard'
+import {
+  getDeliveryWallet,
+  listDeliveryWalletLedger,
+  pollDeliveryPayment,
+  startDeliveryWalletRecharge,
+  type DeliveryLedgerEntryType,
+  type DeliveryWallet,
+  type DeliveryWalletLedger,
+} from '../../services/delivery-payment'
 import Taro from '../../services/taro'
 import './index.scss'
 
-type LedgerKind = 'fee' | 'refund' | 'recharge'
-
-interface LedgerItem {
-  id: string
-  kind: LedgerKind
-  title: string
-  time: string
-  amount: number
-}
-
 const rechargeOptions = [50, 100, 200, 300, 500, 1000]
 
-const initialLedger: LedgerItem[] = [
-  { id: 'fee-B1085', kind: 'fee', title: '支付配送费 · #B1085', time: '今天 12:47', amount: -1.5 },
-  { id: 'fee-B1083', kind: 'fee', title: '支付配送费 · #B1083', time: '今天 12:44', amount: -1.5 },
-  { id: 'fee-B1079', kind: 'fee', title: '支付配送费 · #B1079', time: '今天 12:31', amount: -1.5 },
-  { id: 'refund-B1074', kind: 'refund', title: '取消退款 · #B1074', time: '今天 12:10', amount: 1.5 },
-  { id: 'recharge-today', kind: 'recharge', title: '充值 · 微信支付', time: '今天 09:20', amount: 100 },
-  { id: 'fee-B1071', kind: 'fee', title: '支付配送费 · #B1071', time: '昨天 11:52', amount: -1.5 },
-  { id: 'fee-B1066', kind: 'fee', title: '支付配送费 · #B1066', time: '昨天 11:20', amount: -1.5 },
-  { id: 'recharge-0628', kind: 'recharge', title: '充值 · 微信支付', time: '6月28日 15:44', amount: 50 }
-]
-
-function formatBalance(value: number) {
-  return value.toFixed(2)
+function formatBalance(value?: number) {
+  return value == null ? '--' : (value / 100).toFixed(2)
 }
 
-function formatSignedAmount(value: number) {
-  return `${value > 0 ? '+' : '-'}${Math.abs(value).toFixed(2)}`
+function formatTime(value: string) {
+  return value.replace('T', ' ').slice(0, 16)
 }
 
-function kindSymbol(kind: LedgerKind) {
-  if (kind === 'recharge') return '↓'
-  if (kind === 'refund') return '↶'
-  return '▱'
+function entryTitle(entryType: DeliveryLedgerEntryType) {
+  if (entryType === 'recharge') return '钱包充值'
+  if (entryType === 'refund') return '配送费退款'
+  return '支付配送费'
 }
 
-export default function MerchantWalletPage() {
-  const [balance, setBalance] = useState(86.5)
+function entrySymbol(entryType: DeliveryLedgerEntryType) {
+  if (entryType === 'recharge') return '↓'
+  if (entryType === 'refund') return '↶'
+  return '账'
+}
+
+function MerchantWalletContent() {
+  const identityAllowed = useIdentityGuard('merchant')
+  const [wallet, setWallet] = useState<DeliveryWallet | null>(null)
+  const [ledger, setLedger] = useState<DeliveryWalletLedger[]>([])
   const [selectedAmount, setSelectedAmount] = useState(100)
   const [sheetVisible, setSheetVisible] = useState(false)
-  const [localLedger, setLocalLedger] = useState<LedgerItem[]>([])
-  const [toastText, setToastText] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [paying, setPaying] = useState(false)
+  const [loadError, setLoadError] = useState('')
 
-  const ledger = useMemo(() => [...localLedger, ...initialLedger], [localLedger])
+  const loadWallet = useCallback(async () => {
+    if (!identityAllowed || loading) return
+    setLoading(true)
+    setLoadError('')
+    try {
+      const [walletValue, ledgerValue] = await Promise.all([
+        getDeliveryWallet(),
+        listDeliveryWalletLedger(1, 30),
+      ])
+      setWallet(walletValue)
+      setLedger(ledgerValue.items)
+    } catch (error) {
+      setWallet(null)
+      setLedger([])
+      setLoadError(error instanceof Error ? error.message : '钱包加载失败')
+    } finally {
+      setLoading(false)
+    }
+  }, [identityAllowed, loading])
 
-  const closeToastLater = () => {
-    setTimeout(() => setToastText(''), 1800)
+  useEffect(() => {
+    if (identityAllowed) void loadWallet()
+  }, [identityAllowed]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const confirmRecharge = async () => {
+    if (paying) return
+    setPaying(true)
+    try {
+      const result = await startDeliveryWalletRecharge(selectedAmount * 100)
+      if (!result.payment) throw new Error('后端未返回充值支付记录')
+      if (result.payment.provider === 'wechat') {
+        if (!result.payment.wechat) throw new Error('后端未返回微信支付参数')
+        await Taro.requestPayment(result.payment.wechat)
+      }
+      const latest = await pollDeliveryPayment(result.payment.paymentPublicId)
+      if (latest.status !== 'paid') throw new Error('充值支付尚未完成')
+      setSheetVisible(false)
+      await loadWallet()
+      await Taro.showToast({ title: '充值已到账', icon: 'success' })
+    } catch (error) {
+      void Taro.showToast({
+        title: error instanceof Error ? error.message : '充值失败',
+        icon: 'none',
+        duration: 2200,
+      })
+    } finally {
+      setPaying(false)
+    }
   }
 
-  const confirmRecharge = () => {
-    setBalance((current) => current + selectedAmount)
-    setLocalLedger((current) => [
-      {
-        id: `local-recharge-${Date.now()}`,
-        kind: 'recharge',
-        title: '充值 · 微信支付',
-        time: '刚刚',
-        amount: selectedAmount
-      },
-      ...current
-    ])
-    setSheetVisible(false)
-    setToastText(`充值成功，已到账 ¥${selectedAmount.toFixed(2)}`)
-    closeToastLater()
-  }
+  if (!identityAllowed) return <View className='merchant-wallet-page' />
 
   return (
     <View className='merchant-wallet-page'>
@@ -78,19 +106,17 @@ export default function MerchantWalletPage() {
         <View className='merchant-wallet-hero__orb merchant-wallet-hero__orb--right' />
         <CapsuleSystemRow />
         <View className='merchant-wallet-nav'>
-          <View className='merchant-wallet-nav__back' onClick={() => Taro.navigateBack()}>
-            <Text>‹</Text>
-          </View>
+          <View className='merchant-wallet-nav__back' onClick={() => void Taro.navigateBack()}><Text>‹</Text></View>
           <Text className='merchant-wallet-nav__title'>商家钱包</Text>
           <View className='merchant-wallet-nav__spacer' />
         </View>
         <View className='merchant-wallet-balance'>
           <Text className='merchant-wallet-balance__label'>钱包余额（元）</Text>
           <View className='merchant-wallet-balance__amount-row'>
-            <Text className='merchant-wallet-balance__currency'>¥</Text>
-            <Text className='merchant-wallet-balance__amount'>{formatBalance(balance)}</Text>
+            {wallet ? <Text className='merchant-wallet-balance__currency'>¥</Text> : null}
+            <Text className='merchant-wallet-balance__amount'>{formatBalance(wallet?.availableBalanceCents)}</Text>
           </View>
-          <Text className='merchant-wallet-balance__hint'>ⓘ 余额用于支付配送费，充值走微信支付</Text>
+          <Text className='merchant-wallet-balance__hint'>余额与流水均来自服务端资金账本</Text>
           <View className='merchant-wallet-balance__button' onClick={() => setSheetVisible(true)}>
             <Text>＋ 充值</Text>
           </View>
@@ -101,73 +127,73 @@ export default function MerchantWalletPage() {
         <View className='merchant-wallet-ledger-card'>
           <View className='merchant-wallet-ledger-card__header'>
             <Text className='merchant-wallet-ledger-card__title'>账单流水</Text>
-            <Text className='merchant-wallet-ledger-card__range'>仅展示最近 30 天</Text>
+            <Text className='merchant-wallet-ledger-card__range' onClick={() => void loadWallet()}>刷新</Text>
           </View>
-
-          {ledger.map((item) => (
-            <View key={item.id} className='merchant-wallet-ledger-item'>
-              <View className={`merchant-wallet-ledger-item__icon merchant-wallet-ledger-item__icon--${item.kind}`}>
-                <Text>{kindSymbol(item.kind)}</Text>
+          {loading ? <Text className='merchant-wallet-ledger-card__end'>正在加载真实账本…</Text> : null}
+          {!loading && loadError ? (
+            <Text className='merchant-wallet-ledger-card__end' onClick={() => void loadWallet()}>
+              {loadError}，点击重试
+            </Text>
+          ) : null}
+          {!loading && !loadError && ledger.length === 0 ? (
+            <Text className='merchant-wallet-ledger-card__end'>暂无账单流水</Text>
+          ) : null}
+          {ledger.map((item) => {
+            const positive = item.direction === 'credit'
+            return (
+              <View key={item.ledgerPublicId} className='merchant-wallet-ledger-item'>
+                <View className={`merchant-wallet-ledger-item__icon merchant-wallet-ledger-item__icon--${item.entryType}`}>
+                  <Text>{entrySymbol(item.entryType)}</Text>
+                </View>
+                <View className='merchant-wallet-ledger-item__main'>
+                  <Text className='merchant-wallet-ledger-item__title'>{entryTitle(item.entryType)}</Text>
+                  <Text className='merchant-wallet-ledger-item__time'>{formatTime(item.createdAt)}</Text>
+                </View>
+                <Text className={`merchant-wallet-ledger-item__amount ${positive ? 'merchant-wallet-ledger-item__amount--positive' : ''}`}>
+                  {positive ? '+' : '-'}{(item.amountCents / 100).toFixed(2)}
+                </Text>
               </View>
-              <View className='merchant-wallet-ledger-item__main'>
-                <Text className='merchant-wallet-ledger-item__title'>{item.title}</Text>
-                <Text className='merchant-wallet-ledger-item__time'>{item.time}</Text>
-              </View>
-              <Text
-                className={`merchant-wallet-ledger-item__amount ${
-                  item.amount > 0 ? 'merchant-wallet-ledger-item__amount--positive' : ''
-                }`}
-              >
-                {formatSignedAmount(item.amount)}
-              </Text>
-            </View>
-          ))}
-
-          <Text className='merchant-wallet-ledger-card__end'>— 到底了 —</Text>
+            )
+          })}
         </View>
       </ScrollView>
 
-      {sheetVisible && (
+      {sheetVisible ? (
         <View className='merchant-wallet-modal'>
-          <View className='merchant-wallet-modal__mask' onClick={() => setSheetVisible(false)} />
+          <View className='merchant-wallet-modal__mask' onClick={() => !paying && setSheetVisible(false)} />
           <View className='merchant-wallet-sheet'>
             <View className='merchant-wallet-sheet__header'>
               <Text className='merchant-wallet-sheet__title'>选择充值金额</Text>
-              <View className='merchant-wallet-sheet__close' onClick={() => setSheetVisible(false)}>
-                <Text>×</Text>
-              </View>
+              <View className='merchant-wallet-sheet__close' onClick={() => !paying && setSheetVisible(false)}><Text>×</Text></View>
             </View>
             <View className='merchant-wallet-amount-grid'>
               {rechargeOptions.map((amount) => (
                 <View
                   key={amount}
-                  className={`merchant-wallet-amount ${
-                    selectedAmount === amount ? 'merchant-wallet-amount--active' : ''
-                  }`}
-                  onClick={() => setSelectedAmount(amount)}
+                  className={`merchant-wallet-amount ${selectedAmount === amount ? 'merchant-wallet-amount--active' : ''}`}
+                  onClick={() => !paying && setSelectedAmount(amount)}
                 >
                   <Text>¥{amount}</Text>
                 </View>
               ))}
             </View>
             <View className='merchant-wallet-info'>
-              <Text>ⓘ 充值金额通过微信支付进入商家钱包，用于支付配送费，可开票请联系平台运营。</Text>
+              <Text>充值会创建真实微信支付订单，支付结果和余额以后端为准。</Text>
             </View>
-            <View className='merchant-wallet-pay-button' onClick={confirmRecharge}>
-              <Text>微信支付 ¥{selectedAmount}</Text>
+            <View className='merchant-wallet-pay-button' onClick={() => void confirmRecharge()}>
+              <Text>{paying ? '支付处理中…' : `微信支付 ¥${selectedAmount}`}</Text>
             </View>
           </View>
         </View>
-      )}
-
-      {toastText && (
-        <View className='merchant-wallet-toast'>
-          <View className='merchant-wallet-toast__check'>
-            <Text>✓</Text>
-          </View>
-          <Text className='merchant-wallet-toast__text'>{toastText}</Text>
-        </View>
-      )}
+      ) : null}
     </View>
+  )
+}
+
+export default function MerchantWalletPage() {
+  return (
+    <RuntimeSessionGate preserveAuthenticatedChildrenDuringRetry>
+      <MerchantWalletContent />
+    </RuntimeSessionGate>
   )
 }

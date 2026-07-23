@@ -1,58 +1,143 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Input, ScrollView, Text, Textarea, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
+import RuntimeSessionGate from '../../components/runtime-session-gate'
+import { useIdentityGuard } from '../../hooks/use-identity-guard'
+import { getIdentityApplication } from '../../services/a-user'
+import {
+  createDeliveryClientRequestId,
+  createMerchantDeliveryOrder,
+  type MerchantDeliveryOrder,
+} from '../../services/delivery-merchant'
+import {
+  getDeliveryWallet,
+  payDeliveryOrderWithWallet,
+  payDeliveryOrderWithWechat,
+  pollDeliveryPayment,
+} from '../../services/delivery-payment'
 import Taro from '../../services/taro'
+import { useSessionStore } from '../../stores/session'
 import './index.scss'
 
 type PaymentMethod = 'wallet' | 'wechat'
-
-const paymentOptions: Array<{
-  key: PaymentMethod
-  title: string
-  desc: string
-  icon: string
-}> = [
-  {
-    key: 'wallet',
-    title: '钱包余额',
-    desc: '余额 ¥86.50，优先使用钱包支付',
-    icon: '钱'
-  },
-  {
-    key: 'wechat',
-    title: '微信支付',
-    desc: '从微信支付本次配送费',
-    icon: '微'
-  }
-]
 
 function inputValue(event: { detail: { value?: string } }) {
   return String(event.detail.value ?? '')
 }
 
-export default function MerchantPublishPage() {
-  const [pickupContact, setPickupContact] = useState('王老板')
-  const [pickupPhone, setPickupPhone] = useState('139 2280 6612')
-  const [pickupAddress, setPickupAddress] = useState('茶知味·大学城店（二食堂一楼）')
+function MerchantPublishContent() {
+  const profile = useSessionStore((state) => state.profile)
+  const identityAllowed = useIdentityGuard('merchant')
+  const [pickupContact, setPickupContact] = useState(profile.nickname)
+  const [pickupPhone, setPickupPhone] = useState('')
+  const [pickupAddress, setPickupAddress] = useState(profile.campus || profile.school)
   const [receiverName, setReceiverName] = useState('')
   const [receiverPhone, setReceiverPhone] = useState('')
   const [receiverAddress, setReceiverAddress] = useState('')
   const [remark, setRemark] = useState('')
+  const [balanceCents, setBalanceCents] = useState<number | null>(null)
   const [sheetVisible, setSheetVisible] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('wallet')
+  const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (!identityAllowed) return
+    void getIdentityApplication('merchant').then((application) => {
+      if (application.merchantName) setPickupContact(application.merchantName)
+      if (application.merchantAddress) setPickupAddress(application.merchantAddress)
+    }).catch(() => {
+      // The approved identity remains authoritative; profile values are a safe fallback.
+    })
+    void getDeliveryWallet().then((wallet) => {
+      setBalanceCents(wallet.availableBalanceCents)
+    }).catch(() => {
+      setBalanceCents(null)
+    })
+  }, [identityAllowed])
+
+  const validate = () => {
+    if (!pickupContact.trim() || !pickupPhone.trim() || !pickupAddress.trim()) {
+      void Taro.showToast({ title: '请完整填写取货信息', icon: 'none' })
+      return false
+    }
+    if (!receiverName.trim() || !receiverPhone.trim() || !receiverAddress.trim()) {
+      void Taro.showToast({ title: '请完整填写收货信息', icon: 'none' })
+      return false
+    }
+    return true
+  }
 
   const openPaymentSheet = () => {
-    if (!receiverName.trim() || !receiverPhone.trim() || !receiverAddress.trim()) {
-      void Taro.showToast({ title: '请先填写收货信息', icon: 'none', duration: 1400 })
-      return
-    }
+    if (!validate() || submitting) return
     setSheetVisible(true)
   }
 
-  const confirmPayment = () => {
-    setSheetVisible(false)
-    void Taro.showToast({ title: '发布成功,等待骑手接单', icon: 'none', duration: 1600 })
+  const finishWechatPayment = async (order: MerchantDeliveryOrder) => {
+    const result = await payDeliveryOrderWithWechat(order.deliveryOrderPublicId, order.rowVersion)
+    if (!result.payment) throw new Error('后端未返回支付记录')
+    if (result.payment.provider === 'mock') {
+      await pollDeliveryPayment(result.payment.paymentPublicId)
+      return
+    }
+    if (!result.payment.wechat) throw new Error('后端未返回微信支付参数')
+    await Taro.requestPayment(result.payment.wechat)
+    const latest = await pollDeliveryPayment(result.payment.paymentPublicId)
+    if (latest.status !== 'paid') throw new Error('微信支付尚未完成')
   }
+
+  const confirmPayment = async () => {
+    if (submitting || !validate()) return
+    setSubmitting(true)
+    setSheetVisible(false)
+    let order: MerchantDeliveryOrder | null = null
+    try {
+      order = await createMerchantDeliveryOrder({
+        clientRequestId: createDeliveryClientRequestId(),
+        pickupName: pickupContact.trim(),
+        pickupPhone: pickupPhone.trim(),
+        pickupAddress: pickupAddress.trim(),
+        recipientName: receiverName.trim(),
+        recipientPhone: receiverPhone.trim(),
+        deliveryAddress: receiverAddress.trim(),
+        remark: remark.trim(),
+      })
+      if (paymentMethod === 'wallet') {
+        await payDeliveryOrderWithWallet(order.deliveryOrderPublicId, order.rowVersion)
+      } else {
+        await finishWechatPayment(order)
+      }
+      await Taro.showToast({ title: '配送单已发布', icon: 'success' })
+      await Taro.redirectTo({
+        url: `/pages/merchant-order-detail/index?orderId=${encodeURIComponent(order.deliveryOrderPublicId)}`,
+      })
+    } catch (error) {
+      const prefix = order ? '配送单已创建，但支付未完成：' : ''
+      void Taro.showToast({
+        title: `${prefix}${error instanceof Error ? error.message : '发布失败'}`,
+        icon: 'none',
+        duration: 2400,
+      })
+      if (order) {
+        await Taro.redirectTo({
+          url: `/pages/merchant-order-detail/index?orderId=${encodeURIComponent(order.deliveryOrderPublicId)}`,
+        })
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (!identityAllowed) return <View className='merchant-publish-page' />
+
+  const paymentOptions: Array<{ key: PaymentMethod; title: string; desc: string; icon: string }> = [
+    {
+      key: 'wallet',
+      title: '钱包余额',
+      desc: balanceCents == null ? '余额加载失败，可返回钱包页重试' : `当前余额 ¥${(balanceCents / 100).toFixed(2)}`,
+      icon: '钱',
+    },
+    { key: 'wechat', title: '微信支付', desc: '由微信支付确认本次配送费', icon: '微' },
+  ]
 
   return (
     <View className='merchant-publish-page'>
@@ -70,36 +155,23 @@ export default function MerchantPublishPage() {
               <Text className='merchant-publish-section-head__title'>取货信息</Text>
               <Text className='merchant-publish-pill'>本店</Text>
             </View>
-            <Text className='merchant-publish-section-head__hint'>默认店铺信息,可修改</Text>
+            <Text className='merchant-publish-section-head__hint'>来自审核资料，可修改</Text>
           </View>
-
-          <View className='merchant-publish-field'>
-            <Text className='merchant-publish-field__label'>联系人</Text>
-            <Input
-              className='merchant-publish-field__input'
-              value={pickupContact}
-              placeholder='请输入联系人'
-              onInput={(event) => setPickupContact(inputValue(event))}
-            />
-          </View>
-          <View className='merchant-publish-field'>
-            <Text className='merchant-publish-field__label'>联系电话</Text>
-            <Input
-              className='merchant-publish-field__input'
-              value={pickupPhone}
-              placeholder='请输入联系电话'
-              onInput={(event) => setPickupPhone(inputValue(event))}
-            />
-          </View>
-          <View className='merchant-publish-field merchant-publish-field--last'>
-            <Text className='merchant-publish-field__label'>取货地址</Text>
-            <Input
-              className='merchant-publish-field__input'
-              value={pickupAddress}
-              placeholder='请输入取货地址'
-              onInput={(event) => setPickupAddress(inputValue(event))}
-            />
-          </View>
+          {[
+            { label: '联系人', value: pickupContact, placeholder: '请输入联系人', change: setPickupContact },
+            { label: '联系电话', value: pickupPhone, placeholder: '请输入联系电话', change: setPickupPhone },
+            { label: '取货地址', value: pickupAddress, placeholder: '请输入取货地址', change: setPickupAddress },
+          ].map((field, index) => (
+            <View key={field.label} className={`merchant-publish-field ${index === 2 ? 'merchant-publish-field--last' : ''}`}>
+              <Text className='merchant-publish-field__label'>{field.label}</Text>
+              <Input
+                className='merchant-publish-field__input'
+                value={field.value}
+                placeholder={field.placeholder}
+                onInput={(event) => field.change(inputValue(event))}
+              />
+            </View>
+          ))}
         </View>
 
         <View className='merchant-publish-card'>
@@ -109,41 +181,28 @@ export default function MerchantPublishPage() {
               <Text className='merchant-publish-section-head__title'>收货信息</Text>
             </View>
           </View>
-
-          <View className='merchant-publish-field'>
-            <Text className='merchant-publish-field__label'>收货人</Text>
-            <Input
-              className='merchant-publish-field__input'
-              value={receiverName}
-              placeholder='请输入收货人姓名'
-              onInput={(event) => setReceiverName(inputValue(event))}
-            />
-          </View>
-          <View className='merchant-publish-field'>
-            <Text className='merchant-publish-field__label'>联系电话</Text>
-            <Input
-              className='merchant-publish-field__input'
-              value={receiverPhone}
-              placeholder='请输入收货人电话'
-              onInput={(event) => setReceiverPhone(inputValue(event))}
-            />
-          </View>
-          <View className='merchant-publish-field'>
-            <Text className='merchant-publish-field__label'>送达地址</Text>
-            <Input
-              className='merchant-publish-field__input'
-              value={receiverAddress}
-              placeholder='如 3栋 4楼 412室'
-              onInput={(event) => setReceiverAddress(inputValue(event))}
-            />
-          </View>
+          {[
+            { label: '收货人', value: receiverName, placeholder: '请输入收货人姓名', change: setReceiverName },
+            { label: '联系电话', value: receiverPhone, placeholder: '请输入收货人电话', change: setReceiverPhone },
+            { label: '送货地址', value: receiverAddress, placeholder: '楼栋 / 房间', change: setReceiverAddress },
+          ].map((field, index) => (
+            <View key={field.label} className={`merchant-publish-field ${index === 2 ? 'merchant-publish-field--last' : ''}`}>
+              <Text className='merchant-publish-field__label'>{field.label}</Text>
+              <Input
+                className='merchant-publish-field__input'
+                value={field.value}
+                placeholder={field.placeholder}
+                onInput={(event) => field.change(inputValue(event))}
+              />
+            </View>
+          ))}
           <View className='merchant-publish-textarea-wrap'>
             <Text className='merchant-publish-field__label'>备注</Text>
             <Textarea
               className='merchant-publish-textarea'
               value={remark}
-              placeholder='如 放门口即可、到楼下打电话'
-              maxlength={80}
+              placeholder='选填配送说明'
+              maxlength={500}
               onInput={(event) => setRemark(inputValue(event))}
             />
           </View>
@@ -152,44 +211,34 @@ export default function MerchantPublishPage() {
         <View className='merchant-publish-fee-card'>
           <View className='merchant-publish-fee-card__main'>
             <Text className='merchant-publish-fee-card__label'>配送费</Text>
-            <Text className='merchant-publish-fee-card__hint'>平台统一定价,无需填写,发布时支付</Text>
-          </View>
-          <View className='merchant-publish-fee-card__amount'>
-            <Text className='merchant-publish-fee-card__currency'>¥</Text>
-            <Text>1.5</Text>
+            <Text className='merchant-publish-fee-card__hint'>由服务端按平台规则计算，客户端不会修改金额</Text>
           </View>
         </View>
-
         <View className='merchant-publish-scroll__spacer' />
       </ScrollView>
 
       <View className='merchant-publish-footer'>
         <View className='merchant-publish-footer__button' onClick={openPaymentSheet}>
-          <Text>发布并支付</Text>
+          <Text>{submitting ? '正在提交…' : '发布并支付'}</Text>
         </View>
       </View>
 
-      {sheetVisible && (
+      {sheetVisible ? (
         <View className='merchant-publish-modal'>
           <View className='merchant-publish-modal__mask' onClick={() => setSheetVisible(false)} />
           <View className='merchant-publish-sheet'>
             <View className='merchant-publish-sheet__header'>
               <View>
                 <Text className='merchant-publish-sheet__title'>选择支付方式</Text>
-                <Text className='merchant-publish-sheet__subtitle'>配送费 · 平台统一定价</Text>
+                <Text className='merchant-publish-sheet__subtitle'>实际配送费以服务端返回为准</Text>
               </View>
-              <View className='merchant-publish-sheet__close' onClick={() => setSheetVisible(false)}>
-                <Text>×</Text>
-              </View>
+              <View className='merchant-publish-sheet__close' onClick={() => setSheetVisible(false)}><Text>×</Text></View>
             </View>
-
             <View className='merchant-publish-payments'>
               {paymentOptions.map((option) => (
                 <View
                   key={option.key}
-                  className={`merchant-publish-payment ${
-                    paymentMethod === option.key ? 'merchant-publish-payment--active' : ''
-                  }`}
+                  className={`merchant-publish-payment ${paymentMethod === option.key ? 'merchant-publish-payment--active' : ''}`}
                   onClick={() => setPaymentMethod(option.key)}
                 >
                   <View className={`merchant-publish-payment__icon merchant-publish-payment__icon--${option.key}`}>
@@ -200,18 +249,25 @@ export default function MerchantPublishPage() {
                     <Text className='merchant-publish-payment__desc'>{option.desc}</Text>
                   </View>
                   <View className='merchant-publish-payment__radio'>
-                    {paymentMethod === option.key && <View className='merchant-publish-payment__radio-dot' />}
+                    {paymentMethod === option.key ? <View className='merchant-publish-payment__radio-dot' /> : null}
                   </View>
                 </View>
               ))}
             </View>
-
-            <View className='merchant-publish-confirm' onClick={confirmPayment}>
-              <Text>确认支付 ¥1.50</Text>
+            <View className='merchant-publish-confirm' onClick={() => void confirmPayment()}>
+              <Text>确认发布并支付</Text>
             </View>
           </View>
         </View>
-      )}
+      ) : null}
     </View>
+  )
+}
+
+export default function MerchantPublishPage() {
+  return (
+    <RuntimeSessionGate preserveAuthenticatedChildrenDuringRetry>
+      <MerchantPublishContent />
+    </RuntimeSessionGate>
   )
 }
