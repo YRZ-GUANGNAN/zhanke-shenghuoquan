@@ -15,7 +15,9 @@ const requirements = [
   [app, 'pages/identity-application/index'],
   [profile, '/pages/identity-application/index?role='],
   [page, "chooseAndUploadImagesSettled('identity_application'"],
-  [page, 'waitForMediaApproval('],
+  [page, 'getMediaStatus(proof.assetId)'],
+  [page, '图片仍在审核中，请稍后重试'],
+  [page, '无需停留在此页，稍后返回重试即可'],
   [page, 'mountedRef'],
   [page, 'operationGenerationRef'],
   [page, 'uploadLockRef.current = true'],
@@ -40,6 +42,10 @@ const requirements = [
 
 for (const [source, fragment] of requirements) {
   if (!source.includes(fragment)) throw new Error(`identity application contract missing: ${fragment}`)
+}
+
+if (page.includes('waitForMediaApproval(')) {
+  throw new Error('identity application submit must not block while polling media review')
 }
 
 if (!page.includes("value === 'rider' || value === 'merchant'")) {

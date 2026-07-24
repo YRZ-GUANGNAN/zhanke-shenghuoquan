@@ -4,7 +4,7 @@ import CapsulePageHeader from '../../components/capsule-page-header'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import { getIdentityApplication, submitIdentityApplication } from '../../services/a-user'
 import { isApiError } from '../../services/api'
-import { chooseAndUploadImagesSettled, waitForMediaApproval, type UploadedMedia } from '../../services/media'
+import { chooseAndUploadImagesSettled, getMediaStatus, type UploadedMedia } from '../../services/media'
 import Taro from '../../services/taro'
 import type { IdentityApplicationRole, IdentityApplicationView } from '../../types'
 import './index.scss'
@@ -240,22 +240,29 @@ function IdentityApplicationContent() {
       for (const proof of proofs) {
         if (!isOperationActive(generation)) return
         updateProof(proof.assetId, { state: 'checking', message: '正在确认安全审核状态' })
-        try {
-          await waitForMediaApproval(proof.assetId, (status) => {
-            if (!isOperationActive(generation)) return
-            updateProof(proof.assetId, { state: 'checking', message: status.message || '正在审核' })
-            setProgress(status.message || '正在确认证明图片')
-          }, 90000, () => isOperationActive(generation))
-          if (!isOperationActive(generation)) return
+        const status = await getMediaStatus(proof.assetId)
+        if (!isOperationActive(generation)) return
+        if (status.canUse && status.state === 'approved') {
           updateProof(proof.assetId, { state: 'approved', message: '证明图片已通过安全审核' })
-        } catch (error) {
-          if (!isOperationActive(generation)) return
+          continue
+        }
+        if (status.state === 'rejected' || status.state === 'review_failed' ||
+          status.state === 'expired' || status.state === 'upload_failed' || status.state === 'deleted') {
+          const message = status.state === 'rejected'
+            ? '照片未通过内容安全审核，请重新拍摄'
+            : status.message || '图片处理失败，请重新上传'
           updateProof(proof.assetId, {
             state: 'failed',
-            message: error instanceof Error ? error.message : '图片处理失败，请重新上传'
+            message
           })
-          throw error
+          throw new Error(message)
         }
+
+        const pendingMessage = status.message || '证明图片仍在微信内容审核中，请稍后再提交'
+        updateProof(proof.assetId, { state: 'uploaded', message: pendingMessage })
+        setProgress(`${pendingMessage}。无需停留在此页，稍后返回重试即可。`)
+        await Taro.showToast({ title: '图片仍在审核中，请稍后重试', icon: 'none', duration: 2400 })
+        return
       }
 
       if (!isOperationActive(generation)) return
