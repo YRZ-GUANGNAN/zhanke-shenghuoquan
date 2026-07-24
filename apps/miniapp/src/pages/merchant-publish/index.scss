@@ -230,6 +230,12 @@ page {
   box-shadow: 0 18rpx 34rpx -18rpx rgba($brand-primary-strong, .68);
 }
 
+.merchant-publish-footer__button--disabled {
+  background: $divider-nav;
+  color: $text-tertiary;
+  box-shadow: none;
+}
+
 .merchant-publish-modal {
   position: fixed;
   inset: 0;

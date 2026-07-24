@@ -122,6 +122,12 @@ page {
   line-height: .95;
 }
 
+.merchant-wallet-balance__amount--disabled {
+  margin-top: 22rpx;
+  font-size: 48rpx;
+  letter-spacing: 0;
+}
+
 .merchant-wallet-balance__hint {
   margin-top: 22rpx;
   color: rgba($text-on-color, .78);
@@ -150,6 +156,45 @@ page {
   height: auto;
   margin-top: 0;
   box-sizing: border-box;
+}
+
+.merchant-wallet-unavailable {
+  margin: 34rpx 30rpx;
+  padding: 42rpx 36rpx;
+  border: 1rpx solid $divider-nav;
+  border-radius: 26rpx;
+  background: $bg-surface;
+  box-shadow: $shadow-card;
+  text-align: center;
+}
+
+.merchant-wallet-unavailable__title {
+  display: block;
+  color: $text-strong;
+  font-size: 30rpx;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.merchant-wallet-unavailable__description {
+  display: block;
+  margin-top: 20rpx;
+  color: $text-secondary;
+  font-size: 23rpx;
+  line-height: 1.6;
+}
+
+.merchant-wallet-unavailable__back {
+  height: 76rpx;
+  margin-top: 32rpx;
+  border-radius: 20rpx;
+  background: $brand-tint;
+  color: $brand-primary-strong;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 25rpx;
+  font-weight: 750;
 }
 
 .merchant-wallet-ledger-card {

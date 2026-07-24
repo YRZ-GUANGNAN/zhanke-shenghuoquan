@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Input, ScrollView, Text, Textarea, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
+import { deliveryPaymentEnabled } from '../../feature-flags'
 import { useIdentityGuard } from '../../hooks/use-identity-guard'
 import { getIdentityApplication } from '../../services/a-user'
 import {
@@ -48,11 +49,13 @@ function MerchantPublishContent() {
     }).catch(() => {
       // The approved identity remains authoritative; profile values are a safe fallback.
     })
-    void getDeliveryWallet().then((wallet) => {
-      setBalanceCents(wallet.availableBalanceCents)
-    }).catch(() => {
-      setBalanceCents(null)
-    })
+    if (deliveryPaymentEnabled) {
+      void getDeliveryWallet().then((wallet) => {
+        setBalanceCents(wallet.availableBalanceCents)
+      }).catch(() => {
+        setBalanceCents(null)
+      })
+    }
   }, [identityAllowed])
 
   const validate = () => {
@@ -68,7 +71,12 @@ function MerchantPublishContent() {
   }
 
   const openPaymentSheet = () => {
-    if (!validate() || submitting) return
+    if (submitting) return
+    if (!deliveryPaymentEnabled) {
+      void Taro.showToast({ title: '配送支付暂未开通，当前不能发布配送单', icon: 'none' })
+      return
+    }
+    if (!validate()) return
     setSheetVisible(true)
   }
 
@@ -86,6 +94,10 @@ function MerchantPublishContent() {
   }
 
   const confirmPayment = async () => {
+    if (!deliveryPaymentEnabled) {
+      void Taro.showToast({ title: '配送支付暂未开通', icon: 'none' })
+      return
+    }
     if (submitting || !validate()) return
     setSubmitting(true)
     setSheetVisible(false)
@@ -218,8 +230,13 @@ function MerchantPublishContent() {
       </ScrollView>
 
       <View className='merchant-publish-footer'>
-        <View className='merchant-publish-footer__button' onClick={openPaymentSheet}>
-          <Text>{submitting ? '正在提交…' : '发布并支付'}</Text>
+        <View
+          className={`merchant-publish-footer__button ${!deliveryPaymentEnabled ? 'merchant-publish-footer__button--disabled' : ''}`}
+          onClick={openPaymentSheet}
+        >
+          <Text>
+            {!deliveryPaymentEnabled ? '支付功能暂未开通' : submitting ? '正在提交…' : '发布并支付'}
+          </Text>
         </View>
       </View>
 

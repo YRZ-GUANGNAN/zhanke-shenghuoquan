@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
+import { deliveryPaymentEnabled } from '../../feature-flags'
 import { useIdentityGuard } from '../../hooks/use-identity-guard'
 import {
   getDeliveryWallet,
@@ -48,7 +49,7 @@ function MerchantWalletContent() {
   const [loadError, setLoadError] = useState('')
 
   const loadWallet = useCallback(async () => {
-    if (!identityAllowed || loading) return
+    if (!identityAllowed || !deliveryPaymentEnabled || loading) return
     setLoading(true)
     setLoadError('')
     try {
@@ -68,11 +69,11 @@ function MerchantWalletContent() {
   }, [identityAllowed, loading])
 
   useEffect(() => {
-    if (identityAllowed) void loadWallet()
+    if (identityAllowed && deliveryPaymentEnabled) void loadWallet()
   }, [identityAllowed]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const confirmRecharge = async () => {
-    if (paying) return
+    if (!deliveryPaymentEnabled || paying) return
     setPaying(true)
     try {
       const result = await startDeliveryWalletRecharge(selectedAmount * 100)
@@ -98,6 +99,34 @@ function MerchantWalletContent() {
   }
 
   if (!identityAllowed) return <View className='merchant-wallet-page' />
+  if (!deliveryPaymentEnabled) {
+    return (
+      <View className='merchant-wallet-page'>
+        <View className='merchant-wallet-hero merchant-wallet-hero--disabled'>
+          <CapsuleSystemRow />
+          <View className='merchant-wallet-nav'>
+            <View className='merchant-wallet-nav__back' onClick={() => void Taro.navigateBack()}><Text>‹</Text></View>
+            <Text className='merchant-wallet-nav__title'>商家钱包</Text>
+            <View className='merchant-wallet-nav__spacer' />
+          </View>
+          <View className='merchant-wallet-balance'>
+            <Text className='merchant-wallet-balance__label'>钱包余额（元）</Text>
+            <Text className='merchant-wallet-balance__amount merchant-wallet-balance__amount--disabled'>未开通</Text>
+            <Text className='merchant-wallet-balance__hint'>平台尚未配置微信商户支付</Text>
+          </View>
+        </View>
+        <View className='merchant-wallet-unavailable'>
+          <Text className='merchant-wallet-unavailable__title'>商家钱包暂未开通</Text>
+          <Text className='merchant-wallet-unavailable__description'>
+            当前不会发起充值、支付或资金账本请求。完成微信支付商户配置后，本页面会自动启用真实钱包功能。
+          </Text>
+          <View className='merchant-wallet-unavailable__back' onClick={() => void Taro.navigateBack()}>
+            <Text>返回商家工作台</Text>
+          </View>
+        </View>
+      </View>
+    )
+  }
 
   return (
     <View className='merchant-wallet-page'>

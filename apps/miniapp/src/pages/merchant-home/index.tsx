@@ -3,6 +3,7 @@ import { ScrollView, Text, View } from '@tarojs/components'
 import IdentitySwitchModal from '../../components/IdentitySwitchModal'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
+import { deliveryPaymentEnabled } from '../../feature-flags'
 import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
 import { getIdentityApplication } from '../../services/a-user'
 import {
@@ -222,7 +223,7 @@ function MerchantHomeContent() {
     setApprovalState('approved')
     const [ordersResult, walletResult] = await Promise.all([
       settle(listMerchantDeliveryOrders(1, 100)),
-      settle(getDeliveryWallet()),
+      deliveryPaymentEnabled ? settle(getDeliveryWallet()) : null,
     ])
     if (ordersResult.ok) {
       setOrders(ordersResult.value.items)
@@ -230,7 +231,7 @@ function MerchantHomeContent() {
       setOrders([])
       setLoadError(ordersResult.error instanceof Error ? ordersResult.error.message : '配送单加载失败')
     }
-    setBalanceCents(walletResult.ok ? walletResult.value.availableBalanceCents : null)
+    setBalanceCents(walletResult?.ok ? walletResult.value.availableBalanceCents : null)
     setLoading(false)
   }, [identityAllowed, loading])
 
@@ -312,7 +313,7 @@ function MerchantHomeContent() {
           <View className='merchant-home-wallet'>
             <Text className='merchant-home-wallet__label'>钱包余额（元）</Text>
             <Text className='merchant-home-wallet__amount'>
-              {balanceCents == null ? '--' : `¥${centsToYuan(balanceCents)}`}
+              {!deliveryPaymentEnabled ? '未开通' : balanceCents == null ? '--' : `¥${centsToYuan(balanceCents)}`}
             </Text>
           </View>
           <View className='merchant-home-counts'>

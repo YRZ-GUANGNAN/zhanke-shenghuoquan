@@ -77,6 +77,37 @@ for (const pageName of merchantPages) {
   }
 }
 
+const merchantPaymentGateContracts = [
+  [
+    'merchant-home',
+    /deliveryPaymentEnabled\s*\?\s*settle\(getDeliveryWallet\(\)\)\s*:\s*null/,
+    'merchant home must not request the gated wallet endpoint when delivery payment is disabled'
+  ],
+  [
+    'merchant-wallet',
+    /if\s*\(\s*!deliveryPaymentEnabled\s*\)/,
+    'merchant wallet must render a disabled state without requesting gated payment endpoints'
+  ],
+  [
+    'merchant-publish',
+    /if\s*\(\s*!deliveryPaymentEnabled\s*\)/,
+    'merchant publish must fail closed before creating an unpaid order when delivery payment is disabled'
+  ],
+  [
+    'merchant-order-detail',
+    /deliveryPaymentEnabled\s*\?\s*settle\(getDeliveryOrderFunds\(orderId\)\)\s*:\s*null/,
+    'merchant order detail must not request gated funds when delivery payment is disabled'
+  ]
+]
+for (const [pageName, contract, message] of merchantPaymentGateContracts) {
+  const source = fs.readFileSync(path.join(src, `pages/${pageName}/index.tsx`), 'utf8')
+  if (!source.includes('deliveryPaymentEnabled')) {
+    violations.push(`pages/${pageName}/index.tsx: missing deliveryPaymentEnabled gate`)
+  } else if (!contract.test(source)) {
+    violations.push(`pages/${pageName}/index.tsx: ${message}`)
+  }
+}
+
 const communityClient = fs.readFileSync(path.join(src, 'services/b-community.ts'), 'utf8')
 for (const token of [
   '/community/posts/${encodeURIComponent(postId)}/like',

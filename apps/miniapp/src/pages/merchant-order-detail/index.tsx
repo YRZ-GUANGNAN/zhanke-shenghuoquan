@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
+import { deliveryPaymentEnabled } from '../../feature-flags'
 import { useIdentityGuard } from '../../hooks/use-identity-guard'
 import {
   centsToYuan,
@@ -95,10 +96,10 @@ function MerchantOrderDetailContent() {
       const orderValue = await getMerchantDeliveryOrder(orderId)
       setOrder(orderValue)
       const [fundsResult, proofsResult] = await Promise.all([
-        settle(getDeliveryOrderFunds(orderId)),
+        deliveryPaymentEnabled ? settle(getDeliveryOrderFunds(orderId)) : null,
         settle(loadPrivateDeliveryProofs(orderId)),
       ])
-      setFunds(fundsResult.ok ? fundsResult.value : null)
+      setFunds(fundsResult?.ok ? fundsResult.value : null)
       setProofs(proofsResult.ok ? proofsResult.value : [])
     } catch (error) {
       setOrder(null)
