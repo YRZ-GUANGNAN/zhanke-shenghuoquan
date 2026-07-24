@@ -1,30 +1,11 @@
 // Domain F client: management and the unified review workflow only.
 import type { ExternalTakeoutMerchant, ExternalTakeoutMerchantDirectory, ExternalTakeoutMerchantInput, ExternalTakeoutOperatingStatus, IdentityApplicationAdminList, IdentityApplicationDetail, IdentityApplicationQuery, IdentityApplicationRow, MediaAssetDetail, MediaAssetRow, MediaDeadletters, MediaDecisionRow, MediaEventRow, MediaGCJobRow, MediaQuery, MediaSummary, NavigationCategory, Page, PostRow, ProductRow, ReportRow, ReviewTask, Stats, UserRow } from '../types'
-const base='/api/v1'
+import { adminRequest } from './http'
 export class AdminAPIError extends Error {
 	constructor(message:string,readonly status:number){super(message);this.name='AdminAPIError'}
 }
-type AdminAPIEnvelope<T>={code:number;message:string;data?:T}
-function protocolError(response:Response){return new AdminAPIError(response.ok?'Invalid API response':`HTTP ${response.status}`,response.status)}
 async function api<T>(path:string,init:RequestInit={}):Promise<T>{
-	const token=localStorage.getItem('domainA.token')||''
-	let response:Response
-	try{
-		response=await fetch(`${base}${path}`,{...init,headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})}})
-	}catch{
-		throw new AdminAPIError('Network request failed',0)
-	}
-	let value:unknown
-	try{value=await response.json()}catch{throw protocolError(response)}
-	if(typeof value!=='object'||value===null||Array.isArray(value))throw protocolError(response)
-	const body=value as Partial<AdminAPIEnvelope<T>>
-	if(typeof body.code!=='number'||typeof body.message!=='string')throw protocolError(response)
-	if(!response.ok||body.code!==0){
-		const status=response.ok&&body.code>0?body.code:response.status
-		throw new AdminAPIError(body.message||`HTTP ${status}`,status)
-	}
-	if(!('data' in body))throw protocolError(response)
-	return body.data as T
+	return adminRequest<T>(path,init,(status,message)=>new AdminAPIError(message,status))
 }
 function queryString(query:MediaQuery={}){const params=new URLSearchParams();Object.entries(query).forEach(([key,value])=>{if(value!==undefined&&value!=='')params.set(key,String(value))});const value=params.toString();return value?`?${value}`:''}
 function identityQueryString(query:IdentityApplicationQuery={}){const params=new URLSearchParams();Object.entries(query).forEach(([key,value])=>{if(value!==undefined&&value!=='')params.set(key,String(value))});const value=params.toString();return value?`?${value}`:''}

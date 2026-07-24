@@ -1,4 +1,6 @@
-const base = '/api/v1/admin/delivery'
+import { adminRequest } from './http'
+
+const base = '/admin/delivery'
 
 export class DeliveryAPIError extends Error {
   status: number
@@ -227,18 +229,7 @@ export interface RiderPayoutResult {
 }
 
 async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const token = localStorage.getItem('domainA.token') || ''
-  const response = await fetch(`${base}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init.headers || {})
-    }
-  })
-  const body = await response.json() as { code: number; message: string; data: T }
-  if (!response.ok || body.code !== 0) throw new DeliveryAPIError(response.status, body.message || `HTTP ${response.status}`)
-  return body.data
+  return adminRequest<T>(`${base}${path}`, init, (status, message) => new DeliveryAPIError(status, message))
 }
 
 function queryString(query: DeliveryQuery = {}) {

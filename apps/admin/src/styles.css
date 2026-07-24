@@ -658,6 +658,228 @@ td span {
   .external-merchant-header { flex-direction: column; }
 }
 
+.auth-loading,
+.login-page {
+  min-width: 100vw;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 16% 15%, rgba(24, 182, 164, .12), transparent 30%),
+    radial-gradient(circle at 84% 80%, rgba(22, 119, 255, .11), transparent 34%),
+    #eef3f8;
+}
+
+.auth-loading {
+  align-content: center;
+  gap: 14px;
+  color: #607089;
+}
+
+.auth-loading__mark,
+.login-card__mark {
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #1677ff, #18b6a4);
+  color: #fff;
+  font-weight: 800;
+}
+
+.auth-loading__mark {
+  width: 52px;
+  height: 52px;
+  font-size: 22px;
+}
+
+.login-card {
+  width: min(440px, calc(100vw - 48px));
+  padding: 38px;
+  border: 1px solid rgba(207, 218, 232, .9);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .96);
+  box-shadow: 0 24px 70px rgba(20, 42, 70, .13);
+}
+
+.login-card__mark {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 22px;
+  font-size: 20px;
+}
+
+.login-card__eyebrow {
+  color: #1677ff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+
+.login-card h1 {
+  margin-top: 8px;
+  font-size: 28px;
+}
+
+.login-card__description {
+  margin-top: 12px;
+  color: #6f7f94;
+  line-height: 1.7;
+}
+
+.login-card form {
+  display: grid;
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.login-card label {
+  display: grid;
+  gap: 7px;
+  color: #53637a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.login-card input {
+  height: 46px;
+  padding: 0 13px;
+  border: 1px solid #d7e0eb;
+  border-radius: 9px;
+  outline: 0;
+  background: #fff;
+  color: #172033;
+}
+
+.login-card input:focus {
+  border-color: #1677ff;
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, .1);
+}
+
+.login-card input:disabled {
+  background: #f3f6fa;
+  color: #7b899b;
+}
+
+.login-card form > button {
+  height: 46px;
+  border: 0;
+  border-radius: 9px;
+  background: #1677ff;
+  color: #fff;
+  font-weight: 800;
+}
+
+.login-card form > button:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+.login-error {
+  padding: 11px 12px;
+  border-radius: 8px;
+  background: #fff1f1;
+  color: #c2410c;
+  font-size: 13px;
+}
+
+.account-panel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.account-panel > div {
+  min-width: 180px;
+  text-align: right;
+}
+
+.account-panel strong,
+.account-panel span,
+.account-panel small {
+  display: block;
+}
+
+.account-panel strong {
+  color: #233046;
+  font-size: 14px;
+}
+
+.account-panel span {
+  margin-top: 4px;
+  color: #7c8a9d;
+  font-size: 12px;
+}
+
+.account-panel small {
+  max-width: 260px;
+  margin-top: 5px;
+  color: #c2410c;
+  font-size: 11px;
+}
+
+.account-panel__logout {
+  background: #fff1f1;
+  color: #c2410c;
+}
+
+.password-dialog {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(9, 20, 36, .52);
+}
+
+.password-dialog form {
+  width: min(440px, calc(100vw - 48px));
+  display: grid;
+  gap: 15px;
+  padding: 28px;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(7, 18, 34, .26);
+}
+
+.password-dialog h2 {
+  color: #172033;
+}
+
+.password-dialog p {
+  color: #6f7f94;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.password-dialog label {
+  display: grid;
+  gap: 7px;
+  color: #53637a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.password-dialog input {
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid #d7e0eb;
+  border-radius: 8px;
+  outline: 0;
+}
+
+.password-dialog input:focus {
+  border-color: #1677ff;
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, .1);
+}
+
+.password-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 5px;
+}
+
 .delivery-console { display: grid; gap: 18px; }
 .identity-console { display: grid; gap: 18px; }
 .identity-detail h4 { margin: 20px 0 10px; color: #334155; }

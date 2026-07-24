@@ -7,6 +7,9 @@ import { TakeoutConsole } from './TakeoutConsole'
 import { ExternalTakeoutMerchants } from './ExternalTakeoutMerchants'
 import { IdentityApplications } from './IdentityApplications'
 import { legacyTakeoutEnabled } from './feature-flags'
+import { Login } from './Login'
+import { AccountPanel } from './AccountPanel'
+import { adminAuthAPI } from './services/admin-auth'
 import type { AdminSection, NavigationCategory, Page, PostRow, ProductRow, ReportRow, ReviewTask, Stats, UserRow } from './types'
 
 const nav:Array<{key:AdminSection;label:string;icon:string}>=[
@@ -21,7 +24,7 @@ const nav:Array<{key:AdminSection;label:string;icon:string}>=[
 ]
 
 function Panel({title,children}:{title:string;children:ReactNode}){return <section className="panel"><header className="panel__header"><h2>{title}</h2></header>{children}</section>}
-function ErrorBox({message}:{message:string}){return <div className="placeholder"><strong>{message}</strong><p>请确认已用管理员账号登录，并将 token 写入 domainA.token。</p></div>}
+function ErrorBox({message}:{message:string}){return <div className="placeholder"><strong>{message}</strong><p>请确认管理员会话仍然有效；如果已过期，请重新登录。</p></div>}
 
 function Dashboard(){const[data,setData]=useState<Stats|null>(null);const[error,setError]=useState('');useEffect(()=>{adminAPI.stats().then(setData).catch(e=>setError(String(e)))},[]);if(error)return <ErrorBox message={error}/>;if(!data)return <Panel title="数据统计">加载中…</Panel>;const metrics=[['用户',data.totals.users,data.today.users],['帖子',data.totals.posts,data.today.posts],['商品',data.totals.products,data.today.products],['待审核',data.totals.pendingReview,'-']];return <section className="metric-grid">{metrics.map(([label,total,today])=><article className="metric-card" key={label}><div className="metric-card__label">{label}</div><div className="metric-card__value">{total}</div><div className="metric-card__footer"><span>今日</span><span>{today}</span></div></article>)}</section>}
 
@@ -45,4 +48,19 @@ function TakedownProducts(){const[data,setData]=useState<Page<ProductRow>|null>(
 
 function Content(){const section=useAdminStore(s=>s.section);if(section==='dashboard')return <Dashboard/>;if(section==='users')return <Users/>;if(section==='identities')return <IdentityApplications/>;if(section==='moderation')return <Reviews/>;if(section==='media')return <MediaConsole/>;if(section==='delivery')return <DeliveryConsole/>;if(section==='takeout'&&legacyTakeoutEnabled)return <TakeoutConsole/>;if(section==='community')return <TakedownPosts/>;if(section==='trade')return <TakedownProducts/>;if(section==='reports')return <Reports/>;return <Navigation/>}
 
-export default function App(){const section=useAdminStore(s=>s.section);const setSection=useAdminStore(s=>s.setSection);const active=nav.find(item=>item.key===section);return <div className="app-shell"><aside className="sidebar"><div className="brand"><div className="brand__logo">F</div><div><strong>校园系统</strong><span>收敛管理后台</span></div></div><nav>{nav.map(item=><button key={item.key} type="button" className={section===item.key?'active':''} onClick={()=>setSection(item.key)}><span>{item.icon}</span>{item.label}</button>)}</nav></aside><main className="main"><header className="topbar"><div><span className="eyebrow">{section==='takeout'?'业务域 G':section==='delivery'?'配送域 D':'业务域 F'}</span><h1>{active?.label}</h1></div></header><Content/></main></div>}
+function AdminShell(){const section=useAdminStore(s=>s.section);const setSection=useAdminStore(s=>s.setSection);const active=nav.find(item=>item.key===section);return <div className="app-shell"><aside className="sidebar"><div className="brand"><div className="brand__logo">F</div><div><strong>校园系统</strong><span>收敛管理后台</span></div></div><nav>{nav.map(item=><button key={item.key} type="button" className={section===item.key?'active':''} onClick={()=>setSection(item.key)}><span>{item.icon}</span>{item.label}</button>)}</nav></aside><main className="main"><header className="topbar"><div><span className="eyebrow">{section==='takeout'?'业务域 G':section==='delivery'?'配送域 D':'业务域 F'}</span><h1>{active?.label}</h1></div><AccountPanel/></header><Content/></main></div>}
+
+export default function App(){
+	const authStatus=useAdminStore(state=>state.authStatus)
+	const setAuthenticated=useAdminStore(state=>state.setAuthenticated)
+	const setUnauthenticated=useAdminStore(state=>state.setUnauthenticated)
+	useEffect(()=>{
+		if(authStatus!=='checking')return
+		let active=true
+		adminAuthAPI.session().then(session=>{if(active)setAuthenticated(session)}).catch(()=>{if(active)setUnauthenticated()})
+		return()=>{active=false}
+	},[authStatus,setAuthenticated,setUnauthenticated])
+	if(authStatus==='checking')return <main className="auth-loading"><div className="auth-loading__mark">湛</div><p>正在验证管理员会话…</p></main>
+	if(authStatus==='unauthenticated')return <Login/>
+	return <AdminShell/>
+}

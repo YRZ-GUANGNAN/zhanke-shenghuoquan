@@ -1,6 +1,7 @@
 import type { DishCategoryRow, DishRow, FeeConfigRow, MerchantRow, OrderDetail, OrderRow, Page, RiderConfigRow, RiderRow, RiderStatus, SettlementRow, TakeoutQuery, WithdrawRow } from '../types'
+import { adminRequest } from './http'
 
-const base='/api/v1/admin/takeout'
+const base='/admin/takeout'
 
 export class TakeoutAPIError extends Error{
 	status:number
@@ -8,11 +9,7 @@ export class TakeoutAPIError extends Error{
 }
 
 async function api<T>(path:string,init:RequestInit={}):Promise<T>{
-	const token=localStorage.getItem('domainA.token')||''
-	const response=await fetch(`${base}${path}`,{...init,headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})}})
-	const body=await response.json() as {code:number;message:string;data:T}
-	if(!response.ok||body.code!==0)throw new TakeoutAPIError(response.status,body.message||`HTTP ${response.status}`)
-	return body.data
+	return adminRequest<T>(`${base}${path}`,init,(status,message)=>new TakeoutAPIError(status,message))
 }
 
 function queryString(query:TakeoutQuery={}){

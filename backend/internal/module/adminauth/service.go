@@ -107,7 +107,7 @@ func (s *Service) Login(ctx context.Context, username, password, ip, userAgent s
 			if err == nil {
 				attempts := credential.FailedAttempts + 1
 				var lockedUntil *time.Time
-				if recent+1 >= lockThreshold {
+				if recent >= lockThreshold {
 					until := now.Add(lockDuration)
 					lockedUntil = &until
 					_ = s.audit(ctx, &credential, "account_locked", "blocked", ipHash, userAgentHash, "")

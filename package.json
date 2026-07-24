@@ -20,6 +20,7 @@
     "check:miniapp-domain-search": "node scripts/check-miniapp-domain-search.cjs",
 		"check:miniapp-settings-contract": "node scripts/check-miniapp-settings-contract.cjs",
     "check:identity-application-contract": "node scripts/check-identity-application-contract.cjs",
+    "check:admin-password-session-contract": "node scripts/check-admin-password-session-contract.cjs",
     "check:miniapp-capsule-layout": "node scripts/check-miniapp-capsule-layout.cjs",
     "check:home-real-tools-contract": "node scripts/check-home-real-tools-contract.cjs",
     "check:real-wechat-secret-hygiene": "node scripts/check-real-wechat-secret-hygiene.cjs",
