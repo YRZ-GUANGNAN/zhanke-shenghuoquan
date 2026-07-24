@@ -38,6 +38,9 @@ const riderPage = fs.readFileSync(path.join(src, 'pages/delivery-rider/index.tsx
 for (const token of [
   'CapsuleSystemRow',
   "className='rider-grab-hero'",
+  'RiderWorkbenchIcon',
+  "className='rider-grab-task-summary'",
+  "className='rider-empty-state'",
   "label: '待抢单'",
   "label: '待取货'",
   "label: '待送达'",
@@ -48,6 +51,9 @@ for (const token of [
   if (!riderPage.includes(token)) {
     violations.push(`pages/delivery-rider/index.tsx: missing restored real-data rider workbench contract ${token}`)
   }
+}
+if (/<Text>骑<\/Text>|rider-grab-hero__orb|rider-grab-list-head/.test(riderPage)) {
+  violations.push('pages/delivery-rider/index.tsx: legacy character icons or duplicate rider list controls must stay removed')
 }
 
 const home = fs.readFileSync(path.join(src, 'pages/home/index.tsx'), 'utf8')

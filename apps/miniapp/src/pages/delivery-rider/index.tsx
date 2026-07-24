@@ -21,6 +21,7 @@ import {
 import { centsToYuan, type DeliveryStatus } from '../../services/delivery-merchant'
 import { chooseAndUploadImages, waitForMediaApproval } from '../../services/media'
 import Taro from '../../services/taro'
+import RiderWorkbenchIcon from './rider-workbench-icon'
 import './index.scss'
 
 type RiderTab = 'grab' | 'pickup' | 'delivery'
@@ -227,8 +228,8 @@ export default function DeliveryRiderPage() {
           <CapsuleSystemRow />
           <Text className='rider-access-hero__title'>骑手工作台</Text>
         </View>
-        <View className='rider-grab-placeholder'>
-          <View className='rider-grab-placeholder__icon'><Text>骑</Text></View>
+        <View className='rider-grab-placeholder rider-grab-placeholder--loading'>
+          <RiderWorkbenchIcon name='empty' className='rider-grab-placeholder__icon' />
           <Text className='rider-grab-placeholder__title'>正在加载骑手工作台</Text>
           <Text className='rider-grab-placeholder__desc'>正在同步身份与配送订单，请稍候。</Text>
         </View>
@@ -244,7 +245,7 @@ export default function DeliveryRiderPage() {
           <Text className='rider-access-hero__title'>骑手工作台</Text>
         </View>
         <View className='rider-grab-placeholder'>
-          <View className='rider-grab-placeholder__icon'><Text>骑</Text></View>
+          <RiderWorkbenchIcon name='empty' className='rider-grab-placeholder__icon' />
           <Text className='rider-grab-placeholder__title'>骑手权限尚未开通</Text>
           <Text className='rider-grab-placeholder__desc'>
             {me.message || '请先提交骑手身份申请，并等待平台审核。'}
@@ -264,12 +265,15 @@ export default function DeliveryRiderPage() {
     { key: 'pickup', label: '待取货', count: pickupOrders.length },
     { key: 'delivery', label: '待送达', count: deliveryOrders.length }
   ]
+  const activeOrderCount = activeTab === 'grab'
+    ? claimable.length
+    : activeTab === 'pickup'
+      ? pickupOrders.length
+      : deliveryOrders.length
 
   return (
     <View className='rider-grab-page'>
       <View className='rider-grab-hero'>
-        <View className='rider-grab-hero__orb rider-grab-hero__orb--one' />
-        <View className='rider-grab-hero__orb rider-grab-hero__orb--two' />
         <CapsuleSystemRow className='rider-grab-system-row' />
 
         <View className='rider-grab-user'>
@@ -286,22 +290,35 @@ export default function DeliveryRiderPage() {
           </View>
         </View>
 
-        <View className='rider-grab-wallet-summary'>
-          <View className='rider-grab-wallet-summary__main'>
-            <Text className='rider-grab-wallet-summary__label'>当前配送任务</Text>
-            <View className='rider-grab-wallet-summary__amount-row'>
-              <Text className='rider-grab-wallet-summary__amount'>{activeTaskCount}</Text>
-              <Text className='rider-grab-wallet-summary__unit'>单</Text>
+        <View className='rider-grab-task-summary'>
+          <View className='rider-grab-task-summary__primary'>
+            <Text className='rider-grab-task-summary__label'>当前配送任务</Text>
+            <View className='rider-grab-task-summary__value-row'>
+              <Text className='rider-grab-task-summary__value'>{activeTaskCount}</Text>
+              <Text className='rider-grab-task-summary__unit'>单</Text>
             </View>
-            <Text className='rider-grab-wallet-summary__sub'>
-              可抢 {claimable.length} 单　｜　已完成 {completedCount} 单
-            </Text>
+          </View>
+          <View className='rider-grab-task-summary__stats'>
+            <View className='rider-grab-task-summary__stat'>
+              <Text className='rider-grab-task-summary__stat-value'>{claimable.length}</Text>
+              <Text className='rider-grab-task-summary__stat-label'>可抢</Text>
+            </View>
+            <View className='rider-grab-task-summary__divider' />
+            <View className='rider-grab-task-summary__stat'>
+              <Text className='rider-grab-task-summary__stat-value'>{completedCount}</Text>
+              <Text className='rider-grab-task-summary__stat-label'>已完成</Text>
+            </View>
           </View>
           <View
-            className={`rider-grab-wallet-summary__button ${loading ? 'rider-grab-wallet-summary__button--loading' : ''}`}
-            onClick={() => void load()}
+            className={`rider-grab-refresh ${loading ? 'rider-grab-refresh--loading' : ''}`}
+            onClick={() => {
+              if (!loading) void load()
+            }}
           >
-            <View className='rider-grab-wallet-summary__refresh-icon' />
+            <RiderWorkbenchIcon
+              name='refresh'
+              className={`rider-grab-refresh__icon ${loading ? 'rider-grab-refresh__icon--spin' : ''}`}
+            />
             <Text>{loading ? '刷新中' : '刷新'}</Text>
           </View>
         </View>
@@ -322,88 +339,89 @@ export default function DeliveryRiderPage() {
 
       <ScrollView scrollY enhanced showScrollbar={false} className='rider-grab-content'>
         <View className='rider-grab-content__inner'>
-          {error ? (
-            <View className='rider-grab-error' onClick={() => void load()}>
-              <Text>{error}，点击重试</Text>
+          {error && activeOrderCount === 0 ? (
+            <View className='rider-load-error' onClick={() => void load()}>
+              <Text className='rider-load-error__title'>订单加载失败</Text>
+              <Text className='rider-load-error__desc'>{error}</Text>
+              <Text className='rider-load-error__action'>点击重试</Text>
             </View>
-          ) : null}
-
-          {activeTab === 'grab' ? renderClaimableOrders() : null}
-          {activeTab === 'pickup' ? renderAssignedOrders(pickupOrders, 'pickup') : null}
-          {activeTab === 'delivery' ? renderAssignedOrders(deliveryOrders, 'delivery') : null}
+          ) : (
+            <>
+              {error ? (
+                <View className='rider-grab-error' onClick={() => void load()}>
+                  <Text>{error}，当前显示上次加载的数据，点击重试</Text>
+                </View>
+              ) : null}
+              {activeTab === 'grab' ? renderClaimableOrders() : null}
+              {activeTab === 'pickup' ? renderAssignedOrders(pickupOrders, 'pickup') : null}
+              {activeTab === 'delivery' ? renderAssignedOrders(deliveryOrders, 'delivery') : null}
+            </>
+          )}
         </View>
       </ScrollView>
     </View>
   )
 
   function renderClaimableOrders() {
+    if (claimable.length === 0) {
+      return <EmptyState title='当前暂无可抢配送单' description='新配送单出现后会显示在这里。' />
+    }
+
     return (
-      <>
-        <View className='rider-grab-list-head'>
-          <Text>当前共 {claimable.length} 单可抢</Text>
-          <View className='rider-grab-list-head__refresh' onClick={() => void load()}>
-            <Text>{loading ? '刷新中…' : '刷新订单'}</Text>
-          </View>
-        </View>
-        {claimable.length === 0 ? (
-          <EmptyState title='当前暂无可抢配送单' description='新配送单出现后会显示在这里。' />
-        ) : (
-          <View className='rider-grab-list'>
-            {claimable.map((order) => {
-              const route = parseRouteSummary(order.routeSummary)
-              const busy = busyOrderId === order.deliveryOrderPublicId
-              return (
-                <View key={order.deliveryOrderPublicId} className='rider-order-card'>
-                  <View className='rider-order-card__top'>
-                    <View className='rider-order-card__serial'>
-                      <Text>{shortOrderId(order.deliveryOrderPublicId)}</Text>
-                      <Text className='rider-order-card__dot'>·</Text>
-                      <Text>{formatTime(order.createdAt)}</Text>
-                    </View>
-                    <View className='rider-order-card__fee'>
-                      <Text>配送费 </Text>
-                      <Text className='rider-order-card__fee-price'>¥{centsToYuan(order.deliveryFeeCents)}</Text>
-                    </View>
-                  </View>
+      <View className='rider-grab-list'>
+        {claimable.map((order) => {
+          const route = parseRouteSummary(order.routeSummary)
+          const busy = busyOrderId === order.deliveryOrderPublicId
+          return (
+            <View key={order.deliveryOrderPublicId} className='rider-order-card'>
+              <View className='rider-order-card__top'>
+                <View className='rider-order-card__serial'>
+                  <Text>{shortOrderId(order.deliveryOrderPublicId)}</Text>
+                  <Text className='rider-order-card__dot'>·</Text>
+                  <Text>{formatTime(order.createdAt)}</Text>
+                </View>
+                <View className='rider-order-card__fee'>
+                  <Text>配送费 </Text>
+                  <Text className='rider-order-card__fee-price'>¥{centsToYuan(order.deliveryFeeCents)}</Text>
+                </View>
+              </View>
 
-                  <View className='rider-order-route'>
-                    <View className='rider-order-route__line' />
-                    <View className='rider-order-route__row'>
-                      <View className='rider-order-route__marker rider-order-route__marker--pickup' />
-                      <View className='rider-order-route__info'>
-                        <Text className='rider-order-route__label'>取货点</Text>
-                        <Text className='rider-order-route__place'>{route.pickup}</Text>
-                      </View>
-                    </View>
-                    <View className='rider-order-route__row rider-order-route__row--drop'>
-                      <View className='rider-order-route__marker rider-order-route__marker--drop' />
-                      <View className='rider-order-route__info'>
-                        <Text className='rider-order-route__label'>送达点</Text>
-                        <View className='rider-order-route__drop-row'>
-                          <Text className='rider-order-route__place'>{route.delivery}</Text>
-                          <Text className='rider-order-route__lock'>抢单后显示门牌</Text>
-                        </View>
-                      </View>
-                    </View>
+              <View className='rider-order-route'>
+                <View className='rider-order-route__line' />
+                <View className='rider-order-route__row'>
+                  <View className='rider-order-route__marker rider-order-route__marker--pickup' />
+                  <View className='rider-order-route__info'>
+                    <Text className='rider-order-route__label'>取货点</Text>
+                    <Text className='rider-order-route__place'>{route.pickup}</Text>
                   </View>
-
-                  <View className='rider-order-card__bottom'>
-                    <Text className='rider-order-card__privacy'>隐私保护 · 接单后可联系</Text>
-                    <View
-                      className={`rider-order-card__grab ${busy || rider.status !== 'active' ? 'rider-order-card__grab--disabled' : ''}`}
-                      onClick={() => {
-                        if (!busy && rider.status === 'active') void claim(order)
-                      }}
-                    >
-                      <Text>{busy ? '接单中…' : rider.status === 'active' ? '抢单' : '当前不可接单'}</Text>
+                </View>
+                <View className='rider-order-route__row rider-order-route__row--drop'>
+                  <View className='rider-order-route__marker rider-order-route__marker--drop' />
+                  <View className='rider-order-route__info'>
+                    <Text className='rider-order-route__label'>送达点</Text>
+                    <View className='rider-order-route__drop-row'>
+                      <Text className='rider-order-route__place'>{route.delivery}</Text>
+                      <Text className='rider-order-route__lock'>抢单后显示门牌</Text>
                     </View>
                   </View>
                 </View>
-              )
-            })}
-          </View>
-        )}
-      </>
+              </View>
+
+              <View className='rider-order-card__bottom'>
+                <Text className='rider-order-card__privacy'>隐私保护 · 接单后可联系</Text>
+                <View
+                  className={`rider-order-card__grab ${busy || rider.status !== 'active' ? 'rider-order-card__grab--disabled' : ''}`}
+                  onClick={() => {
+                    if (!busy && rider.status === 'active') void claim(order)
+                  }}
+                >
+                  <Text>{busy ? '接单中…' : rider.status === 'active' ? '抢单' : '当前不可接单'}</Text>
+                </View>
+              </View>
+            </View>
+          )
+        })}
+      </View>
     )
   }
 
@@ -470,12 +488,14 @@ export default function DeliveryRiderPage() {
 
         <View className='rider-order-card__quick-actions'>
           <View className='rider-order-card__secondary' onClick={() => openConversation(order.deliveryOrderPublicId)}>
+            <RiderWorkbenchIcon name='message' className='rider-order-card__secondary-icon' />
             <Text>消息</Text>
           </View>
           <View
             className='rider-order-card__secondary'
             onClick={() => void Taro.makePhoneCall({ phoneNumber: contactPhone })}
           >
+            <RiderWorkbenchIcon name='phone' className='rider-order-card__secondary-icon' />
             <Text>电话</Text>
           </View>
           {releasable ? (
@@ -524,10 +544,12 @@ export default function DeliveryRiderPage() {
 
 function EmptyState({ title, description }: { title: string; description: string }) {
   return (
-    <View className='rider-grab-placeholder rider-grab-placeholder--inline'>
-      <View className='rider-grab-placeholder__icon'><Text>骑</Text></View>
-      <Text className='rider-grab-placeholder__title'>{title}</Text>
-      <Text className='rider-grab-placeholder__desc'>{description}</Text>
+    <View className='rider-empty-state'>
+      <RiderWorkbenchIcon name='empty' className='rider-empty-state__icon' />
+      <View className='rider-empty-state__copy'>
+        <Text className='rider-empty-state__title'>{title}</Text>
+        <Text className='rider-empty-state__desc'>{description}</Text>
+      </View>
     </View>
   )
 }
