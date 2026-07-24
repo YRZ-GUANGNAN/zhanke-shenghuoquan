@@ -35,7 +35,7 @@
 - Create: `scripts/check-merchant-home-clarity.cjs`
 - Modify: `package.json:8-29`
 
-- [ ] **Step 1: 写入会失败的静态合同**
+- [x] **Step 1: 写入会失败的静态合同**
 
 创建脚本，明确检查五个 SVG、私有图标组件、`2 × 2` 布局和业务边界：
 
@@ -84,7 +84,7 @@ assert.match(source, /getIdentityApplication\('merchant'\)/)
 console.log('merchant home clarity contract: ok')
 ```
 
-- [ ] **Step 2: 注册检查命令**
+- [x] **Step 2: 注册检查命令**
 
 在根 `package.json` 的 `scripts` 中加入：
 
@@ -94,7 +94,7 @@ console.log('merchant home clarity contract: ok')
 
 并把 `npm run check:merchant-home-clarity` 放在 `verify` 的小程序合同检查段中、`npm run typecheck` 之前。
 
-- [ ] **Step 3: 运行检查并确认按预期失败**
+- [x] **Step 3: 运行检查并确认按预期失败**
 
 Run:
 
@@ -104,7 +104,7 @@ npm.cmd run check:merchant-home-clarity
 
 Expected: FAIL，首个错误为 `merchant home icon component is required`。
 
-- [ ] **Step 4: 提交失败合同**
+- [x] **Step 4: 提交失败合同**
 
 ```powershell
 git add -- package.json scripts/check-merchant-home-clarity.cjs
@@ -121,7 +121,7 @@ git commit -m "测试：锁定商家首页清晰度合同"
 - Create: `apps/miniapp/src/pages/merchant-home/icons/action-message.svg`
 - Create: `apps/miniapp/src/pages/merchant-home/icons/empty-orders.svg`
 
-- [ ] **Step 1: 创建五个统一 SVG**
+- [x] **Step 1: 创建五个统一 SVG**
 
 `action-publish.svg`：
 
@@ -177,7 +177,7 @@ git commit -m "测试：锁定商家首页清晰度合同"
 
 所有图形落在 `2..44` 的视觉安全区，不使用文字、Emoji、滤镜或外部引用。
 
-- [ ] **Step 2: 创建私有图标组件**
+- [x] **Step 2: 创建私有图标组件**
 
 ```tsx
 import React from 'react'
@@ -215,7 +215,7 @@ export default function MerchantHomeIcon({
 }
 ```
 
-- [ ] **Step 3: 运行图标资产的局部检查**
+- [x] **Step 3: 运行图标资产的局部检查**
 
 Run:
 
@@ -225,7 +225,7 @@ node -e "const fs=require('fs');for(const n of ['action-publish','action-wallet'
 
 Expected: `merchant svg assets: ok`。
 
-- [ ] **Step 4: 提交图标资源**
+- [x] **Step 4: 提交图标资源**
 
 ```powershell
 git add -- apps/miniapp/src/pages/merchant-home/merchant-home-icon.tsx apps/miniapp/src/pages/merchant-home/icons
@@ -237,7 +237,7 @@ git commit -m "新增：商家首页清晰 SVG 图标"
 **Files:**
 - Modify: `apps/miniapp/src/pages/merchant-home/index.tsx:1-380`
 
-- [ ] **Step 1: 引入图标组件并建立快捷入口配置**
+- [x] **Step 1: 引入图标组件并建立快捷入口配置**
 
 在现有导入中增加：
 
@@ -262,7 +262,7 @@ const shortcutCopy: Array<{
 ]
 ```
 
-- [ ] **Step 2: 删除顶部模糊装饰节点**
+- [x] **Step 2: 删除顶部模糊装饰节点**
 
 从 `.merchant-home-hero` 内删除：
 
@@ -273,7 +273,7 @@ const shortcutCopy: Array<{
 
 保留 `CapsuleSystemRow`、商家资料、身份切换、余额和真实统计值。
 
-- [ ] **Step 3: 把快捷入口替换为横向内容卡片**
+- [x] **Step 3: 把快捷入口替换为横向内容卡片**
 
 ```tsx
 <View className='merchant-home-shortcuts'>
@@ -297,7 +297,7 @@ const shortcutCopy: Array<{
 
 不得修改四个 URL。
 
-- [ ] **Step 4: 把空订单文本替换为完整空状态**
+- [x] **Step 4: 把空订单文本替换为完整空状态**
 
 ```tsx
 {!loading && !loadError && groupedOrders[activeTab].length === 0 ? (
@@ -315,7 +315,7 @@ const shortcutCopy: Array<{
 ) : null}
 ```
 
-- [ ] **Step 5: 运行类型检查，确认样式合同仍失败**
+- [x] **Step 5: 运行类型检查，确认样式合同仍失败**
 
 Run:
 
@@ -326,7 +326,7 @@ npm.cmd run check:merchant-home-clarity
 
 Expected: TypeScript PASS；清晰度合同仍因 `2 × 2` SCSS 尚未实现而 FAIL。
 
-- [ ] **Step 6: 提交 JSX 重组**
+- [x] **Step 6: 提交 JSX 重组**
 
 ```powershell
 git add -- apps/miniapp/src/pages/merchant-home/index.tsx
@@ -338,7 +338,7 @@ git commit -m "重构：商家首页信息与快捷入口"
 **Files:**
 - Modify: `apps/miniapp/src/pages/merchant-home/index.scss:65-520`
 
-- [ ] **Step 1: 收敛顶部背景和数据层级**
+- [x] **Step 1: 收敛顶部背景和数据层级**
 
 删除 `.merchant-home-hero__orb*` 样式。调整顶部：
 
@@ -373,7 +373,7 @@ git commit -m "重构：商家首页信息与快捷入口"
 
 次级统计使用半透明度不低于 `.88` 的白色文字，不使用 `filter` 或 `backdrop-filter`。
 
-- [ ] **Step 2: 实现 `2 × 2` 快捷卡片**
+- [x] **Step 2: 实现 `2 × 2` 快捷卡片**
 
 ```scss
 .merchant-home-shortcuts {
@@ -443,7 +443,7 @@ git commit -m "重构：商家首页信息与快捷入口"
 }
 ```
 
-- [ ] **Step 3: 把订单标签改为三等分**
+- [x] **Step 3: 把订单标签改为三等分**
 
 ```scss
 .merchant-home-tabs {
@@ -481,7 +481,7 @@ git commit -m "重构：商家首页信息与快捷入口"
 }
 ```
 
-- [ ] **Step 4: 增加清晰空状态**
+- [x] **Step 4: 增加清晰空状态**
 
 ```scss
 .merchant-home-empty {
@@ -515,7 +515,7 @@ git commit -m "重构：商家首页信息与快捷入口"
 }
 ```
 
-- [ ] **Step 5: 运行三个专项检查**
+- [x] **Step 5: 运行三个专项检查**
 
 Run:
 
@@ -533,7 +533,7 @@ miniapp capsule geometry: ok
 miniapp business closure check PASS
 ```
 
-- [ ] **Step 6: 提交样式**
+- [x] **Step 6: 提交样式**
 
 ```powershell
 git add -- apps/miniapp/src/pages/merchant-home/index.scss
@@ -545,7 +545,7 @@ git commit -m "美化：提升商家首页图标与排版清晰度"
 **Files:**
 - Modify: `docs/superpowers/plans/2026-07-24-merchant-home-clarity.md`
 
-- [ ] **Step 1: 运行小程序类型检查**
+- [x] **Step 1: 运行小程序类型检查**
 
 Run:
 
@@ -555,7 +555,7 @@ npm.cmd --workspace apps/miniapp run typecheck
 
 Expected: exit code `0`，无 TypeScript 错误。
 
-- [ ] **Step 2: 运行相关合同检查**
+- [x] **Step 2: 运行相关合同检查**
 
 Run:
 
@@ -567,7 +567,7 @@ npm.cmd run check:miniapp-business-closure
 
 Expected: 三项均 PASS。
 
-- [ ] **Step 3: 运行微信小程序生产构建**
+- [x] **Step 3: 运行微信小程序生产构建**
 
 Run:
 
@@ -579,7 +579,7 @@ npm.cmd --workspace apps/miniapp run build:weapp
 
 Expected: `Compiled successfully`，产物更新到 `apps/miniapp/dist`。
 
-- [ ] **Step 4: 检查任务范围**
+- [x] **Step 4: 检查任务范围**
 
 Run:
 
@@ -591,7 +591,7 @@ git diff --name-only 0c9f167..HEAD
 
 Expected: 本任务提交只包含商家首页、五个 SVG、清晰度合同、根脚本注册和本计划；原有 `.env.example`、部署文件、微信项目私有配置等用户改动仍保持未暂存。
 
-- [ ] **Step 5: 微信开发者工具视觉验收**
+- [x] **Step 5: 微信开发者工具视觉验收**
 
 在 iPhone 15 Pro 模拟器中重新编译，确认：
 
@@ -603,7 +603,7 @@ Expected: 本任务提交只包含商家首页、五个 SVG、清晰度合同、
 6. 空订单状态包含图标、标题和说明。
 7. 四个入口仍进入原页面。
 
-- [ ] **Step 6: 记录计划完成状态**
+- [x] **Step 6: 记录计划完成状态**
 
 把本计划中已执行步骤勾选为 `[x]`，然后提交：
 
