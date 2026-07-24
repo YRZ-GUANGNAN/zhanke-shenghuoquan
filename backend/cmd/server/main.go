@@ -31,6 +31,7 @@ import (
 	"campus-circle/backend/internal/module/admin/takeoutmerchant"
 	"campus-circle/backend/internal/module/admin/takeoutpayment"
 	"campus-circle/backend/internal/module/admin/takeoutrider"
+	"campus-circle/backend/internal/module/adminauth"
 	"campus-circle/backend/internal/module/community"
 	"campus-circle/backend/internal/module/delivery"
 	"campus-circle/backend/internal/module/identityapplication"
@@ -73,6 +74,12 @@ func main() {
 		user.WithIdentityEligibility(newDeliveryIdentityEligibility(cfg.EnableDelivery, identityRiders, identityApplicationRepository)),
 	)
 	userService.SetAccountClosureCoordinator(accountclosure.New(db))
+	adminAuthService, err := adminauth.NewService(adminauth.NewRepository(db), userService)
+	if err != nil {
+		log.Fatalf("configure administrator authentication: %v", err)
+	}
+	adminAuthMiddleware := adminauth.NewMiddleware(adminAuthService, userService)
+	adminAuthRequired := adminAuthMiddleware.Required()
 	cosClient, err := legacymedia.NewTencentCOS(cfg.COSSecretID, cfg.COSSecretKey, cfg.COSBucket, cfg.COSRegion, cfg.COSAppID)
 	if err != nil {
 		log.Fatalf("configure Tencent COS: %v", err)
@@ -361,12 +368,14 @@ func main() {
 	api := router.Group("/api/v1")
 	authRoutes := api.Group("/auth")
 	user.NewHandler(userService, mediaService).Register(authRoutes)
+	adminauth.NewHandler(adminAuthService, adminAuthMiddleware).Register(api.Group("/admin-auth"))
 	registerIdentityApplicationRoutes(
 		api, authRoutes, identityapplication.NewHandler(identityApplicationService),
 		identityRoutePolicies{
 			authRequired:    userService.AuthRequired(),
 			unmutedRequired: user.UnmutedRequired(),
 			adminRequired:   user.AdminRequired(),
+			adminAuth:       adminAuthRequired,
 		},
 	)
 	legacymedia.NewHandler(mediaService, cfg.WechatCallbackToken, userService.AuthRequired(), user.UnmutedRequired(), func(c *gin.Context) (uint, string) {
@@ -394,11 +403,11 @@ func main() {
 	navigation.NewHandler(navigationService).Register(navigationRoutes)
 	navigation.NewSearchHandler(navigationService, userService.AuthRequired(), user.CurrentUserID, navigationMetrics).Register(navigationRoutes)
 	im.NewHandler(imService, userService).Register(api.Group("/im"))
-	admin.NewHandler(adminService, reviewService, userService, communityService, tradeService, navigationService).Register(api)
-	mediaAdminRoutes := api.Group("/admin/media", userService.AuthRequired(), user.AdminRequired())
+	admin.NewHandler(adminService, reviewService, userService, communityService, tradeService, navigationService, adminAuthRequired).Register(api)
+	mediaAdminRoutes := api.Group("/admin/media", adminAuthRequired, user.AdminRequired())
 	mediaconsole.NewHandler(mediaAdminQuery).Register(mediaAdminRoutes)
-	registerLegacyTakeoutRoutes(legacyTakeout, api, userService, reviewService, coreMediaService)
-	registerDeliveryRoutes(deliveryRuntime, api, userService)
+	registerLegacyTakeoutRoutes(legacyTakeout, api, userService, reviewService, coreMediaService, adminAuthRequired)
+	registerDeliveryRoutes(deliveryRuntime, api, userService, adminAuthRequired)
 
 	if err := router.Run(cfg.HTTPAddr); err != nil {
 		log.Fatalf("run server: %v", err)
@@ -409,6 +418,7 @@ type identityRoutePolicies struct {
 	authRequired    gin.HandlerFunc
 	unmutedRequired gin.HandlerFunc
 	adminRequired   gin.HandlerFunc
+	adminAuth       gin.HandlerFunc
 }
 
 func registerIdentityApplicationRoutes(
@@ -418,7 +428,11 @@ func registerIdentityApplicationRoutes(
 	policies identityRoutePolicies,
 ) {
 	handler.RegisterUser(authRoutes.Group("", policies.authRequired, policies.unmutedRequired))
-	handler.RegisterAdmin(api.Group("/admin/identity-applications", policies.authRequired, policies.adminRequired))
+	adminAuthentication := policies.authRequired
+	if policies.adminAuth != nil {
+		adminAuthentication = policies.adminAuth
+	}
+	handler.RegisterAdmin(api.Group("/admin/identity-applications", adminAuthentication, policies.adminRequired))
 }
 
 func newRouter(loggerOutput io.Writer, recoveryOutput io.Writer) *gin.Engine {
@@ -525,7 +539,7 @@ func newDeliveryRuntime(cfg config.Config, db *gorm.DB, proofPorts ...delivery.M
 	return runtime, nil
 }
 
-func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, userService *user.Service) {
+func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, userService *user.Service, adminAuth ...gin.HandlerFunc) {
 	if runtime == nil {
 		return
 	}
@@ -564,7 +578,11 @@ func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, user
 			runtime.conversationImagesEnabled, runtime.conversationReadReceiptEnabled,
 		).Register(conversationRoutes)
 	}
-	adminRoutes := api.Group("/admin/delivery", userService.AuthRequired(), user.AdminRequired())
+	adminAuthentication := userService.AuthRequired()
+	if len(adminAuth) > 0 {
+		adminAuthentication = adminAuth[0]
+	}
+	adminRoutes := api.Group("/admin/delivery", adminAuthentication, user.AdminRequired())
 	riderHandler.RegisterAdmin(adminRoutes)
 	if paymentHandler != nil {
 		paymentHandler.RegisterAdmin(adminRoutes)
@@ -666,12 +684,17 @@ func registerLegacyTakeoutRoutes(
 	userService *user.Service,
 	reviewService *review.Service,
 	coreMediaService *coremedia.Service,
+	adminAuth ...gin.HandlerFunc,
 ) {
 	if runtime == nil {
 		return
 	}
 
-	takeoutAdminRoutes := api.Group("/admin/takeout", userService.AuthRequired(), user.AdminRequired())
+	adminAuthentication := userService.AuthRequired()
+	if len(adminAuth) > 0 {
+		adminAuthentication = adminAuth[0]
+	}
+	takeoutAdminRoutes := api.Group("/admin/takeout", adminAuthentication, user.AdminRequired())
 	takeoutconsole.NewHandler(runtime.merchantService, runtime.catalogService, runtime.orderService, runtime.riderService, runtime.adminQuery, runtime.withdrawService).Register(takeoutAdminRoutes)
 	takeoutMerchantRoutes := api.Group("/takeout/merchant", userService.AuthRequired())
 	takeoutmerchant.NewHandler(runtime.merchantIdentity, runtime.merchantService, runtime.catalogService, runtime.orderService, runtime.adminQuery, reviewService, coreMediaService, func(c *gin.Context) uint64 {

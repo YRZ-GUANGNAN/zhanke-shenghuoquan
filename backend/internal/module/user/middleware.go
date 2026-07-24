@@ -12,6 +12,10 @@ import (
 
 const contextUser = "domainA.user"
 
+func SetCurrentUser(c *gin.Context, value User) {
+	c.Set(contextUser, value)
+}
+
 func (s *Service) AuthRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
@@ -32,7 +36,7 @@ func (s *Service) AuthRequired() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		c.Set(contextUser, value)
+		SetCurrentUser(c, value)
 		c.Next()
 	}
 }

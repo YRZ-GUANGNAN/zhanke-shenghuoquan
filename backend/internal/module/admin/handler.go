@@ -21,14 +21,23 @@ type Handler struct {
 	community  *community.Service
 	trade      *trade.Service
 	navigation *navigation.Service
+	adminAuth  gin.HandlerFunc
 }
 
-func NewHandler(service *Service, reviews *review.Service, users *user.Service, communityService *community.Service, tradeService *trade.Service, navigationService *navigation.Service) *Handler {
-	return &Handler{service: service, reviews: reviews, users: users, community: communityService, trade: tradeService, navigation: navigationService}
+func NewHandler(service *Service, reviews *review.Service, users *user.Service, communityService *community.Service, tradeService *trade.Service, navigationService *navigation.Service, adminAuth ...gin.HandlerFunc) *Handler {
+	handler := &Handler{service: service, reviews: reviews, users: users, community: communityService, trade: tradeService, navigation: navigationService}
+	if len(adminAuth) > 0 {
+		handler.adminAuth = adminAuth[0]
+	}
+	return handler
 }
 func (h *Handler) Register(api *gin.RouterGroup) {
 	api.POST("/reports", h.users.AuthRequired(), user.UnmutedRequired(), h.submitReport)
-	secured := api.Group("/admin", h.users.AuthRequired(), user.AdminRequired())
+	authRequired := h.users.AuthRequired()
+	if h.adminAuth != nil {
+		authRequired = h.adminAuth
+	}
+	secured := api.Group("/admin", authRequired, user.AdminRequired())
 	secured.GET("/stats", h.stats)
 	secured.GET("/reviews", h.reviewList)
 	secured.POST("/reviews/:id/start", h.startReview)
