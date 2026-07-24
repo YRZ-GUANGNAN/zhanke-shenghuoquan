@@ -15,6 +15,7 @@ import { getDeliveryWallet } from '../../services/delivery-payment'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
 import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
+import MerchantHomeIcon, { type MerchantHomeIconName } from './merchant-home-icon'
 import './index.scss'
 
 type MerchantTabKey = 'pending' | 'delivering' | 'completed'
@@ -33,6 +34,19 @@ const tabCopy: Array<{ key: MerchantTabKey; label: string }> = [
   { key: 'pending', label: '待接单' },
   { key: 'delivering', label: '配送中' },
   { key: 'completed', label: '已完成' },
+]
+
+const shortcutCopy: Array<{
+  key: string
+  label: string
+  description: string
+  icon: MerchantHomeIconName
+  url: string
+}> = [
+  { key: 'publish', label: '发布配送单', description: '创建新的校内配送', icon: 'publish', url: '/pages/merchant-publish/index' },
+  { key: 'wallet', label: '钱包', description: '查看余额与充值', icon: 'wallet', url: '/pages/merchant-wallet/index' },
+  { key: 'bill', label: '账单', description: '核对资金流水', icon: 'bill', url: '/pages/merchant-wallet/index' },
+  { key: 'message', label: '消息', description: '联系正在配送的骑手', icon: 'message', url: '/pages/merchant-messages/index' },
 ]
 
 const statusCopy: Record<DeliveryStatus, string> = {
@@ -271,8 +285,6 @@ function MerchantHomeContent() {
   return (
     <View className='merchant-home-page' style={getCapsuleSafeStyle()}>
       <View className='merchant-home-hero'>
-        <View className='merchant-home-hero__orb merchant-home-hero__orb--left' />
-        <View className='merchant-home-hero__orb merchant-home-hero__orb--right' />
         <CapsuleSystemRow />
         <View className='merchant-home-header'>
           <View className='merchant-home-shop'>
@@ -317,17 +329,19 @@ function MerchantHomeContent() {
       </View>
 
       <View className='merchant-home-shortcuts'>
-        {[
-          { key: 'publish', label: '发布配送单', icon: '+', url: '/pages/merchant-publish/index' },
-          { key: 'wallet', label: '钱包', icon: '¥', url: '/pages/merchant-wallet/index' },
-          { key: 'bill', label: '账单', icon: '账', url: '/pages/merchant-wallet/index' },
-          { key: 'message', label: '消息', icon: '聊', url: '/pages/merchant-messages/index' },
-        ].map((item, index) => (
-          <View key={item.key} className='merchant-home-shortcut' onClick={() => void Taro.navigateTo({ url: item.url })}>
-            <View className={`merchant-home-shortcut__icon ${index === 0 ? 'merchant-home-shortcut__icon--primary' : ''}`}>
-              <Text>{item.icon}</Text>
+        {shortcutCopy.map((item) => (
+          <View
+            key={item.key}
+            className={`merchant-home-shortcut merchant-home-shortcut--${item.key}`}
+            onClick={() => void Taro.navigateTo({ url: item.url })}
+          >
+            <View className='merchant-home-shortcut__icon'>
+              <MerchantHomeIcon name={item.icon} />
             </View>
-            <Text className='merchant-home-shortcut__label'>{item.label}</Text>
+            <View className='merchant-home-shortcut__copy'>
+              <Text className='merchant-home-shortcut__label'>{item.label}</Text>
+              <Text className='merchant-home-shortcut__description'>{item.description}</Text>
+            </View>
           </View>
         ))}
       </View>
@@ -356,7 +370,17 @@ function MerchantHomeContent() {
             </Text>
           ) : null}
           {!loading && !loadError && groupedOrders[activeTab].length === 0 ? (
-            <Text className='merchant-home-orders__end'>当前没有{tabCopy.find((item) => item.key === activeTab)?.label}配送单</Text>
+            <View className='merchant-home-empty'>
+              <View className='merchant-home-empty__icon'>
+                <MerchantHomeIcon name='empty' />
+              </View>
+              <Text className='merchant-home-empty__title'>
+                暂无{tabCopy.find((item) => item.key === activeTab)?.label}配送单
+              </Text>
+              <Text className='merchant-home-empty__description'>
+                新配送单和状态更新会显示在这里
+              </Text>
+            </View>
           ) : null}
           {groupedOrders[activeTab].map((order) => <OrderCard key={order.deliveryOrderPublicId} order={order} />)}
         </View>
