@@ -65,32 +65,9 @@ page {
 .merchant-home-hero {
   position: relative;
   flex: 0 0 auto;
-  height: auto;
-  padding: 0 34rpx 54rpx;
+  padding: 0 32rpx 42rpx;
   box-sizing: border-box;
-  overflow: hidden;
-  background: $gradient-primary;
-}
-
-.merchant-home-hero__orb {
-  position: absolute;
-  border-radius: 999rpx;
-  background: rgba($text-on-color, .09);
-  pointer-events: none;
-}
-
-.merchant-home-hero__orb--left {
-  width: 168rpx;
-  height: 168rpx;
-  right: 124rpx;
-  top: 32rpx;
-}
-
-.merchant-home-hero__orb--right {
-  width: 238rpx;
-  height: 238rpx;
-  right: -4rpx;
-  top: 16rpx;
+  background: linear-gradient(160deg, $brand-primary-strong 0%, $brand-primary 100%);
 }
 
 .merchant-home-header {
@@ -162,7 +139,7 @@ page {
   margin-top: 8rpx;
   display: flex;
   align-items: center;
-  color: rgba($text-on-color, .82);
+  color: rgba($text-on-color, .9);
   font-size: 22rpx;
   line-height: 1.2;
 }
@@ -179,49 +156,57 @@ page {
   flex: 0 0 auto;
   margin-top: 8rpx;
   padding: 14rpx 26rpx;
-  border: 1rpx solid rgba($text-on-color, .36);
+  border: 1rpx solid rgba($text-on-color, .46);
   border-radius: 999rpx;
-  background: rgba($text-on-color, .14);
+  background: rgba($text-on-color, .2);
   color: $text-on-color;
   font-size: 22rpx;
+  font-weight: 600;
   line-height: 1;
-  backdrop-filter: blur(16rpx);
 }
 
 .merchant-home-metrics {
   position: relative;
   z-index: 1;
-  margin-top: 48rpx;
+  margin-top: 40rpx;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
+  gap: 28rpx;
 }
 
 .merchant-home-wallet {
+  min-width: 0;
+  flex: 1;
   display: flex;
   flex-direction: column;
 }
 
 .merchant-home-wallet__label {
-  color: rgba($text-on-color, .82);
+  color: rgba($text-on-color, .9);
   font-size: 22rpx;
   line-height: 1;
 }
 
+.merchant-home-wallet__amount,
+.merchant-home-counts__value {
+  font-variant-numeric: tabular-nums;
+}
+
 .merchant-home-wallet__amount {
-  margin-top: 16rpx;
+  margin-top: 12rpx;
   color: $text-on-color;
-  font-size: 66rpx;
-  font-weight: 900;
-  letter-spacing: 1rpx;
-  line-height: .92;
+  font-size: 58rpx;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -1rpx;
 }
 
 .merchant-home-counts {
-  display: flex;
-  align-items: flex-end;
-  gap: 46rpx;
-  padding-right: 24rpx;
+  min-width: 236rpx;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12rpx;
 }
 
 .merchant-home-counts__item {
@@ -233,13 +218,13 @@ page {
 
 .merchant-home-counts__value {
   font-size: 34rpx;
-  font-weight: 850;
+  font-weight: 800;
   line-height: 1;
 }
 
 .merchant-home-counts__label {
   margin-top: 8rpx;
-  color: rgba($text-on-color, .82);
+  color: rgba($text-on-color, .9);
   font-size: 20rpx;
   line-height: 1;
 }
@@ -248,81 +233,97 @@ page {
   position: relative;
   z-index: 3;
   flex: 0 0 auto;
-  margin: -54rpx 34rpx 0;
-  height: 150rpx;
-  border-radius: 22rpx;
-  background: $bg-surface;
-  box-shadow: 0 18rpx 44rpx -24rpx rgba($text-strong, .42);
+  margin: -28rpx 28rpx 0;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  align-items: center;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16rpx;
 }
 
 .merchant-home-shortcut {
+  min-width: 0;
+  min-height: 132rpx;
+  padding: 22rpx;
+  border: 1rpx solid color.mix($brand-primary, $bg-surface, 14%);
+  border-radius: 22rpx;
+  background: $bg-surface;
+  box-shadow: 0 12rpx 30rpx -24rpx rgba($brand-primary-strong, .58);
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  box-sizing: border-box;
+  transition: transform .18s ease, background-color .18s ease;
+}
+
+.merchant-home-shortcut:active {
+  transform: scale(.985);
+  background: color.mix($brand-tint, $bg-surface, 36%);
 }
 
 .merchant-home-shortcut__icon {
-  width: 66rpx;
-  height: 66rpx;
-  border-radius: 999rpx;
-  background: $merchant-blue-pale;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: $brand-primary;
-  font-size: 28rpx;
-  font-weight: 800;
+  width: 76rpx;
+  height: 76rpx;
+  flex: 0 0 76rpx;
+  padding: 14rpx;
+  border-radius: 20rpx;
+  background: color.mix($brand-primary, $bg-surface, 9%);
+  box-sizing: border-box;
 }
 
-.merchant-home-shortcut__icon--primary {
-  background: $brand-primary;
-  color: $text-on-color;
-  box-shadow: 0 18rpx 34rpx -18rpx rgba($brand-primary-strong, .9);
-  font-size: 38rpx;
-  font-weight: 500;
+.merchant-home-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.merchant-home-shortcut__copy {
+  min-width: 0;
+  margin-left: 18rpx;
+  display: flex;
+  flex-direction: column;
 }
 
 .merchant-home-shortcut__label {
-  margin-top: 14rpx;
-  color: $text-primary;
-  font-size: 21rpx;
-  line-height: 1;
+  color: $text-strong;
+  font-size: 26rpx;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.merchant-home-shortcut__description {
+  margin-top: 8rpx;
+  color: $text-secondary;
+  font-size: 20rpx;
+  line-height: 1.25;
 }
 
 .merchant-home-tabs {
   position: relative;
   z-index: 1;
   flex: 0 0 auto;
-  height: 106rpx;
-  padding: 24rpx 38rpx 0;
-  box-sizing: border-box;
-  display: flex;
-  align-items: flex-start;
-  gap: 70rpx;
+  margin: 18rpx 28rpx 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-bottom: 1rpx solid $divider-hairline;
 }
 
 .merchant-home-tab {
   position: relative;
-  height: 60rpx;
+  min-height: 82rpx;
   display: flex;
-  align-items: flex-start;
-  color: $text-tertiary;
+  align-items: center;
+  justify-content: center;
+  color: $text-secondary;
 }
 
 .merchant-home-tab--active {
-  color: $text-strong;
+  color: $brand-primary-strong;
 }
 
 .merchant-home-tab--active::after {
   content: '';
   position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 78rpx;
+  left: 25%;
+  right: 25%;
+  bottom: -1rpx;
   height: 5rpx;
   border-radius: 999rpx;
   background: $brand-primary;
@@ -371,6 +372,36 @@ page {
   color: $text-faint;
   font-size: 20rpx;
   text-align: center;
+}
+
+.merchant-home-empty {
+  padding: 58rpx 32rpx 72rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.merchant-home-empty__icon {
+  width: 104rpx;
+  height: 104rpx;
+  padding: 22rpx;
+  border-radius: 28rpx;
+  background: color.mix($brand-primary, $bg-surface, 8%);
+  box-sizing: border-box;
+}
+
+.merchant-home-empty__title {
+  margin-top: 24rpx;
+  color: $text-primary;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.merchant-home-empty__description {
+  margin-top: 10rpx;
+  color: $text-secondary;
+  font-size: 21rpx;
 }
 
 .merchant-order-card {
