@@ -1,144 +1,658 @@
-.rider-page {
-  padding-bottom: 48rpx;
+@use '../../styles/design-tokens.scss' as *;
+
+.rider-grab-page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
+  min-height: 100vh;
+  overflow: hidden;
+  background: #eef3f8;
+  color: $text-primary;
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+}
+
+.rider-grab-hero {
+  position: relative;
+  flex: 0 0 auto;
+  overflow: hidden;
+  padding: 0 36rpx 32rpx;
+  background: linear-gradient(147deg, #3489df 0%, #2571c4 60%, #1d63b2 100%);
+  color: $text-on-color;
+  box-sizing: border-box;
+}
+
+.rider-grab-system-row {
+  position: relative;
+  z-index: 2;
+}
+
+.rider-grab-hero__orb {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .09);
+  pointer-events: none;
+}
+
+.rider-grab-hero__orb--one {
+  top: -8rpx;
+  right: 74rpx;
+  width: 170rpx;
+  height: 170rpx;
+}
+
+.rider-grab-hero__orb--two {
+  top: 30rpx;
+  right: -26rpx;
+  width: 230rpx;
+  height: 230rpx;
+}
+
+.rider-grab-user {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  min-height: 74rpx;
+}
+
+.rider-grab-user__avatar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 66rpx;
+  height: 66rpx;
+  border: 3rpx solid rgba(255, 255, 255, .56);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .08);
+  color: #fff;
+  font-size: 30rpx;
+  font-weight: 650;
+}
+
+.rider-grab-user__main {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-left: 18rpx;
+}
+
+.rider-grab-user__name-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.rider-grab-user__name {
+  max-width: 260rpx;
+  overflow: hidden;
+  color: #fff;
+  font-size: 34rpx;
+  font-weight: 800;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rider-grab-user__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 54rpx;
+  height: 30rpx;
+  padding: 0 10rpx;
+  border-radius: 10rpx;
+  background: rgba(255, 255, 255, .18);
+  color: rgba(255, 255, 255, .95);
+  font-size: 19rpx;
+  font-weight: 600;
+  line-height: 30rpx;
+}
+
+.rider-grab-user__meta {
+  display: block;
+  margin-top: 10rpx;
+  color: rgba(255, 255, 255, .88);
+  font-size: 23rpx;
+}
+
+.rider-grab-user__switch {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 136rpx;
+  height: 56rpx;
+  padding: 0 18rpx;
+  border: 1rpx solid rgba(255, 255, 255, .45);
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, .12);
+  color: #fff;
+  font-size: 23rpx;
+  font-weight: 600;
+  box-sizing: border-box;
+}
+
+.rider-grab-wallet-summary {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-top: 42rpx;
+}
+
+.rider-grab-wallet-summary__main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.rider-grab-wallet-summary__label,
+.rider-grab-wallet-summary__sub {
+  display: block;
+  color: rgba(255, 255, 255, .88);
+  font-size: 24rpx;
+}
+
+.rider-grab-wallet-summary__amount-row {
+  display: flex;
+  align-items: baseline;
+  margin-top: 8rpx;
+}
+
+.rider-grab-wallet-summary__amount {
+  color: #fff;
+  font-size: 66rpx;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 1rpx;
+}
+
+.rider-grab-wallet-summary__unit {
+  margin-left: 12rpx;
+  color: rgba(255, 255, 255, .92);
+  font-size: 27rpx;
+  font-weight: 700;
+}
+
+.rider-grab-wallet-summary__sub {
+  margin-top: 22rpx;
+  font-size: 24rpx;
+}
+
+.rider-grab-wallet-summary__button {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 96rpx;
+  height: 106rpx;
+  margin: 0 2rpx 4rpx 28rpx;
+  border-radius: 26rpx;
+  background: #fff;
+  color: $brand-primary;
+  box-shadow: 0 18rpx 34rpx -20rpx rgba(12, 49, 96, .38);
+  font-size: 23rpx;
+  font-weight: 650;
+}
+
+.rider-grab-wallet-summary__button--loading {
+  opacity: .72;
+}
+
+.rider-grab-wallet-summary__refresh-icon {
+  position: relative;
+  width: 31rpx;
+  height: 31rpx;
+  margin-bottom: 10rpx;
+  border: 4rpx solid $brand-primary;
+  border-right-color: transparent;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.rider-grab-wallet-summary__refresh-icon::after {
+  position: absolute;
+  top: -7rpx;
+  right: -5rpx;
+  width: 0;
+  height: 0;
+  border-top: 6rpx solid transparent;
+  border-bottom: 6rpx solid transparent;
+  border-left: 9rpx solid $brand-primary;
+  content: '';
+  transform: rotate(-24deg);
+}
+
+.rider-grab-tabs {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  min-height: 88rpx;
+  background: #fff;
+  box-shadow: 0 8rpx 20rpx rgba(26, 43, 60, .03);
+}
+
+.rider-grab-tabs__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11rpx;
+  color: $text-tertiary;
+  font-size: 29rpx;
+  font-weight: 500;
+}
+
+.rider-grab-tabs__item--active {
+  color: $text-strong;
+  font-weight: 700;
+}
+
+.rider-grab-tabs__item--active::after {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 82rpx;
+  height: 6rpx;
+  border-radius: 8rpx 8rpx 0 0;
+  background: $brand-primary;
+  content: '';
+  transform: translateX(-50%);
+}
+
+.rider-grab-tabs__count {
+  min-width: 29rpx;
+  height: 29rpx;
+  padding: 0 7rpx;
+  border-radius: 999rpx;
+  background: #eef6ff;
+  color: $brand-primary;
+  font-size: 19rpx;
+  font-weight: 600;
+  line-height: 29rpx;
+  text-align: center;
+}
+
+.rider-grab-tabs__count--pickup,
+.rider-grab-tabs__count--delivery {
+  background: #fff0e9;
+  color: #ee855d;
+}
+
+.rider-grab-content {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
   background: #eef3f8;
 }
 
-.rider-hero,
-.rider-between,
-.rider-actions,
-.rider-tabs {
+.rider-grab-content__inner {
+  padding: 0 28rpx calc(38rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
+.rider-grab-list-head {
   display: flex;
   align-items: center;
-}
-
-.rider-hero {
   justify-content: space-between;
-  margin: 0 24rpx 20rpx;
-  padding: 28rpx;
-  border-radius: 24rpx;
-  color: #fff;
-  background: linear-gradient(135deg, #2677c9, #18569a);
+  min-height: 72rpx;
+  color: $text-tertiary;
+  font-size: 24rpx;
 }
 
-.rider-hero__title,
-.rider-hero__meta,
-.rider-state__title,
-.rider-order__title,
-.rider-line,
-.rider-muted {
+.rider-grab-list-head__refresh {
+  display: flex;
+  align-items: center;
+  min-height: 56rpx;
+  color: $brand-primary;
+  font-size: 23rpx;
+  font-weight: 600;
+}
+
+.rider-grab-list {
+  display: flex;
+  flex-direction: column;
+  gap: 26rpx;
+}
+
+.rider-grab-list--assigned {
+  padding-top: 28rpx;
+  gap: 28rpx;
+}
+
+.rider-order-card {
+  overflow: hidden;
+  padding: 30rpx 30rpx 26rpx;
+  border-radius: 30rpx;
+  background: #fff;
+  box-shadow: 0 22rpx 48rpx -34rpx rgba(42, 58, 74, .3);
+  box-sizing: border-box;
+}
+
+.rider-order-card--assigned {
+  padding: 34rpx 28rpx 28rpx;
+  border-radius: 28rpx;
+  box-shadow: 0 26rpx 56rpx -38rpx rgba(39, 65, 92, .38);
+}
+
+.rider-order-card__top,
+.rider-order-card__bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.rider-order-card__serial {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 10rpx;
+  color: $text-secondary;
+  font-size: 23rpx;
+}
+
+.rider-order-card__dot {
+  color: #cad4df;
+}
+
+.rider-order-card__fee {
+  flex: 0 0 auto;
+  color: $text-secondary;
+  font-size: 23rpx;
+}
+
+.rider-order-card__fee-price {
+  color: #ff7547;
+  font-size: 32rpx;
+  font-weight: 900;
+}
+
+.rider-order-route {
+  position: relative;
+  margin-top: 30rpx;
+  padding-left: 40rpx;
+}
+
+.rider-order-route--assigned {
+  margin-top: 32rpx;
+}
+
+.rider-order-route__line {
+  position: absolute;
+  top: 21rpx;
+  bottom: 29rpx;
+  left: 12rpx;
+  width: 0;
+  border-left: 4rpx dotted #d6dee9;
+}
+
+.rider-order-route__row {
+  position: relative;
+  min-height: 88rpx;
+}
+
+.rider-order-route__row--drop {
+  min-height: 72rpx;
+}
+
+.rider-order-route__marker {
+  position: absolute;
+  top: 7rpx;
+  left: -39rpx;
+  width: 20rpx;
+  height: 20rpx;
+  border-radius: 50%;
+  background: $brand-primary;
+  box-shadow: 0 0 0 8rpx rgba(46, 125, 212, .1);
+}
+
+.rider-order-route__marker--drop {
+  top: 34rpx;
+  border-radius: 5rpx;
+  background: #ff7b4b;
+  box-shadow: 0 0 0 8rpx rgba(255, 123, 75, .12);
+}
+
+.rider-order-route__info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rider-order-route__label {
+  color: $text-faint;
+  font-size: 22rpx;
+  line-height: 1;
+}
+
+.rider-order-route__place {
   display: block;
+  margin-top: 14rpx;
+  color: $text-strong;
+  font-size: 28rpx;
+  font-weight: 650;
+  line-height: 1.35;
+  word-break: break-word;
 }
 
-.rider-hero__title {
-  font-size: 34rpx;
+.rider-order-route__drop-row {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  flex-wrap: wrap;
+}
+
+.rider-order-route__lock,
+.rider-order-route__complete {
+  display: inline-flex;
+  align-items: center;
+  min-height: 31rpx;
+  margin-top: 14rpx;
+  padding: 0 12rpx;
+  border-radius: 9rpx;
+  font-size: 18rpx;
+  font-weight: 600;
+  line-height: 31rpx;
+}
+
+.rider-order-route__lock {
+  background: #fff3ed;
+  color: #e28b5a;
+}
+
+.rider-order-route__complete {
+  border-radius: 999rpx;
+  background: #e9fbf2;
+  color: #1fae74;
+}
+
+.rider-order-card__remark {
+  display: flex;
+  align-items: flex-start;
+  gap: 8rpx;
+  margin-top: 18rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 16rpx;
+  background: #f1f6fb;
+  color: #6d7f93;
+  font-size: 23rpx;
+  line-height: 1.45;
+}
+
+.rider-order-card__remark--assigned {
+  margin-top: 22rpx;
+  padding: 18rpx 22rpx;
+  border-radius: 17rpx;
+  background: #eef5fc;
+}
+
+.rider-order-card__remark-label {
+  flex: 0 0 auto;
+  color: $brand-primary;
   font-weight: 700;
 }
 
-.rider-hero__meta {
-  margin-top: 8rpx;
-  font-size: 24rpx;
-  opacity: .88;
+.rider-order-card__bottom {
+  margin-top: 34rpx;
 }
 
-.rider-note,
-.rider-tabs {
-  margin: 0 24rpx 20rpx;
+.rider-order-card__privacy {
+  color: $text-muted;
+  font-size: 22rpx;
 }
 
-.rider-note {
-  padding: 20rpx 24rpx;
-  border-radius: 18rpx;
-  color: #52677d;
-  background: #e2edf7;
-  font-size: 24rpx;
-  line-height: 1.6;
+.rider-order-card__grab {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 142rpx;
+  height: 72rpx;
+  padding: 0 22rpx;
+  border-radius: 22rpx;
+  background: $gradient-primary;
+  box-shadow: 0 18rpx 30rpx -14rpx rgba(33, 104, 184, .62);
+  color: #fff;
+  font-size: 27rpx;
+  font-weight: 750;
+  box-sizing: border-box;
 }
 
-.rider-tabs {
+.rider-order-card__grab--disabled {
+  background: #c8d5e1;
+  box-shadow: none;
+}
+
+.rider-order-card__quick-actions {
+  display: flex;
+  align-items: center;
   gap: 12rpx;
-  padding: 8rpx;
+  margin-top: 28rpx;
+  padding-top: 26rpx;
+  border-top: 1rpx solid rgba(221, 230, 239, .72);
+}
+
+.rider-order-card__secondary,
+.rider-order-card__status {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 74rpx;
+  height: 60rpx;
+  padding: 0 14rpx;
+  border: 1rpx solid rgba(208, 220, 232, .96);
   border-radius: 18rpx;
   background: #fff;
+  color: $brand-primary;
+  font-size: 22rpx;
+  font-weight: 650;
+  box-sizing: border-box;
 }
 
-.rider-tabs text {
-  flex: 1;
-  padding: 18rpx 12rpx;
-  border-radius: 14rpx;
-  text-align: center;
-  color: #687b8e;
-  font-size: 26rpx;
+.rider-order-card__secondary--danger {
+  color: #b8554d;
+  border-color: #edc7c3;
 }
 
-.rider-tabs .rider-tabs__active {
-  color: #1768b3;
-  background: #eaf4ff;
-  font-weight: 700;
+.rider-order-card__secondary--disabled {
+  opacity: .45;
 }
 
-.rider-order,
-.rider-state,
-.rider-error {
-  margin: 0 24rpx 20rpx;
+.rider-order-card__quick-actions .rider-order-card__grab,
+.rider-order-card__quick-actions .rider-order-card__status {
+  margin-left: auto;
 }
 
-.rider-state {
-  padding: 40rpx 28rpx;
-  text-align: center;
+.rider-order-card__status {
+  color: $text-tertiary;
+  background: #f3f6f9;
 }
 
-.rider-state__title {
-  margin-bottom: 16rpx;
-  font-size: 32rpx;
-  font-weight: 700;
-}
-
-.rider-error {
-  color: #b5413a;
+.rider-grab-error {
+  margin-top: 26rpx;
+  padding: 22rpx 24rpx;
+  border: 1rpx solid #f2cbc7;
+  border-radius: 18rpx;
   background: #fff1ef;
-}
-
-.rider-between {
-  justify-content: space-between;
-  gap: 20rpx;
-}
-
-.rider-order__title {
-  font-size: 30rpx;
-  font-weight: 700;
-}
-
-.rider-fee {
-  color: #e1672e;
-  font-size: 32rpx;
-  font-weight: 800;
-}
-
-.rider-line {
-  margin-top: 12rpx;
-  color: #263b50;
-  font-size: 26rpx;
+  color: #b5413a;
+  font-size: 23rpx;
   line-height: 1.5;
 }
 
-.rider-muted {
-  margin: 14rpx 0;
-  color: #73869a;
-  font-size: 23rpx;
-  word-break: break-all;
+.rider-access-hero {
+  flex: 0 0 auto;
+  padding: 0 34rpx 30rpx;
+  background: linear-gradient(147deg, #3489df 0%, #2571c4 60%, #1d63b2 100%);
+  color: #fff;
 }
 
-.rider-actions {
-  flex-wrap: wrap;
-  gap: 12rpx;
-  margin-top: 22rpx;
+.rider-access-hero__title {
+  display: block;
+  font-size: 34rpx;
+  font-weight: 800;
 }
 
-.rider-actions .cc-button {
-  margin: 0;
+.rider-grab-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 34rpx 28rpx 0;
+  padding: 64rpx 34rpx;
+  border-radius: 30rpx;
+  background: #fff;
+  box-shadow: $shadow-card;
+  text-align: center;
+  box-sizing: border-box;
 }
 
-.rider-danger {
-  color: #b5413a;
-  border-color: #e7aaa5;
+.rider-grab-placeholder--inline {
+  margin: 34rpx 0 0;
+}
+
+.rider-grab-placeholder__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 92rpx;
+  height: 92rpx;
+  border-radius: 50%;
+  background: $brand-tint;
+  color: $brand-primary;
+  font-size: 32rpx;
+  font-weight: 700;
+}
+
+.rider-grab-placeholder__title {
+  margin-top: 24rpx;
+  color: $text-strong;
+  font-size: 28rpx;
+  font-weight: 750;
+}
+
+.rider-grab-placeholder__desc {
+  display: block;
+  margin-top: 14rpx;
+  color: $text-muted;
+  font-size: 24rpx;
+  line-height: 1.55;
+}
+
+.rider-grab-placeholder__action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 76rpx;
+  margin-top: 30rpx;
+  border-radius: 20rpx;
+  background: $brand-tint;
+  color: $brand-primary;
+  font-size: 25rpx;
+  font-weight: 700;
 }

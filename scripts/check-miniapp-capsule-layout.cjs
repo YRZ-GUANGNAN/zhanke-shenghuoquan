@@ -123,7 +123,7 @@ for (const pageName of mainPages) {
   assert.doesNotMatch(style, /--capsule-safe-right/, `${pageName} must not squeeze business navigation beside the capsule`)
 }
 
-const heroPages = ['profile', 'user-profile', 'merchant-home', 'merchant-wallet', 'rider-wallet']
+const heroPages = ['profile', 'user-profile', 'merchant-home', 'merchant-wallet', 'delivery-rider', 'rider-wallet']
 
 for (const pageName of heroPages) {
   const source = fs.readFileSync(path.join(miniappPagesRoot, pageName, 'index.tsx'), 'utf8')
@@ -145,7 +145,7 @@ const customNavigationPages = fs.readdirSync(miniappPagesRoot, { withFileTypes: 
     return fs.existsSync(configPath) && /navigationStyle:\s*'custom'/.test(fs.readFileSync(configPath, 'utf8'))
   })
 
-assert.equal(customNavigationPages.length, 26, 'custom navigation page inventory changed')
+assert.equal(customNavigationPages.length, 27, 'custom navigation page inventory changed')
 
 for (const pageName of customNavigationPages) {
   const sourcePath = path.join(miniappPagesRoot, pageName, 'index.tsx')

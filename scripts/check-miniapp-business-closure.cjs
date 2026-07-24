@@ -34,6 +34,22 @@ for (const [relative, token] of mustContain) {
   if (!source.includes(token)) violations.push(`${relative}: missing ${token}`)
 }
 
+const riderPage = fs.readFileSync(path.join(src, 'pages/delivery-rider/index.tsx'), 'utf8')
+for (const token of [
+  'CapsuleSystemRow',
+  "className='rider-grab-hero'",
+  "label: '待抢单'",
+  "label: '待取货'",
+  "label: '待送达'",
+  'claimDeliveryOrder(order)',
+  "chooseAndUploadImages('delivery_proof'",
+  'openConversation(order.deliveryOrderPublicId)'
+]) {
+  if (!riderPage.includes(token)) {
+    violations.push(`pages/delivery-rider/index.tsx: missing restored real-data rider workbench contract ${token}`)
+  }
+}
+
 const home = fs.readFileSync(path.join(src, 'pages/home/index.tsx'), 'utf8')
 if (/静态占位|showTodoToast|特价影票|学生兼职|校园群聊|校园地图/.test(home)) {
   violations.push('pages/home/index.tsx: static fake tools must not be registered')
