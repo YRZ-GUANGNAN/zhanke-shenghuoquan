@@ -1,58 +1,9 @@
-@use '../styles/design-tokens.scss' as *;
-
-.student-bottom-nav {
-  position: fixed;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 30;
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  align-items: end;
-  min-height: 104rpx;
-  padding: 12rpx 28rpx calc(14rpx + env(safe-area-inset-bottom));
-  border-top: 1rpx solid $content-border;
-  background: rgba(255, 255, 255, .98);
-  box-shadow: 0 -6rpx 20rpx rgba(24, 32, 40, .035);
-}
-
-.student-bottom-nav__item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6rpx;
-  min-height: 76rpx;
-  color: $content-faint;
-  font-size: 20rpx;
-  line-height: 1;
-}
-
-.student-bottom-nav__item--active {
-  color: $content-ink;
-  font-weight: 700;
-}
-
 .student-bottom-nav__icon-asset {
   width: 44rpx;
   height: 44rpx;
 }
 
-.student-bottom-nav__fab {
-  align-self: start;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 88rpx;
-  height: 88rpx;
-  margin: -18rpx auto 0;
-  border-radius: 24rpx;
-  background: $content-ink;
-  box-shadow: 0 10rpx 24rpx rgba(32, 35, 39, .2);
-}
-
 .student-bottom-nav__fab-icon {
   width: 52rpx;
   height: 52rpx;
-  color: #fff;
 }

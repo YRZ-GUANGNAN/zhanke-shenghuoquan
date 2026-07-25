@@ -1,8 +1,6 @@
 @use '../../styles/design-tokens.scss' as *;
-@use '../../styles/content-surfaces.scss' as content;
 
 .student-home-page {
-  @include content.content-page;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -10,12 +8,14 @@
   height: 100vh;
   padding: 0;
   overflow: hidden;
+  background: $bg-screen;
+  color: $text-primary;
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 }
 
 .student-home-header {
   z-index: 5;
-  flex: 0 0 auto;
-  box-shadow: none;
+  box-shadow: $shadow-header;
 }
 
 .student-home-header .capsule-page-header__business-row {
@@ -55,88 +55,66 @@
   width: 40rpx;
   height: 6rpx;
   border-radius: 6rpx;
-  background: $content-accent;
+  background: $brand-primary;
   content: '';
   transform: translateX(-50%);
+}
+
+.student-home-header__search {
+  position: relative;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
 }
 
 @media (max-width: 360px) {
   .student-home-header__tabs {
     gap: 16rpx;
   }
-}
 
-.student-home-search-row {
-  flex: 0 0 auto;
-  padding: 14rpx 28rpx 18rpx;
-  background: $content-surface;
-}
-
-.student-home-search {
-  @include content.content-search;
-  gap: 18rpx;
-  padding: 0 26rpx;
-}
-
-.student-home-search__icon {
-  position: relative;
-  flex: 0 0 30rpx;
-  width: 30rpx;
-  height: 30rpx;
-
-  &::before {
-    position: absolute;
-    top: 1rpx;
-    left: 1rpx;
-    width: 19rpx;
-    height: 19rpx;
-    border: 3rpx solid $content-muted;
-    border-radius: 50%;
-    box-sizing: border-box;
-    content: '';
-  }
-
-  &::after {
-    position: absolute;
-    right: 1rpx;
-    bottom: 4rpx;
-    width: 11rpx;
-    height: 3rpx;
-    border-radius: 999rpx;
-    background: $content-muted;
-    content: '';
-    transform: rotate(45deg);
+  .student-home-header__search {
+    margin-left: 0;
   }
 }
 
-.student-home-search__placeholder {
-  color: $content-muted;
-  font-size: 26rpx;
-}
-
-/* 旧胶囊几何合同仍检查该选择器；首页已改用整行搜索，此规则不会产生可见元素。 */
 .student-home-header__search::before {
+  position: absolute;
+  top: 11px;
+  left: 10px;
   width: 14px;
   height: 14px;
+  border: 2px solid $text-strong;
+  border-radius: 50%;
+  box-sizing: border-box;
+  content: '';
 }
 
 .student-home-header__search::after {
+  position: absolute;
+  top: 25px;
+  left: 23px;
   width: 8px;
   height: 2px;
+  border-radius: 2px;
+  background: $text-strong;
+  content: '';
+  transform: rotate(45deg);
+  transform-origin: left center;
 }
 
 .student-home-content {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  background: $content-canvas;
+  background: $bg-app;
 }
 
 .student-waterfall {
   display: flex;
   align-items: flex-start;
-  gap: 16rpx;
-  padding: 18rpx 20rpx 20rpx;
+  gap: 20rpx;
+  padding: 24rpx 24rpx 20rpx;
 }
 
 .student-waterfall--state {
@@ -148,21 +126,15 @@
   flex: 1 1 0;
   display: flex;
   flex-direction: column;
-  gap: 16rpx;
+  gap: 20rpx;
   min-width: 0;
 }
 
 .student-post-card {
   overflow: hidden;
-  border: 0;
-  border-radius: $content-radius-medium;
-  background: $content-surface;
-  box-shadow: none;
-}
-
-.student-post-card--text {
-  border: 1rpx solid $content-border;
-  background: #F7F7F7;
+  border-radius: 28rpx;
+  background: $bg-surface;
+  box-shadow: $shadow-card;
 }
 
 .student-post-card--state {
@@ -177,16 +149,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: $content-muted;
+  color: $placeholder-label;
   font-family: ui-monospace, Menlo, monospace;
   font-size: 20rpx;
   font-weight: 400;
-}
-
-.student-post-card__media-fallback {
-  padding: 24rpx;
-  color: $content-muted;
-  text-align: center;
 }
 
 .student-post-card__image {
@@ -208,80 +174,49 @@
 }
 
 .student-post-card__media--peach {
-  background: #F6EEE9;
+  background: $placeholder-stripe, #FDEBE3;
 }
 
 .student-post-card__media--sky {
-  background: #EDF2F6;
+  background: $placeholder-stripe, #E3EEFB;
 }
 
 .student-post-card__media--mint {
-  background: #EDF5F0;
+  background: $placeholder-stripe, #E8F6EE;
 }
 
 .student-post-card__media--lilac {
-  background: #F2EEF5;
+  background: $placeholder-stripe, #F6EEFB;
 }
 
 .student-post-card__media--lemon {
-  background: #F7F3E8;
+  background: $placeholder-stripe, #FBF3E0;
 }
 
 .student-post-card__media--cyan {
-  background: #EDF4F5;
+  background: $placeholder-stripe, #EAF4F9;
 }
 
 .student-post-card__body {
-  padding: 16rpx 16rpx 18rpx;
-}
-
-.student-post-card__heading {
-  display: flex;
-  align-items: flex-start;
-  gap: 10rpx;
+  padding: 18rpx 22rpx 20rpx;
 }
 
 .student-post-card__title {
-  flex: 1 1 auto;
   display: -webkit-box;
   overflow: hidden;
-  color: $content-ink;
+  color: $text-primary;
   font-size: 27rpx;
-  font-weight: 650;
+  font-weight: 500;
   line-height: 1.45;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-}
-
-.student-post-card__more {
-  flex: 0 0 auto;
-  color: $content-muted;
-  font-size: 22rpx;
-  font-weight: 700;
-  letter-spacing: -2rpx;
-}
-
-.student-post-card__tags {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10rpx;
-  margin-top: 12rpx;
-  color: $content-muted;
-  font-size: 22rpx;
-}
-
-.student-post-card__price {
-  color: $content-accent;
-  font-size: 25rpx;
-  font-weight: 700;
 }
 
 .student-post-card__meta {
   display: flex;
   align-items: center;
   gap: 12rpx;
-  margin-top: 14rpx;
+  margin-top: 18rpx;
   min-height: 36rpx;
 }
 
@@ -556,6 +491,34 @@
   text-overflow: ellipsis;
 }
 
+.student-bottom-nav {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: end;
+  min-height: 124rpx;
+  padding: 16rpx 12rpx calc(48rpx + env(safe-area-inset-bottom));
+  border-top: 1rpx solid $divider-nav;
+  background: rgba(255, 255, 255, .98);
+  overflow: visible;
+}
+
+.student-bottom-nav__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 70rpx;
+  gap: 6rpx;
+  color: $text-tertiary;
+  font-size: 20rpx;
+  font-weight: 400;
+}
+
 .student-bottom-nav__icon {
   position: relative;
   width: 44rpx;
@@ -647,4 +610,27 @@
   border: 4rpx solid currentColor;
   border-bottom: 0;
   border-radius: 18rpx 18rpx 0 0;
+}
+
+.student-bottom-nav__item--active {
+  color: $brand-primary;
+  font-weight: 500;
+}
+
+.student-bottom-nav__fab {
+  align-self: start;
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96rpx;
+  height: 96rpx;
+  margin-top: -24rpx;
+  border-radius: 50%;
+  background: $gradient-primary;
+  box-shadow: $shadow-fab;
+  color: $text-on-color;
+  font-size: 50rpx;
+  font-weight: 400;
+  line-height: 1;
 }

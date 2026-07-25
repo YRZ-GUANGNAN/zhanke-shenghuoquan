@@ -1,5 +1,4 @@
 @use '../../styles/design-tokens.scss' as *;
-@use '../../styles/content-surfaces.scss' as content;
 
 .my-content-page {
   min-height: 100vh;
@@ -17,21 +16,6 @@
   color: $text-strong;
   font-size: 54rpx;
   line-height: 1;
-}
-
-.my-content-page {
-  @include content.content-page;
-}
-
-.my-content-card {
-  @include content.content-surface($content-radius-medium);
-  box-shadow: none;
-}
-
-.my-content-favorite__title,
-.my-content-post__title,
-.my-content-market__title {
-  color: $content-ink;
 }
 
 .my-content-tabs {

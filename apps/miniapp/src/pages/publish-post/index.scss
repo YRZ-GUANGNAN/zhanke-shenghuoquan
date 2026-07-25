@@ -1,14 +1,13 @@
 @use '../../styles/design-tokens.scss' as *;
-@use '../../styles/content-surfaces.scss' as content;
 
 page {
-  background: $content-surface;
+  background: $bg-surface;
 }
 
 .publish-post-page {
-  @include content.content-page;
   min-height: 100vh;
-  background: $content-surface;
+  background: $bg-surface;
+  color: $text-strong;
   box-sizing: border-box;
 }
 
@@ -31,43 +30,41 @@ page {
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  background: $content-input;
-  color: $content-muted;
+  background: $divider-nav;
+  color: $text-muted;
   font-size: 28rpx;
   font-weight: 700;
 }
 
 .publish-post-nav__publish--active {
-  border-radius: 18rpx;
-  background: $content-ink;
-  color: $content-surface;
-  box-shadow: none;
+  background: $brand-primary;
+  color: $text-on-color;
+  box-shadow: $shadow-card;
 }
 
 .publish-post-body {
   padding: 32rpx 32rpx 0;
   box-sizing: border-box;
-  background: $content-surface;
 }
 
 .publish-post-upload {
   width: 160rpx;
   height: 160rpx;
   border-radius: 18rpx;
-  border: 2rpx dashed $content-faint;
+  border: 2rpx dashed $text-faint;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  background: $content-input;
-  color: $content-muted;
+  background: $bg-surface;
+  color: $text-muted;
 }
 
 .publish-post-upload__icon {
   font-size: 36rpx;
   line-height: 40rpx;
-  color: $content-muted;
+  color: $text-muted;
 }
 
 .publish-post-upload__count {
@@ -182,7 +179,7 @@ page {
 }
 
 .publish-post-selected__label {
-  color: $content-accent;
+  color: $text-muted;
 }
 
 .publish-post-selected__item {

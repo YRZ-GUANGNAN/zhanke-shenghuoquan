@@ -1,14 +1,15 @@
 @use '../../styles/design-tokens.scss' as *;
-@use '../../styles/content-surfaces.scss' as content;
 
 .secondhand-detail-page {
-  @include content.content-page;
   position: relative;
   display: flex;
   flex-direction: column;
   height: 100vh;
   min-height: 100vh;
   overflow: hidden;
+  background: $bg-screen;
+  color: $text-primary;
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 }
 
 .secondhand-detail-header__back {
@@ -30,9 +31,9 @@
 }
 
 .secondhand-detail-scroll {
-  @include content.content-page;
   flex: 1 1 auto;
   min-height: 0;
+  background: $bg-screen;
 }
 
 .secondhand-detail-hero {
@@ -40,8 +41,8 @@
   align-items: center;
   justify-content: center;
   height: 430rpx;
-  background: $content-input;
-  color: $content-muted;
+  background: $placeholder-stripe, $brand-tint;
+  color: $placeholder-label;
   font-size: 24rpx;
 }
 
@@ -52,9 +53,8 @@
 }
 
 .secondhand-detail-info {
-  padding: 30rpx 28rpx;
-  border-bottom: 1rpx solid $content-border;
-  background: $content-surface;
+  padding: 32rpx 40rpx 34rpx;
+  background: $bg-surface;
 }
 
 .secondhand-detail-info--state {
@@ -96,9 +96,9 @@
 }
 
 .secondhand-detail-info__price {
-  color: $content-accent;
-  font-size: 54rpx;
-  font-weight: 750;
+  color: $badge-unread;
+  font-size: 58rpx;
+  font-weight: 900;
   line-height: 1;
 }
 
@@ -117,8 +117,8 @@
   height: 42rpx;
   padding: 0 18rpx;
   border-radius: 999rpx;
-  background: $content-accent-soft;
-  color: $content-accent;
+  background: rgba($brand-primary, .10);
+  color: $brand-primary-strong;
   font-size: 24rpx;
   font-weight: 700;
 }
@@ -126,16 +126,16 @@
 .secondhand-detail-info__title {
   display: block;
   margin-top: 24rpx;
-  color: $content-ink;
+  color: $text-strong;
   font-size: 32rpx;
-  font-weight: 700;
+  font-weight: 900;
   line-height: 1.35;
 }
 
 .secondhand-detail-info__desc {
   display: block;
   margin-top: 20rpx;
-  color: $content-ink-soft;
+  color: $text-primary;
   font-size: 28rpx;
   font-weight: 400;
   line-height: 1.65;
@@ -155,8 +155,8 @@
   height: 44rpx;
   padding: 0 22rpx;
   border-radius: 999rpx;
-  background: $content-input;
-  color: $content-muted;
+  background: $brand-tint;
+  color: $brand-primary;
   font-size: 24rpx;
   font-weight: 600;
 }
@@ -164,23 +164,24 @@
 .secondhand-detail-info__meta {
   display: block;
   margin-top: 26rpx;
-  color: $content-muted;
+  color: $text-muted;
   font-size: 24rpx;
   line-height: 1.3;
 }
 
 .secondhand-detail-section {
-  padding: 20rpx 24rpx 176rpx;
-  background: $content-canvas;
+  padding: 24rpx 32rpx 176rpx;
+  background: $bg-screen;
 }
 
 .secondhand-detail-seller {
-  @include content.content-surface($content-radius-medium);
   display: flex;
   align-items: center;
   gap: 20rpx;
   padding: 30rpx 28rpx;
-  box-shadow: none;
+  border: 1rpx solid $divider-nav;
+  border-radius: 28rpx;
+  background: $bg-surface;
 }
 
 .secondhand-detail-seller__avatar {
@@ -206,7 +207,7 @@
 }
 
 .secondhand-detail-seller__name {
-  color: $content-ink;
+  color: $text-strong;
   font-size: 29rpx;
   font-weight: 800;
   line-height: 1.2;
@@ -214,7 +215,7 @@
 
 .secondhand-detail-seller__meta {
   overflow: hidden;
-  color: $content-muted;
+  color: $text-muted;
   font-size: 23rpx;
   line-height: 1.35;
   text-overflow: ellipsis;
@@ -229,10 +230,10 @@
   min-width: 82rpx;
   height: 48rpx;
   padding: 0 20rpx;
-  border: 1rpx solid $content-border;
+  border: 1rpx solid $divider-nav;
   border-radius: 999rpx;
-  background: $content-surface;
-  color: $content-accent;
+  background: $bg-surface;
+  color: $brand-primary;
   font-size: 24rpx;
   font-weight: 700;
 }
@@ -243,9 +244,8 @@
   gap: 12rpx;
   margin-top: 24rpx;
   padding: 22rpx 26rpx;
-  border: 1rpx solid rgba($badge-unread, .16);
-  border-radius: $content-radius-small;
-  background: rgba($badge-unread, .055);
+  border-radius: 20rpx;
+  background: rgba($badge-unread, .08);
   color: $badge-unread;
   font-size: 24rpx;
   line-height: 1.55;
@@ -259,7 +259,6 @@
 }
 
 .secondhand-detail-actionbar {
-  @include content.content-fixed-bottom;
   position: fixed;
   right: 0;
   bottom: 0;
@@ -271,7 +270,8 @@
   gap: 18rpx;
   min-height: 122rpx;
   padding: 18rpx 28rpx calc(32rpx + env(safe-area-inset-bottom));
-  box-sizing: border-box;
+  border-top: 1rpx solid $divider-nav;
+  background: rgba($bg-surface, .98);
 }
 
 .secondhand-detail-favorite {
@@ -280,7 +280,7 @@
   align-items: center;
   justify-content: center;
   gap: 5rpx;
-  color: $content-ink-soft;
+  color: $text-secondary;
   font-size: 20rpx;
   font-weight: 500;
 }
@@ -330,8 +330,8 @@
   gap: 14rpx;
   height: 72rpx;
   border-radius: 18rpx;
-  background: $content-accent;
-  box-shadow: none;
+  background: $gradient-primary;
+  box-shadow: 0 18rpx 34rpx -18rpx rgba($brand-primary-strong, .70);
   color: $text-on-color;
   font-size: 30rpx;
   font-weight: 900;
@@ -381,9 +381,9 @@
   bottom: 0;
   left: 0;
   padding: 34rpx 34rpx calc(46rpx + env(safe-area-inset-bottom));
-  border-radius: 34rpx 34rpx 0 0;
-  background: $content-surface;
-  box-shadow: 0 -12rpx 40rpx rgba(24, 32, 40, .10);
+  border-radius: 42rpx 42rpx 0 0;
+  background: $bg-surface;
+  box-shadow: 0 -18rpx 60rpx rgba(24, 53, 92, .14);
 }
 
 .secondhand-contact-sheet__head {
@@ -394,7 +394,7 @@
 }
 
 .secondhand-contact-sheet__title {
-  color: $content-ink;
+  color: $text-strong;
   font-size: 32rpx;
   font-weight: 900;
 }
@@ -406,8 +406,8 @@
   width: 54rpx;
   height: 54rpx;
   border-radius: 50%;
-  background: $content-input;
-  color: $content-ink-soft;
+  background: $bg-screen;
+  color: $text-secondary;
   font-size: 32rpx;
   line-height: 1;
 }
@@ -418,9 +418,9 @@
   gap: 22rpx;
   min-height: 108rpx;
   padding: 24rpx;
-  border: 1rpx solid $content-border;
-  border-radius: $content-radius-medium;
-  background: $content-surface;
+  border: 1rpx solid $divider-nav;
+  border-radius: 22rpx;
+  background: $bg-surface;
 }
 
 .secondhand-contact-option + .secondhand-contact-option {
@@ -436,13 +436,13 @@
 }
 
 .secondhand-contact-option__icon--chat {
-  background: $content-accent-soft;
+  background: $brand-tint;
 }
 
 .secondhand-contact-option__icon--chat::before {
   position: absolute;
   inset: 20rpx 16rpx 23rpx;
-  border: 4rpx solid $content-accent;
+  border: 4rpx solid $brand-primary;
   border-radius: 5rpx;
   content: '';
 }
@@ -453,8 +453,8 @@
   bottom: 17rpx;
   width: 12rpx;
   height: 12rpx;
-  border-right: 4rpx solid $content-accent;
-  border-bottom: 4rpx solid $content-accent;
+  border-right: 4rpx solid $brand-primary;
+  border-bottom: 4rpx solid $brand-primary;
   content: '';
   transform: skew(-20deg);
 }
@@ -494,14 +494,14 @@
 }
 
 .secondhand-contact-option__title {
-  color: $content-ink;
+  color: $text-strong;
   font-size: 28rpx;
   font-weight: 800;
 }
 
 .secondhand-contact-option__desc {
   overflow: hidden;
-  color: $content-ink-soft;
+  color: $text-secondary;
   font-size: 23rpx;
   line-height: 1.35;
   text-overflow: ellipsis;
@@ -509,7 +509,7 @@
 }
 
 .secondhand-contact-option__arrow {
-  color: $content-faint;
+  color: $text-faint;
   font-size: 42rpx;
   line-height: 1;
 }
@@ -517,7 +517,7 @@
 .secondhand-contact-sheet__safe {
   display: block;
   margin-top: 28rpx;
-  color: $content-muted;
+  color: $text-muted;
   font-size: 22rpx;
   line-height: 1.4;
   text-align: center;

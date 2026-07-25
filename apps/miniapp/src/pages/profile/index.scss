@@ -1,23 +1,22 @@
 @use '../../styles/design-tokens.scss' as *;
-@use '../../styles/content-surfaces.scss' as content;
 
 .student-profile-page {
-  @include content.content-page;
   position: relative;
   min-height: 100vh;
   padding: 0 0 calc(176rpx + env(safe-area-inset-bottom));
   overflow-x: hidden;
+  background: $bg-app;
+  color: $text-primary;
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 }
 
 .student-profile-hero {
   position: relative;
-  min-height: 300rpx;
-  padding: 0 36rpx 62rpx;
+  min-height: 0;
+  padding: 0 36rpx 78rpx;
   box-sizing: border-box;
   overflow: hidden;
-  border-bottom: 1rpx solid $content-border;
-  background: $content-surface;
-  color: $content-ink;
+  background: $gradient-primary;
   cursor: pointer;
 }
 
@@ -25,9 +24,22 @@
   opacity: .98;
 }
 
-.student-profile-hero::after,
+.student-profile-hero::after {
+  position: absolute;
+  right: -40rpx;
+  bottom: 20rpx;
+  width: 230rpx;
+  height: 160rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .08);
+  content: '';
+}
+
 .student-profile-hero__orb {
-  display: none;
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .08);
+  pointer-events: none;
 }
 
 .student-profile-hero__orb--small {
@@ -60,13 +72,13 @@
   justify-content: center;
   width: 112rpx;
   height: 112rpx;
-  border: 1rpx solid $content-border;
+  border: 4rpx solid rgba(255, 255, 255, .62);
   border-radius: 50%;
-  color: $content-accent;
+  color: $text-on-color;
   font-size: 46rpx;
   font-weight: 500;
   line-height: 1;
-  background: $content-accent-soft;
+  background: rgba(255, 255, 255, .08);
 }
 
 .student-profile-user__main {
@@ -81,7 +93,7 @@
 }
 
 .student-profile-user__name {
-  color: $content-ink;
+  color: $text-on-color;
   font-size: 40rpx;
   font-weight: 800;
   line-height: 1.1;
@@ -90,18 +102,18 @@
 .student-profile-user__badge {
   padding: 4rpx 14rpx;
   border-radius: 999rpx;
-  color: $content-accent;
+  color: $text-on-color;
   font-size: 20rpx;
   font-weight: 500;
   line-height: 1.2;
-  background: $content-accent-soft;
+  background: rgba(255, 255, 255, .16);
 }
 
 .student-profile-user__meta {
   display: block;
   overflow: hidden;
   margin-top: 12rpx;
-  color: $content-muted;
+  color: rgba(255, 255, 255, .86);
   font-size: 25rpx;
   line-height: 1.3;
   white-space: nowrap;
@@ -116,18 +128,18 @@
   min-width: 126rpx;
   height: 58rpx;
   padding: 0 24rpx;
-  border: 1rpx solid $content-border;
+  border: 1.5rpx solid rgba(255, 255, 255, .72);
   border-radius: 999rpx;
-  color: $content-ink-soft;
+  color: $text-on-color;
   font-size: 25rpx;
   font-weight: 500;
-  background: $content-surface;
+  background: rgba(255, 255, 255, .12);
 }
 
 .student-profile-content {
   position: relative;
   z-index: 2;
-  margin-top: -36rpx;
+  margin-top: -52rpx;
   padding: 0 28rpx;
 }
 
@@ -136,12 +148,9 @@
   grid-template-columns: repeat(4, 1fr);
   overflow: hidden;
   min-height: 120rpx;
-}
-
-.student-profile-stats,
-.student-profile-card {
-  @include content.content-surface($content-radius-medium);
-  box-shadow: none;
+  border-radius: 26rpx;
+  background: $bg-surface;
+  box-shadow: 0 18rpx 38rpx -20rpx rgba(24, 53, 92, .20);
 }
 
 .student-profile-stats__item {
@@ -164,14 +173,14 @@
 }
 
 .student-profile-stats__value {
-  color: $content-ink;
+  color: $text-strong;
   font-size: 34rpx;
   font-weight: 800;
   line-height: 1;
 }
 
 .student-profile-stats__label {
-  color: $content-muted;
+  color: $text-tertiary;
   font-size: 23rpx;
   font-weight: 400;
   line-height: 1;
@@ -179,6 +188,9 @@
 
 .student-profile-card {
   margin-top: 28rpx;
+  border-radius: 28rpx;
+  background: $bg-surface;
+  box-shadow: $shadow-card;
 }
 
 .student-profile-roles {
@@ -193,14 +205,14 @@
 }
 
 .student-profile-card__title {
-  color: $content-ink;
+  color: $text-strong;
   font-size: 29rpx;
   font-weight: 800;
   line-height: 1;
 }
 
 .student-profile-card__hint {
-  color: $content-muted;
+  color: $text-tertiary;
   font-size: 22rpx;
   line-height: 1;
 }
@@ -219,14 +231,14 @@
   align-items: center;
   min-height: 172rpx;
   padding: 28rpx 12rpx 20rpx;
-  border: 1rpx solid $content-border;
+  border: 2rpx solid #E8EDF3;
   border-radius: 20rpx;
-  background: $content-surface;
+  background: $bg-surface;
 }
 
 .student-profile-role--active {
-  border-color: $content-accent;
-  background: $content-accent-soft;
+  border-color: $brand-primary;
+  background: rgba(230, 241, 251, .45);
 }
 
 .student-profile-role__corner {
@@ -235,11 +247,11 @@
   right: 18rpx;
   padding: 4rpx 14rpx;
   border-radius: 999rpx;
-  color: $content-surface;
+  color: $text-on-color;
   font-size: 19rpx;
   font-weight: 700;
   line-height: 1;
-  background: $content-accent;
+  background: $brand-primary;
 }
 
 .student-profile-role__icon {
@@ -249,13 +261,13 @@
   width: 62rpx;
   height: 62rpx;
   border-radius: 50%;
-  background: $content-input;
-  color: $content-muted;
+  background: #F1F5F8;
+  color: $text-tertiary;
 }
 
 .student-profile-role--active .student-profile-role__icon {
-  background: $content-surface;
-  color: $content-accent;
+  background: $brand-tint;
+  color: $brand-primary;
 }
 
 .student-profile-role__icon-image {
@@ -265,7 +277,7 @@
 
 .student-profile-role__title {
   margin-top: 18rpx;
-  color: $content-ink;
+  color: $text-primary;
   font-size: 26rpx;
   font-weight: 500;
   line-height: 1;
@@ -273,7 +285,7 @@
 
 .student-profile-role__subtitle {
   margin-top: 14rpx;
-  color: $content-muted;
+  color: $text-faint;
   font-size: 20rpx;
   line-height: 1;
 }
@@ -291,7 +303,7 @@
 }
 
 .student-profile-setting:not(:last-child) {
-  border-bottom: 1rpx solid $content-border;
+  border-bottom: 1rpx solid $divider-hairline;
 }
 
 .student-profile-setting__icon {
@@ -301,8 +313,8 @@
   height: 56rpx;
   margin-right: 22rpx;
   border-radius: 16rpx;
-  background: $content-accent-soft;
-  color: $content-accent;
+  background: $brand-tint;
+  color: $brand-primary;
 }
 
 .student-profile-setting__icon::before,
@@ -411,7 +423,7 @@
 
 .student-profile-setting__title {
   flex: 1 1 auto;
-  color: $content-ink;
+  color: $text-primary;
   font-size: 27rpx;
   font-weight: 400;
 }
@@ -419,7 +431,7 @@
 .student-profile-setting__value,
 .student-profile-setting__arrow {
   flex: 0 0 auto;
-  color: $content-muted;
+  color: $text-muted;
   font-size: 25rpx;
 }
 

@@ -1,14 +1,14 @@
 @use '../../styles/design-tokens.scss' as *;
-@use '../../styles/content-surfaces.scss' as content;
 
 .student-search-page {
-  @include content.content-page;
   min-height: 100vh;
+  background: $bg-screen;
+  color: $text-primary;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
 }
 
 .student-search-header {
-  background: $content-surface;
-  box-shadow: none;
+  box-shadow: $shadow-header;
 }
 
 .student-search-back {
@@ -32,12 +32,15 @@
 }
 
 .student-search-box {
-  @include content.content-search;
   box-sizing: border-box;
   flex: 1;
-  width: 100%;
+  height: 64rpx;
   padding: 0 24rpx;
+  border-radius: 36rpx;
+  display: flex;
+  align-items: center;
   gap: 14rpx;
+  background: #f0f3f7;
 }
 
 .student-search-box__icon {
@@ -72,10 +75,10 @@
 }
 
 .student-search-box__input {
-  flex: 1 1 auto;
+  flex: 1;
   min-width: 0;
-  color: $content-ink;
-  font-size: 27rpx;
+  font-size: 26rpx;
+  color: $text-primary;
 }
 
 .student-search-submit {
@@ -86,7 +89,7 @@
 }
 
 .student-search-content {
-  padding: 24rpx 28rpx 80rpx;
+  padding: 34rpx 32rpx 48rpx;
 }
 
 .student-search-section {
@@ -124,20 +127,25 @@
 }
 
 .student-search-chip {
-  @include content.content-pill;
   box-sizing: border-box;
+  min-height: 52rpx;
+  padding: 0 28rpx;
+  border-radius: 28rpx;
+  display: flex;
+  align-items: center;
   justify-content: center;
   gap: 10rpx;
+  font-size: 26rpx;
 }
 
 .student-search-chip--history {
-  border: 1rpx solid $content-border;
-  background: $content-surface;
+  background: $bg-surface;
+  border: 1rpx solid $divider-nav;
 }
 
 .student-search-chip--popular {
-  background: $content-accent-soft;
-  color: $content-accent;
+  background: $brand-tint;
+  color: $brand-primary;
 }
 
 .student-search-hot {
@@ -169,28 +177,28 @@
 }
 
 .student-search-result {
-  padding: 24rpx 0;
-  border-bottom: 1rpx solid $content-border;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
+  margin-bottom: 20rpx;
+  padding: 26rpx 28rpx;
+  border-radius: 18rpx;
+  background: $bg-surface;
+  box-shadow: 0 6rpx 20rpx rgba(31, 72, 120, .06);
 }
 
 .student-search-result__title {
   flex: 1;
-  color: $content-ink;
-  font-size: 30rpx;
+  font-size: 29rpx;
   line-height: 40rpx;
-  font-weight: 650;
+  font-weight: 700;
+  color: $text-strong;
 }
 
 .student-search-result__summary {
   display: -webkit-box;
   margin-top: 10rpx;
   overflow: hidden;
-  color: $content-ink-soft;
+  color: $text-secondary;
   font-size: 25rpx;
-  line-height: 1.55;
+  line-height: 38rpx;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }

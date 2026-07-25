@@ -1,8 +1,6 @@
 @use '../../styles/design-tokens.scss' as *;
-@use '../../styles/content-surfaces.scss' as content;
 
 .edit-profile-page {
-  @include content.content-page;
   min-height: 100vh;
   background: $bg-app;
   color: $text-primary;
@@ -11,9 +9,6 @@
 
 .edit-profile-nav__action,
 .edit-profile-nav__save {
-  min-width: 64px;
-  min-height: 44px;
-  white-space: nowrap;
   flex: 0 0 64px;
   display: flex;
   align-items: center;
@@ -132,8 +127,6 @@
 
 .edit-profile-card,
 .edit-profile-signature-card {
-  @include content.content-surface($content-radius-medium);
-  box-shadow: none;
   border-radius: 26rpx;
   background: $bg-surface;
   box-shadow: $shadow-card;
