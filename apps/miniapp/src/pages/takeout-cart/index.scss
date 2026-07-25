@@ -1,5 +1,23 @@
+@use '../../styles/design-tokens.scss' as *;
+@use '../../styles/content-surfaces.scss' as content;
+
 .takeout-cart-page {
   background: #f5f8fb;
+}
+
+.takeout-cart-page {
+  @include content.content-page;
+}
+
+.cart-card,
+.cart-item {
+  @include content.content-surface($content-radius-medium);
+  box-shadow: none;
+}
+
+.cart-title,
+.cart-item__name {
+  color: $content-ink;
 }
 
 .cart-card,

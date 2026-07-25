@@ -1,15 +1,15 @@
 @use '../../styles/design-tokens.scss' as *;
+@use '../../styles/content-surfaces.scss' as content;
 
 .post-detail-page {
+  @include content.content-page;
   position: relative;
   height: 100vh;
   min-height: 100vh;
   padding-top: var(--capsule-total-header-height);
   box-sizing: border-box;
   overflow: hidden;
-  background: $bg-surface;
-  color: $text-strong;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
+  background: $content-surface;
 }
 
 .capsule-page-header.post-detail-nav {
@@ -18,7 +18,8 @@
   right: 0;
   left: 0;
   z-index: 20;
-  background: rgba($bg-surface, .98);
+  border-bottom: 1rpx solid $content-border;
+  background: rgba($content-surface, .98);
 }
 
 .post-detail-nav__back {
@@ -27,7 +28,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  color: $text-strong;
+  color: $content-ink;
   font-size: 34px;
   line-height: 1;
 }
@@ -47,7 +48,7 @@
   height: 34px;
   margin-right: 10px;
   border-radius: 50%;
-  background: rgba($like-active, .72);
+  background: rgba($content-accent, .72);
   color: $text-on-color;
   font-size: 15px;
   font-weight: 700;
@@ -68,9 +69,9 @@
 .post-detail-author__name {
   display: block;
   overflow: hidden;
-  color: $text-strong;
+  color: $content-ink;
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.1;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -80,7 +81,7 @@
   display: block;
   overflow: hidden;
   margin-top: 2px;
-  color: $text-tertiary;
+  color: $content-muted;
   font-size: 11px;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -93,26 +94,27 @@
   justify-content: center;
   width: 72px;
   height: 44px;
+  border: 1rpx solid $content-accent;
   border-radius: 22px;
-  background: $brand-primary;
-  color: $text-on-color;
+  background: $content-surface;
+  color: $content-accent;
   font-size: 14px;
   font-weight: 700;
-  box-shadow: 0 10px 24px rgba($brand-primary, .22);
+  box-shadow: none;
 }
 
 .post-detail-follow--active {
-  color: $brand-primary;
-  background: $brand-primary-light;
-  box-shadow: none;
+  border-color: transparent;
+  color: $content-accent;
+  background: $content-accent-soft;
 }
 
 .post-detail-scroll {
   height: 100%;
-  padding-bottom: 116px;
+  padding-bottom: calc(112rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
   overflow-y: auto;
-  background: $bg-surface;
+  background: $content-surface;
 }
 
 .post-detail-state {
@@ -123,23 +125,23 @@
   min-height: 520px;
   padding: 48px 32px;
   box-sizing: border-box;
-  color: $text-secondary;
+  color: $content-ink-soft;
   text-align: center;
 }
 
 .post-detail-state--retry {
-  color: $brand-primary;
+  color: $content-accent;
 }
 
 .post-detail-state__title {
-  color: $text-strong;
+  color: $content-ink;
   font-size: 26px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .post-detail-state__desc {
   margin-top: 14px;
-  color: $text-tertiary;
+  color: $content-muted;
   font-size: 18px;
   line-height: 1.5;
 }
@@ -149,16 +151,8 @@
   align-items: center;
   justify-content: center;
   height: 412px;
-  background:
-    repeating-linear-gradient(
-      135deg,
-      rgba($like-active, .08) 0,
-      rgba($like-active, .08) 18px,
-      rgba($like-active, .08) 18px,
-      rgba($like-active, .08) 36px
-    ),
-    rgba($like-active, .06);
-  color: $placeholder-label;
+  background: $content-input;
+  color: $content-muted;
   font-size: 20px;
 }
 
@@ -169,72 +163,65 @@
 }
 
 .post-detail-content {
-  padding: 28px 32px 30px;
-  background: $bg-surface;
-  border-bottom: 16px solid $bg-screen;
+  padding: 32rpx 32rpx 28rpx;
+  border-bottom: 1rpx solid $content-border;
+  background: $content-surface;
 }
 
 .post-detail-content__title {
   display: block;
-  color: $text-strong;
-  font-size: 30px;
-  font-weight: 900;
+  color: $content-ink;
+  font-size: 42rpx;
+  font-weight: 700;
   line-height: 1.35;
 }
 
 .post-detail-content__body {
   display: block;
-  margin-top: 22px;
-  color: $text-primary;
-  font-size: 22px;
-  line-height: 1.8;
+  margin-top: 22rpx;
+  color: $content-ink-soft;
+  font-size: 30rpx;
+  line-height: 1.75;
 }
 
 .post-detail-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 24px;
+  gap: 12rpx;
+  margin-top: 24rpx;
 }
 
 .post-detail-tag {
-  display: flex;
-  align-items: center;
-  min-height: 42px;
-  padding: 0 20px;
-  border-radius: 999px;
-  background: $brand-tint;
-  color: $brand-primary-strong;
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 42px;
+  @include content.content-pill;
+  color: $content-accent;
+  font-weight: 600;
 }
 
 .post-detail-content__meta {
   display: block;
-  margin-top: 22px;
-  color: $text-tertiary;
-  font-size: 18px;
+  margin-top: 22rpx;
+  color: $content-muted;
+  font-size: 23rpx;
 }
 
 .post-detail-comments {
-  padding: 28px 32px 32px;
-  background: $bg-surface;
+  padding: 32rpx 32rpx 40rpx;
+  background: $content-surface;
 }
 
 .post-detail-comments__title {
   display: block;
-  margin-bottom: 18px;
-  color: $text-strong;
-  font-size: 22px;
-  font-weight: 900;
+  margin-bottom: 14rpx;
+  color: $content-ink;
+  font-size: 32rpx;
+  font-weight: 700;
 }
 
 .post-detail-comment {
   position: relative;
   display: flex;
-  padding: 18px 0 20px;
-  border-bottom: 1px solid $divider-hairline;
+  padding: 28rpx 0 30rpx;
+  border-bottom: 1rpx solid $content-border;
 }
 
 .post-detail-comment__avatar {
@@ -242,13 +229,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 52px;
-  height: 52px;
-  margin-right: 16px;
+  width: 72rpx;
+  height: 72rpx;
+  margin-right: 18rpx;
   border-radius: 50%;
   color: $text-on-color;
-  font-size: 18px;
-  font-weight: 800;
+  font-size: 25rpx;
+  font-weight: 700;
 }
 
 .post-detail-comment__avatar--sky {
@@ -256,7 +243,7 @@
 }
 
 .post-detail-comment__avatar--peach {
-  background: rgba($like-active, .68);
+  background: rgba($content-like, .68);
 }
 
 .post-detail-comment__avatar--green {
@@ -264,67 +251,67 @@
 }
 
 .post-detail-comment__avatar--mint {
-  background: rgba($brand-primary-strong, .58);
+  background: rgba($content-accent, .58);
 }
 
 .post-detail-comment__main {
   min-width: 0;
   flex: 1;
-  padding-right: 62px;
+  padding-right: 76rpx;
 }
 
 .post-detail-comment__author {
   display: block;
-  color: $text-secondary;
-  font-size: 18px;
-  font-weight: 700;
+  color: $content-muted;
+  font-size: 24rpx;
+  font-weight: 600;
   line-height: 1.2;
 }
 
 .post-detail-comment__content {
   display: block;
-  margin-top: 8px;
-  color: $text-primary;
-  font-size: 20px;
-  line-height: 1.55;
+  margin-top: 10rpx;
+  color: $content-ink;
+  font-size: 28rpx;
+  line-height: 1.6;
 }
 
 .post-detail-comment__meta {
   display: flex;
-  gap: 20px;
-  margin-top: 10px;
-  color: $text-tertiary;
-  font-size: 16px;
+  gap: 20rpx;
+  margin-top: 12rpx;
+  color: $content-muted;
+  font-size: 22rpx;
 }
 
 .post-detail-comment__like {
   position: absolute;
   right: 0;
-  top: 22px;
+  top: 30rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
-  color: $like-idle-count;
-  font-size: 16px;
+  color: $content-muted;
+  font-size: 21rpx;
   line-height: 1.2;
 
   Text:first-child {
-    margin-bottom: 4px;
+    margin-bottom: 4rpx;
     color: $heart-idle-stroke;
-    font-size: 24px;
+    font-size: 34rpx;
   }
 }
 
 .post-detail-comments__bottom {
   display: block;
-  padding: 26px 0 10px;
+  padding: 30rpx 0 12rpx;
   text-align: center;
-  color: $text-faint;
-  font-size: 18px;
+  color: $content-faint;
+  font-size: 23rpx;
 }
 
 .post-detail-comments__bottom--retry {
-  color: $brand-primary;
+  color: $content-accent;
   font-weight: 700;
 }
 
@@ -332,12 +319,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 72px;
-  color: $text-faint;
-  font-size: 18px;
+  min-height: 72rpx;
+  color: $content-faint;
+  font-size: 23rpx;
 }
 
 .post-detail-actionbar {
+  @include content.content-fixed-bottom;
   position: fixed;
   left: 0;
   right: 0;
@@ -345,53 +333,55 @@
   z-index: 25;
   display: flex;
   align-items: center;
-  gap: 18px;
-  height: 116px;
-  padding: 14px 24px 34px;
+  gap: 18rpx;
+  min-height: calc(104rpx + env(safe-area-inset-bottom));
+  padding: 14rpx 24rpx calc(14rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
-  background: rgba($bg-surface, .98);
-  border-top: 1px solid $divider-hairline;
+  box-shadow: 0 -4rpx 18rpx rgba(24, 32, 40, .04);
 }
 
 .post-detail-input {
   flex: 1;
   display: flex;
   align-items: center;
-  height: 54px;
-  padding: 0 24px;
-  border-radius: 27px;
-  background: $bg-screen;
+  height: 72rpx;
+  padding: 0 24rpx;
+  border-radius: 999rpx;
+  background: $content-input;
 
   input {
     width: 100%;
-    color: $text-primary;
-    font-size: 18px;
+    color: $content-ink;
+    font-size: 26rpx;
   }
 
   input::placeholder {
-    color: $text-faint;
+    color: $content-faint;
   }
 }
 
 .post-detail-action {
   display: flex;
   align-items: center;
-  gap: 6px;
-  color: $text-secondary;
-  font-size: 18px;
-  font-weight: 700;
+  justify-content: center;
+  gap: 6rpx;
+  min-width: 68rpx;
+  min-height: 68rpx;
+  color: $content-muted;
+  font-size: 23rpx;
+  font-weight: 600;
 }
 
 .post-detail-action__icon {
-  color: $text-secondary;
-  font-size: 28px;
+  color: $content-muted;
+  font-size: 36rpx;
   line-height: 1;
 }
 
 .post-detail-action--active {
-  color: $like-active;
+  color: $content-like;
 
   .post-detail-action__icon {
-    color: $like-active;
+    color: $content-like;
   }
 }

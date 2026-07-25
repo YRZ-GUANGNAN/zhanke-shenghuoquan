@@ -1,11 +1,11 @@
 @use '../../styles/design-tokens.scss' as *;
+@use '../../styles/content-surfaces.scss' as content;
 
 .publish-entry-page {
+  @include content.content-page;
   min-height: 100vh;
   box-sizing: border-box;
   padding: 0 0 48rpx;
-  background: $bg-app;
-  color: $text-strong;
   overflow: hidden;
 }
 
@@ -24,16 +24,15 @@
   position: relative;
   margin: 24rpx 32rpx 0;
   padding: 44rpx 40rpx 42rpx;
-  border-radius: 36rpx;
-  background: $gradient-primary;
-  color: $text-on-color;
+  border: 1rpx solid $content-border;
+  border-radius: $content-radius-large;
+  background: $content-surface;
+  color: $content-ink;
   overflow: hidden;
-  box-shadow: 0 20rpx 48rpx -18rpx rgba(33, 104, 184, .46);
+  box-shadow: none;
 
   &__orb {
-    position: absolute;
-    border-radius: 999rpx;
-    background: rgba(255, 255, 255, .12);
+    display: none;
   }
 
   &__orb--large {
@@ -59,8 +58,9 @@
   }
 
   &__eyebrow {
+    color: $content-accent;
     font-size: 24rpx;
-    opacity: .82;
+    font-weight: 600;
   }
 
   &__title {
@@ -68,6 +68,7 @@
     font-size: 42rpx;
     line-height: 1.24;
     font-weight: 900;
+    letter-spacing: -1rpx;
     max-width: 500rpx;
   }
 
@@ -76,7 +77,7 @@
     max-width: 560rpx;
     font-size: 26rpx;
     line-height: 1.6;
-    opacity: .82;
+    color: $content-muted;
   }
 }
 
@@ -88,14 +89,13 @@
 }
 
 .publish-entry-card {
+  @include content.content-surface($content-radius-medium);
   display: flex;
   align-items: center;
   min-height: 146rpx;
   padding: 24rpx 26rpx;
   box-sizing: border-box;
-  border-radius: 30rpx;
-  background: $bg-surface;
-  box-shadow: $shadow-card;
+  box-shadow: none;
 
   &__icon {
     flex: 0 0 84rpx;
@@ -105,7 +105,7 @@
     align-items: center;
     justify-content: center;
     border-radius: 26rpx;
-    color: #fff;
+    color: $content-accent;
     font-size: 34rpx;
     font-weight: 800;
   }
@@ -126,7 +126,7 @@
     font-size: 32rpx;
     line-height: 1.25;
     font-weight: 850;
-    color: $text-strong;
+    color: $content-ink;
   }
 
   &__tag {
@@ -134,8 +134,8 @@
     border-radius: 999rpx;
     font-size: 21rpx;
     line-height: 1.35;
-    color: $brand-primary;
-    background: $brand-tint;
+    color: $content-accent;
+    background: $content-accent-soft;
   }
 
   &__subtitle {
@@ -143,28 +143,29 @@
     margin-top: 10rpx;
     font-size: 25rpx;
     line-height: 1.5;
-    color: $text-tertiary;
+    color: $content-muted;
   }
 
   &__arrow {
     flex: 0 0 auto;
     margin-left: 16rpx;
-    color: $text-faint;
+    color: $content-faint;
     font-size: 40rpx;
     line-height: 1;
   }
 }
 
 .publish-entry-card--blue .publish-entry-card__icon {
-  background: linear-gradient(135deg, #56A4F3, #2E7DD4);
+  background: $content-accent-soft;
 }
 
 .publish-entry-card--orange .publish-entry-card__icon {
-  background: linear-gradient(135deg, #FFB36C, #FF7B4A);
+  background: $content-input;
+  color: $content-ink-soft;
 }
 
 .publish-entry-card--green .publish-entry-card__icon {
-  background: linear-gradient(135deg, #7AD9B1, #2FAA82);
+  background: $content-accent-soft;
 }
 
 .publish-entry-note {
@@ -174,8 +175,9 @@
   gap: 14rpx;
   padding: 22rpx 24rpx;
   border-radius: 24rpx;
-  background: rgba(230, 241, 251, .86);
-  color: $brand-primary-strong;
+  border: 1rpx solid $content-border;
+  background: $content-accent-soft;
+  color: $content-ink-soft;
   font-size: 24rpx;
   line-height: 1.55;
 
@@ -187,7 +189,8 @@
     align-items: center;
     justify-content: center;
     border-radius: 999rpx;
-    border: 2rpx solid rgba(46, 125, 212, .42);
+    border: 2rpx solid $content-accent;
+    color: $content-accent;
     font-size: 20rpx;
     font-weight: 800;
   }

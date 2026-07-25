@@ -1,4 +1,5 @@
 @use '../../styles/design-tokens.scss' as *;
+@use '../../styles/content-surfaces.scss' as content;
 
 .student-takeout-page {
   min-height: 100vh;
@@ -19,6 +20,22 @@
   background: rgba(255, 255, 255, .98);
   box-shadow: $shadow-header;
   box-sizing: border-box;
+}
+
+/* 内容优先视觉收敛：只调整表面，不改变商家列表和下单行为。 */
+.student-takeout-page {
+  @include content.content-page;
+}
+
+.student-takeout-merchant {
+  @include content.content-surface($content-radius-medium);
+  box-shadow: none;
+}
+
+.student-takeout-header__title,
+.student-takeout-merchant__name {
+  color: $content-ink;
+  font-weight: 700;
 }
 
 .student-takeout-header__row {

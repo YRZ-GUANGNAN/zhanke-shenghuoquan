@@ -1,5 +1,19 @@
+@use '../../styles/design-tokens.scss' as *;
+@use '../../styles/content-surfaces.scss' as content;
+
 .takeout-order-detail-page {
   background: #f5f8fb;
+}
+
+.takeout-order-detail-page {
+  @include content.content-page;
+}
+
+.detail-card {
+  border-bottom: 1rpx solid $content-border;
+  border-radius: $content-radius-medium;
+  background: $content-surface;
+  box-shadow: none;
 }
 
 .detail-card {

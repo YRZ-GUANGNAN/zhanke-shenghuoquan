@@ -34,6 +34,24 @@ $shadow-fab: 0 20rpx 40rpx -12rpx rgba(33, 104, 184, .55), 0 0 0 10rpx #fff;
 $placeholder-stripe: repeating-linear-gradient(135deg, rgba(30, 60, 100, .03) 0 20rpx, transparent 20rpx 40rpx);
 $placeholder-label: rgba(30, 50, 80, .38);
 
+/* 内容优先视觉系统：用于首页、搜索、详情和后续内容页面统一。 */
+$content-canvas: #F5F6F7;
+$content-surface: #FFFFFF;
+$content-ink: #202327;
+$content-ink-soft: #50565F;
+$content-muted: #8D949D;
+$content-faint: #B8BDC4;
+$content-accent: #2F8F9D;
+$content-accent-soft: #E8F4F4;
+$content-border: #ECEFF1;
+$content-input: #F3F4F5;
+$content-like: #EC6A86;
+
+$content-radius-small: 12rpx;
+$content-radius-medium: 20rpx;
+$content-radius-large: 28rpx;
+$content-shadow: 0 2rpx 10rpx rgba(24, 32, 40, .035);
+
 page {
   --brand-primary: #2E7DD4;
   --brand-primary-strong: #2168B8;
@@ -48,4 +66,14 @@ page {
   --bg-app: #F2F5F9;
   --bg-screen: #F7F8FA;
   --bg-surface: #FFFFFF;
+  --content-canvas: #F5F6F7;
+  --content-surface: #FFFFFF;
+  --content-ink: #202327;
+  --content-ink-soft: #50565F;
+  --content-muted: #8D949D;
+  --content-accent: #2F8F9D;
+  --content-accent-soft: #E8F4F4;
+  --content-border: #ECEFF1;
+  --content-input: #F3F4F5;
+  --content-like: #EC6A86;
 }

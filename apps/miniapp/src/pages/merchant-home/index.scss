@@ -637,6 +637,21 @@ page {
   gap: 14rpx;
 }
 
+/* 保留商家工作台结构，只降低装饰噪声并统一内容表面。 */
+.merchant-home-hero {
+  background: linear-gradient(155deg, #286fae 0%, #347fb9 100%);
+}
+
+.merchant-home-shortcut,
+.merchant-order-card {
+  border: 1rpx solid $content-border;
+  box-shadow: $content-shadow;
+}
+
+.merchant-home-shortcut__icon {
+  background: rgba($content-accent, .08);
+}
+
 .merchant-order-button {
   min-width: 104rpx;
   height: 64rpx;

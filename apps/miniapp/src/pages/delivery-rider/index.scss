@@ -620,6 +620,23 @@
   line-height: 1.5;
 }
 
+/* 保留骑手接单结构和全部操作，仅统一底色、边框与阴影。 */
+.rider-grab-page,
+.rider-grab-content {
+  background: $content-canvas;
+}
+
+.rider-grab-hero {
+  background: linear-gradient(155deg, #286fae 0%, #347fb9 100%);
+}
+
+.rider-grab-tabs,
+.rider-order-card,
+.rider-empty-state {
+  border: 1rpx solid $content-border;
+  box-shadow: $content-shadow;
+}
+
 .rider-load-error {
   display: flex;
   flex-direction: column;

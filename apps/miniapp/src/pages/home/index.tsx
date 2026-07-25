@@ -28,6 +28,7 @@ type DiscoverCard = {
   likes: number
   height: 'short' | 'medium' | 'tall'
   imageUrl?: string
+  price?: string
 }
 
 type SettledResult<T> =
@@ -114,7 +115,8 @@ function toProductCard(product: Product): DiscoverCard {
     title: product.title,
     author: product.sellerName,
     avatar: product.sellerName.slice(0, 1) || '校',
-    likes: product.favoriteCount
+    likes: product.favoriteCount,
+    price: String(product.price)
   }
 }
 
@@ -393,30 +395,40 @@ function HomeContent() {
 
   const renderDiscoverCard = (card: DiscoverCard) => {
     const imageKey = `${card.target}:${card.id}`
+    const hasMedia = Boolean(card.imageUrl)
     return (
       <View
         key={imageKey}
-        className='student-post-card'
+        className={`student-post-card ${hasMedia ? 'student-post-card--media' : 'student-post-card--text'}`}
         onClick={() => openCard(card)}
       >
-        <View className={`student-post-card__media student-post-card__media--${card.tone} student-post-card__media--${card.height}`}>
-          {card.imageUrl && !failedImageKeys.has(imageKey) ? (
-            <Image
-              className='student-post-card__image'
-              src={card.imageUrl}
-              mode='aspectFill'
-              onError={() => setFailedImageKeys((current) => {
-                const next = new Set(current)
-                next.add(imageKey)
-                return next
-              })}
-            />
-          ) : (
-            <Text>{card.mediaLabel}</Text>
-          )}
-        </View>
+        {hasMedia && (
+          <View className={`student-post-card__media student-post-card__media--${card.tone} student-post-card__media--${card.height}`}>
+            {!failedImageKeys.has(imageKey) ? (
+              <Image
+                className='student-post-card__image'
+                src={card.imageUrl!}
+                mode='aspectFill'
+                onError={() => setFailedImageKeys((current) => {
+                  const next = new Set(current)
+                  next.add(imageKey)
+                  return next
+                })}
+              />
+            ) : (
+              <Text className='student-post-card__media-fallback'>{card.mediaLabel}</Text>
+            )}
+          </View>
+        )}
         <View className='student-post-card__body'>
-          <Text className='student-post-card__title'>{card.title}</Text>
+          <View className='student-post-card__heading'>
+            <Text className='student-post-card__title'>{card.title}</Text>
+            <Text className='student-post-card__more'>•••</Text>
+          </View>
+          <View className='student-post-card__tags'>
+            <Text>{card.target === 'secondhand' ? '#二手' : '#校园动态'}</Text>
+            {card.price && <Text className='student-post-card__price'>¥{card.price}</Text>}
+          </View>
           <View className='student-post-card__meta'>
             <View className={`student-post-card__avatar student-post-card__avatar--${card.tone}`}>
               <Text>{card.avatar}</Text>
@@ -476,8 +488,16 @@ function HomeContent() {
             ))}
           </View>
         }
-        right={<View className='student-home-header__search' onClick={openSearch} />}
       />
+
+      {activeTab === 'discover' && (
+        <View className='student-home-search-row'>
+          <View className='student-home-search' onClick={openSearch}>
+            <View className='student-home-search__icon' />
+            <Text className='student-home-search__placeholder'>搜帖子、话题和校园动态</Text>
+          </View>
+        </View>
+      )}
 
       <View className='student-home-content'>
         {activeTab === 'messages' && (

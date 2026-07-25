@@ -1,5 +1,6 @@
 @use 'sass:color';
 @use '../../styles/design-tokens.scss' as *;
+@use '../../styles/content-surfaces.scss' as content;
 
 $secondhand-orange: #FF7B4A;
 $secondhand-orange-pale: color.mix($secondhand-orange, $bg-surface, 10%);
@@ -11,6 +12,7 @@ page {
 }
 
 .publish-secondhand-page {
+  @include content.content-page;
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -40,6 +42,8 @@ page {
 
 .publish-secondhand-upload-card,
 .publish-secondhand-form-card {
+  @include content.content-surface($content-radius-medium);
+  box-shadow: none;
   margin: 24rpx 28rpx 0;
   border-radius: 26rpx;
   background: $bg-surface;
@@ -312,7 +316,9 @@ page {
 .publish-secondhand-footer__button {
   height: 86rpx;
   border-radius: 22rpx;
-  background: $gradient-primary;
+  background: $content-ink;
+  color: $content-surface;
+  box-shadow: none;
   color: $text-on-color;
   box-shadow: 0 18rpx 34rpx -18rpx rgba($brand-primary-strong, .68);
   font-size: 30rpx;

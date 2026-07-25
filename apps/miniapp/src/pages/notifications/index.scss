@@ -1,3 +1,6 @@
+@use '../../styles/design-tokens.scss' as *;
+@use '../../styles/content-surfaces.scss' as content;
+
 .notifications-page { padding-bottom: 40rpx; }
 .notifications-head { display:flex; justify-content:space-between; margin-bottom:20rpx; color:#667085; }
 .notification { margin-bottom:16rpx; padding:24rpx; }
@@ -6,3 +9,13 @@
 .notification__title { color:#172033; font-weight:700; }
 .notification__time { margin-top:10rpx; color:#8791a2; font-size:23rpx; }
 .notifications-empty { padding:40rpx; text-align:center; color:#8791a2; }
+
+.notifications-page {
+  @include content.content-page;
+}
+
+.notification {
+  border-bottom: 1rpx solid $content-border;
+  background: $content-surface;
+  box-shadow: none;
+}

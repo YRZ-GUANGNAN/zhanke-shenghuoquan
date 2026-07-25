@@ -1,0 +1,40 @@
+@use './design-tokens.scss' as *;
+
+@mixin content-page {
+  background: $content-canvas;
+  color: $content-ink;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+}
+
+@mixin content-surface($radius: $content-radius-medium) {
+  border: 1rpx solid $content-border;
+  border-radius: $radius;
+  background: $content-surface;
+  box-shadow: $content-shadow;
+}
+
+@mixin content-search {
+  display: flex;
+  align-items: center;
+  min-height: 72rpx;
+  border-radius: 999rpx;
+  background: $content-input;
+  color: $content-muted;
+}
+
+@mixin content-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 42rpx;
+  padding: 0 16rpx;
+  border-radius: 999rpx;
+  background: $content-input;
+  color: $content-muted;
+  font-size: 22rpx;
+}
+
+@mixin content-fixed-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+  border-top: 1rpx solid $content-border;
+  background: rgba(255, 255, 255, .98);
+}

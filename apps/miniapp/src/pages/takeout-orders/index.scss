@@ -1,5 +1,21 @@
+@use '../../styles/design-tokens.scss' as *;
+@use '../../styles/content-surfaces.scss' as content;
+
 .takeout-orders-page {
   background: #f5f8fb;
+}
+
+.takeout-orders-page {
+  @include content.content-page;
+}
+
+.order-card {
+  @include content.content-surface($content-radius-medium);
+  box-shadow: none;
+}
+
+.order-title {
+  color: $content-ink;
 }
 
 .orders-filter {

@@ -1,7 +1,29 @@
+@use '../../styles/design-tokens.scss' as *;
+@use '../../styles/content-surfaces.scss' as content;
+
 .product-detail-page {
   min-height: 100vh;
   padding-bottom: 130rpx;
   background: #f5f8fb;
+}
+
+.product-detail-page {
+  @include content.content-page;
+}
+
+.product-info,
+.seller-card {
+  border: 1rpx solid $content-border;
+  border-radius: $content-radius-medium;
+  background: $content-surface;
+  box-shadow: none;
+}
+
+.product-actions .cc-button--primary {
+  border-radius: 18rpx;
+  background: $content-ink;
+  color: $content-surface;
+  box-shadow: none;
 }
 
 .product-cover {
