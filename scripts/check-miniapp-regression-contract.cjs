@@ -1,0 +1,124 @@
+const fs = require('node:fs')
+const path = require('node:path')
+
+const root = path.resolve(__dirname, '..')
+
+function read(relativePath) {
+  return fs.readFileSync(path.join(root, relativePath), 'utf8')
+}
+
+function requireMatch(source, pattern, message) {
+  if (!pattern.test(source)) throw new Error(message)
+}
+
+function forbidMatch(source, pattern, message) {
+  if (pattern.test(source)) throw new Error(message)
+}
+
+const home = read('apps/miniapp/src/pages/home/index.tsx')
+requireMatch(home, /import\s*\{[^}]*ScrollView[^}]*\}\s*from\s*'@tarojs\/components'/s, '首页必须使用原生 ScrollView')
+requireMatch(home, /<ScrollView[\s\S]*scrollY[\s\S]*onScrollToLower=/, '首页必须通过 onScrollToLower 触发翻页')
+forbidMatch(home, /createIntersectionObserver|home-discover-sentinel/, '首页不得继续使用不稳定的 IntersectionObserver sentinel')
+requireMatch(home, /conversationOwnerRef\.current\s*!==\s*ownerKey/, '私信列表必须拒绝旧账号请求写回')
+requireMatch(home, /key=\{activeTab\}/, '首页标签切换时必须隔离 ScrollView 滚动位置')
+
+const chatPage = read('apps/miniapp/src/pages/secondhand-chat/index.tsx')
+requireMatch(chatPage, /<AppIcon\s+name='home'/, '聊天页主页入口必须使用标准 home 图标')
+requireMatch(chatPage, /`campus_\$\{currentUserId\}`/, '聊天页必须绑定当前后端用户对应的 Tencent IM 账号')
+requireMatch(chatPage, /activeChatKeyRef\.current\s*!==\s*operationKey/, '聊天发送完成后必须拒绝旧账号结果写回')
+
+forbidMatch(
+  chatPage,
+  /className='secondhand-chat-scroll'[\s\S]{0,180}marginBottom:\s*`\$\{keyboardHeight\}px`/,
+  '聊天滚动区不得再次按键盘高度缩小，否则真机会发生重复补偿'
+)
+requireMatch(
+  chatPage,
+  /className=\{`secondhand-chat-inputbar[\s\S]{0,240}bottom:\s*`\$\{keyboardHeight\}px`/,
+  '聊天输入栏必须跟随键盘高度移动'
+)
+requireMatch(chatPage, /adjustPosition=\{false\}/, '聊天输入框必须关闭系统自动顶起，避免与手动键盘适配冲突')
+
+const sessionStore = read('apps/miniapp/src/stores/session.ts')
+requireMatch(sessionStore, /let sessionEpoch = 0/, '登录状态必须维护会话代次')
+requireMatch(sessionStore, /const isCurrent = \(\) => sessionEpoch === epoch/, 'bootstrap 异步结果必须校验会话代次')
+requireMatch(sessionStore, /setToken:[\s\S]*profile: emptyProfile[\s\S]*identity: null/, '更换 token 时不得保留旧用户资料')
+
+const imService = read('apps/miniapp/src/services/e-im.ts')
+requireMatch(imService, /function\s+withTimeout\s*</, 'Tencent IM 必须提供统一的 Promise 超时边界')
+requireMatch(
+  imService,
+  /if\s*\(loginTask\)[\s\S]*loginTask\.generation\s*===\s*generation[\s\S]*loginTask\.userId\s*===\s*credentials\.userId[\s\S]*return loginTask\.promise/,
+  'Tencent IM 登录必须只复用同账号、同会话代次的进行中任务'
+)
+requireMatch(
+  imService,
+  /loginTask\s*=\s*\{\s*userId:\s*credentials\.userId,\s*generation,\s*promise\s*\}/,
+  'Tencent IM 登录任务必须记录账号与会话代次'
+)
+requireMatch(imService, /await resetTask[\s\S]*const generation = sessionGeneration/, 'Tencent IM 新登录必须等待旧连接释放')
+requireMatch(
+  imService,
+  /nextReqMessageID[\s\S]*TENCENT_IM_HISTORY_PAGE_LIMIT/,
+  'Tencent IM 历史消息必须支持有上限的分页读取'
+)
+for (const call of ['getConversationProfile', 'getMessageList', 'setMessageRead']) {
+  const callIndex = imService.indexOf(call)
+  const wrapperIndex = imService.lastIndexOf('withTimeout(', callIndex)
+  if (callIndex < 0 || wrapperIndex < 0 || callIndex - wrapperIndex > 180) {
+    throw new Error(`${call} 必须受超时保护`)
+  }
+}
+
+const postDetail = read('apps/miniapp/src/pages/post-detail/index.tsx')
+const myContent = read('apps/miniapp/src/pages/my-content/index.tsx')
+const myContentStyle = read('apps/miniapp/src/pages/my-content/index.scss')
+const postDetailStyle = read('apps/miniapp/src/pages/post-detail/index.scss')
+const devConfig = read('apps/miniapp/config/dev.ts')
+const prodConfig = read('apps/miniapp/config/prod.ts')
+const apiService = read('apps/miniapp/src/services/api.ts')
+for (const fakeText of ['奶茶脑袋', '三食堂新出的芋泥波波', '预览模式', '本地预览内容', 'DEMO_POST', 'DEMO_COMMENTS']) {
+  forbidMatch(postDetail, new RegExp(fakeText), `帖子详情不得包含旧假数据：${fakeText}`)
+}
+requireMatch(postDetail, /getMyCommunityPost\(postId\)/, '待审核帖子必须从本人真实帖子接口读取')
+for (const [source, label] of [
+  [devConfig, '开发配置'],
+  [prodConfig, '生产配置'],
+  [apiService, 'API 默认配置']
+]) {
+  requireMatch(source, /https:\/\/zhanduiwang\.top\/api\/v1/, `${label}必须默认使用真机可访问的 HTTPS 接口`)
+  forbidMatch(source, /127\.0\.0\.1:8080/, `${label}不得默认指向真机自身的 localhost`)
+}
+requireMatch(postDetail, /帖子读取失败[\s\S]*重新读取/, '帖子接口失败时必须显示可重试错误态')
+
+for (const className of [
+  'my-content-row',
+  'my-content-row__main',
+  'my-content-row__title',
+  'my-content-row__meta',
+  'my-content-row__status'
+]) {
+  requireMatch(myContent, new RegExp(`className=['"\`][^'"\`]*${className}`), `我的内容 JSX 必须使用 ${className}`)
+  requireMatch(myContentStyle, new RegExp(`\\.${className}(?:[\\s,{.:]|$)`), `我的内容样式必须覆盖 ${className}`)
+}
+requireMatch(myContent, /my-content-thumb--empty/, '无图片内容必须使用紧凑无图样式')
+requireMatch(myContent, /label\s*=\s*'无图'/, '无图片内容必须显示真实无图文案')
+requireMatch(postDetail, /heroAvailable[\s\S]*onError=\{\(\) => setHeroAvailable\(false\)\}/, '帖子首图加载失败后必须收起媒体区')
+requireMatch(postDetail, /Taro\.getImageInfo\(\{\s*src:\s*heroImage\s*\}\)/, '帖子首图展示前必须先校验媒体资源可用')
+requireMatch(postDetail, /showHero\s*\?[\s\S]*post-detail-hero/, '帖子详情必须只在首图有效时渲染媒体区')
+forbidMatch(postDetailStyle, /post-detail-hero[\s\S]{0,240}background:\s*\$like-active/, '帖子媒体区不得恢复粉色占位背景')
+requireMatch(postDetail, /post-detail-follow-hitbox/, '帖子关注按钮必须使用独立点击热区')
+requireMatch(postDetail, /post-detail-comments__empty[\s\S]*还没有评论[\s\S]*成为第一个评论的人/, '无评论状态必须使用紧凑语义空态')
+requireMatch(postDetailStyle, /\.post-detail-follow-hitbox[\s\S]*width:\s*116rpx[\s\S]*height:\s*88rpx/, '帖子关注点击热区必须保持 58×44 逻辑像素')
+requireMatch(postDetailStyle, /\.post-detail-follow\s*\{[\s\S]*width:\s*116rpx[\s\S]*height:\s*64rpx/, '帖子关注按钮视觉尺寸必须收敛为 58×32 逻辑像素')
+requireMatch(postDetailStyle, /\.post-detail-comments__empty[\s\S]*min-height:\s*148rpx/, '无评论空态必须使用受控高度')
+forbidMatch(postDetailStyle, /\.post-detail-follow\s*\{[\s\S]{0,160}width:\s*72px[\s\S]{0,160}height:\s*44px/, '帖子关注按钮不得恢复为会被 Taro 二次缩小的 px 写法')
+requireMatch(postDetailStyle, /\.post-detail-action\s*\{[\s\S]*flex-direction:\s*column/, '帖子底部统计动作必须纵向排列')
+
+const communityService = read('apps/miniapp/src/services/b-community.ts')
+requireMatch(communityService, /\/community\/me\/posts\/\$\{encodeURIComponent\(postId\)\}/, '前端必须接入本人帖子详情接口')
+
+const communityHandler = read('backend/internal/module/community/handler.go')
+requireMatch(communityHandler, /auth\.GET\("\/me\/posts\/:id", h\.myPost\)/, '后端必须提供受认证保护的本人帖子详情接口')
+
+console.log('miniapp regression contract: PASS')

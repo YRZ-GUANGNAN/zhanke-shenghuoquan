@@ -2,14 +2,14 @@
 
 .my-content-page {
   min-height: 100vh;
+  padding-bottom: env(safe-area-inset-bottom);
   background: $bg-app;
   color: $text-strong;
-  padding-bottom: env(safe-area-inset-bottom);
 }
 
 .my-content-header__back {
-  width: 44px;
-  height: 44px;
+  width: 88rpx;
+  height: 88rpx;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -19,7 +19,7 @@
 }
 
 .my-content-tabs {
-  height: 86rpx;
+  height: 88rpx;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   align-items: center;
@@ -29,13 +29,14 @@
 
 .my-content-tab {
   position: relative;
-  height: 86rpx;
+  height: 88rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   color: $text-muted;
   font-size: 28rpx;
   font-weight: 500;
+  transition: color 160ms ease;
 }
 
 .my-content-tab--active {
@@ -48,207 +49,224 @@
   position: absolute;
   left: 50%;
   bottom: 0;
-  width: 42rpx;
-  height: 8rpx;
+  width: 44rpx;
+  height: 7rpx;
   border-radius: 999rpx;
   background: $brand-primary;
   transform: translateX(-50%);
 }
 
 .my-content-body {
-  padding: 22rpx 32rpx 80rpx;
+  padding: 18rpx 24rpx 64rpx;
 }
 
-.my-content-card {
-  background: $bg-surface;
-  border-radius: 28rpx;
-  box-shadow: $shadow-card;
-  overflow: hidden;
+.my-content-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
 }
 
-.my-content-card--favorites,
-.my-content-card--comments {
-  padding-top: 4rpx;
-}
-
-.my-content-favorite,
-.my-content-post,
-.my-content-market {
+.my-content-row {
+  min-height: 144rpx;
   display: flex;
   align-items: center;
-  min-height: 132rpx;
-  padding: 24rpx 26rpx;
+  gap: 16rpx;
+  padding: 18rpx;
   box-sizing: border-box;
-  border-bottom: 1rpx solid $divider-hairline;
+  border: 1rpx solid rgba(26, 55, 82, 0.04);
+  border-radius: 24rpx;
+  background: $bg-surface;
+  box-shadow: $shadow-card;
+  transition: transform 120ms ease, background-color 120ms ease;
 }
 
-.my-content-favorite__main,
-.my-content-post__main,
-.my-content-market__main {
-  min-width: 0;
-  flex: 1;
-  padding-left: 22rpx;
-}
-
-.my-content-favorite__title,
-.my-content-post__title,
-.my-content-market__title {
-  display: block;
-  color: $text-strong;
-  font-size: 28rpx;
-  font-weight: 600;
-  line-height: 40rpx;
-}
-
-.my-content-favorite__meta,
-.my-content-post__meta {
-  display: block;
-  margin-top: 8rpx;
-  color: $text-muted;
-  font-size: 24rpx;
-  line-height: 32rpx;
+.my-content-row:active,
+.my-content-comment:active,
+.my-content-state--retry:active {
+  background: $bg-screen;
+  transform: scale(0.992);
 }
 
 .my-content-thumb {
-  width: 92rpx;
-  height: 92rpx;
+  width: 104rpx;
+  height: 104rpx;
   flex: none;
   border-radius: 18rpx;
+  overflow: hidden;
+  background: $bg-screen;
+}
+
+.my-content-thumb--empty {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: $placeholder-label;
-  font-size: 22rpx;
-  background-image: $placeholder-stripe;
-  background-color: $brand-tint;
-  overflow: hidden;
-}
-
-.my-content-thumb--peach {
   background-color: $bg-screen;
+  background-image: $placeholder-stripe;
+  color: $text-faint;
+  font-size: 22rpx;
+  font-weight: 500;
 }
 
-.my-content-thumb--mint {
-  background-color: $brand-tint;
+.my-content-row__main {
+  min-width: 0;
+  flex: 1;
 }
 
-.my-content-thumb--lavender {
-  background-color: $divider-nav;
+.my-content-row__title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: $text-strong;
+  font-size: 28rpx;
+  font-weight: 650;
+  line-height: 40rpx;
+  word-break: break-word;
 }
 
-.my-content-thumb--rose {
-  background-color: $bg-app;
+.my-content-row__meta {
+  display: block;
+  margin-top: 10rpx;
+  overflow: hidden;
+  color: $text-muted;
+  font-size: 23rpx;
+  line-height: 32rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.my-content-thumb--blue {
-  background-color: $brand-tint;
+.my-content-row__price {
+  display: block;
+  margin-top: 8rpx;
+  color: $like-active;
+  font-size: 30rpx;
+  font-weight: 800;
+  line-height: 38rpx;
 }
 
-.my-content-like {
-  min-width: 78rpx;
+.my-content-row__tail {
+  min-width: 80rpx;
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 8rpx;
-  color: $like-idle-count;
-  font-size: 24rpx;
 }
 
-.my-content-like__heart {
-  color: $like-active;
-  font-size: 24rpx;
-}
-
-.my-content-chevron {
-  margin-left: 18rpx;
-  color: $text-faint;
-  font-size: 42rpx;
-  line-height: 1;
-}
-
-.my-content-footer {
-  display: block;
-  padding: 26rpx 0 30rpx;
-  text-align: center;
-  color: $text-muted;
-  font-size: 24rpx;
-}
-
-.my-content-comment {
-  padding: 24rpx 26rpx;
-  border-bottom: 1rpx solid $divider-hairline;
-}
-
-.my-content-comment__content {
-  display: block;
-  color: $text-strong;
-  font-size: 27rpx;
-  font-weight: 500;
-  line-height: 40rpx;
-}
-
-.my-content-comment__source {
-  margin-top: 14rpx;
-  min-height: 44rpx;
-  border-radius: 12rpx;
-  background: $bg-screen;
-  display: flex;
-  align-items: center;
-  padding: 0 18rpx;
-  box-sizing: border-box;
-  color: $text-muted;
-  font-size: 22rpx;
-}
-
-.my-content-comment__icon {
-  margin-right: 10rpx;
-  color: $text-muted;
-}
-
-.my-content-comment__text {
-  flex: 1;
-  min-width: 0;
+.my-content-row__status {
+  max-width: 104rpx;
+  padding: 6rpx 12rpx;
   overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.my-content-comment__time {
-  flex: none;
-  margin-left: 16rpx;
-}
-
-.my-content-market {
-  position: relative;
-}
-
-.my-content-market__price {
-  display: block;
-  margin-top: 8rpx;
-  color: $like-active;
-  font-size: 28rpx;
-  font-weight: 800;
-  line-height: 36rpx;
-}
-
-.my-content-market__price--sold {
-  color: $text-muted;
-}
-
-.my-content-market__status {
-  flex: none;
-  min-width: 76rpx;
-  height: 34rpx;
-  padding: 0 14rpx;
   border-radius: 999rpx;
   background: $brand-tint;
   color: $brand-primary;
-  font-size: 22rpx;
+  font-size: 20rpx;
+  font-weight: 600;
+  line-height: 30rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-content-row__status--muted {
+  background: $bg-screen;
+  color: $text-muted;
+}
+
+.my-content-row__chevron {
+  color: $text-faint;
+  font-size: 36rpx;
+  line-height: 1;
+}
+
+.my-content-comment {
+  padding: 24rpx;
+  box-sizing: border-box;
+  border: 1rpx solid rgba(26, 55, 82, 0.04);
+  border-radius: 24rpx;
+  background: $bg-surface;
+  box-shadow: $shadow-card;
+  transition: transform 120ms ease, background-color 120ms ease;
+}
+
+.my-content-comment__content {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  color: $text-strong;
+  font-size: 29rpx;
+  font-weight: 600;
+  line-height: 43rpx;
+  word-break: break-word;
+}
+
+.my-content-comment__source {
+  margin-top: 18rpx;
+  padding: 14rpx 16rpx;
+  border-radius: 14rpx;
+  background: $bg-screen;
+}
+
+.my-content-comment__source-title {
+  display: block;
+  overflow: hidden;
+  color: $text-muted;
+  font-size: 24rpx;
   line-height: 34rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-content-comment__meta {
+  display: block;
+  margin-top: 4rpx;
+  color: $text-faint;
+  font-size: 21rpx;
+  line-height: 30rpx;
+}
+
+.my-content-state {
+  min-height: 260rpx;
+  padding: 52rpx 36rpx;
+  box-sizing: border-box;
+  border-radius: 24rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: $bg-surface;
+  box-shadow: $shadow-card;
   text-align: center;
 }
 
-.my-content-market__status--sold {
-  background: $bg-screen;
+.my-content-state__title {
+  color: $text-strong;
+  font-size: 30rpx;
+  font-weight: 700;
+  line-height: 42rpx;
+}
+
+.my-content-state__desc {
+  display: block;
+  max-width: 560rpx;
+  margin-top: 10rpx;
   color: $text-muted;
+  font-size: 24rpx;
+  line-height: 36rpx;
+  word-break: break-word;
+}
+
+.my-content-state__action {
+  margin-top: 24rpx;
+  padding: 12rpx 24rpx;
+  border-radius: 999rpx;
+  background: $brand-tint;
+  color: $brand-primary;
+  font-size: 24rpx;
+  font-weight: 650;
+  line-height: 32rpx;
+}
+
+.my-content-state--retry {
+  transition: transform 120ms ease, background-color 120ms ease;
 }

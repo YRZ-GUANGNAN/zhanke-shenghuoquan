@@ -27,10 +27,16 @@ function reviewLabel(value?: string): string {
   return '审核中'
 }
 
-function PostThumb({ value }: { value: CommunityPost }) {
-  return value.images[0]
-    ? <Image className='my-content-thumb' src={value.images[0]} mode='aspectFill' />
-    : <View className='my-content-thumb my-content-thumb--blue'><Text>暂无图片</Text></View>
+function productStatusLabel(value: Product): string {
+  if (value.status === 'sold') return '已售'
+  if (value.status === 'reserved') return '已预订'
+  return reviewLabel(value.reviewStatus)
+}
+
+function ContentThumb({ src, label = '无图' }: { src?: string; label?: string }) {
+  return src
+    ? <Image className='my-content-thumb' src={src} mode='aspectFill' />
+    : <View className='my-content-thumb my-content-thumb--empty'><Text>{label}</Text></View>
 }
 
 export default function MyContentPage() {
@@ -66,54 +72,97 @@ export default function MyContentPage() {
   const openProduct = (productId: string) => void Taro.navigateTo({ url: `/pages/secondhand-detail/index?id=${encodeURIComponent(productId)}` })
 
   const state = () => {
-    if (loading) return <View className='my-content-card my-content-end'>正在加载…</View>
-    if (error) return <View className='my-content-card my-content-end' onClick={() => void load()}>加载失败：{error}，点击重试</View>
+    if (loading) {
+      return (
+        <View className='my-content-state'>
+          <Text className='my-content-state__title'>正在加载</Text>
+          <Text className='my-content-state__desc'>正在读取你的内容…</Text>
+        </View>
+      )
+    }
+    if (error) {
+      return (
+        <View className='my-content-state my-content-state--retry' onClick={() => void load()}>
+          <Text className='my-content-state__title'>内容加载失败</Text>
+          <Text className='my-content-state__desc'>{error}</Text>
+          <Text className='my-content-state__action'>点击重试</Text>
+        </View>
+      )
+    }
     return null
   }
 
   const renderPosts = (values: CommunityPost[], favorite = false) => (
-    <View className='my-content-card my-content-card--list'>
+    <View className='my-content-list'>
       {values.map((item) => (
-        <View key={item.id} className={favorite ? 'favorite-row' : 'post-row'} onClick={() => openPost(item.id)}>
-          <PostThumb value={item} />
-          <View className={favorite ? 'favorite-row__main' : 'post-row__main'}>
-            <Text className={favorite ? 'favorite-row__title' : 'post-row__title'}>{item.title || item.content}</Text>
-            <Text className={favorite ? 'favorite-row__meta' : 'post-row__meta'}>
-              {favorite ? `${item.author} · ${item.createdAt}` : `${reviewLabel(item.reviewStatus)} · ${item.likedCount} 赞 · ${item.commentCount} 评论`}
+        <View key={item.id} className='my-content-row' onClick={() => openPost(item.id)}>
+          <ContentThumb src={item.images[0]} />
+          <View className='my-content-row__main'>
+            <Text className='my-content-row__title'>{item.title || item.content}</Text>
+            <Text className='my-content-row__meta'>
+              {favorite
+                ? `${item.author || '校园用户'} · ${item.createdAt}`
+                : `${item.likedCount} 赞 · ${item.commentCount} 评论`}
             </Text>
           </View>
-          {favorite ? <Text className='favorite-row__like'>♥ {item.likedCount}</Text> : <Text className='post-row__arrow'>›</Text>}
+          <View className='my-content-row__tail'>
+            <Text className='my-content-row__status'>{favorite ? `赞 ${item.likedCount}` : reviewLabel(item.reviewStatus)}</Text>
+            <Text className='my-content-row__chevron'>›</Text>
+          </View>
         </View>
       ))}
-      {values.length === 0 && <View className='my-content-end'>暂无内容</View>}
+      {values.length === 0 && (
+        <View className='my-content-state'>
+          <Text className='my-content-state__title'>{favorite ? '还没有收藏' : '还没有发布帖子'}</Text>
+          <Text className='my-content-state__desc'>{favorite ? '收藏的帖子会集中显示在这里' : '发布后的真实帖子会显示在这里'}</Text>
+        </View>
+      )}
     </View>
   )
 
   const renderComments = () => (
-    <View className='my-content-card my-content-card--comments'>
+    <View className='my-content-list'>
       {comments.map((item) => (
-        <View key={item.id} className='comment-row' onClick={() => openPost(item.postId, 'comments')}>
-          <Text className='comment-row__content'>{item.content}</Text>
-          <View className='comment-row__source'>
-            <Text className='comment-row__source-text'>评论了《{item.postTitle}》</Text>
-            <Text className='comment-row__time'>{item.createdAt} · {reviewLabel(item.reviewStatus)}</Text>
+        <View key={item.id} className='my-content-comment' onClick={() => openPost(item.postId, 'comments')}>
+          <Text className='my-content-comment__content'>{item.content}</Text>
+          <View className='my-content-comment__source'>
+            <Text className='my-content-comment__source-title'>评论了《{item.postTitle}》</Text>
+            <Text className='my-content-comment__meta'>{item.createdAt} · {reviewLabel(item.reviewStatus)}</Text>
           </View>
         </View>
       ))}
-      {comments.length === 0 && <View className='my-content-end'>暂无评论</View>}
+      {comments.length === 0 && (
+        <View className='my-content-state'>
+          <Text className='my-content-state__title'>还没有评论</Text>
+          <Text className='my-content-state__desc'>你发表的评论会集中显示在这里</Text>
+        </View>
+      )}
     </View>
   )
 
   const renderItems = () => (
-    <View className='my-content-card my-content-card--list'>
+    <View className='my-content-list'>
       {items.map((item) => (
-        <View key={item.id} className='item-row' onClick={() => openProduct(item.id)}>
-          {item.images[0] ? <Image className='my-content-thumb' src={item.images[0]} mode='aspectFill' /> : <View className='my-content-thumb my-content-thumb--blue'><Text>暂无图片</Text></View>}
-          <View className='item-row__main'><Text className='item-row__title'>{item.title}</Text><Text className='item-row__price'>¥{item.price}</Text></View>
-          <Text className={`item-row__status ${item.status === 'sold' ? 'item-row__status--sold' : ''}`}>{item.status === 'sold' ? '已售' : reviewLabel(item.reviewStatus)}</Text>
+        <View key={item.id} className='my-content-row my-content-row--product' onClick={() => openProduct(item.id)}>
+          <ContentThumb src={item.images[0]} />
+          <View className='my-content-row__main'>
+            <Text className='my-content-row__title'>{item.title}</Text>
+            <Text className='my-content-row__price'>¥{item.price}</Text>
+          </View>
+          <View className='my-content-row__tail'>
+            <Text className={`my-content-row__status${item.status === 'sold' ? ' my-content-row__status--muted' : ''}`}>
+              {productStatusLabel(item)}
+            </Text>
+            <Text className='my-content-row__chevron'>›</Text>
+          </View>
         </View>
       ))}
-      {items.length === 0 && <View className='my-content-end'>暂无二手商品</View>}
+      {items.length === 0 && (
+        <View className='my-content-state'>
+          <Text className='my-content-state__title'>还没有二手宝贝</Text>
+          <Text className='my-content-state__desc'>你发布的商品会集中显示在这里</Text>
+        </View>
+      )}
     </View>
   )
 
