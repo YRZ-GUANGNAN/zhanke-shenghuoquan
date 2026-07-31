@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Button, Image, Input, ScrollView, Text, View } from '@tarojs/components'
 import AppIcon from '../../components/app-icon'
+import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import { isApiError } from '../../services/api'
 import {
   deliveryConversationCanSend,
@@ -189,12 +190,15 @@ export default function DeliveryConversationPage() {
 
   return (
     <View className='delivery-chat-page'>
-      <View className='delivery-chat-order'>
-        <View>
-          <Text className='delivery-chat-order__title'>配送单沟通</Text>
-          <Text className='delivery-chat-order__id'>{orderId ? `单号 ${orderId}` : '缺少配送单号'}</Text>
+      <View className='delivery-chat-header'>
+        <CapsuleSystemRow />
+        <View className='delivery-chat-order'>
+          <View className='delivery-chat-order__main'>
+            <Text className='delivery-chat-order__title'>配送单沟通</Text>
+            <Text className='delivery-chat-order__id'>{orderId ? `单号 ${orderId}` : '缺少配送单号'}</Text>
+          </View>
+          <Button className='cc-button cc-button--small delivery-chat-order__back' onClick={goBack}>返回订单</Button>
         </View>
-        <Button className='cc-button cc-button--small' onClick={goBack}>返回订单</Button>
       </View>
 
       <View className='delivery-chat-safe'>仅限本配送单的商家与骑手沟通；图片会先经过内容安全审核。</View>

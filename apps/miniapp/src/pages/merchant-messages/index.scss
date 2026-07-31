@@ -65,7 +65,8 @@ page {
   padding: 8rpx 24rpx 0;
   border-radius: 26rpx;
   background: $bg-surface;
-  box-shadow: $message-card-shadow;
+  border: 1rpx solid $border-subtle;
+  box-shadow: 0 8rpx 24rpx rgba(42, 73, 108, .055);
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -92,11 +93,11 @@ page {
   color: $text-on-color;
   font-size: 28rpx;
   font-weight: 800;
-  box-shadow: $message-avatar-shadow;
+  box-shadow: none;
 }
 
 .merchant-message-item__avatar--rider {
-  background: $gradient-primary;
+  background: $brand-primary;
 }
 
 .merchant-message-item__avatar--order {

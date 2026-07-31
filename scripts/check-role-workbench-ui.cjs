@@ -9,6 +9,7 @@ const merchant = read('apps', 'miniapp', 'src', 'pages', 'merchant-home', 'index
 const merchantStyle = read('apps', 'miniapp', 'src', 'pages', 'merchant-home', 'index.scss')
 const rider = read('apps', 'miniapp', 'src', 'pages', 'delivery-rider', 'index.tsx')
 const riderStyle = read('apps', 'miniapp', 'src', 'pages', 'delivery-rider', 'index.scss')
+const riderWallet = read('apps', 'miniapp', 'src', 'pages', 'rider-wallet', 'index.tsx')
 
 for (const fragment of [
   'CapsuleSystemRow',
@@ -45,5 +46,7 @@ assert.match(merchantStyle, /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*
 assert.match(riderStyle, /grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/, 'rider tabs must keep three balanced columns')
 assert.doesNotMatch(merchantStyle, /merchant-home-hero__orb/, 'merchant workbench must not use decorative hero orbs')
 assert.doesNotMatch(riderStyle, /rider-grab-hero__orb/, 'rider workbench must not use decorative hero orbs')
+assert.match(riderWallet, /骑手结算功能尚未开放/, 'rider wallet must expose an honest unavailable state until a real API exists')
+assert.doesNotMatch(riderWallet, /ledgerItems|128\.50|静态示意/, 'rider wallet must not present fabricated balances or ledger records')
 
 console.log('role workbench ui contract: ok')

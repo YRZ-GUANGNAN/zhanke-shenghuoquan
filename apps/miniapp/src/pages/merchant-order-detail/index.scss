@@ -60,9 +60,10 @@ page {
 .merchant-detail-rider-card,
 .merchant-detail-progress-card,
 .merchant-detail-photo-card {
+  border: 1rpx solid $border-subtle;
   border-radius: 24rpx;
   background: $bg-surface;
-  box-shadow: $shadow-card;
+  box-shadow: 0 8rpx 24rpx rgba(42, 73, 108, .055);
   box-sizing: border-box;
 }
 
@@ -120,6 +121,7 @@ page {
   font-size: 40rpx;
   font-weight: 900;
   line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 .merchant-detail-status-card__pay {
