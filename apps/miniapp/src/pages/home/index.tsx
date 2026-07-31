@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDidShow } from '@tarojs/taro'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
+import AppIcon from '../../components/app-icon'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import StudentBottomNav from '../../components/student-bottom-nav'
 import { useIdentityGuard } from '../../hooks/use-identity-guard'
@@ -402,7 +403,7 @@ function HomeContent() {
             </View>
             <Text className='student-post-card__author'>{card.author}</Text>
             <View className='student-post-card__like'>
-              <Text className='student-post-card__heart'>♡</Text>
+              <AppIcon name='heart' className='student-post-card__heart' />
               <Text>{card.likes}</Text>
             </View>
           </View>

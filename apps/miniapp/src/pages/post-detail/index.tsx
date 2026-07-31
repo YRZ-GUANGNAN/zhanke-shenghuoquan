@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Image, Input, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
-import { AppIconButton } from '../../components/ui'
+import AppIcon from '../../components/app-icon'
+import { AppIconButton, AppState } from '../../components/ui'
 import Taro from '../../services/taro'
 import type { CommunityComment, CommunityPost } from '../../types'
 import { isApiError } from '../../services/api'
@@ -257,16 +258,15 @@ export default function PostDetailPage() {
       />
 
       {loading ? (
-        <View className="post-detail-state">
-          <Text className="post-detail-state__title">正在读取帖子</Text>
-          <Text className="post-detail-state__desc">请稍候…</Text>
-        </View>
+        <AppState kind='loading' title='正在读取帖子' description='请稍候…' />
       ) : error || !post ? (
-        <View className="post-detail-state post-detail-state--retry">
-          <Text className="post-detail-state__title">帖子读取失败</Text>
-          <Text className="post-detail-state__desc">{error || '没有读取到帖子内容'}</Text>
-          <Text className="post-detail-state__button" onClick={() => setReloadKey((value) => value + 1)}>重新读取</Text>
-        </View>
+        <AppState
+          kind='error'
+          title='帖子读取失败'
+          description={error || '没有读取到帖子内容'}
+          actionText='重新读取'
+          onAction={() => setReloadKey((value) => value + 1)}
+        />
       ) : (
         <>
           <View className="post-detail-scroll">
@@ -314,7 +314,6 @@ export default function PostDetailPage() {
                       <Text className="post-detail-comment__content">{comment.content}</Text>
                       <Text className="post-detail-comment__meta">{comment.createdAt}　回复</Text>
                     </View>
-                    <Text className="post-detail-comment__like">♡</Text>
                   </View>
                 ))}
                 {commentError ? (
@@ -343,18 +342,18 @@ export default function PostDetailPage() {
                 confirmType="send"
                 onConfirm={handleSubmitComment}
               />
-              <Text className={`post-detail-action${liked ? ' post-detail-action--active' : ''}`} onClick={handleLike}>
-                <Text className="post-detail-action__icon">♡</Text>
-                {post.likedCount}
-              </Text>
-              <Text className={`post-detail-action${favorited ? ' post-detail-action--active' : ''}`} onClick={handleFavorite}>
-                <Text className="post-detail-action__icon">☆</Text>
-                {post.favoriteCount}
-              </Text>
-              <Text className="post-detail-action" onClick={handleSubmitComment}>
-                <Text className="post-detail-action__icon">▱</Text>
-                {post.commentCount || comments.length}
-              </Text>
+              <View className={`post-detail-action${liked ? ' post-detail-action--active' : ''}`} onClick={handleLike}>
+                <AppIcon name='heart' active={liked} className='post-detail-action__icon' />
+                <Text>{post.likedCount}</Text>
+              </View>
+              <View className={`post-detail-action${favorited ? ' post-detail-action--active post-detail-action--favorite' : ''}`} onClick={handleFavorite}>
+                <AppIcon name='star' active={favorited} className='post-detail-action__icon' />
+                <Text>{post.favoriteCount}</Text>
+              </View>
+              <View className="post-detail-action" onClick={handleSubmitComment}>
+                <AppIcon name='comment' className='post-detail-action__icon' />
+                <Text>{post.commentCount || comments.length}</Text>
+              </View>
             </View>
           ) : null}
         </>

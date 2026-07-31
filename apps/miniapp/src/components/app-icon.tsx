@@ -22,7 +22,10 @@ import actionSearch from '../assets/icons/action-search.svg'
 import actionChevronRight from '../assets/icons/action-chevron-right.svg'
 import actionMore from '../assets/icons/action-more.svg'
 import actionRefresh from '../assets/icons/action-refresh.svg'
+import actionHeart from '../assets/icons/action-heart.svg'
+import actionHeartActive from '../assets/icons/action-heart-active.svg'
 import actionStar from '../assets/icons/action-star.svg'
+import actionStarActive from '../assets/icons/action-star-active.svg'
 import actionComment from '../assets/icons/action-comment.svg'
 import actionWallet from '../assets/icons/action-wallet.svg'
 import actionOrder from '../assets/icons/action-order.svg'
@@ -44,6 +47,7 @@ export type AppIconName =
   | 'chevron-right'
   | 'more'
   | 'refresh'
+  | 'heart'
   | 'star'
   | 'comment'
   | 'wallet'
@@ -65,7 +69,8 @@ const sources: Record<AppIconName, { normal: string; active: string }> = {
   'chevron-right': { normal: actionChevronRight, active: actionChevronRight },
   more: { normal: actionMore, active: actionMore },
   refresh: { normal: actionRefresh, active: actionRefresh },
-  star: { normal: actionStar, active: actionStar },
+  heart: { normal: actionHeart, active: actionHeartActive },
+  star: { normal: actionStar, active: actionStarActive },
   comment: { normal: actionComment, active: actionComment },
   wallet: { normal: actionWallet, active: actionWallet },
   order: { normal: actionOrder, active: actionOrder }

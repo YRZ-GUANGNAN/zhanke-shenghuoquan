@@ -307,12 +307,11 @@ export default function SecondhandDetailPage() {
                 className={`secondhand-detail-favorite ${favorited ? 'secondhand-detail-favorite--active' : ''} ${favoritePending ? 'secondhand-detail-favorite--pending' : ''}`}
                 onClick={() => void handleFavorite()}
               >
-                <Text
+                <AppIcon
+                  name='star'
+                  active={Boolean(favorited)}
                   className='secondhand-detail-favorite__star'
-                  aria-label={favorited ? '取消收藏' : '收藏'}
-                >
-                  {favorited ? '★' : '☆'}
-                </Text>
+                />
                 <Text>{favoritePending ? '处理中' : favorited ? '已收藏' : '收藏'}</Text>
               </View>
               <View

@@ -1,5 +1,6 @@
 import { Text, View } from '@tarojs/components'
 import type { IdentityRoleKey } from '../types'
+import AppIcon from './app-icon'
 import { AppDialog } from './ui'
 import './IdentitySwitchModal.scss'
 
@@ -57,7 +58,9 @@ export default function IdentitySwitchModal({
         <View className='identity-switch-modal__role identity-switch-modal__role--muted'>
           <Text>{roleNames[currentRole]}</Text>
         </View>
-        <Text className='identity-switch-modal__arrow'>→</Text>
+        <View className='identity-switch-modal__arrow'>
+          <AppIcon name='chevron-right' />
+        </View>
         <View className='identity-switch-modal__role identity-switch-modal__role--active'>
           <Text>{roleNames[targetRole]}</Text>
         </View>

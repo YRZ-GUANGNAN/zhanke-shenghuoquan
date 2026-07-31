@@ -52,9 +52,9 @@
 }
 
 .post-detail-author__avatar {
-  width: 64rpx;
-  height: 64rpx;
-  margin-right: 18rpx;
+  width: 56rpx;
+  height: 56rpx;
+  margin-right: 14rpx;
   flex: none;
   display: flex;
   align-items: center;
@@ -63,7 +63,7 @@
   border-radius: 50%;
   background: rgba($brand-primary, 0.72);
   color: $text-on-color;
-  font-size: 28rpx;
+  font-size: 24rpx;
   font-weight: 700;
 }
 
@@ -88,20 +88,20 @@
 
 .post-detail-author__name {
   color: $text-strong;
-  font-size: 28rpx;
-  font-weight: 800;
-  line-height: 1.1;
+  font-size: 26rpx;
+  font-weight: 700;
+  line-height: 32rpx;
 }
 
 .post-detail-author__meta {
-  margin-top: 4rpx;
+  margin-top: 2rpx;
   color: $text-tertiary;
-  font-size: 22rpx;
-  line-height: 1.2;
+  font-size: 20rpx;
+  line-height: 26rpx;
 }
 
 .post-detail-follow-hitbox {
-  width: 116rpx;
+  width: 104rpx;
   height: 88rpx;
   display: flex;
   align-items: center;
@@ -109,8 +109,10 @@
 }
 
 .post-detail-follow {
-  width: 116rpx;
-  height: 64rpx;
+  min-width: 96rpx;
+  height: 56rpx;
+  padding: 0 18rpx;
+  box-sizing: border-box;
   flex: none;
   display: flex;
   align-items: center;
@@ -119,7 +121,7 @@
   background: $brand-primary;
   color: $text-on-color;
   box-shadow: 0 12rpx 32rpx rgba($brand-primary, 0.16);
-  font-size: 26rpx;
+  font-size: 24rpx;
   font-weight: 700;
   transition: transform 120ms ease, background-color 120ms ease;
 }
@@ -143,51 +145,8 @@
   -webkit-overflow-scrolling: touch;
 }
 
-.post-detail-state {
-  min-height: 70vh;
-  padding: 96rpx 56rpx;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: $text-secondary;
-  text-align: center;
-}
-
-.post-detail-state--retry {
-  color: $brand-primary;
-}
-
-.post-detail-state__title {
-  color: $text-strong;
-  font-size: 34rpx;
-  font-weight: 800;
-  line-height: 46rpx;
-}
-
-.post-detail-state__desc {
-  display: block;
-  max-width: 580rpx;
-  margin-top: 18rpx;
-  color: $text-tertiary;
-  font-size: 25rpx;
-  line-height: 40rpx;
-}
-
-.post-detail-state__button {
-  min-width: 240rpx;
-  height: 80rpx;
-  margin-top: 38rpx;
-  padding: 0 32rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999rpx;
-  background: $brand-primary;
-  color: $text-on-color;
-  font-size: 27rpx;
-  font-weight: 750;
+.post-detail-page > .app-state {
+  min-height: calc(100vh - var(--capsule-total-header-height));
 }
 
 .post-detail-review {
@@ -248,9 +207,9 @@
 .post-detail-content__title {
   display: block;
   color: $text-strong;
-  font-size: 36rpx;
+  font-size: 34rpx;
   font-weight: 800;
-  line-height: 50rpx;
+  line-height: 48rpx;
   word-break: break-word;
 }
 
@@ -258,8 +217,8 @@
   display: block;
   margin-top: 16rpx;
   color: $text-primary;
-  font-size: 29rpx;
-  line-height: 46rpx;
+  font-size: 28rpx;
+  line-height: 44rpx;
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -302,7 +261,7 @@
   display: block;
   margin-bottom: 8rpx;
   color: $text-strong;
-  font-size: 30rpx;
+  font-size: 28rpx;
   font-weight: 800;
   line-height: 42rpx;
 }
@@ -315,9 +274,9 @@
 }
 
 .post-detail-comment__avatar {
-  width: 76rpx;
-  height: 76rpx;
-  margin-right: 20rpx;
+  width: 64rpx;
+  height: 64rpx;
+  margin-right: 16rpx;
   flex: none;
   display: flex;
   align-items: center;
@@ -353,7 +312,7 @@
 .post-detail-comment__main {
   min-width: 0;
   flex: 1;
-  padding-right: 68rpx;
+  padding-right: 0;
 }
 
 .post-detail-comment__author {
@@ -381,15 +340,6 @@
   line-height: 30rpx;
 }
 
-.post-detail-comment__like {
-  position: absolute;
-  top: 26rpx;
-  right: 0;
-  color: $like-idle-count;
-  font-size: 28rpx;
-  line-height: 1;
-}
-
 .post-detail-comments__bottom {
   display: block;
   padding: 32rpx 0 12rpx;
@@ -400,8 +350,8 @@
 }
 
 .post-detail-comments__empty {
-  min-height: 148rpx;
-  padding: 24rpx 20rpx;
+  min-height: 124rpx;
+  padding: 20rpx;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -499,12 +449,15 @@
 }
 
 .post-detail-action__icon {
-  color: $text-secondary;
-  font-size: 32rpx;
-  line-height: 1;
+  width: 32rpx;
+  height: 32rpx;
 }
 
 .post-detail-action--active,
 .post-detail-action--active .post-detail-action__icon {
   color: $like-active;
+}
+
+.post-detail-action--favorite {
+  color: $warning;
 }

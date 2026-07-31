@@ -279,9 +279,8 @@
 }
 
 .student-post-card__heart {
-  color: $heart-idle-stroke;
-  font-size: 30rpx;
-  line-height: 1;
+  width: 28rpx;
+  height: 28rpx;
 }
 
 .student-post-card__like--active,
