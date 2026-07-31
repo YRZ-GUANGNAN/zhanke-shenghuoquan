@@ -105,8 +105,9 @@
 
 .student-home-content {
   flex: 1 1 auto;
+  height: 0;
   min-height: 0;
-  overflow-y: auto;
+  box-sizing: border-box;
   background: $bg-app;
 }
 
@@ -303,11 +304,6 @@
 
 .student-discover-feedback--retry {
   color: $brand-primary;
-}
-
-.student-discover-sentinel {
-  height: 2rpx;
-  margin-bottom: 216rpx;
 }
 
 .student-message-panel {

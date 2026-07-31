@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import TaroRuntime, { useDidShow } from '@tarojs/taro'
-import { Image, Text, View } from '@tarojs/components'
+import { useDidShow } from '@tarojs/taro'
+import { Image, ScrollView, Text, View } from '@tarojs/components'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import StudentBottomNav from '../../components/student-bottom-nav'
 import CapsulePageHeader from '../../components/capsule-page-header'
@@ -13,6 +13,7 @@ import { listIMConversations } from '../../services/e-im'
 import { listNavigationItems } from '../../services/d-navigation'
 import { requestWithSingleSessionRecovery } from '../../services/session-recovery'
 import Taro from '../../services/taro'
+import { useSessionStore } from '../../stores/session'
 import './index.scss'
 
 type HomeTab = 'messages' | 'discover' | 'tools'
@@ -33,29 +34,6 @@ type DiscoverCard = {
 type SettledResult<T> =
   | { status: 'fulfilled'; value: T }
   | { status: 'rejected'; reason: unknown }
-
-type RuntimeIntersectionObserver = {
-  relativeTo(selector: string): RuntimeIntersectionObserver
-  observe(selector: string, callback: (entry: { intersectionRatio: number }) => void): void
-  disconnect(): void
-}
-
-type RuntimeSelectorQuery = {
-  in(component: object): RuntimeSelectorQuery
-  select(selector: string): {
-    boundingClientRect(callback: (rect: object | null) => void): RuntimeSelectorQuery
-  }
-  exec(): void
-}
-
-type ObserverRuntime = {
-  getCurrentInstance(): { page?: object }
-  createIntersectionObserver(page: object, options: { thresholds: number[] }): RuntimeIntersectionObserver
-  createSelectorQuery(): RuntimeSelectorQuery
-  nextTick(callback: () => void): void
-}
-
-const observerRuntime = TaroRuntime as unknown as ObserverRuntime
 
 const tabs: Array<{ key: HomeTab; label: string }> = [
   { key: 'messages', label: '私信' },
@@ -143,6 +121,16 @@ type ConversationItem = {
 type ConversationStatus = 'idle' | 'loading' | 'empty' | 'ready' | 'error'
 type ToolStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'error'
 
+function conversationPeerLabel(context: IMConversationContext, currentUserId: string): string {
+  if (String(context.sellerId) === currentUserId) {
+    return `你是卖家 · 对方买家 #${context.buyerId} · 会话 #${context.relationId}`
+  }
+  if (String(context.buyerId) === currentUserId) {
+    return `你是买家 · 对方卖家 #${context.sellerId} · 会话 #${context.relationId}`
+  }
+  return `交易会话 #${context.relationId}`
+}
+
 function HomeContent() {
   const [activeTab, setActiveTab] = useState<HomeTab>('discover')
   const [postCards, setPostCards] = useState<DiscoverCard[]>([])
@@ -161,6 +149,7 @@ function HomeContent() {
   const discoverRequestVersion = useRef(0)
   const conversationLoadingRef = useRef(false)
   const conversationRequestVersion = useRef(0)
+  const conversationOwnerRef = useRef('')
   const toolLoadingRef = useRef(false)
   const cards = useMemo(
     () => interleaveCards(postCards, productCards),
@@ -168,6 +157,8 @@ function HomeContent() {
   )
   const columns = useMemo(() => splitCards(cards), [cards])
   const identityAllowed = useIdentityGuard('student')
+  const currentUserId = useSessionStore((state) => state.profile.id)
+  const currentSessionKey = useSessionStore((state) => `${state.token}:${state.profile.id}`)
 
   const loadDiscover = useCallback(async (
     reset = false,
@@ -259,8 +250,12 @@ function HomeContent() {
     }
   }, [])
 
-  const loadConversations = useCallback(async () => {
-    if (!mountedRef.current || conversationLoadingRef.current) return
+  const loadConversations = useCallback(async (ownerKey: string) => {
+    if (
+      !mountedRef.current ||
+      conversationLoadingRef.current ||
+      conversationOwnerRef.current !== ownerKey
+    ) return
     conversationLoadingRef.current = true
     const version = conversationRequestVersion.current + 1
     conversationRequestVersion.current = version
@@ -274,18 +269,29 @@ function HomeContent() {
           return { context, product: null }
         }
       }))
-      if (!mountedRef.current || conversationRequestVersion.current !== version) return
+      if (
+        !mountedRef.current ||
+        conversationRequestVersion.current !== version ||
+        conversationOwnerRef.current !== ownerKey
+      ) return
       setConversationItems(items)
       setConversationStatus(items.length ? 'ready' : 'empty')
     } catch (error) {
-      if (!mountedRef.current || conversationRequestVersion.current !== version) return
+      if (
+        !mountedRef.current ||
+        conversationRequestVersion.current !== version ||
+        conversationOwnerRef.current !== ownerKey
+      ) return
       setConversationItems([])
       setConversationStatus('error')
       if (isApiError(error) && error.status === 401) {
         void Taro.showToast({ title: '登录恢复失败，请点击重试', icon: 'none' })
       }
     } finally {
-      if (conversationRequestVersion.current === version) conversationLoadingRef.current = false
+      if (
+        conversationRequestVersion.current === version &&
+        conversationOwnerRef.current === ownerKey
+      ) conversationLoadingRef.current = false
     }
   }, [])
 
@@ -324,48 +330,21 @@ function HomeContent() {
   }, [loadDiscover])
 
   useEffect(() => {
-    if (activeTab === 'messages' && conversationStatus === 'idle') void loadConversations()
-  }, [activeTab, conversationStatus, loadConversations])
+    conversationRequestVersion.current += 1
+    conversationLoadingRef.current = false
+    conversationOwnerRef.current = currentSessionKey
+    setConversationItems([])
+    setConversationStatus('idle')
+    if (activeTab === 'messages') void loadConversations(currentSessionKey)
+  }, [activeTab, currentSessionKey, loadConversations])
 
   useEffect(() => {
     if (activeTab === 'tools' && toolStatus === 'idle') void loadTools()
   }, [activeTab, loadTools, toolStatus])
 
   useDidShow(() => {
-    if (activeTab === 'messages') void loadConversations()
+    if (activeTab === 'messages') void loadConversations(currentSessionKey)
   })
-
-  useEffect(() => {
-    if (
-      activeTab !== 'discover' ||
-      initialStatus !== 'ready' ||
-      sourceError.community ||
-      sourceError.trade
-    ) return undefined
-    const page = observerRuntime.getCurrentInstance().page
-    if (!page) return undefined
-    let disposed = false
-    let observer: RuntimeIntersectionObserver | null = null
-    observerRuntime.nextTick(() => {
-      if (disposed) return
-      observerRuntime.createSelectorQuery()
-        .in(page)
-        .select('#home-discover-sentinel')
-        .boundingClientRect((rect) => {
-          if (!rect) return
-          if (disposed) return
-          observer = observerRuntime.createIntersectionObserver(page, { thresholds: [0] })
-          observer.relativeTo('.student-home-content').observe('#home-discover-sentinel', (entry) => {
-            if (entry.intersectionRatio > 0) void loadDiscover(false)
-          })
-        })
-        .exec()
-    })
-    return () => {
-      disposed = true
-      observer?.disconnect()
-    }
-  }, [activeTab, initialStatus, loadDiscover, sourceError.community, sourceError.trade])
 
   const openSearch = () => {
     void Taro.navigateTo({ url: '/pages/search/index?scope=community' })
@@ -479,13 +458,34 @@ function HomeContent() {
         right={<View className='student-home-header__search' onClick={openSearch} />}
       />
 
-      <View className='student-home-content'>
+      <ScrollView
+        key={activeTab}
+        className='student-home-content'
+        scrollY
+        enhanced
+        showScrollbar={false}
+        lowerThreshold={120}
+        onScrollToLower={() => {
+          if (
+            activeTab === 'discover' &&
+            initialStatus === 'ready' &&
+            !sourceError.community &&
+            !sourceError.trade &&
+            !loadingRef.current
+          ) {
+            void loadDiscover(false)
+          }
+        }}
+      >
         {activeTab === 'messages' && (
           <View className='student-message-panel'>
             {conversationStatus === 'loading' || conversationStatus === 'idle' ? (
               <View className='student-message-state'><Text>正在读取真实私信...</Text></View>
             ) : conversationStatus === 'error' ? (
-              <View className='student-message-state student-message-state--retry' onClick={() => void loadConversations()}>
+              <View
+                className='student-message-state student-message-state--retry'
+                onClick={() => void loadConversations(currentSessionKey)}
+              >
                 <Text>私信加载失败，点击重试</Text>
               </View>
             ) : conversationStatus === 'empty' ? (
@@ -506,7 +506,9 @@ function HomeContent() {
                   </View>
                   <View className='student-message-row__main'>
                     <Text className='student-message-row__name'>{item.product?.title || `二手商品 #${item.context.productId}`}</Text>
-                    <Text className='student-message-row__preview'>二手交易私信</Text>
+                    <Text className='student-message-row__preview'>
+                      {conversationPeerLabel(item.context, currentUserId)}
+                    </Text>
                   </View>
                 </View>
               ))
@@ -538,7 +540,6 @@ function HomeContent() {
                   <Text>正在加载更多...</Text>
                 </View>
               ) : null}
-              <View id='home-discover-sentinel' className='student-discover-sentinel' />
             </>
           )
         )}
@@ -565,7 +566,7 @@ function HomeContent() {
           )
         )}
 
-      </View>
+      </ScrollView>
 
       <StudentBottomNav active='home' />
     </View>
