@@ -3,7 +3,23 @@ const path = require('node:path')
 
 const root = path.resolve(__dirname, '..')
 const moduleRoot = path.join(root, 'backend', 'internal', 'module')
-const allowedDomains = new Set(['user', 'community', 'trade', 'navigation', 'im', 'admin', 'media', 'takeout', 'delivery'])
+const allowedDomains = new Set([
+  'user',
+  'community',
+  'trade',
+  'navigation',
+  'im',
+  'admin',
+  'media',
+  'takeout',
+  'delivery',
+  'adminauth',
+  'identityapplication',
+])
+const transactionOrchestrators = new Set([
+  path.join('identityapplication', 'media.go'),
+  path.join('identityapplication', 'service.go'),
+])
 const failures = []
 
 for (const entry of fs.readdirSync(moduleRoot, { withFileTypes: true })) {
@@ -22,7 +38,9 @@ for (const file of files(moduleRoot).filter((file) => file.endsWith('.go'))) {
   const name = path.basename(file)
   const repositoryFile = name === 'repository.go' || name.endsWith('_repository.go')
   const testFile = name.endsWith('_test.go')
-  if ((source.includes('*gorm.DB') || source.includes('.WithContext(')) && !repositoryFile && !testFile) {
+  const moduleRelativePath = path.relative(moduleRoot, file)
+  const transactionOrchestrator = transactionOrchestrators.has(moduleRelativePath)
+  if ((source.includes('*gorm.DB') || source.includes('.WithContext(')) && !repositoryFile && !testFile && !transactionOrchestrator) {
     failures.push(`database access outside repository: ${path.relative(root, file)}`)
   }
 }
