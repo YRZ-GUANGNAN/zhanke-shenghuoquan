@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Image, Input, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
+import { AppIconButton } from '../../components/ui'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import { getIdentityApplication, submitIdentityApplication } from '../../services/a-user'
 import { isApiError } from '../../services/api'
@@ -353,7 +354,7 @@ function IdentityApplicationContent() {
   if (!role || !copy) {
     return (
       <View className='identity-application-page'>
-        <CapsulePageHeader title='身份申请' left={<View className='identity-application-nav__back' onClick={() => void cancelAndBack()}><Text>‹</Text></View>} />
+        <CapsulePageHeader title='身份申请' left={<AppIconButton name='back' label='返回' className='identity-application-nav__back' onClick={() => void cancelAndBack()} />} />
         <View className='identity-application-state'>
           <Text className='identity-application-state__title'>申请类型无效</Text>
           <Text className='identity-application-state__copy'>只能申请骑手或商家身份。</Text>
@@ -365,7 +366,7 @@ function IdentityApplicationContent() {
 
   return (
     <View className='identity-application-page'>
-      <CapsulePageHeader title={copy.title} left={<View className='identity-application-nav__back' onClick={() => void cancelAndBack()}><Text>‹</Text></View>} />
+      <CapsulePageHeader title={copy.title} left={<AppIconButton name='back' label='返回' className='identity-application-nav__back' onClick={() => void cancelAndBack()} />} />
 
       <View className='identity-application-content'>
         <View className='identity-application-intro'>

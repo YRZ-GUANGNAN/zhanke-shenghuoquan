@@ -1,6 +1,7 @@
 import React from 'react'
 import { Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
+import { AppIconButton } from '../../components/ui'
 import Taro from '../../services/taro'
 import './index.scss'
 
@@ -45,9 +46,7 @@ export default function PublishEntryPage() {
       <CapsulePageHeader
         title='发布'
         left={
-          <View className='publish-entry-topbar__back' onClick={() => void Taro.navigateBack()}>
-            <Text>‹</Text>
-          </View>
+          <AppIconButton name='back' label='返回' className='publish-entry-topbar__back' onClick={() => void Taro.navigateBack()} />
         }
       />
 
@@ -76,7 +75,7 @@ export default function PublishEntryPage() {
               </View>
               <Text className='publish-entry-card__subtitle'>{entry.subtitle}</Text>
             </View>
-            <Text className='publish-entry-card__arrow'>›</Text>
+            <AppIconButton name='chevron-right' label={`进入${entry.title}`} size='small' className='publish-entry-card__arrow' />
           </View>
         ))}
       </View>

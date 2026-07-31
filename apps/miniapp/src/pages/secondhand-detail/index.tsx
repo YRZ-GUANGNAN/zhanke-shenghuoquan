@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
+import AppIcon from '../../components/app-icon'
 import { AppActionSheet, AppDialog, AppNotice } from '../../components/ui'
 import { isApiError } from '../../services/api'
 import { changeProductStatus, contactSeller, getProduct, getTradeViewerState, setProductFavorited } from '../../services/c-trade'
@@ -343,7 +344,7 @@ export default function SecondhandDetailPage() {
                   {contactPending ? '正在建立安全会话' : '通过平台私信沟通'}
                 </Text>
               </View>
-              <Text className='secondhand-contact-option__arrow'>›</Text>
+              <AppIcon name='chevron-right' className='secondhand-contact-option__arrow app-icon--chevron' />
             </View>
 
             <View className='secondhand-contact-option' onClick={() => showToast('卖家未提供微信联系方式')}>
@@ -352,7 +353,7 @@ export default function SecondhandDetailPage() {
                 <Text className='secondhand-contact-option__title'>加微信联系</Text>
                 <Text className='secondhand-contact-option__desc'>卖家未提供微信联系方式</Text>
               </View>
-              <Text className='secondhand-contact-option__arrow'>›</Text>
+              <AppIcon name='chevron-right' className='secondhand-contact-option__arrow app-icon--chevron' />
             </View>
 
           <AppNotice tone='warning'>交易由买卖双方私下完成，平台不担保、不代收款。</AppNotice>

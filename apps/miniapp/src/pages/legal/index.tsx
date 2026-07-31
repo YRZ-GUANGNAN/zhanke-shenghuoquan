@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
+import { AppIconButton } from '../../components/ui'
 import Taro from '../../services/taro'
 import './index.scss'
 
@@ -75,9 +76,7 @@ export default function LegalPage() {
     <View className='student-legal-page'>
       <CapsulePageHeader
         title='法律条款'
-        left={<View className='student-legal-nav__back' onClick={() => void Taro.navigateBack()}>
-          <Text>‹</Text>
-        </View>}
+        left={<AppIconButton name='back' label='返回' className='student-legal-nav__back' onClick={() => void Taro.navigateBack()} />}
       />
       <View className='student-legal-tabs'>
         {tabs.map((tab) => (

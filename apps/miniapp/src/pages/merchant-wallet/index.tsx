@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
-import { AppActionSheet, AppButton, AppNotice } from '../../components/ui'
+import { AppActionSheet, AppButton, AppIconButton, AppNotice } from '../../components/ui'
 import { deliveryPaymentEnabled } from '../../feature-flags'
 import { useIdentityGuard } from '../../hooks/use-identity-guard'
 import {
@@ -106,7 +106,7 @@ function MerchantWalletContent() {
         <View className='merchant-wallet-hero merchant-wallet-hero--disabled'>
           <CapsuleSystemRow />
           <View className='merchant-wallet-nav'>
-            <View className='merchant-wallet-nav__back' onClick={() => void Taro.navigateBack()}><Text>‹</Text></View>
+            <AppIconButton name='back' label='返回' className='merchant-wallet-nav__back' onClick={() => void Taro.navigateBack()} />
             <Text className='merchant-wallet-nav__title'>商家钱包</Text>
             <View className='merchant-wallet-nav__spacer' />
           </View>
@@ -136,7 +136,7 @@ function MerchantWalletContent() {
         <View className='merchant-wallet-hero__orb merchant-wallet-hero__orb--right' />
         <CapsuleSystemRow />
         <View className='merchant-wallet-nav'>
-          <View className='merchant-wallet-nav__back' onClick={() => void Taro.navigateBack()}><Text>‹</Text></View>
+          <AppIconButton name='back' label='返回' className='merchant-wallet-nav__back' onClick={() => void Taro.navigateBack()} />
           <Text className='merchant-wallet-nav__title'>商家钱包</Text>
           <View className='merchant-wallet-nav__spacer' />
         </View>

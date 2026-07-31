@@ -236,7 +236,7 @@ function ProfileContent() {
               <View className={`student-profile-setting__icon student-profile-setting__icon--${item.icon}`} />
               <Text className='student-profile-setting__title'>{item.title}</Text>
               {item.value && <Text className='student-profile-setting__value'>{item.value}</Text>}
-              {item.arrow && <Text className='student-profile-setting__arrow'>›</Text>}
+              {item.arrow && <AppIcon name='chevron-right' className='student-profile-setting__arrow app-icon--chevron' />}
             </View>
           ))}
         </View>

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Text, View } from '@tarojs/components'
+import { AppIconButton } from './app-icon-button'
 import './app-action-sheet.scss'
 
 export interface AppActionSheetProps {
@@ -23,9 +24,15 @@ export function AppActionSheet({ visible, title, description, children, loading 
             <Text className='app-action-sheet__title'>{title}</Text>
             {description ? <Text className='app-action-sheet__description'>{description}</Text> : null}
           </View>
-          <View className={`app-action-sheet__close ${loading ? 'app-action-sheet__close--disabled' : ''}`} role='button' onClick={() => !loading && onClose()}>
-            <Text>×</Text>
-          </View>
+          <AppIconButton
+            name='close'
+            label='关闭'
+            size='small'
+            tone='surface'
+            disabled={loading}
+            className='app-action-sheet__close'
+            onClick={onClose}
+          />
         </View>
         <View className='app-action-sheet__content'>{children}</View>
       </View>

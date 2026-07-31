@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Input, ScrollView, Text, Textarea, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
+import { AppIconButton } from '../../components/ui'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import { AppActionSheet, AppButton } from '../../components/ui'
 import { deliveryMockFeeEnabled, deliveryPaymentEnabled } from '../../feature-flags'
@@ -200,7 +201,7 @@ function MerchantPublishContent() {
       <CapsulePageHeader
         className='merchant-publish-nav'
         title='发布配送单'
-        left={<View className='merchant-publish-nav__back' onClick={() => void Taro.navigateBack()}><Text>‹</Text></View>}
+        left={<AppIconButton name='back' label='返回' className='merchant-publish-nav__back' onClick={() => void Taro.navigateBack()} />}
       />
 
       <ScrollView scrollY className='merchant-publish-scroll' enhanced showScrollbar={false}>

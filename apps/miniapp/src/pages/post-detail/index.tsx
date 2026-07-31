@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Image, Input, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
+import { AppIconButton } from '../../components/ui'
 import Taro from '../../services/taro'
 import type { CommunityComment, CommunityPost } from '../../types'
 import { isApiError } from '../../services/api'
@@ -244,7 +245,7 @@ export default function PostDetailPage() {
       <CapsulePageHeader
         className='post-detail-nav'
         variant='standard'
-        left={<Text className='post-detail-nav__back' onClick={() => void Taro.navigateBack()}>‹</Text>}
+        left={<AppIconButton name='back' label='返回' className='post-detail-nav__back' onClick={() => void Taro.navigateBack()} />}
         center={headerCenter}
         right={post && isApproved ? (
           <View className='post-detail-follow-hitbox' onClick={handleFollow}>

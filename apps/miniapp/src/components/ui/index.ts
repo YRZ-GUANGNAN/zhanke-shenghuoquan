@@ -1,3 +1,4 @@
+export { AppIconButton, type AppIconButtonProps } from './app-icon-button'
 export { AppButton, type AppButtonProps, type AppButtonSize, type AppButtonVariant } from './app-button'
 export { AppField, type AppFieldProps } from './app-field'
 export { AppDialog, type AppDialogProps } from './app-dialog'

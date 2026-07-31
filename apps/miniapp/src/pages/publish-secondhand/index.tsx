@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react'
 import { Image, Input, ScrollView, Text, Textarea, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
+import { AppIconButton } from '../../components/ui'
 import { isApiError } from '../../services/api'
 import { createProduct } from '../../services/c-trade'
 import { createClientRequestId } from '../../services/client-request-id'
@@ -143,9 +144,7 @@ export default function PublishSecondhandPage() {
       <CapsulePageHeader
         title='发布二手'
         left={
-          <View className='publish-secondhand-nav__back' onClick={() => void Taro.navigateBack()}>
-            <Text>‹</Text>
-          </View>
+          <AppIconButton name='back' label='返回' className='publish-secondhand-nav__back' onClick={() => void Taro.navigateBack()} />
         }
       />
 

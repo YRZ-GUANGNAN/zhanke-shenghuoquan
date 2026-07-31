@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { Image, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
+import AppIcon from '../../components/app-icon'
+import { AppIconButton } from '../../components/ui'
 import type { CommunityPost, Product } from '../../types'
 import { getMyComments, getMyFavoritePosts, getMyPosts, type MyCommunityComment } from '../../services/b-community'
 import { getMyProductsPage } from '../../services/c-trade'
@@ -107,7 +109,7 @@ export default function MyContentPage() {
           </View>
           <View className='my-content-row__tail'>
             <Text className='my-content-row__status'>{favorite ? `赞 ${item.likedCount}` : reviewLabel(item.reviewStatus)}</Text>
-            <Text className='my-content-row__chevron'>›</Text>
+            <AppIcon name='chevron-right' className='my-content-row__chevron app-icon--chevron' />
           </View>
         </View>
       ))}
@@ -153,7 +155,7 @@ export default function MyContentPage() {
             <Text className={`my-content-row__status${item.status === 'sold' ? ' my-content-row__status--muted' : ''}`}>
               {productStatusLabel(item)}
             </Text>
-            <Text className='my-content-row__chevron'>›</Text>
+            <AppIcon name='chevron-right' className='my-content-row__chevron app-icon--chevron' />
           </View>
         </View>
       ))}
@@ -177,7 +179,7 @@ export default function MyContentPage() {
 
   return (
     <View className='my-content-page'>
-      <CapsulePageHeader title='我的内容' left={<View className='my-content-header__back' onClick={() => void Taro.navigateBack()}><Text>‹</Text></View>} />
+      <CapsulePageHeader title='我的内容' left={<AppIconButton name='back' label='返回' className='my-content-header__back' onClick={() => void Taro.navigateBack()} />} />
       <View className='my-content-tabs'>{tabs.map((tab) => <View key={tab.key} className={`my-content-tab ${activeTab === tab.key ? 'my-content-tab--active' : ''}`} onClick={() => setActiveTab(tab.key)}><Text>{tab.label}</Text></View>)}</View>
       <View className='my-content-body'>{renderContent()}</View>
     </View>

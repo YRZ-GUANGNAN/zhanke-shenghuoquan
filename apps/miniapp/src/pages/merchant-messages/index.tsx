@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
+import { AppIconButton } from '../../components/ui'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import { useIdentityGuard } from '../../hooks/use-identity-guard'
 import {
@@ -76,7 +77,7 @@ function MerchantMessagesContent() {
       <CapsulePageHeader
         className='merchant-messages-nav'
         title='消息'
-        left={<View className='merchant-messages-nav__back' onClick={() => void Taro.navigateBack()}><Text>‹</Text></View>}
+        left={<AppIconButton name='back' label='返回' className='merchant-messages-nav__back' onClick={() => void Taro.navigateBack()} />}
         right={(
           <Text className='merchant-messages-nav__read' onClick={() => void loadMessages()}>
             刷新

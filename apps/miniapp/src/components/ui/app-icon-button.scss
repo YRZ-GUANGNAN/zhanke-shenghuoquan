@@ -1,0 +1,51 @@
+@use '../../styles/design-tokens.scss' as *;
+
+.app-icon-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  box-sizing: border-box;
+  transition: background $duration-fast $ease-standard,
+    opacity $duration-fast $ease-standard,
+    transform $duration-fast $ease-standard;
+}
+
+.app-icon-button--regular {
+  width: 80rpx;
+  height: 80rpx;
+}
+
+.app-icon-button--small {
+  width: 64rpx;
+  height: 64rpx;
+}
+
+.app-icon-button--surface {
+  border: 1rpx solid $border-default;
+  background: $bg-surface-subtle;
+}
+
+.app-icon-button--brand {
+  background: $brand-tint;
+}
+
+.app-icon-button:active {
+  background: $bg-surface-subtle;
+  transform: scale(.94);
+}
+
+.app-icon-button--disabled {
+  opacity: .42;
+}
+
+.app-icon-button__icon {
+  width: 40rpx;
+  height: 40rpx;
+}
+
+.app-icon-button--small .app-icon-button__icon {
+  width: 32rpx;
+  height: 32rpx;
+}

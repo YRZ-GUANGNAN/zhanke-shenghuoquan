@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDidShow } from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
-import StudentBottomNav from '../../components/student-bottom-nav'
 import CapsulePageHeader from '../../components/capsule-page-header'
+import AppIcon from '../../components/app-icon'
+import StudentBottomNav from '../../components/student-bottom-nav'
 import {
   listExternalTakeoutMerchants,
   type ExternalTakeoutMerchantLink,
@@ -131,7 +132,7 @@ export default function StudentTakeoutPage() {
                   <View className={`student-takeout-merchant__action${resting ? ' student-takeout-merchant__action--disabled' : ''}`}>
                     <Text>{jumping ? '打开中' : resting ? '暂休' : '小程序'}</Text>
                   </View>
-                  <Text className='student-takeout-merchant__arrow'>›</Text>
+                  <AppIcon name='chevron-right' className='student-takeout-merchant__arrow app-icon--chevron' />
                 </View>
               )
             })}

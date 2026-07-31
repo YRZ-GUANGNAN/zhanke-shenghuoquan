@@ -2,7 +2,8 @@ import React, { useState } from 'react'
 import { Button, Text, View } from '@tarojs/components'
 import { useDidShow } from '@tarojs/taro'
 import CapsulePageHeader from '../../components/capsule-page-header'
-import { AppDialog } from '../../components/ui'
+import AppIcon from '../../components/app-icon'
+import { AppDialog, AppIconButton } from '../../components/ui'
 import {
   bindWechatPhone,
   closeAccount,
@@ -141,7 +142,7 @@ export default function SettingsPage() {
 
   return (
     <View className='student-settings-page'>
-      <CapsulePageHeader title='设置' left={<View className='student-settings-nav__back' onClick={() => void Taro.navigateBack()}><Text>‹</Text></View>} />
+      <CapsulePageHeader title='设置' left={<AppIconButton name='back' label='返回' className='student-settings-nav__back' onClick={() => void Taro.navigateBack()} />} />
 
       <View className='student-settings-content'>
         <View className='student-settings-section'>
@@ -195,7 +196,7 @@ export default function SettingsPage() {
               <Text className='student-settings-row__title'>黑名单管理</Text>
               <View className='student-settings-row__right'>
                 <Text className='student-settings-row__value'>{settings.blacklistCount} 人</Text>
-                <Text className='student-settings-row__arrow'>›</Text>
+                <AppIcon name='chevron-right' className='student-settings-row__arrow app-icon--chevron' />
               </View>
             </View>
           </View>
@@ -213,10 +214,10 @@ export default function SettingsPage() {
               <Text className='student-settings-row__value'>{currentVersion()}</Text>
             </View>
             <View className='student-settings-row' onClick={() => void Taro.navigateTo({ url: '/pages/feedback/index' })}>
-              <Text className='student-settings-row__title'>意见反馈</Text><Text className='student-settings-row__arrow'>›</Text>
+              <Text className='student-settings-row__title'>意见反馈</Text><AppIcon name='chevron-right' className='student-settings-row__arrow app-icon--chevron' />
             </View>
             <View className='student-settings-row' onClick={() => void Taro.navigateTo({ url: '/pages/about/index' })}>
-              <Text className='student-settings-row__title'>关于湛科生活圈</Text><Text className='student-settings-row__arrow'>›</Text>
+              <Text className='student-settings-row__title'>关于湛科生活圈</Text><AppIcon name='chevron-right' className='student-settings-row__arrow app-icon--chevron' />
             </View>
           </View>
         </View>

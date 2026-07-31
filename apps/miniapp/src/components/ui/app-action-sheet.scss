@@ -9,9 +9,8 @@
 .app-action-sheet__title, .app-action-sheet__description { display: block; }
 .app-action-sheet__title { color: $text-strong; font-size: 32rpx; font-weight: 800; line-height: 1.35; }
 .app-action-sheet__description { margin-top: 8rpx; color: $text-secondary; font-size: 24rpx; line-height: 1.45; }
-.app-action-sheet__close { display: flex; align-items: center; justify-content: center; width: 72rpx; height: 72rpx; border-radius: 50%; background: $bg-surface-subtle; color: $text-secondary; font-size: 40rpx; line-height: 1; }
+.app-action-sheet__close { flex: 0 0 auto; }
 .app-action-sheet__close:active { background: $divider-nav; }
-.app-action-sheet__close--disabled { opacity: .45; }
 .app-action-sheet__content { padding-top: $space-2; }
 @keyframes app-sheet-mask { from { opacity: 0; } }
 @keyframes app-sheet-enter { from { transform: translateY(100%); } }

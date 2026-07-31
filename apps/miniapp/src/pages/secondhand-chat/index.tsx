@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Image, Input, ScrollView, Text, View } from '@tarojs/components'
-import AppIcon from '../../components/app-icon'
 import CapsulePageHeader from '../../components/capsule-page-header'
+import AppIcon from '../../components/app-icon'
 import { isApiError } from '../../services/api'
 import { contactSeller, getProduct, type IMConversationContext } from '../../services/c-trade'
 import {

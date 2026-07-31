@@ -1,9 +1,76 @@
+@use '../styles/design-tokens.scss' as *;
+
+.student-bottom-nav {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: $z-sticky;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: end;
+  min-height: 124rpx;
+  padding: 16rpx 12rpx calc(48rpx + env(safe-area-inset-bottom));
+  border-top: 1rpx solid $divider-nav;
+  background: rgba($bg-surface, .98);
+  box-shadow: 0 -10rpx 28rpx rgba(15, 42, 68, .045);
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+.student-bottom-nav__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 72rpx;
+  gap: 6rpx;
+  color: $text-tertiary;
+  font-size: 20rpx;
+  font-weight: 500;
+  line-height: 1.2;
+  transition: color $duration-fast $ease-standard,
+    transform $duration-fast $ease-standard;
+}
+
+.student-bottom-nav__item:active {
+  transform: translateY(1rpx);
+}
+
 .student-bottom-nav__icon-asset {
   width: 44rpx;
   height: 44rpx;
 }
 
+.student-bottom-nav__item--active {
+  color: $brand-primary;
+  font-weight: 700;
+}
+
+.student-bottom-nav__fab {
+  align-self: start;
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96rpx;
+  height: 96rpx;
+  margin-top: -24rpx;
+  border: 6rpx solid rgba($bg-surface, .98);
+  border-radius: 50%;
+  background: $gradient-primary;
+  box-shadow: $shadow-fab;
+  box-sizing: border-box;
+  transition: transform $duration-fast $ease-standard,
+    box-shadow $duration-fast $ease-standard;
+}
+
+.student-bottom-nav__fab:active {
+  transform: scale(.96);
+  box-shadow: 0 8rpx 24rpx rgba(34, 113, 202, .22);
+}
+
 .student-bottom-nav__fab-icon {
-  width: 52rpx;
-  height: 52rpx;
+  width: 46rpx;
+  height: 46rpx;
 }

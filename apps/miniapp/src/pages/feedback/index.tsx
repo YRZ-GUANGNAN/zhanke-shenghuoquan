@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Image, Text, Textarea, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
+import { AppIconButton } from '../../components/ui'
 import { AppDialog } from '../../components/ui'
 import { submitFeedback, type FeedbackCategory } from '../../services/a-user'
 import { chooseAndUploadImages, waitForMediaApproval, type UploadedMedia } from '../../services/media'
@@ -64,7 +65,7 @@ export default function FeedbackPage() {
 
   return (
     <View className='feedback-page'>
-      <CapsulePageHeader title='意见反馈' left={<View className='feedback-nav__back' onClick={() => void Taro.navigateBack()}><Text>‹</Text></View>} />
+      <CapsulePageHeader title='意见反馈' left={<AppIconButton name='back' label='返回' className='feedback-nav__back' onClick={() => void Taro.navigateBack()} />} />
       <View className='feedback-content'>
         <Text className='feedback-label'>问题类型</Text>
         <View className='feedback-categories'>
@@ -90,7 +91,7 @@ export default function FeedbackPage() {
           {images.map((item, index) => (
             <View className='feedback-image' key={item.assetId}>
               <Image src={item.previewPath} mode='aspectFill' onClick={() => void Taro.previewImage({ urls: images.map((value) => value.previewPath), current: item.previewPath })} />
-              <View className='feedback-image__remove' onClick={() => setImages((current) => current.filter((_, currentIndex) => currentIndex !== index))}><Text>×</Text></View>
+              <AppIconButton name='close' label='移除图片' size='small' tone='surface' className='feedback-image__remove' onClick={() => setImages((current) => current.filter((_, currentIndex) => currentIndex !== index))} />
             </View>
           ))}
           {images.length < 3 && <View className='feedback-add' onClick={() => void chooseImages()}><Text className='feedback-add__plus'>＋</Text><Text>添加截图</Text></View>}

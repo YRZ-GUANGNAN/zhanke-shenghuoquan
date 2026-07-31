@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
+import { AppIconButton } from '../../components/ui'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import { deliveryPaymentEnabled } from '../../feature-flags'
 import { useIdentityGuard } from '../../hooks/use-identity-guard'
@@ -134,7 +135,7 @@ function MerchantOrderDetailContent() {
       <CapsulePageHeader
         className='merchant-detail-nav'
         title='配送单详情'
-        left={<View className='merchant-detail-nav__back' onClick={() => void Taro.navigateBack()}><Text>‹</Text></View>}
+        left={<AppIconButton name='back' label='返回' className='merchant-detail-nav__back' onClick={() => void Taro.navigateBack()} />}
         right={<Text className='merchant-detail-nav__refresh' onClick={() => void loadDetail()}>刷新</Text>}
       />
 
