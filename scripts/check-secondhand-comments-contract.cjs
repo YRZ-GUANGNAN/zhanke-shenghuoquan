@@ -66,7 +66,8 @@ for (const fragment of [
   'changeProductStatus',
   '<ProductComments',
   'targetCommentId={targetCommentId}',
-  "{favorited ? '★' : '☆'}",
+  "name='star'",
+  'active={Boolean(favorited)}',
 ]) {
   if (!detail.includes(fragment)) {
     throw new Error(`second-hand detail contract missing: ${fragment}`)

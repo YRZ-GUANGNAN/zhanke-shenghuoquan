@@ -101,7 +101,7 @@
 }
 
 .post-detail-follow-hitbox {
-  width: 104rpx;
+  width: 116rpx;
   height: 88rpx;
   display: flex;
   align-items: center;
@@ -109,8 +109,8 @@
 }
 
 .post-detail-follow {
-  min-width: 96rpx;
-  height: 56rpx;
+  width: 116rpx;
+  height: 64rpx;
   padding: 0 18rpx;
   box-sizing: border-box;
   flex: none;
@@ -350,7 +350,7 @@
 }
 
 .post-detail-comments__empty {
-  min-height: 124rpx;
+  min-height: 148rpx;
   padding: 20rpx;
   box-sizing: border-box;
   display: flex;

@@ -35,8 +35,8 @@ for (const [source, fragment] of requirements) {
   if (!source.includes(fragment)) throw new Error(`settings contract missing: ${fragment}`)
 }
 
-if ((settings.match(/showModal\(/g) || []).length < 3) {
-  throw new Error('account closure must keep two confirmations plus a blocked-state modal')
+for (const fragment of ["visible={closeStage === 'first'}", "visible={closeStage === 'final'}", "visible={closeStage === 'blocked'}"]) {
+  if (!settings.includes(fragment)) throw new Error('account closure must keep two confirmations plus a blocked-state dialog')
 }
 
 for (const forbidden of ['159****8834', '12.6MB', 'v2.4.0', 'initialBlockedUsers']) {
