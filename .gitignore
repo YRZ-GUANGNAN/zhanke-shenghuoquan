@@ -16,6 +16,10 @@ logs/
 *.pid
 apps/miniapp/dist/
 apps/admin/dist/
+.release/
+.codex-tmp/
+.superpowers/
+.tmp/
 apps/miniapp/project.private.config.json
 **/.swc/
 ~$*
