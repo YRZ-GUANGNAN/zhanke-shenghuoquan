@@ -424,27 +424,7 @@
   line-height: 1.4;
 }
 
-.public-profile-sheet-layer {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-}
-
-.public-profile-sheet-layer__mask {
-  position: absolute;
-  inset: 0;
-  background: rgba(17, 31, 48, .54);
-}
-
-.public-profile-sheet {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  padding: 20rpx 24rpx calc(28rpx + env(safe-area-inset-bottom));
-  background: $bg-app;
-  box-sizing: border-box;
-}
+.public-profile-sheet__content { padding-bottom: 8rpx; }
 
 .public-profile-sheet__group {
   overflow: hidden;
@@ -452,8 +432,7 @@
   background: $bg-surface;
 }
 
-.public-profile-sheet__item,
-.public-profile-sheet__cancel {
+.public-profile-sheet__item {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -477,13 +456,6 @@
 
 .public-profile-sheet__item--danger {
   color: #F0525F;
-}
-
-.public-profile-sheet__cancel {
-  margin-top: 16rpx;
-  border-radius: 8rpx;
-  background: $bg-surface;
-  font-weight: 700;
 }
 
 @media (max-width: 340px) {

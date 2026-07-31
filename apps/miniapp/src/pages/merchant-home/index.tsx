@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
-import IdentitySwitchModal from '../../components/IdentitySwitchModal'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
+import IdentitySwitchModal from '../../components/IdentitySwitchModal'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import { deliveryPaymentEnabled } from '../../feature-flags'
 import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'

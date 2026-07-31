@@ -1,6 +1,6 @@
 import { useRef, type ReactNode } from 'react'
-import { Text, View } from '@tarojs/components'
 import { useSessionStore } from '../stores/session'
+import { AppState } from './ui'
 
 interface RuntimeSessionGateProps {
   children: ReactNode
@@ -28,23 +28,11 @@ export default function RuntimeSessionGate({
   }
 
   if (status === 'idle' || status === 'booting') {
-    return (
-      <View className='runtime-session-state'>
-        <Text className='runtime-session-state__title'>正在登录...</Text>
-      </View>
-    )
+    return <AppState kind='loading' title='正在登录…' description='正在安全校验当前微信会话' />
   }
 
   if (status !== 'authenticated') {
-    return (
-      <View className='runtime-session-state'>
-        <Text className='runtime-session-state__title'>暂时无法登录</Text>
-        <Text className='runtime-session-state__message'>{error || '请重新尝试微信登录'}</Text>
-        <View className='runtime-session-state__retry' onClick={() => void retry()}>
-          <Text>重试</Text>
-        </View>
-      </View>
-    )
+    return <AppState kind='error' title='暂时无法登录' description={error || '请重新尝试微信登录'} actionText='重试' onAction={() => void retry()} />
   }
 
   return <>{children}</>

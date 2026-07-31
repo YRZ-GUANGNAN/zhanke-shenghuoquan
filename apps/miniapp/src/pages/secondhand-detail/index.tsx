@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
+import { AppActionSheet, AppDialog, AppNotice } from '../../components/ui'
 import { isApiError } from '../../services/api'
 import { changeProductStatus, contactSeller, getProduct, getTradeViewerState, setProductFavorited } from '../../services/c-trade'
 import Taro from '../../services/taro'
@@ -40,6 +41,7 @@ export default function SecondhandDetailPage() {
   const [favoritePending, setFavoritePending] = useState(false)
   const [contactPending, setContactPending] = useState(false)
   const [statusPending, setStatusPending] = useState(false)
+  const [statusCandidate, setStatusCandidate] = useState<Product['status'] | null>(null)
   const [scrollTarget, setScrollTarget] = useState('')
   const retryProduct = useCallback(() => setReloadKey((value) => value + 1), [])
 
@@ -146,23 +148,20 @@ export default function SecondhandDetailPage() {
     }
   }
 
-  const handleStatusChange = async (nextStatus: Product['status']) => {
+  const requestStatusChange = (nextStatus: Product['status']) => {
     if (!product || statusPending || !isSeller) return
-    const labels: Record<Product['status'], string> = {
-      selling: '重新上架',
-      reserved: '标记预订',
-      sold: '标记售出'
-    }
-    const result = await Taro.showModal({
-      title: labels[nextStatus],
-      content: `确认将“${product.title}”${labels[nextStatus]}吗？`,
-      confirmText: '确认'
-    })
-    if (!result.confirm) return
+    setStatusCandidate(nextStatus)
+  }
+
+  const confirmStatusChange = async () => {
+    const nextStatus = statusCandidate
+    if (!product || statusPending || !isSeller) return
+    if (!nextStatus) return
     setStatusPending(true)
     try {
       await changeProductStatus(product.id, nextStatus)
       setProduct(await getProduct(product.id))
+      setStatusCandidate(null)
       await Taro.showToast({ title: '状态已更新', icon: 'success' })
     } catch (error) {
       await Taro.showToast({ title: writeErrorMessage(error, '更新状态'), icon: 'none', duration: 1800 })
@@ -286,17 +285,17 @@ export default function SecondhandDetailPage() {
           {isSeller ? (
             <View className='secondhand-detail-seller-actions'>
               {product.status === 'selling' && (
-                <View className='secondhand-detail-seller-action' onClick={() => void handleStatusChange('reserved')}>
+                <View className='secondhand-detail-seller-action' onClick={() => requestStatusChange('reserved')}>
                   <Text>标记预订</Text>
                 </View>
               )}
               {product.status !== 'sold' && (
-                <View className='secondhand-detail-seller-action secondhand-detail-seller-action--primary' onClick={() => void handleStatusChange('sold')}>
+                <View className='secondhand-detail-seller-action secondhand-detail-seller-action--primary' onClick={() => requestStatusChange('sold')}>
                   <Text>标记售出</Text>
                 </View>
               )}
               {product.status !== 'selling' && (
-                <View className='secondhand-detail-seller-action secondhand-detail-seller-action--primary' onClick={() => void handleStatusChange('selling')}>
+                <View className='secondhand-detail-seller-action secondhand-detail-seller-action--primary' onClick={() => requestStatusChange('selling')}>
                   <Text>重新上架</Text>
                 </View>
               )}
@@ -334,17 +333,8 @@ export default function SecondhandDetailPage() {
         </View>
       )}
 
-      {contactVisible && product && (
-        <View className='secondhand-contact-modal'>
-          <View className='secondhand-contact-modal__mask' onClick={() => !contactPending && setContactVisible(false)} />
-          <View className='secondhand-contact-sheet'>
-            <View className='secondhand-contact-sheet__head'>
-              <Text className='secondhand-contact-sheet__title'>联系卖家</Text>
-              <View className='secondhand-contact-sheet__close' onClick={() => !contactPending && setContactVisible(false)}>
-                <Text>×</Text>
-              </View>
-            </View>
-
+      <AppActionSheet visible={contactVisible && Boolean(product)} title='联系卖家' description='请选择一种安全的沟通方式' loading={contactPending} onClose={() => setContactVisible(false)}>
+        {product ? <View className='secondhand-contact-sheet__content'>
             <View className='secondhand-contact-option' onClick={() => void handleStartChat()}>
               <View className='secondhand-contact-option__icon secondhand-contact-option__icon--chat' />
               <View className='secondhand-contact-option__main'>
@@ -365,10 +355,19 @@ export default function SecondhandDetailPage() {
               <Text className='secondhand-contact-option__arrow'>›</Text>
             </View>
 
-            <Text className='secondhand-contact-sheet__safe'>交易由买卖双方私下完成，平台不担保、不代收款</Text>
-          </View>
-        </View>
-      )}
+          <AppNotice tone='warning'>交易由买卖双方私下完成，平台不担保、不代收款。</AppNotice>
+        </View> : null}
+      </AppActionSheet>
+
+      <AppDialog
+        visible={statusCandidate !== null}
+        title={statusCandidate === 'selling' ? '重新上架' : statusCandidate === 'reserved' ? '标记预订' : '标记售出'}
+        description={product && statusCandidate ? `确认更新“${product.title}”的商品状态吗？` : ''}
+        confirmText='确认更新'
+        loading={statusPending}
+        onCancel={() => setStatusCandidate(null)}
+        onConfirm={() => void confirmStatusChange()}
+      />
     </View>
   )
 }

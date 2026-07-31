@@ -236,72 +236,12 @@ page {
   box-shadow: none;
 }
 
-.merchant-publish-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 20;
-}
+.merchant-publish-sheet__content { display: grid; gap: 24rpx; }
 
-.merchant-publish-modal__mask {
-  position: absolute;
-  inset: 0;
-  background: $publish-mask;
-}
-
-.merchant-publish-sheet {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 34rpx 30rpx calc(34rpx + env(safe-area-inset-bottom));
-  border-radius: 34rpx 34rpx 0 0;
-  background: $bg-surface;
-  box-shadow: $publish-sheet-shadow;
-  box-sizing: border-box;
-}
-
-.merchant-publish-sheet__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.merchant-publish-sheet__title {
-  display: block;
-  color: $text-strong;
-  font-size: 31rpx;
-  font-weight: 900;
-  line-height: 1;
-}
-
-.merchant-publish-sheet__subtitle {
-  display: block;
-  margin-top: 16rpx;
-  color: $text-muted;
-  font-size: 22rpx;
-  line-height: 1;
-}
-
-.merchant-publish-sheet__close {
-  width: 58rpx;
-  height: 58rpx;
-  border-radius: 999rpx;
-  background: $divider-hairline;
-  color: $text-tertiary;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 34rpx;
-  line-height: 1;
-}
-
-.merchant-publish-payments {
-  margin-top: 28rpx;
-}
+.merchant-publish-payments { display: grid; gap: 18rpx; }
 
 .merchant-publish-payment {
   min-height: 106rpx;
-  margin-top: 18rpx;
   padding: 20rpx 22rpx;
   border: 2rpx solid $divider-nav;
   border-radius: 22rpx;
@@ -378,8 +318,4 @@ page {
   height: 18rpx;
   border-radius: 999rpx;
   background: $brand-primary;
-}
-
-.merchant-publish-confirm {
-  margin-top: 30rpx;
 }

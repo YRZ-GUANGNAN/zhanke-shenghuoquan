@@ -13,6 +13,7 @@ export interface AppDialogProps {
   tone?: 'default' | 'danger'
   loading?: boolean
   error?: string
+  showCancel?: boolean
   onConfirm: () => void
   onCancel: () => void
 }
@@ -27,6 +28,7 @@ export function AppDialog({
   tone = 'default',
   loading = false,
   error,
+  showCancel = true,
   onConfirm,
   onCancel,
 }: AppDialogProps) {
@@ -39,8 +41,8 @@ export function AppDialog({
         {description ? <Text className='app-dialog__description'>{description}</Text> : null}
         {children ? <View className='app-dialog__content'>{children}</View> : null}
         {error ? <Text className='app-dialog__error'>{error}</Text> : null}
-        <View className='app-dialog__actions'>
-          <AppButton variant='secondary' disabled={loading} onClick={onCancel}>{cancelText}</AppButton>
+        <View className={`app-dialog__actions ${showCancel ? '' : 'app-dialog__actions--single'}`}>
+          {showCancel ? <AppButton variant='secondary' disabled={loading} onClick={onCancel}>{cancelText}</AppButton> : null}
           <AppButton variant={tone === 'danger' ? 'danger' : 'primary'} loading={loading} onClick={onConfirm}>{confirmText}</AppButton>
         </View>
       </View>

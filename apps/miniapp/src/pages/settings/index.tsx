@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Button, Text, View } from '@tarojs/components'
 import { useDidShow } from '@tarojs/taro'
 import CapsulePageHeader from '../../components/capsule-page-header'
+import { AppDialog } from '../../components/ui'
 import {
   bindWechatPhone,
   closeAccount,
@@ -15,6 +16,7 @@ import { useSessionStore } from '../../stores/session'
 import './index.scss'
 
 type ToggleKey = 'orderNotice' | 'socialNotice' | 'quietHours' | 'personalized'
+type CloseStage = 'idle' | 'first' | 'final' | 'blocked'
 
 const defaults: UserSettingsView = {
   orderNotice: true,
@@ -52,6 +54,8 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [closing, setClosing] = useState(false)
+  const [closeStage, setCloseStage] = useState<CloseStage>('idle')
+  const [closeError, setCloseError] = useState('')
 
   const load = async () => {
     setLoading(true)
@@ -114,20 +118,7 @@ export default function SettingsPage() {
 
   const closeCurrentAccount = async () => {
     if (closing) return
-    const first = await Taro.showModal({
-      title: '注销账号',
-      content: '注销后当前登录立即失效，未售出的商品会下架；历史帖子、评论和已完成交易会匿名保留。',
-      confirmText: '继续注销',
-      confirmColor: '#d64545'
-    })
-    if (!first.confirm) return
-    const second = await Taro.showModal({
-      title: '最后确认',
-      content: '该操作不可撤销。确认永久注销当前账号吗？',
-      confirmText: '确认注销',
-      confirmColor: '#d64545'
-    })
-    if (!second.confirm) return
+    setCloseStage('idle')
     setClosing(true)
     try {
       await closeAccount()
@@ -139,7 +130,8 @@ export default function SettingsPage() {
         const data = error.data as { blockers?: Array<{ message: string }> } | undefined
         if (data?.blockers?.length) message = data.blockers.map((item) => item.message).join('；')
       }
-      void Taro.showModal({ title: '暂时无法注销', content: message, showCancel: false, confirmText: '知道了' })
+      setCloseError(message)
+      setCloseStage('blocked')
     } finally {
       setClosing(false)
     }
@@ -230,10 +222,38 @@ export default function SettingsPage() {
         </View>
 
         <View className='student-settings-logout' onClick={() => { logout(); void Taro.reLaunch({ url: '/pages/home/index' }) }}><Text>退出登录</Text></View>
-        <View className={`student-settings-close ${closing ? 'student-settings-close--disabled' : ''}`} onClick={() => void closeCurrentAccount()}>
+        <View className={`student-settings-close ${closing ? 'student-settings-close--disabled' : ''}`} onClick={() => !closing && setCloseStage('first')}>
           <Text>{closing ? '正在注销…' : '注销账号'}</Text>
         </View>
       </View>
+      <AppDialog
+        visible={closeStage === 'first'}
+        title='注销账号'
+        description='注销后当前登录立即失效，未售出的商品会下架；历史帖子、评论和已完成交易会匿名保留。'
+        confirmText='继续注销'
+        tone='danger'
+        onCancel={() => setCloseStage('idle')}
+        onConfirm={() => setCloseStage('final')}
+      />
+      <AppDialog
+        visible={closeStage === 'final'}
+        title='最后确认'
+        description='该操作不可撤销。确认永久注销当前账号吗？'
+        confirmText='永久注销'
+        tone='danger'
+        loading={closing}
+        onCancel={() => setCloseStage('idle')}
+        onConfirm={() => void closeCurrentAccount()}
+      />
+      <AppDialog
+        visible={closeStage === 'blocked'}
+        title='暂时无法注销'
+        description={closeError}
+        confirmText='知道了'
+        showCancel={false}
+        onCancel={() => undefined}
+        onConfirm={() => setCloseStage('idle')}
+      />
     </View>
   )
 }

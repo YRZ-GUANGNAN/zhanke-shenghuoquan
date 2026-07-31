@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
+import { AppActionSheet, AppButton, AppNotice } from '../../components/ui'
 import { deliveryPaymentEnabled } from '../../feature-flags'
 import { useIdentityGuard } from '../../hooks/use-identity-guard'
 import {
@@ -187,14 +188,8 @@ function MerchantWalletContent() {
         </View>
       </ScrollView>
 
-      {sheetVisible ? (
-        <View className='merchant-wallet-modal'>
-          <View className='merchant-wallet-modal__mask' onClick={() => !paying && setSheetVisible(false)} />
-          <View className='merchant-wallet-sheet'>
-            <View className='merchant-wallet-sheet__header'>
-              <Text className='merchant-wallet-sheet__title'>选择充值金额</Text>
-              <View className='merchant-wallet-sheet__close' onClick={() => !paying && setSheetVisible(false)}><Text>×</Text></View>
-            </View>
+      <AppActionSheet visible={sheetVisible} title='选择充值金额' loading={paying} onClose={() => setSheetVisible(false)}>
+        <View className='merchant-wallet-sheet__content'>
             <View className='merchant-wallet-amount-grid'>
               {rechargeOptions.map((amount) => (
                 <View
@@ -206,15 +201,10 @@ function MerchantWalletContent() {
                 </View>
               ))}
             </View>
-            <View className='merchant-wallet-info'>
-              <Text>充值会创建真实微信支付订单，支付结果和余额以后端为准。</Text>
-            </View>
-            <View className='merchant-wallet-pay-button' onClick={() => void confirmRecharge()}>
-              <Text>{paying ? '支付处理中…' : `微信支付 ¥${selectedAmount}`}</Text>
-            </View>
-          </View>
+          <AppNotice title='支付说明'>充值会创建真实微信支付订单，支付结果和余额以后端为准。</AppNotice>
+          <AppButton block loading={paying} onClick={() => void confirmRecharge()}>微信支付 ¥{selectedAmount}</AppButton>
         </View>
-      ) : null}
+      </AppActionSheet>
     </View>
   )
 }

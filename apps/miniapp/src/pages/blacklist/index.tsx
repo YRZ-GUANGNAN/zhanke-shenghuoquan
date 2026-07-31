@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Text, View } from '@tarojs/components'
 import { useDidShow } from '@tarojs/taro'
 import CapsulePageHeader from '../../components/capsule-page-header'
+import { AppDialog } from '../../components/ui'
 import { listBlockedUsers, removeBlockedUser, type BlockedUserView } from '../../services/a-user'
 import Taro from '../../services/taro'
 import './index.scss'
@@ -17,6 +18,7 @@ export default function BlacklistPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [removing, setRemoving] = useState<number | null>(null)
+  const [removeCandidate, setRemoveCandidate] = useState<BlockedUserView | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -34,12 +36,11 @@ export default function BlacklistPage() {
 
   const remove = async (value: BlockedUserView) => {
     if (removing !== null) return
-    const result = await Taro.showModal({ title: '移出黑名单', content: `确认将“${value.nickname}”移出黑名单吗？`, confirmText: '移出' })
-    if (!result.confirm) return
     setRemoving(value.userId)
     try {
       await removeBlockedUser(value.userId)
       setBlockedUsers((users) => users.filter((user) => user.userId !== value.userId))
+      setRemoveCandidate(null)
       void Taro.showToast({ title: '已移出黑名单', icon: 'success' })
     } catch (cause) {
       void Taro.showToast({ title: cause instanceof Error ? cause.message : '移出失败', icon: 'none' })
@@ -67,7 +68,7 @@ export default function BlacklistPage() {
                   <Text className='student-blacklist-user__name'>{user.nickname || '匿名用户'}</Text>
                   <Text className='student-blacklist-user__meta'>{blockedAt(user.createdAt)}</Text>
                 </View>
-                <View className='student-blacklist-user__remove' onClick={() => void remove(user)}><Text>{removing === user.userId ? '处理中' : '移出'}</Text></View>
+                <View className='student-blacklist-user__remove' onClick={() => setRemoveCandidate(user)}><Text>{removing === user.userId ? '处理中' : '移出'}</Text></View>
               </View>
             ))
           ) : (
@@ -75,6 +76,16 @@ export default function BlacklistPage() {
           )}
         </View>
       </View>
+      <AppDialog
+        visible={removeCandidate !== null}
+        title='移出黑名单'
+        description={removeCandidate ? `确认将“${removeCandidate.nickname}”移出黑名单吗？` : ''}
+        confirmText='确认移出'
+        tone='danger'
+        loading={removing !== null}
+        onCancel={() => setRemoveCandidate(null)}
+        onConfirm={() => { if (removeCandidate) void remove(removeCandidate) }}
+      />
     </View>
   )
 }

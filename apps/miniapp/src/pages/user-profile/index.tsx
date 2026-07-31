@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
+import { AppActionSheet, AppDialog } from '../../components/ui'
 import { blockUser } from '../../services/a-user'
 import {
   getPublicCommunityProfile,
@@ -46,6 +47,8 @@ export default function UserProfilePage() {
   const [followerCount, setFollowerCount] = useState(0)
   const [menuVisible, setMenuVisible] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [blockConfirmVisible, setBlockConfirmVisible] = useState(false)
+  const [blockPending, setBlockPending] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -124,20 +127,23 @@ export default function UserProfilePage() {
     })
   }
 
-  const confirmBlock = async () => {
+  const requestBlock = () => {
     setMenuVisible(false)
-    const result = await Taro.showModal({
-      title: '确认拉黑该用户',
-      content: '拉黑记录会进入设置中的黑名单，你可以随时解除。',
-      confirmText: '确认拉黑'
-    })
-    if (!result.confirm) return
+    setBlockConfirmVisible(true)
+  }
+
+  const confirmBlock = async () => {
+    if (blockPending) return
+    setBlockPending(true)
     try {
       await blockUser(Number(userId))
+      setBlockConfirmVisible(false)
       await Taro.showToast({ title: '已加入黑名单', icon: 'success' })
       await Taro.navigateBack()
     } catch (value) {
       showToast(value instanceof Error ? value.message : '拉黑失败')
+    } finally {
+      setBlockPending(false)
     }
   }
 
@@ -231,19 +237,25 @@ export default function UserProfilePage() {
           )}
         </ScrollView>
       </View>
-      {menuVisible ? (
-        <View className='public-profile-sheet-layer'>
-          <View className='public-profile-sheet-layer__mask' onClick={() => setMenuVisible(false)} />
-          <View className='public-profile-sheet'>
+      <AppActionSheet visible={menuVisible} title='更多操作' onClose={() => setMenuVisible(false)}>
+        <View className='public-profile-sheet__content'>
             <View className='public-profile-sheet__group'>
               <View className='public-profile-sheet__item' onClick={() => void copyProfilePath()}><Text>复制主页路径</Text></View>
               {!isSelf ? <View className='public-profile-sheet__item public-profile-sheet__item--warning' onClick={reportUser}><Text>举报该用户</Text></View> : null}
-              {!isSelf ? <View className='public-profile-sheet__item public-profile-sheet__item--danger' onClick={() => void confirmBlock()}><Text>拉黑该用户</Text></View> : null}
+              {!isSelf ? <View className='public-profile-sheet__item public-profile-sheet__item--danger' onClick={requestBlock}><Text>拉黑该用户</Text></View> : null}
             </View>
-            <View className='public-profile-sheet__cancel' onClick={() => setMenuVisible(false)}><Text>取消</Text></View>
-          </View>
         </View>
-      ) : null}
+      </AppActionSheet>
+      <AppDialog
+        visible={blockConfirmVisible}
+        title='确认拉黑该用户'
+        description='拉黑后将不再展示对方的新内容，记录会进入设置中的黑名单。'
+        confirmText='确认拉黑'
+        tone='danger'
+        loading={blockPending}
+        onCancel={() => setBlockConfirmVisible(false)}
+        onConfirm={() => void confirmBlock()}
+      />
     </View>
   )
 }

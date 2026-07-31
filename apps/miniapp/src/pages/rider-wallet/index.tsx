@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Text, View } from '@tarojs/components'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
+import { AppActionSheet, AppButton, AppNotice } from '../../components/ui'
 import Taro from '../../services/taro'
 import './index.scss'
 
@@ -115,16 +116,8 @@ export default function RiderWalletPage() {
         <Text className='rider-wallet-ledger__end'>— 到底了 —</Text>
       </View>
 
-      {withdrawVisible && (
-        <View className='rider-wallet-mask'>
-          <View className='rider-wallet-sheet'>
-            <View className='rider-wallet-sheet__top'>
-              <Text className='rider-wallet-sheet__title'>申请提现</Text>
-              <View className='rider-wallet-sheet__close' onClick={closeWithdraw}>
-                <Text>×</Text>
-              </View>
-            </View>
-
+      <AppActionSheet visible={withdrawVisible} title='申请提现' description='提现由平台通过微信转账处理' onClose={closeWithdraw}>
+        <View className='rider-wallet-sheet__content'>
             <View className='rider-wallet-withdraw-card'>
               <Text className='rider-wallet-withdraw-card__label'>提现金额（全部余额）</Text>
               <View className='rider-wallet-withdraw-card__amount-row'>
@@ -133,16 +126,10 @@ export default function RiderWalletPage() {
               </View>
             </View>
 
-            <View className='rider-wallet-sheet__tip'>
-              <Text>ⓘ 提交后由平台通过微信转账打款，一般 1-2 天内到账，请留意平台消息。</Text>
-            </View>
-
-            <View className='rider-wallet-sheet__submit' onClick={submitWithdraw}>
-              <Text>申请提现 ¥128.50</Text>
-            </View>
-          </View>
+          <AppNotice tone='warning' title='到账说明'>提交后一般 1–2 天内到账，请留意平台消息。</AppNotice>
+          <AppButton block onClick={submitWithdraw}>申请提现 ¥128.50</AppButton>
         </View>
-      )}
+      </AppActionSheet>
     </View>
   )
 }

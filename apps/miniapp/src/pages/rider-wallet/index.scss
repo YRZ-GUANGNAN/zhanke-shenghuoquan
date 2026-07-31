@@ -259,56 +259,12 @@
   text-align: center;
 }
 
-.rider-wallet-mask {
-  position: fixed;
-  z-index: 50;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  display: flex;
-  align-items: flex-end;
-  background: rgba(20, 33, 48, .46);
-}
-
-.rider-wallet-sheet {
-  width: 100%;
-  padding: 42rpx 58rpx 58rpx;
-  border-radius: 34rpx 34rpx 0 0;
-  background: #fff;
-  box-shadow: 0 -22rpx 52rpx -28rpx rgba(20, 42, 72, .32);
-}
-
-.rider-wallet-sheet__top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.rider-wallet-sheet__title {
-  color: $text-strong;
-  font-size: 32rpx;
-  font-weight: 900;
-}
-
-.rider-wallet-sheet__close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 58rpx;
-  height: 58rpx;
-  border-radius: 50%;
-  background: #f3f7fb;
-  color: $text-secondary;
-  font-size: 34rpx;
-  line-height: 1;
-}
+.rider-wallet-sheet__content { display: grid; gap: 24rpx; }
 
 .rider-wallet-withdraw-card {
   display: flex;
   align-items: center;
   flex-direction: column;
-  margin-top: 34rpx;
   padding: 34rpx 28rpx 36rpx;
   border-radius: 18rpx;
   background: linear-gradient(180deg, #f7f9fc 0%, #f3f6fa 100%);
@@ -338,29 +294,5 @@
   font-weight: 900;
   line-height: 1;
   letter-spacing: 1rpx;
-}
-
-.rider-wallet-sheet__tip {
-  margin-top: 30rpx;
-  padding: 22rpx 24rpx;
-  border-radius: 16rpx;
-  background: #fff6ee;
-  color: #a66218;
-  font-size: 23rpx;
-  line-height: 1.55;
-}
-
-.rider-wallet-sheet__submit {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 86rpx;
-  margin-top: 34rpx;
-  border-radius: 18rpx;
-  background: linear-gradient(135deg, #348ce4 0%, #216dbe 100%);
-  box-shadow: 0 18rpx 34rpx -18rpx rgba(29, 104, 190, .72);
-  color: #fff;
-  font-size: 29rpx;
-  font-weight: 900;
 }
 

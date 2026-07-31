@@ -1,49 +1,5 @@
 @use '../styles/design-tokens.scss' as *;
 
-.identity-switch-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-}
-
-.identity-switch-modal__mask {
-  position: absolute;
-  inset: 0;
-  background: rgba(20, 35, 52, .48);
-  backdrop-filter: blur(2rpx);
-}
-
-.identity-switch-modal__panel {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  box-sizing: border-box;
-  width: 560rpx;
-  padding: 48rpx 42rpx 38rpx;
-  border-radius: 34rpx;
-  background: $bg-surface;
-  box-shadow: 0 30rpx 80rpx rgba(18, 46, 86, .22);
-  transform: translate(-50%, -50%);
-}
-
-.identity-switch-modal__title {
-  display: block;
-  color: $text-strong;
-  font-size: 34rpx;
-  font-weight: 800;
-  line-height: 1.25;
-  text-align: center;
-}
-
-.identity-switch-modal__desc {
-  display: block;
-  margin-top: 22rpx;
-  color: $text-secondary;
-  font-size: 27rpx;
-  line-height: 1.65;
-  text-align: center;
-}
-
 .identity-switch-modal__roles {
   display: flex;
   align-items: center;
@@ -78,45 +34,4 @@
   color: $text-muted;
   font-size: 28rpx;
   line-height: 1;
-}
-
-.identity-switch-modal__error {
-  display: block;
-  margin-top: 20rpx;
-  color: #d14343;
-  font-size: 23rpx;
-  line-height: 1.45;
-  text-align: center;
-}
-
-.identity-switch-modal__actions {
-  display: grid;
-  grid-template-columns: 1fr 1.15fr;
-  gap: 18rpx;
-  margin-top: 38rpx;
-}
-
-.identity-switch-modal__button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 72rpx;
-  border-radius: 18rpx;
-  font-size: 27rpx;
-  font-weight: 700;
-}
-
-.identity-switch-modal__button--cancel {
-  color: $text-secondary;
-  background: #F4F7FA;
-}
-
-.identity-switch-modal__button--confirm {
-  color: $text-on-color;
-  background: $gradient-primary;
-  box-shadow: 0 14rpx 28rpx rgba(43, 128, 214, .22);
-}
-
-.identity-switch-modal__button--disabled {
-  opacity: .58;
 }

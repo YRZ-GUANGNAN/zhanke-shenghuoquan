@@ -8,6 +8,7 @@
 .app-dialog__content { margin-top: $space-4; }
 .app-dialog__error { display: block; margin-top: $space-3; padding: $space-2 $space-3; border-radius: 12rpx; background: $danger-tint; color: $danger; font-size: 24rpx; line-height: 1.45; text-align: center; }
 .app-dialog__actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: $space-2; margin-top: $space-5; }
+.app-dialog__actions--single { grid-template-columns: minmax(0, 1fr); }
 @keyframes app-layer-fade { from { opacity: 0; } }
 @keyframes app-dialog-enter { from { opacity: 0; transform: translateY(20rpx) scale(.98); } }
 @media (prefers-reduced-motion: reduce) { .app-dialog-layer__mask, .app-dialog { animation: none; } }

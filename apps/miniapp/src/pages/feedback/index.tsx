@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Image, Text, Textarea, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
+import { AppDialog } from '../../components/ui'
 import { submitFeedback, type FeedbackCategory } from '../../services/a-user'
 import { chooseAndUploadImages, waitForMediaApproval, type UploadedMedia } from '../../services/media'
 import Taro from '../../services/taro'
@@ -22,6 +23,7 @@ export default function FeedbackPage() {
   const [images, setImages] = useState<UploadedMedia[]>([])
   const [progress, setProgress] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [submittedId, setSubmittedId] = useState('')
 
   const chooseImages = async () => {
     if (images.length >= 3) return
@@ -52,8 +54,7 @@ export default function FeedbackPage() {
     setSubmitting(true)
     try {
       const result = await submitFeedback(category, normalized, images.map((item) => item.assetId))
-      await Taro.showModal({ title: '反馈已提交', content: `反馈编号：${result.id}\n我们会尽快处理。`, showCancel: false, confirmText: '完成' })
-      await Taro.navigateBack()
+      setSubmittedId(result.id)
     } catch (error) {
       void Taro.showToast({ title: error instanceof Error ? error.message : '提交失败，内容已为你保留', icon: 'none' })
     } finally {
@@ -98,6 +99,15 @@ export default function FeedbackPage() {
 
         <View className={`feedback-submit ${submitting ? 'feedback-submit--disabled' : ''}`} onClick={() => void submit()}><Text>{submitting ? '正在提交…' : '提交反馈'}</Text></View>
       </View>
+      <AppDialog
+        visible={Boolean(submittedId)}
+        title='反馈已提交'
+        description={`反馈编号：${submittedId}。我们会尽快处理。`}
+        confirmText='完成'
+        showCancel={false}
+        onCancel={() => undefined}
+        onConfirm={() => void Taro.navigateBack()}
+      />
     </View>
   )
 }

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Input, ScrollView, Text, Textarea, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
+import { AppActionSheet, AppButton } from '../../components/ui'
 import { deliveryMockFeeEnabled, deliveryPaymentEnabled } from '../../feature-flags'
 import { useIdentityGuard } from '../../hooks/use-identity-guard'
 import { getIdentityApplication } from '../../services/a-user'
@@ -289,17 +290,14 @@ function MerchantPublishContent() {
         </View>
       </View>
 
-      {sheetVisible ? (
-        <View className='merchant-publish-modal'>
-          <View className='merchant-publish-modal__mask' onClick={() => setSheetVisible(false)} />
-          <View className='merchant-publish-sheet'>
-            <View className='merchant-publish-sheet__header'>
-              <View>
-                <Text className='merchant-publish-sheet__title'>选择支付方式</Text>
-                <Text className='merchant-publish-sheet__subtitle'>实际配送费以服务端返回为准</Text>
-              </View>
-              <View className='merchant-publish-sheet__close' onClick={() => setSheetVisible(false)}><Text>×</Text></View>
-            </View>
+      <AppActionSheet
+        visible={sheetVisible}
+        title='选择支付方式'
+        description='实际配送费以服务端返回为准'
+        loading={submitting}
+        onClose={() => setSheetVisible(false)}
+      >
+        <View className='merchant-publish-sheet__content'>
             <View className='merchant-publish-payments'>
               {paymentOptions.map((option) => (
                 <View
@@ -320,12 +318,9 @@ function MerchantPublishContent() {
                 </View>
               ))}
             </View>
-            <View className='merchant-publish-confirm' onClick={() => void confirmPayment()}>
-              <Text>确认发布并支付</Text>
-            </View>
-          </View>
+          <AppButton block loading={submitting} onClick={() => void confirmPayment()}>确认发布并支付</AppButton>
         </View>
-      ) : null}
+      </AppActionSheet>
     </View>
   )
 }

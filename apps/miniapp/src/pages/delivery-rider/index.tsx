@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
 import { useDidShow } from '@tarojs/taro'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
+import { AppDialog } from '../../components/ui'
 import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
 import { isApiError } from '../../services/api'
 import {
@@ -79,6 +80,7 @@ export default function DeliveryRiderPage() {
   const [loading, setLoading] = useState(false)
   const [busyOrderId, setBusyOrderId] = useState('')
   const [error, setError] = useState('')
+  const [releaseCandidate, setReleaseCandidate] = useState<AssignedDeliveryOrder | null>(null)
 
   const pickupOrders = useMemo(
     () => assigned.filter((order) => order.status === 'claimed' || order.status === 'to_pickup'),
@@ -194,13 +196,8 @@ export default function DeliveryRiderPage() {
   }
 
   const release = async (order: AssignedDeliveryOrder) => {
-    const modal = await Taro.showModal({
-      title: '确认释放订单',
-      content: '释放后订单会重新进入抢单池，请确认你尚未取到货物。',
-      confirmText: '确认释放'
-    })
-    if (!modal.confirm) return
     await runCommand(order, releaseDeliveryOrder, '订单已释放')
+    setReleaseCandidate(null)
   }
 
   const openConversation = (orderId: string) => {
@@ -359,6 +356,16 @@ export default function DeliveryRiderPage() {
           )}
         </View>
       </ScrollView>
+      <AppDialog
+        visible={releaseCandidate !== null}
+        title='确认释放订单'
+        description='释放后订单会重新进入抢单池，请确认你尚未取到货物。'
+        confirmText='确认释放'
+        tone='danger'
+        loading={Boolean(busyOrderId)}
+        onCancel={() => setReleaseCandidate(null)}
+        onConfirm={() => { if (releaseCandidate) void release(releaseCandidate) }}
+      />
     </View>
   )
 
@@ -502,7 +509,7 @@ export default function DeliveryRiderPage() {
             <View
               className={`rider-order-card__secondary rider-order-card__secondary--danger ${busyOrderId ? 'rider-order-card__secondary--disabled' : ''}`}
               onClick={() => {
-                if (!busyOrderId) void release(order)
+                if (!busyOrderId) setReleaseCandidate(order)
               }}
             >
               <Text>释放</Text>
