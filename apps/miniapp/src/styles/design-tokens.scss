@@ -36,6 +36,11 @@ $border-strong: #C9D5E3;
 $divider-hairline: #F7F9FC;
 $divider-nav: #EDF1F6;
 
+// 角色工作台低强调层级使用的语义别名。
+$bg-subtle: $bg-surface-subtle;
+$bg-muted: $bg-screen;
+$border-subtle: $divider-nav;
+
 $radius-control: 16rpx;
 $radius-card: 24rpx;
 $radius-dialog: 32rpx;

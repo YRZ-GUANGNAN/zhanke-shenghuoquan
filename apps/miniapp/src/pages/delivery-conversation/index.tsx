@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Button, Image, Input, ScrollView, Text, View } from '@tarojs/components'
-import AppIcon from '../../components/app-icon'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
+import AppIcon from '../../components/app-icon'
 import { isApiError } from '../../services/api'
 import {
   deliveryConversationCanSend,
