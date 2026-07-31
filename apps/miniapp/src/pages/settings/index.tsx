@@ -205,10 +205,6 @@ export default function SettingsPage() {
         <View className='student-settings-section'>
           <Text className='student-settings-section__label'>通用</Text>
           <View className='student-settings-card'>
-            <View className='student-settings-row' onClick={() => void Taro.showToast({ title: '当前没有可安全清理的缓存', icon: 'none' })}>
-              <Text className='student-settings-row__title'>清理缓存</Text>
-              <Text className='student-settings-row__value'>0 B</Text>
-            </View>
             <View className='student-settings-row' onClick={checkUpdate}>
               <Text className='student-settings-row__title'>检查更新</Text>
               <Text className='student-settings-row__value'>{currentVersion()}</Text>

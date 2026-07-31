@@ -424,32 +424,6 @@
   transform: skew(-20deg);
 }
 
-.secondhand-contact-option__icon--wechat {
-  background: rgba(36, 181, 120, .12);
-}
-
-.secondhand-contact-option__icon--wechat::before,
-.secondhand-contact-option__icon--wechat::after {
-  position: absolute;
-  border: 4rpx solid #22A76F;
-  border-radius: 50%;
-  content: '';
-}
-
-.secondhand-contact-option__icon--wechat::before {
-  top: 20rpx;
-  left: 16rpx;
-  width: 30rpx;
-  height: 22rpx;
-}
-
-.secondhand-contact-option__icon--wechat::after {
-  right: 14rpx;
-  bottom: 18rpx;
-  width: 24rpx;
-  height: 18rpx;
-}
-
 .secondhand-contact-option__main {
   flex: 1 1 auto;
   min-width: 0;

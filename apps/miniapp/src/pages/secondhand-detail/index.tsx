@@ -346,15 +346,6 @@ export default function SecondhandDetailPage() {
               <AppIcon name='chevron-right' className='secondhand-contact-option__arrow app-icon--chevron' />
             </View>
 
-            <View className='secondhand-contact-option' onClick={() => showToast('卖家未提供微信联系方式')}>
-              <View className='secondhand-contact-option__icon secondhand-contact-option__icon--wechat' />
-              <View className='secondhand-contact-option__main'>
-                <Text className='secondhand-contact-option__title'>加微信联系</Text>
-                <Text className='secondhand-contact-option__desc'>卖家未提供微信联系方式</Text>
-              </View>
-              <AppIcon name='chevron-right' className='secondhand-contact-option__arrow app-icon--chevron' />
-            </View>
-
           <AppNotice tone='warning'>交易由买卖双方私下完成，平台不担保、不代收款。</AppNotice>
         </View> : null}
       </AppActionSheet>
