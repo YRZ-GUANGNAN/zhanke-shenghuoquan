@@ -1,0 +1,17 @@
+@use '../../styles/design-tokens.scss' as *;
+
+@mixin skeleton-block { background: linear-gradient(100deg, #EDF2F7 25%, #F7F9FC 45%, #EDF2F7 65%); background-size: 240% 100%; animation: app-skeleton-shimmer 1.4s ease-in-out infinite; }
+.app-skeleton { width: 100%; }
+.app-skeleton--list { display: grid; gap: $space-3; }
+.app-skeleton__row { display: flex; gap: $space-3; padding: $space-3; border-radius: $radius-card; background: $bg-surface; }
+.app-skeleton__thumb { @include skeleton-block; flex: 0 0 auto; width: 144rpx; height: 144rpx; border-radius: $radius-control; }
+.app-skeleton__copy { flex: 1; min-width: 0; padding-top: 10rpx; }
+.app-skeleton__line { @include skeleton-block; width: 100%; height: 24rpx; margin-top: 24rpx; border-radius: $radius-pill; }
+.app-skeleton__line--title { width: 72%; height: 32rpx; margin-top: 0; }
+.app-skeleton__line--short { width: 46%; }
+.app-skeleton--detail { padding: $space-3; border-radius: $radius-card; background: $bg-surface; }
+.app-skeleton__media { @include skeleton-block; width: 100%; height: 420rpx; border-radius: $radius-card; }
+.app-skeleton--metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: $space-2; }
+.app-skeleton__metric { @include skeleton-block; height: 132rpx; border-radius: $radius-control; }
+@keyframes app-skeleton-shimmer { to { background-position-x: -240%; } }
+@media (prefers-reduced-motion: reduce) { .app-skeleton__thumb, .app-skeleton__line, .app-skeleton__media, .app-skeleton__metric { animation: none; } }

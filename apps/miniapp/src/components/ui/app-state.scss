@@ -1,0 +1,18 @@
+@use '../../styles/design-tokens.scss' as *;
+
+.app-state { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 420rpx; padding: $space-6 $space-4; text-align: center; }
+.app-state--compact { min-height: 240rpx; padding: $space-5 $space-3; }
+.app-state__symbol { display: flex; align-items: center; justify-content: center; width: 88rpx; height: 88rpx; margin-bottom: $space-3; border-radius: 50%; background: $brand-tint; }
+.app-state__symbol-core { width: 30rpx; height: 30rpx; border: 5rpx solid $brand-primary; border-radius: 50%; }
+.app-state--loading .app-state__symbol-core { border-right-color: transparent; animation: app-state-spin .8s linear infinite; }
+.app-state--empty .app-state__symbol-core { width: 36rpx; height: 24rpx; border-radius: 8rpx; }
+.app-state--error .app-state__symbol, .app-state--forbidden .app-state__symbol { background: $danger-tint; }
+.app-state--error .app-state__symbol-core, .app-state--forbidden .app-state__symbol-core { border-color: $danger; }
+.app-state--offline .app-state__symbol { background: $warning-tint; }
+.app-state--offline .app-state__symbol-core { border-color: $warning; border-right-color: transparent; border-radius: 4rpx; transform: rotate(-12deg); }
+.app-state__title, .app-state__description { display: block; }
+.app-state__title { color: $text-strong; font-size: 30rpx; font-weight: 800; line-height: 1.35; }
+.app-state__description { max-width: 560rpx; margin-top: 10rpx; color: $text-secondary; font-size: 25rpx; line-height: 1.55; }
+.app-state .app-button { margin-top: $space-4; }
+@keyframes app-state-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .app-state--loading .app-state__symbol-core { animation-duration: 1.6s; } }

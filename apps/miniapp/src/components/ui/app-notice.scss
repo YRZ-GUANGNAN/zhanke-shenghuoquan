@@ -1,0 +1,12 @@
+@use '../../styles/design-tokens.scss' as *;
+
+.app-notice { display: flex; align-items: flex-start; gap: $space-2; padding: 20rpx $space-3; border: 1rpx solid rgba($info, .14); border-radius: $radius-control; background: $info-tint; color: $brand-primary-strong; }
+.app-notice__mark { flex: 0 0 auto; width: 14rpx; height: 14rpx; margin-top: 10rpx; border: 4rpx solid currentColor; border-radius: 50%; }
+.app-notice__body { flex: 1; min-width: 0; }
+.app-notice__title, .app-notice__content { display: block; }
+.app-notice__title { font-size: 25rpx; font-weight: 800; line-height: 1.4; }
+.app-notice__content { font-size: 24rpx; line-height: 1.55; }
+.app-notice__title + .app-notice__content { margin-top: 4rpx; }
+.app-notice--success { border-color: rgba($success, .14); background: $success-tint; color: $success; }
+.app-notice--warning { border-color: rgba($warning, .16); background: $warning-tint; color: $warning; }
+.app-notice--danger { border-color: rgba($danger, .14); background: $danger-tint; color: $danger; }
