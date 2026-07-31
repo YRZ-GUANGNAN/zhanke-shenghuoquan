@@ -1,5 +1,7 @@
 # G-7 本地最小验收快速指引：最快看到买家端菜品图
 
+> 安全约束：根目录的 `npm run test:backend` 会清空测试进程中的各类 `*_MYSQL_DSN`，避免迁移回滚验收误连共享库。只有准备好独立临时 MySQL 数据库并显式配置对应 DSN 后，才运行 `npm run test:backend:mysql`。
+
 ## 0. 这份指引的目标
 
 用最少步骤，让微信开发者工具里的买家端“外卖”tab 显示出一个带图菜品，肉眼验证：
@@ -111,7 +113,7 @@ npm run dev:miniapp
 1. 导入目录：`apps/miniapp`
 2. `apps/miniapp/project.config.json` 已配置：
    - `miniprogramRoot: "dist/"`
-   - `appid: "wx27a4c1be22695ed6"`（如你的真实 AppID 不同，请确认本地项目配置）
+   - `appid: "wx0dacef976daa8e55"`（如你的真实 AppID 不同，请确认本地项目配置）
    - `setting.urlCheck: false`
 3. 本地调试时仍建议在开发者工具里关闭“校验合法域名、web-view、TLS 版本以及 HTTPS 证书”。
 4. 如果看不到“外卖”tab：
