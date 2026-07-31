@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { AdminAPIError, adminAPI } from './services/f-admin'
+import { useAdminDialog } from './components'
 import type {
   IdentityApplicationAdminList,
   IdentityApplicationDetail,
@@ -50,6 +51,7 @@ function Fact({ label, value }: { label: string; value: ReactNode }) {
 }
 
 export function IdentityApplications() {
+  const dialog = useAdminDialog()
   const [data, setData] = useState<IdentityApplicationAdminList>(emptyPage)
   const [role, setRole] = useState<IdentityApplicationRole | ''>('')
   const [status, setStatus] = useState<IdentityApplicationStatus | ''>('pending')
@@ -231,7 +233,8 @@ export function IdentityApplications() {
       setError('拒绝原因不能为空')
       return
     }
-    if (action === 'approve' && !window.confirm(`确认通过用户 #${selected.userId} 的${roleLabel(selected.role)}申请吗？`)) return
+    if (action === 'approve' && !await dialog.confirm({ title: '通过身份申请', description: `确认通过用户 #${selected.userId} 的${roleLabel(selected.role)}申请吗？通过后用户即可进入对应工作台。`, confirmLabel: '确认通过' })) return
+    if (action === 'reject' && !await dialog.confirm({ title: '拒绝身份申请', description: `确认拒绝用户 #${selected.userId} 的${roleLabel(selected.role)}申请吗？拒绝原因将用于审核记录。`, confirmLabel: '确认拒绝', tone: 'danger' })) return
     setBusy(true)
     setError('')
     try {

@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { adminAuthAPI } from './services/admin-auth'
 import { useAdminStore } from './store'
+import { useAdminDialog } from './components'
 
 export function AccountPanel() {
+  const dialog = useAdminDialog()
   const user = useAdminStore(state => state.user)
   const setUnauthenticated = useAdminStore(state => state.setUnauthenticated)
   const [changing, setChanging] = useState(false)
@@ -32,7 +34,7 @@ export function AccountPanel() {
     setError('')
     try {
       await adminAuthAPI.changePassword(oldPassword, newPassword)
-      window.alert('密码已修改，请使用新密码重新登录。')
+      await dialog.notify({ title: '密码已修改', description: '所有管理网页会话已退出，请使用新密码重新登录。', confirmLabel: '重新登录' })
       setOldPassword('')
       setNewPassword('')
       setConfirmation('')

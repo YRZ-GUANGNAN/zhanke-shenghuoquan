@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { TakeoutAPIError, takeoutAdminAPI } from './services/takeout-admin'
+import { useAdminDialog } from './components'
 import type { DishCategoryRow, DishRow, FeeConfigRow, MerchantRow, OrderDetail, OrderRow, Page, RiderConfigRow, RiderRow, RiderStatus, SettlementRow, TakeoutQuery, WithdrawRow, WithdrawStatus } from './types'
 
 type View='merchants'|'catalog'|'orders'|'riders'|'fee'|'rider-config'|'settlements'|'withdrawals'
@@ -34,6 +35,7 @@ function Detail({title,close,children}:{title:string;close:()=>void;children:Rea
 function Fact({label,value}:{label:string;value:ReactNode}){return <div className="takeout-fact"><span>{label}</span><strong>{value}</strong></div>}
 
 function Merchants(){
+	const dialog=useAdminDialog()
 	const[data,setData]=useState<Page<MerchantRow>>(emptyPage())
 	const[status,setStatus]=useState('')
 	const[page,setPage]=useState(1)
@@ -48,7 +50,7 @@ function Merchants(){
 	const act=async(action:'suspend'|'unsuspend')=>{
 		if(!detail)return
 		const label=action==='suspend'?'封禁':'解封'
-		if(!window.confirm(`确认${label}商家“${detail.name}”？`))return
+		if(!await dialog.confirm({title:`${label}商家`,description:`确认${label}商家“${detail.name}”？该操作会立即影响商家工作台状态。`,confirmLabel:`确认${label}`,tone:action==='suspend'?'danger':'default'}))return
 		setBusy(action);setError('');setConflict(false)
 		try{
 			const updated=action==='suspend'?await takeoutAdminAPI.suspendMerchant(detail.merchantPublicId,detail.status,detail.rowVersion):await takeoutAdminAPI.unsuspendMerchant(detail.merchantPublicId,detail.rowVersion)
@@ -107,6 +109,7 @@ function Orders(){
 function OrderDetailPanel({value,close}:{value:OrderDetail;close:()=>void}){const order=value.order;const stages:Array<[string,string|undefined]>=[['已支付',order.paidAt],['已接单',order.acceptedAt],['备餐中',order.preparingAt],['待取餐',order.readyAt],['配送中',order.deliveringAt],['已完成',order.completedAt],['已取消',order.cancelledAt],['已退款',order.refundedAt]];return <Detail title={`订单 ${order.orderPublicId}`} close={close}><div className="detail-grid"><Fact label="状态" value={<Badge value={order.status}/>}/><Fact label="商品金额" value={money(order.itemsAmountCents)}/><Fact label="配送费" value={money(order.deliveryFeeCents)}/><Fact label="总额" value={money(order.totalAmountCents)}/><Fact label="联系人" value={`${order.contactName} / ${order.contactPhone}`}/><Fact label="地址" value={`${order.addressBuilding} ${order.addressRoom}`}/></div><h4>订单明细</h4><table><thead><tr><th>菜品</th><th>单价</th><th>数量</th><th>小计</th></tr></thead><tbody>{value.items.map((item,index)=><tr key={`${item.dishPublicId}-${index}`}><td>{item.dishNameSnapshot}</td><td>{money(item.unitPriceCentsSnapshot)}</td><td>{item.quantity}</td><td>{money(item.lineAmountCents)}</td></tr>)}</tbody></table><h4>阶段时间</h4><div className="takeout-timeline">{stages.map(([label,value])=><div key={label}><span>{label}</span><strong>{time(value)}</strong></div>)}</div></Detail>}
 
 function Riders(){
+	const dialog=useAdminDialog()
 	const[data,setData]=useState<Page<RiderRow>>(emptyPage())
 	const[status,setStatus]=useState('')
 	const[page,setPage]=useState(1)
@@ -115,11 +118,12 @@ function Riders(){
 	const[busy,setBusy]=useState<number|null>(null)
 	const load=useCallback(async()=>{setError('');setConflict(false);try{setData(await takeoutAdminAPI.riders({status,page,pageSize}))}catch(reason){setError(errorMessage(reason))}},[status,page])
 	useEffect(()=>{void load()},[load])
-	const act=async(row:RiderRow,next:RiderStatus)=>{if(!window.confirm(`确认将骑手 #${row.riderUserId} 状态改为 ${next}？`))return;setBusy(row.riderUserId);setError('');setConflict(false);try{await takeoutAdminAPI.updateRiderStatus(row.riderUserId,next,row.status,row.rowVersion);await load()}catch(reason){if(reason instanceof TakeoutAPIError&&reason.status===409){setConflict(true);setError(conflictMessage)}else setError(errorMessage(reason))}finally{setBusy(null)}}
+	const act=async(row:RiderRow,next:RiderStatus)=>{if(!await dialog.confirm({title:'更新骑手状态',description:`确认将骑手 #${row.riderUserId} 的状态从 ${row.status} 改为 ${next}？`,confirmLabel:'确认更新',tone:next==='suspended'?'danger':'default'}))return;setBusy(row.riderUserId);setError('');setConflict(false);try{await takeoutAdminAPI.updateRiderStatus(row.riderUserId,next,row.status,row.rowVersion);await load()}catch(reason){if(reason instanceof TakeoutAPIError&&reason.status===409){setConflict(true);setError(conflictMessage)}else setError(errorMessage(reason))}finally{setBusy(null)}}
 	return <Panel title="骑手管理" actions={<div className="takeout-controls"><label>状态<select value={status} onChange={event=>{setPage(1);setStatus(event.target.value)}}><option value="">全部</option>{['active','resting','suspended'].map(value=><option key={value}>{value}</option>)}</select></label><button onClick={()=>void load()}>刷新</button></div>}><ErrorNotice error={error} conflict={conflict} refresh={()=>void load()}/><div className="table-scroll"><table><thead><tr><th>骑手</th><th>联系方式</th><th>状态</th><th>版本</th><th>操作</th></tr></thead><tbody>{data.items.map(row=><tr key={row.riderUserId}><td>{row.realName}<span>#{row.riderUserId}</span></td><td>{row.phone}</td><td><Badge value={row.status}/></td><td>v{row.rowVersion}</td><td><div className="takeout-row-actions">{row.status==='active'&&<button disabled={busy===row.riderUserId} onClick={()=>void act(row,'resting')}>设为休息</button>}{row.status==='resting'&&<button disabled={busy===row.riderUserId} onClick={()=>void act(row,'active')}>恢复接单</button>}{row.status!=='suspended'&&<button className="danger" disabled={busy===row.riderUserId} onClick={()=>void act(row,'suspended')}>封禁</button>}{row.status==='suspended'&&<button disabled={busy===row.riderUserId} onClick={()=>void act(row,'active')}>解封</button>}</div></td></tr>)}</tbody></table></div><Pagination value={data} setPage={setPage}/></Panel>
 }
 
 function FeeConfig(){
+	const dialog=useAdminDialog()
 	const[value,setValue]=useState<FeeConfigRow|null>(null)
 	const[riderFee,setRiderFee]=useState('')
 	const[platformCut,setPlatformCut]=useState('')
@@ -128,11 +132,12 @@ function FeeConfig(){
 	const[loading,setLoading]=useState(false)
 	const load=useCallback(async()=>{setError('');setConflict(false);try{const latest=await takeoutAdminAPI.feeConfig();setValue(latest);setRiderFee(String(latest.riderFeeCents));setPlatformCut(String(latest.platformCutCents))}catch(reason){setError(errorMessage(reason))}},[])
 	useEffect(()=>{void load()},[load])
-	const submit=async()=>{if(!value)return;if(!window.confirm('确认更新配送费与平台抽成配置？'))return;setLoading(true);setError('');setConflict(false);try{await takeoutAdminAPI.updateFeeConfig(Number(riderFee),Number(platformCut),value.rowVersion);await load()}catch(reason){if(reason instanceof TakeoutAPIError&&reason.status===409){setConflict(true);setError(conflictMessage)}else setError(errorMessage(reason))}finally{setLoading(false)}}
+	const submit=async()=>{if(!value)return;if(!await dialog.confirm({title:'更新费率配置',description:`新配置：骑手配送费 ${money(Number(riderFee))}，平台抽成 ${money(Number(platformCut))}。仅影响后续订单。`,confirmLabel:'保存配置'}))return;setLoading(true);setError('');setConflict(false);try{await takeoutAdminAPI.updateFeeConfig(Number(riderFee),Number(platformCut),value.rowVersion);await load()}catch(reason){if(reason instanceof TakeoutAPIError&&reason.status===409){setConflict(true);setError(conflictMessage)}else setError(errorMessage(reason))}finally{setLoading(false)}}
 	return <Panel title="费率配置"><ErrorNotice error={error} conflict={conflict} refresh={()=>void load()}/>{value?<div className="takeout-form"><label>骑手配送费（分）<input type="number" min="0" value={riderFee} onChange={event=>setRiderFee(event.target.value)}/></label><label>平台抽成（分）<input type="number" min="0" value={platformCut} onChange={event=>setPlatformCut(event.target.value)}/></label><Fact label="当前 Row Version" value={`v${value.rowVersion}`}/><Fact label="服务端更新时间" value={time(value.updatedAt)}/><button disabled={loading} onClick={()=>void submit()}>{loading?'保存中…':'保存配置'}</button><button className="secondary" disabled={loading} onClick={()=>void load()}>刷新</button></div>:<p>加载中…</p>}</Panel>
 }
 
 function RiderConfig(){
+	const dialog=useAdminDialog()
 	const[value,setValue]=useState<RiderConfigRow|null>(null)
 	const[max,setMax]=useState('')
 	const[error,setError]=useState('')
@@ -140,7 +145,7 @@ function RiderConfig(){
 	const[loading,setLoading]=useState(false)
 	const load=useCallback(async()=>{setError('');setConflict(false);try{const latest=await takeoutAdminAPI.riderConfig();setValue(latest);setMax(String(latest.maxInFlightPerRider))}catch(reason){setError(errorMessage(reason))}},[])
 	useEffect(()=>{void load()},[load])
-	const submit=async()=>{if(!value)return;if(!window.confirm('确认更新骑手在途订单上限？'))return;setLoading(true);setError('');setConflict(false);try{await takeoutAdminAPI.updateRiderConfig(Number(max),value.rowVersion);await load()}catch(reason){if(reason instanceof TakeoutAPIError&&reason.status===409){setConflict(true);setError(conflictMessage)}else setError(errorMessage(reason))}finally{setLoading(false)}}
+	const submit=async()=>{if(!value)return;if(!await dialog.confirm({title:'更新在途订单上限',description:`每名骑手的最大在途订单将调整为 ${max} 单。`,confirmLabel:'保存配置'}))return;setLoading(true);setError('');setConflict(false);try{await takeoutAdminAPI.updateRiderConfig(Number(max),value.rowVersion);await load()}catch(reason){if(reason instanceof TakeoutAPIError&&reason.status===409){setConflict(true);setError(conflictMessage)}else setError(errorMessage(reason))}finally{setLoading(false)}}
 	return <Panel title="骑手在途上限配置"><ErrorNotice error={error} conflict={conflict} refresh={()=>void load()}/>{value?<div className="takeout-form"><label>每名骑手最大在途单数<input type="number" min="1" value={max} onChange={event=>setMax(event.target.value)}/></label><Fact label="当前 Row Version" value={`v${value.rowVersion}`}/><Fact label="服务端更新时间" value={time(value.updatedAt)}/><button disabled={loading} onClick={()=>void submit()}>{loading?'保存中…':'保存配置'}</button><button className="secondary" disabled={loading} onClick={()=>void load()}>刷新</button></div>:<p>加载中…</p>}</Panel>
 }
 
@@ -154,6 +159,7 @@ function Settlements(){
 }
 
 function Withdrawals(){
+	const dialog=useAdminDialog()
 	const[data,setData]=useState<Page<WithdrawRow>>(emptyPage())
 	const[status,setStatus]=useState<WithdrawStatus|''>('pending')
 	const[page,setPage]=useState(1)
@@ -164,7 +170,7 @@ function Withdrawals(){
 	const load=useCallback(async()=>{setError('');setConflict(false);try{setData(await takeoutAdminAPI.withdrawals({status,page,pageSize}))}catch(reason){setError(errorMessage(reason))}},[status,page])
 	useEffect(()=>{void load()},[load])
 	const inspect=async(id:string)=>{setError('');try{setDetail(await takeoutAdminAPI.withdrawal(id))}catch(reason){setError(errorMessage(reason))}}
-	const run=async(action:'pay'|'reject')=>{if(!detail)return;let reason='';if(action==='pay'){if(!window.confirm(`请确认已完成线下打款。是否将提现 ${detail.withdrawPublicId} 标记为已打款？`))return}else{reason=window.prompt('请输入拒绝原因')?.trim()||'';if(!reason)return;if(!window.confirm(`确认拒绝提现 ${detail.withdrawPublicId}？`))return}setBusy(action);setError('');setConflict(false);try{const updated=action==='pay'?await takeoutAdminAPI.payWithdrawal(detail.withdrawPublicId,detail.rowVersion):await takeoutAdminAPI.rejectWithdrawal(detail.withdrawPublicId,detail.rowVersion,reason);setDetail(updated);await load()}catch(cause){if(cause instanceof TakeoutAPIError&&cause.status===409){setConflict(true);setError(conflictMessage)}else setError(errorMessage(cause))}finally{setBusy('')}}
+	const run=async(action:'pay'|'reject')=>{if(!detail)return;let reason='';if(action==='pay'){if(!await dialog.confirm({title:'登记线下打款',description:`请先确认已完成线下打款，再将提现 ${detail.withdrawPublicId}（${money(detail.amountCents)}）标记为已打款。本操作不会发起真实转账。`,confirmLabel:'确认已打款'}))return}else{reason=await dialog.prompt({title:'拒绝提现申请',description:`确认拒绝提现 ${detail.withdrawPublicId}（${money(detail.amountCents)}）。`,inputLabel:'拒绝原因',placeholder:'请输入具体原因',requiredMessage:'拒绝原因不能为空',confirmLabel:'确认拒绝',tone:'danger'})||'';if(!reason)return}setBusy(action);setError('');setConflict(false);try{const updated=action==='pay'?await takeoutAdminAPI.payWithdrawal(detail.withdrawPublicId,detail.rowVersion):await takeoutAdminAPI.rejectWithdrawal(detail.withdrawPublicId,detail.rowVersion,reason);setDetail(updated);await load()}catch(cause){if(cause instanceof TakeoutAPIError&&cause.status===409){setConflict(true);setError(conflictMessage)}else setError(errorMessage(cause))}finally{setBusy('')}}
 	const refresh=async()=>{await load();if(detail)await inspect(detail.withdrawPublicId)}
 	return <Panel title="提现处理" actions={<div className="takeout-controls"><label>状态<select value={status} onChange={event=>{setPage(1);setStatus(event.target.value as WithdrawStatus|'')}}><option value="">全部</option><option value="pending">pending</option><option value="paid">paid</option><option value="rejected">rejected</option></select></label><button onClick={()=>void load()}>刷新</button></div>}><ErrorNotice error={error} conflict={conflict} refresh={()=>void refresh()}/><div className="table-scroll"><table><thead><tr><th>提现申请</th><th>骑手</th><th>金额</th><th>状态</th><th>版本</th><th>创建时间</th></tr></thead><tbody>{data.items.map(row=><tr key={row.withdrawPublicId}><td><button className="link-button" onClick={()=>void inspect(row.withdrawPublicId)}>{row.withdrawPublicId}</button></td><td>#{row.riderUserId}</td><td>{money(row.amountCents)}</td><td><Badge value={row.status}/></td><td>v{row.rowVersion}</td><td>{time(row.createdAt)}</td></tr>)}</tbody></table></div><Pagination value={data} setPage={setPage}/>{detail&&<Detail title={`提现 ${detail.withdrawPublicId}`} close={()=>setDetail(null)}><div className="detail-grid"><Fact label="骑手" value={`#${detail.riderUserId}`}/><Fact label="金额" value={money(detail.amountCents)}/><Fact label="状态" value={<Badge value={detail.status}/>}/><Fact label="Row Version" value={`v${detail.rowVersion}`}/><Fact label="备注" value={detail.note||'—'}/><Fact label="打款时间" value={time(detail.paidAt)}/></div>{detail.status==='pending'&&<div className="takeout-actions"><button disabled={Boolean(busy)} onClick={()=>void run('pay')}>{busy==='pay'?'处理中…':'标记已打款'}</button><button className="danger" disabled={Boolean(busy)} onClick={()=>void run('reject')}>{busy==='reject'?'处理中…':'拒绝申请'}</button></div>}</Detail>}</Panel>
 }

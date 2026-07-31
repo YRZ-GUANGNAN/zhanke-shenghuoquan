@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AdminAPIError, adminAPI } from './services/f-admin'
+import { useAdminDialog } from './components'
 import type {
   ExternalTakeoutMerchant,
   ExternalTakeoutMerchantDirectory,
@@ -59,6 +60,7 @@ function toDraft(item: ExternalTakeoutMerchant): ExternalTakeoutMerchantInput {
 }
 
 export function ExternalTakeoutMerchants() {
+  const dialog = useAdminDialog()
   const [directory, setDirectory] = useState<ExternalTakeoutMerchantDirectory | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -133,7 +135,7 @@ export function ExternalTakeoutMerchants() {
   }
 
   const remove = async (item: ExternalTakeoutMerchant) => {
-    if (!window.confirm(`确认删除“${item.title}”吗？`)) return
+    if (!await dialog.confirm({ title: '删除外部商家', description: `确认删除“${item.title}”吗？删除后学生端将不再展示该入口。`, confirmLabel: '确认删除', tone: 'danger' })) return
     await mutate(`delete-${item.id}`, () => adminAPI.deleteExternalTakeoutMerchant(item.id))
   }
 

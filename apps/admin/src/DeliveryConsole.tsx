@@ -18,6 +18,7 @@ import {
   type RiderPayoutResult,
   type RiderWallet
 } from './services/delivery-admin'
+import { useAdminDialog } from './components'
 
 type View = 'summary' | 'orders' | 'fee' | 'overrides' | 'merchant-wallets' | 'rider-wallets' | 'earnings' | 'refunds'
 
@@ -222,6 +223,7 @@ function OrderDetailPanel({ value, close }: { value: OrderFunds; close: () => vo
 }
 
 function FeeConfigPanel() {
+  const dialog = useAdminDialog()
   const [value, setValue] = useState<FeeConfig | null>(null)
   const [deliveryFee, setDeliveryFee] = useState('')
   const [platformCut, setPlatformCut] = useState('')
@@ -241,7 +243,7 @@ function FeeConfigPanel() {
   useEffect(() => { void load() }, [load])
   const submit = async () => {
     if (!value) return
-    if (!window.confirm('确认更新全局配送费配置？新配送单会使用新配置，旧单快照不会改变。')) return
+    if (!await dialog.confirm({ title: '更新全局配送费', description: `新订单将使用配送费 ${money(Number(deliveryFee))}、平台抽成 ${money(Number(platformCut))}，旧订单费用快照不会改变。`, confirmLabel: '保存配置' })) return
     setLoading(true); setError(''); setConflict(false)
     try {
       await deliveryAdminAPI.updateFeeConfig(Number(deliveryFee), Number(platformCut), value.rowVersion)
@@ -264,6 +266,7 @@ function FeeConfigPanel() {
 }
 
 function MerchantOverridesPanel() {
+  const dialog = useAdminDialog()
   const [data, setData] = useState<Page<MerchantFeeOverride>>(emptyPage())
   const [merchantUserId, setMerchantUserId] = useState('')
   const [status, setStatus] = useState('')
@@ -288,7 +291,7 @@ function MerchantOverridesPanel() {
   const upsert = async () => {
     const merchant = Number(merchantUserId)
     if (!merchant || !fee || !cut) { setError('请填写商家用户 ID、配送费和平台抽成'); return }
-    if (!window.confirm(`确认保存商家 #${merchant} 的特殊价配置？`)) return
+    if (!await dialog.confirm({ title: '保存商家特殊价', description: `确认保存商家 #${merchant} 的特殊配送费 ${money(Number(fee))}、平台抽成 ${money(Number(cut))}？仅影响后续新订单。`, confirmLabel: '保存配置' })) return
     setBusy('upsert'); setError(''); setConflict(false)
     try {
       await deliveryAdminAPI.upsertMerchantFeeOverride(merchant, Number(fee), Number(cut), expectedRowVersion ? Number(expectedRowVersion) : undefined)
@@ -299,7 +302,7 @@ function MerchantOverridesPanel() {
     } finally { setBusy('') }
   }
   const disable = async (row: MerchantFeeOverride) => {
-    if (!window.confirm(`确认停用商家 #${row.merchantUserId} 的特殊价？停用后新单回到全局配置。`)) return
+    if (!await dialog.confirm({ title: '停用商家特殊价', description: `停用商家 #${row.merchantUserId} 的特殊价后，新订单将恢复使用全局配置。`, confirmLabel: '确认停用', tone: 'danger' })) return
     setBusy(`disable-${row.merchantUserId}`); setError(''); setConflict(false)
     try {
       await deliveryAdminAPI.disableMerchantFeeOverride(row.merchantUserId, row.rowVersion)
@@ -388,6 +391,7 @@ function LedgerDetail({ title, close, rows }: { title: string; close: () => void
 }
 
 function EarningsPanel() {
+  const dialog = useAdminDialog()
   const [data, setData] = useState<Page<RiderEarning>>(emptyPage())
   const [payouts, setPayouts] = useState<Page<RiderPayout>>(emptyPage())
   const [detail, setDetail] = useState<RiderEarning | null>(null)
@@ -411,9 +415,8 @@ function EarningsPanel() {
     try { setDetail(await deliveryAdminAPI.riderEarning(id)) } catch (reason) { setError(errorMessage(reason)) }
   }
   const pay = async (row: RiderEarning) => {
-    const note = window.prompt('请输入线下清账备注（例如：微信已付截图编号/日期）')?.trim()
-    if (note === undefined) return
-    if (!window.confirm(`确认登记骑手 #${row.riderUserId} 的 ${money(row.riderFeeCents)} 已线下支付？\n\n注意：此操作仅登记线下已付，不会真实打款。`)) return
+    const note = await dialog.prompt({ title: '登记线下清账', description: `将骑手 #${row.riderUserId} 的 ${money(row.riderFeeCents)} 登记为已线下支付。本操作不会发起真实打款。`, inputLabel: '清账备注', placeholder: '例如：微信已付截图编号 / 日期', requiredMessage: '清账备注不能为空', confirmLabel: '确认已支付' })
+    if (note === null) return
     setBusy(row.earningPublicId); setError(''); setConflict(false)
     try {
       const updated = await deliveryAdminAPI.payOffline(row.earningPublicId, row.rowVersion, newIdempotencyKey(row.earningPublicId), note)
