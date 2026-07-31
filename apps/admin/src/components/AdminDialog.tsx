@@ -12,10 +12,13 @@ export function AdminDialog({ open, title, description, confirmLabel, cancelLabe
   useEffect(() => {
     if (!open) return
     const timer = window.setTimeout(() => (inputRef.current || confirmRef.current)?.focus(), 0)
-    const handleKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && !busy) onCancel() }
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !busy) onCancel()
+      if (event.key === 'Enter' && !busy && event.target instanceof HTMLInputElement) onConfirm()
+    }
     document.addEventListener('keydown', handleKey)
     return () => { window.clearTimeout(timer); document.removeEventListener('keydown', handleKey) }
-  }, [open, busy, onCancel])
+  }, [open, busy, onCancel, onConfirm])
   if (!open) return null
   return <div className='admin-dialog-layer'>
     <button className='admin-dialog-backdrop' aria-label='关闭对话框' disabled={busy} onClick={onCancel} />

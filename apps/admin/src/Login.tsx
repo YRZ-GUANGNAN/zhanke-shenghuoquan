@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { adminAuthAPI } from './services/admin-auth'
 import { useAdminStore } from './store'
+import { AdminButton, AdminField, AdminNotice } from './components'
 
 export function Login() {
   const [password, setPassword] = useState('')
@@ -30,27 +31,10 @@ export function Login() {
       <h1>管理后台登录</h1>
       <p className="login-card__description">使用独立管理员密码登录，无需将当前微信账号添加为小程序项目成员。</p>
       <form onSubmit={event => void submit(event)}>
-        <label>
-          管理员用户名
-          <input value="administrator" disabled autoComplete="username" />
-        </label>
-        <label>
-          密码
-          <input
-            type="password"
-            value={password}
-            onChange={event => setPassword(event.target.value)}
-            minLength={14}
-            maxLength={72}
-            autoComplete="current-password"
-            autoFocus
-            required
-          />
-        </label>
-        {error && <div className="login-error" role="alert">{error}</div>}
-        <button type="submit" disabled={busy || password.length < 14}>
-          {busy ? '正在登录…' : '登录'}
-        </button>
+        <AdminField label="管理员用户名" value="administrator" disabled autoComplete="username" />
+        <AdminField label="密码" type="password" value={password} onChange={event => setPassword(event.target.value)} minLength={14} maxLength={72} autoComplete="current-password" autoFocus required />
+        {error && <AdminNotice tone="danger" title="登录失败">{error}</AdminNotice>}
+        <AdminButton type="submit" tone="primary" loading={busy} disabled={password.length < 14}>登录</AdminButton>
       </form>
     </section>
   </main>

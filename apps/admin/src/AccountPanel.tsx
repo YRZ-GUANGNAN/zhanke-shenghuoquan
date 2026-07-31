@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { adminAuthAPI } from './services/admin-auth'
 import { useAdminStore } from './store'
-import { useAdminDialog } from './components'
+import { AdminButton, AdminField, AdminNotice, useAdminDialog } from './components'
 
 export function AccountPanel() {
   const dialog = useAdminDialog()
@@ -63,13 +63,13 @@ export function AccountPanel() {
       <form onSubmit={event => { event.preventDefault(); void changePassword() }}>
         <h2 id="password-dialog-title">修改管理员密码</h2>
         <p>新密码需为 14–72 个字符。修改成功后，所有管理网页会话都会退出。</p>
-        <label>当前密码<input type="password" value={oldPassword} onChange={event => setOldPassword(event.target.value)} autoComplete="current-password" required autoFocus /></label>
-        <label>新密码<input type="password" value={newPassword} onChange={event => setNewPassword(event.target.value)} minLength={14} maxLength={72} autoComplete="new-password" required /></label>
-        <label>确认新密码<input type="password" value={confirmation} onChange={event => setConfirmation(event.target.value)} minLength={14} maxLength={72} autoComplete="new-password" required /></label>
-        {error && <div className="login-error" role="alert">{error}</div>}
+        <AdminField label="当前密码" type="password" value={oldPassword} onChange={event => setOldPassword(event.target.value)} autoComplete="current-password" required autoFocus />
+        <AdminField label="新密码" type="password" value={newPassword} onChange={event => setNewPassword(event.target.value)} minLength={14} maxLength={72} autoComplete="new-password" description="14–72 个字符" required />
+        <AdminField label="确认新密码" type="password" value={confirmation} onChange={event => setConfirmation(event.target.value)} minLength={14} maxLength={72} autoComplete="new-password" required />
+        {error && <AdminNotice tone="danger">{error}</AdminNotice>}
         <div className="password-dialog__actions">
-          <button type="button" className="ghost-button" disabled={changing} onClick={() => setChangeOpen(false)}>取消</button>
-          <button type="submit" className="primary-button" disabled={changing}>{changing ? '处理中…' : '确认修改'}</button>
+          <AdminButton tone="secondary" disabled={changing} onClick={() => setChangeOpen(false)}>取消</AdminButton>
+          <AdminButton type="submit" tone="primary" loading={changing}>确认修改</AdminButton>
         </div>
       </form>
     </div>}

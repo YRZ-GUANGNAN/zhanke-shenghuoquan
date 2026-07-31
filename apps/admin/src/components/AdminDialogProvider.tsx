@@ -28,8 +28,33 @@ export function AdminDialogProvider({ children }: { children: ReactNode }) {
     else { settled.current = true; active.resolve() }
     setActive(null)
   }, [active, value])
-  const api = useMemo<AdminDialogAPI>(() => ({ confirm: (options) => new Promise((resolve) => open({ kind: 'confirm', options, resolve })), prompt: (options) => new Promise((resolve) => open({ kind: 'prompt', options, resolve })), notify: (options) => new Promise((resolve) => open({ kind: 'notify', options, resolve })) }), [open])
+  const api = useMemo<AdminDialogAPI>(() => ({
+    confirm: (options) => new Promise((resolve) => open({ kind: 'confirm', options, resolve })),
+    prompt: (options) => new Promise((resolve) => open({ kind: 'prompt', options, resolve })),
+    notify: (options) => new Promise((resolve) => open({ kind: 'notify', options, resolve })),
+  }), [open])
   const options = active?.options
-  return <AdminDialogContext.Provider value={api}>{children}<AdminDialog open={Boolean(active)} title={options?.title || ''} description={options?.description || ''} confirmLabel={options?.confirmLabel || (active?.kind === 'notify' ? '知道了' : '确认')} tone={active && active.kind !== 'notify' ? active.options.tone : 'default'} inputLabel={active?.kind === 'prompt' ? active.options.inputLabel : undefined} placeholder={active?.kind === 'prompt' ? active.options.placeholder : undefined} value={value} error={error} notifyOnly={active?.kind === 'notify'} onValueChange={(next) => { setValue(next); setError('') }} onConfirm={confirmCurrent} onCancel={close} /></AdminDialogContext.Provider>
+  return <AdminDialogContext.Provider value={api}>
+    {children}
+    <AdminDialog
+      open={Boolean(active)}
+      title={options?.title || ''}
+      description={options?.description || ''}
+      confirmLabel={options?.confirmLabel || (active?.kind === 'notify' ? '知道了' : '确认')}
+      tone={active && active.kind !== 'notify' ? active.options.tone : 'default'}
+      inputLabel={active?.kind === 'prompt' ? active.options.inputLabel : undefined}
+      placeholder={active?.kind === 'prompt' ? active.options.placeholder : undefined}
+      value={value}
+      error={error}
+      notifyOnly={active?.kind === 'notify'}
+      onValueChange={(next) => { setValue(next); setError('') }}
+      onConfirm={confirmCurrent}
+      onCancel={close}
+    />
+  </AdminDialogContext.Provider>
 }
-export function useAdminDialog(): AdminDialogAPI { const value = useContext(AdminDialogContext); if (!value) throw new Error('useAdminDialog must be used within AdminDialogProvider'); return value }
+export function useAdminDialog(): AdminDialogAPI {
+  const value = useContext(AdminDialogContext)
+  if (!value) throw new Error('useAdminDialog must be used within AdminDialogProvider')
+  return value
+}

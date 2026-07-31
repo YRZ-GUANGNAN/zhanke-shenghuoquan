@@ -1226,3 +1226,101 @@ td span {
   .delivery-form,
   .delivery-form--wide { grid-template-columns: repeat(2, minmax(180px, 1fr)); }
 }
+
+/* Final visual convergence: keep every business module on the same product-grade surface rhythm. */
+.metric-card,
+.panel,
+.external-merchant-panel {
+  border-color: var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.main button,
+.main input,
+.main select,
+.main textarea {
+  transition: border-color var(--duration-fast), background var(--duration-fast), color var(--duration-fast), box-shadow var(--duration-fast), transform var(--duration-fast);
+}
+
+.main button:not(:disabled):active {
+  transform: scale(.98);
+}
+
+.audit-row,
+.review-detail,
+.takeout-detail,
+.delivery-detail,
+.identity-proofs a,
+.delivery-summary-grid article,
+.takeout-summary-grid article {
+  border-radius: var(--radius-control);
+}
+
+.takeout-tabs button,
+.delivery-tabs button,
+.takeout-controls button,
+.takeout-form button,
+.takeout-actions button,
+.delivery-controls button,
+.delivery-form button,
+.delivery-row-actions button,
+.delivery-header button,
+.delivery-pagination button,
+.external-merchant-panel button,
+.audit-row__actions button,
+.review-detail__actions button,
+.review-link-button {
+  min-height: 40px;
+  border-radius: var(--radius-control);
+  font-weight: 700;
+}
+
+.takeout-controls input,
+.takeout-controls select,
+.takeout-form input,
+.takeout-form select,
+.delivery-controls input,
+.delivery-controls select,
+.delivery-form input,
+.delivery-form select,
+.external-merchant-form input,
+.identity-decision textarea {
+  min-height: 40px;
+  border-color: var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+table thead th {
+  background: #f8fafc;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  letter-spacing: .02em;
+}
+
+table tbody tr {
+  transition: background var(--duration-fast);
+}
+
+table tbody tr:hover {
+  background: #f8fbff;
+}
+
+.password-dialog {
+  z-index: 1000;
+  background: rgba(12, 24, 42, .58);
+  backdrop-filter: blur(4px);
+}
+
+.password-dialog form {
+  border: 1px solid rgba(255, 255, 255, .65);
+  border-radius: var(--radius-dialog);
+  box-shadow: var(--shadow-dialog);
+  animation: admin-dialog-in var(--duration-standard) cubic-bezier(.2, 0, 0, 1);
+}
+
+.login-card {
+  border-color: var(--color-border);
+  border-radius: var(--radius-dialog);
+  box-shadow: var(--shadow-dialog);
+}
