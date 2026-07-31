@@ -130,7 +130,7 @@ function OrderCard({ order }: { order: MerchantDeliveryOrder }) {
           </View>
           <View className='merchant-order-rider__actions'>
             <View className='merchant-order-rider__circle' onClick={() => openConversation(order)}>
-              <Text>聊</Text>
+              <MerchantHomeIcon name='message' className='merchant-order-rider__action-icon' />
             </View>
           </View>
         </View>
@@ -310,41 +310,45 @@ function MerchantHomeContent() {
         </View>
 
         <View className='merchant-home-metrics'>
-          <View className='merchant-home-wallet'>
-            <Text className='merchant-home-wallet__label'>钱包余额（元）</Text>
-            <Text className='merchant-home-wallet__amount'>
+          <View className='merchant-home-metric merchant-home-metric--wallet'>
+            <Text className='merchant-home-metric__label'>钱包余额</Text>
+            <Text className='merchant-home-metric__value merchant-home-metric__value--wallet'>
               {!deliveryPaymentEnabled ? '未开通' : balanceCents == null ? '--' : `¥${centsToYuan(balanceCents)}`}
             </Text>
           </View>
-          <View className='merchant-home-counts'>
-            <View className='merchant-home-counts__item'>
-              <Text className='merchant-home-counts__value'>{todayCount}</Text>
-              <Text className='merchant-home-counts__label'>今日单量</Text>
-            </View>
-            <View className='merchant-home-counts__item'>
-              <Text className='merchant-home-counts__value'>{groupedOrders.delivering.length}</Text>
-              <Text className='merchant-home-counts__label'>配送中</Text>
-            </View>
+          <View className='merchant-home-metric'>
+            <Text className='merchant-home-metric__label'>今日单量</Text>
+            <Text className='merchant-home-metric__value'>{todayCount}</Text>
+          </View>
+          <View className='merchant-home-metric'>
+            <Text className='merchant-home-metric__label'>配送中</Text>
+            <Text className='merchant-home-metric__value'>{groupedOrders.delivering.length}</Text>
           </View>
         </View>
       </View>
 
-      <View className='merchant-home-shortcuts'>
-        {shortcutCopy.map((item) => (
-          <View
-            key={item.key}
-            className={`merchant-home-shortcut merchant-home-shortcut--${item.key}`}
-            onClick={() => void Taro.navigateTo({ url: item.url })}
-          >
-            <View className='merchant-home-shortcut__icon'>
-              <MerchantHomeIcon name={item.icon} />
+      <View className='merchant-home-tools'>
+        <View className='merchant-home-section-head'>
+          <Text className='merchant-home-section-head__title'>常用功能</Text>
+          <Text className='merchant-home-section-head__hint'>经营与配送</Text>
+        </View>
+        <View className='merchant-home-shortcuts'>
+          {shortcutCopy.map((item) => (
+            <View
+              key={item.key}
+              className={`merchant-home-shortcut merchant-home-shortcut--${item.key}`}
+              onClick={() => void Taro.navigateTo({ url: item.url })}
+            >
+              <View className='merchant-home-shortcut__icon'>
+                <MerchantHomeIcon name={item.icon} />
+              </View>
+              <View className='merchant-home-shortcut__copy'>
+                <Text className='merchant-home-shortcut__label'>{item.label}</Text>
+                <Text className='merchant-home-shortcut__description'>{item.description}</Text>
+              </View>
             </View>
-            <View className='merchant-home-shortcut__copy'>
-              <Text className='merchant-home-shortcut__label'>{item.label}</Text>
-              <Text className='merchant-home-shortcut__description'>{item.description}</Text>
-            </View>
-          </View>
-        ))}
+          ))}
+        </View>
       </View>
 
       <View className='merchant-home-tabs'>
