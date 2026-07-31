@@ -1,4 +1,4 @@
-const apiBase = process.env.TARO_APP_API_BASE || ''
+const apiBase = process.env.TARO_APP_API_BASE || 'https://zhanduiwang.top/api/v1'
 const enableLegacyTakeout = process.env.TARO_APP_ENABLE_LEGACY_TAKEOUT === 'true'
 const enableDelivery = process.env.TARO_APP_ENABLE_DELIVERY !== 'false'
 const enableDeliveryMockFee = process.env.TARO_APP_ENABLE_DELIVERY_MOCK_FEE === 'true'

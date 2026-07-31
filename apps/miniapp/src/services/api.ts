@@ -2,12 +2,12 @@ import Taro, { type RequestOptions } from './taro'
 
 declare const TARO_APP_API_BASE: string | undefined
 
-const LOCAL_API_BASE = 'http://127.0.0.1:8080/api/v1'
+const DEFAULT_API_BASE = 'https://zhanduiwang.top/api/v1'
 
 export const API_BASE = (
   typeof TARO_APP_API_BASE !== 'undefined' && TARO_APP_API_BASE
     ? TARO_APP_API_BASE
-    : LOCAL_API_BASE
+    : DEFAULT_API_BASE
 ).replace(/\/$/, '')
 
 export class ApiError extends Error {
