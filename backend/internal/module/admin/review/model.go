@@ -7,25 +7,31 @@ import (
 )
 
 type Status string
+type DecisionSource string
 
 const (
 	StatusSubmitted Status = "submitted"
 	StatusReviewing Status = "reviewing"
 	StatusApproved  Status = "approved"
 	StatusRejected  Status = "rejected"
+
+	DecisionSourceManual         DecisionSource = "manual"
+	DecisionSourceAutomatic      DecisionSource = "automatic"
+	DecisionSourceManualOverride DecisionSource = "manual_override"
 )
 
 type Task struct {
-	ID          uint      `json:"id" gorm:"primaryKey"`
-	ObjectType  string    `json:"objectType" gorm:"size:32;index:idx_review_object,unique"`
-	ObjectID    uint      `json:"objectId" gorm:"index:idx_review_object,unique"`
-	SubmitterID uint      `json:"submitterId" gorm:"index"`
-	Risk        string    `json:"risk" gorm:"size:240"`
-	Status      Status    `json:"status" gorm:"size:24;index;default:submitted"`
-	Reason      string    `json:"reason" gorm:"size:240"`
-	OperatorID  uint      `json:"operatorId" gorm:"index"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
+	ID             uint           `json:"id" gorm:"primaryKey"`
+	ObjectType     string         `json:"objectType" gorm:"size:32;index:idx_review_object,unique"`
+	ObjectID       uint           `json:"objectId" gorm:"index:idx_review_object,unique"`
+	SubmitterID    uint           `json:"submitterId" gorm:"index"`
+	Risk           string         `json:"risk" gorm:"size:240"`
+	Status         Status         `json:"status" gorm:"size:24;index;default:submitted"`
+	DecisionSource DecisionSource `json:"decisionSource" gorm:"size:24;default:manual"`
+	Reason         string         `json:"reason" gorm:"size:240"`
+	OperatorID     uint           `json:"operatorId" gorm:"index"`
+	CreatedAt      time.Time      `json:"createdAt"`
+	UpdatedAt      time.Time      `json:"updatedAt"`
 }
 
 type Submission struct {

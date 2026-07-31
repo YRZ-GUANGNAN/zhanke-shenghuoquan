@@ -84,10 +84,37 @@ export interface CommunityComment {
 
 export interface CommunityNotification {
   id: string
-  type: 'post_commented' | 'post_liked' | 'user_followed'
+  type:
+    | 'post_commented'
+    | 'post_liked'
+    | 'user_followed'
+    | 'product_commented'
+    | 'product_comment_replied'
   actor: string
   postId: string
+  productId?: string
+  productCommentId?: string
   read: boolean
+  createdAt: string
+}
+
+export type ProductCommentReviewStatus =
+  | 'submitted'
+  | 'reviewing'
+  | 'approved'
+  | 'rejected'
+
+export interface ProductComment {
+  id: string
+  productId: string
+  parentCommentId: string
+  replyToUserId: string
+  content: string
+  reviewStatus: ProductCommentReviewStatus
+  author: UserProfile
+  replyTo?: UserProfile
+  isSeller: boolean
+  replies: ProductComment[]
   createdAt: string
 }
 

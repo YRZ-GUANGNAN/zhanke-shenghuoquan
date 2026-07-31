@@ -2,16 +2,18 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import { isApiError } from '../../services/api'
-import { contactSeller, getProduct, getTradeViewerState, setProductFavorited } from '../../services/c-trade'
+import { changeProductStatus, contactSeller, getProduct, getTradeViewerState, setProductFavorited } from '../../services/c-trade'
 import Taro from '../../services/taro'
+import { useSessionStore } from '../../stores/session'
 import type { Product } from '../../types'
+import ProductComments from './product-comments'
 import './index.scss'
 
 function showToast(title: string) {
   void Taro.showToast({ title, icon: 'none', duration: 1400 })
 }
 
-function writeErrorMessage(error: unknown, action: '收藏' | '联系卖家'): string {
+function writeErrorMessage(error: unknown, action: '收藏' | '联系卖家' | '更新状态'): string {
   if (!isApiError(error)) return error instanceof Error ? error.message : `${action}失败，请稍后重试`
   if (error.status === 0) return '网络连接失败，请稍后重试'
   if (error.status === 401 || error.status === 403) return '登录状态已失效，请重新登录'
@@ -23,7 +25,9 @@ function writeErrorMessage(error: unknown, action: '收藏' | '联系卖家'): s
 
 export default function SecondhandDetailPage() {
   const requestedId = Taro.getCurrentInstance().router?.params?.id ?? ''
+  const targetCommentId = Taro.getCurrentInstance().router?.params?.commentId ?? ''
   const validId = /^[1-9]\d*$/.test(requestedId)
+  const currentUserId = useSessionStore((state) => state.profile.id)
   const [product, setProduct] = useState<Product | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'empty' | 'error'>(
     validId ? 'loading' : 'empty'
@@ -35,6 +39,8 @@ export default function SecondhandDetailPage() {
   const [favorited, setFavorited] = useState<boolean | null>(null)
   const [favoritePending, setFavoritePending] = useState(false)
   const [contactPending, setContactPending] = useState(false)
+  const [statusPending, setStatusPending] = useState(false)
+  const [scrollTarget, setScrollTarget] = useState('')
   const retryProduct = useCallback(() => setReloadKey((value) => value + 1), [])
 
   useEffect(() => {
@@ -92,6 +98,7 @@ export default function SecondhandDetailPage() {
   const sellerMeta = product?.campus || '校内'
   const sellerAvatar = product?.sellerName.trim().charAt(0) || '校'
   const firstImage = product?.images[0]
+  const isSeller = Boolean(product && currentUserId === product.sellerId)
 
   const handleFavorite = async () => {
     if (!product || favoritePending) return
@@ -127,15 +134,40 @@ export default function SecondhandDetailPage() {
     }
     setContactPending(true)
     try {
-      await contactSeller(product.id)
+      const relation = await contactSeller(product.id)
       setContactVisible(false)
       await Taro.navigateTo({
-        url: `/pages/secondhand-chat/index?productId=${encodeURIComponent(product.id)}`
+        url: `/pages/secondhand-chat/index?relationId=${encodeURIComponent(String(relation.relationId))}`
       })
     } catch (error) {
       await Taro.showToast({ title: writeErrorMessage(error, '联系卖家'), icon: 'none', duration: 1800 })
     } finally {
       setContactPending(false)
+    }
+  }
+
+  const handleStatusChange = async (nextStatus: Product['status']) => {
+    if (!product || statusPending || !isSeller) return
+    const labels: Record<Product['status'], string> = {
+      selling: '重新上架',
+      reserved: '标记预订',
+      sold: '标记售出'
+    }
+    const result = await Taro.showModal({
+      title: labels[nextStatus],
+      content: `确认将“${product.title}”${labels[nextStatus]}吗？`,
+      confirmText: '确认'
+    })
+    if (!result.confirm) return
+    setStatusPending(true)
+    try {
+      await changeProductStatus(product.id, nextStatus)
+      setProduct(await getProduct(product.id))
+      await Taro.showToast({ title: '状态已更新', icon: 'success' })
+    } catch (error) {
+      await Taro.showToast({ title: writeErrorMessage(error, '更新状态'), icon: 'none', duration: 1800 })
+    } finally {
+      setStatusPending(false)
     }
   }
 
@@ -159,11 +191,18 @@ export default function SecondhandDetailPage() {
   return (
     <View className='secondhand-detail-page'>
       <CapsulePageHeader
+        className='secondhand-detail-header'
         title='宝贝详情'
         left={<View className='secondhand-detail-header__back' onClick={goBack} />}
       />
 
-      <ScrollView className='secondhand-detail-scroll' scrollY enhanced showScrollbar={false}>
+      <ScrollView
+        className='secondhand-detail-scroll'
+        scrollY
+        enhanced
+        showScrollbar={false}
+        scrollIntoView={scrollTarget}
+      >
         {status !== 'ready' || !product ? renderState() : (
           <>
             <View
@@ -230,27 +269,68 @@ export default function SecondhandDetailPage() {
                 <Text className='secondhand-detail-warning__icon'>△</Text>
                 <Text>平台仅展示信息、不参与交易。请与卖家私下当面交易，验货后再付款，谨防转账诈骗。</Text>
               </View>
+
+              <ProductComments
+                productId={product.id}
+                productStatus={product.status}
+                targetCommentId={targetCommentId}
+                onTargetReady={setScrollTarget}
+              />
             </View>
           </>
         )}
       </ScrollView>
 
       {status === 'ready' && product && (
-        <View className='secondhand-detail-actionbar'>
-          <View
-            className={`secondhand-detail-favorite ${favorited ? 'secondhand-detail-favorite--active' : ''} ${favoritePending ? 'secondhand-detail-favorite--pending' : ''}`}
-            onClick={() => void handleFavorite()}
-          >
-            <View className='secondhand-detail-favorite__star' />
-            <Text>{favoritePending ? '处理中' : favorited ? '已收藏' : '收藏'}</Text>
-          </View>
-          <View
-            className={`secondhand-detail-contact ${contactPending ? 'secondhand-detail-contact--pending' : ''}`}
-            onClick={() => !contactPending && setContactVisible(true)}
-          >
-            <View className='secondhand-detail-contact__icon' />
-            <Text>联系卖家</Text>
-          </View>
+        <View className={`secondhand-detail-actionbar ${isSeller ? 'secondhand-detail-actionbar--seller' : ''}`}>
+          {isSeller ? (
+            <View className='secondhand-detail-seller-actions'>
+              {product.status === 'selling' && (
+                <View className='secondhand-detail-seller-action' onClick={() => void handleStatusChange('reserved')}>
+                  <Text>标记预订</Text>
+                </View>
+              )}
+              {product.status !== 'sold' && (
+                <View className='secondhand-detail-seller-action secondhand-detail-seller-action--primary' onClick={() => void handleStatusChange('sold')}>
+                  <Text>标记售出</Text>
+                </View>
+              )}
+              {product.status !== 'selling' && (
+                <View className='secondhand-detail-seller-action secondhand-detail-seller-action--primary' onClick={() => void handleStatusChange('selling')}>
+                  <Text>重新上架</Text>
+                </View>
+              )}
+            </View>
+          ) : (
+            <>
+              <View
+                className={`secondhand-detail-favorite ${favorited ? 'secondhand-detail-favorite--active' : ''} ${favoritePending ? 'secondhand-detail-favorite--pending' : ''}`}
+                onClick={() => void handleFavorite()}
+              >
+                <Text
+                  className='secondhand-detail-favorite__star'
+                  aria-label={favorited ? '取消收藏' : '收藏'}
+                >
+                  {favorited ? '★' : '☆'}
+                </Text>
+                <Text>{favoritePending ? '处理中' : favorited ? '已收藏' : '收藏'}</Text>
+              </View>
+              <View
+                className={`secondhand-detail-contact ${contactPending ? 'secondhand-detail-contact--pending' : ''} ${product.status === 'sold' ? 'secondhand-detail-contact--disabled' : ''}`}
+                onClick={() => {
+                  if (contactPending) return
+                  if (product.status === 'sold') {
+                    showToast('商品已售出，不能新建私信会话')
+                    return
+                  }
+                  setContactVisible(true)
+                }}
+              >
+                <View className='secondhand-detail-contact__icon' />
+                <Text>{product.status === 'sold' ? '商品已售' : '联系卖家'}</Text>
+              </View>
+            </>
+          )}
         </View>
       )}
 

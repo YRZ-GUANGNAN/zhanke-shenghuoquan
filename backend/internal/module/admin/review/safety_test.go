@@ -31,13 +31,51 @@ func safetyClientForTest(transport safetyRoundTripFunc) *SafetyClient {
 }
 
 func tokenThen(next safetyRoundTripFunc) safetyRoundTripFunc {
-	calls := 0
 	return func(r *http.Request) (*http.Response, error) {
-		calls++
-		if calls == 1 {
+		if r.URL.Path == "/cgi-bin/token" {
 			return safetyResponse(http.StatusOK, `{"access_token":"test-token"}`), nil
 		}
 		return next(r)
+	}
+}
+
+func TestSafetyClientRetriesTransientRequestOnce(t *testing.T) {
+	checkCalls := 0
+	client := safetyClientForTest(tokenThen(func(*http.Request) (*http.Response, error) {
+		checkCalls++
+		if checkCalls == 1 {
+			return nil, errors.New("temporary network failure")
+		}
+		return safetyResponse(http.StatusOK, `{"errcode":0,"result":{"suggest":"pass","label":100}}`), nil
+	}))
+	if got := client.CheckText(context.Background(), "openid-secret", "content-secret"); got != "wechat pass" {
+		t.Fatalf("risk=%q", got)
+	}
+	if checkCalls != 2 {
+		t.Fatalf("safety check calls=%d want=2", checkCalls)
+	}
+}
+
+func TestSafetyClientStopsAfterTwoTransientFailures(t *testing.T) {
+	checkCalls := 0
+	client := safetyClientForTest(tokenThen(func(*http.Request) (*http.Response, error) {
+		checkCalls++
+		return nil, context.DeadlineExceeded
+	}))
+	if got := client.CheckText(context.Background(), "openid-secret", "content-secret"); got != "manual:wechat_request_failed" {
+		t.Fatalf("risk=%q", got)
+	}
+	if checkCalls != 2 {
+		t.Fatalf("safety check calls=%d want=2", checkCalls)
+	}
+}
+
+func TestSafetyClientPreservesRiskySuggestion(t *testing.T) {
+	client := safetyClientForTest(tokenThen(func(*http.Request) (*http.Response, error) {
+		return safetyResponse(http.StatusOK, `{"errcode":0,"result":{"suggest":"risky","label":100}}`), nil
+	}))
+	if got := client.CheckText(context.Background(), "openid-secret", "content-secret"); got != "wechat risky label=100" {
+		t.Fatalf("risk=%q", got)
 	}
 }
 

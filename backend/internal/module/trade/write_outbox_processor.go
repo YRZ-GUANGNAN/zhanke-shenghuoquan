@@ -124,13 +124,28 @@ func (p *WriteOutboxProcessor) deliver(ctx context.Context, event WriteOutbox) e
 
 func validateTradeWriteOutbox(event WriteOutbox) (tradeWriteOutboxPayload, error) {
 	var payload tradeWriteOutboxPayload
-	if event.EventType != "trade_product_created" || event.AggregateType != "product" || event.AggregateID == 0 || event.OwnerUserID == 0 || !json.Valid([]byte(event.Payload)) {
+	if event.AggregateID == 0 || event.OwnerUserID == 0 || !json.Valid([]byte(event.Payload)) {
 		return payload, permanentTradeOutboxError("invalid event coordinates or JSON payload")
 	}
+	switch event.EventType {
+	case "trade_product_created":
+		return validateProductCreatedEvent(event)
+	case ProductCommentCreatedEventType:
+		return validateProductCommentCreatedEvent(event)
+	default:
+		return payload, permanentTradeOutboxError("unsupported trade write event")
+	}
+}
+
+func validateProductCreatedEvent(event WriteOutbox) (tradeWriteOutboxPayload, error) {
+	var payload tradeWriteOutboxPayload
 	if err := json.Unmarshal([]byte(event.Payload), &payload); err != nil {
 		return payload, permanentTradeOutboxError("decode payload: %v", err)
 	}
-	if payload.Version != "trade-product-create:v1" || payload.ReviewObjectType != "product" || !validOrderedTradeAssetIDs(payload.OrderedAssetPublicIDs) {
+	if event.AggregateType != "product" ||
+		payload.Version != "trade-product-create:v1" ||
+		payload.ReviewObjectType != "product" ||
+		!validOrderedTradeAssetIDs(payload.OrderedAssetPublicIDs) {
 		return payload, permanentTradeOutboxError("product event and payload disagree")
 	}
 	if len(payload.OrderedAssetPublicIDs) > 0 {
@@ -139,6 +154,21 @@ func validateTradeWriteOutbox(event WriteOutbox) (tradeWriteOutboxPayload, error
 		}
 	} else if event.ReservationToken != nil && *event.ReservationToken != "" {
 		return payload, permanentTradeOutboxError("reservation token has no media assets")
+	}
+	return payload, nil
+}
+
+func validateProductCommentCreatedEvent(event WriteOutbox) (tradeWriteOutboxPayload, error) {
+	var payload tradeWriteOutboxPayload
+	if err := json.Unmarshal([]byte(event.Payload), &payload); err != nil {
+		return payload, permanentTradeOutboxError("decode payload: %v", err)
+	}
+	if event.AggregateType != ProductCommentAggregateType ||
+		payload.Version != "trade-product-comment:v1" ||
+		payload.ReviewObjectType != ProductCommentAggregateType ||
+		len(payload.OrderedAssetPublicIDs) != 0 ||
+		event.ReservationToken != nil {
+		return payload, permanentTradeOutboxError("product comment event and payload disagree")
 	}
 	return payload, nil
 }

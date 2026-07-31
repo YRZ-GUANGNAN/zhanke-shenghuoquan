@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"campus-circle/backend/internal/module/admin/review"
 	"campus-circle/backend/internal/module/community"
@@ -43,6 +44,7 @@ func (h *Handler) Register(api *gin.RouterGroup) {
 	secured.POST("/reviews/:id/start", h.startReview)
 	secured.POST("/reviews/:id/approve", h.approve)
 	secured.POST("/reviews/:id/reject", h.reject)
+	secured.POST("/reviews/:id/override", h.overrideReview)
 	secured.GET("/reports", h.reports)
 	secured.GET("/users", h.usersList)
 	secured.GET("/feedbacks", h.feedbacks)
@@ -147,6 +149,28 @@ func (h *Handler) decide(c *gin.Context, status review.Status) {
 	}
 	_ = c.ShouldBindJSON(&req)
 	value, err := h.reviews.Decide(c, id, user.CurrentUserID(c), status, req.Reason)
+	write(c, value, err)
+}
+func (h *Handler) overrideReview(c *gin.Context) {
+	id, ok := paramID(c)
+	if !ok {
+		return
+	}
+	var req struct {
+		Status review.Status `json:"status"`
+		Reason string        `json:"reason"`
+	}
+	if c.ShouldBindJSON(&req) != nil ||
+		(req.Status != review.StatusApproved && req.Status != review.StatusRejected) ||
+		strings.TrimSpace(req.Reason) == "" {
+		response.Fail(c, http.StatusBadRequest, "invalid review override")
+		return
+	}
+	value, err := h.reviews.Override(c, id, user.CurrentUserID(c), req.Status, req.Reason)
+	if errors.Is(err, review.ErrNotFound) {
+		response.Fail(c, http.StatusNotFound, err.Error())
+		return
+	}
 	write(c, value, err)
 }
 func (h *Handler) reports(c *gin.Context) {

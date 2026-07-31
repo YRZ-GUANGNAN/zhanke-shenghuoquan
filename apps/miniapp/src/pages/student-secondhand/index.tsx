@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useDidShow } from '@tarojs/taro'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
 import StudentBottomNav from '../../components/student-bottom-nav'
 import CapsulePageHeader from '../../components/capsule-page-header'
@@ -73,6 +74,7 @@ export default function StudentSecondhandPage() {
   const queryVersion = useRef(0)
   const categoryRef = useRef<CategoryKey>('全部')
   const loadingKeys = useRef(new Set<string>())
+  const didShowOnce = useRef(false)
 
   const fetchProductsPage = useCallback(async (
     category: CategoryKey,
@@ -141,6 +143,14 @@ export default function StudentSecondhandPage() {
     setPagingError(false)
     void fetchProductsPage(category, 1, version, true)
   }, [fetchProductsPage])
+
+  useDidShow(() => {
+    if (!didShowOnce.current) {
+      didShowOnce.current = true
+      return
+    }
+    retryCurrentCategory()
+  })
 
   const cards = useMemo(() => items.map(toCard), [items])
   const columns = useMemo(() => splitProducts(cards), [cards])

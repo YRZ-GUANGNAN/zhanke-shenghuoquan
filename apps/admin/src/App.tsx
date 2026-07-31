@@ -25,10 +25,97 @@ const nav:Array<{key:AdminSection;label:string;icon:string}>=[
 
 function Panel({title,children}:{title:string;children:ReactNode}){return <section className="panel"><header className="panel__header"><h2>{title}</h2></header>{children}</section>}
 function ErrorBox({message}:{message:string}){return <div className="placeholder"><strong>{message}</strong><p>请确认管理员会话仍然有效；如果已过期，请重新登录。</p></div>}
+function reviewStatusLabel(status:ReviewTask['status']){return({submitted:'待开始',reviewing:'审核中',approved:'已通过',rejected:'已拒绝'})[status]}
+function reviewObjectLabel(objectType:ReviewTask['objectType']){return({post:'帖子',comment:'评论',product:'商品',product_comment:'商品留言',report:'举报'})[objectType]}
+function reviewDecisionSourceLabel(source:ReviewTask['decisionSource']){return({manual:'人工审核',automatic:'自动审核',manual_override:'人工改判'})[source]}
 
 function Dashboard(){const[data,setData]=useState<Stats|null>(null);const[error,setError]=useState('');useEffect(()=>{adminAPI.stats().then(setData).catch(e=>setError(String(e)))},[]);if(error)return <ErrorBox message={error}/>;if(!data)return <Panel title="数据统计">加载中…</Panel>;const metrics=[['用户',data.totals.users,data.today.users],['帖子',data.totals.posts,data.today.posts],['商品',data.totals.products,data.today.products],['待审核',data.totals.pendingReview,'-']];return <section className="metric-grid">{metrics.map(([label,total,today])=><article className="metric-card" key={label}><div className="metric-card__label">{label}</div><div className="metric-card__value">{total}</div><div className="metric-card__footer"><span>今日</span><span>{today}</span></div></article>)}</section>}
 
-function Reviews(){const[data,setData]=useState<Page<ReviewTask>|null>(null);const[error,setError]=useState('');const load=useCallback(()=>adminAPI.reviews().then(setData).catch(e=>setError(String(e))),[]);useEffect(()=>{load()},[load]);const act=async(item:ReviewTask,action:'start'|'approve'|'reject')=>{try{if(action==='start')await adminAPI.startReview(item.id);else await adminAPI.decideReview(item.id,action);await load()}catch(e){setError(String(e))}};if(error)return <ErrorBox message={error}/>;return <Panel title="提交 → 审核 → 通过/拒绝 → 展示"><div className="audit-list">{(data?.items||[]).map(item=><div className="audit-row" key={item.id}><div><div className="audit-row__title"><span className="type-chip">{item.objectType}</span>#{item.objectId}</div><p>{item.risk||'无风险备注'} · {item.createdAt}</p></div><div className="audit-row__actions"><span className={`status status--${item.status}`}>{item.status}</span>{item.status==='submitted'&&<button onClick={()=>act(item,'start')}>开始审核</button>}{item.status==='reviewing'&&<><button onClick={()=>act(item,'approve')}>通过</button><button onClick={()=>act(item,'reject')}>拒绝</button></>}</div></div>)}</div></Panel>}
+function Reviews(){
+	const[data,setData]=useState<Page<ReviewTask>|null>(null)
+	const[error,setError]=useState('')
+	const[notice,setNotice]=useState('')
+	const[busyTaskId,setBusyTaskId]=useState<number|null>(null)
+	const[selectedTaskId,setSelectedTaskId]=useState<number|null>(null)
+	const load=useCallback(async()=>{
+		try{
+			const value=await adminAPI.reviews()
+			setData(value)
+			setError('')
+		}catch(e){setError(String(e))}
+	},[])
+	useEffect(()=>{void load()},[load])
+	const selected=(data?.items||[]).find(item=>item.id===selectedTaskId)||null
+	const selectTask=(item:ReviewTask)=>{setSelectedTaskId(item.id);setError('');setNotice('')}
+	const act=async(item:ReviewTask,action:'start'|'approve'|'reject')=>{
+		let reason=''
+		if(action==='approve'&&!window.confirm(`确认通过${reviewObjectLabel(item.objectType)} #${item.objectId} 吗？通过后将按业务规则公开展示。`))return
+		if(action==='reject'){
+			reason=window.prompt(`请输入拒绝${reviewObjectLabel(item.objectType)} #${item.objectId} 的原因。`)?.trim()||''
+			if(!reason){setError('拒绝原因不能为空');return}
+		}
+		setBusyTaskId(item.id)
+		setError('')
+		setNotice('')
+		try{
+			if(action==='start')await adminAPI.startReview(item.id)
+			else await adminAPI.decideReview(item.id,action,reason)
+			setNotice(action==='start'?'已进入审核，请继续选择“通过”或“拒绝”。':action==='approve'?'审核已通过，内容将按业务规则公开展示。':'审核已拒绝。')
+			await load()
+		}catch(e){setError(String(e))}
+		finally{setBusyTaskId(null)}
+	}
+	const override=async(item:ReviewTask,status:'approved'|'rejected')=>{
+		const actionLabel=status==='approved'?'通过':'拒绝'
+		const reason=window.prompt(`请输入将${reviewObjectLabel(item.objectType)} #${item.objectId} 改判为“${actionLabel}”的原因。`)?.trim()||''
+		if(!reason){setError('改判原因不能为空');return}
+		if(!window.confirm(`确认将任务 #${item.id} 改判为“${actionLabel}”吗？`))return
+		setBusyTaskId(item.id)
+		setError('')
+		setNotice('')
+		try{
+			await adminAPI.overrideReview(item.id,status,reason)
+			setNotice(`任务 #${item.id} 已由管理员改判为“${actionLabel}”。`)
+			await load()
+		}catch(e){setError(String(e))}
+		finally{setBusyTaskId(null)}
+	}
+	return <Panel title="提交 → 审核 → 通过/拒绝 → 展示">
+		<p className="review-guide">点击任务行或“处理审核”打开操作区。商品管理页只展示状态，不直接执行审核。</p>
+		{error&&<div className="review-feedback review-feedback--error" role="alert">{error}</div>}
+		{notice&&<div className="review-feedback review-feedback--success" role="status">{notice}</div>}
+		<div className="audit-list">
+			{(data?.items||[]).map(item=><div
+				className={`audit-row audit-row--selectable ${selectedTaskId===item.id?'audit-row--selected':''}`}
+				key={item.id}
+				role="button"
+				tabIndex={0}
+				onClick={()=>selectTask(item)}
+				onKeyDown={event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();selectTask(item)}}}
+			>
+				<div>
+					<div className="audit-row__title"><span className="type-chip">{reviewObjectLabel(item.objectType)}</span>{reviewObjectLabel(item.objectType)} #{item.objectId}<small>任务 #{item.id}</small></div>
+					<p><span className={`decision-source decision-source--${item.decisionSource}`}>{reviewDecisionSourceLabel(item.decisionSource)}</span>{item.risk||'无风险备注'} · {item.createdAt}</p>
+				</div>
+				<div className="audit-row__actions">
+					<span className={`status status--${item.status}`}>{reviewStatusLabel(item.status)}</span>
+					<button type="button" onClick={event=>{event.stopPropagation();selectTask(item)}}>{selectedTaskId===item.id?'已展开':'处理审核'}</button>
+				</div>
+			</div>)}
+			{data&&data.items.length===0&&<div className="placeholder">当前没有审核任务</div>}
+		</div>
+		{selected&&<section className="review-detail" aria-label={`审核任务 ${selected.id}`}>
+			<header><div><span>当前任务</span><strong>{reviewObjectLabel(selected.objectType)} #{selected.objectId}</strong></div><span className={`status status--${selected.status}`}>{reviewStatusLabel(selected.status)}</span></header>
+			<div className="review-detail__facts"><span>任务编号：#{selected.id}</span><span>决策来源：{reviewDecisionSourceLabel(selected.decisionSource)}</span><span>风险备注：{selected.risk||'无'}</span><span>决策原因：{selected.reason||'无'}</span><span>提交时间：{selected.createdAt}</span></div>
+			<div className="review-detail__actions">
+				{selected.status==='submitted'&&<button type="button" disabled={busyTaskId===selected.id} onClick={()=>void act(selected,'start')}>{busyTaskId===selected.id?'处理中…':'开始审核'}</button>}
+				{selected.status==='reviewing'&&<><button type="button" disabled={busyTaskId===selected.id} onClick={()=>void act(selected,'approve')}>{busyTaskId===selected.id?'处理中…':'通过并公开'}</button><button type="button" className="danger" disabled={busyTaskId===selected.id} onClick={()=>void act(selected,'reject')}>拒绝</button></>}
+				{(selected.status==='approved'||selected.status==='rejected')&&(selected.decisionSource==='automatic'||selected.decisionSource==='manual_override')&&<><button type="button" disabled={busyTaskId===selected.id||selected.status==='approved'} onClick={()=>void override(selected,'approved')}>改判为通过</button><button type="button" className="danger" disabled={busyTaskId===selected.id||selected.status==='rejected'} onClick={()=>void override(selected,'rejected')}>改判为拒绝</button></>}
+				{(selected.status==='approved'||selected.status==='rejected')&&selected.decisionSource==='manual'&&<span>该任务已由人工完成，无需再次操作。</span>}
+			</div>
+		</section>}
+	</Panel>
+}
 
 function Users(){const[data,setData]=useState<Page<UserRow>|null>(null);const[error,setError]=useState('');const load=()=>adminAPI.users().then(setData).catch(e=>setError(String(e)));const act=async(run:()=>Promise<unknown>)=>{try{setError('');await run();await load()}catch(e){setError(String(e))}};useEffect(()=>{void load()},[]);return <Panel title="用户与管理员权限"><>{error&&<ErrorBox message={error}/>}<table><thead><tr><th>用户</th><th>学校/校区</th><th>角色</th><th>状态</th><th>状态操作</th><th>角色操作（仅超管）</th></tr></thead><tbody>{(data?.items||[]).map(row=><tr key={row.id}><td><strong>{row.nickname}</strong><span>#{row.id}</span></td><td>{row.school} / {row.campus}</td><td>{row.role}</td><td>{row.status}</td><td><button onClick={()=>act(()=>adminAPI.updateUserStatus(row.id,'active'))}>启用</button><button onClick={()=>act(()=>adminAPI.updateUserStatus(row.id,'muted'))}>禁言</button><button onClick={()=>act(()=>adminAPI.updateUserStatus(row.id,'banned'))}>封禁</button></td><td><button onClick={()=>act(()=>adminAPI.updateUserRole(row.id,'user'))}>用户</button><button onClick={()=>act(()=>adminAPI.updateUserRole(row.id,'admin'))}>管理员</button><button onClick={()=>act(()=>adminAPI.updateUserRole(row.id,'superadmin'))}>超级管理员</button></td></tr>)}</tbody></table></></Panel>}
 
@@ -44,7 +131,7 @@ function takedownReason(kind:string,title:string){if(!window.confirm(`确认下�
 
 function TakedownPosts(){const[data,setData]=useState<Page<PostRow>|null>(null);const[error,setError]=useState('');const[busy,setBusy]=useState<number|null>(null);const load=useCallback(()=>adminAPI.posts().then(setData).catch(e=>setError(String(e))),[]);useEffect(()=>{void load()},[load]);const takedown=async(row:PostRow)=>{const reason=takedownReason('帖子',row.title);if(reason===null)return;setBusy(row.id);setError('');try{await adminAPI.takedownPost(row.id,reason);await load()}catch(e){setError(String(e))}finally{setBusy(null)}};return <Panel title="帖子管理"><>{error&&<div className="content-takedown-error" role="alert">{error}</div>}<table><thead><tr><th>帖子</th><th>作者</th><th>话题</th><th>审核状态</th><th>操作</th></tr></thead><tbody>{(data?.items||[]).map(row=><tr key={row.id}><td><strong>{row.title}</strong><span>#{row.id}</span></td><td>{row.author.nickname}</td><td>{row.topic}</td><td>{row.reviewStatus}</td><td>{row.reviewStatus==='approved'?<button className="content-takedown-button" disabled={busy===row.id} onClick={()=>void takedown(row)}>{busy===row.id?'下架中…':'下架'}</button>:<span>不可下架</span>}</td></tr>)}</tbody></table></></Panel>}
 
-function TakedownProducts(){const[data,setData]=useState<Page<ProductRow>|null>(null);const[error,setError]=useState('');const[busy,setBusy]=useState<number|null>(null);const load=useCallback(()=>adminAPI.products().then(setData).catch(e=>setError(String(e))),[]);useEffect(()=>{void load()},[load]);const takedown=async(row:ProductRow)=>{const reason=takedownReason('商品',row.title);if(reason===null)return;setBusy(row.id);setError('');try{await adminAPI.takedownProduct(row.id,reason);await load()}catch(e){setError(String(e))}finally{setBusy(null)}};return <Panel title="商品管理"><>{error&&<div className="content-takedown-error" role="alert">{error}</div>}<table><thead><tr><th>商品</th><th>卖家</th><th>价格</th><th>业务状态</th><th>审核状态</th><th>操作</th></tr></thead><tbody>{(data?.items||[]).map(row=><tr key={row.id}><td><strong>{row.title}</strong><span>#{row.id}</span></td><td>{row.seller.nickname}</td><td>¥{(row.price/100).toFixed(2)}</td><td>{row.status}</td><td>{row.reviewStatus}</td><td>{row.reviewStatus==='approved'?<button className="content-takedown-button" disabled={busy===row.id} onClick={()=>void takedown(row)}>{busy===row.id?'下架中…':'下架'}</button>:<span>不可下架</span>}</td></tr>)}</tbody></table></></Panel>}
+function TakedownProducts(){const[data,setData]=useState<Page<ProductRow>|null>(null);const[error,setError]=useState('');const[busy,setBusy]=useState<number|null>(null);const setSection=useAdminStore(s=>s.setSection);const load=useCallback(()=>adminAPI.products().then(setData).catch(e=>setError(String(e))),[]);useEffect(()=>{void load()},[load]);const takedown=async(row:ProductRow)=>{const reason=takedownReason('商品',row.title);if(reason===null)return;setBusy(row.id);setError('');try{await adminAPI.takedownProduct(row.id,reason);await load()}catch(e){setError(String(e))}finally{setBusy(null)}};return <Panel title="商品管理"><>{error&&<div className="content-takedown-error" role="alert">{error}</div>}<table><thead><tr><th>商品</th><th>卖家</th><th>价格</th><th>业务状态</th><th>审核状态</th><th>操作</th></tr></thead><tbody>{(data?.items||[]).map(row=><tr key={row.id}><td><strong>{row.title}</strong><span>#{row.id}</span></td><td>{row.seller.nickname}</td><td>¥{(row.price/100).toFixed(2)}</td><td>{row.status}</td><td>{row.reviewStatus}</td><td>{row.reviewStatus==='approved'?<button className="content-takedown-button" disabled={busy===row.id} onClick={()=>void takedown(row)}>{busy===row.id?'下架中…':'下架'}</button>:row.reviewStatus==='submitted'||row.reviewStatus==='reviewing'?<button type="button" className="review-link-button" onClick={()=>setSection('moderation')}>前往审核</button>:<span>不可下架</span>}</td></tr>)}</tbody></table></></Panel>}
 
 function Content(){const section=useAdminStore(s=>s.section);if(section==='dashboard')return <Dashboard/>;if(section==='users')return <Users/>;if(section==='identities')return <IdentityApplications/>;if(section==='moderation')return <Reviews/>;if(section==='media')return <MediaConsole/>;if(section==='delivery')return <DeliveryConsole/>;if(section==='takeout'&&legacyTakeoutEnabled)return <TakeoutConsole/>;if(section==='community')return <TakedownPosts/>;if(section==='trade')return <TakedownProducts/>;if(section==='reports')return <Reports/>;return <Navigation/>}
 

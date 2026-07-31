@@ -41,6 +41,17 @@ func (t *memoryTarget) SetReviewStatus(_ context.Context, _ uint, status Status)
 	return nil
 }
 
+type recordingTarget struct {
+	objectType string
+	statuses   []Status
+}
+
+func (t *recordingTarget) ObjectType() string { return t.objectType }
+func (t *recordingTarget) SetReviewStatus(_ context.Context, _ uint, status Status) error {
+	t.statuses = append(t.statuses, status)
+	return nil
+}
+
 func TestReviewWorkflow(t *testing.T) {
 	repo := &memoryRepo{}
 	service := NewService(repo)
@@ -118,6 +129,124 @@ func TestEnsureSubmittedPreservesEveryLegalExistingState(t *testing.T) {
 			}
 			if got != existing || repo.task != existing {
 				t.Fatalf("status %s changed: got=%#v stored=%#v", status, got, repo.task)
+			}
+		})
+	}
+}
+
+func TestEnsureSubmittedAutomaticallyApprovesTrustedResultOnce(t *testing.T) {
+	repo := &memoryRepo{}
+	service := NewService(repo)
+	target := &recordingTarget{objectType: "product"}
+	service.RegisterTarget(target)
+	input := Submission{
+		ObjectType: "product", ObjectID: 12, SubmitterID: 8, Risk: "wechat pass",
+	}
+
+	created, err := service.EnsureSubmitted(context.Background(), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created.Status != StatusApproved || created.DecisionSource != DecisionSourceAutomatic {
+		t.Fatalf("automatic task=%#v", created)
+	}
+	if len(target.statuses) != 1 || target.statuses[0] != StatusApproved {
+		t.Fatalf("target statuses=%v", target.statuses)
+	}
+
+	replayed, err := service.EnsureSubmitted(context.Background(), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replayed != created {
+		t.Fatalf("replayed=%#v want=%#v", replayed, created)
+	}
+	if len(target.statuses) != 1 {
+		t.Fatalf("terminal replay repeated target side effect: %v", target.statuses)
+	}
+}
+
+func TestSubmitAutomaticallyRejectsRiskyResult(t *testing.T) {
+	repo := &memoryRepo{}
+	service := NewService(repo)
+	target := &recordingTarget{objectType: "comment"}
+	service.RegisterTarget(target)
+
+	task, err := service.Submit(context.Background(), Submission{
+		ObjectType: "comment", ObjectID: 5, SubmitterID: 3, Risk: "wechat risky label=100",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if task.Status != StatusRejected || task.DecisionSource != DecisionSourceAutomatic {
+		t.Fatalf("automatic task=%#v", task)
+	}
+	if len(target.statuses) != 1 || target.statuses[0] != StatusRejected {
+		t.Fatalf("target statuses=%v", target.statuses)
+	}
+}
+
+func TestEnsureSubmittedKeepsAmbiguousResultForManualReview(t *testing.T) {
+	repo := &memoryRepo{}
+	service := NewService(repo)
+	task, err := service.EnsureSubmitted(context.Background(), Submission{
+		ObjectType: "product", ObjectID: 12, SubmitterID: 8, Risk: "wechat review label=20001",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if task.Status != StatusSubmitted || task.DecisionSource != DecisionSourceManual {
+		t.Fatalf("manual task=%#v", task)
+	}
+}
+
+func TestOverrideAutomaticDecision(t *testing.T) {
+	repo := &memoryRepo{}
+	service := NewService(repo)
+	target := &recordingTarget{objectType: "product"}
+	service.RegisterTarget(target)
+	automatic, err := service.EnsureSubmitted(context.Background(), Submission{
+		ObjectType: "product", ObjectID: 12, SubmitterID: 8, Risk: "wechat risky label=100",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	overridden, err := service.Override(context.Background(), automatic.ID, 27, StatusApproved, " 人工复核确认无违规 ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if overridden.Status != StatusApproved ||
+		overridden.DecisionSource != DecisionSourceManualOverride ||
+		overridden.OperatorID != 27 ||
+		overridden.Reason != "人工复核确认无违规" {
+		t.Fatalf("overridden=%#v", overridden)
+	}
+	if len(target.statuses) != 2 || target.statuses[0] != StatusRejected || target.statuses[1] != StatusApproved {
+		t.Fatalf("target statuses=%v", target.statuses)
+	}
+}
+
+func TestOverrideRequiresTerminalTaskOperatorAndReason(t *testing.T) {
+	tests := []struct {
+		name       string
+		task       Task
+		operatorID uint
+		status     Status
+		reason     string
+	}{
+		{name: "not terminal", task: Task{ID: 1, ObjectType: "post", ObjectID: 9, Status: StatusReviewing}, operatorID: 1, status: StatusApproved, reason: "ok"},
+		{name: "missing operator", task: Task{ID: 1, ObjectType: "post", ObjectID: 9, Status: StatusRejected}, status: StatusApproved, reason: "ok"},
+		{name: "missing reason", task: Task{ID: 1, ObjectType: "post", ObjectID: 9, Status: StatusRejected}, operatorID: 1, status: StatusApproved, reason: " "},
+		{name: "invalid status", task: Task{ID: 1, ObjectType: "post", ObjectID: 9, Status: StatusRejected}, operatorID: 1, status: StatusReviewing, reason: "ok"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			repo := &memoryRepo{task: test.task}
+			service := NewService(repo)
+			service.RegisterTarget(&memoryTarget{})
+			if _, err := service.Override(context.Background(), test.task.ID, test.operatorID, test.status, test.reason); err == nil {
+				t.Fatal("override must fail")
 			}
 		})
 	}

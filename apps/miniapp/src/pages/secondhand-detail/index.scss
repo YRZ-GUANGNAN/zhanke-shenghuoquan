@@ -12,6 +12,10 @@
   font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 }
 
+.capsule-page-header.secondhand-detail-header .capsule-page-header__business-row {
+  margin-top: -8px;
+}
+
 .secondhand-detail-header__back {
   position: relative;
   width: 44px;
@@ -286,41 +290,30 @@
 }
 
 .secondhand-detail-favorite__star {
-  position: relative;
-  width: 42rpx;
-  height: 42rpx;
-}
-
-.secondhand-detail-favorite__star::before {
-  position: absolute;
-  top: 4rpx;
-  left: 4rpx;
-  width: 28rpx;
-  height: 28rpx;
-  border: 4rpx solid currentColor;
-  border-radius: 8rpx;
-  content: '';
-  transform: rotate(45deg);
-}
-
-.secondhand-detail-favorite__star::after {
-  position: absolute;
-  top: 15rpx;
-  left: 10rpx;
-  width: 22rpx;
-  height: 4rpx;
-  border-radius: 999rpx;
-  background: $bg-surface;
-  content: '';
+  color: $text-muted;
+  font-size: 44rpx;
+  line-height: 1;
+  transform: scale(1);
+  transition: transform 120ms ease, color 120ms ease;
 }
 
 .secondhand-detail-favorite--active {
   color: $like-active;
 }
 
+.secondhand-detail-favorite--active .secondhand-detail-favorite__star {
+  color: #f4b740;
+}
+
 .secondhand-detail-favorite--pending,
 .secondhand-detail-contact--pending {
   opacity: .62;
+}
+
+.secondhand-detail-contact--disabled {
+  background: $bg-app;
+  color: $text-muted;
+  box-shadow: none;
 }
 
 .secondhand-detail-contact {
@@ -335,6 +328,34 @@
   color: $text-on-color;
   font-size: 30rpx;
   font-weight: 900;
+}
+
+.secondhand-detail-actionbar--seller {
+  display: block;
+}
+
+.secondhand-detail-seller-actions {
+  display: flex;
+  gap: 18rpx;
+}
+
+.secondhand-detail-seller-action {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 72rpx;
+  border: 1rpx solid $brand-primary;
+  border-radius: 18rpx;
+  background: $bg-surface;
+  color: $brand-primary;
+  font-size: 27rpx;
+  font-weight: 800;
+}
+
+.secondhand-detail-seller-action--primary {
+  background: $gradient-primary;
+  color: $text-on-color;
 }
 
 .secondhand-detail-contact__icon {

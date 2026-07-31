@@ -72,18 +72,22 @@ type NotificationType string
 const (
 	ReviewStatusTakenDown review.Status = "taken_down"
 
-	NotificationComment NotificationType = "post_commented"
-	NotificationLike    NotificationType = "post_liked"
-	NotificationFollow  NotificationType = "user_followed"
+	NotificationComment        NotificationType = "post_commented"
+	NotificationLike           NotificationType = "post_liked"
+	NotificationFollow         NotificationType = "user_followed"
+	NotificationProductComment NotificationType = "product_commented"
+	NotificationProductReply   NotificationType = "product_comment_replied"
 )
 
 type Notification struct {
-	ID          uint             `json:"id" gorm:"primaryKey"`
-	RecipientID uint             `json:"recipientId" gorm:"index;uniqueIndex:idx_notification_event"`
-	ActorID     uint             `json:"actorId" gorm:"index;uniqueIndex:idx_notification_event"`
-	Type        NotificationType `json:"type" gorm:"size:32;index;uniqueIndex:idx_notification_event"`
-	PostID      uint             `json:"postId" gorm:"index;uniqueIndex:idx_notification_event"`
-	CommentID   uint             `json:"commentId" gorm:"uniqueIndex:idx_notification_event"`
-	ReadAt      *time.Time       `json:"readAt" gorm:"index"`
-	CreatedAt   time.Time        `json:"createdAt"`
+	ID               uint             `json:"id" gorm:"primaryKey"`
+	RecipientID      uint             `json:"recipientId" gorm:"index;uniqueIndex:idx_notification_event"`
+	ActorID          uint             `json:"actorId" gorm:"index;uniqueIndex:idx_notification_event"`
+	Type             NotificationType `json:"type" gorm:"size:32;index;uniqueIndex:idx_notification_event"`
+	PostID           uint             `json:"postId" gorm:"index;uniqueIndex:idx_notification_event"`
+	CommentID        uint             `json:"commentId" gorm:"uniqueIndex:idx_notification_event"`
+	ProductID        uint             `json:"productId" gorm:"uniqueIndex:idx_notification_event"`
+	ProductCommentID uint             `json:"productCommentId" gorm:"uniqueIndex:idx_notification_event"`
+	ReadAt           *time.Time       `json:"readAt" gorm:"index"`
+	CreatedAt        time.Time        `json:"createdAt"`
 }

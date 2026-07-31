@@ -3,7 +3,8 @@ export type AdminSection = 'dashboard' | 'users' | 'identities' | 'moderation' |
 export interface AdminUser{id:number;nickname:string;role:'admin'|'superadmin'}
 export interface AdminSession{user:AdminUser;csrfToken:string;expiresAt:string}
 export interface Page<T>{items:T[];page:number;pageSize:number;total:number}
-export interface ReviewTask{id:number;objectType:'post'|'comment'|'product'|'report';objectId:number;risk:string;status:'submitted'|'reviewing'|'approved'|'rejected';reason:string;createdAt:string}
+export type ReviewDecisionSource='manual'|'automatic'|'manual_override'
+export interface ReviewTask{id:number;objectType:'post'|'comment'|'product'|'product_comment'|'report';objectId:number;risk:string;status:'submitted'|'reviewing'|'approved'|'rejected';decisionSource:ReviewDecisionSource;reason:string;createdAt:string}
 export interface UserRow{id:number;nickname:string;school:string;campus:string;role:'user'|'admin'|'superadmin';status:'active'|'muted'|'banned'}
 export interface Author{nickname:string;school:string;campus:string}
 export interface PostRow{id:number;title:string;topic:string;reviewStatus:string;author:Author;createdAt:string}

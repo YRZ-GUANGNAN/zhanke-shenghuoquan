@@ -1,0 +1,190 @@
+@use '../../styles/design-tokens.scss' as *;
+
+.product-comments {
+  margin-top: 24rpx;
+  padding: 30rpx 28rpx;
+  border: 1rpx solid $divider-nav;
+  border-radius: 28rpx;
+  background: $bg-surface;
+}
+
+.product-comments__head,
+.product-comment__meta,
+.product-comments__input-row,
+.product-comments__replying {
+  display: flex;
+  align-items: center;
+}
+
+.product-comments__head {
+  justify-content: space-between;
+  margin-bottom: 24rpx;
+}
+
+.product-comments__title {
+  color: $text-strong;
+  font-size: 30rpx;
+  font-weight: 900;
+}
+
+.product-comments__count,
+.product-comments__state,
+.product-comment__time {
+  color: $text-muted;
+  font-size: 23rpx;
+}
+
+.product-comments__state {
+  display: block;
+  padding: 34rpx 0;
+  text-align: center;
+}
+
+.product-comments__state--retry {
+  color: $brand-primary;
+}
+
+.product-comment-thread + .product-comment-thread {
+  margin-top: 28rpx;
+  padding-top: 28rpx;
+  border-top: 1rpx solid $divider-nav;
+}
+
+.product-comment {
+  display: flex;
+  align-items: flex-start;
+  gap: 18rpx;
+}
+
+.product-comment--reply {
+  margin-top: 20rpx;
+  margin-left: 58rpx;
+  padding: 18rpx;
+  border-radius: 18rpx;
+  background: $bg-screen;
+}
+
+.product-comment__avatar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 54rpx;
+  height: 54rpx;
+  border-radius: 50%;
+  background: $brand-tint;
+  color: $brand-primary;
+  font-size: 23rpx;
+  font-weight: 800;
+}
+
+.product-comment__main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.product-comment__meta {
+  flex-wrap: wrap;
+  gap: 10rpx;
+}
+
+.product-comment__author {
+  color: $text-strong;
+  font-size: 25rpx;
+  font-weight: 800;
+}
+
+.product-comment__seller,
+.product-comment__review {
+  padding: 3rpx 10rpx;
+  border-radius: 999rpx;
+  background: $brand-tint;
+  color: $brand-primary;
+  font-size: 19rpx;
+  font-weight: 700;
+}
+
+.product-comment__review--rejected {
+  background: rgba($badge-unread, .10);
+  color: $badge-unread;
+}
+
+.product-comment__reply-to {
+  color: $text-secondary;
+  font-size: 21rpx;
+}
+
+.product-comment__content {
+  display: block;
+  margin-top: 10rpx;
+  color: $text-primary;
+  font-size: 26rpx;
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.product-comment__time {
+  display: block;
+  margin-top: 10rpx;
+}
+
+.product-comments__composer {
+  margin-top: 28rpx;
+  padding-top: 24rpx;
+  border-top: 1rpx solid $divider-nav;
+}
+
+.product-comments__replying {
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+  color: $text-secondary;
+  font-size: 22rpx;
+}
+
+.product-comments__replying text:last-child {
+  color: $brand-primary;
+}
+
+.product-comments__input-row {
+  gap: 14rpx;
+}
+
+.product-comments__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 72rpx;
+  padding: 0 24rpx;
+  border-radius: 999rpx;
+  background: $bg-screen;
+  color: $text-primary;
+  font-size: 25rpx;
+}
+
+.product-comments__send {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 100rpx;
+  height: 66rpx;
+  padding: 0 20rpx;
+  border-radius: 999rpx;
+  background: $brand-primary;
+  color: $text-on-color;
+  font-size: 24rpx;
+  font-weight: 800;
+}
+
+.product-comments__send--disabled {
+  opacity: .45;
+}
+
+.product-comments__closed {
+  display: block;
+  padding: 18rpx;
+  border-radius: 16rpx;
+  background: $bg-screen;
+  color: $text-muted;
+  font-size: 24rpx;
+  text-align: center;
+}

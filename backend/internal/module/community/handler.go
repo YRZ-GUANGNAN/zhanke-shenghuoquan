@@ -32,6 +32,7 @@ func (h *Handler) Register(rg *gin.RouterGroup) {
 	auth.GET("/me/summary", h.mySummary)
 	auth.GET("/me/favorites", h.myFavorites)
 	auth.GET("/me/posts", h.myPosts)
+	auth.GET("/me/posts/:id", h.myPost)
 	auth.GET("/me/comments", h.myComments)
 	auth.GET("/users/:id/profile", h.publicProfile)
 	auth.GET("/users/:id/posts", h.publicUserPosts)
@@ -84,6 +85,15 @@ func (h *Handler) myFavorites(c *gin.Context) {
 func (h *Handler) myPosts(c *gin.Context) {
 	page, size := pagination(c)
 	value, err := h.service.MyPosts(c, user.CurrentUserID(c), page, size)
+	write(c, value, err)
+}
+
+func (h *Handler) myPost(c *gin.Context) {
+	id, ok := paramID(c)
+	if !ok {
+		return
+	}
+	value, err := h.service.MyPost(c, user.CurrentUserID(c), id)
 	write(c, value, err)
 }
 

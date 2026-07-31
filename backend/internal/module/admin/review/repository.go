@@ -24,7 +24,8 @@ type GormRepository struct{ db *gorm.DB }
 func NewRepository(db *gorm.DB) *GormRepository { return &GormRepository{db: db} }
 func (r *GormRepository) Submit(ctx context.Context, value *Task) error {
 	err := r.db.WithContext(ctx).Where("object_type = ? AND object_id = ?", value.ObjectType, value.ObjectID).Assign(map[string]any{
-		"submitter_id": value.SubmitterID, "risk": value.Risk, "status": StatusSubmitted, "reason": "", "operator_id": 0,
+		"submitter_id": value.SubmitterID, "risk": value.Risk, "status": StatusSubmitted,
+		"decision_source": DecisionSourceManual, "reason": "", "operator_id": 0,
 	}).FirstOrCreate(value).Error
 	return err
 }

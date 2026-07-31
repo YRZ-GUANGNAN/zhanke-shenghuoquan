@@ -157,6 +157,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("configure trade media gateway: %v", err)
 	}
+	communityMediaGateway, err := community.NewHybridMediaGateway(bindingService, mediaService, cfg.MediaPublicBaseURL)
+	if err != nil {
+		log.Fatalf("configure community media gateway: %v", err)
+	}
 	privateProofDisplay, err := coremedia.NewMediaDisplayService(
 		coreMediaGateway, mediaRepository, completionStore, delivery.PrivateProofURLTTL,
 	)
@@ -225,9 +229,10 @@ func main() {
 	cancelSearch()
 	communityRepository := community.NewRepository(db)
 	tradeRepository := trade.NewRepository(db)
-	communityService := community.NewService(communityRepository, userService, reviewService, mediaService)
+	communityService := community.NewService(communityRepository, userService, reviewService, communityMediaGateway)
 	tradeService := trade.NewService(tradeRepository, userService, reviewService, imService, searchIndex, tradeMediaGateway)
-	communityWriteOutboxProcessor := community.NewWriteOutboxProcessor(communityRepository, mediaService, reviewService)
+	tradeCommentService := trade.NewProductCommentService(tradeRepository, tradeRepository, userService)
+	communityWriteOutboxProcessor := community.NewWriteOutboxProcessor(communityRepository, communityMediaGateway, reviewService)
 	tradeWriteOutboxProcessor := trade.NewWriteOutboxProcessor(tradeRepository, tradeMediaGateway, reviewService)
 	go func() {
 		for {
@@ -353,6 +358,7 @@ func main() {
 		reviewService.RegisterTarget(target)
 	}
 	reviewService.RegisterTarget(tradeService)
+	reviewService.RegisterTarget(trade.NewProductCommentReviewTarget(tradeRepository))
 	reviewService.RegisterTarget(adminService)
 
 	if cfg.AppEnv == "prod" {
@@ -398,6 +404,7 @@ func main() {
 	community.NewSearchHandler(communityService, userService, communityMetrics).Register(communityRoutes)
 	tradeRoutes := api.Group("/trade")
 	trade.NewHandler(tradeService, userService, safety).Register(tradeRoutes)
+	trade.NewProductCommentHandler(tradeCommentService, userService, safety).Register(tradeRoutes)
 	trade.NewSearchHandler(tradeService, userService, tradeMetrics).Register(tradeRoutes)
 	navigationRoutes := api.Group("/navigation")
 	navigation.NewHandler(navigationService).Register(navigationRoutes)

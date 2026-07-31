@@ -14,6 +14,7 @@ export const adminAPI={
 	reviews:(status='')=>api<Page<ReviewTask>>(`/admin/reviews${status?`?status=${status}`:''}`),
 	startReview:(id:number)=>api<ReviewTask>(`/admin/reviews/${id}/start`,{method:'POST'}),
 	decideReview:(id:number,decision:'approve'|'reject',reason='')=>api<ReviewTask>(`/admin/reviews/${id}/${decision}`,{method:'POST',body:JSON.stringify({reason})}),
+	overrideReview:(id:number,status:'approved'|'rejected',reason:string)=>api<ReviewTask>(`/admin/reviews/${id}/override`,{method:'POST',body:JSON.stringify({status,reason})}),
 	users:()=>api<Page<UserRow>>('/admin/users'),
 	listIdentityApplications:(query:IdentityApplicationQuery={})=>api<IdentityApplicationAdminList>(`/admin/identity-applications${identityQueryString(query)}`),
 	identityApplication:(applicationId:string)=>api<IdentityApplicationDetail>(`/admin/identity-applications/${encodeURIComponent(applicationId)}`),

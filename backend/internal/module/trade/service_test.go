@@ -603,7 +603,15 @@ func TestProductStatusTransitions(t *testing.T) {
 	tests := []struct {
 		from, to ProductStatus
 		want     bool
-	}{{StatusSelling, StatusReserved, true}, {StatusSelling, StatusSold, true}, {StatusReserved, StatusSelling, true}, {StatusReserved, StatusSold, true}, {StatusSold, StatusSelling, false}, {StatusSelling, StatusSelling, false}}
+	}{
+		{StatusSelling, StatusReserved, true},
+		{StatusSelling, StatusSold, true},
+		{StatusReserved, StatusSelling, true},
+		{StatusReserved, StatusSold, true},
+		{StatusSold, StatusSelling, true},
+		{StatusSold, StatusReserved, false},
+		{StatusSelling, StatusSelling, false},
+	}
 	for _, tt := range tests {
 		if got := validTransition(tt.from, tt.to); got != tt.want {
 			t.Errorf("%s -> %s = %v, want %v", tt.from, tt.to, got, tt.want)
@@ -639,13 +647,47 @@ func TestStatusCASOwnershipAndSoldTerminal(t *testing.T) {
 	if err := service.ChangeStatus(context.Background(), 1, 1, StatusSold); err != nil {
 		t.Fatal(err)
 	}
-	if err := service.ChangeStatus(context.Background(), 1, 1, StatusSelling); err == nil {
-		t.Fatal("sold terminal was reopened")
+	if err := service.ChangeStatus(context.Background(), 1, 1, StatusReserved); err == nil {
+		t.Fatal("sold product was reserved directly")
+	}
+	if err := service.ChangeStatus(context.Background(), 1, 1, StatusSelling); err != nil {
+		t.Fatalf("seller could not relist sold product: %v", err)
 	}
 	repo.products[1] = Product{ID: 1, SellerID: 1, Status: StatusSelling, ReviewStatus: review.StatusApproved}
 	repo.forceConflict = true
 	if err := service.ChangeStatus(context.Background(), 1, 1, StatusReserved); !errors.Is(err, ErrConflict) {
 		t.Fatalf("CAS conflict not surfaced: %v", err)
+	}
+}
+
+func TestSoldProductGuards(t *testing.T) {
+	repo := newTradeMemoryRepo(Product{
+		ID: 1, SellerID: 1, Status: StatusSold, ReviewStatus: review.StatusApproved,
+	})
+	service := newTradeService(repo, &tradeSearchFake{}, &tradeConversations{})
+
+	if err := service.ChangeStatus(context.Background(), 1, 2, StatusSelling); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("non-seller relisted sold product: %v", err)
+	}
+	if err := service.ChangeStatus(context.Background(), 1, 1, StatusReserved); err == nil {
+		t.Fatal("sold product changed directly to reserved")
+	}
+
+	repo.products[1] = Product{
+		ID: 1, SellerID: 1, Status: StatusSold, ReviewStatus: review.StatusRejected,
+	}
+	if err := service.ChangeStatus(context.Background(), 1, 1, StatusSelling); !errors.Is(err, ErrConflict) {
+		t.Fatalf("unapproved sold product relisted: %v", err)
+	}
+
+	repo.products[1] = Product{
+		ID: 1, SellerID: 1, Status: StatusSold, ReviewStatus: review.StatusApproved,
+	}
+	if err := service.ChangeStatus(context.Background(), 1, 1, StatusSelling); err != nil {
+		t.Fatalf("approved seller relist failed: %v", err)
+	}
+	if got := repo.products[1].Status; got != StatusSelling {
+		t.Fatalf("relisted status=%q want=%q", got, StatusSelling)
 	}
 }
 
@@ -697,7 +739,10 @@ func TestProductTargetFavoriteViewerStateAndStableContact(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if conversations.calls != 1 || first != second || first.ProductID != 1 || first.PeerUserID == "" {
+	if conversations.calls != 1 || first != second ||
+		first.RelationID == 0 || first.ProductID != 1 ||
+		first.BuyerID != 2 || first.SellerID != 1 ||
+		first.ConversationID != "C2C"+first.PeerUserID || first.PeerUserID == "" {
 		t.Fatalf("contact was not stable: calls=%d first=%+v second=%+v", conversations.calls, first, second)
 	}
 	state, err = service.ViewerState(context.Background(), 1, 2)

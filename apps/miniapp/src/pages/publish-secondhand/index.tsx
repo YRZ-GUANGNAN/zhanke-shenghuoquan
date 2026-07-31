@@ -125,7 +125,7 @@ export default function PublishSecondhandPage() {
         clientRequestId
       })
       clientRequestIdRef.current = null
-      await Taro.showToast({ title: '发布成功，等待审核', icon: 'success', duration: 1600 })
+      await Taro.showToast({ title: '已提交审核，通过后会显示在集市', icon: 'success', duration: 2200 })
       await Taro.redirectTo({ url: '/pages/student-secondhand/index' })
     } catch (error) {
       if (isApiError(error) && error.status >= 400 && error.status < 500) {

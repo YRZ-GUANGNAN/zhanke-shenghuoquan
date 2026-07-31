@@ -175,13 +175,20 @@ const normalizeNotification = (raw: unknown): CommunityNotification => {
   const actorRecord = isRecord(record.actor) ? record.actor : {}
   const rawType = asString(first(record, ['type', 'eventType', 'event_type']), 'post_commented')
   const type: CommunityNotification['type'] =
-    rawType === 'post_liked' || rawType === 'user_followed' ? rawType : 'post_commented'
+    rawType === 'post_liked'
+    || rawType === 'user_followed'
+    || rawType === 'product_commented'
+    || rawType === 'product_comment_replied'
+      ? rawType
+      : 'post_commented'
 
   return {
     id: asString(first(record, ['id', 'notificationId', 'notification_id'])),
     type,
     actor: asString(first(record, ['actorName', 'actor_name', 'actor'], first(actorRecord, ['name', 'nickname'])), '同学'),
     postId: asString(first(record, ['postId', 'post_id', 'postPublicId', 'post_public_id'])),
+    productId: asString(first(record, ['productId', 'product_id'])) || undefined,
+    productCommentId: asString(first(record, ['productCommentId', 'product_comment_id'])) || undefined,
     read: asBoolean(first(record, ['read', 'isRead', 'is_read'])),
     createdAt: dateLabel(first(record, ['createdAt', 'created_at'])),
   }
@@ -232,6 +239,11 @@ export async function listFollowingPosts(): Promise<CommunityPost[]> {
 
 export async function getCommunityPost(postId: string): Promise<CommunityPost> {
   const data = await request<unknown>(`/community/posts/${encodeURIComponent(postId)}`)
+  return unwrapPost(data)
+}
+
+export async function getMyCommunityPost(postId: string): Promise<CommunityPost> {
+  const data = await request<unknown>(`/community/me/posts/${encodeURIComponent(postId)}`)
   return unwrapPost(data)
 }
 

@@ -84,13 +84,15 @@ func (m *tradeProcessorMedia) EnsureCommitted(_ context.Context, _ uint, token, 
 }
 
 type tradeProcessorReviews struct {
-	calls    int
-	effects  map[string]bool
-	failOnce bool
+	calls       int
+	effects     map[string]bool
+	submissions []review.Submission
+	failOnce    bool
 }
 
 func (r *tradeProcessorReviews) EnsureSubmitted(_ context.Context, submission review.Submission) (review.Task, error) {
 	r.calls++
+	r.submissions = append(r.submissions, submission)
 	if r.failOnce {
 		r.failOnce = false
 		return review.Task{}, errors.New("temporary review outage")
@@ -166,5 +168,101 @@ func TestTradeWriteOutboxProcessorPropagatesLeaseCASAndHandlesEmptyQueue(t *test
 	repo.completeErr = nil
 	if processed, err := processor.DrainOne(context.Background()); err != nil || processed {
 		t.Fatalf("empty queue is not safe: processed=%v err=%v", processed, err)
+	}
+}
+
+func TestTradeWriteOutboxProcessorCommentSubmitsReviewWithoutMedia(t *testing.T) {
+	repo := &tradeProcessorRepo{events: []WriteOutbox{{
+		ID: 4, AggregateType: ProductCommentAggregateType, AggregateID: 24, OwnerUserID: 8,
+		EventType: ProductCommentCreatedEventType,
+		Payload:   `{"version":"trade-product-comment:v1","reviewObjectType":"product_comment","reviewSubmitterId":8,"reviewRisk":"wechat pass"}`,
+		Status:    WriteOutboxPending, RowVersion: 1,
+	}}}
+	media := &tradeProcessorMedia{effects: map[string]bool{}}
+	reviews := &tradeProcessorReviews{effects: map[string]bool{}}
+	processor := NewWriteOutboxProcessor(repo, media, reviews)
+
+	processed, err := processor.DrainOne(context.Background())
+	if err != nil || !processed {
+		t.Fatalf("drain comment: processed=%v err=%v", processed, err)
+	}
+	if repo.completed != 1 || repo.failed != 0 || repo.deadletters != 0 {
+		t.Fatalf("unexpected outbox state: %+v", repo)
+	}
+	if media.calls != 0 {
+		t.Fatalf("comment outbox must not commit media: calls=%d", media.calls)
+	}
+	if len(reviews.submissions) != 1 {
+		t.Fatalf("review submissions=%d", len(reviews.submissions))
+	}
+	submission := reviews.submissions[0]
+	if submission.ObjectType != ProductCommentAggregateType || submission.ObjectID != 24 ||
+		submission.SubmitterID != 8 || submission.Risk != "wechat pass" {
+		t.Fatalf("unexpected review submission: %#v", submission)
+	}
+}
+
+func TestTradeWriteOutboxCommentRejectsMediaAndMismatchedContracts(t *testing.T) {
+	token := "reservation-forbidden"
+	tests := []struct {
+		name  string
+		event WriteOutbox
+	}{
+		{
+			name: "reservation",
+			event: WriteOutbox{
+				AggregateType: ProductCommentAggregateType, AggregateID: 24, OwnerUserID: 8,
+				EventType: ProductCommentCreatedEventType, ReservationToken: &token,
+				Payload: `{"version":"trade-product-comment:v1","reviewObjectType":"product_comment","reviewSubmitterId":8,"reviewRisk":"low"}`,
+			},
+		},
+		{
+			name: "assets",
+			event: WriteOutbox{
+				AggregateType: ProductCommentAggregateType, AggregateID: 24, OwnerUserID: 8,
+				EventType: ProductCommentCreatedEventType,
+				Payload:   `{"version":"trade-product-comment:v1","orderedAssetPublicIds":["asset-a"],"reviewObjectType":"product_comment","reviewSubmitterId":8,"reviewRisk":"low"}`,
+			},
+		},
+		{
+			name: "aggregate",
+			event: WriteOutbox{
+				AggregateType: "product", AggregateID: 24, OwnerUserID: 8,
+				EventType: ProductCommentCreatedEventType,
+				Payload:   `{"version":"trade-product-comment:v1","reviewObjectType":"product_comment","reviewSubmitterId":8,"reviewRisk":"low"}`,
+			},
+		},
+		{
+			name: "review object",
+			event: WriteOutbox{
+				AggregateType: ProductCommentAggregateType, AggregateID: 24, OwnerUserID: 8,
+				EventType: ProductCommentCreatedEventType,
+				Payload:   `{"version":"trade-product-comment:v1","reviewObjectType":"product","reviewSubmitterId":8,"reviewRisk":"low"}`,
+			},
+		},
+		{
+			name: "version",
+			event: WriteOutbox{
+				AggregateType: ProductCommentAggregateType, AggregateID: 24, OwnerUserID: 8,
+				EventType: ProductCommentCreatedEventType,
+				Payload:   `{"version":"trade-product-comment:v0","reviewObjectType":"product_comment","reviewSubmitterId":8,"reviewRisk":"low"}`,
+			},
+		},
+		{
+			name: "unsupported event",
+			event: WriteOutbox{
+				AggregateType: ProductCommentAggregateType, AggregateID: 24, OwnerUserID: 8,
+				EventType: "trade_product_comment_deleted",
+				Payload:   `{"version":"trade-product-comment:v1","reviewObjectType":"product_comment","reviewSubmitterId":8,"reviewRisk":"low"}`,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := validateTradeWriteOutbox(test.event)
+			if !errors.Is(err, ErrPermanentWriteOutboxFailure) {
+				t.Fatalf("expected permanent contract failure, got %v", err)
+			}
+		})
 	}
 }

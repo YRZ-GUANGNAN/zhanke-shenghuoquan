@@ -91,12 +91,6 @@ type ProductViewerState struct {
 	ContactedSeller bool `json:"contactedSeller"`
 }
 
-type ContactView struct {
-	ConversationID string `json:"conversationId"`
-	PeerUserID     string `json:"peerUserId"`
-	ProductID      uint   `json:"productId"`
-}
-
 type Page struct {
 	Items    []ProductView `json:"items"`
 	Page     int           `json:"page"`
@@ -460,7 +454,7 @@ func validTransition(from, to ProductStatus) bool {
 	case StatusReserved:
 		return to == StatusSelling || to == StatusSold
 	case StatusSold:
-		return false
+		return to == StatusSelling
 	default:
 		return false
 	}
@@ -516,34 +510,27 @@ func (s *Service) ContactSeller(ctx context.Context, id, buyerID uint) (im.Conve
 	return s.conversations.EnsureProductConversation(ctx, id, buyerID, value.SellerID)
 }
 
-func (s *Service) EnsureSellerContact(ctx context.Context, id, buyerID uint) (ContactView, error) {
+func (s *Service) EnsureSellerContact(ctx context.Context, id, buyerID uint) (im.ConversationContext, error) {
 	value, err := s.repo.Find(ctx, id, true)
 	if err != nil {
-		return ContactView{}, err
+		return im.ConversationContext{}, err
 	}
 	if value.Status == StatusSold {
-		return ContactView{}, ErrProductSold
+		return im.ConversationContext{}, ErrProductSold
 	}
 	if value.SellerID == buyerID {
-		return ContactView{}, ErrCannotContactSelf
+		return im.ConversationContext{}, ErrCannotContactSelf
 	}
 
 	stable, ok := s.conversations.(stableProductConversationGateway)
 	if !ok {
-		return ContactView{}, ErrContactStateUnavailable
+		return im.ConversationContext{}, ErrContactStateUnavailable
 	}
 	created, err := stable.EnsureProductConversationStable(ctx, id, buyerID, value.SellerID)
 	if err != nil {
-		return ContactView{}, err
+		return im.ConversationContext{}, err
 	}
-	return sanitizeContact(created), nil
-}
-
-func sanitizeContact(value im.ConversationContext) ContactView {
-	return ContactView{
-		ConversationID: value.ConversationID,
-		PeerUserID:     value.PeerUserID, ProductID: value.ProductID,
-	}
+	return created, nil
 }
 
 func (s *Service) AdminList(ctx context.Context, page, size int) (Page, error) {

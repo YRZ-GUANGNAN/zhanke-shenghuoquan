@@ -328,6 +328,19 @@ h2 {
   background: #f7f9fc;
 }
 
+.audit-row--selectable {
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.audit-row--selectable:hover,
+.audit-row--selectable:focus-visible,
+.audit-row--selected {
+  border-color: #8abfff;
+  background: #f0f7ff;
+  outline: none;
+}
+
 .audit-row__title {
   display: flex;
   align-items: center;
@@ -336,10 +349,38 @@ h2 {
   font-weight: 800;
 }
 
+.audit-row__title small {
+  color: #8a98ab;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .audit-row p {
   margin-top: 6px;
   color: #728197;
   font-size: 13px;
+}
+
+.decision-source {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.decision-source--automatic {
+  background: #edf5ff;
+  color: #1677ff;
+}
+
+.decision-source--manual_override {
+  background: #fff8e5;
+  color: #a16207;
 }
 
 .audit-row__actions {
@@ -347,6 +388,97 @@ h2 {
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+}
+
+.audit-row__actions button,
+.review-detail__actions button,
+.review-link-button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 8px;
+  background: #1677ff;
+  color: #fff;
+  font-weight: 700;
+}
+
+.audit-row__actions button:disabled,
+.review-detail__actions button:disabled {
+  cursor: wait;
+  opacity: .55;
+}
+
+.review-guide {
+  margin: -4px 0 16px;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.review-feedback {
+  margin-bottom: 14px;
+  padding: 11px 13px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.review-feedback--error {
+  background: #fff1f1;
+  color: #c2410c;
+}
+
+.review-feedback--success {
+  background: #e9f8f3;
+  color: #087f5b;
+}
+
+.review-detail {
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid #cfe1f8;
+  border-radius: 10px;
+  background: #fbfdff;
+}
+
+.review-detail header,
+.review-detail__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.review-detail header div span,
+.review-detail header div strong {
+  display: block;
+}
+
+.review-detail header div span,
+.review-detail__facts {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.review-detail header div strong {
+  margin-top: 4px;
+  color: #1f2937;
+  font-size: 18px;
+}
+
+.review-detail__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin: 16px 0;
+}
+
+.review-detail__actions {
+  justify-content: flex-start;
+}
+
+.review-detail__actions button.danger {
+  background: #fff1f1;
+  color: #c2410c;
 }
 
 .type-chip,
@@ -371,12 +503,15 @@ h2 {
   color: #64748b;
 }
 
+.status--submitted,
+.status--reviewing,
 .status--待审核,
 .status--审核中 {
   background: #fff8e5;
   color: #b7791f;
 }
 
+.status--approved,
 .status--已通过,
 .status--正常,
 .status--在售 {
@@ -384,6 +519,7 @@ h2 {
   color: #087f5b;
 }
 
+.status--rejected,
 .status--已驳回,
 .status--封禁 {
   background: #fff1f1;

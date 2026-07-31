@@ -43,6 +43,21 @@ func (s *Service) MyPosts(ctx context.Context, userID uint, page, size int) (Pag
 	return Page[PostView]{Items: items, Page: page, PageSize: size, Total: total}, err
 }
 
+func (s *Service) MyPost(ctx context.Context, userID, postID uint) (PostView, error) {
+	if userID == 0 || postID == 0 {
+		return PostView{}, ErrNotFound
+	}
+	value, err := s.repo.FindPost(ctx, postID, false)
+	if err != nil || value.UserID != userID {
+		return PostView{}, ErrNotFound
+	}
+	items, err := s.enrichPosts(ctx, []Post{value})
+	if err != nil {
+		return PostView{}, err
+	}
+	return items[0], nil
+}
+
 func (s *Service) MyFavoritePosts(ctx context.Context, userID uint, page, size int) (Page[PostView], error) {
 	repo, ok := s.repo.(myContentRepository)
 	if !ok {
