@@ -130,6 +130,17 @@ for (const [pageName, contract, message] of merchantPaymentGateContracts) {
   }
 }
 
+const merchantPublish = fs.readFileSync(path.join(src, 'pages/merchant-publish/index.tsx'), 'utf8')
+if (!/const\s+testPublishEnabled\s*=\s*deliveryMockFeeEnabled\s*&&\s*!deliveryPaymentEnabled/.test(merchantPublish)) {
+  violations.push('pages/merchant-publish/index.tsx: mock fee publishing must require the explicit mock fee flag and disabled real payment')
+}
+if (!/if\s*\(\s*testPublishEnabled\s*\)\s*\{\s*void publishWithMockFee\(\)/.test(merchantPublish)) {
+  violations.push('pages/merchant-publish/index.tsx: mock fee publishing must stay behind the explicit test gate')
+}
+if (!merchantPublish.includes('await confirmMockDeliveryFee(order)')) {
+  violations.push('pages/merchant-publish/index.tsx: test publishing must confirm the server-created delivery fee before success')
+}
+
 const communityClient = fs.readFileSync(path.join(src, 'services/b-community.ts'), 'utf8')
 for (const token of [
   '/community/posts/${encodeURIComponent(postId)}/like',
