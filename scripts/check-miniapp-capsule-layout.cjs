@@ -176,6 +176,14 @@ assert.match(postDetailStyle, /padding-top:\s*var\(--capsule-total-header-height
 assert.match(postDetailStyle, /\.capsule-page-header\.post-detail-nav[\s\S]*position:\s*fixed/)
 assert.doesNotMatch(postDetailStyle, /184px/)
 
+const secondhandDetailSource = fs.readFileSync(path.join(miniappPagesRoot, 'secondhand-detail', 'index.tsx'), 'utf8')
+const secondhandDetailStyle = fs.readFileSync(path.join(miniappPagesRoot, 'secondhand-detail', 'index.scss'), 'utf8')
+assert.match(secondhandDetailSource, /className='secondhand-detail-header'/)
+assert.match(
+  secondhandDetailStyle,
+  /\.capsule-page-header\.secondhand-detail-header\s+\.capsule-page-header__business-row[\s\S]*margin-top:\s*-8px/,
+)
+
 const homeStyle = fs.readFileSync(path.join(miniappPagesRoot, 'home', 'index.scss'), 'utf8')
 assert.match(homeStyle, /\.student-home-header__search::before[\s\S]*width:\s*14px/)
 assert.match(homeStyle, /\.student-home-header__search::after[\s\S]*width:\s*8px/)
