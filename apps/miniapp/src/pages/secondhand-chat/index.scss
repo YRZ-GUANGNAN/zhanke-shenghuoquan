@@ -99,14 +99,27 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 92rpx;
-  min-height: 44px;
+  width: 44px;
+  height: 44px;
   border: 1rpx solid $divider-nav;
-  border-radius: 999rpx;
+  border-radius: 50%;
+  box-sizing: border-box;
   background: $bg-surface;
   color: $brand-primary;
   font-size: 24rpx;
   font-weight: 700;
+}
+
+.secondhand-chat-header__home-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.secondhand-chat-header__home--text {
+  width: auto;
+  min-width: 92rpx;
+  padding: 0 18rpx;
+  border-radius: 999rpx;
 }
 
 .secondhand-chat-header__home--disabled {
@@ -189,9 +202,18 @@
 .secondhand-chat-scroll {
   flex: 1 1 auto;
   min-height: 0;
+  background: $bg-app;
+}
+
+.secondhand-chat-scroll__inner {
+  min-height: 100%;
   padding: 22rpx 30rpx 150rpx;
   box-sizing: border-box;
-  background: $bg-app;
+}
+
+.secondhand-chat-scroll__anchor {
+  width: 1px;
+  height: 1px;
 }
 
 .secondhand-chat-safe-tip {
@@ -336,6 +358,10 @@
   padding: 18rpx 28rpx calc(30rpx + env(safe-area-inset-bottom));
   border-top: 1rpx solid $divider-nav;
   background: rgba($bg-surface, .98);
+}
+
+.secondhand-chat-inputbar--keyboard {
+  padding-bottom: 18rpx;
 }
 
 .secondhand-chat-image-button {

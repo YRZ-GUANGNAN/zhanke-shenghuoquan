@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Image, Input, ScrollView, Text, View } from '@tarojs/components'
 import AppIcon from '../../components/app-icon'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import { isApiError } from '../../services/api'
 import { contactSeller, getProduct, type IMConversationContext } from '../../services/c-trade'
 import {
+  getTencentIMLoginUser,
   getIMConversation,
   loadTencentMessages,
   sendTencentText,
@@ -80,26 +81,38 @@ function formatTime(value: number): string {
 export default function SecondhandChatPage() {
   const params = Taro.getCurrentInstance().router?.params ?? {}
   const entry = parseChatEntry(params)
+  const sessionUserId = useSessionStore((state) => state.profile.id)
   const [status, setStatus] = useState<PageStatus>('loading')
   const [reloadKey, setReloadKey] = useState(0)
+  const chatOperationKey = `${sessionUserId}:${entry?.kind || ''}:${entry?.id || ''}:${reloadKey}`
+  const activeChatKeyRef = useRef(chatOperationKey)
+  activeChatKeyRef.current = chatOperationKey
   const [product, setProduct] = useState<Product | null>(null)
   const [context, setContext] = useState<IMConversationContext | null>(null)
   const [role, setRole] = useState<ViewerRole | null>(null)
+  const [tencentUserId, setTencentUserId] = useState('')
   const [messages, setMessages] = useState<TencentMessage[]>([])
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
 
   useEffect(() => {
     let active = true
     let unsubscribe: (() => void) | undefined
+    const operationKey = chatOperationKey
+    const isActive = () => active && activeChatKeyRef.current === operationKey
 
     setStatus('loading')
     setProduct(null)
     setContext(null)
     setRole(null)
+    setTencentUserId('')
     setMessages([])
+    setDraft('')
+    setSending(false)
     setErrorMessage('')
+    setKeyboardHeight(0)
 
     if (!entry) {
       setStatus('error')
@@ -121,12 +134,18 @@ export default function SecondhandChatPage() {
         if (recoveredSession.status !== 'authenticated' || !recoveredSession.profile.id) {
           throw new Error('登录恢复失败')
         }
-        const nextRole = viewerRole(nextContext, recoveredSession.profile.id)
+        const currentUserId = recoveredSession.profile.id
+        const expectedTencentUserId = `campus_${currentUserId}`
+        const nextRole = viewerRole(nextContext, currentUserId)
         const validRelation = Number.isInteger(nextContext.relationId) && nextContext.relationId > 0
         const validProduct = Number.isInteger(nextContext.productId) && nextContext.productId > 0
         const validTencentPeer = Boolean(nextContext.peerUserId) && nextContext.conversationId === `C2C${nextContext.peerUserId}`
         if (!nextRole || !validRelation || !validProduct || !validTencentPeer) {
           throw new Error('会话参与者校验失败')
+        }
+        const tencentLoginUser = await getTencentIMLoginUser(expectedTencentUserId)
+        if (tencentLoginUser !== expectedTencentUserId) {
+          throw new Error('腾讯云 IM 账号与当前登录用户不一致，请返回“我的”重新登录')
         }
         let nextProduct: Product | null = null
         try {
@@ -134,32 +153,38 @@ export default function SecondhandChatPage() {
         } catch {
           nextProduct = null
         }
-        if (!active) return
+        if (!isActive()) return
 
         setContext(nextContext)
         setProduct(nextProduct)
         setRole(nextRole)
+        setTencentUserId(tencentLoginUser)
         unsubscribe = await subscribeTencentMessages(nextContext, (incoming) => {
-          if (!active) return
+          if (!isActive()) return
           setMessages((current) => mergeMessages(current, incoming.filter((message) => Boolean(messageText(message)))))
-        })
-        if (!active) {
+        }, expectedTencentUserId)
+        if (!isActive()) {
           unsubscribe()
           unsubscribe = undefined
           return
         }
 
-        const history = await loadTencentMessages(nextContext)
-        if (!active) return
-        setMessages((current) => mergeMessages(current, history.filter((message) => Boolean(messageText(message)))))
         setStatus('ready')
+        try {
+          const history = await loadTencentMessages(nextContext, expectedTencentUserId)
+          if (!isActive()) return
+          setMessages((current) => mergeMessages(current, history.filter((message) => Boolean(messageText(message)))))
+        } catch (error) {
+          if (isActive()) showToast(`历史消息读取失败：${chatErrorMessage(error)}`)
+        }
       } catch (error) {
         unsubscribe?.()
         unsubscribe = undefined
-        if (!active) return
+        if (!isActive()) return
         setProduct(null)
         setContext(null)
         setRole(null)
+        setTencentUserId('')
         const message = chatErrorMessage(error)
         setErrorMessage(message)
         setStatus('error')
@@ -171,16 +196,21 @@ export default function SecondhandChatPage() {
       active = false
       unsubscribe?.()
     }
-  }, [entry?.id, entry?.kind, reloadKey])
+  }, [chatOperationKey, entry?.id, entry?.kind, reloadKey, sessionUserId])
 
   const visibleMessages = useMemo(
     () => messages.filter((message) => Boolean(messageText(message))),
     [messages]
   )
-  const peerName = role === 'seller' ? '交易对方' : product?.sellerName || '校园卖家'
+  const scrollAnchorId = `secondhand-chat-bottom-${visibleMessages.length}-${keyboardHeight}`
+  const peerName = role === 'seller'
+    ? context?.buyerId ? `买家 #${context.buyerId}` : '交易对方'
+    : product?.sellerName || (context?.sellerId ? `卖家 #${context.sellerId}` : '校园卖家')
   const peerAvatar = role === 'seller' ? '买' : peerName.trim().charAt(0) || '校'
   const peerAvatarImage = role === 'buyer' ? product?.sellerAvatar : ''
-  const peerState = role === 'seller' ? '买家 · 腾讯云 IM' : `${product?.campus || '校内'} · 腾讯云 IM`
+  const peerState = role === 'seller'
+    ? `你是卖家 · 对方用户 #${context?.buyerId || '-'} · 腾讯云 IM`
+    : `你是买家 · 对方用户 #${context?.sellerId || '-'} · 腾讯云 IM`
   const canOpenSellerProfile = role === 'buyer' && Boolean(product?.sellerId)
   const resolvedProductId = context
     ? String(context.productId)
@@ -212,17 +242,24 @@ export default function SecondhandChatPage() {
       showToast('先输入消息')
       return
     }
-    if (!context || !role || status !== 'ready' || sending) return
+    if (!context || !role || !tencentUserId || status !== 'ready' || sending) return
 
+    const operationKey = activeChatKeyRef.current
+    const sendingUserId = sessionUserId
     setSending(true)
     try {
-      const message = await sendTencentText(context, value)
+      const message = await sendTencentText(context, value, tencentUserId)
+      if (
+        activeChatKeyRef.current !== operationKey ||
+        useSessionStore.getState().profile.id !== sendingUserId
+      ) return
       setMessages((current) => mergeMessages(current, [message]))
       setDraft('')
     } catch (error) {
+      if (activeChatKeyRef.current !== operationKey) return
       showToast(chatErrorMessage(error))
     } finally {
-      setSending(false)
+      if (activeChatKeyRef.current === operationKey) setSending(false)
     }
   }
 
@@ -250,10 +287,14 @@ export default function SecondhandChatPage() {
         }
         right={
           <View
-            className={`secondhand-chat-header__home ${canOpenSellerProfile ? '' : 'secondhand-chat-header__home--disabled'}`}
+            className={`secondhand-chat-header__home ${canOpenSellerProfile ? '' : 'secondhand-chat-header__home--text secondhand-chat-header__home--disabled'}`}
             onClick={canOpenSellerProfile ? openSellerProfile : undefined}
           >
-            <Text>{canOpenSellerProfile ? '主页' : '交易中'}</Text>
+            {canOpenSellerProfile ? (
+              <AppIcon name='home' active className='secondhand-chat-header__home-icon' />
+            ) : (
+              <Text>交易中</Text>
+            )}
           </View>
         }
       />
@@ -280,7 +321,14 @@ export default function SecondhandChatPage() {
         </View>
       </View>
 
-      <ScrollView className='secondhand-chat-scroll' scrollY enhanced showScrollbar={false}>
+      <ScrollView
+        className='secondhand-chat-scroll'
+        scrollY
+        enhanced
+        showScrollbar={false}
+        scrollIntoView={scrollAnchorId}
+      >
+        <View className='secondhand-chat-scroll__inner'>
         <View className='secondhand-chat-safe-tip'>
           <Text>平台不担保交易，请当面验货后再付款</Text>
         </View>
@@ -304,7 +352,9 @@ export default function SecondhandChatPage() {
           </View>
         ) : (
           visibleMessages.map((message) => {
-            const mine = message.flow === 'out'
+            const mine = tencentUserId
+              ? String(message.from || '') === tencentUserId
+              : message.flow === 'out'
             return (
               <View
                 key={message.ID}
@@ -328,9 +378,14 @@ export default function SecondhandChatPage() {
             )
           })
         )}
+        <View id={scrollAnchorId} className='secondhand-chat-scroll__anchor' />
+        </View>
       </ScrollView>
 
-      <View className='secondhand-chat-inputbar'>
+      <View
+        className={`secondhand-chat-inputbar ${keyboardHeight > 0 ? 'secondhand-chat-inputbar--keyboard' : ''}`}
+        style={keyboardHeight > 0 ? { bottom: `${keyboardHeight}px` } : undefined}
+      >
         <View className='secondhand-chat-image-button' onClick={() => showToast('二手私信图片发送尚未开放')}>
           <AppIcon name='image' className='secondhand-chat-image-button__icon' />
         </View>
@@ -343,7 +398,11 @@ export default function SecondhandChatPage() {
             placeholder={status === 'ready' ? '发消息...' : '私信连接中...'}
             placeholderClass='secondhand-chat-input__placeholder'
             confirmType='send'
+            adjustPosition={false}
+            cursorSpacing={0}
             onInput={(event) => setDraft(String(event.detail.value ?? ''))}
+            onKeyboardHeightChange={(event) => setKeyboardHeight(Math.max(0, Number(event.detail.height) || 0))}
+            onBlur={() => setKeyboardHeight(0)}
             onConfirm={() => void sendText()}
           />
         </View>
