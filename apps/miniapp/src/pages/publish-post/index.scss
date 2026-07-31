@@ -120,6 +120,12 @@ page {
   gap: 16rpx 18rpx;
 }
 
+.publish-post-topics__empty {
+  font-size: 26rpx;
+  line-height: 38rpx;
+  color: $text-faint;
+}
+
 .publish-post-topic {
   height: 54rpx;
   padding: 0 28rpx;

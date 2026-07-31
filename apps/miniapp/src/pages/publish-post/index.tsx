@@ -12,7 +12,6 @@ import { chooseAndUploadImages, waitForMediaApproval, type UploadedMedia } from 
 import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import './index.scss'
 
-const FALLBACK_TAGS = ['奶茶推荐', '求助', '搭子', '二手', '兼职', '攻略', '湛科日常']
 const MAX_IMAGES = 9
 const MAX_TAGS = 3
 
@@ -34,7 +33,7 @@ const validateTag = (value: string): string => {
 export default function PublishPostPage() {
   const [content, setContent] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
-  const [hotTags, setHotTags] = useState(FALLBACK_TAGS)
+  const [hotTags, setHotTags] = useState<string[]>([])
   const [customTag, setCustomTag] = useState('')
   const [images, setImages] = useState<UploadedMedia[]>([])
   const [uploading, setUploading] = useState(false)
@@ -53,7 +52,7 @@ export default function PublishPostPage() {
       .then((items) => {
         if (!active) return
         const tags = items.map((item) => normalizeTag(item.tag)).filter(Boolean)
-        if (tags.length > 0) setHotTags(tags)
+        setHotTags(tags)
       })
       .catch((error) => console.error('load community hot tags failed', error))
     return () => { active = false }
@@ -209,15 +208,17 @@ export default function PublishPostPage() {
           <Text className='publish-post-topic-head__hint'>最多选择 {MAX_TAGS} 个</Text>
         </View>
         <View className='publish-post-topics'>
-          {hotTags.map((tag) => (
-            <Text
-              key={tag}
-              className={`publish-post-topic${selectedTags.includes(tag) ? ' publish-post-topic--active' : ''}`}
-              onClick={() => toggleTag(tag)}
-            >
-              #{tag}
-            </Text>
-          ))}
+          {hotTags.length > 0
+            ? hotTags.map((tag) => (
+                <Text
+                  key={tag}
+                  className={`publish-post-topic${selectedTags.includes(tag) ? ' publish-post-topic--active' : ''}`}
+                  onClick={() => toggleTag(tag)}
+                >
+                  #{tag}
+                </Text>
+              ))
+            : <Text className='publish-post-topics__empty'>暂无热门标签，可在下方自定义</Text>}
         </View>
 
         <View className='publish-post-custom-tag'>
