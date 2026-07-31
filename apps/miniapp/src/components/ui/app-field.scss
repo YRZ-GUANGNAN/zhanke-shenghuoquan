@@ -1,0 +1,17 @@
+@use '../../styles/design-tokens.scss' as *;
+
+.app-field { display: flex; flex-direction: column; gap: 12rpx; width: 100%; }
+.app-field__label { color: $text-primary; font-size: 26rpx; font-weight: 700; line-height: 1.35; }
+.app-field__control { display: flex; align-items: center; min-height: 88rpx; padding: 0 $space-3; border: 1rpx solid $border-default; border-radius: $radius-control; background: $bg-surface-subtle; transition: border-color $duration-fast $ease-standard, box-shadow $duration-fast $ease-standard, background-color $duration-fast $ease-standard; }
+.app-field__control:focus-within { border-color: $brand-primary; background: $bg-surface; box-shadow: 0 0 0 6rpx rgba($brand-primary, .1); }
+.app-field__control--multiline { align-items: flex-start; min-height: 224rpx; padding-top: 20rpx; padding-bottom: 20rpx; }
+.app-field__input, .app-field__textarea { width: 100%; color: $text-primary; font-size: 28rpx; line-height: 1.55; }
+.app-field__textarea { min-height: 184rpx; }
+.app-field__placeholder { color: $text-tertiary; }
+.app-field__message { color: $text-secondary; font-size: 23rpx; line-height: 1.45; }
+.app-field__message--error { color: $danger; }
+.app-field--error .app-field__control { border-color: $danger; background: $danger-tint; }
+.app-field--disabled { opacity: .56; }
+.app-field--disabled .app-field__control { background: #EEF2F6; }
+
+@media (prefers-reduced-motion: reduce) { .app-field__control { transition: none; } }

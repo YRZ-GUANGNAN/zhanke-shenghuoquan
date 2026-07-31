@@ -5,8 +5,19 @@
 $brand-primary: #2E7DD4;
 $brand-primary-strong: #2168B8;
 $brand-primary-light: #3487DE;
+$brand-primary-hover: #256FBD;
+$brand-primary-pressed: #1F61A6;
 $brand-tint: #E6F1FB;
 $gradient-primary: linear-gradient(135deg, #3487DE, #2168B8);
+
+$success: #168A5B;
+$success-tint: #E8F6F0;
+$warning: #B7791F;
+$warning-tint: #FFF6DF;
+$danger: #C43D4B;
+$danger-tint: #FDEDEF;
+$info: $brand-primary;
+$info-tint: $brand-tint;
 
 $text-strong: #1A2B3C;
 $text-primary: #2A3A4A;
@@ -19,8 +30,32 @@ $text-on-color: #FFFFFF;
 $bg-app: #F2F5F9;
 $bg-screen: #F7F8FA;
 $bg-surface: #FFFFFF;
+$bg-surface-subtle: #F7F9FC;
+$border-default: #DFE7F0;
+$border-strong: #C9D5E3;
 $divider-hairline: #F7F9FC;
 $divider-nav: #EDF1F6;
+
+$radius-control: 16rpx;
+$radius-card: 24rpx;
+$radius-dialog: 32rpx;
+$radius-pill: 999rpx;
+
+$space-1: 8rpx;
+$space-2: 16rpx;
+$space-3: 24rpx;
+$space-4: 32rpx;
+$space-5: 40rpx;
+$space-6: 48rpx;
+
+$duration-fast: 120ms;
+$duration-standard: 200ms;
+$duration-layer: 260ms;
+$ease-standard: cubic-bezier(.2, 0, 0, 1);
+
+$z-sticky: 20;
+$z-overlay: 80;
+$z-dialog: 100;
 
 $like-active: #FF6B8A;
 $heart-idle-stroke: #9DB2C8;
@@ -30,6 +65,7 @@ $badge-unread: #FF5B5B;
 $shadow-header: 0 6rpx 20rpx rgba(24, 53, 92, .04);
 $shadow-card: 0 8rpx 28rpx -12rpx rgba(24, 53, 92, .08);
 $shadow-fab: 0 20rpx 40rpx -12rpx rgba(33, 104, 184, .55), 0 0 0 10rpx #fff;
+$shadow-dialog: 0 30rpx 80rpx rgba(18, 46, 86, .22);
 
 $placeholder-stripe: repeating-linear-gradient(135deg, rgba(30, 60, 100, .03) 0 20rpx, transparent 20rpx 40rpx);
 $placeholder-label: rgba(30, 50, 80, .38);
@@ -38,6 +74,8 @@ page {
   --brand-primary: #2E7DD4;
   --brand-primary-strong: #2168B8;
   --brand-primary-light: #3487DE;
+  --brand-primary-hover: #256FBD;
+  --brand-primary-pressed: #1F61A6;
   --brand-tint: #E6F1FB;
   --text-strong: #1A2B3C;
   --text-primary: #2A3A4A;
@@ -48,4 +86,9 @@ page {
   --bg-app: #F2F5F9;
   --bg-screen: #F7F8FA;
   --bg-surface: #FFFFFF;
+  --bg-surface-subtle: #F7F9FC;
+  --border-default: #DFE7F0;
+  --radius-control: 16rpx;
+  --radius-card: 24rpx;
+  --radius-dialog: 32rpx;
 }

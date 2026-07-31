@@ -1,0 +1,49 @@
+@use '../../styles/design-tokens.scss' as *;
+
+.app-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: $space-2;
+  min-width: 144rpx;
+  height: 88rpx;
+  margin: 0;
+  padding: 0 $space-4;
+  border: 1rpx solid transparent;
+  border-radius: $radius-control;
+  font-size: 28rpx;
+  font-weight: 700;
+  line-height: 1;
+  transition: background-color $duration-fast $ease-standard, border-color $duration-fast $ease-standard, opacity $duration-fast $ease-standard;
+}
+
+.app-button::after { border: 0; }
+.app-button--block { display: flex; width: 100%; }
+.app-button--small { min-width: 112rpx; height: 72rpx; padding: 0 $space-3; font-size: 25rpx; }
+.app-button--primary { background: $brand-primary; color: $text-on-color; box-shadow: 0 12rpx 24rpx -12rpx rgba($brand-primary, .65); }
+.app-button--primary:active { background: $brand-primary-pressed; }
+.app-button--secondary { border-color: rgba($brand-primary, .22); background: $brand-tint; color: $brand-primary-strong; }
+.app-button--secondary:active { background: #D8EAF9; }
+.app-button--ghost { border-color: $border-default; background: $bg-surface; color: $text-primary; }
+.app-button--ghost:active { background: $bg-surface-subtle; }
+.app-button--danger { background: $danger; color: $text-on-color; box-shadow: 0 12rpx 24rpx -12rpx rgba($danger, .55); }
+.app-button--danger:active { background: #A93240; }
+.app-button--text { min-width: 0; height: 72rpx; padding: 0 $space-2; background: transparent; color: $brand-primary; }
+.app-button--text:active { background: $brand-tint; }
+.app-button--disabled { box-shadow: none; opacity: .46; }
+
+.app-button__loading-dot {
+  width: 18rpx;
+  height: 18rpx;
+  border: 3rpx solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: app-button-spin .7s linear infinite;
+}
+
+@keyframes app-button-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .app-button { transition: none; }
+  .app-button__loading-dot { animation-duration: 1.4s; }
+}
