@@ -44,7 +44,7 @@ export default function StudentBottomNav({ active, className = '' }: StudentBott
         className='student-bottom-nav__publish'
         onClick={() => void Taro.navigateTo({ url: '/pages/publish-entry/index' })}
       >
-        <Text className='student-bottom-nav__publish-label'>发布</Text>
+        <Text className='student-bottom-nav__publish-label'>+</Text>
       </View>
       {navItems.slice(2).map(renderItem)}
     </View>

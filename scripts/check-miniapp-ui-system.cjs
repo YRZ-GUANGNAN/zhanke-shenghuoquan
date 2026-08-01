@@ -53,7 +53,7 @@ const publishStyleBlock = studentBottomNavStyle.match(
 )?.[1] || ''
 
 assert.match(studentBottomNavSource, /student-bottom-nav__publish/)
-assert.match(studentBottomNavSource, />发布<\/Text>/)
+assert.match(studentBottomNavSource, />\+<\/Text>/)
 assert.doesNotMatch(studentBottomNavSource, /AppIcon name='add'/)
 assert.match(publishStyleBlock, /width:\s*84rpx/)
 assert.match(publishStyleBlock, /height:\s*64rpx/)
