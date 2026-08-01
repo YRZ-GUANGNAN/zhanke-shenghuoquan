@@ -5,6 +5,7 @@ const root = path.resolve(__dirname, '..')
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8')
 
 const community = read('apps', 'miniapp', 'src', 'services', 'b-community.ts')
+const media = read('apps', 'miniapp', 'src', 'services', 'media.ts')
 const publishPost = read('apps', 'miniapp', 'src', 'pages', 'publish-post', 'index.tsx')
 const publishEntry = read('apps', 'miniapp', 'src', 'pages', 'publish-entry', 'index.tsx')
 
@@ -25,6 +26,25 @@ if (!publishPost.includes('useRef') || !publishPost.includes('clientRequestIdRef
 }
 if (!publishPost.includes('isApiError(error)') || !publishPost.includes('error.status >= 400 && error.status < 500')) {
   throw new Error('publish page must discard a request id after a 4xx contract failure')
+}
+if (!/export async function waitForMediaApprovals\(/.test(media)) {
+  throw new Error('media service must support bounded batch approval polling')
+}
+if (!/concurrency\s*=\s*3/.test(media) || !/Math\.max\(1,\s*Math\.min\(3,\s*concurrency\)\)/.test(media)) {
+  throw new Error('media approval polling must cap concurrency at three')
+}
+for (const fragment of [
+  'const SUBMIT_TIMEOUT_MS = 120000',
+  'const APPROVAL_TIMEOUT_MS = 105000',
+  'waitForMediaApprovals(',
+  'Math.min(APPROVAL_TIMEOUT_MS, deadline - Date.now())',
+  "setSubmitStage('reviewing')",
+  "setSubmitStage('publishing')",
+]) {
+  if (!publishPost.includes(fragment)) throw new Error(`publish timeout contract is missing: ${fragment}`)
+}
+if (!/if \(deadline - Date\.now\(\) < 12000\)/.test(publishPost)) {
+  throw new Error('post creation must not begin after the total publish deadline is exhausted')
 }
 for (const forbidden of ["key: 'delivery'", '发布配送单', '/pages/merchant-publish/index']) {
   if (publishEntry.includes(forbidden)) {

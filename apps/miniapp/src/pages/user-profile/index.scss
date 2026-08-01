@@ -424,6 +424,18 @@
   line-height: 1.4;
 }
 
+.public-profile-load-more {
+  display: block;
+  padding: 26rpx 0 18rpx;
+  color: $text-muted;
+  font-size: 23rpx;
+  text-align: center;
+}
+
+.public-profile-load-more--retry {
+  color: $brand-primary;
+}
+
 .public-profile-sheet__content { padding-bottom: 8rpx; }
 
 .public-profile-sheet__group {

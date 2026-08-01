@@ -27,6 +27,20 @@ type MeiliSearch struct {
 	name   string
 }
 
+func (m *MeiliSearch) Ready(ctx context.Context) error {
+	if m == nil || m.client == nil {
+		return ErrSearchUnavailable
+	}
+	health, err := m.client.HealthWithContext(ctx)
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrSearchUnavailable, err)
+	}
+	if health == nil || health.Status != "available" {
+		return ErrSearchUnavailable
+	}
+	return nil
+}
+
 func NewMeiliSearch(host, apiKey, indexName string) (*MeiliSearch, error) {
 	if host == "" || apiKey == "" {
 		return nil, errors.New("MEILI_HOST and MEILI_MASTER_KEY are required")

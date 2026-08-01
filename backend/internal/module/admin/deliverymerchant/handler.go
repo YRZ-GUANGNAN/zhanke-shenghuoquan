@@ -73,7 +73,12 @@ func (h *Handler) list(c *gin.Context) {
 	if !ok {
 		return
 	}
-	values, total, err := h.service.MerchantOrders(c.Request.Context(), h.currentUserID(c), page)
+	statuses, ok := merchantStatusesForGroup(c.Query("statusGroup"))
+	if !ok {
+		response.Fail(c, http.StatusBadRequest, "invalid status group")
+		return
+	}
+	values, total, err := h.service.MerchantOrders(c.Request.Context(), h.currentUserID(c), statuses, page)
 	if err != nil {
 		h.write(c, nil, err)
 		return
@@ -83,6 +88,30 @@ func (h *Handler) list(c *gin.Context) {
 		items = append(items, orderView(value))
 	}
 	response.OK(c, Page[OrderView]{Items: items, Page: page.Page, PageSize: page.Size, Total: total})
+}
+
+func merchantStatusesForGroup(group string) ([]delivery.Status, bool) {
+	switch strings.TrimSpace(group) {
+	case "":
+		return nil, true
+	case "pending":
+		return []delivery.Status{
+			delivery.StatusPendingFeePayment,
+			delivery.StatusPaymentFailed,
+			delivery.StatusReadyForClaim,
+		}, true
+	case "delivering":
+		return []delivery.Status{
+			delivery.StatusClaimed,
+			delivery.StatusToPickup,
+			delivery.StatusPickedUp,
+			delivery.StatusDelivering,
+		}, true
+	case "completed":
+		return []delivery.Status{delivery.StatusDelivered, delivery.StatusCancelled}, true
+	default:
+		return nil, false
+	}
 }
 
 func (h *Handler) detail(c *gin.Context) {

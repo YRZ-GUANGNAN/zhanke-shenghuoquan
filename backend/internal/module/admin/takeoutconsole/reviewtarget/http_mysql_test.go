@@ -36,6 +36,23 @@ type apiEnvelope struct {
 	Data    json.RawMessage `json:"data"`
 }
 
+var errForcedApprovedTaskSave = errors.New("force approved review task save failure")
+
+type failApprovedSaveReviewRepository struct{ review.Repository }
+
+func (r *failApprovedSaveReviewRepository) WithinTransaction(ctx context.Context, fn func(context.Context, review.Repository) error) error {
+	return r.Repository.WithinTransaction(ctx, func(txCtx context.Context, txRepo review.Repository) error {
+		return fn(txCtx, &failApprovedSaveReviewRepository{Repository: txRepo})
+	})
+}
+
+func (r *failApprovedSaveReviewRepository) Save(ctx context.Context, value *review.Task) error {
+	if value.Status == review.StatusApproved {
+		return errForcedApprovedTaskSave
+	}
+	return r.Repository.Save(ctx, value)
+}
+
 type racingMerchantService struct {
 	service *takeout.MerchantService
 	db      *gorm.DB
@@ -124,6 +141,10 @@ func TestTakeoutReviewTargetsAgainstRealHTTPAndMySQL84(t *testing.T) {
 	merchantApproved := createMerchant(t, ctx, merchants, uint64(administrator.User.ID), testMerchantPrefix+"Approved", logoAsset.AssetPublicID)
 	bindReviewTargetReference(t, ctx, mediaService, logoAsset, coremedia.PurposeMerchantLogo, merchantApproved.MerchantPublicID, merchantApproved.RowVersion)
 	assertReviewTargetMediaNotVisible(t, ctx, mediaGateway, coremedia.PurposeMerchantLogo, merchantApproved.MerchantPublicID, logoAsset.AssetPublicID)
+	rollbackLogoAsset := createApprovedMediaAsset(t, ctx, db, mediaService, uint64(administrator.User.ID), coremedia.PurposeMerchantLogo, "g6a2-logo-rollback")
+	merchantLogoRollback := createMerchant(t, ctx, merchants, uint64(administrator.User.ID), testMerchantPrefix+"Logo Rollback", rollbackLogoAsset.AssetPublicID)
+	bindReviewTargetReference(t, ctx, mediaService, rollbackLogoAsset, coremedia.PurposeMerchantLogo, merchantLogoRollback.MerchantPublicID, merchantLogoRollback.RowVersion)
+	assertReviewTargetMediaNotVisible(t, ctx, mediaGateway, coremedia.PurposeMerchantLogo, merchantLogoRollback.MerchantPublicID, rollbackLogoAsset.AssetPublicID)
 	merchantRejected := createMerchant(t, ctx, merchants, uint64(administrator.User.ID), testMerchantPrefix+"Rejected")
 	merchantRace := createMerchant(t, ctx, merchants, uint64(administrator.User.ID), testMerchantPrefix+"Race")
 	dishApproved := createDish(t, ctx, catalog, merchantApproved.MerchantPublicID, testDishPrefix+"Approved")
@@ -131,9 +152,11 @@ func TestTakeoutReviewTargetsAgainstRealHTTPAndMySQL84(t *testing.T) {
 
 	reviewRepository := review.NewRepository(db)
 	reviews := review.NewService(reviewRepository)
+	rollbackReviews := review.NewService(&failApprovedSaveReviewRepository{Repository: reviewRepository})
 	racingMerchants := &racingMerchantService{service: merchants, db: db, raceID: merchantRace.ID}
 	for _, target := range reviewtarget.NewTargets(racingMerchants, catalog, mediaService) {
 		reviews.RegisterTarget(target)
+		rollbackReviews.RegisterTarget(target)
 	}
 
 	tasks := map[string]review.Task{}
@@ -143,6 +166,7 @@ func TestTakeoutReviewTargetsAgainstRealHTTPAndMySQL84(t *testing.T) {
 		objectID   uint64
 	}{
 		{name: "merchant-approved", objectType: reviewtarget.MerchantObjectType, objectID: merchantApproved.ID},
+		{name: "merchant-logo-rollback", objectType: reviewtarget.MerchantObjectType, objectID: merchantLogoRollback.ID},
 		{name: "merchant-rejected", objectType: reviewtarget.MerchantObjectType, objectID: merchantRejected.ID},
 		{name: "dish-approved", objectType: reviewtarget.DishObjectType, objectID: dishApproved.ID},
 		{name: "dish-rejected", objectType: reviewtarget.DishObjectType, objectID: dishRejected.ID},
@@ -176,22 +200,31 @@ func TestTakeoutReviewTargetsAgainstRealHTTPAndMySQL84(t *testing.T) {
 		t.Fatalf("ordinary review=%d want=403", status)
 	}
 
-	startAndDecide(t, server, administrator.Token, tasks["merchant-approved"], "approve", "merchant approved")
+	startAndDecide(t, server, administrator.Token, tasks["merchant-approved"], "approve", "")
 	assertMerchantStatus(t, ctx, merchants, merchantApproved.MerchantPublicID, takeout.MerchantActive)
-	assertReviewTask(t, ctx, reviewRepository, tasks["merchant-approved"].ID, review.StatusApproved, "merchant approved")
+	assertReviewTask(t, ctx, reviewRepository, tasks["merchant-approved"].ID, review.StatusApproved, "")
 	assertReviewTargetMediaVisible(t, ctx, mediaGateway, coremedia.PurposeMerchantLogo, merchantApproved.MerchantPublicID, logoAsset.AssetPublicID)
+	if _, err := rollbackReviews.Start(ctx, tasks["merchant-logo-rollback"].ID, administrator.User.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rollbackReviews.Decide(ctx, tasks["merchant-logo-rollback"].ID, administrator.User.ID, review.StatusApproved, ""); !errors.Is(err, errForcedApprovedTaskSave) {
+		t.Fatalf("approved task save failure=%v want=%v", err, errForcedApprovedTaskSave)
+	}
+	assertMerchantStatus(t, ctx, merchants, merchantLogoRollback.MerchantPublicID, takeout.MerchantPendingReview)
+	assertReviewTask(t, ctx, reviewRepository, tasks["merchant-logo-rollback"].ID, review.StatusReviewing, "")
+	assertReviewTargetMediaNotVisible(t, ctx, mediaGateway, coremedia.PurposeMerchantLogo, merchantLogoRollback.MerchantPublicID, rollbackLogoAsset.AssetPublicID)
 	startAndDecide(t, server, administrator.Token, tasks["merchant-rejected"], "reject", "merchant rejected")
 	assertMerchantStatus(t, ctx, merchants, merchantRejected.MerchantPublicID, takeout.MerchantRejected)
 	assertReviewTask(t, ctx, reviewRepository, tasks["merchant-rejected"].ID, review.StatusRejected, "merchant rejected")
-	startAndDecide(t, server, administrator.Token, tasks["dish-approved"], "approve", "dish approved")
+	startAndDecide(t, server, administrator.Token, tasks["dish-approved"], "approve", "")
 	assertDishStatus(t, ctx, catalog, dishApproved.DishPublicID, takeout.DishOnShelf)
-	assertReviewTask(t, ctx, reviewRepository, tasks["dish-approved"].ID, review.StatusApproved, "dish approved")
+	assertReviewTask(t, ctx, reviewRepository, tasks["dish-approved"].ID, review.StatusApproved, "")
 	startAndDecide(t, server, administrator.Token, tasks["dish-rejected"], "reject", "dish policy rejection")
 	assertDishStatus(t, ctx, catalog, dishRejected.DishPublicID, takeout.DishDraft)
 	assertReviewTask(t, ctx, reviewRepository, tasks["dish-rejected"].ID, review.StatusRejected, "dish policy rejection")
 
 	startAndExpectOK(t, server, administrator.Token, tasks["merchant-race"])
-	status, body := httpJSON(t, server.Client(), http.MethodPost, reviewURL(server.URL, tasks["merchant-race"], "approve"), administrator.Token, map[string]any{"reason": "must expose CAS"})
+	status, body := httpJSON(t, server.Client(), http.MethodPost, reviewURL(server.URL, tasks["merchant-race"], "approve"), administrator.Token, map[string]any{"reason": ""})
 	if status == http.StatusOK || body.Code == 0 {
 		t.Fatalf("CAS race was hidden: status=%d body=%+v", status, body)
 	}
@@ -213,8 +246,8 @@ func TestTakeoutReviewTargetsAgainstRealHTTPAndMySQL84(t *testing.T) {
 		t.Fatalf("F non-atomic residue status=%s want=reviewing", raceTask.Status)
 	}
 
-	t.Log("happy_path=PASS merchant approved/rejected; dish approved/rejected(draft retained)")
-	t.Logf("F_non_atomicity=EXPOSED http_status=%d target_error=%q task_status=%s merchant_status=%s logo_publish=GATEWAY_VISIBLE", status, body.Message, raceTask.Status, raceMerchant.Status)
+	t.Log("happy_path=PASS merchant approved/rejected; dish approved/rejected(draft retained); logo approval rollback=PASS")
+	t.Logf("CAS_conflict=ROLLED_BACK http_status=%d target_error=%q task_status=%s merchant_status=%s", status, body.Message, raceTask.Status, raceMerchant.Status)
 	cleanupG6A2(t, db)
 	assertG6A2Residue(t, db)
 }

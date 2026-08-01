@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useRef, useState } from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
+import { useDidShow } from '@tarojs/taro'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import IdentitySwitchModal from '../../components/IdentitySwitchModal'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
@@ -20,8 +21,22 @@ import MerchantHomeIcon, { type MerchantHomeIconName } from './merchant-home-ico
 import './index.scss'
 
 type MerchantTabKey = 'pending' | 'delivering' | 'completed'
+type MerchantOrdersByTab = Record<MerchantTabKey, MerchantDeliveryOrder[]>
+type MerchantNumbersByTab = Record<MerchantTabKey, number>
 type Settled<T> = { ok: true; value: T } | { ok: false; error: unknown }
 type ApprovalState = 'checking' | 'approved' | 'blocked'
+
+function emptyOrdersByTab(): MerchantOrdersByTab {
+  return { pending: [], delivering: [], completed: [] }
+}
+
+function initialNumbersByTab(): MerchantNumbersByTab {
+  return { pending: 1, delivering: 1, completed: 1 }
+}
+
+function emptyTotalsByTab(): MerchantNumbersByTab {
+  return { pending: 0, delivering: 0, completed: 0 }
+}
 
 async function settle<T>(promise: Promise<T>): Promise<Settled<T>> {
   try {
@@ -62,14 +77,6 @@ const statusCopy: Record<DeliveryStatus, string> = {
   cancelled: '已取消',
 }
 
-function orderTab(status: DeliveryStatus): MerchantTabKey {
-  if (status === 'delivered' || status === 'cancelled') return 'completed'
-  if (status === 'claimed' || status === 'to_pickup' || status === 'picked_up' || status === 'delivering') {
-    return 'delivering'
-  }
-  return 'pending'
-}
-
 function orderTone(status: DeliveryStatus): 'waiting' | 'pickup' | 'delivering' | 'completed' {
   if (status === 'delivered' || status === 'cancelled') return 'completed'
   if (status === 'picked_up' || status === 'delivering') return 'delivering'
@@ -81,15 +88,6 @@ function formatTime(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value.replace('T', ' ').slice(0, 16)
   return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
-}
-
-function createdToday(value: string): boolean {
-  const date = new Date(value)
-  const now = new Date()
-  return !Number.isNaN(date.getTime())
-    && date.getFullYear() === now.getFullYear()
-    && date.getMonth() === now.getMonth()
-    && date.getDate() === now.getDate()
 }
 
 function openConversation(order: MerchantDeliveryOrder) {
@@ -180,7 +178,10 @@ function OrderCard({ order }: { order: MerchantDeliveryOrder }) {
 
 function MerchantHomeContent() {
   const [activeTab, setActiveTab] = useState<MerchantTabKey>('pending')
-  const [orders, setOrders] = useState<MerchantDeliveryOrder[]>([])
+  const [ordersByTab, setOrdersByTab] = useState<MerchantOrdersByTab>(emptyOrdersByTab)
+  const [ordersPageByTab, setOrdersPageByTab] = useState<MerchantNumbersByTab>(initialNumbersByTab)
+  const [ordersTotalByTab, setOrdersTotalByTab] = useState<MerchantNumbersByTab>(emptyTotalsByTab)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [balanceCents, setBalanceCents] = useState<number | null>(null)
   const [merchantName, setMerchantName] = useState('')
   const [merchantAddress, setMerchantAddress] = useState('')
@@ -194,14 +195,19 @@ function MerchantHomeContent() {
   const profile = useSessionStore((state) => state.profile)
   const switchIdentity = useSessionStore((state) => state.switchIdentity)
   const identityAllowed = useIdentityGuard('merchant')
+  const requestVersion = useRef(0)
 
   const loadWorkbench = useCallback(async () => {
-    if (!identityAllowed || loading) return
+    if (!identityAllowed) return
+    const version = requestVersion.current + 1
+    requestVersion.current = version
     setLoading(true)
+    setLoadingMore(false)
     setLoadError('')
     setApprovalState('checking')
     setApprovalMessage('正在核验商家审核状态…')
     const applicationResult = await settle(getIdentityApplication('merchant'))
+    if (requestVersion.current !== version) return
     if (!applicationResult.ok) {
       setApprovalState('blocked')
       setApprovalMessage('暂时无法确认商家审核状态，请返回“我的”重新进入')
@@ -221,30 +227,69 @@ function MerchantHomeContent() {
     setMerchantName(applicationResult.value.merchantName)
     setMerchantAddress(applicationResult.value.merchantAddress)
     setApprovalState('approved')
-    const [ordersResult, walletResult] = await Promise.all([
-      settle(listMerchantDeliveryOrders(1, 100)),
+    const [pendingResult, deliveringResult, completedResult, walletResult] = await Promise.all([
+      settle(listMerchantDeliveryOrders(1, 50, 'pending')),
+      settle(listMerchantDeliveryOrders(1, 50, 'delivering')),
+      settle(listMerchantDeliveryOrders(1, 50, 'completed')),
       deliveryPaymentEnabled ? settle(getDeliveryWallet()) : null,
     ])
-    if (ordersResult.ok) {
-      setOrders(ordersResult.value.items)
-    } else {
-      setOrders([])
-      setLoadError(ordersResult.error instanceof Error ? ordersResult.error.message : '配送单加载失败')
+    if (requestVersion.current !== version) return
+    setOrdersByTab((current) => ({
+      pending: pendingResult.ok ? pendingResult.value.items : current.pending,
+      delivering: deliveringResult.ok ? deliveringResult.value.items : current.delivering,
+      completed: completedResult.ok ? completedResult.value.items : current.completed,
+    }))
+    setOrdersPageByTab((current) => ({
+      pending: pendingResult.ok ? pendingResult.value.page || 1 : current.pending,
+      delivering: deliveringResult.ok ? deliveringResult.value.page || 1 : current.delivering,
+      completed: completedResult.ok ? completedResult.value.page || 1 : current.completed,
+    }))
+    setOrdersTotalByTab((current) => ({
+      pending: pendingResult.ok ? pendingResult.value.total : current.pending,
+      delivering: deliveringResult.ok ? deliveringResult.value.total : current.delivering,
+      completed: completedResult.ok ? completedResult.value.total : current.completed,
+    }))
+    const failedResult = [pendingResult, deliveringResult, completedResult].find((result) => !result.ok)
+    if (failedResult && !failedResult.ok) {
+      setLoadError(failedResult.error instanceof Error ? failedResult.error.message : '部分配送单加载失败')
     }
     setBalanceCents(walletResult?.ok ? walletResult.value.availableBalanceCents : null)
     setLoading(false)
-  }, [identityAllowed, loading])
+  }, [identityAllowed])
 
-  useEffect(() => {
+  useDidShow(() => {
     if (identityAllowed) void loadWorkbench()
-  }, [identityAllowed]) // eslint-disable-line react-hooks/exhaustive-deps
+  })
 
-  const groupedOrders = useMemo(() => ({
-    pending: orders.filter((item) => orderTab(item.status) === 'pending'),
-    delivering: orders.filter((item) => orderTab(item.status) === 'delivering'),
-    completed: orders.filter((item) => orderTab(item.status) === 'completed'),
-  }), [orders])
-  const todayCount = useMemo(() => orders.filter((item) => createdToday(item.createdAt)).length, [orders])
+  const loadMoreOrders = useCallback(async () => {
+    const requestedTab = activeTab
+    const currentOrders = ordersByTab[requestedTab]
+    const currentTotal = ordersTotalByTab[requestedTab]
+    if (!identityAllowed || loading || loadingMore || currentOrders.length >= currentTotal) return
+    const version = requestVersion.current
+    const nextPage = ordersPageByTab[requestedTab] + 1
+    setLoadingMore(true)
+    setLoadError('')
+    try {
+      const result = await listMerchantDeliveryOrders(nextPage, 50, requestedTab)
+      if (requestVersion.current !== version) return
+      setOrdersByTab((current) => {
+        const byId = new Map(current[requestedTab].map((order) => [order.deliveryOrderPublicId, order]))
+        result.items.forEach((order) => byId.set(order.deliveryOrderPublicId, order))
+        return { ...current, [requestedTab]: Array.from(byId.values()) }
+      })
+      setOrdersPageByTab((current) => ({ ...current, [requestedTab]: result.page || nextPage }))
+      setOrdersTotalByTab((current) => ({ ...current, [requestedTab]: result.total }))
+    } catch (error) {
+      if (requestVersion.current === version) {
+        setLoadError(error instanceof Error ? error.message : '更多配送单加载失败')
+      }
+    } finally {
+      if (requestVersion.current === version) setLoadingMore(false)
+    }
+  }, [activeTab, identityAllowed, loading, loadingMore, ordersByTab, ordersPageByTab, ordersTotalByTab])
+
+  const totalOrderCount = ordersTotalByTab.pending + ordersTotalByTab.delivering + ordersTotalByTab.completed
   const shopName = merchantName || profile.nickname || '已认证商家'
   const shopAddress = merchantAddress || profile.campus || profile.school || '商家资料已通过审核'
 
@@ -317,12 +362,12 @@ function MerchantHomeContent() {
             </Text>
           </View>
           <View className='merchant-home-metric'>
-            <Text className='merchant-home-metric__label'>今日单量</Text>
-            <Text className='merchant-home-metric__value'>{todayCount}</Text>
+            <Text className='merchant-home-metric__label'>累计单量</Text>
+            <Text className='merchant-home-metric__value'>{totalOrderCount}</Text>
           </View>
           <View className='merchant-home-metric'>
             <Text className='merchant-home-metric__label'>配送中</Text>
-            <Text className='merchant-home-metric__value'>{groupedOrders.delivering.length}</Text>
+            <Text className='merchant-home-metric__value'>{ordersTotalByTab.delivering}</Text>
           </View>
         </View>
       </View>
@@ -360,13 +405,20 @@ function MerchantHomeContent() {
           >
             <Text className='merchant-home-tab__label'>{tab.label}</Text>
             <Text className={`merchant-home-tab__count merchant-home-tab__count--${tab.key}`}>
-              {groupedOrders[tab.key].length}
+              {ordersTotalByTab[tab.key]}
             </Text>
           </View>
         ))}
       </View>
 
-      <ScrollView scrollY className='merchant-home-orders' enhanced showScrollbar={false}>
+      <ScrollView
+        scrollY
+        className='merchant-home-orders'
+        enhanced
+        showScrollbar={false}
+        lowerThreshold={120}
+        onScrollToLower={() => void loadMoreOrders()}
+      >
         <View className='merchant-home-orders__inner'>
           {loading ? <Text className='merchant-home-orders__end'>正在加载真实配送单…</Text> : null}
           {!loading && loadError ? (
@@ -374,7 +426,7 @@ function MerchantHomeContent() {
               {loadError}，点击重试
             </Text>
           ) : null}
-          {!loading && !loadError && groupedOrders[activeTab].length === 0 ? (
+          {!loading && !loadError && ordersByTab[activeTab].length === 0 ? (
             <View className='merchant-home-empty'>
               <View className='merchant-home-empty__icon'>
                 <MerchantHomeIcon name='empty' />
@@ -387,7 +439,11 @@ function MerchantHomeContent() {
               </Text>
             </View>
           ) : null}
-          {groupedOrders[activeTab].map((order) => <OrderCard key={order.deliveryOrderPublicId} order={order} />)}
+          {ordersByTab[activeTab].map((order) => <OrderCard key={order.deliveryOrderPublicId} order={order} />)}
+          {loadingMore ? <Text className='merchant-home-orders__end'>正在加载更多配送单…</Text> : null}
+          {!loadError && ordersByTab[activeTab].length > 0 && ordersByTab[activeTab].length >= ordersTotalByTab[activeTab] ? (
+            <Text className='merchant-home-orders__end'>— 已显示全部配送单 —</Text>
+          ) : null}
         </View>
       </ScrollView>
 

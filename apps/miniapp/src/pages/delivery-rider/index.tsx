@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useRef, useState } from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
 import { useDidShow } from '@tarojs/taro'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
@@ -76,62 +76,157 @@ export default function DeliveryRiderPage() {
   const [activeTab, setActiveTab] = useState<RiderTab>('grab')
   const [me, setMe] = useState<DeliveryRiderMe | null>(null)
   const [claimable, setClaimable] = useState<ClaimableDeliveryOrder[]>([])
-  const [assigned, setAssigned] = useState<AssignedDeliveryOrder[]>([])
+  const [pickupOrders, setPickupOrders] = useState<AssignedDeliveryOrder[]>([])
+  const [deliveryOrders, setDeliveryOrders] = useState<AssignedDeliveryOrder[]>([])
+  const [claimablePage, setClaimablePage] = useState(1)
+  const [claimableTotal, setClaimableTotal] = useState(0)
+  const [pickupPage, setPickupPage] = useState(1)
+  const [pickupTotal, setPickupTotal] = useState(0)
+  const [deliveryPage, setDeliveryPage] = useState(1)
+  const [deliveryTotal, setDeliveryTotal] = useState(0)
+  const [completedTotal, setCompletedTotal] = useState(0)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [loading, setLoading] = useState(false)
   const [busyOrderId, setBusyOrderId] = useState('')
   const [error, setError] = useState('')
+  const [loadMoreError, setLoadMoreError] = useState('')
   const [releaseCandidate, setReleaseCandidate] = useState<AssignedDeliveryOrder | null>(null)
+  const requestVersion = useRef(0)
 
-  const pickupOrders = useMemo(
-    () => assigned.filter((order) => order.status === 'claimed' || order.status === 'to_pickup'),
-    [assigned]
-  )
-  const deliveryOrders = useMemo(
-    () => assigned.filter((order) => order.status === 'picked_up' || order.status === 'delivering'),
-    [assigned]
-  )
-  const activeTaskCount = pickupOrders.length + deliveryOrders.length
-  const completedCount = assigned.filter((order) => order.status === 'delivered').length
+  const activeTaskCount = pickupTotal + deliveryTotal
 
   const refreshOrders = async () => {
-    const [claimablePage, assignedPage] = await Promise.all([
-      listClaimableDeliveryOrders(),
-      listAssignedDeliveryOrders()
-    ])
-    setClaimable(claimablePage.items)
-    setAssigned(assignedPage.items)
+    const version = requestVersion.current + 1
+    requestVersion.current = version
+    setLoading(true)
+    setLoadingMore(false)
+    setError('')
+    setLoadMoreError('')
+    try {
+      const [nextClaimable, nextPickup, nextDelivery, nextCompleted] = await Promise.all([
+        listClaimableDeliveryOrders(1, 50),
+        listAssignedDeliveryOrders(1, 50, 'pickup'),
+        listAssignedDeliveryOrders(1, 50, 'delivery'),
+        listAssignedDeliveryOrders(1, 1, 'completed')
+      ])
+      if (requestVersion.current !== version) return
+      setClaimable(nextClaimable.items)
+      setClaimablePage(nextClaimable.page || 1)
+      setClaimableTotal(nextClaimable.total)
+      setPickupOrders(nextPickup.items)
+      setPickupPage(nextPickup.page || 1)
+      setPickupTotal(nextPickup.total)
+      setDeliveryOrders(nextDelivery.items)
+      setDeliveryPage(nextDelivery.page || 1)
+      setDeliveryTotal(nextDelivery.total)
+      setCompletedTotal(nextCompleted.total)
+    } finally {
+      if (requestVersion.current === version) setLoading(false)
+    }
   }
 
   const load = useCallback(async () => {
-    if (!identityAllowed || loading) return
+    if (!identityAllowed) return
+    const version = requestVersion.current + 1
+    requestVersion.current = version
     setLoading(true)
+    setLoadingMore(false)
     setError('')
+    setLoadMoreError('')
     try {
       const rider = await getDeliveryRiderMe()
+      if (requestVersion.current !== version) return
       setMe(rider)
       if (!rider.registered || !rider.rider) {
         setClaimable([])
-        setAssigned([])
+        setPickupOrders([])
+        setDeliveryOrders([])
+        setClaimableTotal(0)
+        setPickupTotal(0)
+        setDeliveryTotal(0)
+        setCompletedTotal(0)
         return
       }
-      const [claimablePage, assignedPage] = await Promise.all([
-        listClaimableDeliveryOrders(),
-        listAssignedDeliveryOrders()
+      const [claimablePage, pickupPage, deliveryPage, completedPage] = await Promise.all([
+        listClaimableDeliveryOrders(1, 50),
+        listAssignedDeliveryOrders(1, 50, 'pickup'),
+        listAssignedDeliveryOrders(1, 50, 'delivery'),
+        listAssignedDeliveryOrders(1, 1, 'completed')
       ])
+      if (requestVersion.current !== version) return
       setClaimable(claimablePage.items)
-      setAssigned(assignedPage.items)
+      setClaimablePage(claimablePage.page || 1)
+      setClaimableTotal(claimablePage.total)
+      setPickupOrders(pickupPage.items)
+      setPickupPage(pickupPage.page || 1)
+      setPickupTotal(pickupPage.total)
+      setDeliveryOrders(deliveryPage.items)
+      setDeliveryPage(deliveryPage.page || 1)
+      setDeliveryTotal(deliveryPage.total)
+      setCompletedTotal(completedPage.total)
     } catch (value) {
+      if (requestVersion.current !== version) return
       const message = errorMessage(value, '骑手订单加载失败')
       setError(message)
       await Taro.showToast({ title: message, icon: 'none' })
     } finally {
-      setLoading(false)
+      if (requestVersion.current === version) setLoading(false)
     }
-  }, [identityAllowed, loading])
+  }, [identityAllowed])
 
   useDidShow(() => {
     void load()
   })
+
+  const loadMoreOrders = async () => {
+    if (loading || loadingMore) return
+    const isClaimable = activeTab === 'grab'
+    const items = isClaimable ? claimable : activeTab === 'pickup' ? pickupOrders : deliveryOrders
+    const total = isClaimable ? claimableTotal : activeTab === 'pickup' ? pickupTotal : deliveryTotal
+    if (items.length >= total) return
+    const nextPage = (isClaimable ? claimablePage : activeTab === 'pickup' ? pickupPage : deliveryPage) + 1
+    const requestedTab = activeTab
+    const version = requestVersion.current
+    setLoadingMore(true)
+    setLoadMoreError('')
+    try {
+      if (isClaimable) {
+        const result = await listClaimableDeliveryOrders(nextPage, 50)
+        if (requestVersion.current !== version) return
+        setClaimable((current) => {
+          const byId = new Map(current.map((order) => [order.deliveryOrderPublicId, order]))
+          result.items.forEach((order) => byId.set(order.deliveryOrderPublicId, order))
+          return Array.from(byId.values())
+        })
+        setClaimablePage(result.page || nextPage)
+        setClaimableTotal(result.total)
+      } else {
+        const statusGroup = requestedTab === 'pickup' ? 'pickup' : 'delivery'
+        const result = await listAssignedDeliveryOrders(nextPage, 50, statusGroup)
+        if (requestVersion.current !== version) return
+        const mergeOrders = (current: AssignedDeliveryOrder[]) => {
+          const byId = new Map(current.map((order) => [order.deliveryOrderPublicId, order]))
+          result.items.forEach((order) => byId.set(order.deliveryOrderPublicId, order))
+          return Array.from(byId.values())
+        }
+        if (requestedTab === 'pickup') {
+          setPickupOrders(mergeOrders)
+          setPickupPage(result.page || nextPage)
+          setPickupTotal(result.total)
+        } else {
+          setDeliveryOrders(mergeOrders)
+          setDeliveryPage(result.page || nextPage)
+          setDeliveryTotal(result.total)
+        }
+      }
+    } catch (value) {
+      if (requestVersion.current === version) {
+        setLoadMoreError(errorMessage(value, '更多订单加载失败，点击重试'))
+      }
+    } finally {
+      if (requestVersion.current === version) setLoadingMore(false)
+    }
+  }
 
   const claim = async (order: ClaimableDeliveryOrder) => {
     if (busyOrderId) return
@@ -258,9 +353,9 @@ export default function DeliveryRiderPage() {
   const rider = me.rider
   const riderInitial = rider.realName.trim().slice(0, 1) || '骑'
   const tabs: Array<{ key: RiderTab; label: string; count: number }> = [
-    { key: 'grab', label: '待抢单', count: claimable.length },
-    { key: 'pickup', label: '待取货', count: pickupOrders.length },
-    { key: 'delivery', label: '待送达', count: deliveryOrders.length }
+    { key: 'grab', label: '待抢单', count: claimableTotal },
+    { key: 'pickup', label: '待取货', count: pickupTotal },
+    { key: 'delivery', label: '待送达', count: deliveryTotal }
   ]
   const activeOrderCount = activeTab === 'grab'
     ? claimable.length
@@ -297,13 +392,13 @@ export default function DeliveryRiderPage() {
           </View>
           <View className='rider-grab-task-summary__stats'>
             <View className='rider-grab-task-summary__stat'>
-              <Text className='rider-grab-task-summary__stat-value'>{claimable.length}</Text>
+              <Text className='rider-grab-task-summary__stat-value'>{claimableTotal}</Text>
               <Text className='rider-grab-task-summary__stat-label'>可抢</Text>
             </View>
             <View className='rider-grab-task-summary__divider' />
             <View className='rider-grab-task-summary__stat'>
-              <Text className='rider-grab-task-summary__stat-value'>{completedCount}</Text>
-              <Text className='rider-grab-task-summary__stat-label'>已完成</Text>
+              <Text className='rider-grab-task-summary__stat-value'>{completedTotal}</Text>
+              <Text className='rider-grab-task-summary__stat-label'>已结束</Text>
             </View>
           </View>
           <View
@@ -334,7 +429,14 @@ export default function DeliveryRiderPage() {
         ))}
       </View>
 
-      <ScrollView scrollY enhanced showScrollbar={false} className='rider-grab-content'>
+      <ScrollView
+        scrollY
+        enhanced
+        showScrollbar={false}
+        className='rider-grab-content'
+        lowerThreshold={120}
+        onScrollToLower={() => void loadMoreOrders()}
+      >
         <View className='rider-grab-content__inner'>
           {error && activeOrderCount === 0 ? (
             <View className='rider-load-error' onClick={() => void load()}>
@@ -352,6 +454,10 @@ export default function DeliveryRiderPage() {
               {activeTab === 'grab' ? renderClaimableOrders() : null}
               {activeTab === 'pickup' ? renderAssignedOrders(pickupOrders, 'pickup') : null}
               {activeTab === 'delivery' ? renderAssignedOrders(deliveryOrders, 'delivery') : null}
+              {loadMoreError ? (
+                <Text className='rider-grab-content__loading-more rider-grab-content__loading-more--retry' onClick={() => void loadMoreOrders()}>{loadMoreError}</Text>
+              ) : null}
+              {loadingMore ? <Text className='rider-grab-content__loading-more'>正在加载更多订单…</Text> : null}
             </>
           )}
         </View>

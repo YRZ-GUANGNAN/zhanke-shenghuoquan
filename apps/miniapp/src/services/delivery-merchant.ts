@@ -11,6 +11,8 @@ export type DeliveryStatus =
   | 'delivered'
   | 'cancelled'
 
+export type MerchantDeliveryStatusGroup = 'pending' | 'delivering' | 'completed'
+
 export interface StageTimestamps {
   readyForClaimAt: string | null
   claimedAt: string | null
@@ -88,8 +90,13 @@ export function createMerchantDeliveryOrder(input: CreateMerchantDeliveryInput):
   })
 }
 
-export function listMerchantDeliveryOrders(page = 1, pageSize = 50): Promise<Page<MerchantDeliveryOrder>> {
-  return request<Page<MerchantDeliveryOrder>>(`${BASE}/orders?page=${page}&pageSize=${pageSize}`, {
+export function listMerchantDeliveryOrders(
+  page = 1,
+  pageSize = 50,
+  statusGroup?: MerchantDeliveryStatusGroup
+): Promise<Page<MerchantDeliveryOrder>> {
+  const groupQuery = statusGroup ? `&statusGroup=${encodeURIComponent(statusGroup)}` : ''
+  return request<Page<MerchantDeliveryOrder>>(`${BASE}/orders?page=${page}&pageSize=${pageSize}${groupQuery}`, {
     url: '',
     timeout: 10000
   })

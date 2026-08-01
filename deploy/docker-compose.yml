@@ -1,7 +1,10 @@
+# Local development stack only. Do not use this Compose file as a production deployment manifest.
+name: campus-circle-dev
+
 services:
   mysql:
     image: mysql:8.0
-    container_name: campus_mysql
+    container_name: campus_dev_mysql
     command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
       MYSQL_ROOT_PASSWORD: rootpass
@@ -21,7 +24,7 @@ services:
 
   meilisearch:
     image: getmeili/meilisearch:v1.46.0
-    container_name: campus_meilisearch
+    container_name: campus_dev_meilisearch
     environment:
       MEILI_ENV: production
       MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:?MEILI_MASTER_KEY is required}
@@ -36,9 +39,13 @@ services:
   backend:
     build:
       context: ../backend
-    container_name: campus_backend
+      args:
+        BUILD_VERSION: ${BUILD_VERSION:-dev}
+        BUILD_COMMIT: ${BUILD_COMMIT:-unknown}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+    container_name: campus_dev_backend
     environment:
-      APP_ENV: prod
+      APP_ENV: dev
       MYSQL_DSN: campus:campus@tcp(mysql:3306)/campus_circle?charset=utf8mb4&parseTime=True&loc=Local
       HTTP_ADDR: :8080
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
@@ -67,13 +74,20 @@ services:
         condition: service_healthy
     ports:
       - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/readyz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
 
   admin:
     build:
-      context: ../apps/admin
-    container_name: campus_admin
+      context: ..
+      dockerfile: apps/admin/Dockerfile
+    container_name: campus_dev_admin
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - "8088:80"
 

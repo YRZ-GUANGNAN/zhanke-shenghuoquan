@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"campus-circle/backend/internal/pkg/dbtx"
 	mysqldriver "github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -55,7 +56,7 @@ const bindingAssetSelect = `
 
 func (r *GormReferenceBindingRepository) ReserveBinding(ctx context.Context, input BindingReserveInput) ([]BindingAsset, error) {
 	var result []BindingAsset
-	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := r.withinTransaction(ctx, func(tx *gorm.DB) error {
 		rows, err := loadBindingAssetRows(tx, input.OrderedAssetPublicIDs, true)
 		if err != nil {
 			return err
@@ -125,7 +126,7 @@ func (r *GormReferenceBindingRepository) ReserveBinding(ctx context.Context, inp
 }
 
 func (r *GormReferenceBindingRepository) CommitBinding(ctx context.Context, input BindingCommitInput) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return r.withinTransaction(ctx, func(tx *gorm.DB) error {
 		rows, err := loadBindingAssetRows(tx, input.OrderedAssetPublicIDs, true)
 		if err != nil {
 			return err
@@ -181,7 +182,8 @@ func (r *GormReferenceBindingRepository) CommitBinding(ctx context.Context, inpu
 }
 
 func (r *GormReferenceBindingRepository) ExactCommittedBinding(ctx context.Context, input BindingCommitInput) (bool, error) {
-	rows, err := loadBindingAssetRows(r.db.WithContext(ctx), input.OrderedAssetPublicIDs, false)
+	db := dbtx.DB(ctx, r.db)
+	rows, err := loadBindingAssetRows(db, input.OrderedAssetPublicIDs, false)
 	if err != nil {
 		return false, err
 	}
@@ -195,7 +197,7 @@ func (r *GormReferenceBindingRepository) ExactCommittedBinding(ctx context.Conte
 		}
 	}
 	var references []AssetReference
-	if err := r.db.WithContext(ctx).Where("reference_type = ? AND reference_id = ?", input.ReferenceType, input.ReferenceID).
+	if err := db.Where("reference_type = ? AND reference_id = ?", input.ReferenceType, input.ReferenceID).
 		Order("slot ASC, id ASC").Find(&references).Error; err != nil {
 		return false, err
 	}
@@ -203,13 +205,13 @@ func (r *GormReferenceBindingRepository) ExactCommittedBinding(ctx context.Conte
 }
 
 func (r *GormReferenceBindingRepository) CancelBinding(ctx context.Context, ownerID uint64, token string) error {
-	return r.db.WithContext(ctx).Model(&Asset{}).
+	return dbtx.DB(ctx, r.db).Model(&Asset{}).
 		Where("owner_id = ? AND reservation_token = ?", ownerID, token).
 		Updates(map[string]any{"reservation_token": "", "reservation_expires_at": nil}).Error
 }
 
 func (r *GormReferenceBindingRepository) PublishBinding(ctx context.Context, referenceType Purpose, referenceID string) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return r.withinTransaction(ctx, func(tx *gorm.DB) error {
 		references, err := lockBindingParentReferences(tx, referenceType, referenceID)
 		if err != nil {
 			return err
@@ -259,7 +261,7 @@ func (r *GormReferenceBindingRepository) PublishBinding(ctx context.Context, ref
 }
 
 func (r *GormReferenceBindingRepository) RevokeBinding(ctx context.Context, referenceType Purpose, referenceID string, keep []uint64, fence string) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return r.withinTransaction(ctx, func(tx *gorm.DB) error {
 		references, err := lockBindingParentReferences(tx, referenceType, referenceID)
 		if err != nil {
 			return err
@@ -302,6 +304,13 @@ func (r *GormReferenceBindingRepository) RevokeBinding(ctx context.Context, refe
 		}
 		return rebuildBindingActiveRefCounts(tx, assetIDs, now)
 	})
+}
+
+func (r *GormReferenceBindingRepository) withinTransaction(ctx context.Context, fn func(*gorm.DB) error) error {
+	if tx, ok := dbtx.FromContext(ctx); ok {
+		return fn(tx.WithContext(ctx))
+	}
+	return r.db.WithContext(ctx).Transaction(fn)
 }
 
 func loadBindingAssetRows(db *gorm.DB, lookupIDs []string, lock bool) ([]bindingAssetRow, error) {

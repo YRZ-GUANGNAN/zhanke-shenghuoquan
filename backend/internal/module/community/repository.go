@@ -9,6 +9,7 @@ import (
 	"gorm.io/gorm/clause"
 
 	"campus-circle/backend/internal/module/admin/review"
+	"campus-circle/backend/internal/pkg/dbtx"
 )
 
 var ErrNotFound = errors.New("community content not found")
@@ -404,7 +405,7 @@ func (r *GormRepository) createPostNotification(tx *gorm.DB, postID, actorID uin
 
 func (r *GormRepository) SetReviewStatus(ctx context.Context, objectType string, id uint, status review.Status) error {
 	if objectType == "post" {
-		result := r.db.WithContext(ctx).Model(&Post{}).Where("id = ?", id).Update("review_status", status)
+		result := dbtx.DB(ctx, r.db).Model(&Post{}).Where("id = ?", id).Update("review_status", status)
 		if result.Error == nil && result.RowsAffected == 0 {
 			return ErrNotFound
 		}
@@ -413,7 +414,7 @@ func (r *GormRepository) SetReviewStatus(ctx context.Context, objectType string,
 	if objectType != "comment" {
 		return errors.New("unsupported community review target")
 	}
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return dbtx.DB(ctx, r.db).Transaction(func(tx *gorm.DB) error {
 		var value Comment
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&value, id).Error; errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrNotFound

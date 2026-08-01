@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"campus-circle/backend/internal/module/admin/review"
+	"campus-circle/backend/internal/pkg/dbtx"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -200,7 +201,7 @@ type productCommentNotificationRecord struct {
 func (productCommentNotificationRecord) TableName() string { return "notifications" }
 
 func (r *GormRepository) SetProductCommentReviewStatus(ctx context.Context, id uint, status review.Status) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return dbtx.DB(ctx, r.db).Transaction(func(tx *gorm.DB) error {
 		var comment ProductComment
 		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&comment, id).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {

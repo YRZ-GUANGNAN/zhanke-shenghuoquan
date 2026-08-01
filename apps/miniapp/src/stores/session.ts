@@ -6,7 +6,7 @@ import {
   switchIdentity as requestIdentitySwitch,
   wechatLogin
 } from '../services/a-user'
-import { isApiError } from '../services/api'
+import { isApiError, isRetryableNetworkError } from '../services/api'
 import { resetTencentIMSession } from '../services/e-im'
 import Taro from '../services/taro'
 import type { IdentityRoleKey, IdentitySummary, UserProfile } from '../types'
@@ -38,6 +38,18 @@ function errorMessage(error: unknown): string {
   if (isApiError(error) && error.status === 0) return '网络连接失败，请检查后重试'
   if (error instanceof Error && error.message) return error.message
   return '登录失败，请稍后重试'
+}
+
+async function retryNetworkOnce<T>(action: () => Promise<T>): Promise<T> {
+  try {
+    return await action()
+  } catch (error) {
+    if (!isRetryableNetworkError(error)) throw error
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 250 + Math.floor(Math.random() * 201))
+    })
+    return action()
+  }
 }
 
 export const useSessionStore = create<SessionState>((set, get) => {
@@ -76,9 +88,9 @@ export const useSessionStore = create<SessionState>((set, get) => {
       try {
         // Keep authentication hydration ordered so a stale-token 401 cannot
         // be masked by a concurrent network or server failure.
-        const profile = await currentUser()
+        const profile = await retryNetworkOnce(currentUser)
         if (!isCurrent()) return
-        const identity = await currentIdentity()
+        const identity = await retryNetworkOnce(currentIdentity)
         if (!isCurrent()) return
         set({ status: 'authenticated', token: storedToken, profile, identity, error: '' })
         return
@@ -100,6 +112,8 @@ export const useSessionStore = create<SessionState>((set, get) => {
       if (!isCurrent()) return
       if (!loginResult.code) throw new Error('微信登录未返回有效 code')
 
+      // A WeChat login code is single-use. A failed exchange must return to
+      // bootstrap/retry so the next attempt calls Taro.login for a fresh code.
       const session = await wechatLogin(loginResult.code)
       if (!isCurrent()) return
       await resetTencentIMSession()
@@ -107,7 +121,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       Taro.setStorageSync(TOKEN_KEY, session.token)
       set({ token: session.token, profile: session.profile })
 
-      const identity = await currentIdentity()
+      const identity = await retryNetworkOnce(currentIdentity)
       if (!isCurrent()) return
       set({
         status: 'authenticated',

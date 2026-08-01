@@ -120,11 +120,11 @@ func (s *DispatchService) MerchantOrder(ctx context.Context, merchantUserID uint
 	return s.repository.FindOwnedByMerchant(ctx, strings.TrimSpace(publicID), merchantUserID)
 }
 
-func (s *DispatchService) MerchantOrders(ctx context.Context, merchantUserID uint64, page Page) ([]Order, int64, error) {
-	if merchantUserID == 0 || !page.Valid() {
+func (s *DispatchService) MerchantOrders(ctx context.Context, merchantUserID uint64, statuses []Status, page Page) ([]Order, int64, error) {
+	if merchantUserID == 0 || !page.Valid() || !validStatusFilter(statuses) {
 		return nil, 0, ErrInvalidRecord
 	}
-	return s.repository.ListByMerchantUserID(ctx, merchantUserID, page)
+	return s.repository.ListByMerchantUserID(ctx, merchantUserID, statuses, page)
 }
 
 func (s *DispatchService) CancelMerchantOrder(
@@ -177,14 +177,23 @@ func (s *DispatchService) ClaimOrder(
 	return s.orders.AssignRider(ctx, strings.TrimSpace(publicID), expectedRowVersion, riderUserID)
 }
 
-func (s *DispatchService) RiderOrders(ctx context.Context, riderUserID uint64, page Page) ([]Order, int64, error) {
+func (s *DispatchService) RiderOrders(ctx context.Context, riderUserID uint64, statuses []Status, page Page) ([]Order, int64, error) {
 	if err := s.requireActive(ctx, riderUserID); err != nil {
 		return nil, 0, err
 	}
-	if !page.Valid() {
+	if !page.Valid() || !validStatusFilter(statuses) {
 		return nil, 0, ErrInvalidRecord
 	}
-	return s.repository.ListByRiderUserID(ctx, riderUserID, page)
+	return s.repository.ListByRiderUserID(ctx, riderUserID, statuses, page)
+}
+
+func validStatusFilter(statuses []Status) bool {
+	for _, status := range statuses {
+		if !status.Valid() {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *DispatchService) RiderOrder(ctx context.Context, riderUserID uint64, publicID string) (Order, error) {

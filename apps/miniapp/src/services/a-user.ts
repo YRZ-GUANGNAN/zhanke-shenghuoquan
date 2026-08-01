@@ -71,7 +71,8 @@ export async function wechatLogin(code: string, loginAvatarPreview = ''): Promis
   const result = await request<LoginResult>('/auth/wechat-login', {
     url: '',
     method: 'POST',
-    data: { code }
+    data: { code },
+    timeout: 12000
   })
   const profile = toProfile(result.user)
   return {
@@ -81,7 +82,7 @@ export async function wechatLogin(code: string, loginAvatarPreview = ''): Promis
 }
 
 export async function currentUser(): Promise<UserProfile> {
-  return toProfile(await request<BackendUser>('/auth/me'))
+  return toProfile(await request<BackendUser>('/auth/me', { url: '', timeout: 12000 }))
 }
 
 export async function updateProfile(profile: UserProfile, avatarAssetId?: string): Promise<UserProfile> {
@@ -98,7 +99,7 @@ export async function updateProfile(profile: UserProfile, avatarAssetId?: string
 }
 
 export async function currentIdentity(): Promise<IdentitySummary> {
-  return request('/auth/identity')
+  return request('/auth/identity', { url: '', timeout: 12000 })
 }
 
 export async function switchIdentity(identity: IdentityRoleKey): Promise<IdentitySummary> {

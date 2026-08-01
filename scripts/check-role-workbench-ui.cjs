@@ -10,21 +10,31 @@ const merchantStyle = read('apps', 'miniapp', 'src', 'pages', 'merchant-home', '
 const rider = read('apps', 'miniapp', 'src', 'pages', 'delivery-rider', 'index.tsx')
 const riderStyle = read('apps', 'miniapp', 'src', 'pages', 'delivery-rider', 'index.scss')
 const riderWallet = read('apps', 'miniapp', 'src', 'pages', 'rider-wallet', 'index.tsx')
+const merchantService = read('apps', 'miniapp', 'src', 'services', 'delivery-merchant.ts')
+const riderService = read('apps', 'miniapp', 'src', 'services', 'delivery-rider.ts')
 
 for (const fragment of [
   'CapsuleSystemRow',
+  'useDidShow',
   "useIdentityGuard('merchant')",
   "getIdentityApplication('merchant')",
   'merchant-home-metrics',
   'merchant-home-shortcuts',
   'merchant-home-tabs',
   'merchant-order-card',
+  'onScrollToLower={() => void loadMoreOrders()}',
+  "listMerchantDeliveryOrders(1, 50, 'pending')",
+  "listMerchantDeliveryOrders(1, 50, 'delivering')",
+  "listMerchantDeliveryOrders(1, 50, 'completed')",
+  'listMerchantDeliveryOrders(nextPage, 50, requestedTab)',
+  'ordersTotalByTab[tab.key]',
 ]) {
   assert.ok(merchant.includes(fragment), `merchant workbench missing: ${fragment}`)
 }
 
 for (const fragment of [
   'CapsuleSystemRow',
+  'useDidShow',
   "useIdentityGuard('rider')",
   'getDeliveryRiderMe',
   'listClaimableDeliveryOrders',
@@ -32,9 +42,22 @@ for (const fragment of [
   'rider-grab-task-summary',
   'rider-grab-tabs',
   'rider-order-card',
+  'onScrollToLower={() => void loadMoreOrders()}',
+  "listAssignedDeliveryOrders(1, 50, 'pickup')",
+  "listAssignedDeliveryOrders(1, 50, 'delivery')",
+  "listAssignedDeliveryOrders(1, 1, 'completed')",
+  '已结束',
+  "const statusGroup = requestedTab === 'pickup' ? 'pickup' : 'delivery'",
+  'listClaimableDeliveryOrders(nextPage, 50)',
+  'listAssignedDeliveryOrders(nextPage, 50, statusGroup)',
+  'setLoadMoreError',
 ]) {
   assert.ok(rider.includes(fragment), `rider workbench missing: ${fragment}`)
 }
+
+assert.match(merchantService, /statusGroup=\$\{encodeURIComponent\(statusGroup\)\}/, 'merchant order service must forward the status group')
+assert.match(riderService, /statusGroup=\$\{encodeURIComponent\(statusGroup\)\}/, 'rider order service must forward the status group')
+assert.doesNotMatch(rider, /setError\(errorMessage\(value, '更多订单加载失败/, 'rider load-more failures must not duplicate the initial-load error')
 
 for (const [name, source] of [['merchant', merchant], ['rider', rider]]) {
   assert.doesNotMatch(source, /window\.(?:alert|confirm|prompt)/, `${name} workbench must use app feedback primitives`)

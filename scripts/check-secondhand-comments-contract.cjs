@@ -95,6 +95,24 @@ for (const fragment of [
 }
 
 for (const fragment of [
+  'onLoadMoreReady',
+  'const loadMore = useCallback(async () =>',
+  'listProductComments(productId, nextPage, 20)',
+  'mergeComments(current, next.items)',
+]) {
+  if (!comments.includes(fragment)) {
+    throw new Error(`product comment pagination contract missing: ${fragment}`)
+  }
+}
+
+if (!detail.includes('onScrollToLower={() => commentsLoadMoreRef.current?.()}')) {
+  throw new Error('second-hand detail must trigger comment pagination at the scroll boundary')
+}
+if (!comments.includes("onLoadMoreReady?.(() => { void loadMore() })")) {
+  throw new Error('product comments must register a load-more callback with the detail page')
+}
+
+for (const fragment of [
   'parentCommentId:optionalID(item.parentCommentId)',
   'replyToUserId:optionalID(item.replyToUserId)',
   "value===0||value==='0'",

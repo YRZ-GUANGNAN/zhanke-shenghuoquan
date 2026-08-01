@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import { AppActionSheet, AppDialog } from '../../components/ui'
@@ -42,6 +42,10 @@ export default function UserProfilePage() {
   const [products, setProducts] = useState<Product[]>([])
   const [postTotal, setPostTotal] = useState(0)
   const [productTotal, setProductTotal] = useState(0)
+  const [postPage, setPostPage] = useState(1)
+  const [productPage, setProductPage] = useState(1)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [loadMoreError, setLoadMoreError] = useState('')
   const [activeTab, setActiveTab] = useState<ProfileTab>(initialTab)
   const [following, setFollowing] = useState(false)
   const [followerCount, setFollowerCount] = useState(0)
@@ -50,9 +54,16 @@ export default function UserProfilePage() {
   const [blockConfirmVisible, setBlockConfirmVisible] = useState(false)
   const [blockPending, setBlockPending] = useState(false)
   const [error, setError] = useState('')
+  const requestVersion = useRef(0)
 
   useEffect(() => {
     let active = true
+    const version = requestVersion.current + 1
+    requestVersion.current = version
+    setLoadingMore(false)
+    setLoadMoreError('')
+    setPostPage(1)
+    setProductPage(1)
     setStatus('loading')
     setError('')
     if (!/^[1-9]\d*$/.test(userId)) {
@@ -62,10 +73,10 @@ export default function UserProfilePage() {
     }
     void Promise.all([
       getPublicCommunityProfile(userId),
-      getPublicUserPosts(userId, 1, 40),
-      getPublicUserProducts(userId, 1, 40)
+      getPublicUserPosts(userId, 1, 20),
+      getPublicUserProducts(userId, 1, 20)
     ]).then(([profileValue, postPage, productPage]) => {
-      if (!active) return
+      if (!active || requestVersion.current !== version) return
       setProfile(profileValue)
       setFollowing(profileValue.isFollowing)
       setFollowerCount(profileValue.followerCount)
@@ -73,14 +84,58 @@ export default function UserProfilePage() {
       setProducts(productPage.items)
       setPostTotal(postPage.total)
       setProductTotal(productPage.total)
+      setPostPage(postPage.page || 1)
+      setProductPage(productPage.page || 1)
       setStatus('ready')
     }).catch((value: unknown) => {
-      if (!active) return
+      if (!active || requestVersion.current !== version) return
       setStatus('error')
       setError(value instanceof Error ? value.message : '用户主页加载失败')
     })
     return () => { active = false }
   }, [reloadKey, userId])
+
+  const loadMore = async () => {
+    if (loadingMore) return
+    const isPosts = activeTab === 'posts'
+    const currentItems = isPosts ? posts : products
+    const total = isPosts ? postTotal : productTotal
+    if (currentItems.length >= total) return
+    const nextPage = (isPosts ? postPage : productPage) + 1
+    const version = requestVersion.current + 1
+    requestVersion.current = version
+    setLoadingMore(true)
+    setLoadMoreError('')
+    try {
+      if (isPosts) {
+        const result = await getPublicUserPosts(userId, nextPage, 20)
+        if (requestVersion.current !== version) return
+        setPosts((current) => {
+          const byId = new Map(current.map((item) => [item.id, item]))
+          result.items.forEach((item) => byId.set(item.id, item))
+          return Array.from(byId.values())
+        })
+        setPostPage(result.page || nextPage)
+        setPostTotal(result.total)
+      } else {
+        const result = await getPublicUserProducts(userId, nextPage, 20)
+        if (requestVersion.current !== version) return
+        setProducts((current) => {
+          const byId = new Map(current.map((item) => [item.id, item]))
+          result.items.forEach((item) => byId.set(item.id, item))
+          return Array.from(byId.values())
+        })
+        setProductPage(result.page || nextPage)
+        setProductTotal(result.total)
+      }
+    } catch (value) {
+      if (requestVersion.current === version) {
+        setLoadMoreError(value instanceof Error ? `${value.message}，点击重试` : '更多内容加载失败，点击重试')
+      }
+    } finally {
+      if (requestVersion.current === version) setLoadingMore(false)
+    }
+  }
 
   const postColumns = useMemo(() => splitColumns(posts), [posts])
   const productColumns = useMemo(() => splitColumns(products), [products])
@@ -227,7 +282,14 @@ export default function UserProfilePage() {
         <View className={`public-profile-tab ${activeTab === 'secondhand' ? 'public-profile-tab--active' : ''}`} onClick={() => setActiveTab('secondhand')}><Text>二手 {productTotal}</Text></View>
       </View>
       <View className='public-profile-content'>
-        <ScrollView className='public-profile-scroll' scrollY enhanced showScrollbar={false}>
+        <ScrollView
+          className='public-profile-scroll'
+          scrollY
+          enhanced
+          showScrollbar={false}
+          lowerThreshold={120}
+          onScrollToLower={() => void loadMore()}
+        >
           {empty ? (
             <View className='public-profile-empty'><Text className='public-profile-empty__title'>{activeTab === 'posts' ? '暂无公开帖子' : '暂无公开二手商品'}</Text></View>
           ) : activeTab === 'posts' ? (
@@ -235,6 +297,8 @@ export default function UserProfilePage() {
           ) : (
             <View className='public-profile-waterfall'><View className='public-profile-waterfall__column'>{productColumns.left.map(renderProduct)}</View><View className='public-profile-waterfall__column'>{productColumns.right.map(renderProduct)}</View></View>
           )}
+          {loadMoreError ? <Text className='public-profile-load-more public-profile-load-more--retry' onClick={() => void loadMore()}>{loadMoreError}</Text> : null}
+          {loadingMore ? <Text className='public-profile-load-more'>正在加载更多内容…</Text> : null}
         </ScrollView>
       </View>
       <AppActionSheet visible={menuVisible} title='更多操作' onClose={() => setMenuVisible(false)}>

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"campus-circle/backend/internal/pkg/dbtx"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -48,29 +49,29 @@ type GormRepository struct{ db *gorm.DB }
 func NewRepository(db *gorm.DB) *GormRepository { return &GormRepository{db: db} }
 
 func (r *GormRepository) CreateAsset(ctx context.Context, value *Asset) error {
-	return r.db.WithContext(ctx).Create(value).Error
+	return dbtx.DB(ctx, r.db).Create(value).Error
 }
 
 func (r *GormRepository) FindAsset(ctx context.Context, publicID string) (Asset, error) {
 	var value Asset
-	err := r.db.WithContext(ctx).Where("asset_public_id = ?", publicID).First(&value).Error
+	err := dbtx.DB(ctx, r.db).Where("asset_public_id = ?", publicID).First(&value).Error
 	return value, normalizeNotFound(err)
 }
 
 func (r *GormRepository) CASAssetTechnicalStatus(ctx context.Context, id, version uint64, from, to TechnicalStatus) error {
-	return casUpdate(r.db.WithContext(ctx).Model(&Asset{}).
+	return casUpdate(dbtx.DB(ctx, r.db).Model(&Asset{}).
 		Where("id = ? AND row_version = ? AND technical_status = ?", id, version, from).
 		Updates(map[string]any{"technical_status": to, "row_version": gorm.Expr("row_version + 1")}))
 }
 
 func (r *GormRepository) CASAssetStorageStage(ctx context.Context, id, version uint64, from, to StorageStage) error {
-	return casUpdate(r.db.WithContext(ctx).Model(&Asset{}).
+	return casUpdate(dbtx.DB(ctx, r.db).Model(&Asset{}).
 		Where("id = ? AND row_version = ? AND storage_stage = ?", id, version, from).
 		Updates(map[string]any{"storage_stage": to, "row_version": gorm.Expr("row_version + 1")}))
 }
 
 func (r *GormRepository) CASAssetReviewProjection(ctx context.Context, id, version, decisionVersion uint64, decision ReviewStatus, decidedAt time.Time) error {
-	return casUpdate(r.db.WithContext(ctx).Model(&Asset{}).
+	return casUpdate(dbtx.DB(ctx, r.db).Model(&Asset{}).
 		Where("id = ? AND row_version = ? AND applied_decision_version < ?", id, version, decisionVersion).
 		Updates(map[string]any{
 			"review_status": decision, "projected_decision": decision,
@@ -80,31 +81,31 @@ func (r *GormRepository) CASAssetReviewProjection(ctx context.Context, id, versi
 }
 
 func (r *GormRepository) CreateReference(ctx context.Context, value *AssetReference) error {
-	return r.db.WithContext(ctx).Create(value).Error
+	return dbtx.DB(ctx, r.db).Create(value).Error
 }
 
 func (r *GormRepository) FindReference(ctx context.Context, id uint64) (AssetReference, error) {
 	var value AssetReference
-	err := r.db.WithContext(ctx).First(&value, id).Error
+	err := dbtx.DB(ctx, r.db).First(&value, id).Error
 	return value, normalizeNotFound(err)
 }
 
 func (r *GormRepository) FindReferenceByCoordinates(ctx context.Context, assetID uint64, referenceType Purpose, referenceID string, slot uint16) (AssetReference, error) {
 	var value AssetReference
-	err := r.db.WithContext(ctx).
+	err := dbtx.DB(ctx, r.db).
 		Where("asset_id = ? AND reference_type = ? AND reference_id = ? AND slot = ?", assetID, referenceType, referenceID, slot).
 		First(&value).Error
 	return value, normalizeNotFound(err)
 }
 
 func (r *GormRepository) CASReferenceStatus(ctx context.Context, id, version uint64, from, to ReferenceStatus) error {
-	return casUpdate(r.db.WithContext(ctx).Model(&AssetReference{}).
+	return casUpdate(dbtx.DB(ctx, r.db).Model(&AssetReference{}).
 		Where("id = ? AND row_version = ? AND status = ?", id, version, from).
 		Updates(map[string]any{"status": to, "row_version": gorm.Expr("row_version + 1")}))
 }
 
 func (r *GormRepository) CASParentVisibility(ctx context.Context, id, version uint64, from, to ParentVisibility) error {
-	return casUpdate(r.db.WithContext(ctx).Model(&AssetReference{}).
+	return casUpdate(dbtx.DB(ctx, r.db).Model(&AssetReference{}).
 		Where("id = ? AND row_version = ? AND parent_visibility = ?", id, version, from).
 		Updates(map[string]any{"parent_visibility": to, "updated_at": time.Now().UTC(), "row_version": gorm.Expr("row_version + 1")}))
 }
@@ -113,7 +114,7 @@ func (r *GormRepository) CASParentVisibility(ctx context.Context, id, version ui
 // GC must still inspect reference rows and must never trust this cache alone.
 func (r *GormRepository) RebuildActiveRefCount(ctx context.Context, assetID uint64) (uint64, error) {
 	var count int64
-	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := r.withinTransaction(ctx, func(tx *gorm.DB) error {
 		var asset Asset
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Select("id", "row_version").First(&asset, assetID).Error; err != nil {
 			return normalizeNotFound(err)
@@ -129,12 +130,12 @@ func (r *GormRepository) RebuildActiveRefCount(ctx context.Context, assetID uint
 }
 
 func (r *GormRepository) CreateUploadTicket(ctx context.Context, value *UploadTicket) error {
-	return r.db.WithContext(ctx).Create(value).Error
+	return dbtx.DB(ctx, r.db).Create(value).Error
 }
 
 func (r *GormRepository) FindUploadTicket(ctx context.Context, ticketID string) (UploadTicket, error) {
 	var value UploadTicket
-	err := r.db.WithContext(ctx).Where("ticket_id = ?", ticketID).First(&value).Error
+	err := dbtx.DB(ctx, r.db).Where("ticket_id = ?", ticketID).First(&value).Error
 	return value, normalizeNotFound(err)
 }
 
@@ -143,29 +144,29 @@ func (r *GormRepository) CASTicketStatus(ctx context.Context, ticketID string, v
 	if from == TicketCreated && to == TicketAuthorizationIssued {
 		updates["credential_issue_count"] = gorm.Expr("credential_issue_count + 1")
 	}
-	return casUpdate(r.db.WithContext(ctx).Model(&UploadTicket{}).
+	return casUpdate(dbtx.DB(ctx, r.db).Model(&UploadTicket{}).
 		Where("ticket_id = ? AND row_version = ? AND status = ?", ticketID, version, from).
 		Updates(updates))
 }
 
 func (r *GormRepository) CreateQuotaReservation(ctx context.Context, value *QuotaReservation) error {
-	return r.db.WithContext(ctx).Create(value).Error
+	return dbtx.DB(ctx, r.db).Create(value).Error
 }
 
 func (r *GormRepository) FindQuotaReservation(ctx context.Context, reservationID string) (QuotaReservation, error) {
 	var value QuotaReservation
-	err := r.db.WithContext(ctx).Where("reservation_id = ?", reservationID).First(&value).Error
+	err := dbtx.DB(ctx, r.db).Where("reservation_id = ?", reservationID).First(&value).Error
 	return value, normalizeNotFound(err)
 }
 
 func (r *GormRepository) CASQuotaReservationStatus(ctx context.Context, reservationID string, version uint64, from, to ReservationStatus) error {
-	return casUpdate(r.db.WithContext(ctx).Model(&QuotaReservation{}).
+	return casUpdate(dbtx.DB(ctx, r.db).Model(&QuotaReservation{}).
 		Where("reservation_id = ? AND row_version = ? AND status = ?", reservationID, version, from).
 		Updates(map[string]any{"status": to, "row_version": gorm.Expr("row_version + 1")}))
 }
 
 func (r *GormRepository) AppendOutbox(ctx context.Context, value *OutboxEvent) error {
-	return r.db.WithContext(ctx).Create(value).Error
+	return dbtx.DB(ctx, r.db).Create(value).Error
 }
 
 func (r *GormRepository) PendingOutbox(ctx context.Context, limit int) ([]OutboxEvent, error) {
@@ -173,14 +174,21 @@ func (r *GormRepository) PendingOutbox(ctx context.Context, limit int) ([]Outbox
 		limit = 100
 	}
 	var values []OutboxEvent
-	err := r.db.WithContext(ctx).Where("processed_at IS NULL").Order("created_at ASC, event_id ASC").Limit(limit).Find(&values).Error
+	err := dbtx.DB(ctx, r.db).Where("processed_at IS NULL").Order("created_at ASC, event_id ASC").Limit(limit).Find(&values).Error
 	return values, err
 }
 
 func (r *GormRepository) MarkOutboxProcessed(ctx context.Context, eventID string, version uint64, processedAt time.Time) error {
-	return casUpdate(r.db.WithContext(ctx).Model(&OutboxEvent{}).
+	return casUpdate(dbtx.DB(ctx, r.db).Model(&OutboxEvent{}).
 		Where("event_id = ? AND row_version = ? AND processed_at IS NULL", eventID, version).
 		Updates(map[string]any{"processed_at": processedAt, "row_version": gorm.Expr("row_version + 1")}))
+}
+
+func (r *GormRepository) withinTransaction(ctx context.Context, fn func(*gorm.DB) error) error {
+	if tx, ok := dbtx.FromContext(ctx); ok {
+		return fn(tx.WithContext(ctx))
+	}
+	return r.db.WithContext(ctx).Transaction(fn)
 }
 
 func casUpdate(result *gorm.DB) error {

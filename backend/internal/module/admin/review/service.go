@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"unicode/utf8"
 )
 
 type Submitter interface {
@@ -70,17 +71,23 @@ func (s *Service) applyAutomaticDecision(ctx context.Context, task Task) (Task, 
 	if !decision.Apply {
 		return task, nil
 	}
-	if err := s.setTarget(ctx, task, decision.Status); err != nil {
-		return Task{}, err
-	}
-	task.Status = decision.Status
-	task.DecisionSource = DecisionSourceAutomatic
-	task.Reason = decision.Reason
-	task.OperatorID = 0
-	if err := s.repo.Save(ctx, &task); err != nil {
-		return Task{}, err
-	}
-	return task, nil
+	return s.mutateTask(ctx, task.ID, func(txCtx context.Context, txRepo Repository, current *Task) error {
+		if current.Status != StatusSubmitted {
+			return nil
+		}
+		currentDecision := ClassifyAutomaticDecision(current.ObjectType, current.Risk)
+		if !currentDecision.Apply {
+			return nil
+		}
+		if err := s.setTarget(txCtx, *current, currentDecision.Status); err != nil {
+			return err
+		}
+		current.Status = currentDecision.Status
+		current.DecisionSource = DecisionSourceAutomatic
+		current.Reason = currentDecision.Reason
+		current.OperatorID = 0
+		return txRepo.Save(txCtx, current)
+	})
 }
 
 func validStatus(status Status) bool {
@@ -92,41 +99,41 @@ func validStatus(status Status) bool {
 	}
 }
 func (s *Service) Start(ctx context.Context, id, operatorID uint) (Task, error) {
-	value, err := s.repo.Find(ctx, id)
-	if err != nil {
-		return Task{}, err
-	}
-	if value.Status != StatusSubmitted {
-		return Task{}, errors.New("only submitted tasks can enter review")
-	}
-	if err := s.setTarget(ctx, value, StatusReviewing); err != nil {
-		return Task{}, err
-	}
-	value.Status, value.OperatorID, value.DecisionSource = StatusReviewing, operatorID, DecisionSourceManual
-	if err := s.repo.Save(ctx, &value); err != nil {
-		return Task{}, err
-	}
-	return value, nil
+	return s.mutateTask(ctx, id, func(txCtx context.Context, txRepo Repository, value *Task) error {
+		if value.Status != StatusSubmitted {
+			return errors.New("only submitted tasks can enter review")
+		}
+		if err := s.setTarget(txCtx, *value, StatusReviewing); err != nil {
+			return err
+		}
+		value.Status, value.OperatorID, value.DecisionSource = StatusReviewing, operatorID, DecisionSourceManual
+		return txRepo.Save(txCtx, value)
+	})
 }
 func (s *Service) Decide(ctx context.Context, id, operatorID uint, status Status, reason string) (Task, error) {
+	reason = strings.TrimSpace(reason)
 	if status != StatusApproved && status != StatusRejected {
 		return Task{}, errors.New("invalid review decision")
 	}
-	value, err := s.repo.Find(ctx, id)
-	if err != nil {
-		return Task{}, err
+	if utf8.RuneCountInString(reason) > 240 {
+		return Task{}, errors.New("review reason exceeds 240 characters")
 	}
-	if value.Status != StatusReviewing {
-		return Task{}, errors.New("task must be reviewing before decision")
+	if status == StatusRejected && reason == "" {
+		return Task{}, errors.New("rejected review requires a reason")
 	}
-	if err := s.setTarget(ctx, value, status); err != nil {
-		return Task{}, err
+	if status == StatusApproved && reason != "" {
+		return Task{}, errors.New("approved review must not include a reason")
 	}
-	value.Status, value.OperatorID, value.Reason, value.DecisionSource = status, operatorID, reason, DecisionSourceManual
-	if err := s.repo.Save(ctx, &value); err != nil {
-		return Task{}, err
-	}
-	return value, nil
+	return s.mutateTask(ctx, id, func(txCtx context.Context, txRepo Repository, value *Task) error {
+		if value.Status != StatusReviewing {
+			return errors.New("task must be reviewing before decision")
+		}
+		if err := s.setTarget(txCtx, *value, status); err != nil {
+			return err
+		}
+		value.Status, value.OperatorID, value.Reason, value.DecisionSource = status, operatorID, reason, DecisionSourceManual
+		return txRepo.Save(txCtx, value)
+	})
 }
 
 func (s *Service) Override(ctx context.Context, id, operatorID uint, status Status, reason string) (Task, error) {
@@ -140,24 +147,45 @@ func (s *Service) Override(ctx context.Context, id, operatorID uint, status Stat
 	if reason == "" {
 		return Task{}, errors.New("review override requires a reason")
 	}
-	value, err := s.repo.Find(ctx, id)
+	if utf8.RuneCountInString(reason) > 240 {
+		return Task{}, errors.New("review override reason exceeds 240 characters")
+	}
+	return s.mutateTask(ctx, id, func(txCtx context.Context, txRepo Repository, value *Task) error {
+		if value.Status != StatusApproved && value.Status != StatusRejected {
+			return errors.New("only terminal review tasks can be overridden")
+		}
+		if err := s.setTarget(txCtx, *value, status); err != nil {
+			return err
+		}
+		value.Status = status
+		value.OperatorID = operatorID
+		value.Reason = reason
+		value.DecisionSource = DecisionSourceManualOverride
+		return txRepo.Save(txCtx, value)
+	})
+}
+
+func (s *Service) mutateTask(
+	ctx context.Context,
+	id uint,
+	mutate func(context.Context, Repository, *Task) error,
+) (Task, error) {
+	var result Task
+	err := s.repo.WithinTransaction(ctx, func(txCtx context.Context, txRepo Repository) error {
+		value, err := txRepo.FindForUpdate(txCtx, id)
+		if err != nil {
+			return err
+		}
+		if err := mutate(txCtx, txRepo, &value); err != nil {
+			return err
+		}
+		result = value
+		return nil
+	})
 	if err != nil {
 		return Task{}, err
 	}
-	if value.Status != StatusApproved && value.Status != StatusRejected {
-		return Task{}, errors.New("only terminal review tasks can be overridden")
-	}
-	if err := s.setTarget(ctx, value, status); err != nil {
-		return Task{}, err
-	}
-	value.Status = status
-	value.OperatorID = operatorID
-	value.Reason = reason
-	value.DecisionSource = DecisionSourceManualOverride
-	if err := s.repo.Save(ctx, &value); err != nil {
-		return Task{}, err
-	}
-	return value, nil
+	return result, nil
 }
 func (s *Service) setTarget(ctx context.Context, task Task, status Status) error {
 	s.mu.RLock()

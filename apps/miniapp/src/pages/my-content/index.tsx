@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react'
-import { Image, Text, View } from '@tarojs/components'
+import React, { useEffect, useRef, useState } from 'react'
+import { Image, ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import AppIcon from '../../components/app-icon'
 import { AppIconButton } from '../../components/ui'
@@ -41,6 +41,12 @@ function ContentThumb({ src, label = '无图' }: { src?: string; label?: string 
     : <View className='my-content-thumb my-content-thumb--empty'><Text>{label}</Text></View>
 }
 
+function mergeById<T extends { id: string }>(current: T[], incoming: T[]): T[] {
+  const byId = new Map(current.map((item) => [item.id, item]))
+  incoming.forEach((item) => byId.set(item.id, item))
+  return Array.from(byId.values())
+}
+
 export default function MyContentPage() {
   const [activeTab, setActiveTab] = useState<TabKey>(getInitialTab)
   const [favorites, setFavorites] = useState<CommunityPost[]>([])
@@ -48,24 +54,84 @@ export default function MyContentPage() {
   const [comments, setComments] = useState<MyCommunityComment[]>([])
   const [items, setItems] = useState<Product[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
   const [error, setError] = useState('')
+  const [loadMoreError, setLoadMoreError] = useState('')
+  const requestVersion = useRef(0)
 
-  const load = async (tab = activeTab) => {
-    setLoading(true)
-    setError('')
+  const load = async (tab = activeTab, nextPage = 1, append = false) => {
+    const version = append ? requestVersion.current : requestVersion.current + 1
+    if (!append) requestVersion.current = version
+    if (append) setLoadingMore(true)
+    else {
+      setLoading(true)
+      setLoadingMore(false)
+    }
+    if (append) setLoadMoreError('')
+    else setError('')
     try {
-      if (tab === 'favorites') setFavorites((await getMyFavoritePosts()).items)
-      if (tab === 'posts') setPosts((await getMyPosts()).items)
-      if (tab === 'comments') setComments((await getMyComments()).items)
-      if (tab === 'items') setItems((await getMyProductsPage()).items)
+      if (tab === 'favorites') {
+        const result = await getMyFavoritePosts(nextPage, 20)
+        if (requestVersion.current !== version) return
+        setFavorites((current) => append ? mergeById(current, result.items) : result.items)
+        setTotal(result.total)
+        setPage(result.page || nextPage)
+      }
+      if (tab === 'posts') {
+        const result = await getMyPosts(nextPage, 20)
+        if (requestVersion.current !== version) return
+        setPosts((current) => append ? mergeById(current, result.items) : result.items)
+        setTotal(result.total)
+        setPage(result.page || nextPage)
+      }
+      if (tab === 'comments') {
+        const result = await getMyComments(nextPage, 20)
+        if (requestVersion.current !== version) return
+        setComments((current) => append ? mergeById(current, result.items) : result.items)
+        setTotal(result.total)
+        setPage(result.page || nextPage)
+      }
+      if (tab === 'items') {
+        const result = await getMyProductsPage(nextPage, 20)
+        if (requestVersion.current !== version) return
+        setItems((current) => append ? mergeById(current, result.items) : result.items)
+        setTotal(result.total)
+        setPage(result.page || nextPage)
+      }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '内容加载失败')
+      if (requestVersion.current !== version) return
+      const message = cause instanceof Error ? cause.message : '内容加载失败'
+      if (append) setLoadMoreError(`${message}，点击重试`)
+      else setError(message)
     } finally {
-      setLoading(false)
+      if (requestVersion.current === version) {
+        if (append) setLoadingMore(false)
+        else setLoading(false)
+      }
     }
   }
 
-  useEffect(() => { void load(activeTab) }, [activeTab])
+  useEffect(() => {
+    setPage(1)
+    setTotal(0)
+    setLoadMoreError('')
+    void load(activeTab, 1, false)
+  }, [activeTab])
+
+  const currentLength = activeTab === 'favorites'
+    ? favorites.length
+    : activeTab === 'posts'
+      ? posts.length
+      : activeTab === 'comments'
+        ? comments.length
+        : items.length
+
+  const loadMore = () => {
+    if (loading || loadingMore || currentLength >= total) return
+    void load(activeTab, page + 1, true)
+  }
 
   const openPost = (postId: string, anchor?: string) => {
     const anchorQuery = anchor ? `&anchor=${encodeURIComponent(anchor)}` : ''
@@ -181,7 +247,23 @@ export default function MyContentPage() {
     <View className='my-content-page'>
       <CapsulePageHeader title='我的内容' left={<AppIconButton name='back' label='返回' className='my-content-header__back' onClick={() => void Taro.navigateBack()} />} />
       <View className='my-content-tabs'>{tabs.map((tab) => <View key={tab.key} className={`my-content-tab ${activeTab === tab.key ? 'my-content-tab--active' : ''}`} onClick={() => setActiveTab(tab.key)}><Text>{tab.label}</Text></View>)}</View>
-      <View className='my-content-body'>{renderContent()}</View>
+      <ScrollView
+        className='my-content-body'
+        scrollY
+        enhanced
+        showScrollbar={false}
+        lowerThreshold={120}
+        onScrollToLower={loadMore}
+      >
+        {renderContent()}
+        {loadMoreError ? (
+          <Text className='my-content-load-more my-content-load-more--retry' onClick={loadMore}>{loadMoreError}</Text>
+        ) : loadingMore ? (
+          <Text className='my-content-load-more'>正在加载更多内容…</Text>
+        ) : currentLength > 0 && currentLength >= total ? (
+          <Text className='my-content-load-more'>— 已显示全部内容 —</Text>
+        ) : null}
+      </ScrollView>
     </View>
   )
 }

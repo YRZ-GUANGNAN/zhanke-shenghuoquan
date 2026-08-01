@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -153,7 +154,12 @@ func (h *Handler) list(c *gin.Context) {
 	if !ok {
 		return
 	}
-	values, total, err := h.service.RiderOrders(c.Request.Context(), h.currentUserID(c), page)
+	statuses, ok := riderStatusesForGroup(c.Query("statusGroup"))
+	if !ok {
+		response.Fail(c, http.StatusBadRequest, "invalid status group")
+		return
+	}
+	values, total, err := h.service.RiderOrders(c.Request.Context(), h.currentUserID(c), statuses, page)
 	if err != nil {
 		h.write(c, nil, err)
 		return
@@ -163,6 +169,21 @@ func (h *Handler) list(c *gin.Context) {
 		items = append(items, assignedView(value))
 	}
 	response.OK(c, Page[AssignedOrderView]{Items: items, Page: page.Page, PageSize: page.Size, Total: total})
+}
+
+func riderStatusesForGroup(group string) ([]delivery.Status, bool) {
+	switch strings.TrimSpace(group) {
+	case "":
+		return nil, true
+	case "pickup":
+		return []delivery.Status{delivery.StatusClaimed, delivery.StatusToPickup}, true
+	case "delivery":
+		return []delivery.Status{delivery.StatusPickedUp, delivery.StatusDelivering}, true
+	case "completed":
+		return []delivery.Status{delivery.StatusDelivered, delivery.StatusCancelled}, true
+	default:
+		return nil, false
+	}
 }
 
 func (h *Handler) detail(c *gin.Context) {

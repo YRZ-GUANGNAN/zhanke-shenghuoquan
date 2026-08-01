@@ -28,6 +28,12 @@ export function isApiError(error: unknown): error is ApiError {
   return error instanceof ApiError
 }
 
+export function isRetryableNetworkError(error: unknown): boolean {
+  if (!isApiError(error) || error.status !== 0) return false
+  if (error.message === 'API base is not configured') return false
+  return /timeout|timed out|network|request:fail|econn|err_network|failed to fetch/i.test(error.message)
+}
+
 export async function request<T>(url: string, options: RequestOptions = { url: '' }): Promise<T> {
   if (!API_BASE) {
     throw new ApiError('API base is not configured', 0, -1)

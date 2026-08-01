@@ -1,7 +1,9 @@
 @use '../../styles/design-tokens.scss' as *;
 
 .my-content-page {
-  min-height: 100vh;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
   padding-bottom: env(safe-area-inset-bottom);
   background: $bg-app;
   color: $text-strong;
@@ -57,7 +59,22 @@
 }
 
 .my-content-body {
+  box-sizing: border-box;
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 18rpx 24rpx 64rpx;
+}
+
+.my-content-load-more {
+  display: block;
+  padding: 28rpx 0 10rpx;
+  color: $text-muted;
+  font-size: 23rpx;
+  text-align: center;
+}
+
+.my-content-load-more--retry {
+  color: $brand-primary;
 }
 
 .my-content-list {

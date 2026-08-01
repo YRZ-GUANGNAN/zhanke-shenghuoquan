@@ -49,7 +49,7 @@ func TestModule10Boundary(t *testing.T) {
 		`if !localMockWechatMode(cfg) {`,
 		`wechatReviewSigner = wechatReviewProxy`,
 		`newWechatReviewSubmitter(cfg, wechatReviewSigner)`,
-		`middleware.CORS(miniappflow.WechatReviewContentPath)`,
+		`middleware.CORSWithOrigins(cfg.CORSAllowedOrigins, miniappflow.WechatReviewContentPath)`,
 	} {
 		if !strings.Contains(main, expected) {
 			t.Fatalf("composition root is missing %q", expected)

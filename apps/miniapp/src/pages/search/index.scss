@@ -1,7 +1,9 @@
 @use '../../styles/design-tokens.scss' as *;
 
 .student-search-page {
-  min-height: 100vh;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
   background: $bg-screen;
   color: $text-primary;
   font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
@@ -89,6 +91,9 @@
 }
 
 .student-search-content {
+  box-sizing: border-box;
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 34rpx 32rpx 48rpx;
 }
 

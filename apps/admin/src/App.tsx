@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { adminAPI } from './services/f-admin'
 import { useAdminStore } from './store'
 import { MediaConsole } from './MediaConsole'
@@ -30,6 +30,9 @@ function reviewStatusLabel(status:ReviewTask['status']){return({submitted:'待�
 function reviewObjectLabel(objectType:ReviewTask['objectType']){return({post:'帖子',comment:'评论',product:'商品',product_comment:'商品留言',report:'举报'})[objectType]}
 function reviewDecisionSourceLabel(source:ReviewTask['decisionSource']){return({manual:'人工审核',automatic:'自动审核',manual_override:'人工改判'})[source]}
 
+const REVIEW_PAGE_SIZE=20
+type ReviewStatusFilter=ReviewTask['status']|''
+
 function Dashboard(){const[data,setData]=useState<Stats|null>(null);const[error,setError]=useState('');useEffect(()=>{adminAPI.stats().then(setData).catch(e=>setError(String(e)))},[]);if(error)return <ErrorBox message={error}/>;if(!data)return <Panel title="数据统计">加载中…</Panel>;const metrics=[['用户',data.totals.users,data.today.users],['帖子',data.totals.posts,data.today.posts],['商品',data.totals.products,data.today.products],['待审核',data.totals.pendingReview,'-']];return <section className="metric-grid">{metrics.map(([label,total,today])=><article className="metric-card" key={label}><div className="metric-card__label">{label}</div><div className="metric-card__value">{total}</div><div className="metric-card__footer"><span>今日</span><span>{today}</span></div></article>)}</section>}
 
 function Reviews(){
@@ -37,17 +40,28 @@ function Reviews(){
 	const[data,setData]=useState<Page<ReviewTask>|null>(null)
 	const[error,setError]=useState('')
 	const[notice,setNotice]=useState('')
+	const[loading,setLoading]=useState(false)
 	const[busyTaskId,setBusyTaskId]=useState<number|null>(null)
 	const[selectedTaskId,setSelectedTaskId]=useState<number|null>(null)
+	const[reviewStatus,setReviewStatus]=useState<ReviewStatusFilter>('submitted')
+	const[reviewPage,setReviewPage]=useState(1)
+	const requestSequence=useRef(0)
 	const load=useCallback(async()=>{
+		const requestId=++requestSequence.current
+		setLoading(true)
 		try{
-			const value=await adminAPI.reviews()
+			const value=await adminAPI.reviews({status:reviewStatus,page:reviewPage,pageSize:REVIEW_PAGE_SIZE})
+			if(requestId!==requestSequence.current)return
+			if(value.items.length===0&&reviewPage>1){setReviewPage(current=>Math.max(1,current-1));return}
 			setData(value)
+			setSelectedTaskId(current=>current!==null&&value.items.some(item=>item.id===current)?current:null)
 			setError('')
-		}catch(e){setError(String(e))}
-	},[])
+		}catch(e){if(requestId===requestSequence.current)setError(String(e))}
+		finally{if(requestId===requestSequence.current)setLoading(false)}
+	},[reviewPage,reviewStatus])
 	useEffect(()=>{void load()},[load])
 	const selected=(data?.items||[]).find(item=>item.id===selectedTaskId)||null
+	const totalPages=Math.max(1,Math.ceil((data?.total||0)/(data?.pageSize||REVIEW_PAGE_SIZE)))
 	const selectTask=(item:ReviewTask)=>{setSelectedTaskId(item.id);setError('');setNotice('')}
 	const act=async(item:ReviewTask,action:'start'|'approve'|'reject')=>{
 		let reason=''
@@ -62,7 +76,7 @@ function Reviews(){
 		try{
 			if(action==='start')await adminAPI.startReview(item.id)
 			else await adminAPI.decideReview(item.id,action,reason)
-			setNotice(action==='start'?'已进入审核，请继续选择“通过”或“拒绝”。':action==='approve'?'审核已通过，内容将按业务规则公开展示。':'审核已拒绝。')
+			setNotice(action==='start'?'已进入审核，可在“审核中”筛选继续选择“通过”或“拒绝”。':action==='approve'?'审核已通过，内容将按业务规则公开展示。':'审核已拒绝。')
 			await load()
 		}catch(e){setError(String(e))}
 		finally{setBusyTaskId(null)}
@@ -83,6 +97,21 @@ function Reviews(){
 	}
 	return <Panel title="提交 → 审核 → 通过/拒绝 → 展示">
 		<p className="review-guide">点击任务行或“处理审核”打开操作区。商品管理页只展示状态，不直接执行审核。</p>
+		<div className="review-toolbar">
+			<label className="review-filter">
+				<span>审核状态</span>
+				<select value={reviewStatus} onChange={event=>{setReviewStatus(event.target.value as ReviewStatusFilter);setReviewPage(1);setSelectedTaskId(null);setData(null);setNotice('');setError('')}}>
+					<option value="submitted">待审核</option>
+					<option value="reviewing">审核中</option>
+					<option value="approved">已通过</option>
+					<option value="rejected">已拒绝</option>
+					<option value="">全部</option>
+				</select>
+			</label>
+			<div className="review-toolbar__summary" role="status">
+				<strong>{data?.total??0}</strong><span>条任务</span><span>第 {data?.page??reviewPage} / {totalPages} 页</span>{loading&&<span>刷新中…</span>}
+			</div>
+		</div>
 		{error&&<div className="review-feedback review-feedback--error" role="alert">{error}</div>}
 		{notice&&<div className="review-feedback review-feedback--success" role="status">{notice}</div>}
 		<div className="audit-list">
@@ -104,6 +133,11 @@ function Reviews(){
 				</div>
 			</div>)}
 			{data&&data.items.length===0&&<div className="placeholder">当前没有审核任务</div>}
+		</div>
+		<div className="review-pagination" aria-label="审核任务分页">
+			<button type="button" disabled={loading||reviewPage<=1} onClick={()=>setReviewPage(current=>Math.max(1,current-1))}>上一页</button>
+			<span>共 {data?.total??0} 条 · 每页 {data?.pageSize??REVIEW_PAGE_SIZE} 条</span>
+			<button type="button" disabled={loading||reviewPage>=totalPages||(data?.total??0)===0} onClick={()=>setReviewPage(current=>current+1)}>下一页</button>
 		</div>
 		{selected&&<section className="review-detail" aria-label={`审核任务 ${selected.id}`}>
 			<header><div><span>当前任务</span><strong>{reviewObjectLabel(selected.objectType)} #{selected.objectId}</strong></div><span className={`status status--${selected.status}`}>{reviewStatusLabel(selected.status)}</span></header>

@@ -153,6 +153,26 @@ export async function waitForMediaApproval(
   }
 }
 
+export async function waitForMediaApprovals(
+  assetIds: string[],
+  onStatus?: (assetId: string, value: MediaStatus) => void,
+  timeoutMs = 105000,
+  concurrency = 3
+): Promise<MediaStatus[]> {
+  const deadline = Date.now() + timeoutMs
+  const workerCount = Math.max(1, Math.min(3, concurrency))
+  return mapConcurrent(assetIds, workerCount, async (assetId) => {
+    const remaining = deadline - Date.now()
+    if (remaining <= 0) throw new Error('图片审核等待超时，草稿和图片已保留')
+    return waitForMediaApproval(
+      assetId,
+      (status) => onStatus?.(assetId, status),
+      remaining,
+      () => Date.now() < deadline
+    )
+  })
+}
+
 async function uploadImage(
   sourcePath: string,
   purpose: MediaPurpose,

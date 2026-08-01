@@ -261,6 +261,7 @@ export async function createCommunityPost(input: CreateCommunityPostInput): Prom
       clientRequestId,
     },
     header: { 'Idempotency-Key': clientRequestId },
+    timeout: 12000,
   })
   return unwrapPost(data)
 }
@@ -339,11 +340,16 @@ export async function listPostComments(postId: string): Promise<CommunityComment
   return page.items
 }
 
-export async function addPostComment(postId: string, content: string): Promise<CommunityComment> {
+export async function addPostComment(
+  postId: string,
+  content: string,
+  clientRequestId = createCommunityClientRequestId()
+): Promise<CommunityComment> {
   const data = await request<unknown>(`/community/posts/${encodeURIComponent(postId)}/comments`, {
     url: '',
     method: 'POST',
-    data: { content },
+    data: { content, clientRequestId },
+    header: { 'Idempotency-Key': clientRequestId },
   })
   if (isRecord(data)) return normalizeComment(first(data, ['comment', 'item'], data))
   return normalizeComment(data)

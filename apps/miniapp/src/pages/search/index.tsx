@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Input, Text, View } from '@tarojs/components'
+import { useEffect, useRef, useState } from 'react'
+import { Input, ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import type { CommunityPost, Product } from '../../types'
 import Taro from '../../services/taro'
@@ -33,6 +33,13 @@ const scopeCopy: Record<SearchScope, { title: string; placeholder: string; empty
   secondhand: { title: '二手搜索', placeholder: '搜索二手商品', empty: '没有找到相关商品' },
   takeout: { title: '外卖搜索', placeholder: '搜索外卖商家', empty: '没有找到相关商家' },
 }
+const SEARCH_PAGE_SIZE = 20
+
+function mergeResults(current: SearchResult[], incoming: SearchResult[]): SearchResult[] {
+  const byId = new Map(current.map((item) => [item.id, item]))
+  incoming.forEach((item) => byId.set(item.id, item))
+  return Array.from(byId.values())
+}
 
 export function isSearchScope(value: string | undefined): value is SearchScope {
   return value === 'community' || value === 'secondhand' || value === 'takeout'
@@ -53,10 +60,12 @@ export default function SearchPage() {
   const [hot, setHot] = useState<string[]>([])
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
   const [hasSearched, setHasSearched] = useState(false)
   const [error, setError] = useState('')
-
-  const resultCount = useMemo(() => results.length, [results])
+  const searchVersion = useRef(0)
 
   const loadSuggestions = async (activeScope: SearchScope) => {
     try {
@@ -94,6 +103,12 @@ export default function SearchPage() {
     void loadSuggestions(scope)
   }, [scope])
 
+  const searchPage = async (activeScope: SearchScope, value: string, nextPage: number) => {
+    if (activeScope === 'community') return searchCommunityPosts(value, nextPage, SEARCH_PAGE_SIZE)
+    if (activeScope === 'secondhand') return searchTradeProducts(value, nextPage, SEARCH_PAGE_SIZE)
+    return searchExternalTakeoutMerchants(value, nextPage, SEARCH_PAGE_SIZE)
+  }
+
   const submitSearch = async (candidate = keyword) => {
     if (!scope || loading) return
     const normalized = candidate.trim()
@@ -103,23 +118,50 @@ export default function SearchPage() {
     }
     setKeyword(normalized)
     setLoading(true)
+    setLoadingMore(false)
     setError('')
     setHasSearched(true)
+    setResults([])
+    setPage(1)
+    setTotal(0)
+    const version = searchVersion.current + 1
+    searchVersion.current = version
     try {
-      if (scope === 'community') {
-        setResults((await searchCommunityPosts(normalized)).items)
-      } else if (scope === 'secondhand') {
-        setResults((await searchTradeProducts(normalized)).items)
-      } else {
-        setResults((await searchExternalTakeoutMerchants(normalized)).items)
-      }
+      const result = await searchPage(scope, normalized, 1)
+      if (searchVersion.current !== version) return
+      setResults(result.items)
+      setPage(result.page || 1)
+      setTotal(result.total)
       await loadSuggestions(scope)
     } catch (searchError) {
+      if (searchVersion.current !== version) return
       console.error('domain search failed', searchError)
       setResults([])
       setError(errorMessage(searchError))
     } finally {
-      setLoading(false)
+      if (searchVersion.current === version) setLoading(false)
+    }
+  }
+
+  const loadMore = async () => {
+    if (!scope || loading || loadingMore || results.length >= total) return
+    const nextPage = page + 1
+    const normalized = keyword.trim()
+    const version = searchVersion.current
+    setLoadingMore(true)
+    setError('')
+    try {
+      const result = await searchPage(scope, normalized, nextPage)
+      if (searchVersion.current !== version) return
+      setResults((current) => mergeResults(current, result.items))
+      setPage(result.page || nextPage)
+      setTotal(result.total)
+    } catch (searchError) {
+      if (searchVersion.current !== version) return
+      console.error('load more search results failed', searchError)
+      setError('更多结果加载失败，点击重试')
+    } finally {
+      if (searchVersion.current === version) setLoadingMore(false)
     }
   }
 
@@ -238,7 +280,14 @@ export default function SearchPage() {
         right={<Text className='student-search-submit' onClick={() => void submitSearch()}>{loading ? '搜索中' : '搜索'}</Text>}
       />
 
-      <View className='student-search-content'>
+      <ScrollView
+        className='student-search-content'
+        scrollY
+        enhanced
+        showScrollbar={false}
+        lowerThreshold={120}
+        onScrollToLower={() => void loadMore()}
+      >
         {!hasSearched && (
           <>
             <View className='student-search-section'>
@@ -274,15 +323,26 @@ export default function SearchPage() {
         {hasSearched && (
           <View className='student-search-results'>
             <View className='student-search-results__head'>
-              <Text>{error ? '搜索失败' : `找到 ${resultCount} 条结果`}</Text>
+              <Text>{error && results.length === 0 ? '搜索失败' : `找到 ${total} 条结果`}</Text>
               <Text className='student-search-results__reset' onClick={() => setHasSearched(false)}>返回推荐</Text>
             </View>
-            {error && <Text className='student-search-state student-search-state--error'>{error}</Text>}
+            {error && (
+              <Text
+                className='student-search-state student-search-state--error'
+                onClick={() => results.length > 0 ? void loadMore() : void submitSearch()}
+              >
+                {error}
+              </Text>
+            )}
             {!error && !loading && results.length === 0 && <Text className='student-search-state'>{copy.empty}</Text>}
             {results.map(renderResult)}
+            {loadingMore && <Text className='student-search-state'>正在加载更多结果…</Text>}
+            {!error && results.length > 0 && results.length >= total && (
+              <Text className='student-search-state'>— 已显示全部结果 —</Text>
+            )}
           </View>
         )}
-      </View>
+      </ScrollView>
     </View>
   )
 }

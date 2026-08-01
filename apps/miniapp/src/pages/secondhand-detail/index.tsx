@@ -44,6 +44,7 @@ export default function SecondhandDetailPage() {
   const [statusPending, setStatusPending] = useState(false)
   const [statusCandidate, setStatusCandidate] = useState<Product['status'] | null>(null)
   const [scrollTarget, setScrollTarget] = useState('')
+  const commentsLoadMoreRef = useRef<(() => void) | null>(null)
   const retryProduct = useCallback(() => setReloadKey((value) => value + 1), [])
 
   useEffect(() => {
@@ -202,6 +203,8 @@ export default function SecondhandDetailPage() {
         enhanced
         showScrollbar={false}
         scrollIntoView={scrollTarget}
+        lowerThreshold={120}
+        onScrollToLower={() => commentsLoadMoreRef.current?.()}
       >
         {status !== 'ready' || !product ? renderState() : (
           <>
@@ -275,6 +278,7 @@ export default function SecondhandDetailPage() {
                 productStatus={product.status}
                 targetCommentId={targetCommentId}
                 onTargetReady={setScrollTarget}
+                onLoadMoreReady={(handler) => { commentsLoadMoreRef.current = handler }}
               />
             </View>
           </>

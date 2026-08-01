@@ -15,9 +15,9 @@ type DispatchRepository interface {
 	CreateIdempotent(context.Context, *Order) (Order, error)
 	FindOwnedByMerchant(context.Context, string, uint64) (Order, error)
 	FindAssignedToRider(context.Context, string, uint64) (Order, error)
-	ListByMerchantUserID(context.Context, uint64, Page) ([]Order, int64, error)
+	ListByMerchantUserID(context.Context, uint64, []Status, Page) ([]Order, int64, error)
 	ListClaimable(context.Context, Page) ([]Order, int64, error)
-	ListByRiderUserID(context.Context, uint64, Page) ([]Order, int64, error)
+	ListByRiderUserID(context.Context, uint64, []Status, Page) ([]Order, int64, error)
 	TransitionToReadyAndEnqueue(context.Context, string, *uint64, uint64, Status, *uint64, time.Time) (Order, OutboxEvent, error)
 
 	ClaimNextOutbox(context.Context, time.Time, time.Duration) (OutboxDelivery, bool, error)
@@ -73,16 +73,25 @@ func (r *GormRepository) FindAssignedToRider(ctx context.Context, publicID strin
 	return value, err
 }
 
-func (r *GormRepository) ListByMerchantUserID(ctx context.Context, merchantUserID uint64, page Page) ([]Order, int64, error) {
-	return listOrders(r.db.WithContext(ctx).Where("merchant_user_id = ?", merchantUserID), page)
+func (r *GormRepository) ListByMerchantUserID(ctx context.Context, merchantUserID uint64, statuses []Status, page Page) ([]Order, int64, error) {
+	query := r.db.WithContext(ctx).Where("merchant_user_id = ?", merchantUserID)
+	return listOrders(filterOrderStatuses(query, statuses), page)
 }
 
 func (r *GormRepository) ListClaimable(ctx context.Context, page Page) ([]Order, int64, error) {
 	return listOrders(r.db.WithContext(ctx).Where("status = ? AND rider_user_id IS NULL", StatusReadyForClaim), page)
 }
 
-func (r *GormRepository) ListByRiderUserID(ctx context.Context, riderUserID uint64, page Page) ([]Order, int64, error) {
-	return listOrders(r.db.WithContext(ctx).Where("rider_user_id = ?", riderUserID), page)
+func (r *GormRepository) ListByRiderUserID(ctx context.Context, riderUserID uint64, statuses []Status, page Page) ([]Order, int64, error) {
+	query := r.db.WithContext(ctx).Where("rider_user_id = ?", riderUserID)
+	return listOrders(filterOrderStatuses(query, statuses), page)
+}
+
+func filterOrderStatuses(query *gorm.DB, statuses []Status) *gorm.DB {
+	if len(statuses) == 0 {
+		return query
+	}
+	return query.Where("status IN ?", statuses)
 }
 
 func listOrders(query *gorm.DB, page Page) ([]Order, int64, error) {

@@ -16,7 +16,27 @@ const sources = fs.readdirSync(src, { withFileTypes: true })
   .join('\n')
 
 assert.doesNotMatch(sources, /window\.(confirm|prompt|alert)\s*\(/)
-assert.doesNotMatch(fs.readFileSync(path.join(src, 'App.tsx'), 'utf8'), /icon:\s*'[A-Z]'/)
+const appSource = fs.readFileSync(path.join(src, 'App.tsx'), 'utf8')
+const adminAPI = fs.readFileSync(path.join(src, 'services', 'f-admin.ts'), 'utf8')
+assert.doesNotMatch(appSource, /icon:\s*'[A-Z]'/)
+
+assert.match(adminAPI, /reviews:\s*\(query[^)]*=\s*\{\}\)\s*=>/,
+  'review API must accept a query object instead of a status-only argument')
+for (const field of ['status', 'page', 'pageSize']) {
+  assert.match(adminAPI, new RegExp(`type ReviewQuery=[^\\n]*${field}`), `review API query must include ${field}`)
+}
+assert.match(appSource, /const\s*\[reviewStatus,\s*setReviewStatus\]\s*=\s*useState/,
+  'review page must keep the active status filter')
+assert.match(appSource, /const\s*\[reviewPage,\s*setReviewPage\]\s*=\s*useState/,
+  'review page must keep the current server page')
+assert.match(appSource, /adminAPI\.reviews\(\{status:reviewStatus,page:reviewPage,pageSize:REVIEW_PAGE_SIZE\}\)/,
+  'review refresh must preserve status, page, and pageSize')
+assert.match(appSource, /data\?\.total/,
+  'review page must render the server total rather than the visible row count')
+assert.match(appSource, /value\.items\.length===0&&reviewPage>1/,
+  'review refresh must step back when an action empties the current page')
+assert.match(appSource, />上一页</)
+assert.match(appSource, />下一页</)
 
 const styles = fs.readFileSync(path.join(src, 'styles.css'), 'utf8')
 for (const token of ['--color-primary', '--radius-control', '--shadow-dialog', '--duration-fast']) {

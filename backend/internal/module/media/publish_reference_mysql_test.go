@@ -3,8 +3,12 @@ package media
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
+
+	"campus-circle/backend/internal/pkg/dbtx"
+	"gorm.io/gorm"
 )
 
 func TestPublishReferenceAgainstMySQL84(t *testing.T) {
@@ -118,9 +122,55 @@ func TestPublishReferenceValidatesAssetCoordinatesAgainstMySQL84(t *testing.T) {
 	t.Log("wrong_asset=ErrNotFound missing_asset=ErrNotFound missing_reference=ErrNotFound no_mutation=PASS")
 }
 
+func TestPublishReferenceJoinsOuterTransactionAgainstMySQL84(t *testing.T) {
+	db := openModule6MySQL(t)
+	ownerID := uint64(99_000_804)
+	cleanupGatewayOwner(t, db, ownerID)
+	t.Cleanup(func() { cleanupGatewayOwner(t, db, ownerID) })
+	now := time.Date(2026, 6, 23, 15, 30, 0, 0, time.UTC)
+	fixture := createGatewayFixture(t, db, ownerID, "publish-reference-outer-rollback", 0, ProjectionApproved, ReferencePending, ParentHidden, "", now)
+
+	repository := NewRepository(db)
+	service := NewService(repository)
+	gateway, err := NewMediaGateway(repository)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rollbackErr := errors.New("force outer review transaction rollback")
+	ctx := context.Background()
+	err = db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		txCtx := dbtx.WithDB(ctx, tx)
+		if publishErr := service.PublishReference(txCtx, fixture.Asset.AssetPublicID, PurposePost, fixture.Reference.ReferenceID, fixture.Reference.Slot); publishErr != nil {
+			return publishErr
+		}
+		inside, findErr := repository.FindReference(txCtx, fixture.Reference.ID)
+		if findErr != nil {
+			return findErr
+		}
+		if inside.Status != ReferenceActive || inside.ParentVisibility != ParentVisible || inside.RowVersion != 3 {
+			return fmt.Errorf("reference not published inside outer transaction: %#v", inside)
+		}
+		return rollbackErr
+	})
+	if !errors.Is(err, rollbackErr) {
+		t.Fatalf("outer transaction err=%v want=%v", err, rollbackErr)
+	}
+	afterRollback, err := repository.FindReference(ctx, fixture.Reference.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if afterRollback.Status != ReferencePending || afterRollback.ParentVisibility != ParentHidden || afterRollback.RowVersion != 1 {
+		t.Fatalf("outer rollback left published reference: %#v", afterRollback)
+	}
+	if _, err := gateway.BuildDisplayView(ctx, PurposePost, fixture.Reference.ReferenceID, fixture.Reference.Slot); !errors.Is(err, ErrMediaNotVisible) {
+		t.Fatalf("outer rollback left media visible: %v", err)
+	}
+	t.Log("outer_review_transaction=ROLLBACK media_reference=PENDING_HIDDEN")
+}
+
 func TestZZPublishReferenceResidueAgainstMySQL84(t *testing.T) {
 	db := openModule6MySQL(t)
-	owners := []uint64{99_000_801, 99_000_802, 99_000_803}
+	owners := []uint64{99_000_801, 99_000_802, 99_000_803, 99_000_804}
 	for _, ownerID := range owners {
 		cleanupGatewayOwner(t, db, ownerID)
 	}

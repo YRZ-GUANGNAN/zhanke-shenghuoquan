@@ -51,6 +51,16 @@ func (d2ApprovedProofPort) ResolveProofURL(context.Context, string, uint16, time
 	return "https://signed.example/d2-proof", nil
 }
 
+type d2IdentityEligibility struct{}
+
+func (d2IdentityEligibility) RiderEligible(context.Context, uint64) (user.IdentityEligibilityResult, error) {
+	return user.IdentityEligibilityResult{Available: true, Status: "active"}, nil
+}
+
+func (d2IdentityEligibility) MerchantEligible(context.Context, uint64) (user.IdentityEligibilityResult, error) {
+	return user.IdentityEligibilityResult{Available: true, Status: "active"}, nil
+}
+
 func TestD2DeliveryRealHTTPMySQLAuthConcurrencyOutboxAndGates(t *testing.T) {
 	db := openD2ServerMySQL(t)
 	assertD2ServerSchema(t, db)
@@ -60,7 +70,7 @@ func TestD2DeliveryRealHTTPMySQLAuthConcurrencyOutboxAndGates(t *testing.T) {
 	ctx := context.Background()
 	auth := user.NewService(
 		user.NewRepository(db), "d2-test-secret-that-is-longer-than-thirty-two-characters",
-		"", "", true, user.WithAppEnv("dev"),
+		"", "", true, user.WithAppEnv("dev"), user.WithIdentityEligibility(d2IdentityEligibility{}),
 	)
 	merchant, err := auth.WechatLogin(ctx, user.LoginInput{Code: d2Fence + "-merchant", Nickname: "D2 Merchant"})
 	if err != nil {
@@ -89,6 +99,11 @@ func TestD2DeliveryRealHTTPMySQLAuthConcurrencyOutboxAndGates(t *testing.T) {
 	if err := db.Model(&user.User{}).Where("id = ?", administrator.User.ID).
 		Update("role", user.RoleAdmin).Error; err != nil {
 		t.Fatal(err)
+	}
+	for _, merchantUser := range []user.LoginResult{merchant, otherMerchant} {
+		if _, err := auth.SwitchIdentity(ctx, merchantUser.User.ID, user.IdentityMerchant); err != nil {
+			t.Fatalf("switch merchant identity user=%d: %v", merchantUser.User.ID, err)
+		}
 	}
 
 	cfg := config.Config{
@@ -147,16 +162,26 @@ func TestD2DeliveryRealHTTPMySQLAuthConcurrencyOutboxAndGates(t *testing.T) {
 			t.Fatalf("admin rider open status=%d body=%s", status, body.Data)
 		}
 	}
-	status, body := d2HTTPJSON(t, server.Client(), http.MethodGet,
+	var body d2Envelope
+	status, _ = d2HTTPJSON(t, server.Client(), http.MethodGet,
+		server.URL+"/api/v1/delivery/rider/orders/claimable", riderA.Token, nil)
+	if status != http.StatusForbidden {
+		t.Fatalf("active rider with student identity claim pool status=%d", status)
+	}
+	status, _ = d2HTTPJSON(t, server.Client(), http.MethodGet,
 		server.URL+"/api/v1/delivery/rider/me", unregistered.Token, nil)
-	if status != http.StatusOK || !strings.Contains(string(body.Data), `"registered":false`) ||
-		!strings.Contains(string(body.Data), "请联系管理员开通") {
-		t.Fatalf("unregistered me status=%d body=%s", status, body.Data)
+	if status != http.StatusForbidden {
+		t.Fatalf("unregistered me status=%d", status)
 	}
 	status, _ = d2HTTPJSON(t, server.Client(), http.MethodGet,
 		server.URL+"/api/v1/delivery/rider/orders/claimable", unregistered.Token, nil)
 	if status != http.StatusForbidden {
 		t.Fatalf("unregistered claim pool status=%d", status)
+	}
+	for _, rider := range []user.LoginResult{riderA, riderB} {
+		if _, err := auth.SwitchIdentity(ctx, rider.User.ID, user.IdentityRider); err != nil {
+			t.Fatalf("switch rider identity user=%d: %v", rider.User.ID, err)
+		}
 	}
 
 	requestID := "01J00000000000000000000901"

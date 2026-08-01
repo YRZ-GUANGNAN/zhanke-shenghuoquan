@@ -35,6 +35,9 @@ func (r *overrideReviewRepository) Find(_ context.Context, id uint) (review.Task
 	}
 	return r.task, nil
 }
+func (r *overrideReviewRepository) FindForUpdate(ctx context.Context, id uint) (review.Task, error) {
+	return r.Find(ctx, id)
+}
 func (r *overrideReviewRepository) Save(_ context.Context, value *review.Task) error {
 	r.task = *value
 	return nil
@@ -43,6 +46,14 @@ func (r *overrideReviewRepository) List(context.Context, review.Status, int, int
 	return []review.Task{r.task}, 1, nil
 }
 func (r *overrideReviewRepository) CountPending(context.Context) (int64, error) { return 0, nil }
+func (r *overrideReviewRepository) WithinTransaction(ctx context.Context, fn func(context.Context, review.Repository) error) error {
+	snapshot := r.task
+	if err := fn(ctx, r); err != nil {
+		r.task = snapshot
+		return err
+	}
+	return nil
+}
 
 type overrideReviewTarget struct {
 	statuses []review.Status

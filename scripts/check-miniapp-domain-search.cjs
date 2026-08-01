@@ -24,6 +24,22 @@ if (!secondhand.includes('/pages/search/index?scope=secondhand')) {
 for (const scope of ["'community'", "'secondhand'", "'takeout'"]) {
   if (!page.includes(scope)) throw new Error(`search page is missing scope ${scope}`)
 }
+for (const fragment of [
+  'const [page, setPage]',
+  'const [total, setTotal]',
+  'const [loadingMore, setLoadingMore]',
+  'onScrollToLower={() => void loadMore()}',
+  'searchPage(scope, normalized, nextPage)',
+  'mergeResults(current, result.items)',
+]) {
+  if (!page.includes(fragment)) throw new Error(`search pagination contract is missing: ${fragment}`)
+}
+if (!/const version = searchVersion\.current \+ 1[\s\S]{0,100}searchVersion\.current = version/.test(page)) {
+  throw new Error('search page must reject stale asynchronous results')
+}
+if (!/找到 \$\{total\} 条结果/.test(page)) {
+  throw new Error('search result heading must use the server total')
+}
 if (!page.includes('搜索入口无效') || !page.includes('isSearchScope')) {
   throw new Error('invalid or missing scope must fail closed')
 }

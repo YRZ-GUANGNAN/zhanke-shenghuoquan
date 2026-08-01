@@ -3,6 +3,8 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -10,10 +12,13 @@ import (
 	"github.com/joho/godotenv"
 )
 
+const defaultMySQLDSN = "campus:campus@tcp(127.0.0.1:3306)/campus_circle?charset=utf8mb4&parseTime=True&loc=Local"
+
 type Config struct {
-	AppEnv    string
-	HTTPAddr  string
-	JWTSecret string
+	AppEnv             string
+	HTTPAddr           string
+	JWTSecret          string
+	CORSAllowedOrigins []string
 
 	MySQLDSN          string
 	TencentIMSDKAppID string
@@ -60,13 +65,56 @@ type Config struct {
 
 func Load() (Config, error) {
 	_ = godotenv.Load()
+	appEnv := env("APP_ENV", "dev")
+	if appEnv == "prod" {
+		if strings.TrimSpace(os.Getenv("HTTP_ADDR")) == "" {
+			return Config{}, errors.New("production requires explicit HTTP_ADDR")
+		}
+		if strings.TrimSpace(os.Getenv("MYSQL_DSN")) == "" {
+			return Config{}, errors.New("production requires explicit MYSQL_DSN")
+		}
+	}
+
+	allowMockWechat, err := envBool("ALLOW_MOCK_WECHAT_LOGIN", false)
+	if err != nil {
+		return Config{}, err
+	}
+	allowMockPayment, err := envBool("ALLOW_MOCK_PAYMENT", false)
+	if err != nil {
+		return Config{}, err
+	}
+	enableLegacyTakeout, err := envBool("ENABLE_LEGACY_TAKEOUT", false)
+	if err != nil {
+		return Config{}, err
+	}
+	enableDelivery, err := envBool("ENABLE_DELIVERY", true)
+	if err != nil {
+		return Config{}, err
+	}
+	enableDeliveryPayment, err := envBool("ENABLE_DELIVERY_PAYMENT", false)
+	if err != nil {
+		return Config{}, err
+	}
+	allowMockDeliveryFeeConfirmation, err := envBool("ALLOW_MOCK_DELIVERY_FEE_CONFIRMATION", false)
+	if err != nil {
+		return Config{}, err
+	}
+	allowMockDeliveryPayment, err := envBool("ALLOW_MOCK_DELIVERY_PAYMENT", false)
+	if err != nil {
+		return Config{}, err
+	}
+	enableDeliveryIMReadReceipt, err := envBool("ENABLE_DELIVERY_IM_READ_RECEIPT", false)
+	if err != nil {
+		return Config{}, err
+	}
 
 	cfg := Config{
-		AppEnv:    env("APP_ENV", "dev"),
-		HTTPAddr:  env("HTTP_ADDR", ":8080"),
-		JWTSecret: env("JWT_SECRET", "dev-secret-change-me"),
+		AppEnv:             appEnv,
+		HTTPAddr:           env("HTTP_ADDR", ":8080"),
+		JWTSecret:          env("JWT_SECRET", "dev-secret-change-me"),
+		CORSAllowedOrigins: envList("CORS_ALLOW_ORIGINS"),
 
-		MySQLDSN:          env("MYSQL_DSN", "campus:campus@tcp(127.0.0.1:3306)/campus_circle?charset=utf8mb4&parseTime=True&loc=Local"),
+		MySQLDSN:          env("MYSQL_DSN", defaultMySQLDSN),
 		TencentIMSDKAppID: env("TENCENT_IM_SDK_APP_ID", ""),
 		TencentIMSecret:   env("TENCENT_IM_SECRET_KEY", ""),
 		TencentIMAdmin:    env("TENCENT_IM_ADMIN_USER", ""),
@@ -87,7 +135,7 @@ func Load() (Config, error) {
 
 		WechatAppID:     env("WECHAT_APP_ID", ""),
 		WechatAppSecret: env("WECHAT_APP_SECRET", ""),
-		AllowMockWechat: envBool("ALLOW_MOCK_WECHAT_LOGIN", false),
+		AllowMockWechat: allowMockWechat,
 
 		WechatPayMchID:            env("WECHAT_PAY_MCH_ID", ""),
 		WechatPayAPIv3Key:         env("WECHAT_PAY_API_V3_KEY", ""),
@@ -96,14 +144,14 @@ func Load() (Config, error) {
 		WechatPayNotifyURL:        env("WECHAT_PAY_NOTIFY_URL", ""),
 		WechatPayAPIBase:          env("WECHAT_PAY_API_BASE", "https://api.mch.weixin.qq.com"),
 		WechatPayPlatformKeyPath:  env("WECHAT_PAY_PLATFORM_PUBLIC_KEY_PATH", ""),
-		AllowMockPayment:          envBool("ALLOW_MOCK_PAYMENT", false),
+		AllowMockPayment:          allowMockPayment,
 
-		EnableLegacyTakeout:              envBool("ENABLE_LEGACY_TAKEOUT", false),
-		EnableDelivery:                   envBool("ENABLE_DELIVERY", true),
-		EnableDeliveryPayment:            envBool("ENABLE_DELIVERY_PAYMENT", false),
-		AllowMockDeliveryFeeConfirmation: envBool("ALLOW_MOCK_DELIVERY_FEE_CONFIRMATION", false),
-		AllowMockDeliveryPayment:         envBool("ALLOW_MOCK_DELIVERY_PAYMENT", false),
-		EnableDeliveryIMReadReceipt:      envBool("ENABLE_DELIVERY_IM_READ_RECEIPT", false),
+		EnableLegacyTakeout:              enableLegacyTakeout,
+		EnableDelivery:                   enableDelivery,
+		EnableDeliveryPayment:            enableDeliveryPayment,
+		AllowMockDeliveryFeeConfirmation: allowMockDeliveryFeeConfirmation,
+		AllowMockDeliveryPayment:         allowMockDeliveryPayment,
+		EnableDeliveryIMReadReceipt:      enableDeliveryIMReadReceipt,
 		DeliveryWechatPayNotifyURL:       env("DELIVERY_WECHAT_PAY_NOTIFY_URL", ""),
 		DeliveryWechatRefundNotifyURL:    env("DELIVERY_WECHAT_REFUND_NOTIFY_URL", ""),
 		WeComRiderWebhookURL:             env("WECOM_RIDER_WEBHOOK_URL", ""),
@@ -115,6 +163,19 @@ func Load() (Config, error) {
 }
 
 func (c Config) Validate() error {
+	if c.AppEnv != "dev" && c.AppEnv != "prod" {
+		return errors.New("APP_ENV must be either dev or prod")
+	}
+	for _, origin := range c.CORSAllowedOrigins {
+		parsed, err := url.Parse(origin)
+		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" ||
+			parsed.User != nil || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+			return fmt.Errorf("CORS_ALLOW_ORIGINS contains invalid origin %q", origin)
+		}
+		if c.AppEnv == "prod" && parsed.Scheme != "https" {
+			return fmt.Errorf("production CORS origin must use HTTPS: %q", origin)
+		}
+	}
 	if len(c.JWTSecret) < 32 || c.JWTSecret == "dev-secret-change-me" {
 		return errors.New("JWT_SECRET must be a non-default secret of at least 32 characters")
 	}
@@ -150,6 +211,18 @@ func (c Config) Validate() error {
 		return errors.New("enabled delivery payment requires either no real credentials or a complete real configuration")
 	}
 	if c.AppEnv == "prod" {
+		if strings.TrimSpace(c.HTTPAddr) == "" {
+			return errors.New("production HTTP_ADDR cannot be empty")
+		}
+		if err := validateProductionHTTPAddr(c.HTTPAddr); err != nil {
+			return err
+		}
+		if strings.TrimSpace(c.MySQLDSN) == "" {
+			return errors.New("production MYSQL_DSN cannot be empty")
+		}
+		if c.MySQLDSN == defaultMySQLDSN {
+			return errors.New("production cannot use the development MYSQL_DSN")
+		}
 		if c.WechatAppID == "" || c.WechatAppSecret == "" {
 			return errors.New("production requires WECHAT_APP_ID and WECHAT_APP_SECRET")
 		}
@@ -185,6 +258,15 @@ func (c Config) Validate() error {
 		}
 	} else if c.WechatAppID == "" && !c.AllowMockWechat {
 		return fmt.Errorf("WeChat credentials are missing; set ALLOW_MOCK_WECHAT_LOGIN=true only for local development")
+	}
+	return nil
+}
+
+func validateProductionHTTPAddr(value string) error {
+	host, portText, err := net.SplitHostPort(strings.TrimSpace(value))
+	port, portErr := strconv.Atoi(portText)
+	if err != nil || host != "127.0.0.1" || portErr != nil || port < 1 || port > 65535 {
+		return errors.New("production HTTP_ADDR must use 127.0.0.1 with an explicit port")
 	}
 	return nil
 }
@@ -225,11 +307,38 @@ func env(key string, fallback string) string {
 	return fallback
 }
 
-func envBool(key string, fallback bool) bool {
+func envBool(key string, fallback bool) (bool, error) {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback, nil
+	}
+	switch value {
+	case "true", "1":
+		return true, nil
+	case "false", "0":
+		return false, nil
+	default:
+		return false, fmt.Errorf("%s must be one of true, false, 1 or 0", key)
+	}
+}
+
+func envList(key string) []string {
 	value := strings.TrimSpace(os.Getenv(key))
 	if value == "" {
-		return fallback
+		return nil
 	}
-	parsed, err := strconv.ParseBool(value)
-	return err == nil && parsed
+	seen := make(map[string]struct{})
+	items := make([]string, 0)
+	for _, part := range strings.Split(value, ",") {
+		item := strings.TrimSpace(part)
+		if item == "" {
+			continue
+		}
+		if _, exists := seen[item]; exists {
+			continue
+		}
+		seen[item] = struct{}{}
+		items = append(items, item)
+	}
+	return items
 }

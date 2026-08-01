@@ -1,7 +1,11 @@
 package admin
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -81,21 +85,47 @@ func (h *Handler) feedbacks(c *gin.Context) {
 }
 func (h *Handler) submitReport(c *gin.Context) {
 	var req struct {
-		TargetType string `json:"targetType"`
-		TargetID   uint   `json:"targetId"`
-		Reason     string `json:"reason"`
-		Detail     string `json:"detail"`
+		TargetType      string `json:"targetType"`
+		TargetID        uint   `json:"targetId"`
+		Reason          string `json:"reason"`
+		Detail          string `json:"detail"`
+		ClientRequestID string `json:"clientRequestId"`
 	}
-	if c.ShouldBindJSON(&req) != nil {
+	if decodeStrictJSON(c, &req) != nil {
 		response.Fail(c, 400, "invalid report")
 		return
 	}
-	value, err := h.service.SubmitReport(c, user.CurrentUserID(c), req.TargetType, req.TargetID, req.Reason, req.Detail)
+	clientRequestID, err := resolveReportIdempotencyKey(c.GetHeader("Idempotency-Key"), req.ClientRequestID)
 	if err != nil {
+		response.Fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	value, err := h.service.SubmitReport(c, user.CurrentUserID(c), req.TargetType, req.TargetID, req.Reason, req.Detail, clientRequestID)
+	if err != nil {
+		if errors.Is(err, ErrReportIdempotencyConflict) {
+			response.Fail(c, http.StatusConflict, err.Error())
+			return
+		}
 		response.Fail(c, 400, err.Error())
 		return
 	}
 	response.Created(c, value)
+}
+
+func resolveReportIdempotencyKey(headerValue, bodyValue string) (string, error) {
+	headerValue = strings.TrimSpace(headerValue)
+	bodyValue = strings.TrimSpace(bodyValue)
+	if headerValue != "" && bodyValue != "" && headerValue != bodyValue {
+		return "", errors.New("idempotency key header and body mismatch")
+	}
+	value := headerValue
+	if value == "" {
+		value = bodyValue
+	}
+	if value == "" || len(value) > 96 {
+		return "", errors.New("valid idempotency key is required")
+	}
+	return value, nil
 }
 func (h *Handler) stats(c *gin.Context) {
 	ut, ud, err := h.users.Stats(c)
@@ -147,7 +177,10 @@ func (h *Handler) decide(c *gin.Context, status review.Status) {
 	var req struct {
 		Reason string `json:"reason"`
 	}
-	_ = c.ShouldBindJSON(&req)
+	if err := decodeStrictJSON(c, &req); err != nil {
+		response.Fail(c, http.StatusBadRequest, "invalid review decision")
+		return
+	}
 	value, err := h.reviews.Decide(c, id, user.CurrentUserID(c), status, req.Reason)
 	write(c, value, err)
 }
@@ -160,7 +193,7 @@ func (h *Handler) overrideReview(c *gin.Context) {
 		Status review.Status `json:"status"`
 		Reason string        `json:"reason"`
 	}
-	if c.ShouldBindJSON(&req) != nil ||
+	if decodeStrictJSON(c, &req) != nil ||
 		(req.Status != review.StatusApproved && req.Status != review.StatusRejected) ||
 		strings.TrimSpace(req.Reason) == "" {
 		response.Fail(c, http.StatusBadRequest, "invalid review override")
@@ -172,6 +205,33 @@ func (h *Handler) overrideReview(c *gin.Context) {
 		return
 	}
 	write(c, value, err)
+}
+
+const maxStrictJSONBodyBytes = 16 << 10
+
+func decodeStrictJSON(c *gin.Context, destination any) error {
+	decoder := json.NewDecoder(io.LimitReader(c.Request.Body, maxStrictJSONBodyBytes+1))
+	var raw json.RawMessage
+	if err := decoder.Decode(&raw); err != nil {
+		return err
+	}
+	if len(raw) > maxStrictJSONBodyBytes {
+		return fmt.Errorf("request body exceeds %d bytes", maxStrictJSONBodyBytes)
+	}
+	var trailing json.RawMessage
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return errors.New("request body contains multiple JSON values")
+		}
+		return err
+	}
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) || trimmed[0] != '{' {
+		return errors.New("request body must be a JSON object")
+	}
+	strict := json.NewDecoder(bytes.NewReader(trimmed))
+	strict.DisallowUnknownFields()
+	return strict.Decode(destination)
 }
 func (h *Handler) reports(c *gin.Context) {
 	page, size := pagination(c)

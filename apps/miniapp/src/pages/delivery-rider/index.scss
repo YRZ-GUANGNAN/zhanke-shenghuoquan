@@ -717,6 +717,18 @@ page {
   box-sizing: border-box;
 }
 
+.rider-grab-content__loading-more {
+  display: block;
+  padding: 28rpx 0 16rpx;
+  color: $text-muted;
+  font-size: 23rpx;
+  text-align: center;
+}
+
+.rider-grab-content__loading-more--retry {
+  color: $brand-primary;
+}
+
 .rider-access-hero {
   flex: 0 0 auto;
   padding: 0 28rpx 24rpx;

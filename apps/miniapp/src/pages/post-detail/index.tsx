@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Image, Input, Text, View } from '@tarojs/components'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Image, Input, ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import AppIcon from '../../components/app-icon'
 import { AppIconButton, AppState } from '../../components/ui'
@@ -8,10 +8,11 @@ import type { CommunityComment, CommunityPost } from '../../types'
 import { isApiError } from '../../services/api'
 import {
   addPostComment,
+  createCommunityClientRequestId,
   getCommunityPost,
   getCommunityViewerState,
   getMyCommunityPost,
-  listPostComments,
+  getPostCommentsPage,
   setPostFavorited,
   setPostLiked,
   setUserFollowing,
@@ -20,6 +21,18 @@ import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import './index.scss'
 
 const commentTone = ['sky', 'peach', 'green', 'mint'] as const
+const COMMENT_PAGE_SIZE = 20
+
+interface PendingCommentSubmission {
+  key: string
+  clientRequestId: string
+}
+
+function mergeComments(current: CommunityComment[], incoming: CommunityComment[]): CommunityComment[] {
+  const byId = new Map(current.map((comment) => [comment.id, comment]))
+  incoming.forEach((comment) => byId.set(comment.id, comment))
+  return Array.from(byId.values())
+}
 
 const showToast = (title: string, icon: 'success' | 'error' | 'none' = 'none') => {
   void Taro.showToast({ title, icon, duration: 1600 })
@@ -63,6 +76,9 @@ export default function PostDetailPage() {
   const postId = params.id ? decodeURIComponent(params.id) : ''
   const [post, setPost] = useState<CommunityPost | null>(null)
   const [comments, setComments] = useState<CommunityComment[]>([])
+  const [commentPage, setCommentPage] = useState(1)
+  const [commentTotal, setCommentTotal] = useState(0)
+  const [commentsLoadingMore, setCommentsLoadingMore] = useState(false)
   const [liked, setLiked] = useState(false)
   const [favorited, setFavorited] = useState(false)
   const [following, setFollowing] = useState(false)
@@ -74,6 +90,7 @@ export default function PostDetailPage() {
   const [submittingComment, setSubmittingComment] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const [heroAvailable, setHeroAvailable] = useState(false)
+  const pendingComment = useRef<PendingCommentSubmission | null>(null)
 
   const heroImage = post?.images[0] ?? ''
   const showHero = Boolean(heroImage && heroAvailable)
@@ -114,6 +131,8 @@ export default function PostDetailPage() {
       setCommentError('')
       setPost(null)
       setComments([])
+      setCommentPage(1)
+      setCommentTotal(0)
       if (!postId) {
         setError('帖子链接缺少编号，无法读取')
         setLoading(false)
@@ -135,11 +154,11 @@ export default function PostDetailPage() {
         setPost(nextPost)
 
         if (nextPost.reviewStatus === 'approved') {
-          const [nextComments, viewerState] = await Promise.all([
-            listPostComments(postId).catch((commentsError) => {
+          const [commentsPage, viewerState] = await Promise.all([
+            getPostCommentsPage(postId, { page: 1, pageSize: COMMENT_PAGE_SIZE }).catch((commentsError) => {
               console.error('load post comments failed', commentsError)
               if (alive) setCommentError('评论暂时无法读取，点击重试')
-              return [] as CommunityComment[]
+              return { items: [] as CommunityComment[], page: 1, pageSize: COMMENT_PAGE_SIZE, total: 0 }
             }),
             getCommunityViewerState(postId).catch(() => ({
               liked: false,
@@ -148,7 +167,9 @@ export default function PostDetailPage() {
             })),
           ])
           if (!alive) return
-          setComments(nextComments)
+          setComments(commentsPage.items)
+          setCommentPage(commentsPage.page || 1)
+          setCommentTotal(commentsPage.total)
           setLiked(viewerState.liked)
           setFavorited(viewerState.favorited)
           setFollowing(viewerState.followingAuthor)
@@ -165,6 +186,24 @@ export default function PostDetailPage() {
       alive = false
     }
   }, [postId, reloadKey])
+
+  const loadMoreComments = async () => {
+    if (!post || !isApproved || commentsLoadingMore || comments.length >= commentTotal) return
+    const nextPage = commentPage + 1
+    setCommentsLoadingMore(true)
+    setCommentError('')
+    try {
+      const result = await getPostCommentsPage(post.id, { page: nextPage, pageSize: COMMENT_PAGE_SIZE })
+      setComments((current) => mergeComments(current, result.items))
+      setCommentPage(result.page || nextPage)
+      setCommentTotal(result.total)
+    } catch (loadError) {
+      console.error('load more post comments failed', loadError)
+      setCommentError('更多评论加载失败，点击重试')
+    } finally {
+      setCommentsLoadingMore(false)
+    }
+  }
 
   const withActionGuard = async (run: () => Promise<void>) => {
     if (actioning || !post || !isApproved) return
@@ -214,15 +253,24 @@ export default function PostDetailPage() {
       return
     }
     if (submittingComment) return
+    const clientRequestId = pendingComment.current?.key === content
+      ? pendingComment.current.clientRequestId
+      : createCommunityClientRequestId()
+    pendingComment.current = { key: content, clientRequestId }
     setSubmittingComment(true)
     try {
-      const comment = await addPostComment(post.id, content)
-      setComments((current) => [comment, ...current])
+      const comment = await addPostComment(post.id, content, clientRequestId)
+      setComments((current) => mergeComments([comment], current))
+      setCommentTotal((current) => current + 1)
       setPost((current) => current ? { ...current, commentCount: current.commentCount + 1 } : current)
       setCommentText('')
+      pendingComment.current = null
       showToast('评论已提交审核', 'success')
     } catch (commentSubmitError) {
       console.error('submit comment failed', commentSubmitError)
+      if (isApiError(commentSubmitError) && commentSubmitError.status >= 400 && commentSubmitError.status < 500) {
+        pendingComment.current = null
+      }
       showToast('评论失败，请稍后再试', 'error')
     } finally {
       setSubmittingComment(false)
@@ -269,7 +317,14 @@ export default function PostDetailPage() {
         />
       ) : (
         <>
-          <View className="post-detail-scroll">
+          <ScrollView
+            className="post-detail-scroll"
+            scrollY
+            enhanced
+            showScrollbar={false}
+            lowerThreshold={120}
+            onScrollToLower={() => void loadMoreComments()}
+          >
             {reviewState?.title ? (
               <View className={`post-detail-review post-detail-review--${post.reviewStatus}`}>
                 <Text className="post-detail-review__title">{reviewState.title}</Text>
@@ -303,7 +358,7 @@ export default function PostDetailPage() {
 
             {isApproved ? (
               <View className="post-detail-comments">
-                <Text className="post-detail-comments__title">共 {post.commentCount || comments.length} 条评论</Text>
+                <Text className="post-detail-comments__title">共 {commentTotal || post.commentCount || comments.length} 条评论</Text>
                 {comments.map((comment, index) => (
                   <View className="post-detail-comment" key={comment.id}>
                     <View className={`post-detail-comment__avatar post-detail-comment__avatar--${commentTone[index % commentTone.length]}`}>
@@ -317,7 +372,10 @@ export default function PostDetailPage() {
                   </View>
                 ))}
                 {commentError ? (
-                  <Text className="post-detail-comments__bottom post-detail-comments__bottom--retry" onClick={() => setReloadKey((value) => value + 1)}>
+                  <Text
+                    className="post-detail-comments__bottom post-detail-comments__bottom--retry"
+                    onClick={() => comments.length > 0 ? void loadMoreComments() : setReloadKey((value) => value + 1)}
+                  >
                     {commentError}
                   </Text>
                 ) : comments.length === 0 ? (
@@ -325,12 +383,14 @@ export default function PostDetailPage() {
                     <Text className="post-detail-comments__empty-title">还没有评论</Text>
                     <Text className="post-detail-comments__empty-desc">说说你的看法，成为第一个评论的人</Text>
                   </View>
-                ) : (
+                ) : commentsLoadingMore ? (
+                  <Text className="post-detail-comments__bottom">正在加载更多评论…</Text>
+                ) : comments.length >= commentTotal ? (
                   <Text className="post-detail-comments__bottom">— 到底了 —</Text>
-                )}
+                ) : null}
               </View>
             ) : null}
-          </View>
+          </ScrollView>
 
           {isApproved ? (
             <View className="post-detail-actionbar">
@@ -338,7 +398,10 @@ export default function PostDetailPage() {
                 className="post-detail-input"
                 value={commentText}
                 placeholder={submittingComment ? '发送中…' : '说点什么…'}
-                onInput={(event) => setCommentText(event.detail.value)}
+                onInput={(event) => {
+                  setCommentText(event.detail.value)
+                  if (pendingComment.current?.key !== event.detail.value.trim()) pendingComment.current = null
+                }}
                 confirmType="send"
                 onConfirm={handleSubmitComment}
               />

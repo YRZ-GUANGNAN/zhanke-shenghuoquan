@@ -7,7 +7,8 @@ import (
 
 func validConfig() Config {
 	return Config{
-		AppEnv: "prod", JWTSecret: "production-secret-that-is-longer-than-thirty-two-characters",
+		AppEnv: "prod", HTTPAddr: "127.0.0.1:8080", JWTSecret: "production-secret-that-is-longer-than-thirty-two-characters",
+		MySQLDSN:            "campus-prod:strong-password@tcp(mysql:3306)/campus_circle?charset=utf8mb4&parseTime=True&loc=Local",
 		EnableLegacyTakeout: true, EnableDelivery: true,
 		WechatAppID: "wx-app", WechatAppSecret: "wx-secret",
 		TencentIMSDKAppID: "1400000000", TencentIMSecret: "im-secret", TencentIMAdmin: "administrator",
@@ -167,23 +168,125 @@ func TestFeatureGateDefaults(t *testing.T) {
 	t.Setenv("ALLOW_MOCK_DELIVERY_FEE_CONFIRMATION", "")
 	t.Setenv("ALLOW_MOCK_DELIVERY_PAYMENT", "")
 	t.Setenv("ENABLE_DELIVERY_IM_READ_RECEIPT", "")
-	if envBool("ENABLE_LEGACY_TAKEOUT", false) {
+	legacy, err := envBool("ENABLE_LEGACY_TAKEOUT", false)
+	if err != nil || legacy {
 		t.Fatal("legacy takeout default must be fail-closed")
 	}
-	if !envBool("ENABLE_DELIVERY", true) {
+	delivery, err := envBool("ENABLE_DELIVERY", true)
+	if err != nil || !delivery {
 		t.Fatal("delivery placeholder default must be enabled")
 	}
-	if envBool("ALLOW_MOCK_DELIVERY_FEE_CONFIRMATION", false) {
+	mockFee, err := envBool("ALLOW_MOCK_DELIVERY_FEE_CONFIRMATION", false)
+	if err != nil || mockFee {
 		t.Fatal("mock delivery fee confirmation must be fail-closed")
 	}
-	if envBool("ENABLE_DELIVERY_PAYMENT", false) {
+	deliveryPayment, err := envBool("ENABLE_DELIVERY_PAYMENT", false)
+	if err != nil || deliveryPayment {
 		t.Fatal("delivery payment gate must be fail-closed")
 	}
-	if envBool("ALLOW_MOCK_DELIVERY_PAYMENT", false) {
+	mockDeliveryPayment, err := envBool("ALLOW_MOCK_DELIVERY_PAYMENT", false)
+	if err != nil || mockDeliveryPayment {
 		t.Fatal("mock delivery payment must be fail-closed")
 	}
-	if envBool("ENABLE_DELIVERY_IM_READ_RECEIPT", false) {
+	readReceipt, err := envBool("ENABLE_DELIVERY_IM_READ_RECEIPT", false)
+	if err != nil || readReceipt {
 		t.Fatal("delivery IM read receipt must be fail-closed")
+	}
+}
+
+func TestBooleanEnvironmentRejectsAmbiguousValues(t *testing.T) {
+	for _, value := range []string{"yes", "enabled", "TRUE ", "t"} {
+		t.Run(value, func(t *testing.T) {
+			t.Setenv("ENABLE_DELIVERY", value)
+			if _, err := envBool("ENABLE_DELIVERY", true); err == nil {
+				t.Fatalf("ambiguous boolean %q was accepted", value)
+			}
+		})
+	}
+
+	for _, value := range []string{"true", "false", "1", "0"} {
+		t.Run("accepted-"+value, func(t *testing.T) {
+			t.Setenv("ENABLE_DELIVERY", value)
+			if _, err := envBool("ENABLE_DELIVERY", false); err != nil {
+				t.Fatalf("supported boolean %q was rejected: %v", value, err)
+			}
+		})
+	}
+}
+
+func TestProductionLoadRequiresExplicitNetworkConfiguration(t *testing.T) {
+	t.Setenv("APP_ENV", "prod")
+	t.Setenv("HTTP_ADDR", "")
+	t.Setenv("MYSQL_DSN", "")
+
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "HTTP_ADDR") {
+		t.Fatalf("production load without explicit HTTP_ADDR returned %v", err)
+	}
+}
+
+func TestProductionLoadRequiresExplicitDatabaseConfiguration(t *testing.T) {
+	t.Setenv("APP_ENV", "prod")
+	t.Setenv("HTTP_ADDR", ":8080")
+	t.Setenv("MYSQL_DSN", "")
+
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "MYSQL_DSN") {
+		t.Fatalf("production load without explicit MYSQL_DSN returned %v", err)
+	}
+}
+
+func TestCORSOriginsAreParsedAndValidated(t *testing.T) {
+	t.Setenv("CORS_ALLOW_ORIGINS", " https://admin.example.com,https://admin.example.com, http://localhost:5173 ")
+	origins := envList("CORS_ALLOW_ORIGINS")
+	if len(origins) != 2 || origins[0] != "https://admin.example.com" || origins[1] != "http://localhost:5173" {
+		t.Fatalf("unexpected origins: %#v", origins)
+	}
+
+	cfg := validConfig()
+	cfg.CORSAllowedOrigins = []string{"https://admin.example.com/path"}
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "invalid origin") {
+		t.Fatalf("invalid CORS origin returned %v", err)
+	}
+
+	cfg.CORSAllowedOrigins = []string{"http://admin.example.com"}
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "HTTPS") {
+		t.Fatalf("insecure production CORS origin returned %v", err)
+	}
+}
+
+func TestProductionValidationRejectsDefaultDatabaseDSN(t *testing.T) {
+	cfg := validConfig()
+	cfg.MySQLDSN = defaultMySQLDSN
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("production accepted the development database DSN")
+	}
+}
+
+func TestProductionValidationRequiresNativeProxyHTTPAddress(t *testing.T) {
+	for _, address := range []string{":8080", "0.0.0.0:8080", "[::]:8080", "[::1]:8080", "127.0.0.2:8080", "localhost:8080", "api.example.com:8080", "127.0.0.1:", "127.0.0.1:0", "127.0.0.1:65536", "127.0.0.1:not-a-port"} {
+		t.Run(address, func(t *testing.T) {
+			cfg := validConfig()
+			cfg.HTTPAddr = address
+			if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "127.0.0.1") {
+				t.Fatalf("unsafe production HTTP_ADDR %q returned %v", address, err)
+			}
+		})
+	}
+	for _, address := range []string{"127.0.0.1:8080", "127.0.0.1:18080"} {
+		t.Run("allowed-"+address, func(t *testing.T) {
+			cfg := validConfig()
+			cfg.HTTPAddr = address
+			if err := cfg.Validate(); err != nil {
+				t.Fatalf("loopback production HTTP_ADDR %q was rejected: %v", address, err)
+			}
+		})
+	}
+}
+
+func TestConfigurationRejectsUnknownEnvironmentName(t *testing.T) {
+	cfg := validConfig()
+	cfg.AppEnv = "production"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("unknown APP_ENV was treated as a development profile")
 	}
 }
 

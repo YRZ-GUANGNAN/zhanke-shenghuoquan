@@ -2,12 +2,18 @@ package review
 
 import (
 	"context"
+	"errors"
+	"strings"
+	"sync"
 	"testing"
 )
 
 type memoryRepo struct {
+	mu          sync.Mutex
 	task        Task
 	ensureCalls int
+	saveErr     error
+	projection  Status
 }
 
 func (r *memoryRepo) Submit(_ context.Context, v *Task) error { v.ID = 1; r.task = *v; return nil }
@@ -27,11 +33,32 @@ func (r *memoryRepo) Find(_ context.Context, id uint) (Task, error) {
 	}
 	return r.task, nil
 }
-func (r *memoryRepo) Save(_ context.Context, v *Task) error { r.task = *v; return nil }
+func (r *memoryRepo) FindForUpdate(ctx context.Context, id uint) (Task, error) {
+	return r.Find(ctx, id)
+}
+func (r *memoryRepo) Save(_ context.Context, v *Task) error {
+	if r.saveErr != nil {
+		return r.saveErr
+	}
+	r.task = *v
+	return nil
+}
 func (r *memoryRepo) List(context.Context, Status, int, int) ([]Task, int64, error) {
 	return []Task{r.task}, 1, nil
 }
 func (r *memoryRepo) CountPending(context.Context) (int64, error) { return 1, nil }
+func (r *memoryRepo) WithinTransaction(ctx context.Context, fn func(context.Context, Repository) error) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	snapshot := r.task
+	projectionSnapshot := r.projection
+	if err := fn(ctx, r); err != nil {
+		r.task = snapshot
+		r.projection = projectionSnapshot
+		return err
+	}
+	return nil
+}
 
 type memoryTarget struct{ status Status }
 
@@ -68,9 +95,96 @@ func TestReviewWorkflow(t *testing.T) {
 	if err != nil || task.Status != StatusReviewing || target.status != StatusReviewing {
 		t.Fatalf("start: %v %#v", err, task)
 	}
-	task, err = service.Decide(context.Background(), task.ID, 1, StatusApproved, "ok")
+	task, err = service.Decide(context.Background(), task.ID, 1, StatusApproved, "")
 	if err != nil || task.Status != StatusApproved || target.status != StatusApproved {
 		t.Fatalf("approve: %v %#v", err, task)
+	}
+}
+
+func TestDecisionReasonValidation(t *testing.T) {
+	repo := &memoryRepo{task: Task{ID: 1, ObjectType: "post", ObjectID: 9, Status: StatusReviewing}}
+	service := NewService(repo)
+	service.RegisterTarget(&memoryTarget{})
+
+	tests := []struct {
+		name   string
+		status Status
+		reason string
+	}{
+		{name: "blank rejection", status: StatusRejected, reason: " \t\n"},
+		{name: "approval reason", status: StatusApproved, reason: "looks good"},
+		{name: "overlong rejection", status: StatusRejected, reason: strings.Repeat("界", 241)},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := service.Decide(context.Background(), 1, 7, test.status, test.reason); err == nil {
+				t.Fatal("invalid decision reason must fail")
+			}
+		})
+	}
+}
+
+type transactionalStatusTarget struct {
+	repo *memoryRepo
+	seen Status
+}
+
+func (*transactionalStatusTarget) ObjectType() string { return "post" }
+func (t *transactionalStatusTarget) SetReviewStatus(_ context.Context, _ uint, status Status) error {
+	t.seen = status
+	t.repo.projection = status
+	return nil
+}
+
+func TestDecisionSaveFailureRollsBackTask(t *testing.T) {
+	wantErr := errors.New("save failed")
+	repo := &memoryRepo{
+		task:    Task{ID: 1, ObjectType: "post", ObjectID: 9, Status: StatusReviewing},
+		saveErr: wantErr,
+	}
+	service := NewService(repo)
+	target := &transactionalStatusTarget{repo: repo}
+	service.RegisterTarget(target)
+
+	if _, err := service.Decide(context.Background(), 1, 7, StatusApproved, ""); !errors.Is(err, wantErr) {
+		t.Fatalf("error=%v want=%v", err, wantErr)
+	}
+	if repo.task.Status != StatusReviewing {
+		t.Fatalf("task status=%s want=%s", repo.task.Status, StatusReviewing)
+	}
+	if repo.projection != "" {
+		t.Fatalf("target projection was not rolled back: %s", repo.projection)
+	}
+}
+
+func TestConcurrentDecisionHasSingleWinner(t *testing.T) {
+	repo := &memoryRepo{task: Task{ID: 1, ObjectType: "post", ObjectID: 9, Status: StatusReviewing}}
+	service := NewService(repo)
+	service.RegisterTarget(&memoryTarget{})
+
+	var wg sync.WaitGroup
+	errs := make(chan error, 2)
+	for _, decision := range []struct {
+		status Status
+		reason string
+	}{{StatusApproved, ""}, {StatusRejected, "policy violation"}} {
+		wg.Add(1)
+		go func(status Status, reason string) {
+			defer wg.Done()
+			_, err := service.Decide(context.Background(), 1, 7, status, reason)
+			errs <- err
+		}(decision.status, decision.reason)
+	}
+	wg.Wait()
+	close(errs)
+	successes := 0
+	for err := range errs {
+		if err == nil {
+			successes++
+		}
+	}
+	if successes != 1 {
+		t.Fatalf("successful decisions=%d want=1", successes)
 	}
 }
 

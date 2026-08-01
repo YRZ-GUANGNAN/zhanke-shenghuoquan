@@ -2,6 +2,7 @@ import { request } from './api'
 import type { DeliveryStatus, Page, StageTimestamps } from './delivery-merchant'
 
 export type RiderStatus = 'active' | 'resting' | 'suspended'
+export type RiderAssignedStatusGroup = 'pickup' | 'delivery' | 'completed'
 
 export interface DeliveryRider {
   riderUserId: number
@@ -61,8 +62,13 @@ export function claimDeliveryOrder(order: ClaimableDeliveryOrder): Promise<Assig
   return riderCommand(order.deliveryOrderPublicId, 'claim', order.rowVersion, 'POST')
 }
 
-export function listAssignedDeliveryOrders(page = 1, pageSize = 50): Promise<Page<AssignedDeliveryOrder>> {
-  return request<Page<AssignedDeliveryOrder>>(`${BASE}/orders?page=${page}&pageSize=${pageSize}`, {
+export function listAssignedDeliveryOrders(
+  page = 1,
+  pageSize = 50,
+  statusGroup?: RiderAssignedStatusGroup
+): Promise<Page<AssignedDeliveryOrder>> {
+  const groupQuery = statusGroup ? `&statusGroup=${encodeURIComponent(statusGroup)}` : ''
+  return request<Page<AssignedDeliveryOrder>>(`${BASE}/orders?page=${page}&pageSize=${pageSize}${groupQuery}`, {
     url: '',
     timeout: 10000
   })

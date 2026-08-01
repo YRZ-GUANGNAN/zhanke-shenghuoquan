@@ -1,6 +1,7 @@
 // Domain F client: management and the unified review workflow only.
 import type { ExternalTakeoutMerchant, ExternalTakeoutMerchantDirectory, ExternalTakeoutMerchantInput, ExternalTakeoutOperatingStatus, IdentityApplicationAdminList, IdentityApplicationDetail, IdentityApplicationQuery, IdentityApplicationRow, MediaAssetDetail, MediaAssetRow, MediaDeadletters, MediaDecisionRow, MediaEventRow, MediaGCJobRow, MediaQuery, MediaSummary, NavigationCategory, Page, PostRow, ProductRow, ReportRow, ReviewTask, Stats, UserRow } from '../types'
 import { adminRequest } from './http'
+type ReviewQuery={status?:ReviewTask['status']|'';page?:number;pageSize?:number}
 export class AdminAPIError extends Error {
 	constructor(message:string,readonly status:number){super(message);this.name='AdminAPIError'}
 }
@@ -9,9 +10,10 @@ async function api<T>(path:string,init:RequestInit={}):Promise<T>{
 }
 function queryString(query:MediaQuery={}){const params=new URLSearchParams();Object.entries(query).forEach(([key,value])=>{if(value!==undefined&&value!=='')params.set(key,String(value))});const value=params.toString();return value?`?${value}`:''}
 function identityQueryString(query:IdentityApplicationQuery={}){const params=new URLSearchParams();Object.entries(query).forEach(([key,value])=>{if(value!==undefined&&value!=='')params.set(key,String(value))});const value=params.toString();return value?`?${value}`:''}
+function reviewQueryString(query:ReviewQuery={}){const params=new URLSearchParams();Object.entries(query).forEach(([key,value])=>{if(value!==undefined&&value!=='')params.set(key,String(value))});const value=params.toString();return value?`?${value}`:''}
 export const adminAPI={
 	stats:()=>api<Stats>('/admin/stats'),
-	reviews:(status='')=>api<Page<ReviewTask>>(`/admin/reviews${status?`?status=${status}`:''}`),
+	reviews:(query:ReviewQuery={})=>api<Page<ReviewTask>>(`/admin/reviews${reviewQueryString(query)}`),
 	startReview:(id:number)=>api<ReviewTask>(`/admin/reviews/${id}/start`,{method:'POST'}),
 	decideReview:(id:number,decision:'approve'|'reject',reason='')=>api<ReviewTask>(`/admin/reviews/${id}/${decision}`,{method:'POST',body:JSON.stringify({reason})}),
 	overrideReview:(id:number,status:'approved'|'rejected',reason:string)=>api<ReviewTask>(`/admin/reviews/${id}/override`,{method:'POST',body:JSON.stringify({status,reason})}),

@@ -43,7 +43,6 @@ import (
 	"campus-circle/backend/internal/module/trade"
 	"campus-circle/backend/internal/module/user"
 	legacymedia "campus-circle/backend/internal/pkg/media"
-	"campus-circle/backend/internal/pkg/response"
 	"campus-circle/backend/internal/pkg/searchmetrics"
 	"gorm.io/gorm"
 )
@@ -52,6 +51,9 @@ func main() {
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("load configuration: %v", err)
+	}
+	if err := validateProductionBuildMetadata(cfg.AppEnv); err != nil {
+		log.Fatalf("validate release build: %v", err)
 	}
 	db, err := database.Open(cfg)
 	if err != nil {
@@ -366,10 +368,8 @@ func main() {
 	}
 
 	router := newRouter(gin.DefaultWriter, gin.DefaultErrorWriter)
-	router.Use(middleware.CORS(miniappflow.WechatReviewContentPath))
-	router.GET("/healthz", func(c *gin.Context) {
-		response.OK(c, gin.H{"status": "ok"})
-	})
+	router.Use(middleware.CORSWithOrigins(cfg.CORSAllowedOrigins, miniappflow.WechatReviewContentPath))
+	registerOperationalRoutes(router, db, searchIndex.Ready)
 
 	api := router.Group("/api/v1")
 	authRoutes := api.Group("/auth")
@@ -568,7 +568,11 @@ func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, user
 		paymentHandler.RegisterMerchant(merchantRoutes)
 		paymentHandler.RegisterWebhook(api.Group("/delivery/payments"))
 	}
-	riderRoutes := api.Group("/delivery/rider", userService.AuthRequired())
+	riderRoutes := api.Group(
+		"/delivery/rider",
+		userService.AuthRequired(),
+		userService.IdentityRequired(user.IdentityRider),
+	)
 	riderHandler := deliveryrider.NewHandler(runtime.dispatch, runtime.identity, userService, currentUserID, runtime.proofs)
 	if runtime.conversationLifecycle != nil {
 		riderHandler.WithConversationCommands(runtime.conversationLifecycle)

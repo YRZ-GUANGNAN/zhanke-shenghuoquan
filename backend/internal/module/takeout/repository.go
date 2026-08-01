@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"campus-circle/backend/internal/pkg/dbtx"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -43,7 +44,7 @@ func (r *GormRepository) TransitionMerchantStatus(
 	updatedAt time.Time,
 ) (Merchant, error) {
 	var result Merchant
-	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := dbtx.DB(ctx, r.db).Transaction(func(tx *gorm.DB) error {
 		query := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("merchant_public_id = ?", publicID)
 		if ownerUserID != nil {
 			query = query.Where("owner_user_id = ?", *ownerUserID)
@@ -192,7 +193,7 @@ func (r *GormRepository) UpdateDish(ctx context.Context, publicID, merchantPubli
 
 func (r *GormRepository) TransitionDishStatus(ctx context.Context, publicID, merchantPublicID string, expectedRowVersion uint64, from, to DishStatus, updatedAt time.Time) (Dish, error) {
 	var result Dish
-	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := dbtx.DB(ctx, r.db).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("dish_public_id = ? AND merchant_public_id = ?", publicID, merchantPublicID).
 			First(&result).Error; err != nil {

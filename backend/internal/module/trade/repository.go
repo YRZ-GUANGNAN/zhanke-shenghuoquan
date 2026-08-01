@@ -9,6 +9,7 @@ import (
 	"gorm.io/gorm/clause"
 
 	"campus-circle/backend/internal/module/admin/review"
+	"campus-circle/backend/internal/pkg/dbtx"
 )
 
 var (
@@ -363,7 +364,7 @@ func requireFavoriteUpdate(result *gorm.DB) error {
 }
 
 func (r *GormRepository) SetReviewStatus(ctx context.Context, id uint, status review.Status) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return dbtx.DB(ctx, r.db).Transaction(func(tx *gorm.DB) error {
 		result := tx.Model(&Product{}).Where("id = ?", id).Update("review_status", status)
 		if result.Error != nil {
 			return result.Error

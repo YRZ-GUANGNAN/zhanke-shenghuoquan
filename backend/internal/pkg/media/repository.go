@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"campus-circle/backend/internal/pkg/dbtx"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -130,7 +131,7 @@ func (r *GormRepository) SetReviewStatus(ctx context.Context, id uint64, status 
 	if !ok {
 		return ErrInvalidState
 	}
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return dbtx.DB(ctx, r.db).Transaction(func(tx *gorm.DB) error {
 		value, err := lockAsset(tx, id)
 		if err != nil {
 			return err

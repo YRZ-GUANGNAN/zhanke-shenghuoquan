@@ -1,0 +1,16 @@
+.git
+.github
+.vscode
+.idea
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+!**/.env.example
+apps/miniapp
+backend
+deploy
+docs
+scripts
+*.log
+coverage

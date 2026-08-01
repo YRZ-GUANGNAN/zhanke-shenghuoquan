@@ -19,6 +19,7 @@ interface ProductCommentsProps {
   productStatus: Product['status']
   targetCommentId?: string
   onTargetReady?: (elementId: string) => void
+  onLoadMoreReady?: (handler: (() => void) | null) => void
 }
 
 interface PendingSubmission {
@@ -49,14 +50,24 @@ function upsertReply(items: ProductComment[], reply: ProductComment, parentId: s
     : item)
 }
 
+function mergeComments(current: ProductComment[], incoming: ProductComment[]): ProductComment[] {
+  const byId = new Map(current.map((comment) => [comment.id, comment]))
+  incoming.forEach((comment) => byId.set(comment.id, comment))
+  return Array.from(byId.values())
+}
+
 export default function ProductComments({
   productId,
   productStatus,
   targetCommentId = '',
-  onTargetReady
+  onTargetReady,
+  onLoadMoreReady
 }: ProductCommentsProps) {
   const [items, setItems] = useState<ProductComment[]>([])
   const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [loadMoreError, setLoadMoreError] = useState('')
   const [state, setState] = useState<CommentLoadState>('loading')
   const [draft, setDraft] = useState('')
   const [replyTarget, setReplyTarget] = useState<ReplyTarget>(null)
@@ -65,10 +76,12 @@ export default function ProductComments({
 
   const load = useCallback(async () => {
     setState('loading')
+    setLoadMoreError('')
     try {
       const pageSize = 20
       const firstPage = await listProductComments(productId, 1, pageSize)
       let loadedItems = firstPage.items
+      let loadedPage = 1
 
       const containsTarget = (values: ProductComment[]) => values.some((item) => (
         item.id === targetCommentId
@@ -79,17 +92,41 @@ export default function ProductComments({
         const pageCount = Math.ceil(firstPage.total / pageSize)
         for (let page = 2; page <= pageCount && !containsTarget(loadedItems); page += 1) {
           const nextPage = await listProductComments(productId, page, pageSize)
-          loadedItems = [...loadedItems, ...nextPage.items]
+          loadedItems = mergeComments(loadedItems, nextPage.items)
+          loadedPage = page
         }
       }
 
       setItems(loadedItems)
       setTotal(firstPage.total)
+      setPage(loadedPage)
       setState(loadedItems.length > 0 ? 'ready' : 'empty')
     } catch {
       setState('error')
     }
   }, [productId, targetCommentId])
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || items.length >= total) return
+    const nextPage = page + 1
+    setLoadingMore(true)
+    setLoadMoreError('')
+    try {
+      const next = await listProductComments(productId, nextPage, 20)
+      setItems((current) => mergeComments(current, next.items))
+      setPage(next.page || nextPage)
+      setTotal(next.total)
+    } catch {
+      setLoadMoreError('更多留言加载失败，点击重试')
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [items.length, loadingMore, page, productId, total])
+
+  useEffect(() => {
+    onLoadMoreReady?.(() => { void loadMore() })
+    return () => onLoadMoreReady?.(null)
+  }, [loadMore, onLoadMoreReady])
 
   useEffect(() => {
     void load()
@@ -137,6 +174,9 @@ export default function ProductComments({
       pendingSubmission.current = null
       await Taro.showToast({ title: created.reviewStatus === 'approved' ? '留言成功' : '留言已提交审核', icon: 'success' })
     } catch (error) {
+      if (isApiError(error) && error.status >= 400 && error.status < 500) {
+        pendingSubmission.current = null
+      }
       await Taro.showToast({ title: submissionError(error), icon: 'none', duration: 1900 })
     } finally {
       setSubmitting(false)
@@ -202,6 +242,16 @@ export default function ProductComments({
           ))}
         </View>
       ))}
+
+      {loadMoreError ? (
+        <Text className='product-comments__state product-comments__state--retry' onClick={() => void loadMore()}>
+          {loadMoreError}
+        </Text>
+      ) : loadingMore ? (
+        <Text className='product-comments__state'>正在加载更多留言...</Text>
+      ) : items.length > 0 && items.length >= total ? (
+        <Text className='product-comments__state'>— 已显示全部留言 —</Text>
+      ) : null}
 
       <View className='product-comments__composer'>
         {replyTarget && productStatus !== 'sold' && (

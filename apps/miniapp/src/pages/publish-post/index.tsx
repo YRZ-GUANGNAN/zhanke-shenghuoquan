@@ -8,12 +8,15 @@ import {
   createCommunityPost,
   listHotCommunityTags,
 } from '../../services/b-community'
-import { chooseAndUploadImages, waitForMediaApproval, type UploadedMedia } from '../../services/media'
+import { chooseAndUploadImages, waitForMediaApprovals, type UploadedMedia } from '../../services/media'
 import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import './index.scss'
 
 const MAX_IMAGES = 9
 const MAX_TAGS = 3
+const SUBMIT_TIMEOUT_MS = 120000
+const APPROVAL_TIMEOUT_MS = 105000
+type SubmitStage = 'idle' | 'reviewing' | 'publishing'
 
 const toast = (title: string, icon: 'success' | 'error' | 'loading' | 'none' = 'none') => {
   void Taro.showToast({ title, icon, duration: 1800 })
@@ -38,6 +41,7 @@ export default function PublishPostPage() {
   const [images, setImages] = useState<UploadedMedia[]>([])
   const [uploading, setUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [submitStage, setSubmitStage] = useState<SubmitStage>('idle')
   const [uploadHint, setUploadHint] = useState('0/9')
   const clientRequestIdRef = useRef<string | null>(null)
 
@@ -129,11 +133,21 @@ export default function PublishPostPage() {
     const clientRequestId = clientRequestIdRef.current ?? createCommunityClientRequestId()
     clientRequestIdRef.current = clientRequestId
     setSubmitting(true)
+    setSubmitStage('reviewing')
+    const deadline = Date.now() + SUBMIT_TIMEOUT_MS
     try {
-      for (const image of images) {
-        setUploadHint('审核中')
-        await waitForMediaApproval(image.assetId)
+      setUploadHint('审核中')
+      await waitForMediaApprovals(
+        images.map((image) => image.assetId),
+        () => setUploadHint('审核中'),
+        Math.min(APPROVAL_TIMEOUT_MS, deadline - Date.now()),
+        3
+      )
+      if (deadline - Date.now() < 12000) {
+        throw new Error('本次提交等待超时，草稿和图片已保留，请稍后重试')
       }
+      setSubmitStage('publishing')
+      setUploadHint('发布中')
       const normalizedContent = content.trim()
       const title = normalizedContent.split('\n')[0].slice(0, 32) || '校园动态'
       const post = await createCommunityPost({
@@ -164,6 +178,7 @@ export default function PublishPostPage() {
       toast(message)
     } finally {
       setSubmitting(false)
+      setSubmitStage('idle')
       setUploadHint(`${images.length}/${MAX_IMAGES}`)
     }
   }
@@ -178,7 +193,7 @@ export default function PublishPostPage() {
             className={`publish-post-nav__publish${canPublish ? ' publish-post-nav__publish--active' : ''}`}
             onClick={() => void handlePublish()}
           >
-            {submitting ? '发布中' : '发布'}
+            {submitting ? submitStage === 'reviewing' ? '审核中' : '发布中' : '发布'}
           </Text>
         }
       />

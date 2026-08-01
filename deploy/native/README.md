@@ -26,3 +26,24 @@ TARO_APP_API_BASE=https://zhanduiwang.top/api/v1
 
 The API and Meilisearch listen only on loopback. Only Nginx exposes ports 80
 and 443.
+
+Release builds must inject non-secret build metadata so `/version` identifies
+the running artifact. From the repository root, use the fixed build entrypoint;
+it cross-compiles a Linux amd64 binary and writes a SHA-256 sidecar:
+
+```powershell
+.\scripts\build-native-backend.ps1 -Version 2026.08.01
+```
+
+The equivalent underlying command is:
+
+```sh
+go build -trimpath \
+  -ldflags "-s -w -X main.buildVersion=${BUILD_VERSION} -X main.buildCommit=${BUILD_COMMIT} -X main.buildTime=${BUILD_TIME}" \
+  -o campus-api ./cmd/server
+```
+
+Use `/healthz` for process liveness and `/readyz` for MySQL and Meilisearch
+dependency readiness. The native Nginx route for `/readyz` is loopback-only;
+run readiness probes on the host instead of exposing database probes publicly.
+Neither endpoint replaces a real miniapp business-flow acceptance test.

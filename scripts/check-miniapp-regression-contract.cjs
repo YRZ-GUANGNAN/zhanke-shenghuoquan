@@ -40,9 +40,23 @@ requireMatch(
 requireMatch(chatPage, /adjustPosition=\{false\}/, '聊天输入框必须关闭系统自动顶起，避免与手动键盘适配冲突')
 
 const sessionStore = read('apps/miniapp/src/stores/session.ts')
+const userService = read('apps/miniapp/src/services/a-user.ts')
+const apiServiceReliability = read('apps/miniapp/src/services/api.ts')
 requireMatch(sessionStore, /let sessionEpoch = 0/, '登录状态必须维护会话代次')
 requireMatch(sessionStore, /const isCurrent = \(\) => sessionEpoch === epoch/, 'bootstrap 异步结果必须校验会话代次')
 requireMatch(sessionStore, /setToken:[\s\S]*profile: emptyProfile[\s\S]*identity: null/, '更换 token 时不得保留旧用户资料')
+
+requireMatch(userService, /wechatLogin[\s\S]{0,480}timeout:\s*12000/, '微信登录请求必须使用 12 秒超时')
+requireMatch(userService, /currentUser[\s\S]{0,240}timeout:\s*12000/, '会话恢复请求必须使用 12 秒超时')
+requireMatch(userService, /currentIdentity[\s\S]{0,240}timeout:\s*12000/, '身份恢复请求必须使用 12 秒超时')
+requireMatch(apiServiceReliability, /export function isRetryableNetworkError\(/, 'API 层必须统一识别可重试网络错误')
+requireMatch(sessionStore, /async function retryNetworkOnce</, '会话恢复必须提供一次性网络重试')
+requireMatch(sessionStore, /if \(!isRetryableNetworkError\(error\)\) throw error[\s\S]{0,220}return action\(\)/, '会话恢复只能对网络错误额外重试一次')
+for (const action of ['currentUser', 'currentIdentity']) {
+  requireMatch(sessionStore, new RegExp(`retryNetworkOnce\\([^\\n]*${action}`), `会话流程必须为 ${action} 提供网络重试`)
+}
+requireMatch(sessionStore, /const session = await wechatLogin\(loginResult\.code\)/, '微信 code 交换失败必须返回上层重新获取 code')
+forbidMatch(sessionStore, /retryNetworkOnce\(\(\) => wechatLogin\(loginResult\.code\)\)/, '同一个微信 code 不得重复交换')
 
 const imService = read('apps/miniapp/src/services/e-im.ts')
 requireMatch(imService, /function\s+withTimeout\s*</, 'Tencent IM 必须提供统一的 Promise 超时边界')
@@ -116,6 +130,12 @@ forbidMatch(postDetailStyle, /\.post-detail-follow\s*\{[\s\S]{0,160}width:\s*72p
 requireMatch(postDetailStyle, /\.post-detail-action\s*\{[\s\S]*flex-direction:\s*column/, '帖子底部统计动作必须纵向排列')
 
 const communityService = read('apps/miniapp/src/services/b-community.ts')
+requireMatch(communityService, /addPostComment\([\s\S]{0,260}clientRequestId\s*=\s*createCommunityClientRequestId\(\)/, '帖子评论必须生成可复用的幂等请求号')
+requireMatch(communityService, /data:\s*\{\s*content,\s*clientRequestId\s*\}[\s\S]{0,160}'Idempotency-Key':\s*clientRequestId/, '帖子评论必须同时发送 clientRequestId 与 Idempotency-Key')
+requireMatch(postDetail, /const pendingComment = useRef<PendingCommentSubmission \| null>/, '帖子评论页必须在可重试失败后保留请求号')
+requireMatch(postDetail, /getPostCommentsPage\(post\.id,\s*\{\s*page:\s*nextPage/, '帖子评论必须按页加载后续数据')
+requireMatch(postDetail, /onScrollToLower=\{\(\) => void loadMoreComments\(\)\}/, '帖子详情滚动到底必须加载下一页评论')
+requireMatch(postDetail, /mergeComments\(current,\s*result\.items\)/, '帖子评论翻页必须去重并保留现有内容')
 requireMatch(communityService, /\/community\/me\/posts\/\$\{encodeURIComponent\(postId\)\}/, '前端必须接入本人帖子详情接口')
 
 const communityHandler = read('backend/internal/module/community/handler.go')
