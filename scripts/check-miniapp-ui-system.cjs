@@ -40,4 +40,32 @@ for (const { file, source } of sources) {
   }
 }
 
+const studentBottomNavSource = fs.readFileSync(
+  path.join(root, 'apps', 'miniapp', 'src', 'components', 'student-bottom-nav.tsx'),
+  'utf8',
+)
+const studentBottomNavStyle = fs.readFileSync(
+  path.join(root, 'apps', 'miniapp', 'src', 'components', 'student-bottom-nav.scss'),
+  'utf8',
+)
+const publishStyleBlock = studentBottomNavStyle.match(
+  /\.student-bottom-nav__publish\s*\{([\s\S]*?)\}/,
+)?.[1] || ''
+
+assert.match(studentBottomNavSource, /student-bottom-nav__publish/)
+assert.match(studentBottomNavSource, />发布<\/Text>/)
+assert.doesNotMatch(studentBottomNavSource, /AppIcon name='add'/)
+assert.match(publishStyleBlock, /width:\s*84rpx/)
+assert.match(publishStyleBlock, /height:\s*64rpx/)
+assert.doesNotMatch(publishStyleBlock, /border-radius:\s*50%/)
+
+for (const pageName of ['home', 'profile', 'student-secondhand', 'student-takeout']) {
+  const pageStyle = fs.readFileSync(path.join(pagesRoot, pageName, 'index.scss'), 'utf8')
+  assert.doesNotMatch(
+    pageStyle,
+    /\.student-bottom-nav(?:--|__|\s*\{)/,
+    `${pageName} must not override the shared student bottom navigation`,
+  )
+}
+
 console.log('miniapp ui system: ok')

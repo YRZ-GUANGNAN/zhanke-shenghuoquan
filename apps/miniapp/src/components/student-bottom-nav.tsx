@@ -41,10 +41,10 @@ export default function StudentBottomNav({ active, className = '' }: StudentBott
     <View className={`student-bottom-nav ${className}`.trim()}>
       {navItems.slice(0, 2).map(renderItem)}
       <View
-        className='student-bottom-nav__fab'
+        className='student-bottom-nav__publish'
         onClick={() => void Taro.navigateTo({ url: '/pages/publish-entry/index' })}
       >
-        <AppIcon name='add' className='student-bottom-nav__fab-icon' />
+        <Text className='student-bottom-nav__publish-label'>发布</Text>
       </View>
       {navItems.slice(2).map(renderItem)}
     </View>
