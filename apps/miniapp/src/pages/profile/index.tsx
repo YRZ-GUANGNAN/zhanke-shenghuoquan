@@ -113,7 +113,9 @@ function ProfileContent() {
   const switchIdentity = useSessionStore((state) => state.switchIdentity)
   const activeRole = identity?.currentIdentity ?? 'student'
   const roleName = roles.find((role) => role.key === activeRole)?.title ?? '学生'
-  const campusName = profile.campus || profile.school || '学校未设置'
+  const schoolName = profile.school && profile.school !== '未设置' ? profile.school : ''
+  const campusName = profile.campus && profile.campus !== '未设置' ? profile.campus : ''
+  const campusLabel = Array.from(new Set([schoolName, campusName].filter(Boolean))).join(' · ') || '学校未设置'
   const identityAllowed = useIdentityGuard('student')
 
   useDidShow(() => {
@@ -195,18 +197,20 @@ function ProfileContent() {
           <View className='student-profile-user__main'>
             <View className='student-profile-user__title-row'>
               <Text className='student-profile-user__name'>{profile.nickname || '校园用户'}</Text>
-              <Text className='student-profile-user__badge'>{roleName}</Text>
+              <View className='student-profile-user__identity'>
+                <Text className='student-profile-user__badge'>{roleName}</Text>
+              </View>
             </View>
-            <Text className='student-profile-user__meta'>
-              用户号 {profile.id || '--'}
-            </Text>
-            <View className='student-profile-user__campus-row'>
-              <View className='student-profile-user__campus-dot' />
-              <Text className='student-profile-user__campus'>{campusName}</Text>
+            <View className='student-profile-user__details'>
+              <Text className='student-profile-user__meta'>用户号 {profile.id || '--'}</Text>
+              <View className='student-profile-user__campus-row'>
+                <View className='student-profile-user__campus-dot' />
+                <Text className='student-profile-user__campus'>{campusLabel}</Text>
+              </View>
             </View>
           </View>
           <View className='student-profile-user__edit'>
-            <Text>编辑</Text>
+            <Text>编辑资料</Text>
             <AppIcon name='chevron-right' className='student-profile-user__edit-icon' />
           </View>
         </View>

@@ -23,7 +23,7 @@ page {
 }
 
 .student-profile-hero {
-  padding: 0 28rpx 26rpx;
+  padding: 0 30rpx 24rpx;
   border-bottom: 1rpx solid $border-subtle;
   background: $bg-surface;
   box-sizing: border-box;
@@ -36,9 +36,9 @@ page {
 .student-profile-user {
   display: flex;
   align-items: center;
-  gap: 18rpx;
-  min-height: 144rpx;
-  padding: 18rpx 0 16rpx;
+  gap: 20rpx;
+  min-height: 152rpx;
+  padding: 18rpx 0 14rpx;
   box-sizing: border-box;
 }
 
@@ -47,15 +47,18 @@ page {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 92rpx;
-  height: 92rpx;
+  width: 98rpx;
+  height: 98rpx;
   overflow: hidden;
-  border-radius: 28rpx;
+  border: 3rpx solid $bg-surface;
+  border-radius: 50%;
   color: $brand-primary-strong;
   font-size: 38rpx;
   font-weight: 750;
   line-height: 1;
   background: $profile-accent-soft;
+  box-shadow: 0 0 0 1rpx $border-subtle, 0 8rpx 22rpx rgba(42, 73, 108, .08);
+  box-sizing: border-box;
 }
 
 .student-profile-user__avatar-image {
@@ -73,6 +76,12 @@ page {
   align-items: center;
   gap: 10rpx;
   min-width: 0;
+}
+
+.student-profile-user__identity {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
 }
 
 .student-profile-user__name {
@@ -98,9 +107,13 @@ page {
   background: $profile-accent-soft;
 }
 
+.student-profile-user__details {
+  min-width: 0;
+  margin-top: 8rpx;
+}
+
 .student-profile-user__meta {
   display: block;
-  margin-top: 7rpx;
   color: $text-secondary;
   font-size: 22rpx;
   line-height: 1.25;
@@ -112,7 +125,7 @@ page {
   align-items: center;
   gap: 8rpx;
   min-width: 0;
-  margin-top: 7rpx;
+  margin-top: 8rpx;
 }
 
 .student-profile-user__campus-dot {
@@ -140,15 +153,15 @@ page {
   align-items: center;
   justify-content: center;
   gap: 4rpx;
-  min-width: 98rpx;
+  min-width: 124rpx;
   min-height: 60rpx;
   padding: 0 12rpx 0 18rpx;
-  border: 1rpx solid $border-default;
+  border: 1rpx solid $border-subtle;
   border-radius: 18rpx;
-  color: $text-secondary;
+  color: $brand-primary-strong;
   font-size: 22rpx;
   font-weight: 600;
-  background: $bg-surface;
+  background: $profile-accent-soft;
   box-sizing: border-box;
 }
 
