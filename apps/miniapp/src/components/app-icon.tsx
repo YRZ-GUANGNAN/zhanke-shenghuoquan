@@ -29,6 +29,10 @@ import actionStarActive from '../assets/icons/action-star-active.svg'
 import actionComment from '../assets/icons/action-comment.svg'
 import actionWallet from '../assets/icons/action-wallet.svg'
 import actionOrder from '../assets/icons/action-order.svg'
+import actionSettings from '../assets/icons/action-settings.svg'
+import actionDocument from '../assets/icons/action-document.svg'
+import actionFeedback from '../assets/icons/action-feedback.svg'
+import actionInfo from '../assets/icons/action-info.svg'
 import './app-icon.scss'
 
 export type AppIconName =
@@ -52,6 +56,10 @@ export type AppIconName =
   | 'comment'
   | 'wallet'
   | 'order'
+  | 'settings'
+  | 'document'
+  | 'feedback'
+  | 'info'
 
 const sources: Record<AppIconName, { normal: string; active: string }> = {
   home: { normal: navHome, active: navHomeActive },
@@ -73,7 +81,11 @@ const sources: Record<AppIconName, { normal: string; active: string }> = {
   star: { normal: actionStar, active: actionStarActive },
   comment: { normal: actionComment, active: actionComment },
   wallet: { normal: actionWallet, active: actionWallet },
-  order: { normal: actionOrder, active: actionOrder }
+  order: { normal: actionOrder, active: actionOrder },
+  settings: { normal: actionSettings, active: actionSettings },
+  document: { normal: actionDocument, active: actionDocument },
+  feedback: { normal: actionFeedback, active: actionFeedback },
+  info: { normal: actionInfo, active: actionInfo }
 }
 
 interface AppIconProps {

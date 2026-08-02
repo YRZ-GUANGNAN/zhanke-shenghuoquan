@@ -1,9 +1,9 @@
 import React, { useRef, useState } from 'react'
-import { Text, View } from '@tarojs/components'
+import { Image, Text, View } from '@tarojs/components'
 import { useDidShow } from '@tarojs/taro'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import IdentitySwitchModal from '../../components/IdentitySwitchModal'
-import AppIcon from '../../components/app-icon'
+import AppIcon, { type AppIconName } from '../../components/app-icon'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import StudentBottomNav from '../../components/student-bottom-nav'
 import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
@@ -27,10 +27,12 @@ interface RoleOption {
 interface SettingItem {
   key: string
   title: string
-  value?: string
-  icon: string
+  description: string
+  icon: AppIconName
   arrow?: boolean
 }
+
+type RoleStatusTone = 'current' | 'available' | 'pending' | 'action' | 'unavailable'
 
 const roles: RoleOption[] = [
   { key: 'student', title: '学生', subtitle: '社交 · 校园服务' },
@@ -39,10 +41,10 @@ const roles: RoleOption[] = [
 ]
 
 const settings: SettingItem[] = [
-  { key: 'settings', title: '设置', icon: 'settings', arrow: true },
-  { key: 'privacy', title: '用户协议与隐私政策', icon: 'document', arrow: true },
-	{ key: 'feedback', title: '意见反馈', icon: 'refresh', arrow: true },
-  { key: 'about', title: '关于湛科生活圈', icon: 'info', arrow: true }
+  { key: 'settings', title: '设置', description: '隐私、通知与账号管理', icon: 'settings', arrow: true },
+  { key: 'privacy', title: '用户协议与隐私政策', description: '了解平台规则与数据使用方式', icon: 'document', arrow: true },
+  { key: 'feedback', title: '意见反馈', description: '提交问题与改进建议', icon: 'feedback', arrow: true },
+  { key: 'about', title: '关于湛科生活圈', description: '产品信息与服务说明', icon: 'info', arrow: true }
 ]
 
 function showPlaceholder(title: string) {
@@ -86,6 +88,19 @@ function unavailableMessage(value?: IdentityAvailability): string {
   return value.reason || '该身份暂不可用'
 }
 
+function roleStatus(
+  role: RoleKey,
+  activeRole: RoleKey,
+  availability?: IdentityAvailability,
+): { label: string; tone: RoleStatusTone } {
+  if (role === activeRole) return { label: '当前使用', tone: 'current' }
+  if (availability?.available) return { label: '已通过', tone: 'available' }
+  if (availability?.status === 'pending') return { label: '审核中', tone: 'pending' }
+  if (availability?.status === 'missing') return { label: '去申请', tone: 'action' }
+  if (availability?.status === 'rejected') return { label: '需完善', tone: 'action' }
+  return { label: '暂不可用', tone: 'unavailable' }
+}
+
 function ProfileContent() {
   const [pendingRole, setPendingRole] = useState<RoleKey | null>(null)
   const [switching, setSwitching] = useState(false)
@@ -98,6 +113,7 @@ function ProfileContent() {
   const switchIdentity = useSessionStore((state) => state.switchIdentity)
   const activeRole = identity?.currentIdentity ?? 'student'
   const roleName = roles.find((role) => role.key === activeRole)?.title ?? '学生'
+  const campusName = profile.campus || profile.school || '学校未设置'
   const identityAllowed = useIdentityGuard('student')
 
   useDidShow(() => {
@@ -167,12 +183,14 @@ function ProfileContent() {
   return (
     <View className='student-profile-page' style={getCapsuleSafeStyle()}>
       <View className='student-profile-hero' onClick={openProfileEditor}>
-        <View className='student-profile-hero__orb student-profile-hero__orb--small' />
-        <View className='student-profile-hero__orb student-profile-hero__orb--large' />
         <CapsuleSystemRow />
         <View className='student-profile-user'>
           <View className='student-profile-user__avatar'>
-            <Text>{profile.nickname.trim().slice(0, 1) || '同'}</Text>
+            {profile.avatar ? (
+              <Image className='student-profile-user__avatar-image' src={profile.avatar} mode='aspectFill' />
+            ) : (
+              <Text>{profile.nickname.trim().slice(0, 1) || '同'}</Text>
+            )}
           </View>
           <View className='student-profile-user__main'>
             <View className='student-profile-user__title-row'>
@@ -180,62 +198,94 @@ function ProfileContent() {
               <Text className='student-profile-user__badge'>{roleName}</Text>
             </View>
             <Text className='student-profile-user__meta'>
-              用户号：{profile.id || '--'} · {profile.campus || profile.school || '校园用户'}
+              用户号 {profile.id || '--'}
             </Text>
+            <View className='student-profile-user__campus-row'>
+              <View className='student-profile-user__campus-dot' />
+              <Text className='student-profile-user__campus'>{campusName}</Text>
+            </View>
           </View>
           <View className='student-profile-user__edit'>
-            <Text>编辑资料</Text>
+            <Text>编辑</Text>
+            <AppIcon name='chevron-right' className='student-profile-user__edit-icon' />
           </View>
         </View>
       </View>
 
       <View className='student-profile-content'>
-        <View className='student-profile-stats'>
-          {stats.map((item) => (
-            <View
-              key={item.label}
-              className='student-profile-stats__item'
-              onClick={() => void Taro.navigateTo({ url: `/pages/my-content/index?tab=${item.tab}` })}
-            >
-              <Text className='student-profile-stats__value'>{item.value}</Text>
-              <Text className='student-profile-stats__label'>{item.label}</Text>
-            </View>
-          ))}
-        </View>
-
-        <View className='student-profile-card student-profile-roles'>
+        <View className='student-profile-card student-profile-content-card'>
           <View className='student-profile-card__header'>
-            <Text className='student-profile-card__title'>身份切换</Text>
-            <Text className='student-profile-card__hint'>切换后主界面完全不同</Text>
+            <View>
+              <Text className='student-profile-card__title'>我的内容</Text>
+              <Text className='student-profile-card__description'>收藏与发布内容集中管理</Text>
+            </View>
+            <View className='student-profile-card__link' onClick={() => void Taro.navigateTo({ url: '/pages/my-content/index?tab=posts' })}>
+              <Text>查看全部</Text>
+              <AppIcon name='chevron-right' className='student-profile-card__link-icon' />
+            </View>
           </View>
-          <View className='student-profile-role-grid'>
-            {roles.map((role) => (
+          <View className='student-profile-stats'>
+            {stats.map((item) => (
               <View
-                key={role.key}
-                className={`student-profile-role ${activeRole === role.key ? 'student-profile-role--active' : ''}`}
-                onClick={() => handleRoleClick(role)}
+                key={item.label}
+                className='student-profile-stats__item'
+                onClick={() => void Taro.navigateTo({ url: `/pages/my-content/index?tab=${item.tab}` })}
               >
-                {activeRole === role.key && <Text className='student-profile-role__corner'>当前</Text>}
-                <View className='student-profile-role__icon'>
-                  <AppIcon name={role.key} active={activeRole === role.key} className='student-profile-role__icon-image' />
-                </View>
-                <Text className='student-profile-role__title'>{role.title}</Text>
-                <Text className='student-profile-role__subtitle'>{role.subtitle}</Text>
+                <Text className='student-profile-stats__value'>{item.value}</Text>
+                <Text className='student-profile-stats__label'>{item.label}</Text>
               </View>
             ))}
           </View>
         </View>
 
+        <View className='student-profile-card student-profile-roles'>
+          <View className='student-profile-card__header'>
+            <View>
+              <Text className='student-profile-card__title'>身份与工作台</Text>
+              <Text className='student-profile-card__description'>切换后进入对应的校园工作台</Text>
+            </View>
+          </View>
+          <View className='student-profile-role-grid'>
+            {roles.map((role) => {
+              const availability = identity?.identities.find((item) => item.identity === role.key)
+              const status = roleStatus(role.key, activeRole, availability)
+              return (
+                <View
+                  key={role.key}
+                  className={`student-profile-role ${activeRole === role.key ? 'student-profile-role--active' : ''}`}
+                  onClick={() => handleRoleClick(role)}
+                >
+                  <View className='student-profile-role__top'>
+                    <View className='student-profile-role__icon'>
+                      <AppIcon name={role.key} active={activeRole === role.key} className='student-profile-role__icon-image' />
+                    </View>
+                    <Text className={`student-profile-role__status student-profile-role__status--${status.tone}`}>{status.label}</Text>
+                  </View>
+                  <Text className='student-profile-role__title'>{role.title}</Text>
+                  <Text className='student-profile-role__subtitle'>{role.subtitle}</Text>
+                </View>
+              )
+            })}
+          </View>
+        </View>
+
         <View className='student-profile-card student-profile-settings'>
+          <View className='student-profile-settings__header'>
+            <Text className='student-profile-card__title'>账户与支持</Text>
+          </View>
           {settings.map((item) => (
             <View
               key={item.key}
               className='student-profile-setting'
               onClick={() => handleSettingClick(item)}
             >
-              <View className={`student-profile-setting__icon student-profile-setting__icon--${item.icon}`} />
-              <Text className='student-profile-setting__title'>{item.title}</Text>
-              {item.value && <Text className='student-profile-setting__value'>{item.value}</Text>}
+              <View className='student-profile-setting__icon'>
+                <AppIcon name={item.icon} className='student-profile-setting__icon-image' />
+              </View>
+              <View className='student-profile-setting__copy'>
+                <Text className='student-profile-setting__title'>{item.title}</Text>
+                <Text className='student-profile-setting__description'>{item.description}</Text>
+              </View>
               {item.arrow && <AppIcon name='chevron-right' className='student-profile-setting__arrow app-icon--chevron' />}
             </View>
           ))}
