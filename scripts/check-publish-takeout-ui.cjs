@@ -20,14 +20,23 @@ function assertExcludes(source, value) {
 for (const required of [
   '/pages/publish-post/index',
   '/pages/publish-secondhand/index',
-  '把内容发到正确的频道',
-  '帖子用于交流，二手用于交易。',
-  '发布帖子',
+  '想发布什么？',
+  '选择一种内容类型开始发布',
+  '发帖子',
+  '卖闲置',
+  "icon: 'comment'",
+  "icon: 'market'",
 ]) assertIncludes(publishSource, required)
 
 for (const forbidden of [
   'publish-entry-hero__orb',
   'publish-entry-note',
+  "order: '01'",
+  "order: '02'",
+  'publish-entry-card__index',
+  'publish-entry-card__action',
+  '去发布',
+  '把内容发到正确的频道',
   'linear-gradient',
   '$gradient-primary',
 ]) {

@@ -20,145 +20,156 @@
 }
 
 .publish-entry-intro {
-  padding: 52rpx 40rpx 36rpx;
+  padding: 42rpx 34rpx 30rpx;
   border-bottom: 1rpx solid $border-subtle;
   background: $bg-surface;
 
-  &__eyebrow,
   &__title,
   &__desc {
     display: block;
   }
 
-  &__eyebrow {
-    color: $brand-primary;
-    font-size: 23rpx;
-    font-weight: 750;
-    letter-spacing: 2rpx;
-  }
-
   &__title {
-    margin-top: 14rpx;
     color: $text-strong;
-    font-size: 42rpx;
+    font-size: 40rpx;
     font-weight: 900;
-    line-height: 1.24;
+    line-height: 1.25;
   }
 
   &__desc {
-    margin-top: 14rpx;
+    margin-top: 10rpx;
     color: $text-secondary;
-    font-size: 27rpx;
-    line-height: 1.55;
+    font-size: 25rpx;
+    line-height: 1.45;
   }
 }
 
 .publish-entry-list {
-  display: flex;
-  flex-direction: column;
-  gap: 20rpx;
-  margin: 28rpx 28rpx 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18rpx;
+  margin: 24rpx 28rpx 0;
 }
 
 .publish-entry-card {
-  position: relative;
   display: flex;
-  align-items: stretch;
-  min-height: 190rpx;
-  padding: 28rpx;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 322rpx;
+  padding: 26rpx;
   box-sizing: border-box;
-  border: 1rpx solid $border-subtle;
-  border-radius: 28rpx;
-  background: $bg-surface;
-  box-shadow: $shadow-card;
+  border: 1rpx solid transparent;
+  border-radius: 30rpx;
   overflow: hidden;
-  transition: transform $duration-fast $ease-standard, background $duration-fast $ease-standard;
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 30rpx;
-    bottom: 30rpx;
-    left: 0;
-    width: 6rpx;
-    border-radius: 0 999rpx 999rpx 0;
-    background: $brand-primary;
-  }
+  transition: transform $duration-fast $ease-standard, box-shadow $duration-fast $ease-standard;
 
   &--pressed {
-    background: $bg-surface-subtle;
-    transform: scale(.992);
+    transform: scale(.975);
+    box-shadow: none;
   }
 
-  &__index {
-    flex: 0 0 70rpx;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    padding-top: 4rpx;
-    color: $brand-primary;
-    font-size: 25rpx;
-    font-weight: 850;
-    letter-spacing: 1rpx;
-  }
-
-  &__main {
-    flex: 1;
-    min-width: 0;
-    padding-left: 8rpx;
-  }
-
-  &__meta,
-  &__title,
-  &__subtitle {
-    display: block;
-  }
-
-  &__meta {
-    color: $text-tertiary;
-    font-size: 22rpx;
-    font-weight: 650;
-  }
-
-  &__title {
-    margin-top: 8rpx;
-    color: $text-strong;
-    font-size: 32rpx;
-    font-weight: 900;
-    line-height: 1.28;
-  }
-
-  &__subtitle {
-    margin-top: 10rpx;
-    color: $text-secondary;
-    font-size: 24rpx;
-    line-height: 1.45;
-  }
-
-  &__action {
-    flex: 0 0 auto;
+  &__top {
     display: flex;
     align-items: center;
-    align-self: center;
-    gap: 2rpx;
-    margin-left: 18rpx;
-    color: $brand-primary;
-    font-size: 23rpx;
-    font-weight: 750;
-    white-space: nowrap;
+    justify-content: space-between;
+  }
+
+  &__icon-wrap,
+  &__arrow-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__icon-wrap {
+    width: 72rpx;
+    height: 72rpx;
+    border-radius: 22rpx;
+    background: rgba(255, 255, 255, .94);
+  }
+
+  &__icon {
+    width: 40rpx;
+    height: 40rpx;
+  }
+
+  &__arrow-wrap {
+    width: 50rpx;
+    height: 50rpx;
+    border-radius: $radius-pill;
+    background: rgba(255, 255, 255, .72);
   }
 
   &__arrow {
-    color: $brand-primary;
-    font-size: 34rpx;
-    line-height: 1;
+    width: 28rpx;
+    height: 28rpx;
+  }
+
+  &__main {
+    margin-top: 42rpx;
+  }
+
+  &__title,
+  &__subtitle,
+  &__meta {
+    display: block;
+  }
+
+  &__title {
+    font-size: 36rpx;
+    font-weight: 900;
+    line-height: 1.2;
+  }
+
+  &__subtitle {
+    margin-top: 14rpx;
+    font-size: 24rpx;
+    line-height: 1.5;
+  }
+
+  &__meta {
+    margin-top: auto;
+    padding-top: 24rpx;
+    font-size: 22rpx;
+    font-weight: 700;
+    letter-spacing: 1rpx;
   }
 }
 
-.publish-entry-card--secondhand::before {
-  background: $warning;
+.publish-entry-card--post {
+  border-color: $brand-primary;
+  background: $brand-primary;
+  box-shadow: 0 16rpx 34rpx -18rpx rgba(33, 104, 184, .6);
+
+  .publish-entry-card__title {
+    color: $text-on-color;
+  }
+
+  .publish-entry-card__subtitle,
+  .publish-entry-card__meta {
+    color: rgba(255, 255, 255, .78);
+  }
 }
 
-.publish-entry-card--secondhand .publish-entry-card__index {
-  color: $warning;
+.publish-entry-card--secondhand {
+  border-color: $border-default;
+  background: $bg-surface;
+  box-shadow: $shadow-card;
+
+  .publish-entry-card__icon-wrap,
+  .publish-entry-card__arrow-wrap {
+    background: $brand-tint;
+  }
+
+  .publish-entry-card__title {
+    color: $text-strong;
+  }
+
+  .publish-entry-card__subtitle {
+    color: $text-secondary;
+  }
+
+  .publish-entry-card__meta {
+    color: $brand-primary;
+  }
 }
