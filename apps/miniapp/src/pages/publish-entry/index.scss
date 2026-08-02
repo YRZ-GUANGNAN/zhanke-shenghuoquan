@@ -20,7 +20,7 @@
 }
 
 .publish-entry-intro {
-  padding: 42rpx 34rpx 30rpx;
+  padding: 36rpx 36rpx 26rpx;
   border-bottom: 1rpx solid $border-subtle;
   background: $bg-surface;
 
@@ -31,15 +31,15 @@
 
   &__title {
     color: $text-strong;
-    font-size: 40rpx;
+    font-size: 38rpx;
     font-weight: 900;
     line-height: 1.25;
   }
 
   &__desc {
-    margin-top: 10rpx;
+    margin-top: 8rpx;
     color: $text-secondary;
-    font-size: 25rpx;
+    font-size: 24rpx;
     line-height: 1.45;
   }
 }
@@ -47,24 +47,24 @@
 .publish-entry-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18rpx;
-  margin: 24rpx 28rpx 0;
+  gap: 16rpx;
+  margin: 20rpx 30rpx 0;
 }
 
 .publish-entry-card {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  min-height: 322rpx;
-  padding: 26rpx;
+  min-height: 304rpx;
+  padding: 24rpx;
   box-sizing: border-box;
   border: 1rpx solid transparent;
-  border-radius: 30rpx;
+  border-radius: 28rpx;
   overflow: hidden;
   transition: transform $duration-fast $ease-standard, box-shadow $duration-fast $ease-standard;
 
   &--pressed {
-    transform: scale(.975);
+    transform: scale(.985);
     box-shadow: none;
   }
 
@@ -82,31 +82,31 @@
   }
 
   &__icon-wrap {
-    width: 72rpx;
-    height: 72rpx;
-    border-radius: 22rpx;
+    width: 68rpx;
+    height: 68rpx;
+    border-radius: 20rpx;
     background: rgba(255, 255, 255, .94);
   }
 
   &__icon {
-    width: 40rpx;
-    height: 40rpx;
+    width: 38rpx;
+    height: 38rpx;
   }
 
   &__arrow-wrap {
-    width: 50rpx;
-    height: 50rpx;
+    width: 46rpx;
+    height: 46rpx;
     border-radius: $radius-pill;
     background: rgba(255, 255, 255, .72);
   }
 
   &__arrow {
-    width: 28rpx;
-    height: 28rpx;
+    width: 26rpx;
+    height: 26rpx;
   }
 
   &__main {
-    margin-top: 42rpx;
+    margin-top: 34rpx;
   }
 
   &__title,
@@ -116,30 +116,31 @@
   }
 
   &__title {
-    font-size: 36rpx;
+    font-size: 34rpx;
     font-weight: 900;
-    line-height: 1.2;
+    line-height: 1.22;
   }
 
   &__subtitle {
-    margin-top: 14rpx;
-    font-size: 24rpx;
+    min-height: 72rpx;
+    margin-top: 12rpx;
+    font-size: 23rpx;
     line-height: 1.5;
   }
 
   &__meta {
     margin-top: auto;
-    padding-top: 24rpx;
-    font-size: 22rpx;
+    padding-top: 20rpx;
+    font-size: 21rpx;
     font-weight: 700;
-    letter-spacing: 1rpx;
+    letter-spacing: .5rpx;
   }
 }
 
 .publish-entry-card--post {
   border-color: $brand-primary;
   background: $brand-primary;
-  box-shadow: 0 16rpx 34rpx -18rpx rgba(33, 104, 184, .6);
+  box-shadow: 0 14rpx 28rpx -18rpx rgba(33, 104, 184, .55);
 
   .publish-entry-card__title {
     color: $text-on-color;
@@ -154,7 +155,7 @@
 .publish-entry-card--secondhand {
   border-color: $border-default;
   background: $bg-surface;
-  box-shadow: $shadow-card;
+  box-shadow: none;
 
   .publish-entry-card__icon-wrap,
   .publish-entry-card__arrow-wrap {

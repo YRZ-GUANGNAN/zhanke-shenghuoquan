@@ -44,6 +44,13 @@ for (const forbidden of [
 }
 
 for (const required of [
+  'grid-template-columns: repeat(2, minmax(0, 1fr))',
+  'min-height: 304rpx',
+  'min-height: 72rpx',
+  'transform: scale(.985)',
+]) assertIncludes(publishStyle, required)
+
+for (const required of [
   "type MerchantFilter = 'all' | 'open' | 'resting'",
   'listExternalTakeoutMerchants',
   'navigateToMiniProgram',
