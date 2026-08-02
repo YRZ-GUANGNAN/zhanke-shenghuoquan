@@ -79,6 +79,7 @@ interface TaroFacade {
 	showModal(options: ModalOptions): Promise<{ confirm: boolean; cancel: boolean }>
 	makePhoneCall(options: { phoneNumber: string }): Promise<unknown>
 	setClipboardData(options: { data: string }): Promise<unknown>
+	getClipboardData(): Promise<{ data: string }>
   login(options?: { timeout?: number }): Promise<LoginResult>
   request<T = unknown>(options: RequestOptions): Promise<RequestResult<T>>
 	getStorageSync<T = unknown>(key: string): T

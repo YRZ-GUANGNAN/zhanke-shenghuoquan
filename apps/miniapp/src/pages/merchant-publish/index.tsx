@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Input, ScrollView, Text, Textarea, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
+import AppIcon from '../../components/app-icon'
 import { AppIconButton } from '../../components/ui'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import { AppActionSheet, AppButton } from '../../components/ui'
@@ -21,9 +22,25 @@ import {
 } from '../../services/delivery-payment'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
+import {
+  deliveryClipboardTemplate,
+  parseDeliveryOrderClipboard,
+  type DeliveryClipboardField,
+  type DeliveryClipboardParseResult,
+} from '../../utils/delivery-order-clipboard'
 import './index.scss'
 
 type PaymentMethod = 'wallet' | 'wechat'
+
+const clipboardFieldCopy: Record<DeliveryClipboardField, string> = {
+  pickupContact: '取货联系人',
+  pickupPhone: '取货电话',
+  pickupAddress: '取货地址',
+  receiverName: '收货人',
+  receiverPhone: '收货电话',
+  receiverAddress: '送货地址',
+  remark: '备注',
+}
 
 function inputValue(event: { detail: { value?: string } }) {
   return String(event.detail.value ?? '')
@@ -42,6 +59,9 @@ function MerchantPublishContent() {
   const [remark, setRemark] = useState('')
   const [balanceCents, setBalanceCents] = useState<number | null>(null)
   const [sheetVisible, setSheetVisible] = useState(false)
+  const [clipboardSheetVisible, setClipboardSheetVisible] = useState(false)
+  const [clipboardPreview, setClipboardPreview] = useState<DeliveryClipboardParseResult | null>(null)
+  const [clipboardReading, setClipboardReading] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('wallet')
   const [submitting, setSubmitting] = useState(false)
 
@@ -61,6 +81,68 @@ function MerchantPublishContent() {
       })
     }
   }, [identityAllowed])
+
+  const currentFormValues: Record<DeliveryClipboardField, string> = {
+    pickupContact,
+    pickupPhone,
+    pickupAddress,
+    receiverName,
+    receiverPhone,
+    receiverAddress,
+    remark,
+  }
+
+  const copyImportTemplate = async () => {
+    try {
+      await Taro.setClipboardData({ data: deliveryClipboardTemplate })
+      void Taro.showToast({ title: '填写模板已复制', icon: 'success' })
+    } catch {
+      void Taro.showToast({ title: '复制失败，请稍后重试', icon: 'none' })
+    }
+  }
+
+  const readClipboard = async () => {
+    if (clipboardReading) return
+    setClipboardReading(true)
+    try {
+      const result = await Taro.getClipboardData()
+      const source = String(result.data ?? '')
+      if (!source.trim()) {
+        void Taro.showToast({ title: '剪贴板没有可导入的文字', icon: 'none' })
+        return
+      }
+      const parsed = parseDeliveryOrderClipboard(source)
+      if (parsed.recognizedFields.length === 0) {
+        void Taro.showToast({ title: '未识别到配送字段，请使用填写模板', icon: 'none', duration: 2400 })
+        return
+      }
+      setClipboardPreview(parsed)
+      setClipboardSheetVisible(true)
+    } catch {
+      void Taro.showToast({ title: '读取剪贴板失败，请检查授权后重试', icon: 'none', duration: 2400 })
+    } finally {
+      setClipboardReading(false)
+    }
+  }
+
+  const applyClipboardPreview = () => {
+    if (!clipboardPreview) return
+    const setters: Record<DeliveryClipboardField, (value: string) => void> = {
+      pickupContact: setPickupContact,
+      pickupPhone: setPickupPhone,
+      pickupAddress: setPickupAddress,
+      receiverName: setReceiverName,
+      receiverPhone: setReceiverPhone,
+      receiverAddress: setReceiverAddress,
+      remark: setRemark,
+    }
+    clipboardPreview.recognizedFields.forEach((field) => {
+      const value = clipboardPreview.values[field]?.trim()
+      if (value) setters[field](value)
+    })
+    setClipboardSheetVisible(false)
+    void Taro.showToast({ title: `已导入 ${clipboardPreview.recognizedFields.length} 项信息`, icon: 'success' })
+  }
 
   const validate = () => {
     if (!pickupContact.trim() || !pickupPhone.trim() || !pickupAddress.trim()) {
@@ -205,6 +287,24 @@ function MerchantPublishContent() {
       />
 
       <ScrollView scrollY className='merchant-publish-scroll' enhanced showScrollbar={false}>
+        <View className='merchant-publish-import-card'>
+          <View className='merchant-publish-import-card__icon'>
+            <AppIcon name='order' />
+          </View>
+          <View className='merchant-publish-import-card__main'>
+            <Text className='merchant-publish-import-card__title'>批量导入配送信息</Text>
+            <Text className='merchant-publish-import-card__description'>本机解析，确认后才会写入表单</Text>
+          </View>
+          <View className='merchant-publish-import-card__actions'>
+            <View className='merchant-publish-import-card__secondary' onClick={() => void copyImportTemplate()}>
+              <Text>复制模板</Text>
+            </View>
+            <View className='merchant-publish-import-card__primary' onClick={() => void readClipboard()}>
+              <Text>{clipboardReading ? '读取中…' : '从剪贴板导入'}</Text>
+            </View>
+          </View>
+        </View>
+
         <View className='merchant-publish-card'>
           <View className='merchant-publish-section-head'>
             <View className='merchant-publish-section-head__left'>
@@ -290,6 +390,35 @@ function MerchantPublishContent() {
           </Text>
         </View>
       </View>
+
+      <AppActionSheet
+        visible={clipboardSheetVisible}
+        title='确认导入配送信息'
+        description={clipboardPreview ? `识别到 ${clipboardPreview.recognizedFields.length} 项，只更新下列字段` : ''}
+        onClose={() => setClipboardSheetVisible(false)}
+      >
+        <View className='merchant-publish-import-sheet'>
+          <View className='merchant-publish-import-preview'>
+            {clipboardPreview?.recognizedFields.map((field) => {
+              const nextValue = clipboardPreview.values[field] ?? ''
+              const currentValue = currentFormValues[field].trim()
+              const state = currentValue && currentValue !== nextValue ? '更新' : currentValue === nextValue ? '保持' : '新增'
+              const stateTone = state === '更新' ? 'update' : state === '保持' ? 'keep' : 'add'
+              return (
+                <View key={field} className='merchant-publish-import-preview__row'>
+                  <View className='merchant-publish-import-preview__copy'>
+                    <Text className='merchant-publish-import-preview__label'>{clipboardFieldCopy[field]}</Text>
+                    <Text className='merchant-publish-import-preview__value'>{nextValue}</Text>
+                  </View>
+                  <Text className={`merchant-publish-import-preview__state merchant-publish-import-preview__state--${stateTone}`}>{state}</Text>
+                </View>
+              )
+            })}
+          </View>
+          <Text className='merchant-publish-import-sheet__notice'>未识别字段保持原值，确认后仍可继续修改。</Text>
+          <AppButton block onClick={applyClipboardPreview}>确认导入</AppButton>
+        </View>
+      </AppActionSheet>
 
       <AppActionSheet
         visible={sheetVisible}

@@ -41,13 +41,98 @@ page {
 }
 
 .merchant-publish-card,
-.merchant-publish-fee-card {
+.merchant-publish-fee-card,
+.merchant-publish-import-card {
   margin: 24rpx 28rpx 0;
   border-radius: 26rpx;
   border: 1rpx solid $border-subtle;
   background: $bg-surface;
   box-shadow: 0 8rpx 24rpx rgba(42, 73, 108, .055);
   box-sizing: border-box;
+}
+
+.merchant-publish-import-card {
+  min-height: 150rpx;
+  padding: 22rpx;
+  display: grid;
+  grid-template-columns: 64rpx minmax(0, 1fr);
+  column-gap: 18rpx;
+  row-gap: 18rpx;
+  align-items: center;
+  border-color: rgba($brand-primary, .18);
+  background: linear-gradient(135deg, $bg-surface 0%, rgba($brand-primary, .055) 100%);
+}
+
+.merchant-publish-import-card__icon {
+  width: 64rpx;
+  height: 64rpx;
+  padding: 16rpx;
+  box-sizing: border-box;
+  border-radius: 20rpx;
+  background: $publish-blue-soft;
+}
+
+.merchant-publish-import-card__main,
+.merchant-publish-import-preview__copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.merchant-publish-import-card__title,
+.merchant-publish-import-card__description {
+  display: block;
+}
+
+.merchant-publish-import-card__title {
+  color: $text-strong;
+  font-size: 27rpx;
+  font-weight: 850;
+  line-height: 1.25;
+}
+
+.merchant-publish-import-card__description {
+  margin-top: 8rpx;
+  color: $text-muted;
+  font-size: 21rpx;
+  line-height: 1.35;
+}
+
+.merchant-publish-import-card__actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, .72fr) minmax(0, 1.28fr);
+  gap: 12rpx;
+}
+
+.merchant-publish-import-card__secondary,
+.merchant-publish-import-card__primary {
+  min-height: 68rpx;
+  padding: 0 16rpx;
+  border-radius: 18rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  font-size: 23rpx;
+  font-weight: 750;
+}
+
+.merchant-publish-import-card__secondary {
+  border: 1rpx solid rgba($brand-primary, .2);
+  color: $brand-primary;
+  background: $bg-surface;
+}
+
+.merchant-publish-import-card__primary {
+  color: $text-on-color;
+  background: $brand-primary;
+  box-shadow: 0 8rpx 18rpx rgba($brand-primary-strong, .14);
+}
+
+.merchant-publish-import-card__secondary:active,
+.merchant-publish-import-card__primary:active {
+  transform: scale(.985);
 }
 
 .merchant-publish-card {
@@ -238,6 +323,86 @@ page {
 }
 
 .merchant-publish-sheet__content { display: grid; gap: 24rpx; }
+
+.merchant-publish-import-sheet {
+  display: grid;
+  gap: 22rpx;
+}
+
+.merchant-publish-import-preview {
+  overflow: hidden;
+  border: 1rpx solid $border-subtle;
+  border-radius: 22rpx;
+  background: $bg-surface;
+}
+
+.merchant-publish-import-preview__row {
+  min-height: 92rpx;
+  padding: 18rpx 20rpx;
+  border-bottom: 1rpx solid $divider-hairline;
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  box-sizing: border-box;
+}
+
+.merchant-publish-import-preview__row:last-child {
+  border-bottom: 0;
+}
+
+.merchant-publish-import-preview__copy {
+  flex: 1;
+}
+
+.merchant-publish-import-preview__label,
+.merchant-publish-import-preview__value {
+  display: block;
+}
+
+.merchant-publish-import-preview__label {
+  color: $text-tertiary;
+  font-size: 21rpx;
+  line-height: 1.2;
+}
+
+.merchant-publish-import-preview__value {
+  margin-top: 7rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: $text-primary;
+  font-size: 25rpx;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.merchant-publish-import-preview__state {
+  flex: 0 0 auto;
+  padding: 7rpx 12rpx;
+  border-radius: 999rpx;
+  color: $brand-primary;
+  background: $publish-blue-soft;
+  font-size: 19rpx;
+  font-weight: 750;
+  line-height: 1;
+}
+
+.merchant-publish-import-preview__state--update {
+  color: $publish-orange;
+  background: $publish-orange-pale;
+}
+
+.merchant-publish-import-preview__state--keep {
+  color: $text-tertiary;
+  background: $bg-subtle;
+}
+
+.merchant-publish-import-sheet__notice {
+  display: block;
+  color: $text-muted;
+  font-size: 22rpx;
+  line-height: 1.5;
+}
 
 .merchant-publish-payments { display: grid; gap: 18rpx; }
 

@@ -4,33 +4,84 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 18rpx;
-  margin-top: 28rpx;
+  gap: 14rpx;
+  margin-top: 8rpx;
 }
 
 .identity-switch-modal__role {
+  position: relative;
   display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 176rpx;
+  padding: 22rpx 12rpx 18rpx;
+  box-sizing: border-box;
+  border: 2rpx solid $border-subtle;
+  border-radius: 24rpx;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-width: 116rpx;
-  height: 48rpx;
-  padding: 0 22rpx;
-  border-radius: 999rpx;
-  font-size: 24rpx;
-  font-weight: 700;
+  background: $bg-subtle;
 }
 
 .identity-switch-modal__role--muted {
-  color: $text-tertiary;
-  background: #F2F6FA;
+  color: $text-secondary;
 }
 
 .identity-switch-modal__role--active {
-  color: $text-on-color;
-  background: $gradient-primary;
+  border-color: rgba($brand-primary, .36);
+  color: $brand-primary;
+  background: rgba($brand-primary, .07);
+  box-shadow: inset 0 0 0 1rpx rgba($brand-primary, .04);
+}
+
+.identity-switch-modal__role-icon {
+  width: 56rpx;
+  height: 56rpx;
+  padding: 12rpx;
+  box-sizing: border-box;
+  border-radius: 18rpx;
+  background: $bg-surface;
+  box-shadow: 0 6rpx 16rpx rgba($text-strong, .06);
+}
+
+.identity-switch-modal__role-name,
+.identity-switch-modal__role-state {
+  display: block;
+}
+
+.identity-switch-modal__role-name {
+  margin-top: 12rpx;
+  color: $text-strong;
+  font-size: 27rpx;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.identity-switch-modal__role-state {
+  margin-top: 7rpx;
+  color: $text-tertiary;
+  font-size: 20rpx;
+  font-weight: 650;
+  line-height: 1;
+}
+
+.identity-switch-modal__role--active .identity-switch-modal__role-state {
+  color: $brand-primary;
 }
 
 .identity-switch-modal__arrow {
-  width: 32rpx;
-  height: 32rpx;
+  width: 34rpx;
+  height: 34rpx;
+  flex: 0 0 34rpx;
+  padding: 7rpx;
+  box-sizing: border-box;
+  border-radius: 999rpx;
+  background: $bg-subtle;
+}
+
+@media (max-width: 340px) {
+  .identity-switch-modal__roles { gap: 8rpx; }
+  .identity-switch-modal__role { min-height: 164rpx; }
+  .identity-switch-modal__arrow { width: 28rpx; height: 28rpx; flex-basis: 28rpx; padding: 5rpx; }
 }

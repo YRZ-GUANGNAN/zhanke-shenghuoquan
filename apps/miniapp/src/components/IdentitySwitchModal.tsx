@@ -21,9 +21,9 @@ const roleNames: Record<IdentityRoleKey, string> = {
 }
 
 const roleDescriptions: Record<IdentityRoleKey, string> = {
-  student: '主界面将回到校园发现、外卖、二手与我的页面。',
-  rider: '主界面将变为抢单大厅，可随时在「我的」切回学生身份。',
-  merchant: '主界面将变为商家工作台，可随时在「我的」切回学生身份。'
+  student: '返回校园生活主界面，已通过的工作身份仍会保留。',
+  rider: '进入骑手接单工作台，之后可随时切回学生模式。',
+  merchant: '进入商家配送工作台，之后可随时切回学生模式。'
 }
 
 export default function IdentitySwitchModal({
@@ -36,8 +36,8 @@ export default function IdentitySwitchModal({
   error = ''
 }: IdentitySwitchModalProps) {
   const title = targetRole === 'student'
-    ? '切回学生身份？'
-    : `切换为${roleNames[targetRole]}身份？`
+    ? '切回学生模式'
+    : `切换到${roleNames[targetRole]}模式`
 
   const confirmText = targetRole === 'student'
     ? '确认切回'
@@ -56,13 +56,21 @@ export default function IdentitySwitchModal({
     >
       <View className='identity-switch-modal__roles'>
         <View className='identity-switch-modal__role identity-switch-modal__role--muted'>
-          <Text>{roleNames[currentRole]}</Text>
+          <View className='identity-switch-modal__role-icon'>
+            <AppIcon name={currentRole} />
+          </View>
+          <Text className='identity-switch-modal__role-name'>{roleNames[currentRole]}</Text>
+          <Text className='identity-switch-modal__role-state'>当前</Text>
         </View>
         <View className='identity-switch-modal__arrow'>
           <AppIcon name='chevron-right' />
         </View>
         <View className='identity-switch-modal__role identity-switch-modal__role--active'>
-          <Text>{roleNames[targetRole]}</Text>
+          <View className='identity-switch-modal__role-icon'>
+            <AppIcon name={targetRole} active />
+          </View>
+          <Text className='identity-switch-modal__role-name'>{roleNames[targetRole]}</Text>
+          <Text className='identity-switch-modal__role-state'>即将使用</Text>
         </View>
       </View>
     </AppDialog>
