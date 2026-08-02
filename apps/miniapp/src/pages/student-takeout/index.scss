@@ -2,7 +2,7 @@
 
 .student-takeout-page {
   min-height: 100vh;
-  padding: calc(var(--capsule-total-header-height) + 76rpx) 28rpx 168rpx;
+  padding: calc(var(--capsule-total-header-height) + 116rpx) 24rpx 168rpx;
   background: $bg-app;
   color: $text-strong;
   box-sizing: border-box;
@@ -14,7 +14,7 @@
   right: 0;
   left: 0;
   z-index: 8;
-  padding: 0 0 22rpx;
+  padding: 0 0 20rpx;
   border-bottom: 1rpx solid $divider-nav;
   background: rgba(255, 255, 255, .98);
   box-shadow: $shadow-header;
@@ -26,38 +26,53 @@
 }
 
 .student-takeout-header__row .capsule-page-header__business-row {
-  gap: 24rpx;
-  padding-right: 40rpx;
-  padding-left: 40rpx;
+  gap: 20rpx;
+  padding-right: 32rpx;
+  padding-left: 32rpx;
 }
 
 .student-takeout-header__title {
-  font-size: 40rpx;
+  color: $text-strong;
+  font-size: 38rpx;
   font-weight: 900;
   line-height: 1.1;
-  color: $text-strong;
 }
 
-.student-takeout-header__subtitle {
-  margin: 10rpx 40rpx 0;
-  font-size: 24rpx;
-  line-height: 1.35;
-  color: $text-muted;
+.student-takeout-header__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  margin: 8rpx 32rpx 0;
+  color: $text-secondary;
+  font-size: 22rpx;
+  line-height: 1.4;
+}
+
+.student-takeout-header__summary text:first-child {
+  color: $text-primary;
+  font-weight: 750;
 }
 
 .student-takeout-search {
-  min-width: 176rpx;
-  height: 54rpx;
-  padding: 0 20rpx;
+  min-width: 226rpx;
+  height: 56rpx;
+  padding: 0 22rpx;
   border-radius: 999rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12rpx;
+  border: 1rpx solid $border-default;
+  background: $bg-surface-subtle;
+  color: $text-secondary;
+  font-size: 23rpx;
+  box-sizing: border-box;
+}
+
+.student-takeout-search--pressed {
   background: $brand-tint;
   color: $brand-primary;
-  font-size: 24rpx;
-  box-sizing: border-box;
 }
 
 .student-takeout-search__icon {
@@ -92,17 +107,55 @@
 .student-takeout-scroll {
   display: flex;
   flex-direction: column;
-  gap: 20rpx;
+  gap: 18rpx;
+}
+
+.student-takeout-filters {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 8rpx;
+  border: 1rpx solid $border-subtle;
+  border-radius: 22rpx;
+  background: $bg-surface;
+}
+
+.student-takeout-filter {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  min-height: 68rpx;
+  border-radius: 16rpx;
+  color: $text-tertiary;
+  font-size: 25rpx;
+  font-weight: 700;
+}
+
+.student-takeout-filter--active {
+  background: $brand-tint;
+  color: $brand-primary;
+}
+
+.student-takeout-filter__count {
+  min-width: 28rpx;
+  height: 28rpx;
+  padding: 0 6rpx;
+  border-radius: 999rpx;
+  background: rgba(46, 125, 212, .08);
+  font-size: 19rpx;
+  line-height: 28rpx;
+  text-align: center;
 }
 
 .student-takeout-tip {
   display: flex;
   gap: 14rpx;
-  align-items: flex-start;
-  padding: 22rpx 26rpx;
-  border-radius: 20rpx;
-  background: $brand-tint;
-  color: $brand-primary;
+  align-items: center;
+  padding: 18rpx 22rpx;
+  border-radius: 18rpx;
+  background: $warning-tint;
+  color: $warning;
 }
 
 .student-takeout-tip__icon {
@@ -112,35 +165,45 @@
   justify-content: center;
   width: 28rpx;
   height: 28rpx;
-  margin-top: 2rpx;
   border: 2rpx solid currentColor;
   border-radius: 50%;
-  font-size: 20rpx;
-  font-weight: 800;
+  font-size: 19rpx;
+  font-weight: 850;
   line-height: 1;
 }
 
 .student-takeout-tip__text {
   flex: 1;
-  font-size: 26rpx;
-  font-weight: 500;
+  color: $text-secondary;
+  font-size: 23rpx;
   line-height: 1.45;
 }
 
 .student-takeout-list {
   display: flex;
   flex-direction: column;
-  gap: 18rpx;
+  gap: 16rpx;
 }
 
 .student-takeout-merchant {
-  display: flex;
-  align-items: center;
-  min-height: 132rpx;
-  padding: 22rpx 22rpx;
+  min-height: 176rpx;
+  padding: 24rpx;
+  box-sizing: border-box;
+  border: 1rpx solid $border-subtle;
   border-radius: 24rpx;
   background: $bg-surface;
   box-shadow: $shadow-card;
+  transition: transform $duration-fast $ease-standard, background $duration-fast $ease-standard;
+}
+
+.student-takeout-merchant--pressed {
+  background: $bg-surface-subtle;
+  transform: scale(.994);
+}
+
+.student-takeout-merchant__top {
+  display: flex;
+  align-items: center;
 }
 
 .student-takeout-merchant__avatar {
@@ -152,7 +215,7 @@
   height: 76rpx;
   border-radius: 18rpx;
   color: $text-on-color;
-  font-size: 34rpx;
+  font-size: 32rpx;
   font-weight: 900;
 }
 
@@ -162,33 +225,26 @@
   margin-left: 20rpx;
 }
 
-.student-takeout-merchant__title-row {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  min-width: 0;
+.student-takeout-merchant__name,
+.student-takeout-merchant__desc {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .student-takeout-merchant__name {
-  max-width: 250rpx;
-  overflow: hidden;
   color: $text-strong;
-  font-size: 28rpx;
+  font-size: 29rpx;
   font-weight: 900;
-  line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.28;
 }
 
 .student-takeout-merchant__desc {
-  display: block;
   margin-top: 8rpx;
-  overflow: hidden;
-  color: $text-muted;
-  font-size: 22rpx;
+  color: $text-secondary;
+  font-size: 23rpx;
   line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .student-takeout-status {
@@ -196,20 +252,20 @@
   display: inline-flex;
   align-items: center;
   gap: 6rpx;
-  min-height: 34rpx;
+  min-height: 38rpx;
   padding: 0 12rpx;
   border-radius: 999rpx;
   font-size: 20rpx;
-  font-weight: 700;
+  font-weight: 750;
 }
 
 .student-takeout-status--open {
-  background: rgba($brand-primary, .12);
-  color: $brand-primary;
+  background: $success-tint;
+  color: $success;
 }
 
 .student-takeout-status--closed {
-  background: $divider-hairline;
+  background: $bg-surface-subtle;
   color: $text-tertiary;
 }
 
@@ -220,64 +276,99 @@
   background: currentColor;
 }
 
+.student-takeout-merchant__bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  margin-top: 20rpx;
+  padding-top: 18rpx;
+  border-top: 1rpx solid $border-subtle;
+}
+
+.student-takeout-merchant__hint {
+  color: $text-tertiary;
+  font-size: 21rpx;
+}
+
 .student-takeout-merchant__action {
-  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 88rpx;
-  height: 42rpx;
-  margin-left: 12rpx;
-  border-radius: 999rpx;
-  background: $brand-tint;
-  color: $brand-primary;
-  font-size: 22rpx;
-  font-weight: 700;
+  gap: 4rpx;
+  min-width: 148rpx;
+  height: 54rpx;
+  padding: 0 18rpx;
+  box-sizing: border-box;
+  border-radius: 16rpx;
+  background: $brand-primary;
+  color: $text-on-color;
+  font-size: 23rpx;
+  font-weight: 800;
 }
 
 .student-takeout-merchant__action--disabled {
-  background: $divider-hairline;
+  background: $bg-surface-subtle;
   color: $text-tertiary;
 }
 
 .student-takeout-merchant--resting {
-  opacity: .68;
   box-shadow: none;
 }
 
 .student-takeout-merchant__arrow {
-  flex: 0 0 auto;
-  margin-left: 10rpx;
-  color: $text-faint;
-  font-size: 36rpx;
+  color: inherit;
+  font-size: 30rpx;
   line-height: 1;
 }
 
 .student-takeout-footer {
   display: block;
-  padding: 28rpx 0 8rpx;
+  padding: 24rpx 0 8rpx;
   color: $text-faint;
-  font-size: 24rpx;
+  font-size: 22rpx;
   text-align: center;
 }
 
 .student-takeout-state {
   min-height: 300rpx;
   padding: 48rpx;
+  border: 1rpx solid $border-subtle;
   border-radius: 24rpx;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   background: $bg-surface;
-  color: $text-muted;
-  font-size: 27rpx;
-  line-height: 42rpx;
   text-align: center;
   box-sizing: border-box;
 }
 
+.student-takeout-state__title,
+.student-takeout-state__desc {
+  display: block;
+}
+
+.student-takeout-state__title {
+  color: $text-primary;
+  font-size: 28rpx;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.student-takeout-state__desc {
+  margin-top: 10rpx;
+  color: $text-tertiary;
+  font-size: 23rpx;
+  line-height: 1.5;
+}
+
 .student-takeout-state--retry {
-  border: 1rpx dashed $brand-primary;
+  border-style: dashed;
+  border-color: $brand-primary;
+}
+
+.student-takeout-state--retry .student-takeout-state__title {
   color: $brand-primary;
 }
 
