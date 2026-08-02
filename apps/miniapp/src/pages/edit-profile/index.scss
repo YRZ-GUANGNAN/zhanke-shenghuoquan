@@ -56,6 +56,16 @@
   border-radius: 50%;
   background: $gradient-primary;
   box-shadow: $shadow-card;
+  transition: opacity $duration-fast $ease-standard, transform $duration-fast $ease-standard;
+}
+
+.edit-profile-avatar:active {
+  transform: scale(.98);
+}
+
+.edit-profile-avatar--busy {
+  opacity: .58;
+  transform: none;
 }
 
 .edit-profile-avatar__text {
@@ -123,6 +133,11 @@
   color: $text-muted;
   font-size: 23rpx;
   line-height: 1;
+}
+
+.edit-profile-avatar-panel__hint--ready {
+  color: $success;
+  font-weight: 650;
 }
 
 .edit-profile-card,

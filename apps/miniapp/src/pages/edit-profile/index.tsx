@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Image, Input, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
-import { updateProfile } from '../../services/a-user'
+import { currentUser, updateProfile } from '../../services/a-user'
 import { chooseAndUploadImages, waitForMediaApproval, type UploadedMedia } from '../../services/media'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
@@ -15,17 +15,23 @@ export default function EditProfilePage() {
   const [campus, setCampus] = useState(profile.campus)
   const [avatar, setAvatar] = useState<UploadedMedia | null>(null)
   const [progress, setProgress] = useState('')
+  const [choosingAvatar, setChoosingAvatar] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const chooseAvatar = async () => {
+    if (choosingAvatar || saving) return
+    setChoosingAvatar(true)
     try {
       const [uploaded] = await chooseAndUploadImages('avatar', 1, (value) => setProgress(value.message))
       await waitForMediaApproval(uploaded.assetId, (value) => setProgress(value.message))
       setAvatar(uploaded)
-      setProgress('')
+      setProgress('头像已通过审核，保存后生效')
     } catch (error) {
+      setAvatar(null)
       setProgress('')
       void Taro.showToast({ title: error instanceof Error ? error.message : '头像上传失败', icon: 'none' })
+    } finally {
+      setChoosingAvatar(false)
     }
   }
 
@@ -35,11 +41,12 @@ export default function EditProfilePage() {
       void Taro.showToast({ title: '昵称不能为空', icon: 'none' })
       return
     }
-    if (saving) return
+    if (saving || choosingAvatar) return
     setSaving(true)
     try {
       const value = await updateProfile({ ...profile, nickname: name, school: school.trim(), campus: campus.trim() }, avatar?.assetId)
-      updateSessionProfile(value)
+      const refreshed = await currentUser().catch(() => value)
+      updateSessionProfile(refreshed)
       await Taro.showToast({ title: '资料已保存', icon: 'success' })
       await Taro.navigateBack()
     } catch (error) {
@@ -61,7 +68,7 @@ export default function EditProfilePage() {
           </View>
         )}
         right={(
-          <View className={`edit-profile-nav__save ${saving ? 'edit-profile-nav__save--disabled' : ''}`} onClick={() => void save()}>
+          <View className={`edit-profile-nav__save ${saving || choosingAvatar ? 'edit-profile-nav__save--disabled' : ''}`} onClick={() => void save()}>
             <Text>{saving ? '保存中' : '保存'}</Text>
           </View>
         )}
@@ -69,11 +76,13 @@ export default function EditProfilePage() {
 
       <View className='edit-profile-content'>
         <View className='edit-profile-avatar-panel'>
-          <View className='edit-profile-avatar' onClick={() => void chooseAvatar()}>
+          <View className={`edit-profile-avatar${choosingAvatar ? ' edit-profile-avatar--busy' : ''}`} onClick={() => void chooseAvatar()}>
             {avatarSource ? <Image className='edit-profile-avatar__image' src={avatarSource} mode='aspectFill' /> : <Text className='edit-profile-avatar__text'>{nameInitial(nickname)}</Text>}
             <View className='edit-profile-avatar__camera'><View className='edit-profile-avatar__camera-body' /></View>
           </View>
-          <Text className='edit-profile-avatar-panel__hint'>{progress || '点击更换头像'}</Text>
+          <Text className={`edit-profile-avatar-panel__hint${avatar ? ' edit-profile-avatar-panel__hint--ready' : ''}`}>
+            {progress || '点击更换头像'}
+          </Text>
         </View>
 
         <View className='edit-profile-card'>
