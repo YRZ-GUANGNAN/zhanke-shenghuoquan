@@ -108,9 +108,17 @@ export default function StudentTakeoutPage() {
           }
           divider={false}
         />
-        <View className='student-takeout-header__summary'>
-          <Text>校外合作商家目录</Text>
-          <Text>{status === 'ready' ? `共 ${merchants.length} 家 · 营业中 ${openCount} 家` : '商品与交易由商家小程序提供'}</Text>
+        <View className='student-takeout-directory'>
+          <View className='student-takeout-directory__copy'>
+            <Text className='student-takeout-directory__title'>校外合作商家</Text>
+            <Text className='student-takeout-directory__desc'>商品、订单与售后由商家小程序提供</Text>
+          </View>
+          {status === 'ready' && (
+            <View className='student-takeout-directory__status'>
+              <View className='student-takeout-directory__dot' />
+              <Text>{openCount} 家营业中</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -137,24 +145,36 @@ export default function StudentTakeoutPage() {
 
         {status === 'loading' && (
           <View className='student-takeout-state'>
+            <View className='student-takeout-state__visual student-takeout-state__visual--loading'>
+              <View /><View /><View />
+            </View>
             <Text className='student-takeout-state__title'>正在读取合作商家</Text>
-            <Text className='student-takeout-state__desc'>请稍候</Text>
+            <Text className='student-takeout-state__desc'>正在同步最新营业状态</Text>
           </View>
         )}
         {status === 'empty' && (
           <View className='student-takeout-state'>
+            <View className='student-takeout-state__visual'>
+              <View /><View /><View />
+            </View>
             <Text className='student-takeout-state__title'>暂无合作商家</Text>
-            <Text className='student-takeout-state__desc'>新的合作商家会显示在这里</Text>
+            <Text className='student-takeout-state__desc'>平台正在拓展校外合作商家，接入后会显示在这里</Text>
           </View>
         )}
         {status === 'error' && (
           <View className='student-takeout-state student-takeout-state--retry' onClick={() => void load()}>
+            <View className='student-takeout-state__visual student-takeout-state__visual--error'>
+              <View /><View /><View />
+            </View>
             <Text className='student-takeout-state__title'>商家加载失败，点击重试</Text>
             <Text className='student-takeout-state__desc'>请检查网络连接后重试</Text>
           </View>
         )}
         {status === 'ready' && filteredMerchants.length === 0 && (
           <View className='student-takeout-state'>
+            <View className='student-takeout-state__visual'>
+              <View /><View /><View />
+            </View>
             <Text className='student-takeout-state__title'>当前分类暂无商家</Text>
             <Text className='student-takeout-state__desc'>可以切换其他营业状态查看</Text>
           </View>

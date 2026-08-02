@@ -2,7 +2,7 @@
 
 .student-takeout-page {
   min-height: 100vh;
-  padding: calc(var(--capsule-total-header-height) + 116rpx) 24rpx 168rpx;
+  padding: calc(var(--capsule-total-header-height) + 148rpx) 24rpx 168rpx;
   background: $bg-app;
   color: $text-strong;
   box-sizing: border-box;
@@ -14,7 +14,7 @@
   right: 0;
   left: 0;
   z-index: 8;
-  padding: 0 0 20rpx;
+  padding: 0 0 18rpx;
   border-bottom: 1rpx solid $divider-nav;
   background: rgba(255, 255, 255, .98);
   box-shadow: $shadow-header;
@@ -38,25 +38,70 @@
   line-height: 1.1;
 }
 
-.student-takeout-header__summary {
+.student-takeout-directory {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 20rpx;
   margin: 8rpx 32rpx 0;
-  color: $text-secondary;
-  font-size: 22rpx;
-  line-height: 1.4;
+  min-height: 76rpx;
+  padding: 0 18rpx 0 20rpx;
+  border-radius: 20rpx;
+  background: $bg-surface-subtle;
+  box-sizing: border-box;
 }
 
-.student-takeout-header__summary text:first-child {
+.student-takeout-directory__copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.student-takeout-directory__title,
+.student-takeout-directory__desc {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-takeout-directory__title {
   color: $text-primary;
-  font-weight: 750;
+  font-size: 24rpx;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.student-takeout-directory__desc {
+  margin-top: 6rpx;
+  color: $text-tertiary;
+  font-size: 20rpx;
+  line-height: 1.25;
+}
+
+.student-takeout-directory__status {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  min-height: 42rpx;
+  padding: 0 12rpx;
+  border-radius: 999rpx;
+  background: $success-tint;
+  color: $success;
+  font-size: 20rpx;
+  font-weight: 700;
+}
+
+.student-takeout-directory__dot {
+  width: 8rpx;
+  height: 8rpx;
+  border-radius: 50%;
+  background: currentColor;
 }
 
 .student-takeout-search {
-  min-width: 226rpx;
-  height: 56rpx;
+  min-width: 252rpx;
+  height: 60rpx;
   padding: 0 22rpx;
   border-radius: 999rpx;
   display: flex;
@@ -152,10 +197,11 @@
   display: flex;
   gap: 14rpx;
   align-items: center;
-  padding: 18rpx 22rpx;
+  padding: 16rpx 20rpx;
   border-radius: 18rpx;
-  background: $warning-tint;
-  color: $warning;
+  border: 1rpx solid $border-subtle;
+  background: $bg-surface;
+  color: $brand-primary;
 }
 
 .student-takeout-tip__icon {
@@ -174,7 +220,7 @@
 
 .student-takeout-tip__text {
   flex: 1;
-  color: $text-secondary;
+  color: $text-tertiary;
   font-size: 23rpx;
   line-height: 1.45;
 }
@@ -331,10 +377,10 @@
 }
 
 .student-takeout-state {
-  min-height: 300rpx;
-  padding: 48rpx;
+  min-height: 330rpx;
+  padding: 50rpx 54rpx;
   border: 1rpx solid $border-subtle;
-  border-radius: 24rpx;
+  border-radius: 26rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -342,6 +388,7 @@
   background: $bg-surface;
   text-align: center;
   box-sizing: border-box;
+  box-shadow: 0 10rpx 28rpx rgba(42, 73, 108, .04);
 }
 
 .student-takeout-state__title,
@@ -356,6 +403,61 @@
   line-height: 1.4;
 }
 
+.student-takeout-state__visual {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 8rpx;
+  width: 86rpx;
+  height: 74rpx;
+  margin-bottom: 24rpx;
+  border: 2rpx solid $border-default;
+  border-radius: 22rpx;
+  background: $bg-surface-subtle;
+  box-sizing: border-box;
+}
+
+.student-takeout-state__visual::before {
+  position: absolute;
+  top: -10rpx;
+  left: 18rpx;
+  width: 46rpx;
+  height: 18rpx;
+  border: 2rpx solid $border-default;
+  border-bottom: 0;
+  border-radius: 12rpx 12rpx 0 0;
+  background: $bg-surface;
+  content: '';
+}
+
+.student-takeout-state__visual > view {
+  width: 10rpx;
+  border-radius: 999rpx 999rpx 3rpx 3rpx;
+  background: $brand-primary;
+  opacity: .72;
+}
+
+.student-takeout-state__visual > view:nth-child(1) { height: 24rpx; }
+.student-takeout-state__visual > view:nth-child(2) { height: 36rpx; }
+.student-takeout-state__visual > view:nth-child(3) { height: 18rpx; }
+
+.student-takeout-state__visual--loading > view {
+  animation: student-takeout-loading 1.1s ease-in-out infinite alternate;
+}
+
+.student-takeout-state__visual--loading > view:nth-child(2) { animation-delay: .18s; }
+.student-takeout-state__visual--loading > view:nth-child(3) { animation-delay: .36s; }
+
+.student-takeout-state__visual--error > view {
+  background: $warning;
+}
+
+@keyframes student-takeout-loading {
+  from { opacity: .24; transform: scaleY(.72); }
+  to { opacity: .86; transform: scaleY(1); }
+}
+
 .student-takeout-state__desc {
   margin-top: 10rpx;
   color: $text-tertiary;
@@ -364,8 +466,7 @@
 }
 
 .student-takeout-state--retry {
-  border-style: dashed;
-  border-color: $brand-primary;
+  border-color: rgba($warning, .28);
 }
 
 .student-takeout-state--retry .student-takeout-state__title {
