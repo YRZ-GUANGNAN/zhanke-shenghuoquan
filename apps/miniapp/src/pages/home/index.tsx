@@ -21,14 +21,14 @@ type HomeTab = 'messages' | 'discover' | 'tools'
 
 type DiscoverCard = {
   id: string
+  kind: 'post' | 'product'
   target: 'post' | 'secondhand'
-  tone: 'peach' | 'sky' | 'mint' | 'lilac' | 'lemon' | 'cyan'
+  tone: 'sky' | 'mint' | 'warm'
   mediaLabel: string
   title: string
   author: string
   avatar: string
   likes: number
-  height: 'short' | 'medium' | 'tall'
   imageUrl?: string
 }
 
@@ -42,8 +42,7 @@ const tabs: Array<{ key: HomeTab; label: string }> = [
   { key: 'tools', label: '工具' }
 ]
 
-const tones: DiscoverCard['tone'][] = ['peach', 'sky', 'mint', 'lilac', 'lemon', 'cyan']
-const heights: DiscoverCard['height'][] = ['medium', 'tall', 'medium', 'medium', 'short']
+const tones: DiscoverCard['tone'][] = ['sky', 'mint', 'warm']
 
 function settle<T>(promise: Promise<T>): Promise<SettledResult<T>> {
   return promise.then(
@@ -58,7 +57,7 @@ function stableNumber(value: string) {
 
 function visualFor(key: string) {
   const value = stableNumber(key)
-  return { tone: tones[value % tones.length], height: heights[value % heights.length] }
+  return { tone: tones[value % tones.length] }
 }
 
 function mergeUnique(current: DiscoverCard[], incoming: DiscoverCard[]) {
@@ -71,9 +70,10 @@ function toPostCard(post: CommunityPost): DiscoverCard {
   const visual = visualFor(`post:${post.id}`)
   return {
     id: post.id,
+    kind: 'post',
     target: 'post',
     ...visual,
-    mediaLabel: `图 · ${post.topic || '校园'}`,
+    mediaLabel: post.topic || '校园动态',
     imageUrl: post.images[0],
     title: post.title || post.content,
     author: post.author,
@@ -86,9 +86,10 @@ function toProductCard(product: Product): DiscoverCard {
   const visual = visualFor(`product:${product.id}`)
   return {
     id: product.id,
+    kind: 'product',
     target: 'secondhand',
     ...visual,
-    mediaLabel: `图 · ${product.category || '二手'}`,
+    mediaLabel: product.category || '二手好物',
     imageUrl: product.images[0],
     title: product.title,
     author: product.sellerName,
@@ -156,7 +157,15 @@ function HomeContent() {
     () => interleaveCards(postCards, productCards),
     [postCards, productCards]
   )
-  const columns = useMemo(() => splitCards(cards), [cards])
+  const textCards = useMemo(
+    () => cards.filter((card) => card.kind === 'post' && !card.imageUrl),
+    [cards]
+  )
+  const mediaCards = useMemo(
+    () => cards.filter((card) => !(card.kind === 'post' && !card.imageUrl)),
+    [cards]
+  )
+  const mediaColumns = useMemo(() => splitCards(mediaCards), [mediaCards])
   const identityAllowed = useIdentityGuard('student')
   const currentUserId = useSessionStore((state) => state.profile.id)
   const currentSessionKey = useSessionStore((state) => `${state.token}:${state.profile.id}`)
@@ -371,19 +380,47 @@ function HomeContent() {
     }
   }
 
-  const renderDiscoverCard = (card: DiscoverCard) => {
+  const renderTextCard = (card: DiscoverCard) => {
     const imageKey = `${card.target}:${card.id}`
     return (
       <View
         key={imageKey}
-        className='student-post-card'
+        className='student-text-card'
         onClick={() => openCard(card)}
       >
-        <View className={`student-post-card__media student-post-card__media--${card.tone} student-post-card__media--${card.height}`}>
-          {card.imageUrl && !failedImageKeys.has(imageKey) ? (
+        <View className='student-text-card__eyebrow'>
+          <Text className='student-text-card__kind'>校园帖子</Text>
+          <Text className='student-text-card__topic'>#{card.mediaLabel}</Text>
+        </View>
+        <Text className='student-text-card__title'>{card.title}</Text>
+        <View className='student-card-meta'>
+          <View className={`student-card-meta__avatar student-card-meta__avatar--${card.tone}`}>
+            <Text>{card.avatar}</Text>
+          </View>
+          <Text className='student-card-meta__author'>{card.author}</Text>
+          <View className='student-card-meta__like'>
+            <AppIcon name='heart' className='student-card-meta__heart' />
+            <Text>{card.likes}</Text>
+          </View>
+        </View>
+      </View>
+    )
+  }
+
+  const renderMediaCard = (card: DiscoverCard) => {
+    const imageKey = `${card.target}:${card.id}`
+    const hasUsableImage = Boolean(card.imageUrl) && !failedImageKeys.has(imageKey)
+    return (
+      <View
+        key={imageKey}
+        className='student-media-card'
+        onClick={() => openCard(card)}
+      >
+        <View className='student-media-card__visual'>
+          {hasUsableImage ? (
             <Image
-              className='student-post-card__image'
-              src={card.imageUrl}
+              className='student-media-card__image'
+              src={card.imageUrl!}
               mode='aspectFill'
               onError={() => setFailedImageKeys((current) => {
                 const next = new Set(current)
@@ -392,18 +429,22 @@ function HomeContent() {
               })}
             />
           ) : (
-            <Text>{card.mediaLabel}</Text>
+            <View className={`student-media-card__empty student-media-card__empty--${card.tone}`}>
+              <Text className='student-media-card__empty-title'>暂无图片</Text>
+              <Text className='student-media-card__empty-sub'>{card.mediaLabel}</Text>
+            </View>
           )}
+          <Text className='student-media-card__badge'>{card.kind === 'product' ? '二手' : '帖子'}</Text>
         </View>
-        <View className='student-post-card__body'>
-          <Text className='student-post-card__title'>{card.title}</Text>
-          <View className='student-post-card__meta'>
-            <View className={`student-post-card__avatar student-post-card__avatar--${card.tone}`}>
+        <View className='student-media-card__body'>
+          <Text className='student-media-card__title'>{card.title}</Text>
+          <View className='student-card-meta'>
+            <View className={`student-card-meta__avatar student-card-meta__avatar--${card.tone}`}>
               <Text>{card.avatar}</Text>
             </View>
-            <Text className='student-post-card__author'>{card.author}</Text>
-            <View className='student-post-card__like'>
-              <AppIcon name='heart' className='student-post-card__heart' />
+            <Text className='student-card-meta__author'>{card.author}</Text>
+            <View className='student-card-meta__like'>
+              <AppIcon name='heart' className='student-card-meta__heart' />
               <Text>{card.likes}</Text>
             </View>
           </View>
@@ -420,17 +461,14 @@ function HomeContent() {
         ? { media: '暂无内容', title: '社区与二手集市暂时还没有内容' }
         : { media: '加载失败', title: '社区与二手集市加载失败，点击重试' }
     return (
-      <View className='student-waterfall student-waterfall--state'>
+      <View className='student-discover-state-wrap'>
         <View
-          className={`student-post-card student-post-card--state ${initialStatus === 'error' && !retrying ? 'student-post-card--retry' : ''}`}
+          className={`student-discover-state ${initialStatus === 'error' && !retrying ? 'student-discover-state--retry' : ''}`}
           onClick={initialStatus === 'error' && !retrying ? () => void loadDiscover(false, sourceError) : undefined}
         >
-          <View className='student-post-card__media student-post-card__media--sky student-post-card__media--medium'>
-            <Text>{copy.media}</Text>
-          </View>
-          <View className='student-post-card__body'>
-            <Text className='student-post-card__title'>{copy.title}</Text>
-          </View>
+          <View className='student-discover-state__icon'><Text>{copy.media.slice(0, 1)}</Text></View>
+          <Text className='student-discover-state__title'>{copy.media}</Text>
+          <Text className='student-discover-state__desc'>{copy.title}</Text>
         </View>
       </View>
     )
@@ -521,13 +559,30 @@ function HomeContent() {
         {activeTab === 'discover' && (
           initialStatus !== 'ready' ? renderDiscoverState() : (
             <>
-              <View className='student-waterfall'>
-                <View className='student-waterfall__column'>
-                  {columns.left.map(renderDiscoverCard)}
-                </View>
-                <View className='student-waterfall__column'>
-                  {columns.right.map(renderDiscoverCard)}
-                </View>
+              <View className='student-discover-feed'>
+                {textCards.length > 0 ? (
+                  <View className='student-text-stream'>
+                    {textCards.map(renderTextCard)}
+                  </View>
+                ) : null}
+                {mediaCards.length > 0 ? (
+                  <View className='student-media-grid'>
+                    <View className='student-media-grid__column'>
+                      {mediaColumns.left.map(renderMediaCard)}
+                    </View>
+                    <View className='student-media-grid__column'>
+                      {mediaColumns.right.map(renderMediaCard)}
+                    </View>
+                  </View>
+                ) : null}
+                {cards.length === 0 ? (
+                  <View className='student-discover-state'>
+                    <View className='student-discover-state__icon'><Text>空</Text></View>
+                    <Text className='student-discover-state__title'>暂时没有可展示的内容</Text>
+                    <Text className='student-discover-state__desc'>新帖子和二手商品会在发布后出现在这里。</Text>
+                  </View>
+                ) : null}
+                <View className='student-discover-feed__end-spacer' />
               </View>
               {(sourceError.community || sourceError.trade) ? (
                 <View

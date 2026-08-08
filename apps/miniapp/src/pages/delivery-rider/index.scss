@@ -218,40 +218,45 @@ page {
   background: $border-subtle;
 }
 
-.rider-grab-refresh {
-  width: 88rpx;
-  flex: 0 0 auto;
-  border-left: 1rpx solid $border-subtle;
+.rider-grab-refresh-hint {
+  min-height: 36rpx;
+  margin-top: 14rpx;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 7rpx;
-  color: $brand-primary;
-  font-size: 19rpx;
-  font-weight: 650;
-  transition: background $duration-fast ease, opacity $duration-fast ease;
+  color: $text-tertiary;
+  font-size: 20rpx;
+  line-height: 1.35;
 }
 
-.rider-grab-refresh:active {
-  background: $rider-accent-soft;
+.rider-grab-refresh-hint__dot {
+  width: 10rpx;
+  height: 10rpx;
+  margin-right: 10rpx;
+  border-radius: 50%;
+  background: $rider-success;
+  box-shadow: 0 0 0 5rpx $rider-success-soft;
 }
 
-.rider-grab-refresh--loading {
+.rider-grab-refresh-hint__dot--active {
+  animation: rider-refresh-pulse 0.9s ease-in-out infinite alternate;
+}
+
+.rider-grab-refresh-hint__label {
+  color: $text-secondary;
+  font-weight: 600;
+}
+
+.rider-grab-refresh-hint__time {
+  margin-left: 7rpx;
   color: $text-tertiary;
 }
 
-.rider-grab-refresh__icon {
-  width: 32rpx;
-  height: 32rpx;
-}
-
-.rider-grab-refresh__icon--spin {
-  animation: rider-refresh-spin 0.9s linear infinite;
-}
-
-@keyframes rider-refresh-spin {
-  to { transform: rotate(360deg); }
+@keyframes rider-refresh-pulse {
+  to {
+    opacity: 0.42;
+    transform: scale(0.78);
+  }
 }
 
 .rider-grab-tabs {
@@ -818,10 +823,6 @@ page {
     flex: 1;
   }
 
-  .rider-grab-refresh {
-    width: 76rpx;
-  }
-
   .rider-order-route__drop-row {
     display: block;
   }
@@ -834,13 +835,12 @@ page {
 
 @media (prefers-reduced-motion: reduce) {
   .rider-grab-user__switch,
-  .rider-grab-refresh,
   .rider-order-card__grab,
   .rider-order-card__secondary {
     transition: none;
   }
 
-  .rider-grab-refresh__icon--spin {
+  .rider-grab-refresh-hint__dot--active {
     animation: none;
   }
 }

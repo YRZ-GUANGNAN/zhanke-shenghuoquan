@@ -111,181 +111,275 @@
   background: $bg-app;
 }
 
-.student-waterfall {
-  display: flex;
-  align-items: flex-start;
-  gap: 20rpx;
-  padding: 24rpx 24rpx 20rpx;
+.student-discover-feed {
+  padding: 24rpx 24rpx 0;
 }
 
-.student-waterfall--state {
-  display: block;
-  padding-bottom: 216rpx;
+.student-text-stream {
+  display: grid;
+  gap: 18rpx;
+  margin-bottom: 20rpx;
 }
 
-.student-waterfall__column {
-  flex: 1 1 0;
-  display: flex;
-  flex-direction: column;
-  gap: 20rpx;
-  min-width: 0;
-}
-
-.student-post-card {
-  overflow: hidden;
+.student-text-card {
+  padding: 28rpx;
+  border: 1rpx solid $border-subtle;
   border-radius: 28rpx;
   background: $bg-surface;
-  box-shadow: $shadow-card;
+  box-shadow: 0 10rpx 30rpx rgba(36, 68, 105, 0.055);
 }
 
-.student-post-card--state {
-  width: 100%;
+.student-text-card:active,
+.student-media-card:active {
+  opacity: 0.9;
+  transform: scale(0.992);
 }
 
-.student-post-card--retry {
-  color: $brand-primary;
-}
-
-.student-post-card__media {
+.student-text-card__eyebrow {
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: $placeholder-label;
-  font-family: ui-monospace, Menlo, monospace;
-  font-size: 20rpx;
-  font-weight: 400;
+  gap: 12rpx;
+  margin-bottom: 14rpx;
+  font-size: 21rpx;
 }
 
-.student-post-card__image {
+.student-text-card__kind {
+  color: $brand-primary;
+  font-weight: 700;
+}
+
+.student-text-card__topic {
+  max-width: 430rpx;
+  overflow: hidden;
+  color: $text-tertiary;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.student-text-card__title {
+  display: -webkit-box;
+  overflow: hidden;
+  color: $text-primary;
+  font-size: 31rpx;
+  font-weight: 650;
+  line-height: 1.48;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.student-media-grid {
+  display: flex;
+  align-items: flex-start;
+  gap: 18rpx;
+}
+
+.student-media-grid__column {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18rpx;
+}
+
+.student-media-card {
+  overflow: hidden;
+  border: 1rpx solid $border-subtle;
+  border-radius: 26rpx;
+  background: $bg-surface;
+  box-shadow: 0 8rpx 24rpx rgba(36, 68, 105, 0.05);
+  transition: opacity $duration-fast ease, transform $duration-fast ease;
+}
+
+.student-media-card__visual {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  background: $bg-muted;
+}
+
+.student-media-card__image {
   display: block;
   width: 100%;
   height: 100%;
 }
 
-.student-post-card__media--short {
-  height: 220rpx;
+.student-media-card__empty {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  color: $text-secondary;
 }
 
-.student-post-card__media--medium {
-  height: 250rpx;
+.student-media-card__empty--sky {
+  background: #eaf2fb;
 }
 
-.student-post-card__media--tall {
-  height: 340rpx;
+.student-media-card__empty--mint {
+  background: #eaf6f1;
 }
 
-.student-post-card__media--peach {
-  background: $placeholder-stripe, #FDEBE3;
+.student-media-card__empty--warm {
+  background: #fbf1e7;
 }
 
-.student-post-card__media--sky {
-  background: $placeholder-stripe, #E3EEFB;
+.student-media-card__empty-title {
+  font-size: 24rpx;
+  font-weight: 650;
 }
 
-.student-post-card__media--mint {
-  background: $placeholder-stripe, #E8F6EE;
+.student-media-card__empty-sub {
+  max-width: 220rpx;
+  overflow: hidden;
+  color: $text-tertiary;
+  font-size: 20rpx;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-.student-post-card__media--lilac {
-  background: $placeholder-stripe, #F6EEFB;
+.student-media-card__badge {
+  position: absolute;
+  top: 16rpx;
+  left: 16rpx;
+  padding: 6rpx 12rpx;
+  border-radius: 999rpx;
+  background: rgba(20, 37, 55, 0.72);
+  color: #fff;
+  font-size: 19rpx;
+  font-weight: 650;
+  line-height: 1.2;
 }
 
-.student-post-card__media--lemon {
-  background: $placeholder-stripe, #FBF3E0;
+.student-media-card__body {
+  padding: 18rpx 20rpx 20rpx;
 }
 
-.student-post-card__media--cyan {
-  background: $placeholder-stripe, #EAF4F9;
-}
-
-.student-post-card__body {
-  padding: 18rpx 22rpx 20rpx;
-}
-
-.student-post-card__title {
+.student-media-card__title {
   display: -webkit-box;
   overflow: hidden;
   color: $text-primary;
   font-size: 27rpx;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.45;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
-.student-post-card__meta {
+.student-card-meta {
+  min-width: 0;
+  min-height: 38rpx;
+  margin-top: 18rpx;
   display: flex;
   align-items: center;
-  gap: 12rpx;
-  margin-top: 18rpx;
-  min-height: 36rpx;
+  gap: 10rpx;
 }
 
-.student-post-card__avatar {
+.student-card-meta__avatar {
+  width: 36rpx;
+  height: 36rpx;
   flex: 0 0 auto;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36rpx;
-  height: 36rpx;
-  border-radius: 50%;
   color: $text-on-color;
   font-size: 18rpx;
   line-height: 1;
 }
 
-.student-post-card__avatar--peach {
-  background: #F0A98B;
+.student-card-meta__avatar--sky {
+  background: #6f9fd0;
 }
 
-.student-post-card__avatar--sky {
-  background: #7FA8D9;
+.student-card-meta__avatar--mint {
+  background: #69b596;
 }
 
-.student-post-card__avatar--mint {
-  background: #7CC9A6;
+.student-card-meta__avatar--warm {
+  background: #d79a62;
 }
 
-.student-post-card__avatar--lilac {
-  background: #B79BD6;
-}
-
-.student-post-card__avatar--lemon {
-  background: #D9B36A;
-}
-
-.student-post-card__avatar--cyan {
-  background: #6FA8C9;
-}
-
-.student-post-card__author {
+.student-card-meta__author {
+  min-width: 0;
   flex: 1 1 auto;
   overflow: hidden;
   color: $text-secondary;
-  font-size: 22rpx;
-  font-weight: 400;
+  font-size: 21rpx;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.student-post-card__like {
+.student-card-meta__like {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 8rpx;
+  gap: 7rpx;
   color: $like-idle-count;
+  font-size: 21rpx;
+  font-variant-numeric: tabular-nums;
+}
+
+.student-card-meta__heart {
+  width: 27rpx;
+  height: 27rpx;
+}
+
+.student-discover-state-wrap {
+  padding: 24rpx 24rpx 216rpx;
+}
+
+.student-discover-state {
+  min-height: 280rpx;
+  padding: 42rpx 32rpx;
+  border: 1rpx solid $border-subtle;
+  border-radius: 28rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: $bg-surface;
+  box-shadow: $shadow-card;
+  box-sizing: border-box;
+}
+
+.student-discover-state--retry {
+  color: $brand-primary;
+}
+
+.student-discover-state__icon {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eaf2fb;
+  color: $brand-primary;
+  font-size: 24rpx;
+  font-weight: 750;
+}
+
+.student-discover-state__title {
+  margin-top: 22rpx;
+  color: $text-primary;
+  font-size: 28rpx;
+  font-weight: 650;
+}
+
+.student-discover-state__desc {
+  margin-top: 10rpx;
+  color: $text-tertiary;
   font-size: 22rpx;
-  font-weight: 400;
+  line-height: 1.5;
+  text-align: center;
 }
 
-.student-post-card__heart {
-  width: 28rpx;
-  height: 28rpx;
-}
-
-.student-post-card__like--active,
-.student-post-card__like--active .student-post-card__heart {
-  color: $like-active;
+.student-discover-feed__end-spacer {
+  height: 18rpx;
 }
 
 .student-discover-feedback {

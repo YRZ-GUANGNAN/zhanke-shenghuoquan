@@ -26,12 +26,15 @@ for (const [icon, binding] of icons) {
 }
 
 assert.match(source, /RiderWorkbenchIcon/)
-assert.match(source, /name='refresh'/)
 assert.match(source, /name='message'/)
 assert.match(source, /name='phone'/)
 assert.match(source, /name='empty'/)
 assert.match(source, /className='rider-grab-task-summary'/)
-assert.match(source, /rider-grab-refresh/)
+assert.match(source, /refresherEnabled/)
+assert.match(source, /refresherTriggered=\{refreshing\}/)
+assert.match(source, /onRefresherRefresh=\{\(\) => void handlePullDownRefresh\(\)\}/)
+assert.match(source, /rider-grab-refresh-hint/)
+assert.doesNotMatch(source, /className=\{`rider-grab-refresh\s/)
 assert.match(source, /className='rider-empty-state'/)
 assert.match(source, /CapsuleSystemRow/)
 assert.match(source, /getDeliveryRiderMe/)
@@ -42,10 +45,11 @@ assert.doesNotMatch(source, /rider-grab-hero__orb/)
 assert.doesNotMatch(source, /rider-grab-list-head/)
 
 assert.match(style, /\.rider-grab-task-summary\s*\{/)
-assert.match(style, /\.rider-grab-refresh\s*\{/)
+assert.match(style, /\.rider-grab-refresh-hint\s*\{/)
+assert.doesNotMatch(style, /\.rider-grab-refresh\s*\{/)
 assert.match(style, /\.rider-grab-tabs\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/)
 assert.match(style, /\.rider-empty-state\s*\{/)
-assert.match(style, /@keyframes\s+rider-refresh-spin/)
+assert.doesNotMatch(style, /@keyframes\s+rider-refresh-spin/)
 assert.doesNotMatch(
   style.match(/\.rider-grab-content\s*\{[^}]*\}/)?.[0] || '',
   /\bpadding\s*:/,

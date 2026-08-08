@@ -51,6 +51,11 @@ function formatTime(value: string): string {
   return `${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
+function formatRefreshTime(value: Date | null): string {
+  if (!value) return '等待首次同步'
+  return `${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')} 更新`
+}
+
 function shortOrderId(value: string): string {
   return `#${value.slice(-8).toUpperCase()}`
 }
@@ -87,6 +92,8 @@ export default function DeliveryRiderPage() {
   const [completedTotal, setCompletedTotal] = useState(0)
   const [loadingMore, setLoadingMore] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null)
   const [busyOrderId, setBusyOrderId] = useState('')
   const [error, setError] = useState('')
   const [loadMoreError, setLoadMoreError] = useState('')
@@ -120,6 +127,7 @@ export default function DeliveryRiderPage() {
       setDeliveryPage(nextDelivery.page || 1)
       setDeliveryTotal(nextDelivery.total)
       setCompletedTotal(nextCompleted.total)
+      setLastUpdatedAt(new Date())
     } finally {
       if (requestVersion.current === version) setLoading(false)
     }
@@ -164,6 +172,7 @@ export default function DeliveryRiderPage() {
       setDeliveryPage(deliveryPage.page || 1)
       setDeliveryTotal(deliveryPage.total)
       setCompletedTotal(completedPage.total)
+      setLastUpdatedAt(new Date())
     } catch (value) {
       if (requestVersion.current !== version) return
       const message = errorMessage(value, '骑手订单加载失败')
@@ -177,6 +186,16 @@ export default function DeliveryRiderPage() {
   useDidShow(() => {
     void load()
   })
+
+  const handlePullDownRefresh = async () => {
+    if (refreshing || loading) return
+    setRefreshing(true)
+    try {
+      await load()
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   const loadMoreOrders = async () => {
     if (loading || loadingMore) return
@@ -401,18 +420,11 @@ export default function DeliveryRiderPage() {
               <Text className='rider-grab-task-summary__stat-label'>已结束</Text>
             </View>
           </View>
-          <View
-            className={`rider-grab-refresh ${loading ? 'rider-grab-refresh--loading' : ''}`}
-            onClick={() => {
-              if (!loading) void load()
-            }}
-          >
-            <RiderWorkbenchIcon
-              name='refresh'
-              className={`rider-grab-refresh__icon ${loading ? 'rider-grab-refresh__icon--spin' : ''}`}
-            />
-            <Text>{loading ? '刷新中' : '刷新'}</Text>
-          </View>
+        </View>
+        <View className='rider-grab-refresh-hint'>
+          <View className={`rider-grab-refresh-hint__dot ${refreshing ? 'rider-grab-refresh-hint__dot--active' : ''}`} />
+          <Text className='rider-grab-refresh-hint__label'>{refreshing ? '正在刷新订单' : '下拉刷新订单'}</Text>
+          <Text className='rider-grab-refresh-hint__time'>· {formatRefreshTime(lastUpdatedAt)}</Text>
         </View>
       </View>
 
@@ -433,6 +445,10 @@ export default function DeliveryRiderPage() {
         scrollY
         enhanced
         showScrollbar={false}
+        refresherEnabled
+        refresherTriggered={refreshing}
+        refresherBackground='#F3F6FA'
+        onRefresherRefresh={() => void handlePullDownRefresh()}
         className='rider-grab-content'
         lowerThreshold={120}
         onScrollToLower={() => void loadMoreOrders()}

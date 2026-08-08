@@ -1,0 +1,21 @@
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+
+const root = path.resolve(__dirname, '..')
+const pageRoot = path.join(root, 'apps', 'miniapp', 'src', 'pages', 'home')
+const source = fs.readFileSync(path.join(pageRoot, 'index.tsx'), 'utf8')
+const style = fs.readFileSync(path.join(pageRoot, 'index.scss'), 'utf8')
+
+assert.match(source, /kind:\s*'post'\s*\|\s*'product'/, 'feed cards must distinguish posts from products')
+assert.match(source, /student-text-card/, 'image-free posts must use a full-width text card')
+assert.match(source, /student-media-grid/, 'real media and products must use the stable media grid')
+assert.match(source, /card\.kind === 'post' && !card\.imageUrl/, 'image-free posts must be separated from media cards')
+assert.match(source, /failedImageKeys\.has\(imageKey\)/, 'failed media must fall back to an honest no-image state')
+assert.doesNotMatch(source, /const heights:/, 'feed cards must not use randomized heights')
+assert.doesNotMatch(source, /student-post-card__media--\$\{card\.height\}/, 'media regions must not bind randomized heights')
+assert.doesNotMatch(style, /\$placeholder-stripe/, 'the home feed must not render striped fake media')
+assert.match(style, /aspect-ratio:\s*4\s*\/\s*5/, 'media cards must use a stable 4:5 ratio')
+assert.match(style, /\.student-text-card\s*\{/, 'text cards must have dedicated styling')
+
+console.log('home feed card contract: ok')
