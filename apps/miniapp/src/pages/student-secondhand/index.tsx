@@ -12,7 +12,6 @@ import './index.scss'
 type CategoryKey = '全部' | '数码' | '书籍资料' | '生活用品' | '代步'
 type ProductTone = 'lemon' | 'lilac' | 'sky' | 'peach' | 'mint'
 type ProductStatus = 'selling' | 'sold'
-type ProductHeight = 'short' | 'medium' | 'tall'
 
 interface ProductCard {
   id: string
@@ -23,12 +22,10 @@ interface ProductCard {
   imageUrl?: string
   status: ProductStatus
   tone: ProductTone
-  height: ProductHeight
 }
 
 const categories: CategoryKey[] = ['全部', '数码', '书籍资料', '生活用品', '代步']
 const productTones: ProductTone[] = ['lemon', 'lilac', 'sky', 'peach', 'mint']
-const productHeights: ProductHeight[] = ['short', 'medium', 'tall']
 
 function stableNumber(value: string) {
   return Array.from(value).reduce((hash, char) => ((hash * 31) + char.charCodeAt(0)) >>> 0, 7)
@@ -50,8 +47,7 @@ function toCard(product: Product): ProductCard {
     imageLabel: `图 · ${product.category || '二手'}`,
     imageUrl: product.images[0],
     status: product.status === 'sold' ? 'sold' : 'selling',
-    tone: productTones[value % productTones.length],
-    height: productHeights[value % productHeights.length]
+    tone: productTones[value % productTones.length]
   }
 }
 
@@ -177,7 +173,7 @@ export default function StudentSecondhandPage() {
       className={`secondhand-card ${item.status === 'sold' ? 'secondhand-card--sold' : ''}`}
       onClick={() => openDetail(item)}
     >
-      <View className={`secondhand-card__media secondhand-card__media--${item.tone} secondhand-card__media--${item.height}`}>
+      <View className={`secondhand-card__media secondhand-card__media--${item.tone}`}>
         {item.imageUrl && !failedImageKeys.has(item.id) ? (
           <Image
             className='secondhand-card__image'
@@ -195,6 +191,7 @@ export default function StudentSecondhandPage() {
         )}
       </View>
       <View className='secondhand-card__body'>
+        <Text className='secondhand-card__category'>{item.category || '二手闲置'}</Text>
         <Text className='secondhand-card__title'>{item.title}</Text>
         <View className='secondhand-card__bottom'>
           <Text className='secondhand-card__price'>¥{item.price}</Text>
@@ -206,9 +203,9 @@ export default function StudentSecondhandPage() {
     </View>
   )
 
-  const renderSkeleton = (key: string, tone: ProductTone, height: ProductHeight) => (
+  const renderSkeleton = (key: string, tone: ProductTone) => (
     <View key={key} className='secondhand-card secondhand-card--skeleton'>
-      <View className={`secondhand-card__media secondhand-card__media--${tone} secondhand-card__media--${height}`} />
+      <View className={`secondhand-card__media secondhand-card__media--${tone}`} />
       <View className='secondhand-card__body'>
         <View className='secondhand-card__skeleton-line secondhand-card__skeleton-line--title' />
         <View className='secondhand-card__skeleton-line secondhand-card__skeleton-line--meta' />
@@ -218,7 +215,7 @@ export default function StudentSecondhandPage() {
 
   const renderStateCard = () => (
     <View className='secondhand-card secondhand-card--state'>
-      <View className='secondhand-card__media secondhand-card__media--sky secondhand-card__media--medium'>
+      <View className='secondhand-card__media secondhand-card__media--sky'>
         <Text>{status === 'empty' ? '该分类暂无在售宝贝' : '加载失败'}</Text>
       </View>
       {status === 'error' && (
@@ -273,20 +270,20 @@ export default function StudentSecondhandPage() {
           <Text>平台仅展示信息，交易请与卖家私下当面交付，验货后再付款。</Text>
         </View>
 
-        <View className='student-secondhand-waterfall'>
+        <View className={`student-secondhand-waterfall ${status === 'ready' && cards.length === 1 ? 'student-secondhand-waterfall--single' : ''}`}>
           <View className='student-secondhand-waterfall__column'>
             {status === 'loading'
               ? [
-                  renderSkeleton('skeleton-left-1', 'lemon', 'short'),
-                  renderSkeleton('skeleton-left-2', 'mint', 'medium')
+                  renderSkeleton('skeleton-left-1', 'lemon'),
+                  renderSkeleton('skeleton-left-2', 'mint')
                 ]
               : (status === 'ready' ? columns.left.map(renderCard) : renderStateCard())}
           </View>
           <View className='student-secondhand-waterfall__column'>
             {status === 'loading'
               ? [
-                  renderSkeleton('skeleton-right-1', 'lilac', 'medium'),
-                  renderSkeleton('skeleton-right-2', 'peach', 'tall')
+                  renderSkeleton('skeleton-right-1', 'lilac'),
+                  renderSkeleton('skeleton-right-2', 'peach')
                 ]
               : (status === 'ready' ? columns.right.map(renderCard) : null)}
           </View>

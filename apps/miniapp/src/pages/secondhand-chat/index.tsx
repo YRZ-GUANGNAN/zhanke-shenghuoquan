@@ -209,8 +209,8 @@ export default function SecondhandChatPage() {
   const peerAvatar = role === 'seller' ? '买' : peerName.trim().charAt(0) || '校'
   const peerAvatarImage = role === 'buyer' ? product?.sellerAvatar : ''
   const peerState = role === 'seller'
-    ? `你是卖家 · 对方用户 #${context?.buyerId || '-'} · 腾讯云 IM`
-    : `你是买家 · 对方用户 #${context?.sellerId || '-'} · 腾讯云 IM`
+    ? '买家咨询 · 会话已加密'
+    : '卖家沟通 · 会话已加密'
   const canOpenSellerProfile = role === 'buyer' && Boolean(product?.sellerId)
   const resolvedProductId = context
     ? String(context.productId)
@@ -311,7 +311,14 @@ export default function SecondhandChatPage() {
           <Text className='secondhand-chat-product__title'>
             {product?.title || (resolvedProductId ? `二手商品 #${resolvedProductId}` : '正在读取宝贝信息')}
           </Text>
-          {product ? <Text className='secondhand-chat-product__price'>¥{product.price}</Text> : null}
+          {product ? (
+            <View className='secondhand-chat-product__meta'>
+              <Text className='secondhand-chat-product__price'>¥{product.price}</Text>
+              <Text className='secondhand-chat-product__status'>
+                {product.status === 'selling' ? '出售中' : '已售出'}
+              </Text>
+            </View>
+          ) : null}
         </View>
         <View
           className={`secondhand-chat-product__button ${resolvedProductId ? '' : 'secondhand-chat-product__button--disabled'}`}
@@ -386,6 +393,12 @@ export default function SecondhandChatPage() {
         className={`secondhand-chat-inputbar ${keyboardHeight > 0 ? 'secondhand-chat-inputbar--keyboard' : ''}`}
         style={keyboardHeight > 0 ? { bottom: `${keyboardHeight}px` } : undefined}
       >
+        <View
+          className='secondhand-chat-composer__media'
+          onClick={() => showToast('图片消息暂未开放，请先发送文字')}
+        >
+          <View className='secondhand-chat-composer__media-icon' />
+        </View>
         <View className='secondhand-chat-input-wrap'>
           <Input
             className='secondhand-chat-input'

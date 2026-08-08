@@ -252,21 +252,23 @@ export default function UserProfilePage() {
           <View className='public-profile-nav__back' onClick={() => void Taro.navigateBack().catch(() => Taro.redirectTo({ url: '/pages/home/index' }))} />
           <View className='public-profile-nav__more' onClick={() => setMenuVisible(true)}><Text>•••</Text></View>
         </View>
-        <View className='public-profile-user'>
-          <View className='public-profile-user__avatar'>
-            {value.avatar ? <Image className='public-profile-user__avatar-image' src={value.avatar} mode='aspectFill' /> : <Text>{value.nickname.slice(0, 1) || '校'}</Text>}
+        <View className='public-profile-identity'>
+          <View className='public-profile-user'>
+            <View className='public-profile-user__avatar'>
+              {value.avatar ? <Image className='public-profile-user__avatar-image' src={value.avatar} mode='aspectFill' /> : <Text>{value.nickname.slice(0, 1) || '校'}</Text>}
+            </View>
+            <View className='public-profile-user__main'>
+              <Text className='public-profile-user__name'>{value.nickname}</Text>
+              <Text className='public-profile-user__meta'>用户编号：{value.id}</Text>
+              <Text className='public-profile-user__meta'>{value.school || '未填写学校'}{value.campus ? ` · ${value.campus}` : ''}</Text>
+            </View>
           </View>
-          <View className='public-profile-user__main'>
-            <Text className='public-profile-user__name'>{value.nickname}</Text>
-            <Text className='public-profile-user__meta'>用户编号：{value.id}</Text>
-            <Text className='public-profile-user__meta'>{value.school || '未填写学校'}{value.campus ? ` · ${value.campus}` : ''}</Text>
+          <Text className='public-profile-bio'>仅展示该用户审核通过的公开内容</Text>
+          <View className='public-profile-stats'>
+            <View><Text className='public-profile-stats__value'>{profile.followingCount}</Text><Text>关注</Text></View>
+            <View><Text className='public-profile-stats__value'>{followerCount}</Text><Text>粉丝</Text></View>
+            <View><Text className='public-profile-stats__value'>{profile.likedCount}</Text><Text>获赞</Text></View>
           </View>
-        </View>
-        <Text className='public-profile-bio'>这里展示该用户审核通过的公开内容。</Text>
-        <View className='public-profile-stats'>
-          <View><Text className='public-profile-stats__value'>{profile.followingCount}</Text><Text>关注</Text></View>
-          <View><Text className='public-profile-stats__value'>{followerCount}</Text><Text>粉丝</Text></View>
-          <View><Text className='public-profile-stats__value'>{profile.likedCount}</Text><Text>获赞</Text></View>
         </View>
         <View className='public-profile-actions'>
           <View className={`public-profile-action public-profile-action--primary ${following ? 'public-profile-action--active' : ''}`} onClick={isSelf ? () => void Taro.navigateTo({ url: '/pages/edit-profile/index' }) : () => void toggleFollow()}>

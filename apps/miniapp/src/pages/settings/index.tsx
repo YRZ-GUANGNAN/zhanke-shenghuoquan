@@ -145,6 +145,18 @@ export default function SettingsPage() {
       <CapsulePageHeader title='设置' left={<AppIconButton name='back' label='返回' className='student-settings-nav__back' onClick={() => void Taro.navigateBack()} />} />
 
       <View className='student-settings-content'>
+        <View className='student-settings-account'>
+          <View className='student-settings-account__mark'><Text>{identityName.slice(0, 1)}</Text></View>
+          <View className='student-settings-account__main'>
+            <Text className='student-settings-account__title'>{identityName}账号</Text>
+            <Text className='student-settings-account__desc'>
+              {settings.phoneBound ? `手机号 ${settings.maskedPhone}` : '绑定手机号，及时接收交易与互动提醒'}
+            </Text>
+          </View>
+          <Text className={`student-settings-account__badge ${settings.phoneBound ? 'student-settings-account__badge--ready' : ''}`}>
+            {settings.phoneBound ? '已绑定' : '待完善'}
+          </Text>
+        </View>
         <View className='student-settings-section'>
           <Text className='student-settings-section__label'>账号与绑定</Text>
           <View className='student-settings-card'>

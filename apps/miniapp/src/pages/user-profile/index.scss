@@ -12,9 +12,10 @@
 
 .public-profile-hero {
   flex: 0 0 auto;
-  padding: 0 30rpx 34rpx;
-  background: $brand-primary;
-  color: $text-on-color;
+  padding: 0 30rpx 30rpx;
+  border-bottom: 1rpx solid $divider-hairline;
+  background: $bg-surface;
+  color: $text-strong;
   box-sizing: border-box;
 }
 
@@ -39,8 +40,8 @@
   left: 20rpx;
   width: 20rpx;
   height: 20rpx;
-  border-bottom: 4rpx solid $text-on-color;
-  border-left: 4rpx solid $text-on-color;
+  border-bottom: 4rpx solid $text-strong;
+  border-left: 4rpx solid $text-strong;
   content: '';
   transform: rotate(45deg);
 }
@@ -52,17 +53,24 @@
   justify-content: center;
   width: 64rpx;
   height: 54rpx;
-  color: $text-on-color;
+  color: $text-strong;
   font-size: 30rpx;
   line-height: 1;
   margin-right: 0;
+}
+
+.public-profile-identity {
+  padding: 28rpx;
+  border: 1rpx solid $divider-hairline;
+  border-radius: 28rpx;
+  background: $bg-surface;
+  box-shadow: $shadow-card;
 }
 
 .public-profile-user {
   display: flex;
   align-items: center;
   gap: 24rpx;
-  margin-top: 24rpx;
 }
 
 .public-profile-user__avatar {
@@ -72,9 +80,9 @@
   justify-content: center;
   width: 94rpx;
   height: 94rpx;
-  border: 5rpx solid rgba(255, 255, 255, .72);
+  border: 5rpx solid $brand-tint;
   border-radius: 50%;
-  background: #F5A888;
+  background: $gradient-primary;
   color: $text-on-color;
   font-size: 46rpx;
   font-weight: 700;
@@ -100,8 +108,8 @@
 
 .public-profile-user__name {
   overflow: hidden;
-  color: $text-on-color;
-  font-size: 36rpx;
+  color: $text-strong;
+  font-size: 34rpx;
   font-weight: 800;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -112,7 +120,7 @@
   display: block;
   overflow: hidden;
   margin-top: 5rpx;
-  color: rgba(255, 255, 255, .86);
+  color: $text-muted;
   font-size: 24rpx;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -122,9 +130,11 @@
 .public-profile-bio {
   display: block;
   overflow: hidden;
-  margin-top: 24rpx;
-  color: rgba(255, 255, 255, .95);
-  font-size: 26rpx;
+  margin-top: 22rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx solid $divider-hairline;
+  color: $text-muted;
+  font-size: 23rpx;
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -133,23 +143,28 @@
 .public-profile-stats {
   display: flex;
   align-items: center;
-  gap: 46rpx;
-  margin-top: 26rpx;
-  color: rgba(255, 255, 255, .84);
-  font-size: 24rpx;
+  gap: 12rpx;
+  margin-top: 20rpx;
+  color: $text-muted;
+  font-size: 22rpx;
 }
 
 .public-profile-stats > view {
+  flex: 1 1 0;
   display: flex;
-  align-items: baseline;
-  gap: 9rpx;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
   min-width: 0;
+  height: 62rpx;
+  border-radius: 18rpx;
+  background: $bg-screen;
   white-space: nowrap;
 }
 
 .public-profile-stats__value {
-  color: $text-on-color;
-  font-size: 34rpx;
+  color: $text-strong;
+  font-size: 28rpx;
   font-weight: 800;
   line-height: 1;
 }
@@ -158,7 +173,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 16rpx;
-  margin-top: 28rpx;
+  margin-top: 20rpx;
 }
 
 .public-profile-action {
@@ -168,8 +183,8 @@
   min-width: 0;
   height: 72rpx;
   padding: 0 18rpx;
-  border: 2rpx solid rgba(255, 255, 255, .48);
-  border-radius: 8rpx;
+  border: 2rpx solid transparent;
+  border-radius: 20rpx;
   font-size: 27rpx;
   font-weight: 600;
   line-height: 1;
@@ -178,26 +193,29 @@
 }
 
 .public-profile-action--primary {
-  border-color: $text-on-color;
-  background: $text-on-color;
-  color: $brand-primary-strong;
+  border-color: $brand-primary;
+  background: $gradient-primary;
+  color: $text-on-color;
 }
 
 .public-profile-action--primary.public-profile-action--active {
-  border-color: rgba(255, 255, 255, .62);
-  background: rgba(255, 255, 255, .16);
-  color: $text-on-color;
+  border-color: rgba($brand-primary, .20);
+  background: $brand-tint;
+  color: $brand-primary;
 }
 
 .public-profile-action--secondary {
-  background: rgba(255, 255, 255, .12);
-  color: $text-on-color;
+  border-color: $divider-nav;
+  background: $bg-surface;
+  color: $text-secondary;
 }
 
 .public-profile-tabs {
   display: flex;
   flex: 0 0 74rpx;
   align-items: stretch;
+  justify-content: center;
+  gap: 48rpx;
   padding: 0 30rpx;
   border-bottom: 1rpx solid $divider-nav;
   background: $bg-surface;
@@ -230,7 +248,7 @@
   width: 44rpx;
   height: 6rpx;
   border-radius: 3rpx;
-  background: $brand-primary;
+  background: $gradient-primary;
   content: '';
   transform: translateX(-50%);
 }
@@ -262,7 +280,7 @@
 .public-profile-card {
   overflow: hidden;
   min-width: 0;
-  border-radius: 8rpx;
+  border-radius: 22rpx;
   background: $bg-surface;
   box-shadow: $shadow-card;
 }
@@ -272,7 +290,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 220rpx;
+  height: 224rpx;
   padding: 18rpx;
   overflow: hidden;
   background-image: $placeholder-stripe;
@@ -320,7 +338,7 @@
   top: 14rpx;
   right: 14rpx;
   padding: 6rpx 12rpx;
-  border-radius: 6rpx;
+  border-radius: 999rpx;
   background: rgba(26, 43, 60, .72);
   color: $text-on-color;
   font-size: 21rpx;
