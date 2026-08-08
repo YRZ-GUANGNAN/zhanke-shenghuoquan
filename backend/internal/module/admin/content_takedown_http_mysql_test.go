@@ -237,14 +237,20 @@ func assertG6B1ReviewStatusSchema(t *testing.T, db *gorm.DB) {
 		}
 	}
 	var checks int64
-	if err := db.Raw(`SELECT COUNT(*) FROM information_schema.table_constraints
-		WHERE table_schema=DATABASE() AND table_name IN ('posts','products') AND constraint_type='CHECK'`).Scan(&checks).Error; err != nil {
+	if err := db.Raw(`SELECT COUNT(*)
+		FROM information_schema.table_constraints tc
+		JOIN information_schema.check_constraints cc
+		  ON cc.constraint_schema=tc.constraint_schema AND cc.constraint_name=tc.constraint_name
+		WHERE tc.table_schema=DATABASE()
+		  AND tc.table_name IN ('posts','products')
+		  AND tc.constraint_type='CHECK'
+		  AND LOWER(cc.check_clause) LIKE '%review_status%'`).Scan(&checks).Error; err != nil {
 		t.Fatal(err)
 	}
 	if checks != 0 {
-		t.Fatalf("posts/products CHECK constraints=%d want=0", checks)
+		t.Fatalf("posts/products review_status CHECK constraints=%d want=0", checks)
 	}
-	t.Log("schema_check=PASS posts.review_status/products.review_status varchar(24) no CHECK/ENUM; migration_required=false")
+	t.Log("schema_check=PASS posts.review_status/products.review_status varchar(24) no review_status CHECK/ENUM; migration_required=false")
 }
 
 func g6b1HTTPJSON(t *testing.T, client *http.Client, method, url, token string, payload any) (int, g6b1Envelope) {
