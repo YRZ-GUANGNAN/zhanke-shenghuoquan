@@ -111,60 +111,18 @@
   background: $bg-app;
 }
 
+.student-discover-content {
+  padding-bottom: calc(184rpx + constant(safe-area-inset-bottom));
+  padding-bottom: calc(184rpx + env(safe-area-inset-bottom));
+}
+
 .student-discover-feed {
   padding: 24rpx 24rpx 0;
 }
 
-.student-text-stream {
-  display: grid;
-  gap: 18rpx;
-  margin-bottom: 20rpx;
-}
-
-.student-text-card {
-  padding: 28rpx;
-  border: 1rpx solid $border-subtle;
-  border-radius: 28rpx;
-  background: $bg-surface;
-  box-shadow: 0 10rpx 30rpx rgba(36, 68, 105, 0.055);
-}
-
-.student-text-card:active,
 .student-media-card:active {
   opacity: 0.9;
   transform: scale(0.992);
-}
-
-.student-text-card__eyebrow {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  margin-bottom: 14rpx;
-  font-size: 21rpx;
-}
-
-.student-text-card__kind {
-  color: $brand-primary;
-  font-weight: 700;
-}
-
-.student-text-card__topic {
-  max-width: 430rpx;
-  overflow: hidden;
-  color: $text-tertiary;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.student-text-card__title {
-  display: -webkit-box;
-  overflow: hidden;
-  color: $text-primary;
-  font-size: 31rpx;
-  font-weight: 650;
-  line-height: 1.48;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
 }
 
 .student-media-grid {
@@ -193,7 +151,7 @@
 .student-media-card__visual {
   position: relative;
   width: 100%;
-  aspect-ratio: 4 / 5;
+  aspect-ratio: 4 / 3;
   overflow: hidden;
   background: $bg-muted;
 }
@@ -207,10 +165,12 @@
 .student-media-card__empty {
   width: 100%;
   height: 100%;
+  padding: 24rpx;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-start;
+  justify-content: flex-end;
   gap: 8rpx;
   color: $text-secondary;
 }
@@ -228,15 +188,16 @@
 }
 
 .student-media-card__empty-title {
-  font-size: 24rpx;
-  font-weight: 650;
+  color: $text-primary;
+  font-size: 25rpx;
+  font-weight: 700;
 }
 
 .student-media-card__empty-sub {
-  max-width: 220rpx;
+  max-width: 230rpx;
   overflow: hidden;
-  color: $text-tertiary;
-  font-size: 20rpx;
+  color: $text-secondary;
+  font-size: 21rpx;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -249,16 +210,17 @@
   border-radius: 999rpx;
   background: rgba(20, 37, 55, 0.72);
   color: #fff;
-  font-size: 19rpx;
-  font-weight: 650;
+  font-size: 22rpx;
+  font-weight: 600;
   line-height: 1.2;
 }
 
 .student-media-card__body {
-  padding: 18rpx 20rpx 20rpx;
+  padding: 18rpx 18rpx 20rpx;
 }
 
 .student-media-card__title {
+  min-height: 78rpx;
   display: -webkit-box;
   overflow: hidden;
   color: $text-primary;
@@ -269,25 +231,47 @@
   -webkit-line-clamp: 2;
 }
 
+.student-media-card__support {
+  display: block;
+  min-height: 36rpx;
+  margin-top: 10rpx;
+  overflow: hidden;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.student-media-card__support--product {
+  color: $danger;
+  font-size: 29rpx;
+  font-weight: 700;
+}
+
+.student-media-card__support--post {
+  color: $brand-primary;
+  font-size: 22rpx;
+  font-weight: 600;
+}
+
 .student-card-meta {
   min-width: 0;
-  min-height: 38rpx;
-  margin-top: 18rpx;
+  min-height: 40rpx;
+  margin-top: 14rpx;
   display: flex;
   align-items: center;
   gap: 10rpx;
 }
 
 .student-card-meta__avatar {
-  width: 36rpx;
-  height: 36rpx;
+  width: 40rpx;
+  height: 40rpx;
   flex: 0 0 auto;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: $text-on-color;
-  font-size: 18rpx;
+  font-size: 20rpx;
   line-height: 1;
 }
 
@@ -308,7 +292,7 @@
   flex: 1 1 auto;
   overflow: hidden;
   color: $text-secondary;
-  font-size: 21rpx;
+  font-size: 22rpx;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -319,13 +303,13 @@
   align-items: center;
   gap: 7rpx;
   color: $like-idle-count;
-  font-size: 21rpx;
+  font-size: 22rpx;
   font-variant-numeric: tabular-nums;
 }
 
 .student-card-meta__heart {
-  width: 27rpx;
-  height: 27rpx;
+  width: 28rpx;
+  height: 28rpx;
 }
 
 .student-discover-state-wrap {
@@ -378,16 +362,12 @@
   text-align: center;
 }
 
-.student-discover-feed__end-spacer {
-  height: 18rpx;
-}
-
 .student-discover-feedback {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 72rpx;
-  margin: 0 24rpx 20rpx;
+  margin: 20rpx 24rpx 0;
   border-radius: 24rpx;
   background: $bg-surface;
   color: $text-muted;

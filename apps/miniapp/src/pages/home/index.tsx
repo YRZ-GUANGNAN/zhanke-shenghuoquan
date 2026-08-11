@@ -30,6 +30,8 @@ type DiscoverCard = {
   avatar: string
   likes: number
   imageUrl?: string
+  priceLabel?: string
+  statusLabel?: string
 }
 
 type SettledResult<T> =
@@ -94,7 +96,9 @@ function toProductCard(product: Product): DiscoverCard {
     title: product.title,
     author: product.sellerName,
     avatar: product.sellerName.slice(0, 1) || '校',
-    likes: product.favoriteCount
+    likes: product.favoriteCount,
+    priceLabel: `¥${product.price}`,
+    statusLabel: product.status === 'reserved' ? '已预订' : product.status === 'sold' ? '已售' : '在售'
   }
 }
 
@@ -109,9 +113,23 @@ function interleaveCards(posts: DiscoverCard[], products: DiscoverCard[]) {
 }
 
 function splitCards(cards: DiscoverCard[]) {
+  const left: DiscoverCard[] = []
+  const right: DiscoverCard[] = []
+
+  cards.forEach((card, index) => {
+    const rowIndex = Math.floor(index / 2)
+    const columnIndex = index % 2
+    const placeOnLeft = rowIndex % 2 === 0 ? columnIndex === 0 : columnIndex === 1
+    if (placeOnLeft) {
+      left.push(card)
+    } else {
+      right.push(card)
+    }
+  })
+
   return {
-    left: cards.filter((_, index) => index % 2 === 0),
-    right: cards.filter((_, index) => index % 2 === 1)
+    left,
+    right
   }
 }
 
@@ -157,15 +175,7 @@ function HomeContent() {
     () => interleaveCards(postCards, productCards),
     [postCards, productCards]
   )
-  const textCards = useMemo(
-    () => cards.filter((card) => card.kind === 'post' && !card.imageUrl),
-    [cards]
-  )
-  const mediaCards = useMemo(
-    () => cards.filter((card) => !(card.kind === 'post' && !card.imageUrl)),
-    [cards]
-  )
-  const mediaColumns = useMemo(() => splitCards(mediaCards), [mediaCards])
+  const cardColumns = useMemo(() => splitCards(cards), [cards])
   const identityAllowed = useIdentityGuard('student')
   const currentUserId = useSessionStore((state) => state.profile.id)
   const currentSessionKey = useSessionStore((state) => `${state.token}:${state.profile.id}`)
@@ -380,40 +390,14 @@ function HomeContent() {
     }
   }
 
-  const renderTextCard = (card: DiscoverCard) => {
-    const imageKey = `${card.target}:${card.id}`
-    return (
-      <View
-        key={imageKey}
-        className='student-text-card'
-        onClick={() => openCard(card)}
-      >
-        <View className='student-text-card__eyebrow'>
-          <Text className='student-text-card__kind'>校园帖子</Text>
-          <Text className='student-text-card__topic'>#{card.mediaLabel}</Text>
-        </View>
-        <Text className='student-text-card__title'>{card.title}</Text>
-        <View className='student-card-meta'>
-          <View className={`student-card-meta__avatar student-card-meta__avatar--${card.tone}`}>
-            <Text>{card.avatar}</Text>
-          </View>
-          <Text className='student-card-meta__author'>{card.author}</Text>
-          <View className='student-card-meta__like'>
-            <AppIcon name='heart' className='student-card-meta__heart' />
-            <Text>{card.likes}</Text>
-          </View>
-        </View>
-      </View>
-    )
-  }
-
-  const renderMediaCard = (card: DiscoverCard) => {
-    const imageKey = `${card.target}:${card.id}`
+  const renderDiscoverCard = (card: DiscoverCard) => {
+    const cardKey = `${card.target}:${card.id}`
+    const imageKey = `${cardKey}:${card.imageUrl || 'no-image'}`
     const hasUsableImage = Boolean(card.imageUrl) && !failedImageKeys.has(imageKey)
     return (
       <View
-        key={imageKey}
-        className='student-media-card'
+        key={cardKey}
+        className={`student-media-card student-media-card--${card.kind} ${hasUsableImage ? 'student-media-card--with-image' : 'student-media-card--no-image'}`}
         onClick={() => openCard(card)}
       >
         <View className='student-media-card__visual'>
@@ -430,21 +414,31 @@ function HomeContent() {
             />
           ) : (
             <View className={`student-media-card__empty student-media-card__empty--${card.tone}`}>
-              <Text className='student-media-card__empty-title'>暂无图片</Text>
-              <Text className='student-media-card__empty-sub'>{card.mediaLabel}</Text>
+              <Text className='student-media-card__empty-title'>
+                {card.kind === 'product' ? '无图商品' : '文字内容'}
+              </Text>
+              <Text className='student-media-card__empty-sub'>#{card.mediaLabel}</Text>
             </View>
           )}
-          <Text className='student-media-card__badge'>{card.kind === 'product' ? '二手' : '帖子'}</Text>
+          <Text className='student-media-card__badge'>
+            {card.kind === 'product' ? `二手 · ${card.statusLabel}` : '帖子'}
+          </Text>
         </View>
         <View className='student-media-card__body'>
           <Text className='student-media-card__title'>{card.title}</Text>
+          <Text className={`student-media-card__support student-media-card__support--${card.kind}`}>
+            {card.kind === 'product' ? card.priceLabel : `#${card.mediaLabel}`}
+          </Text>
           <View className='student-card-meta'>
             <View className={`student-card-meta__avatar student-card-meta__avatar--${card.tone}`}>
               <Text>{card.avatar}</Text>
             </View>
             <Text className='student-card-meta__author'>{card.author}</Text>
             <View className='student-card-meta__like'>
-              <AppIcon name='heart' className='student-card-meta__heart' />
+              <AppIcon
+                name={card.kind === 'product' ? 'star' : 'heart'}
+                className='student-card-meta__heart'
+              />
               <Text>{card.likes}</Text>
             </View>
           </View>
@@ -558,20 +552,15 @@ function HomeContent() {
 
         {activeTab === 'discover' && (
           initialStatus !== 'ready' ? renderDiscoverState() : (
-            <>
+            <View className='student-discover-content'>
               <View className='student-discover-feed'>
-                {textCards.length > 0 ? (
-                  <View className='student-text-stream'>
-                    {textCards.map(renderTextCard)}
-                  </View>
-                ) : null}
-                {mediaCards.length > 0 ? (
+                {cards.length > 0 ? (
                   <View className='student-media-grid'>
                     <View className='student-media-grid__column'>
-                      {mediaColumns.left.map(renderMediaCard)}
+                      {cardColumns.left.map(renderDiscoverCard)}
                     </View>
                     <View className='student-media-grid__column'>
-                      {mediaColumns.right.map(renderMediaCard)}
+                      {cardColumns.right.map(renderDiscoverCard)}
                     </View>
                   </View>
                 ) : null}
@@ -582,7 +571,6 @@ function HomeContent() {
                     <Text className='student-discover-state__desc'>新帖子和二手商品会在发布后出现在这里。</Text>
                   </View>
                 ) : null}
-                <View className='student-discover-feed__end-spacer' />
               </View>
               {(sourceError.community || sourceError.trade) ? (
                 <View
@@ -596,7 +584,7 @@ function HomeContent() {
                   <Text>正在加载更多...</Text>
                 </View>
               ) : null}
-            </>
+            </View>
           )
         )}
 
