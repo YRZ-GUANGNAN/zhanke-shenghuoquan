@@ -184,14 +184,32 @@ assert.match(
   /\.capsule-page-header\.secondhand-detail-header\s+\.capsule-page-header__business-row[\s\S]*margin-top:\s*-8px/,
 )
 
+const homeSource = fs.readFileSync(path.join(miniappPagesRoot, 'home', 'index.tsx'), 'utf8')
 const homeStyle = fs.readFileSync(path.join(miniappPagesRoot, 'home', 'index.scss'), 'utf8')
-assert.match(homeStyle, /\.student-home-header__search::before[\s\S]*width:\s*14px/)
-assert.match(homeStyle, /\.student-home-header__search::after[\s\S]*width:\s*8px/)
-assert.doesNotMatch(
-  homeStyle.match(/\.student-home-header__search::(?:before|after)[\s\S]*?(?=\n\})/g)?.join('\n') || '',
-  /\d+rpx/,
-  'search icon geometry must not mix rpx and px',
-)
+assert.match(homeSource, /<AppIcon name='search' className='student-home-header__search-icon'\s*\/>/)
+assert.match(homeSource, /import \{ Button, Image, ScrollView, Text, View \} from '@tarojs\/components'/)
+assert.match(homeSource, /<Button[\s\S]*className=\{`student-home-header__tab/)
+assert.match(homeSource, /hoverClass='student-home-header__tab--pressed'/)
+assert.match(homeSource, /<View className='student-home-header__tab-indicator'\s*\/>/)
+assert.match(homeSource, /当前栏目/)
+assert.match(homeSource, /<Button[\s\S]*className='student-home-header__search'/)
+assert.match(homeSource, /hoverClass='student-home-header__search--pressed'/)
+assert.match(homeSource, /<Text className='student-home-header__a11y'>搜索<\/Text>/)
+assert.match(homeStyle, /\.student-home-header__tabs[\s\S]*max-width:\s*432rpx/)
+assert.match(homeStyle, /\.student-home-header__tab[\s\S]*flex:\s*1 1 0/)
+assert.match(homeStyle, /\.student-home-header__tab[\s\S]*min-width:\s*44PX/)
+assert.match(homeStyle, /\.student-home-header__tab[\s\S]*min-height:\s*44PX/)
+assert.match(homeStyle, /\.student-home-header__tab--pressed/)
+assert.match(homeStyle, /\.student-home-header__tab::after[\s\S]*display:\s*none/)
+assert.match(homeStyle, /\.student-home-header__tab-indicator[\s\S]*bottom:\s*2px/)
+assert.doesNotMatch(homeStyle, /\.student-home-header__tab--active::after/)
+assert.match(homeStyle, /\.student-home-header__search[\s\S]*min-width:\s*44PX/)
+assert.match(homeStyle, /\.student-home-header__search[\s\S]*min-height:\s*44PX/)
+assert.match(homeStyle, /\.student-home-header__search-icon[\s\S]*width:\s*20PX/)
+assert.match(homeStyle, /\.student-home-header__search--pressed/)
+assert.doesNotMatch(homeStyle, /\.student-home-header__search::before/)
+assert.match(homeStyle, /\.student-home-header__search::after[\s\S]*display:\s*none[\s\S]*border:\s*0/)
+assert.match(homeStyle, /\.student-home-header__a11y[\s\S]*clip:\s*rect\(0, 0, 0, 0\)/)
 
 const editProfileSource = fs.readFileSync(path.join(miniappPagesRoot, 'edit-profile', 'index.tsx'), 'utf8')
 const editProfileStyle = fs.readFileSync(path.join(miniappPagesRoot, 'edit-profile', 'index.scss'), 'utf8')

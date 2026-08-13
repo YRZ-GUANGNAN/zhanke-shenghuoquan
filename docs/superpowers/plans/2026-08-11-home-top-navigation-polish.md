@@ -16,25 +16,28 @@
 - Modify: `scripts/check-miniapp-capsule-layout.cjs`
 - Modify: `scripts/check-home-real-tools-contract.cjs`
 
-- [ ] **Step 1: 将胶囊检查改为新导航契约**
+- [x] **Step 1: 将胶囊检查改为新导航契约**
 
 在读取首页样式的同时读取首页 JSX，并用下列检查替换旧的伪元素几何检查：
 
 ```js
 const homeSource = fs.readFileSync(path.join(miniappPagesRoot, 'home', 'index.tsx'), 'utf8')
 assert.match(homeSource, /<AppIcon name='search' className='student-home-header__search-icon'\s*\/>/)
-assert.match(homeSource, /role='button'/)
-assert.match(homeSource, /aria-label={`切换到\$\{tab\.label\}`}/)
-assert.match(homeSource, /aria-label='搜索'/)
+assert.match(homeSource, /<Button[\s\S]*className=\{`student-home-header__tab/)
+assert.match(homeSource, /hoverClass='student-home-header__tab--pressed'/)
+assert.match(homeSource, /当前栏目/)
+assert.match(homeSource, /<Button[\s\S]*className='student-home-header__search'/)
+assert.match(homeSource, /hoverClass='student-home-header__search--pressed'/)
+assert.match(homeSource, /<Text className='student-home-header__a11y'>搜索<\/Text>/)
 assert.match(homeStyle, /\.student-home-header__tabs[\s\S]*max-width:\s*432rpx/)
 assert.match(homeStyle, /\.student-home-header__tab[\s\S]*flex:\s*1 1 0/)
-assert.match(homeStyle, /\.student-home-header__tab[\s\S]*min-width:\s*44px/)
-assert.match(homeStyle, /\.student-home-header__search[\s\S]*min-width:\s*44px/)
-assert.match(homeStyle, /\.student-home-header__search:active/)
-assert.doesNotMatch(homeStyle, /\.student-home-header__search::(?:before|after)/)
+assert.match(homeStyle, /\.student-home-header__tab[\s\S]*min-width:\s*44PX/)
+assert.match(homeStyle, /\.student-home-header__search[\s\S]*min-width:\s*44PX/)
+assert.match(homeStyle, /\.student-home-header__search--pressed/)
+assert.doesNotMatch(homeStyle, /\.student-home-header__search::before/)
 ```
 
-- [ ] **Step 2: 更新首页工具检查中的连续适配约束**
+- [x] **Step 2: 更新首页工具检查中的连续适配约束**
 
 将旧的 `@media (max-width: 360px)` 断言替换为：
 
@@ -43,7 +46,7 @@ assert.match(homeStyle, /\.student-home-header__tabs[\s\S]*max-width:\s*432rpx/)
 assert.doesNotMatch(homeStyle, /@media \(max-width: 360px\)/)
 ```
 
-- [ ] **Step 3: 运行检查并确认其先失败**
+- [x] **Step 3: 运行检查并确认其先失败**
 
 Run:
 
@@ -60,32 +63,39 @@ Expected: 至少一个检查因首页仍使用 CSS 伪元素搜索图标或旧�
 - Modify: `apps/miniapp/src/pages/home/index.tsx`
 - Modify: `apps/miniapp/src/pages/home/index.scss`
 
-- [ ] **Step 1: 为标签和搜索入口补充语义与现有图标**
+- [x] **Step 1: 为标签和搜索入口补充语义与现有图标**
 
 将标签和搜索入口改为：
 
 ```tsx
-<View
+<Button
   key={tab.key}
   className={`student-home-header__tab ${activeTab === tab.key ? 'student-home-header__tab--active' : ''}`}
-  role='button'
-  aria-label={`切换到${tab.label}`}
-  aria-current={activeTab === tab.key ? 'page' : undefined}
+  hoverClass='student-home-header__tab--pressed'
+  hoverStayTime={80}
   onClick={() => setActiveTab(tab.key)}
 >
   <Text>{tab.label}</Text>
-</View>
+  {activeTab === tab.key ? <View className='student-home-header__tab-indicator' /> : null}
+  {activeTab === tab.key ? <Text className='student-home-header__a11y'>，当前栏目</Text> : null}
+</Button>
 ```
 
 ```tsx
 right={(
-  <View className='student-home-header__search' role='button' aria-label='搜索' onClick={openSearch}>
+  <Button
+    className='student-home-header__search'
+    hoverClass='student-home-header__search--pressed'
+    hoverStayTime={80}
+    onClick={openSearch}
+  >
     <AppIcon name='search' className='student-home-header__search-icon' />
-  </View>
+    <Text className='student-home-header__a11y'>搜索</Text>
+  </Button>
 )}
 ```
 
-- [ ] **Step 2: 将导航改为连续适配的等宽轨道**
+- [x] **Step 2: 将导航改为连续适配的等宽轨道**
 
 使用以下关键样式替换旧的大间距、媒体查询和伪元素：
 
@@ -101,13 +111,18 @@ right={(
 
 .student-home-header__tab {
   flex: 1 1 0;
-  min-width: 44px;
-  min-height: 44px;
+  min-width: 44PX;
+  min-height: 44PX;
   padding: 0;
   font-weight: 600;
 }
 
-.student-home-header__tab--active::after {
+.student-home-header__tab::after {
+  display: none;
+  border: 0;
+}
+
+.student-home-header__tab-indicator {
   width: 32rpx;
   height: 4rpx;
 }
@@ -116,26 +131,26 @@ right={(
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 44px;
-  width: 44px;
-  min-width: 44px;
-  height: 44px;
-  min-height: 44px;
+  flex: 0 0 44PX;
+  width: 44PX;
+  min-width: 44PX;
+  height: 44PX;
+  min-height: 44PX;
   border-radius: 16rpx;
 }
 
-.student-home-header__search:active {
-  background: $bg-soft;
+.student-home-header__search--pressed {
+  background: $bg-subtle;
   transform: scale(0.96);
 }
 
 .student-home-header__search-icon {
-  width: 20px;
-  height: 20px;
+  width: 20PX;
+  height: 20PX;
 }
 ```
 
-- [ ] **Step 3: 运行专项契约**
+- [x] **Step 3: 运行专项契约**
 
 Run:
 
@@ -155,7 +170,7 @@ Expected: 三项全部输出 `ok` 并以 0 退出。
 - Verify: `scripts/check-miniapp-capsule-layout.cjs`
 - Verify: `scripts/check-home-real-tools-contract.cjs`
 
-- [ ] **Step 1: 运行类型检查**
+- [x] **Step 1: 运行类型检查**
 
 Run:
 
@@ -165,7 +180,7 @@ npm --workspace apps/miniapp run typecheck
 
 Expected: 0 个 TypeScript 错误。
 
-- [ ] **Step 2: 运行本地小程序构建**
+- [x] **Step 2: 运行本地小程序构建**
 
 Run:
 
@@ -178,7 +193,7 @@ npm run build:miniapp
 
 Expected: 编译成功；允许保留仓库既有的 `vendors.js` 体积和异步分包警告。
 
-- [ ] **Step 3: 检查差异并提交**
+- [x] **Step 3: 检查差异并提交**
 
 Run:
 

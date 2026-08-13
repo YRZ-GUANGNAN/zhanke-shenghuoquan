@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDidShow } from '@tarojs/taro'
-import { Image, ScrollView, Text, View } from '@tarojs/components'
+import { Button, Image, ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import AppIcon from '../../components/app-icon'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
@@ -478,17 +478,31 @@ function HomeContent() {
         center={
           <View className='student-home-header__tabs'>
             {tabs.map((tab) => (
-              <View
+              <Button
                 key={tab.key}
                 className={`student-home-header__tab ${activeTab === tab.key ? 'student-home-header__tab--active' : ''}`}
+                hoverClass='student-home-header__tab--pressed'
+                hoverStayTime={80}
                 onClick={() => setActiveTab(tab.key)}
               >
                 <Text>{tab.label}</Text>
-              </View>
+                {activeTab === tab.key ? <View className='student-home-header__tab-indicator' /> : null}
+                {activeTab === tab.key ? <Text className='student-home-header__a11y'>，当前栏目</Text> : null}
+              </Button>
             ))}
           </View>
         }
-        right={<View className='student-home-header__search' onClick={openSearch} />}
+        right={(
+          <Button
+            className='student-home-header__search'
+            hoverClass='student-home-header__search--pressed'
+            hoverStayTime={80}
+            onClick={openSearch}
+          >
+            <AppIcon name='search' className='student-home-header__search-icon' />
+            <Text className='student-home-header__a11y'>搜索</Text>
+          </Button>
+        )}
       />
 
       <ScrollView
