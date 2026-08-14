@@ -14,7 +14,11 @@ const deliveryStaticDataPath = path.join(root, 'apps', 'miniapp', 'src', 'pages'
 assert.doesNotMatch(publishPost, /FALLBACK_TAGS/, 'publish page must not fall back to fabricated hot tags')
 assert.match(publishPost, /useState<string\[\]>\(\[\]\)/, 'hot tags must start empty until the real aggregation endpoint responds')
 assert.match(publishPost, /listHotCommunityTags\(/, 'publish page must load hot tags from the real aggregation endpoint')
-assert.doesNotMatch(secondhandChat, /二手私信图片发送尚未开放|secondhand-chat-image-button/, 'secondhand chat must not expose a non-functional image action')
+assert.doesNotMatch(
+  secondhandChat,
+  /二手私信图片发送尚未开放|图片消息暂未开放|secondhand-chat-image-button|secondhand-chat-composer__media/,
+  'secondhand chat must not expose a non-functional image action',
+)
 assert.doesNotMatch(secondhandDetail, /卖家未提供微信联系方式|加微信联系/, 'product contact sheet must not expose a contact method without real data')
 assert.doesNotMatch(settings, /当前没有可安全清理的缓存|>清理缓存</, 'settings must not expose a cache action that performs no work')
 assert.equal(fs.existsSync(deliveryStaticDataPath), false, 'unreferenced static delivery fixtures must be removed')

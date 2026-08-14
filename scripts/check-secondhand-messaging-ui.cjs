@@ -21,15 +21,30 @@ for (const fragment of [
   'sendTencentText',
   'subscribeTencentMessages',
   'requestWithSingleSessionRecovery',
-  'secondhand-chat-composer__media',
   'secondhand-chat-product__status',
 ]) assert.ok(chat.includes(fragment), `chat contract missing: ${fragment}`)
 
-for (const fragment of [
-  '.secondhand-chat-composer__media',
-  '.secondhand-chat-send--active',
-  'env(safe-area-inset-bottom)',
-]) assert.ok(chatStyle.includes(fragment), `chat style missing: ${fragment}`)
+assert.doesNotMatch(
+  chat,
+  /图片消息暂未开放|secondhand-chat-composer__media/,
+  'secondhand chat must only expose working composer actions',
+)
+assert.doesNotMatch(
+  chatStyle,
+  /secondhand-chat-composer__media|secondhand-chat-image-message/,
+  'secondhand chat must not retain dead image-composer styles',
+)
+assert.match(
+  chatStyle,
+  /grid-template-columns:\s*1fr\s+92rpx;/,
+  'secondhand composer must reserve two columns for text and send',
+)
+assert.match(
+  chatStyle,
+  /\.secondhand-chat-scroll__inner\s*\{[^}]*padding:\s*22rpx\s+30rpx\s+calc\(184rpx\s*\+\s*env\(safe-area-inset-bottom\)\);/s,
+  'secondhand chat history must clear the fixed composer and iPhone safe area',
+)
+assert.ok(chatStyle.includes('.secondhand-chat-send--active'), 'active send state is required')
 
 for (const fragment of [
   'getProductsPage',

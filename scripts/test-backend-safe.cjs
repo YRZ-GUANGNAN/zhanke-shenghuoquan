@@ -4,31 +4,44 @@ const { spawnSync } = require('node:child_process')
 
 const root = path.resolve(__dirname, '..')
 const backendRoot = path.join(root, 'backend')
-const mysqlEnvironmentKeys = new Set(['MYSQL_DSN'])
+const unsafeEnvironmentKeys = new Set(['MYSQL_DSN'])
 
-function collectTestFiles(directory) {
+function collectGoFiles(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const absolutePath = path.join(directory, entry.name)
-    if (entry.isDirectory()) return collectTestFiles(absolutePath)
-    return entry.isFile() && entry.name.endsWith('_test.go') ? [absolutePath] : []
+    if (entry.isDirectory()) return collectGoFiles(absolutePath)
+    return entry.isFile() && entry.name.endsWith('.go') ? [absolutePath] : []
   })
 }
 
-for (const file of collectTestFiles(backendRoot)) {
+function isUnsafeEnvironmentKey(key) {
+  return key === 'MYSQL_DSN' ||
+    key.endsWith('_MYSQL_DSN') ||
+    key.endsWith('_MYSQL_ALLOW_IN_PLACE') ||
+    key.startsWith('RUN_REAL_') ||
+    key.includes('_RUN_REAL_') ||
+    /^MEDIA_.*_ENABLE_/.test(key) ||
+    key.includes('_SERVE_WECHAT') ||
+    key.includes('READ_RECEIPT') ||
+    /(^|_)(COS|TENCENT_IM|WECHAT|WECOM|MEILI)(_|$)/.test(key)
+}
+
+for (const file of collectGoFiles(backendRoot)) {
   const source = fs.readFileSync(file, 'utf8')
-  for (const match of source.matchAll(/\b[A-Z][A-Z0-9_]*MYSQL_DSN\b/g)) {
-    mysqlEnvironmentKeys.add(match[0])
+  for (const match of source.matchAll(/["`]([A-Z][A-Z0-9_]{2,})["`]/g)) {
+    if (isUnsafeEnvironmentKey(match[1])) unsafeEnvironmentKeys.add(match[1])
   }
 }
 
 const environment = { ...process.env }
-for (const key of mysqlEnvironmentKeys) {
-  // Default verification must never run destructive migration tests on a shared database.
+for (const key of unsafeEnvironmentKeys) {
+  // Default verification must never reach a shared database or a real external service.
   environment[key] = ''
 }
+environment.APP_ENV = 'dev'
 
 const executable = process.platform === 'win32' ? 'go.exe' : 'go'
-const result = spawnSync(executable, ['test', './...'], {
+const result = spawnSync(executable, ['test', '-count=1', './...'], {
   cwd: backendRoot,
   env: environment,
   stdio: 'inherit',

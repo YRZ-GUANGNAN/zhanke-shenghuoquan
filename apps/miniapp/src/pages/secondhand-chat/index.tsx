@@ -393,12 +393,6 @@ export default function SecondhandChatPage() {
         className={`secondhand-chat-inputbar ${keyboardHeight > 0 ? 'secondhand-chat-inputbar--keyboard' : ''}`}
         style={keyboardHeight > 0 ? { bottom: `${keyboardHeight}px` } : undefined}
       >
-        <View
-          className='secondhand-chat-composer__media'
-          onClick={() => showToast('图片消息暂未开放，请先发送文字')}
-        >
-          <View className='secondhand-chat-composer__media-icon' />
-        </View>
         <View className='secondhand-chat-input-wrap'>
           <Input
             className='secondhand-chat-input'
