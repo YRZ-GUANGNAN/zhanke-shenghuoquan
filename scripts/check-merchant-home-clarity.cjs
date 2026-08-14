@@ -23,6 +23,9 @@ for (const [icon, binding] of icons) {
   const svg = fs.readFileSync(file, 'utf8')
   assert.match(svg, /viewBox="0 0 48 48"/, `${icon}.svg must use the shared viewBox`)
   assert.match(iconComponent, new RegExp(`\\b${binding}\\b`), `${icon}.svg must be registered`)
+  if (icon === 'action-publish') {
+    assert.match(svg, /stroke="#2476D6"/, 'publish icon must remain legible on a light shortcut tile')
+  }
 }
 
 assert.match(source, /MerchantHomeIcon/)
@@ -44,5 +47,31 @@ assert.match(source, /CapsuleSystemRow/)
 assert.match(source, /listMerchantDeliveryOrders/)
 assert.match(source, /getDeliveryWallet/)
 assert.match(source, /getIdentityApplication\('merchant'\)/)
+assert.doesNotMatch(source, /merchant-home-shop__green-dot/)
+assert.doesNotMatch(style, /\.merchant-home-shop__green-dot/)
+assert.match(source, /merchant-order-card__identity/)
+assert.match(source, /merchant-order-card__time/)
+assert.match(source, /merchant-home-tab__count--empty/)
+assert.match(source, /merchant-order-route__step/)
+assert.match(style, /\.merchant-order-route__step/)
+assert.match(style, /\.merchant-home-switch[\s\S]*min-height:\s*44PX/)
+assert.match(style, /\.merchant-home-tab[\s\S]*min-height:\s*44PX/)
+assert.match(style, /\.merchant-order-button[\s\S]*min-height:\s*44PX/)
+assert.match(style, /@media\s*\(max-width:\s*340px\)/)
+assert.match(source, /key:\s*'publish'[^\n]*url:\s*'\/pages\/merchant-publish\/index'/)
+assert.match(source, /key:\s*'wallet'[^\n]*url:\s*'\/pages\/merchant-wallet\/index'/)
+assert.match(source, /key:\s*'bill'[^\n]*url:\s*'\/pages\/merchant-wallet\/index'/)
+assert.match(source, /key:\s*'message'[^\n]*url:\s*'\/pages\/merchant-messages\/index'/)
+assert.match(source, /pending:\s*pendingResult\.ok\s*\?\s*pendingResult\.value\.total/)
+assert.match(source, /delivering:\s*deliveringResult\.ok\s*\?\s*deliveringResult\.value\.total/)
+assert.match(source, /completed:\s*completedResult\.ok\s*\?\s*completedResult\.value\.total/)
+assert.match(
+  source,
+  /new Map\(current\[requestedTab\]\.map\(\(order\)\s*=>\s*\[order\.deliveryOrderPublicId,\s*order\]\)\)/,
+)
+assert.match(source, /\[requestedTab\]:\s*result\.total/)
+assert.match(source, /onScrollToLower=\{\(\)\s*=>\s*void loadMoreOrders\(\)\}/)
+assert.match(source, /encodeURIComponent\(order\.deliveryOrderPublicId\)/)
+assert.match(source, /role=merchant/)
 
 console.log('merchant home clarity contract: ok')

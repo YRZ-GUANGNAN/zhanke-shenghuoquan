@@ -90,6 +90,14 @@ function formatTime(value: string): string {
   return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
+function formatCompactCount(value: number, capAt99 = false): string {
+  const safeValue = Math.max(0, Number.isFinite(value) ? Math.floor(value) : 0)
+  if (capAt99 && safeValue > 99) return '99+'
+  if (safeValue >= 100000) return `${Math.floor(safeValue / 10000)}万+`
+  if (safeValue >= 10000) return `${(safeValue / 10000).toFixed(1).replace(/\.0$/, '')}万`
+  return String(safeValue)
+}
+
 function openConversation(order: MerchantDeliveryOrder) {
   if (!order.riderUserId) {
     void Taro.showToast({ title: '骑手接单后才能进入私聊', icon: 'none' })
@@ -111,9 +119,11 @@ function OrderCard({ order }: { order: MerchantDeliveryOrder }) {
   return (
     <View className='merchant-order-card'>
       <View className='merchant-order-card__top'>
-        <Text className='merchant-order-card__serial'>
-          #{order.deliveryOrderPublicId} · {formatTime(order.createdAt)}
-        </Text>
+        <View className='merchant-order-card__identity'>
+          <Text className='merchant-order-card__eyebrow'>配送单</Text>
+          <Text className='merchant-order-card__serial'>#{order.deliveryOrderPublicId}</Text>
+          <Text className='merchant-order-card__time'>{formatTime(order.createdAt)}</Text>
+        </View>
         <Text className={`merchant-order-card__status merchant-order-card__status--${tone}`}>
           {statusCopy[order.status]}
         </Text>
@@ -135,22 +145,29 @@ function OrderCard({ order }: { order: MerchantDeliveryOrder }) {
       ) : null}
 
       <View className='merchant-order-route'>
-        <View className='merchant-order-route__rail'>
-          <View className='merchant-order-route__dot merchant-order-route__dot--pickup' />
-          <View className='merchant-order-route__line' />
-          <View className='merchant-order-route__dot merchant-order-route__dot--dropoff' />
+        <View className='merchant-order-route__step merchant-order-route__step--pickup'>
+          <View className='merchant-order-route__marker merchant-order-route__marker--pickup'>
+            <View className='merchant-order-route__dot merchant-order-route__dot--pickup' />
+          </View>
+          <View className='merchant-order-route__content'>
+            <Text className='merchant-order-route__label'>取货点</Text>
+            <Text className='merchant-order-route__place'>{order.pickupAddress}</Text>
+            <Text className='merchant-order-route__contact'>
+              {order.pickupContactName} · {order.pickupContactPhone}
+            </Text>
+          </View>
         </View>
-        <View className='merchant-order-route__body'>
-          <Text className='merchant-order-route__label'>取货点</Text>
-          <Text className='merchant-order-route__place'>{order.pickupAddress}</Text>
-          <Text className='merchant-order-route__contact'>
-            {order.pickupContactName} · {order.pickupContactPhone}
-          </Text>
-          <Text className='merchant-order-route__label merchant-order-route__label--dropoff'>送达点</Text>
-          <Text className='merchant-order-route__place'>{order.deliveryAddress}</Text>
-          <Text className='merchant-order-route__contact'>
-            {order.recipientName} · {order.recipientPhone}
-          </Text>
+        <View className='merchant-order-route__step merchant-order-route__step--dropoff'>
+          <View className='merchant-order-route__marker merchant-order-route__marker--dropoff'>
+            <View className='merchant-order-route__dot merchant-order-route__dot--dropoff' />
+          </View>
+          <View className='merchant-order-route__content'>
+            <Text className='merchant-order-route__label'>送达点</Text>
+            <Text className='merchant-order-route__place'>{order.deliveryAddress}</Text>
+            <Text className='merchant-order-route__contact'>
+              {order.recipientName} · {order.recipientPhone}
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -341,7 +358,6 @@ function MerchantHomeContent() {
                 <Text className='merchant-home-shop__badge'>已审核</Text>
               </View>
               <View className='merchant-home-shop__status'>
-                <View className='merchant-home-shop__green-dot' />
                 <Text>{shopAddress}</Text>
               </View>
             </View>
@@ -363,11 +379,11 @@ function MerchantHomeContent() {
           </View>
           <View className='merchant-home-metric'>
             <Text className='merchant-home-metric__label'>累计单量</Text>
-            <Text className='merchant-home-metric__value'>{totalOrderCount}</Text>
+            <Text className='merchant-home-metric__value'>{formatCompactCount(totalOrderCount)}</Text>
           </View>
           <View className='merchant-home-metric'>
             <Text className='merchant-home-metric__label'>配送中</Text>
-            <Text className='merchant-home-metric__value'>{ordersTotalByTab.delivering}</Text>
+            <Text className='merchant-home-metric__value'>{formatCompactCount(ordersTotalByTab.delivering)}</Text>
           </View>
         </View>
       </View>
@@ -404,8 +420,8 @@ function MerchantHomeContent() {
             onClick={() => setActiveTab(tab.key)}
           >
             <Text className='merchant-home-tab__label'>{tab.label}</Text>
-            <Text className={`merchant-home-tab__count merchant-home-tab__count--${tab.key}`}>
-              {ordersTotalByTab[tab.key]}
+            <Text className={`merchant-home-tab__count merchant-home-tab__count--${tab.key} ${ordersTotalByTab[tab.key] === 0 ? 'merchant-home-tab__count--empty' : ''}`}>
+              {formatCompactCount(ordersTotalByTab[tab.key], true)}
             </Text>
           </View>
         ))}
