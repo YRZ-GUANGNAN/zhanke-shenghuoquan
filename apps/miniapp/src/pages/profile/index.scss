@@ -36,9 +36,9 @@ page {
 .student-profile-user {
   display: flex;
   align-items: center;
-  gap: 20rpx;
-  min-height: 152rpx;
-  padding: 18rpx 0 14rpx;
+  gap: 18rpx;
+  min-height: 148rpx;
+  padding: 16rpx 0 14rpx;
   box-sizing: border-box;
 }
 
@@ -47,17 +47,17 @@ page {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 98rpx;
-  height: 98rpx;
+  width: 92rpx;
+  height: 92rpx;
   overflow: hidden;
-  border: 3rpx solid $bg-surface;
+  border: 2rpx solid $bg-surface;
   border-radius: 50%;
   color: $brand-primary-strong;
-  font-size: 38rpx;
-  font-weight: 750;
+  font-size: 36rpx;
+  font-weight: 700;
   line-height: 1;
   background: $profile-accent-soft;
-  box-shadow: 0 0 0 1rpx $border-subtle, 0 8rpx 22rpx rgba(42, 73, 108, .08);
+  box-shadow: 0 0 0 1rpx $border-default;
   box-sizing: border-box;
 }
 
@@ -69,6 +69,7 @@ page {
 .student-profile-user__main {
   flex: 1 1 auto;
   min-width: 0;
+  overflow: hidden;
 }
 
 .student-profile-user__title-row {
@@ -86,11 +87,11 @@ page {
 
 .student-profile-user__name {
   min-width: 0;
-  max-width: 270rpx;
+  max-width: 100%;
   overflow: hidden;
   color: $text-primary;
-  font-size: 34rpx;
-  font-weight: 750;
+  font-size: 32rpx;
+  font-weight: 700;
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -98,51 +99,42 @@ page {
 
 .student-profile-user__badge {
   flex: 0 0 auto;
-  padding: 5rpx 11rpx;
-  border-radius: 9rpx;
+  padding: 4rpx 10rpx;
+  border-radius: $radius-pill;
   color: $brand-primary-strong;
-  font-size: 19rpx;
-  font-weight: 650;
+  font-size: 20rpx;
+  font-weight: 600;
   line-height: 1.1;
   background: $profile-accent-soft;
 }
 
 .student-profile-user__details {
   min-width: 0;
-  margin-top: 8rpx;
+  margin-top: 10rpx;
 }
 
 .student-profile-user__meta {
   display: block;
   color: $text-secondary;
   font-size: 22rpx;
-  line-height: 1.25;
+  line-height: 1.35;
   font-variant-numeric: tabular-nums;
 }
 
 .student-profile-user__campus-row {
   display: flex;
   align-items: center;
-  gap: 8rpx;
   min-width: 0;
-  margin-top: 8rpx;
-}
-
-.student-profile-user__campus-dot {
-  width: 9rpx;
-  height: 9rpx;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: $profile-success;
-  box-shadow: 0 0 0 5rpx rgba($profile-success, .08);
+  min-height: 30rpx;
+  margin-top: 4rpx;
 }
 
 .student-profile-user__campus {
   min-width: 0;
   overflow: hidden;
   color: $text-tertiary;
-  font-size: 21rpx;
-  line-height: 1.25;
+  font-size: 22rpx;
+  line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -153,21 +145,21 @@ page {
   align-items: center;
   justify-content: center;
   gap: 4rpx;
-  min-width: 124rpx;
+  min-width: 118rpx;
   min-height: 60rpx;
-  padding: 0 12rpx 0 18rpx;
+  padding: 0 10rpx 0 16rpx;
   border: 1rpx solid $border-subtle;
-  border-radius: 18rpx;
+  border-radius: 16rpx;
   color: $brand-primary-strong;
   font-size: 22rpx;
   font-weight: 600;
-  background: $profile-accent-soft;
+  background: $bg-surface-subtle;
   box-sizing: border-box;
 }
 
 .student-profile-user__edit-icon {
-  width: 28rpx;
-  height: 28rpx;
+  width: 24rpx;
+  height: 24rpx;
 }
 
 .student-profile-content {

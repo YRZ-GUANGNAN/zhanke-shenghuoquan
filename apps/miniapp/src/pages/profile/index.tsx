@@ -204,7 +204,6 @@ function ProfileContent() {
             <View className='student-profile-user__details'>
               <Text className='student-profile-user__meta'>用户号 {profile.id || '--'}</Text>
               <View className='student-profile-user__campus-row'>
-                <View className='student-profile-user__campus-dot' />
                 <Text className='student-profile-user__campus'>{campusLabel}</Text>
               </View>
             </View>
