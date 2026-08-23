@@ -6,8 +6,13 @@ const root = path.join(__dirname, '..')
 const src = path.join(root, 'apps', 'admin', 'src')
 const componentRoot = path.join(src, 'components')
 
-for (const name of ['AdminButton', 'AdminField', 'AdminSelect', 'AdminIcon', 'AdminState', 'AdminBadge', 'AdminNotice', 'AdminDialog', 'AdminDialogProvider']) {
+for (const name of ['AdminButton', 'AdminField', 'AdminSelect', 'AdminIcon', 'AdminState', 'AdminBadge', 'AdminNotice', 'AdminDialog', 'AdminDialogProvider', 'AdminPageHeader', 'AdminTableFrame']) {
   assert.ok(fs.existsSync(path.join(componentRoot, `${name}.tsx`)), `${name}.tsx is required`)
+}
+
+const navigationSource = fs.readFileSync(path.join(src, 'admin-navigation.ts'), 'utf8')
+for (const group of ['运营中心', '内容治理', '平台管理']) {
+  assert.match(navigationSource, new RegExp(group), `admin navigation must include ${group}`)
 }
 
 const sources = fs.readdirSync(src, { withFileTypes: true })
@@ -41,5 +46,8 @@ assert.match(appSource, />下一页</)
 const styles = fs.readFileSync(path.join(src, 'styles.css'), 'utf8')
 for (const token of ['--color-primary', '--radius-control', '--shadow-dialog', '--duration-fast']) {
   assert.match(styles, new RegExp(token))
+}
+for (const contract of ['focus-visible', '@media (max-width: 900px)', 'overflow-x: auto']) {
+  assert.ok(styles.includes(contract), `styles must include ${contract}`)
 }
 console.log('admin ui system: ok')

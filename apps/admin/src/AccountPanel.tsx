@@ -49,15 +49,18 @@ export function AccountPanel() {
 
   return <>
     <div className="account-panel">
-      <div>
+      <div className="account-panel__identity">
+        <span className="account-panel__avatar" aria-hidden="true">{(user?.nickname || '管').slice(0, 1)}</span>
+        <div>
         <strong>{user?.nickname || '超级管理员'}</strong>
         <span>administrator · #{user?.id}</span>
         {error && <small role="alert">{error}</small>}
+        </div>
       </div>
-      <button type="button" className="ghost-button" onClick={() => { setError(''); setChangeOpen(true) }}>
-        修改密码
-      </button>
-      <button type="button" className="ghost-button account-panel__logout" onClick={() => void logout()}>退出</button>
+      <div className="account-panel__actions">
+        <button type="button" className="ghost-button" onClick={() => { setError(''); setChangeOpen(true) }}>修改密码</button>
+        <button type="button" className="ghost-button account-panel__logout" onClick={() => void logout()}>退出</button>
+      </div>
     </div>
     {changeOpen && <div className="password-dialog" role="dialog" aria-modal="true" aria-labelledby="password-dialog-title">
       <form onSubmit={event => { event.preventDefault(); void changePassword() }}>

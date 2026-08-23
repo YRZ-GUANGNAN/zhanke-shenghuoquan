@@ -28,12 +28,15 @@ const required = [
   ["'/admin-auth/session'", 'session restore endpoint'],
   ["'/admin-auth/logout'", 'logout endpoint'],
   ["'/admin-auth/password/change'", 'password change endpoint'],
-  ["key:'identities'", 'identity applications navigation'],
   ['<IdentityApplications/>', 'identity applications page']
 ]
 
 for (const [token, description] of required) {
   if (!source.includes(token)) failures.push(`missing ${description}: ${token}`)
+}
+
+if (!/key\s*:\s*['"]identities['"]/.test(source)) {
+  failures.push('missing identity applications navigation')
 }
 
 if (failures.length) {
