@@ -102,6 +102,8 @@ type Feedback struct {
 	UpdatedAt        time.Time       `json:"updatedAt"`
 }
 
+func (Feedback) TableName() string { return "user_feedbacks" }
+
 type FeedbackImage struct {
 	ID            uint      `json:"-" gorm:"primaryKey"`
 	FeedbackID    uint      `json:"-" gorm:"not null;index"`
@@ -109,3 +111,5 @@ type FeedbackImage struct {
 	Slot          uint16    `json:"slot" gorm:"not null"`
 	CreatedAt     time.Time `json:"-"`
 }
+
+func (FeedbackImage) TableName() string { return "user_feedback_images" }
