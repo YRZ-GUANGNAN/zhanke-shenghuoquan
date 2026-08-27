@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useRef, useState, type
 import { AdminDialog } from './AdminDialog'
 
 export interface ConfirmOptions { title: string; description: string; confirmLabel?: string; tone?: 'default' | 'danger' }
-export interface PromptOptions extends ConfirmOptions { inputLabel: string; placeholder?: string; requiredMessage?: string }
+export interface PromptOptions extends ConfirmOptions { inputLabel: string; placeholder?: string; requiredMessage?: string; initialValue?: string }
 export interface AdminDialogAPI { confirm(options: ConfirmOptions): Promise<boolean>; prompt(options: PromptOptions): Promise<string | null>; notify(options: Omit<ConfirmOptions, 'tone'>): Promise<void> }
 type ActiveRequest = { kind: 'confirm'; options: ConfirmOptions; resolve: (value: boolean) => void } | { kind: 'prompt'; options: PromptOptions; resolve: (value: string | null) => void } | { kind: 'notify'; options: Omit<ConfirmOptions, 'tone'>; resolve: () => void }
 const AdminDialogContext = createContext<AdminDialogAPI | null>(null)
@@ -12,7 +12,7 @@ export function AdminDialogProvider({ children }: { children: ReactNode }) {
   const [value, setValue] = useState('')
   const [error, setError] = useState('')
   const settled = useRef(false)
-  const open = useCallback((request: ActiveRequest) => { settled.current = false; setValue(''); setError(''); setActive(request) }, [])
+  const open = useCallback((request: ActiveRequest) => { settled.current = false; setValue(request.kind === 'prompt' ? request.options.initialValue || '' : ''); setError(''); setActive(request) }, [])
   const close = useCallback(() => {
     if (!active || settled.current) return
     settled.current = true

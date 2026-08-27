@@ -9,6 +9,9 @@ const componentRoot = path.join(src, 'components')
 for (const name of ['AdminButton', 'AdminField', 'AdminSelect', 'AdminIcon', 'AdminState', 'AdminBadge', 'AdminNotice', 'AdminDialog', 'AdminDialogProvider', 'AdminPageHeader', 'AdminTableFrame']) {
   assert.ok(fs.existsSync(path.join(componentRoot, `${name}.tsx`)), `${name}.tsx is required`)
 }
+for (const name of ['AdminPanel', 'AdminToolbar', 'AdminPagination', 'AdminStatusBadge', 'AdminRowActions']) {
+  assert.ok(fs.existsSync(path.join(componentRoot, `${name}.tsx`)), `${name}.tsx is required`)
+}
 
 const navigationSource = fs.readFileSync(path.join(src, 'admin-navigation.ts'), 'utf8')
 for (const group of ['运营中心', '内容治理', '平台管理']) {
@@ -42,6 +45,10 @@ assert.match(appSource, /value\.items\.length===0&&reviewPage>1/,
   'review refresh must step back when an action empties the current page')
 assert.match(appSource, />上一页</)
 assert.match(appSource, />下一页</)
+assert.match(appSource, /function\s+Feedbacks\(/, 'admin must expose the existing feedback list')
+assert.match(adminAPI, /feedbacks:\s*\(query/, 'feedback API must accept pagination')
+assert.match(adminAPI, /createNavigationCategory:/, 'navigation category create API must be wired')
+assert.match(adminAPI, /deleteNavigationItem:/, 'navigation item delete API must be wired')
 
 const styles = fs.readFileSync(path.join(src, 'styles.css'), 'utf8')
 for (const token of ['--color-primary', '--radius-control', '--shadow-dialog', '--duration-fast']) {
