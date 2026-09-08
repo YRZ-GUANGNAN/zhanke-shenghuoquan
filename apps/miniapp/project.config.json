@@ -2,7 +2,7 @@
   "miniprogramRoot": "dist/",
   "projectname": "campus-circle",
   "description": "Campus community and marketplace mini program.",
-  "appid": "wx0dacef976daa8e55",
+  "appid": "wx065d8f3ce4a056ee",
   "setting": {
     "urlCheck": false,
     "es6": true,
