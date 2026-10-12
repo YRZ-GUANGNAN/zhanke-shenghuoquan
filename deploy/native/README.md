@@ -5,18 +5,16 @@ production host. Secrets are intentionally excluded.
 
 Domain responsibilities:
 
-- `https://zhandui.top/` is the management website. It serves the Admin static
+- `https://zhanduiwang.top/` is the management website. It serves the Admin static
   build and proxies its `/api/` requests to the local Go API.
 - `https://zhanduiwang.top/` remains the mini-program API and existing public
-  entry point. The mini-program build must continue to use this API domain;
-  changing the management host does not change the API contract.
+  entry point. The mini-program build continues to use `/api/v1` on this domain.
 
-During the DNS and certificate migration, keep the existing
-`nginx-zhanduiwang.top.conf` server blocks enabled. Enable
-`nginx-zhandui.top.acme.conf` first, and switch to `nginx-zhandui.top.conf`
-only after `zhandui.top` resolves to this host and the certificate files under
-`/etc/letsencrypt/live/zhandui.top/` exist. The two files must not be enabled
-at the same time because both own the port-80 `zhandui.top` server block.
+The owner corrected the originally requested `zhandui.top` to `zhanduiwang.top`
+on 2026-10-12. The former domain is not managed by the verified Aliyun account.
+Its old migration assets are retained as inactive historical files; do not run
+`migrate-admin-domain.ps1` or enable `nginx-zhandui.top*.conf` for this deployment.
+Keep the existing `nginx-zhanduiwang.top.conf` server blocks and certificate.
 
 Runtime layout:
 
@@ -25,8 +23,7 @@ Runtime layout:
 - `/etc/campus-circle/campus-api.env`
 - `/etc/campus-circle/meilisearch.env`
 - `/var/lib/campus-meilisearch`
-- `/var/www/campus-admin/current` (existing `zhanduiwang.top` site; kept unchanged)
-- `/var/www/campus-admin-zhandui/current` (independent `zhandui.top` Admin site)
+- `/var/www/campus-admin/current` (active `zhanduiwang.top` Admin release symlink)
 
 The production database is initialized from `backend/migrations` in numeric
 order, with `002_seed_dev.sql` explicitly skipped. The migration set is not
@@ -41,7 +38,7 @@ TARO_APP_API_BASE=https://zhanduiwang.top/api/v1
 ```
 
 The Admin build uses relative `/api/v1` requests, so it can be served from
-`https://zhandui.top/` without embedding a second API hostname.
+`https://zhanduiwang.top/` without embedding a second API hostname.
 
 The API and Meilisearch listen only on loopback. Only Nginx exposes ports 80
 and 443.
@@ -67,44 +64,32 @@ dependency readiness. The native Nginx route for `/readyz` is loopback-only;
 run readiness probes on the host instead of exposing database probes publicly.
 Neither endpoint replaces a real miniapp business-flow acceptance test.
 
-## Management-domain migration
+## Admin release on the existing domain
 
-Before changing Nginx, verify the DNS record:
+Verify the DNS record before a release:
 
 ```powershell
-Resolve-DnsName zhandui.top -Type A
+Resolve-DnsName zhanduiwang.top -Type A
 ```
 
-The answer must be the production host address `8.138.227.107`. If it still
-points elsewhere, change the Cloudflare A record first and wait for the low
-TTL to expire; do not disable the existing `zhanduiwang.top` site while
-waiting.
+The answer must be the production host address `8.138.227.107`. The verified
+Aliyun account already has the correct root and `www` records. No DNS migration,
+new certificate, or Nginx reload is needed for an Admin static release.
 
-On the host, publish the HTTP ACME challenge server, request the apex
-certificate using the already registered Certbot account, and then replace it
-with the HTTPS server:
+Upload the built Admin archive and `release-admin.py` into an isolated staging
+directory. Run this on the host with the actual archive hash and release ID:
 
 ```sh
-sudo certbot certonly --webroot -w /var/www/letsencrypt \
-  -d zhandui.top --non-interactive --keep-until-expiring
-sudo test -s /etc/letsencrypt/live/zhandui.top/fullchain.pem
-sudo test -s /etc/letsencrypt/live/zhandui.top/privkey.pem
-# disable nginx-zhandui.top.acme.conf and enable nginx-zhandui.top.conf
-sudo nginx -t
-sudo systemctl reload nginx
+sudo python3 /home/admin/ADMIN_STAGE/release-admin.py \
+  --archive /home/admin/ADMIN_STAGE/admin.tar.gz \
+  --sha256 SHA256 --release RELEASE
 ```
 
-Use `migrate-admin-domain.ps1` from the repository root for the guarded
-sequence. It requires exactly one A record for `8.138.227.107`, rejects an
-unexpected AAAA record, verifies the local and remote SHA-256 of the release
-archive, creates the ACME webroot, switches both the Admin `current` symlink
-and the Nginx site link, and restores both links if `nginx -t` or a later
-step fails:
-
-```powershell
-.\deploy\native\migrate-admin-domain.ps1 -BuildAdmin -Deploy -RequestCertificate -EnableHttps
-```
-
-If a later step fails, the script restores the previous Nginx link and Admin
-`current` symlink independently. It leaves the failed release directory for
-inspection and never removes the existing `zhanduiwang.top` release.
+The default performs read-only preflight checks. Add `--deploy` after they pass.
+The script validates the archive checksum and paths, creates a new release,
+retains previous content-addressed assets for existing browser tabs, and
+atomically switches `/var/www/campus-admin/current`. It verifies every newly
+served asset over HTTPS, the backend health, the public feature policy, and
+401 responses without an administrator session. A failed post-switch check
+restores the previous symlink; old releases are retained. It does not change
+Nginx, DNS, user roles, or business records.

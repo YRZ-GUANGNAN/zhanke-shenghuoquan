@@ -2,7 +2,7 @@
 
 ## 生效范围
 
-后台路径：`https://zhandui.top/` → **小程序功能设置**。超级管理员可保存，普通管理员只读。20 个模块可分别开启、隐藏，支持整组切换和全部隐藏；校园工具中的单个入口沿用“校园导航”的启用状态。
+后台路径：`https://zhanduiwang.top/` → **小程序功能设置**。用户已确认此前的 `zhandui.top` 是误写；不对该域名执行迁移。超级管理员可保存，普通管理员只读。20 个模块可分别开启、隐藏，支持整组切换和全部隐藏；校园工具中的单个入口沿用“校园导航”的启用状态。
 
 设置持久化到 MySQL，并记录修改前后状态、操作人和版本。关闭父模块会限制子模块的有效能力，但不擦掉子模块的保存值。所有用户使用同一份配置；设置不会修改用户角色，也不根据审核账号切换。
 
@@ -13,8 +13,8 @@
 1. 提交经过审查的后端源码，再通过 `scripts/build-native-backend.ps1` 生成 Linux amd64 二进制和 SHA-256；不能绕过源码未提交检查。
 2. 将二进制、`038_feature_policy.sql`、`039_feature_policy_modules.sql` 和 `release-feature-policy.py` 上传到现有服务器的独立 staging 目录。
 3. 先运行部署工具的只读预检，再加 `--deploy`。迁移使用服务器现有的 `/etc/campus-circle/mysql-admin.cnf`（仅 root 可读），运行时账号仍只保留读写业务权限，不授予建表权限。工具会保存权限为 0600 的数据库备份，仅执行 038/039 增量迁移，创建独立 API release，检查版本、依赖健康和公开策略。失败则恢复旧 API 链接；保留新增策略表与审计，绝不重放历史迁移或开发 seed。
-4. 在 Cloudflare 将 `zhandui.top` 根域 A 改为 `8.138.227.107`。确认不存在指向其他服务器的根域 AAAA。不要改变 `zhanduiwang.top`，后者继续作为小程序 API。
-5. 执行 `deploy/native/migrate-admin-domain.ps1 -BuildAdmin -Deploy -RequestCertificate -EnableHttps`，创建独立 Admin release 与 TLS。DNS 不正确时工具拒绝远程写入；原后台目录和原 API 域名继续保留。
+4. 核实阿里云中 `zhanduiwang.top` 的根域与 `www` A 记录为 `8.138.227.107`，现有 HTTPS 和 `/api/` 代理可用；无需更改 DNS 或申请新域名证书。
+5. 构建并打包 Admin，将包与 `deploy/native/release-admin.py` 上传到独立 staging 目录。以 `--archive`、`--sha256`、`--release` 运行只读预检，通过后加 `--deploy`。工具创建 `/var/www/campus-admin/releases/RELEASE`，保留旧资源后原子切换 `current`；核验首页与全部新资源的 HTTPS 内容摘要、后端健康和未登录权限，失败自动恢复旧链接。不修改 Nginx、DNS、用户角色或业务数据。
 6. 以 `TARO_APP_API_BASE=https://zhanduiwang.top/api/v1` 构建并上传小程序新包。必须完成微信实际版本发布后，线上客户端才具备入口显隐、旧链接门控和前台刷新；旧客户端只能受到新增 API 守卫约束，无法凭空获得新界面代码。
 
 服务端读取缓存不超过 2 秒。新小程序回前台刷新，使用期间约每 15 秒刷新，写入前再次读取。网络耗时和离线状态会延迟界面收起；服务端仍阻止已关闭模块的新业务请求。

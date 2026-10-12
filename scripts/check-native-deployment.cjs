@@ -219,7 +219,7 @@ requireTokens('campus-journald.conf', [
 
 requireTokens('README.md', [
   'Secrets are intentionally excluded.',
-  '`https://zhandui.top/` is the management website.',
+  '`https://zhanduiwang.top/` is the management website.',
   '`https://zhanduiwang.top/` remains the mini-program API',
   '`002_seed_dev.sql` explicitly skipped',
   'TARO_APP_API_BASE=https://zhanduiwang.top/api/v1',
