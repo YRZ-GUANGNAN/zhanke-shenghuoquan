@@ -1,3 +1,5 @@
+import { withFeaturePage } from '../../components/feature-page-gate'
+import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Image, Input, ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
@@ -71,7 +73,8 @@ const readableError = (error: unknown): string => {
   return error instanceof Error ? error.message : '帖子读取失败，请稍后重试'
 }
 
-export default function PostDetailPage() {
+function PostDetailPage() {
+  const visibility = useFeatureVisibility()
   const params = Taro.getCurrentInstance().router?.params ?? {}
   const postId = params.id ? decodeURIComponent(params.id) : ''
   const [post, setPost] = useState<CommunityPost | null>(null)
@@ -155,7 +158,7 @@ export default function PostDetailPage() {
 
         if (nextPost.reviewStatus === 'approved') {
           const [commentsPage, viewerState] = await Promise.all([
-            getPostCommentsPage(postId, { page: 1, pageSize: COMMENT_PAGE_SIZE }).catch((commentsError) => {
+            (visibility.comment ? getPostCommentsPage(postId, { page: 1, pageSize: COMMENT_PAGE_SIZE }) : Promise.resolve({ items: [] as CommunityComment[], page: 1, pageSize: COMMENT_PAGE_SIZE, total: 0 })).catch((commentsError) => {
               console.error('load post comments failed', commentsError)
               if (alive) setCommentError('评论暂时无法读取，点击重试')
               return { items: [] as CommunityComment[], page: 1, pageSize: COMMENT_PAGE_SIZE, total: 0 }
@@ -185,10 +188,10 @@ export default function PostDetailPage() {
     return () => {
       alive = false
     }
-  }, [postId, reloadKey])
+  }, [postId, reloadKey, visibility.comment])
 
   const loadMoreComments = async () => {
-    if (!post || !isApproved || commentsLoadingMore || comments.length >= commentTotal) return
+    if (!visibility.comment || !post || !isApproved || commentsLoadingMore || comments.length >= commentTotal) return
     const nextPage = commentPage + 1
     setCommentsLoadingMore(true)
     setCommentError('')
@@ -246,7 +249,7 @@ export default function PostDetailPage() {
     })
 
   const handleSubmitComment = async () => {
-    if (!post || !isApproved) return
+    if (!visibility.canComment || !post || !isApproved) return
     const content = commentText.trim()
     if (!content) {
       showToast('先写一句评论吧')
@@ -296,7 +299,7 @@ export default function PostDetailPage() {
         variant='standard'
         left={<AppIconButton name='back' label='返回' className='post-detail-nav__back' onClick={() => void Taro.navigateBack()} />}
         center={headerCenter}
-        right={post && isApproved ? (
+        right={post && isApproved && visibility.following ? (
           <View className='post-detail-follow-hitbox' onClick={handleFollow}>
             <Text className={`post-detail-follow${following ? ' post-detail-follow--active' : ''}`}>
               {following ? '已关注' : '关注'}
@@ -356,7 +359,7 @@ export default function PostDetailPage() {
               </Text>
             </View>
 
-            {isApproved ? (
+            {isApproved && visibility.comment ? (
               <View className="post-detail-comments">
                 <Text className="post-detail-comments__title">共 {commentTotal || post.commentCount || comments.length} 条评论</Text>
                 {comments.map((comment, index) => (
@@ -394,7 +397,7 @@ export default function PostDetailPage() {
 
           {isApproved ? (
             <View className="post-detail-actionbar">
-              <Input
+              {visibility.canComment && <Input
                 className="post-detail-input"
                 value={commentText}
                 placeholder={submittingComment ? '发送中…' : '说点什么…'}
@@ -404,19 +407,19 @@ export default function PostDetailPage() {
                 }}
                 confirmType="send"
                 onConfirm={handleSubmitComment}
-              />
-              <View className={`post-detail-action${liked ? ' post-detail-action--active' : ''}`} onClick={handleLike}>
+              />}
+              {visibility.likes && <View className={`post-detail-action${liked ? ' post-detail-action--active' : ''}`} onClick={handleLike}>
                 <AppIcon name='heart' active={liked} className='post-detail-action__icon' />
                 <Text>{post.likedCount}</Text>
-              </View>
-              <View className={`post-detail-action${favorited ? ' post-detail-action--active post-detail-action--favorite' : ''}`} onClick={handleFavorite}>
+              </View>}
+              {visibility.favorites && <View className={`post-detail-action${favorited ? ' post-detail-action--active post-detail-action--favorite' : ''}`} onClick={handleFavorite}>
                 <AppIcon name='star' active={favorited} className='post-detail-action__icon' />
                 <Text>{post.favoriteCount}</Text>
-              </View>
-              <View className="post-detail-action" onClick={handleSubmitComment}>
+              </View>}
+              {visibility.canComment && <View className="post-detail-action" onClick={handleSubmitComment}>
                 <AppIcon name='comment' className='post-detail-action__icon' />
                 <Text>{post.commentCount || comments.length}</Text>
-              </View>
+              </View>}
             </View>
           ) : null}
         </>
@@ -424,3 +427,5 @@ export default function PostDetailPage() {
     </View>
   )
 }
+
+export default withFeaturePage(PostDetailPage)

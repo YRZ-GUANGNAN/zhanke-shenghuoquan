@@ -1,3 +1,4 @@
+import { withFeaturePage } from '../../components/feature-page-gate'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Input, Text, Textarea, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
@@ -10,6 +11,7 @@ import {
 } from '../../services/b-community'
 import { chooseAndUploadImages, waitForMediaApprovals, type UploadedMedia } from '../../services/media'
 import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
+import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import './index.scss'
 
 const MAX_IMAGES = 9
@@ -33,7 +35,7 @@ const validateTag = (value: string): string => {
   return ''
 }
 
-export default function PublishPostPage() {
+function PublishPostPage() {
   const [content, setContent] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [hotTags, setHotTags] = useState<string[]>([])
@@ -43,6 +45,7 @@ export default function PublishPostPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitStage, setSubmitStage] = useState<SubmitStage>('idle')
   const [uploadHint, setUploadHint] = useState('0/9')
+  const visibility = useFeatureVisibility()
   const clientRequestIdRef = useRef<string | null>(null)
 
   const canPublish = useMemo(
@@ -183,6 +186,9 @@ export default function PublishPostPage() {
     }
   }
 
+  if (visibility && !visibility.post) {
+    return <View className='publish-post-page'><Text>发帖功能暂未开放</Text></View>
+  }
   return (
     <View className='publish-post-page' style={getCapsuleSafeStyle()}>
       <CapsulePageHeader
@@ -266,3 +272,5 @@ export default function PublishPostPage() {
     </View>
   )
 }
+
+export default withFeaturePage(PublishPostPage)

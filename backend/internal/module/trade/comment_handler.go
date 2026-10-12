@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"campus-circle/backend/internal/module/admin/review"
+	"campus-circle/backend/internal/module/featureflags"
 	"campus-circle/backend/internal/module/user"
 	"campus-circle/backend/internal/pkg/response"
 	"github.com/gin-gonic/gin"
@@ -40,6 +41,10 @@ func (h *ProductCommentHandler) list(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if !featureflags.Can(featureflags.KeySecondhand) {
+		response.Fail(c, http.StatusForbidden, "该功能暂未开放")
+		return
+	}
 	productID, ok := paramID(c)
 	if !ok {
 		return
@@ -52,6 +57,10 @@ func (h *ProductCommentHandler) list(c *gin.Context) {
 func (h *ProductCommentHandler) create(c *gin.Context) {
 	current, ok := authenticatedProductCommentUser(c)
 	if !ok {
+		return
+	}
+	if !featureflags.Can(featureflags.KeySecondhandComments) {
+		response.Fail(c, http.StatusForbidden, "评论功能暂未开放")
 		return
 	}
 	productID, ok := paramID(c)
@@ -79,6 +88,10 @@ func (h *ProductCommentHandler) create(c *gin.Context) {
 func (h *ProductCommentHandler) reply(c *gin.Context) {
 	current, ok := authenticatedProductCommentUser(c)
 	if !ok {
+		return
+	}
+	if !featureflags.Can(featureflags.KeySecondhandComments) {
+		response.Fail(c, http.StatusForbidden, "评论功能暂未开放")
 		return
 	}
 	productID, ok := paramID(c)

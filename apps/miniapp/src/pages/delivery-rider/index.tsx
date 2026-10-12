@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
 import { useDidShow } from '@tarojs/taro'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
@@ -24,6 +24,7 @@ import { chooseAndUploadImages, waitForMediaApproval } from '../../services/medi
 import Taro from '../../services/taro'
 import RiderWorkbenchIcon from './rider-workbench-icon'
 import './index.scss'
+import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 
 type RiderTab = 'grab' | 'pickup' | 'delivery'
 
@@ -72,6 +73,8 @@ function riderStatusLabel(status: NonNullable<DeliveryRiderMe['rider']>['status'
 }
 
 export default function DeliveryRiderPage() {
+  const visibility = useFeatureVisibility()
+  const canClaim = visibility.delivery && visibility.rider
   const identityAllowed = useIdentityGuard('rider')
   const [activeTab, setActiveTab] = useState<RiderTab>('grab')
   const [me, setMe] = useState<DeliveryRiderMe | null>(null)
@@ -94,6 +97,7 @@ export default function DeliveryRiderPage() {
   const requestVersion = useRef(0)
 
   const activeTaskCount = pickupTotal + deliveryTotal
+  useEffect(() => { if (!canClaim && activeTab === 'grab') setActiveTab('pickup') }, [canClaim, activeTab])
 
   const refreshOrders = async () => {
     const version = requestVersion.current + 1
@@ -104,7 +108,7 @@ export default function DeliveryRiderPage() {
     setLoadMoreError('')
     try {
       const [nextClaimable, nextPickup, nextDelivery, nextCompleted] = await Promise.all([
-        listClaimableDeliveryOrders(1, 50),
+        canClaim ? listClaimableDeliveryOrders(1, 50) : Promise.resolve({ items: [] as ClaimableDeliveryOrder[], total: 0, page: 1 }),
         listAssignedDeliveryOrders(1, 50, 'pickup'),
         listAssignedDeliveryOrders(1, 50, 'delivery'),
         listAssignedDeliveryOrders(1, 1, 'completed')
@@ -148,7 +152,7 @@ export default function DeliveryRiderPage() {
         return
       }
       const [claimablePage, pickupPage, deliveryPage, completedPage] = await Promise.all([
-        listClaimableDeliveryOrders(1, 50),
+        canClaim ? listClaimableDeliveryOrders(1, 50) : Promise.resolve({ items: [] as ClaimableDeliveryOrder[], total: 0, page: 1 }),
         listAssignedDeliveryOrders(1, 50, 'pickup'),
         listAssignedDeliveryOrders(1, 50, 'delivery'),
         listAssignedDeliveryOrders(1, 1, 'completed')
@@ -172,7 +176,7 @@ export default function DeliveryRiderPage() {
     } finally {
       if (requestVersion.current === version) setLoading(false)
     }
-  }, [identityAllowed])
+  }, [identityAllowed, canClaim])
 
   useDidShow(() => {
     void load()
@@ -417,7 +421,7 @@ export default function DeliveryRiderPage() {
       </View>
 
       <View className='rider-grab-tabs'>
-        {tabs.map((item) => (
+        {tabs.filter(item => item.key !== 'grab' || canClaim).map((item) => (
           <View
             key={item.key}
             className={`rider-grab-tabs__item ${activeTab === item.key ? 'rider-grab-tabs__item--active' : ''}`}

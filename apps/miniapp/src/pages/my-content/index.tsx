@@ -1,3 +1,5 @@
+import { withFeaturePage } from '../../components/feature-page-gate'
+import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import React, { useEffect, useRef, useState } from 'react'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
@@ -47,7 +49,9 @@ function mergeById<T extends { id: string }>(current: T[], incoming: T[]): T[] {
   return Array.from(byId.values())
 }
 
-export default function MyContentPage() {
+function MyContentPage() {
+  const visibility = useFeatureVisibility()
+  const visibleTabs = tabs.filter(tab => tab.key === 'items' ? visibility.secondhand : tab.key === 'favorites' ? visibility.forum && visibility.favorites : tab.key === 'comments' ? visibility.forum && visibility.comment : visibility.forum)
   const [activeTab, setActiveTab] = useState<TabKey>(getInitialTab)
   const [favorites, setFavorites] = useState<CommunityPost[]>([])
   const [posts, setPosts] = useState<CommunityPost[]>([])
@@ -114,11 +118,15 @@ export default function MyContentPage() {
   }
 
   useEffect(() => {
+    if (!visibleTabs.some(tab => tab.key === activeTab)) {
+      if (visibleTabs[0]) setActiveTab(visibleTabs[0].key)
+      return
+    }
     setPage(1)
     setTotal(0)
     setLoadMoreError('')
     void load(activeTab, 1, false)
-  }, [activeTab])
+  }, [activeTab, visibility.forum, visibility.secondhand, visibility.favorites, visibility.comment])
 
   const currentLength = activeTab === 'favorites'
     ? favorites.length
@@ -246,7 +254,7 @@ export default function MyContentPage() {
   return (
     <View className='my-content-page'>
       <CapsulePageHeader title='我的内容' left={<AppIconButton name='back' label='返回' className='my-content-header__back' onClick={() => void Taro.navigateBack()} />} />
-      <View className='my-content-tabs'>{tabs.map((tab) => <View key={tab.key} className={`my-content-tab ${activeTab === tab.key ? 'my-content-tab--active' : ''}`} onClick={() => setActiveTab(tab.key)}><Text>{tab.label}</Text></View>)}</View>
+      <View className='my-content-tabs'>{visibleTabs.map((tab) => <View key={tab.key} className={`my-content-tab ${activeTab === tab.key ? 'my-content-tab--active' : ''}`} onClick={() => setActiveTab(tab.key)}><Text>{tab.label}</Text></View>)}</View>
       <ScrollView
         className='my-content-body'
         scrollY
@@ -267,3 +275,5 @@ export default function MyContentPage() {
     </View>
   )
 }
+
+export default withFeaturePage(MyContentPage)

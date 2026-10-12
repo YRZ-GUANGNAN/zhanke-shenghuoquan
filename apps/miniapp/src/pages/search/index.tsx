@@ -1,3 +1,4 @@
+import { withFeaturePage } from '../../components/feature-page-gate'
 import { useEffect, useRef, useState } from 'react'
 import { Input, ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
@@ -50,7 +51,7 @@ function errorMessage(error: unknown): string {
   return '请求失败，请稍后重试'
 }
 
-export default function SearchPage() {
+function SearchPage() {
   const rawScope = Taro.getCurrentInstance().router?.params?.scope
   const scope = isSearchScope(rawScope) ? rawScope : null
   const copy = scope ? scopeCopy[scope] : null
@@ -346,3 +347,5 @@ export default function SearchPage() {
     </View>
   )
 }
+
+export default withFeaturePage(SearchPage)

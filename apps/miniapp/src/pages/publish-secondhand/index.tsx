@@ -1,4 +1,5 @@
-import React, { useMemo, useRef, useState } from 'react'
+import { withFeaturePage } from '../../components/feature-page-gate'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Image, Input, ScrollView, Text, Textarea, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import { AppIconButton } from '../../components/ui'
@@ -7,6 +8,7 @@ import { createProduct } from '../../services/c-trade'
 import { createClientRequestId } from '../../services/client-request-id'
 import { chooseAndUploadImages, waitForMediaApproval, type UploadedMedia } from '../../services/media'
 import Taro from '../../services/taro'
+import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import './index.scss'
 
 type SecondhandCategory = '数码' | '书籍资料' | '生活用品' | '代步' | '其他'
@@ -34,7 +36,7 @@ function publishErrorMessage(error: unknown): string {
   return error.message || '发布失败，请稍后重试'
 }
 
-export default function PublishSecondhandPage() {
+function PublishSecondhandPage() {
   const [images, setImages] = useState<UploadedMedia[]>([])
   const [title, setTitle] = useState('')
   const [price, setPrice] = useState('')
@@ -43,6 +45,7 @@ export default function PublishSecondhandPage() {
   const [uploading, setUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [uploadStatus, setUploadStatus] = useState('实拍图更容易卖出去')
+  const visibility = useFeatureVisibility()
   const clientRequestIdRef = useRef<string | null>(null)
 
   const priceLabel = useMemo(() => {
@@ -139,6 +142,9 @@ export default function PublishSecondhandPage() {
     }
   }
 
+  if (visibility && !visibility.secondhand_publish) {
+    return <View className='publish-secondhand-page'><Text>二手发布功能暂未开放</Text></View>
+  }
   return (
     <View className='publish-secondhand-page'>
       <CapsulePageHeader
@@ -269,3 +275,5 @@ export default function PublishSecondhandPage() {
     </View>
   )
 }
+
+export default withFeaturePage(PublishSecondhandPage)

@@ -1,3 +1,5 @@
+import { withFeaturePage } from '../../components/feature-page-gate'
+import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
@@ -25,7 +27,8 @@ function writeErrorMessage(error: unknown, action: '收藏' | '联系卖家' | '
   return error.message || `${action}失败，请稍后重试`
 }
 
-export default function SecondhandDetailPage() {
+function SecondhandDetailPage() {
+  const visibility = useFeatureVisibility()
   const requestedId = Taro.getCurrentInstance().router?.params?.id ?? ''
   const targetCommentId = Taro.getCurrentInstance().router?.params?.commentId ?? ''
   const validId = /^[1-9]\d*$/.test(requestedId)
@@ -273,13 +276,13 @@ export default function SecondhandDetailPage() {
                 <Text>平台仅展示信息、不参与交易。请与卖家私下当面交易，验货后再付款，谨防转账诈骗。</Text>
               </View>
 
-              <ProductComments
+              {visibility.secondhand_comments && <ProductComments
                 productId={product.id}
                 productStatus={product.status}
                 targetCommentId={targetCommentId}
                 onTargetReady={setScrollTarget}
                 onLoadMoreReady={(handler) => { commentsLoadMoreRef.current = handler }}
-              />
+              />}
             </View>
           </>
         )}
@@ -307,7 +310,7 @@ export default function SecondhandDetailPage() {
             </View>
           ) : (
             <>
-              <View
+              {visibility.favorites && <View
                 className={`secondhand-detail-favorite ${favorited ? 'secondhand-detail-favorite--active' : ''} ${favoritePending ? 'secondhand-detail-favorite--pending' : ''}`}
                 onClick={() => void handleFavorite()}
               >
@@ -317,8 +320,8 @@ export default function SecondhandDetailPage() {
                   className='secondhand-detail-favorite__star'
                 />
                 <Text>{favoritePending ? '处理中' : favorited ? '已收藏' : '收藏'}</Text>
-              </View>
-              <View
+              </View>}
+              {visibility.secondhand_chat && <View
                 className={`secondhand-detail-contact ${contactPending ? 'secondhand-detail-contact--pending' : ''} ${product.status === 'sold' ? 'secondhand-detail-contact--disabled' : ''}`}
                 onClick={() => {
                   if (contactPending) return
@@ -331,13 +334,13 @@ export default function SecondhandDetailPage() {
               >
                 <View className='secondhand-detail-contact__icon' />
                 <Text>{product.status === 'sold' ? '商品已售' : '联系卖家'}</Text>
-              </View>
+              </View>}
             </>
           )}
         </View>
       )}
 
-      <AppActionSheet visible={contactVisible && Boolean(product)} title='联系卖家' description='请选择一种安全的沟通方式' loading={contactPending} onClose={() => setContactVisible(false)}>
+      <AppActionSheet visible={contactVisible && visibility.secondhand_chat && Boolean(product)} title='联系卖家' description='请选择一种安全的沟通方式' loading={contactPending} onClose={() => setContactVisible(false)}>
         {product ? <View className='secondhand-contact-sheet__content'>
             <View className='secondhand-contact-option' onClick={() => void handleStartChat()}>
               <View className='secondhand-contact-option__icon secondhand-contact-option__icon--chat' />
@@ -366,3 +369,5 @@ export default function SecondhandDetailPage() {
     </View>
   )
 }
+
+export default withFeaturePage(SecondhandDetailPage)

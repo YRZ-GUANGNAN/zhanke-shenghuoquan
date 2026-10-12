@@ -53,6 +53,7 @@ export interface UserProfile {
   avatar: string
   school: string
   campus: string
+  role?: 'user' | 'admin' | 'superadmin'
 }
 
 export interface CommunityPost {

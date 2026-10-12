@@ -1,9 +1,11 @@
-import React from 'react'
+import { withFeaturePage } from '../../components/feature-page-gate'
+import React, { useEffect, useState } from 'react'
 import { Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import AppIcon, { type AppIconName } from '../../components/app-icon'
 import { AppIconButton } from '../../components/ui'
 import Taro from '../../services/taro'
+import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import './index.scss'
 
 type PublishEntry = {
@@ -34,8 +36,13 @@ const entries: PublishEntry[] = [
   },
 ]
 
-export default function PublishEntryPage() {
+function PublishEntryPage() {
+  const visibility = useFeatureVisibility()
   const openEntry = (entry: PublishEntry) => {
+    if (!visibility || (entry.key === 'post' ? !visibility.post : !visibility.secondhand_publish)) {
+      void Taro.showToast({ title: '该功能暂未开放', icon: 'none' })
+      return
+    }
     void Taro.navigateTo({ url: entry.url })
   }
 
@@ -59,7 +66,7 @@ export default function PublishEntryPage() {
       </View>
 
       <View className='publish-entry-list'>
-        {entries.map((entry) => (
+        {visibility && entries.filter((entry) => entry.key === 'post' ? visibility.post : visibility.secondhand_publish).map((entry) => (
           <View
             key={entry.key}
             className={`publish-entry-card publish-entry-card--${entry.key}`}
@@ -88,7 +95,12 @@ export default function PublishEntryPage() {
             <Text className='publish-entry-card__meta'>{entry.meta}</Text>
           </View>
         ))}
+        {visibility && entries.every((entry) => entry.key === 'post' ? !visibility.post : !visibility.secondhand_publish) && (
+          <View className='publish-entry-empty'><Text>暂未开放可发布的内容类型</Text></View>
+        )}
       </View>
     </View>
   )
 }
+
+export default withFeaturePage(PublishEntryPage)

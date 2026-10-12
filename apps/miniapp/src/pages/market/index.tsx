@@ -1,3 +1,4 @@
+import { withFeaturePage } from '../../components/feature-page-gate'
 import React, { useEffect, useMemo, useState } from 'react'
 import { Button, Image, Input, ScrollView, Text, View } from '@tarojs/components'
 import { AvatarMark, BottomNav } from '../../components'
@@ -9,7 +10,7 @@ import './index.scss'
 const categories=['全部','电子产品','宿舍必备','零食','书籍','学习']
 const statusLabels:Record<Product['status'],string>={selling:'出售中',reserved:'已预定',sold:'已售出'}
 
-export default function MarketPage(){
+function MarketPage(){
   const[category,setCategory]=useState('全部')
   const[status,setStatus]=useState<Product['status']>('selling')
   const[keyword,setKeyword]=useState('')
@@ -38,3 +39,5 @@ export default function MarketPage(){
     <BottomNav active='market'/>
   </View>
 }
+
+export default withFeaturePage(MarketPage)

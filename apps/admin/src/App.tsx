@@ -5,17 +5,19 @@ import { MediaConsole } from './MediaConsole'
 import { DeliveryConsole } from './DeliveryConsole'
 import { TakeoutConsole } from './TakeoutConsole'
 import { ExternalTakeoutMerchants } from './ExternalTakeoutMerchants'
+import { FeaturePolicyConsole } from './FeaturePolicyConsole'
 import { IdentityApplications } from './IdentityApplications'
-import { legacyTakeoutEnabled } from './feature-flags'
+import { featurePolicyEnabled, legacyTakeoutEnabled } from './feature-flags'
 import { Login } from './Login'
 import { AccountPanel } from './AccountPanel'
 import { adminAuthAPI } from './services/admin-auth'
 import { AdminButton, AdminField, AdminIcon, AdminNotice, AdminPageHeader, AdminPagination, AdminPanel, AdminRowActions, AdminSelect, AdminState, AdminStatusBadge, AdminTableFrame, AdminToolbar, useAdminDialog, type AdminDialogAPI } from './components'
-import { adminNavigation, adminNavigationGroups, type AdminNavigationItem } from './admin-navigation'
+import { adminNavigation, adminNavigationGroups, featurePolicyNavigationItem, type AdminNavigationItem } from './admin-navigation'
 import type { AdminSection, FeedbackRow, NavigationCategory, NavigationItem, NavigationItemInput, Page, PageQuery, PostRow, ProductRow, ReportRow, ReviewTask, Stats, UserRow } from './types'
 
 const takeoutNavigation:AdminNavigationItem={key:'takeout',label:'外卖运营',description:'处理商家、菜品、订单与结算',icon:'delivery',group:'运营中心'}
-const visibleNavigation=legacyTakeoutEnabled?[...adminNavigation.slice(0,2),takeoutNavigation,...adminNavigation.slice(2)]:adminNavigation
+const baseNavigation=legacyTakeoutEnabled?[...adminNavigation.slice(0,2),takeoutNavigation,...adminNavigation.slice(2)]:adminNavigation
+const visibleNavigation=featurePolicyEnabled?[...baseNavigation,featurePolicyNavigationItem]:baseNavigation
 
 function Panel({title,children}:{title:string;children:ReactNode}){return <AdminPanel title={title}>{children}</AdminPanel>}
 function ErrorBox({message}:{message:string}){return <AdminState kind="error" title="暂时无法读取数据" description={`${message} 请确认管理员会话仍然有效；如果已过期，请重新登录。`}/>}
@@ -333,7 +335,7 @@ function Navigation(){
 
 async function takedownReason(dialog:AdminDialogAPI,kind:string,title:string){return dialog.prompt({title:`下架${kind}`,description:`确认下架“${title}”。下架后该内容将从用户端消失，恢复需重新提交审核。`,inputLabel:'下架原因',placeholder:'请输入本次操作原因',requiredMessage:'下架原因不能为空',confirmLabel:'确认下架',tone:'danger'})}
 
-function Content(){const section=useAdminStore(s=>s.section);if(section==='dashboard')return <Dashboard/>;if(section==='users')return <Users/>;if(section==='identities')return <IdentityApplications/>;if(section==='moderation')return <Reviews/>;if(section==='media')return <MediaConsole/>;if(section==='delivery')return <DeliveryConsole/>;if(section==='takeout'&&legacyTakeoutEnabled)return <TakeoutConsole/>;if(section==='community')return <Posts/>;if(section==='trade')return <Products/>;if(section==='reports')return <Reports/>;if(section==='feedbacks')return <Feedbacks/>;return <Navigation/>}
+function Content(){const section=useAdminStore(s=>s.section);if(section==='dashboard')return <Dashboard/>;if(section==='users')return <Users/>;if(section==='identities')return <IdentityApplications/>;if(section==='moderation')return <Reviews/>;if(section==='media')return <MediaConsole/>;if(section==='delivery')return <DeliveryConsole/>;if(section==='takeout'&&legacyTakeoutEnabled)return <TakeoutConsole/>;if(section==='community')return <Posts/>;if(section==='trade')return <Products/>;if(section==='reports')return <Reports/>;if(section==='feedbacks')return <Feedbacks/>;if(section==='feature-policy'&&featurePolicyEnabled)return <FeaturePolicyConsole/>;return <Navigation/>}
 
 function AdminShell(){const section=useAdminStore(s=>s.section);const setSection=useAdminStore(s=>s.setSection);const active=visibleNavigation.find(item=>item.key===section)||adminNavigation[0];return <div className="app-shell"><aside className="sidebar"><div className="brand"><div className="brand__logo">湛</div><div><strong>湛科生活圈</strong><span>运营管理后台</span></div></div><nav className="admin-navigation" aria-label="后台主导航">{adminNavigationGroups.map(group=><section className="admin-navigation__group" key={group}><h2>{group}</h2>{visibleNavigation.filter(item=>item.group===group).map(item=><button key={item.key} type="button" className={section===item.key?'active':''} aria-current={section===item.key?'page':undefined} onClick={()=>setSection(item.key)}><span className="admin-navigation__icon"><AdminIcon name={item.icon}/></span><span className="admin-navigation__label">{item.label}</span></button>)}</section>)}</nav><footer className="sidebar__footer"><span className="sidebar__status"/>内部运营系统</footer></aside><main className="main"><div className="topbar"><AdminPageHeader eyebrow={active.group} title={active.label} description={active.description}/><AccountPanel/></div><div className="main__content"><Content/></div></main></div>}
 

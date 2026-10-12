@@ -23,3 +23,4 @@ export const deliveryPaymentEnabled =
 export const deliveryPaymentMockEnabled =
   typeof TARO_APP_ENABLE_DELIVERY_PAYMENT_MOCK !== 'undefined' &&
   TARO_APP_ENABLE_DELIVERY_PAYMENT_MOCK === true
+

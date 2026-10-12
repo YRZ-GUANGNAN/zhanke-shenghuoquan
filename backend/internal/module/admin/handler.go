@@ -12,6 +12,7 @@ import (
 
 	"campus-circle/backend/internal/module/admin/review"
 	"campus-circle/backend/internal/module/community"
+	"campus-circle/backend/internal/module/featureflags"
 	"campus-circle/backend/internal/module/navigation"
 	"campus-circle/backend/internal/module/trade"
 	"campus-circle/backend/internal/module/user"
@@ -59,6 +60,12 @@ func (h *Handler) Register(api *gin.RouterGroup) {
 	secured.GET("/products", h.products)
 	secured.PATCH("/trade/products/:id/takedown", h.takedownProduct)
 	secured.GET("/navigation", h.navigationTree)
+	if featureflags.LabEnabled() {
+		secured.GET("/feature-policy", featureflags.AdminGetHandler)
+		secured.PATCH("/feature-policy", user.SuperAdminRequired(), featureflags.AdminUpdateHandler)
+		// Kept as a read-only compatibility alias for the earlier local draft.
+		secured.GET("/feature-flags", featureflags.AdminGetHandler)
+	}
 	secured.POST("/navigation/categories", h.createCategory)
 	secured.PUT("/navigation/categories/:id", h.updateCategory)
 	secured.DELETE("/navigation/categories/:id", h.deleteCategory)

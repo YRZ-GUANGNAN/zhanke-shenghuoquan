@@ -11,7 +11,10 @@ export default defineConfig(({ mode }) => {
       proxy: {
         '/api': {
           target: apiTarget,
-          changeOrigin: true
+          // Preserve the browser's Host header so the backend's strict
+          // same-origin CSRF check sees the original admin origin during
+          // local development. Production uses the native reverse proxy.
+          changeOrigin: false
         }
       }
     }

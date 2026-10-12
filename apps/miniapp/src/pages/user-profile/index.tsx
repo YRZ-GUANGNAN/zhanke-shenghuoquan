@@ -1,3 +1,5 @@
+import { withFeaturePage } from '../../components/feature-page-gate'
+import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
@@ -30,7 +32,8 @@ function splitColumns<T>(items: T[]) {
   }
 }
 
-export default function UserProfilePage() {
+function UserProfilePage() {
+  const visibility = useFeatureVisibility()
   const params = Taro.getCurrentInstance().router?.params || {}
   const userId = String(params.userId || '').trim()
   const currentUserId = useSessionStore((state) => state.profile.id)
@@ -55,6 +58,7 @@ export default function UserProfilePage() {
   const [blockPending, setBlockPending] = useState(false)
   const [error, setError] = useState('')
   const requestVersion = useRef(0)
+  useEffect(() => { if (!visibility.secondhand && activeTab === 'secondhand') setActiveTab('posts') }, [visibility.secondhand, activeTab])
 
   useEffect(() => {
     let active = true
@@ -74,7 +78,7 @@ export default function UserProfilePage() {
     void Promise.all([
       getPublicCommunityProfile(userId),
       getPublicUserPosts(userId, 1, 20),
-      getPublicUserProducts(userId, 1, 20)
+      visibility.secondhand ? getPublicUserProducts(userId, 1, 20) : Promise.resolve({ items: [] as Product[], total: 0, page: 1 })
     ]).then(([profileValue, postPage, productPage]) => {
       if (!active || requestVersion.current !== version) return
       setProfile(profileValue)
@@ -93,7 +97,7 @@ export default function UserProfilePage() {
       setError(value instanceof Error ? value.message : '用户主页加载失败')
     })
     return () => { active = false }
-  }, [reloadKey, userId])
+  }, [reloadKey, userId, visibility.secondhand])
 
   const loadMore = async () => {
     if (loadingMore) return
@@ -264,22 +268,22 @@ export default function UserProfilePage() {
         </View>
         <Text className='public-profile-bio'>这里展示该用户审核通过的公开内容。</Text>
         <View className='public-profile-stats'>
-          <View><Text className='public-profile-stats__value'>{profile.followingCount}</Text><Text>关注</Text></View>
-          <View><Text className='public-profile-stats__value'>{followerCount}</Text><Text>粉丝</Text></View>
-          <View><Text className='public-profile-stats__value'>{profile.likedCount}</Text><Text>获赞</Text></View>
+          {visibility.following && <View><Text className='public-profile-stats__value'>{profile.followingCount}</Text><Text>关注</Text></View>}
+          {visibility.following && <View><Text className='public-profile-stats__value'>{followerCount}</Text><Text>粉丝</Text></View>}
+          {visibility.likes && <View><Text className='public-profile-stats__value'>{profile.likedCount}</Text><Text>获赞</Text></View>}
         </View>
         <View className='public-profile-actions'>
-          <View className={`public-profile-action public-profile-action--primary ${following ? 'public-profile-action--active' : ''}`} onClick={isSelf ? () => void Taro.navigateTo({ url: '/pages/edit-profile/index' }) : () => void toggleFollow()}>
+          {(isSelf || visibility.following) && <View className={`public-profile-action public-profile-action--primary ${following ? 'public-profile-action--active' : ''}`} onClick={isSelf ? () => void Taro.navigateTo({ url: '/pages/edit-profile/index' }) : () => void toggleFollow()}>
             <Text>{isSelf ? '编辑资料' : busy ? '处理中…' : following ? '已关注' : '+ 关注'}</Text>
-          </View>
-          <View className='public-profile-action public-profile-action--secondary' onClick={secondaryAction}>
+          </View>}
+          {(isSelf || visibility.secondhand) && <View className='public-profile-action public-profile-action--secondary' onClick={secondaryAction}>
             <Text>{isSelf ? '分享主页' : '查看在售商品'}</Text>
-          </View>
+          </View>}
         </View>
       </View>
       <View className='public-profile-tabs'>
         <View className={`public-profile-tab ${activeTab === 'posts' ? 'public-profile-tab--active' : ''}`} onClick={() => setActiveTab('posts')}><Text>帖子 {postTotal}</Text></View>
-        <View className={`public-profile-tab ${activeTab === 'secondhand' ? 'public-profile-tab--active' : ''}`} onClick={() => setActiveTab('secondhand')}><Text>二手 {productTotal}</Text></View>
+        {visibility.secondhand && <View className={`public-profile-tab ${activeTab === 'secondhand' ? 'public-profile-tab--active' : ''}`} onClick={() => setActiveTab('secondhand')}><Text>二手 {productTotal}</Text></View>}
       </View>
       <View className='public-profile-content'>
         <ScrollView
@@ -323,3 +327,5 @@ export default function UserProfilePage() {
     </View>
   )
 }
+
+export default withFeaturePage(UserProfilePage)

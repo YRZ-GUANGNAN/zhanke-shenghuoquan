@@ -1,3 +1,4 @@
+import { withFeaturePage } from '../../components/feature-page-gate'
 import React, { useState } from 'react'
 import { Button, Input, Text, Textarea, View } from '@tarojs/components'
 import { ResolvedMediaImage } from '../../media-image'
@@ -6,7 +7,7 @@ import Taro from '../../services/taro'
 import { useTakeoutCartStore } from '../../stores/cart'
 import './index.scss'
 
-export default function TakeoutCartPage() {
+function TakeoutCartPage() {
   const merchantPublicId = useTakeoutCartStore((state) => state.merchantPublicId)
   const merchantName = useTakeoutCartStore((state) => state.merchantName)
   const items = useTakeoutCartStore((state) => state.items)
@@ -100,3 +101,5 @@ export default function TakeoutCartPage() {
     </View>
   )
 }
+
+export default withFeaturePage(TakeoutCartPage)

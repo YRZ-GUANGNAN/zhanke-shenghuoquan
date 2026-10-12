@@ -1,3 +1,4 @@
+import { withFeaturePage } from '../../components/feature-page-gate'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Image, Input, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
@@ -478,10 +479,12 @@ function IdentityApplicationContent() {
   )
 }
 
-export default function IdentityApplicationPage() {
+function IdentityApplicationPage() {
   return (
     <RuntimeSessionGate>
       <IdentityApplicationContent />
     </RuntimeSessionGate>
   )
 }
+
+export default withFeaturePage(IdentityApplicationPage)

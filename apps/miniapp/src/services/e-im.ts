@@ -2,6 +2,7 @@
 import TencentCloudChat, { type ChatSDK, type Message } from '@tencentcloud/chat'
 import type { IMConversationContext } from './c-trade'
 import { request } from './api'
+import { getFeatureVisibility } from './feature-visibility'
 
 export interface IMCredentials {
   sdkAppId: string
@@ -218,10 +219,10 @@ export function resetTencentIMSession(): Promise<void> {
   return resetTask
 }
 
-async function ensureTencentIMReadyAttempt(expectedUserId: string, retried: boolean): Promise<ChatSDK> {
+async function ensureTencentIMReadyAttempt(expectedUserId: string, retried: boolean, credentialsLoader: () => Promise<IMCredentials>): Promise<ChatSDK> {
   await resetTask
   const generation = sessionGeneration
-  const credentials = await getIMCredentials()
+  const credentials = await credentialsLoader()
   assertCurrentGeneration(generation)
 
   if (expectedUserId && credentials.userId !== expectedUserId) {
@@ -234,7 +235,7 @@ async function ensureTencentIMReadyAttempt(expectedUserId: string, retried: bool
     }
     await resetTencentIMSession()
     if (retried) throw new Error('腾讯云 IM 登录任务与当前账号不一致，请重试')
-    return ensureTencentIMReadyAttempt(expectedUserId, true)
+    return ensureTencentIMReadyAttempt(expectedUserId, true, credentialsLoader)
   }
 
   let promise: Promise<ChatSDK>
@@ -257,8 +258,8 @@ async function ensureTencentIMReadyAttempt(expectedUserId: string, retried: bool
   return promise
 }
 
-export function ensureTencentIMReady(expectedUserId = ''): Promise<ChatSDK> {
-  return ensureTencentIMReadyAttempt(expectedUserId, false)
+export function ensureTencentIMReady(expectedUserId = '', credentialsLoader = getIMCredentials): Promise<ChatSDK> {
+  return ensureTencentIMReadyAttempt(expectedUserId, false, credentialsLoader)
 }
 
 export async function getTencentIMLoginUser(expectedUserId = ''): Promise<string> {
@@ -325,6 +326,8 @@ export async function sendTencentText(
   text: string,
   expectedUserId = ''
 ): Promise<Message> {
+  const visibility = await getFeatureVisibility(true)
+  if (!visibility.secondhand_chat || !visibility.messages) throw new Error('私信功能暂未开放')
   const chat = await ensureTencentIMReady(expectedUserId)
   const message = chat.createTextMessage({
     to: context.peerUserId,

@@ -1,3 +1,4 @@
+import { withFeaturePage } from '../../components/feature-page-gate'
 import React, {useEffect, useMemo, useState} from 'react'
 import {Button, Input, ScrollView, Text, View} from '@tarojs/components'
 import type {IMConversationContext} from '../../services/c-trade'
@@ -5,7 +6,7 @@ import {loadTencentMessages, sendTencentText, subscribeTencentMessages, type Ten
 import Taro from '../../services/taro'
 import './index.scss'
 
-export default function ChatPage(){
+function ChatPage(){
   const params=Taro.getCurrentInstance().router?.params||{}
   const context=useMemo<IMConversationContext>(()=>({relationId:Number(params.relationId||0),conversationId:params.conversationId||'',peerUserId:params.peerUserId||'',productId:Number(params.productId||0),buyerId:Number(params.buyerId||0),sellerId:Number(params.sellerId||0)}),[])
   const[messages,setMessages]=useState<TencentMessage[]>([])
@@ -18,3 +19,5 @@ export default function ChatPage(){
 function mergeMessages(current:TencentMessage[],next:TencentMessage[]){const values=new Map(current.map(item=>[item.ID,item]));next.forEach(item=>values.set(item.ID,item));return[...values.values()].sort((a,b)=>a.time-b.time)}
 function formatTime(value:number){const date=new Date(value*1000);return`${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`}
 function showError(error:unknown){void Taro.showToast({title:error instanceof Error?error.message:'腾讯云 IM 操作失败',icon:'none'})}
+
+export default withFeaturePage(ChatPage)

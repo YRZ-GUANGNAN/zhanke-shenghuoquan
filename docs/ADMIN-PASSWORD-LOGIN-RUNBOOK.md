@@ -65,7 +65,7 @@ sudo -u campus /opt/campus-circle/current/bin/admin-credential reset --user-id 1
 
 ## 上线验收
 
-1. 打开 `https://zhanduiwang.top/`，确认显示密码登录页。
+1. 打开管理后台 `https://zhandui.top/`，确认显示密码登录页。小程序 API 仍使用 `https://zhanduiwang.top/api/v1`，不要把两个入口混用。
 2. 使用固定用户名 `administrator` 和刚设置的密码登录。
 3. 刷新页面，确认会话仍有效。
 4. 退出后确认受保护接口返回 401。

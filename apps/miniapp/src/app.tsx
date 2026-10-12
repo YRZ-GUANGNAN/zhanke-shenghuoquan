@@ -3,8 +3,10 @@ import { identityRoute } from './hooks/use-identity-guard'
 import Taro from './services/taro'
 import { useSessionStore } from './stores/session'
 import './app.scss'
+import { useFeaturePolicyRefresh } from './hooks/use-feature-visibility'
 
 export default function App(props: { children: React.ReactNode }) {
+  useFeaturePolicyRefresh()
   const status = useSessionStore((state) => state.status)
   const identity = useSessionStore((state) => state.identity)
   const bootstrap = useSessionStore((state) => state.bootstrap)

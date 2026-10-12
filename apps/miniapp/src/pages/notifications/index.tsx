@@ -1,3 +1,4 @@
+import { withFeaturePage } from '../../components/feature-page-gate'
 import React, { useEffect, useState } from 'react'
 import { Text, View } from '@tarojs/components'
 import { listCommunityNotifications, markCommunityNotificationRead } from '../../services/b-community'
@@ -7,7 +8,7 @@ import './index.scss'
 
 const labels:Record<CommunityNotification['type'],string>={post_commented:'评论了你的帖子',post_liked:'赞了你的帖子',user_followed:'关注了你',product_commented:'留言了你的商品',product_comment_replied:'回复了你的商品留言'}
 
-export default function NotificationsPage(){
+function NotificationsPage(){
   const[items,setItems]=useState<CommunityNotification[]>([])
   const[unread,setUnread]=useState(0)
   const load=async()=>{const result=await listCommunityNotifications();setItems(result.items);setUnread(result.unread)}
@@ -24,3 +25,5 @@ export default function NotificationsPage(){
 }
 
 function showError(error:unknown){void Taro.showToast({title:error instanceof Error?error.message:'加载失败',icon:'none'})}
+
+export default withFeaturePage(NotificationsPage)

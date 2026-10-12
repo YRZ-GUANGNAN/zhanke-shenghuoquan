@@ -1,3 +1,4 @@
+import { withFeaturePage } from '../../components/feature-page-gate'
 import React, { useEffect, useState } from 'react'
 import { Input, ScrollView, Text, Textarea, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
@@ -455,10 +456,12 @@ function MerchantPublishContent() {
   )
 }
 
-export default function MerchantPublishPage() {
+function MerchantPublishPage() {
   return (
     <RuntimeSessionGate preserveAuthenticatedChildrenDuringRetry>
       <MerchantPublishContent />
     </RuntimeSessionGate>
   )
 }
+
+export default withFeaturePage(MerchantPublishPage)

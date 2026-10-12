@@ -19,6 +19,7 @@ import { useSessionStore } from '../../stores/session'
 import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import MerchantHomeIcon, { type MerchantHomeIconName } from './merchant-home-icon'
 import './index.scss'
+import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 
 type MerchantTabKey = 'pending' | 'delivering' | 'completed'
 type MerchantOrdersByTab = Record<MerchantTabKey, MerchantDeliveryOrder[]>
@@ -177,6 +178,7 @@ function OrderCard({ order }: { order: MerchantDeliveryOrder }) {
 }
 
 function MerchantHomeContent() {
+  const visibility = useFeatureVisibility()
   const [activeTab, setActiveTab] = useState<MerchantTabKey>('pending')
   const [ordersByTab, setOrdersByTab] = useState<MerchantOrdersByTab>(emptyOrdersByTab)
   const [ordersPageByTab, setOrdersPageByTab] = useState<MerchantNumbersByTab>(initialNumbersByTab)
@@ -373,12 +375,13 @@ function MerchantHomeContent() {
       </View>
 
       <View className='merchant-home-tools'>
+        {(!visibility.delivery || !visibility.merchant) && <View className='merchant-home-section-head'><Text>新业务暂未开放，以下仅供处理已有订单与资金。</Text></View>}
         <View className='merchant-home-section-head'>
           <Text className='merchant-home-section-head__title'>常用功能</Text>
           <Text className='merchant-home-section-head__hint'>经营与配送</Text>
         </View>
         <View className='merchant-home-shortcuts'>
-          {shortcutCopy.map((item) => (
+          {shortcutCopy.filter(item => item.key !== 'publish' || visibility.delivery && visibility.merchant).map((item) => (
             <View
               key={item.key}
               className={`merchant-home-shortcut merchant-home-shortcut--${item.key}`}

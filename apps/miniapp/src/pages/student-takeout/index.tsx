@@ -1,3 +1,4 @@
+import { withFeaturePage } from '../../components/feature-page-gate'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDidShow } from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
@@ -6,10 +7,13 @@ import AppIcon from '../../components/app-icon'
 import StudentBottomNav from '../../components/student-bottom-nav'
 import {
   listExternalTakeoutMerchants,
+  listNavigationItems,
   type ExternalTakeoutMerchantLink,
 } from '../../services/d-navigation'
 import Taro from '../../services/taro'
+import type { ToolLink } from '../../types'
 import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
+import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import './index.scss'
 
 type DirectoryStatus = 'loading' | 'empty' | 'ready' | 'error'
@@ -21,12 +25,16 @@ const filters: Array<{ key: MerchantFilter; label: string }> = [
   { key: 'resting', label: '休息中' },
 ]
 
-export default function StudentTakeoutPage() {
+function StudentTakeoutPage() {
+  const [tools, setTools] = useState<ToolLink[]>([])
+  const [toolStatus, setToolStatus] = useState<DirectoryStatus>('loading')
   const [merchants, setMerchants] = useState<ExternalTakeoutMerchantLink[]>([])
   const [status, setStatus] = useState<DirectoryStatus>('loading')
   const [filter, setFilter] = useState<MerchantFilter>('all')
-  const [jumpingMerchantId, setJumpingMerchantId] = useState<string | null>(null)
-  const requestVersion = useRef(0)
+  const [jumpingTarget, setJumpingTarget] = useState<string | null>(null)
+  const visibility = useFeatureVisibility()
+  const toolRequestVersion = useRef(0)
+  const merchantRequestVersion = useRef(0)
   const jumpingRef = useRef<string | null>(null)
 
   const openCount = useMemo(
@@ -39,29 +47,53 @@ export default function StudentTakeoutPage() {
     return merchants.filter((merchant) => merchant.operatingStatus === filter)
   }, [filter, merchants])
 
+  const loadTools = useCallback(async () => {
+    const version = toolRequestVersion.current + 1
+    toolRequestVersion.current = version
+    setToolStatus('loading')
+    try {
+      const values = await listNavigationItems()
+      if (version !== toolRequestVersion.current) return
+      setTools(values)
+      setToolStatus(values.length > 0 ? 'ready' : 'empty')
+    } catch (error) {
+      console.error('load campus service tools failed', error)
+      if (version !== toolRequestVersion.current) return
+      setTools([])
+      setToolStatus('error')
+    }
+  }, [])
+
   const load = useCallback(async () => {
-    const version = requestVersion.current + 1
-    requestVersion.current = version
+    const version = merchantRequestVersion.current + 1
+    merchantRequestVersion.current = version
     setStatus('loading')
     try {
       const values = await listExternalTakeoutMerchants()
-      if (version !== requestVersion.current) return
+      if (version !== merchantRequestVersion.current) return
       setMerchants(values)
       setStatus(values.length > 0 ? 'ready' : 'empty')
     } catch (error) {
       console.error('load external takeout directory failed', error)
-      if (version !== requestVersion.current) return
+      if (version !== merchantRequestVersion.current) return
       setMerchants([])
       setStatus('error')
     }
   }, [])
 
   useDidShow(() => {
-    void load()
+    if (visibility.campus_tools) void loadTools()
+    if (visibility.takeout) void load()
   })
 
+  useEffect(() => {
+    if (visibility.campus_tools) void loadTools()
+    if (visibility.takeout) void load()
+  }, [visibility.campus_tools, visibility.takeout, loadTools, load])
+
   useEffect(() => () => {
-    requestVersion.current += 1
+    toolRequestVersion.current += 1
+    merchantRequestVersion.current += 1
   }, [])
 
   const openMerchant = async (merchant: ExternalTakeoutMerchantLink) => {
@@ -69,17 +101,31 @@ export default function StudentTakeoutPage() {
       await Taro.showToast({ title: '商家休息中', icon: 'none' })
       return
     }
+    await openMiniProgram(
+      `merchant:${merchant.id}`,
+      merchant.appId,
+      merchant.path,
+      '商家小程序暂时无法打开',
+    )
+  }
+
+  const openTool = async (tool: ToolLink) => {
+    if (!tool.appId || !tool.path) return
+    await openMiniProgram(`tool:${tool.id}`, tool.appId, tool.path, '服务小程序暂时无法打开')
+  }
+
+  async function openMiniProgram(target: string, appId: string, path: string, errorTitle: string) {
     if (jumpingRef.current) return
-    jumpingRef.current = merchant.id
-    setJumpingMerchantId(merchant.id)
+    jumpingRef.current = target
+    setJumpingTarget(target)
     try {
-      await Taro.navigateToMiniProgram({ appId: merchant.appId, path: merchant.path })
+      await Taro.navigateToMiniProgram({ appId, path })
     } catch (error) {
-      console.error('open external merchant mini program failed', error)
-      await Taro.showToast({ title: '商家小程序暂时无法打开', icon: 'none' })
+      console.error('open campus service mini program failed', error)
+      await Taro.showToast({ title: errorTitle, icon: 'none' })
     } finally {
       jumpingRef.current = null
-      setJumpingMerchantId(null)
+      setJumpingTarget(null)
     }
   }
 
@@ -93,42 +139,77 @@ export default function StudentTakeoutPage() {
     <View className='student-takeout-page' style={getCapsuleSafeStyle()}>
       <View className='student-takeout-header'>
         <CapsulePageHeader
-          variant='search'
+          variant='standard'
           className='student-takeout-header__row'
-          left={<Text className='student-takeout-header__title'>外卖</Text>}
-          center={
-            <View
-              className='student-takeout-search'
-              hoverClass='student-takeout-search--pressed'
-              onClick={() => void Taro.navigateTo({ url: '/pages/search/index?scope=takeout' })}
-            >
-              <View className='student-takeout-search__icon' />
-              <Text>搜索合作商家</Text>
-            </View>
-          }
+          left={<Text className='student-takeout-header__title'>校园服务</Text>}
           divider={false}
         />
-        <View className='student-takeout-directory'>
-          <View className='student-takeout-directory__copy'>
-            <Text className='student-takeout-directory__title'>校外合作商家</Text>
-            <Text className='student-takeout-directory__desc'>商品、订单与售后由商家小程序提供</Text>
-          </View>
-          {status === 'ready' && (
-            <View className='student-takeout-directory__status'>
-              <View className='student-takeout-directory__dot' />
-              <Text>{openCount} 家营业中</Text>
-            </View>
-          )}
-        </View>
+        {visibility.search && visibility.takeout && <View
+          className='student-takeout-search'
+          hoverClass='student-takeout-search--pressed'
+          onClick={() => void Taro.navigateTo({ url: '/pages/search/index?scope=takeout' })}
+        >
+          <AppIcon name='search' className='student-takeout-search__icon' />
+          <Text>搜索合作商家</Text>
+        </View>}
       </View>
 
       <View className='student-takeout-scroll'>
-        {status === 'ready' && (
+        {visibility?.campus_tools && toolStatus === 'ready' && (
+          <View className='student-takeout-services'>
+            <View className='student-takeout-section-heading'>
+              <View>
+                <Text className='student-takeout-section-heading__title'>常用服务</Text>
+                <Text className='student-takeout-section-heading__desc'>直接进入对应服务小程序</Text>
+              </View>
+            </View>
+            <View className='student-takeout-services__grid'>
+              {tools.map((tool) => {
+                const target = `tool:${tool.id}`
+                return (
+                  <View
+                    key={tool.id}
+                    className='student-takeout-service'
+                    hoverClass='student-takeout-service--pressed'
+                    onClick={() => void openTool(tool)}
+                  >
+                    <View className='student-takeout-service__icon' style={{ color: tool.color }}>
+                      <Text>{tool.iconText}</Text>
+                    </View>
+                    <Text className='student-takeout-service__name'>
+                      {jumpingTarget === target ? '打开中' : tool.title}
+                    </Text>
+                  </View>
+                )
+              })}
+            </View>
+          </View>
+        )}
+
+        {visibility?.campus_tools && toolStatus === 'error' && (
+          <View className='student-takeout-tools-error' onClick={() => void loadTools()}>
+            <Text>常用服务暂时无法加载</Text>
+            <Text className='student-takeout-tools-error__action'>重新加载</Text>
+          </View>
+        )}
+
+        {visibility?.takeout && <View className='student-takeout-directory'>
+          <View className='student-takeout-directory__copy'>
+            <Text className='student-takeout-directory__title'>合作商家</Text>
+            <Text className='student-takeout-directory__desc'>商品、订单与售后由商家小程序提供</Text>
+          </View>
+          {status === 'ready' && (
+            <Text className='student-takeout-directory__status'>{openCount} 家营业中</Text>
+          )}
+        </View>}
+
+        {visibility?.takeout && status === 'ready' && (
           <View className='student-takeout-filters'>
             {filters.map((item) => (
               <View
                 key={item.key}
                 className={`student-takeout-filter${filter === item.key ? ' student-takeout-filter--active' : ''}`}
+                hoverClass='student-takeout-filter--pressed'
                 onClick={() => setFilter(item.key)}
               >
                 <Text>{item.label}</Text>
@@ -138,12 +219,12 @@ export default function StudentTakeoutPage() {
           </View>
         )}
 
-        <View className='student-takeout-tip'>
-          <Text className='student-takeout-tip__icon'>i</Text>
+        {visibility?.takeout && <View className='student-takeout-tip'>
+          <AppIcon name='info' className='student-takeout-tip__icon' />
           <Text className='student-takeout-tip__text'>点击后将前往商家小程序，下单与售后由商家提供。</Text>
-        </View>
+        </View>}
 
-        {status === 'loading' && (
+        {visibility?.takeout && status === 'loading' && (
           <View className='student-takeout-state'>
             <View className='student-takeout-state__visual student-takeout-state__visual--loading'>
               <View /><View /><View />
@@ -152,16 +233,16 @@ export default function StudentTakeoutPage() {
             <Text className='student-takeout-state__desc'>正在同步最新营业状态</Text>
           </View>
         )}
-        {status === 'empty' && (
+        {visibility?.takeout && status === 'empty' && (
           <View className='student-takeout-state'>
             <View className='student-takeout-state__visual'>
               <View /><View /><View />
             </View>
-            <Text className='student-takeout-state__title'>暂无合作商家</Text>
-            <Text className='student-takeout-state__desc'>平台正在拓展校外合作商家，接入后会显示在这里</Text>
+            <Text className='student-takeout-state__title'>暂无可用合作商家</Text>
+            <Text className='student-takeout-state__desc'>接入并启用后会显示在这里</Text>
           </View>
         )}
-        {status === 'error' && (
+        {visibility?.takeout && status === 'error' && (
           <View className='student-takeout-state student-takeout-state--retry' onClick={() => void load()}>
             <View className='student-takeout-state__visual student-takeout-state__visual--error'>
               <View /><View /><View />
@@ -170,7 +251,7 @@ export default function StudentTakeoutPage() {
             <Text className='student-takeout-state__desc'>请检查网络连接后重试</Text>
           </View>
         )}
-        {status === 'ready' && filteredMerchants.length === 0 && (
+        {visibility?.takeout && status === 'ready' && filteredMerchants.length === 0 && (
           <View className='student-takeout-state'>
             <View className='student-takeout-state__visual'>
               <View /><View /><View />
@@ -179,11 +260,11 @@ export default function StudentTakeoutPage() {
             <Text className='student-takeout-state__desc'>可以切换其他营业状态查看</Text>
           </View>
         )}
-        {status === 'ready' && filteredMerchants.length > 0 && (
+        {visibility?.takeout && status === 'ready' && filteredMerchants.length > 0 && (
           <View className='student-takeout-list'>
             {filteredMerchants.map((merchant) => {
               const resting = merchant.operatingStatus === 'resting'
-              const jumping = jumpingMerchantId === merchant.id
+              const jumping = jumpingTarget === `merchant:${merchant.id}`
               return (
                 <View
                   key={merchant.id}
@@ -191,36 +272,37 @@ export default function StudentTakeoutPage() {
                   hoverClass={resting ? 'none' : 'student-takeout-merchant--pressed'}
                   onClick={() => void openMerchant(merchant)}
                 >
-                  <View className='student-takeout-merchant__top'>
-                    <View className='student-takeout-merchant__avatar' style={{ backgroundColor: merchant.color }}>
-                      <Text>{merchant.iconText}</Text>
-                    </View>
-                    <View className='student-takeout-merchant__main'>
+                  <View className='student-takeout-merchant__avatar' style={{ color: merchant.color }}>
+                    <Text>{merchant.iconText}</Text>
+                  </View>
+                  <View className='student-takeout-merchant__main'>
+                    <View className='student-takeout-merchant__headline'>
                       <Text className='student-takeout-merchant__name'>{merchant.title}</Text>
-                      <Text className='student-takeout-merchant__desc'>{merchant.subtitle}</Text>
+                      <View className={`student-takeout-status ${resting ? 'student-takeout-status--closed' : 'student-takeout-status--open'}`}>
+                        <View className='student-takeout-status__dot' />
+                        <Text>{resting ? '休息中' : '营业中'}</Text>
+                      </View>
                     </View>
-                    <View className={`student-takeout-status ${resting ? 'student-takeout-status--closed' : 'student-takeout-status--open'}`}>
-                      <View className='student-takeout-status__dot' />
-                      <Text>{resting ? '休息中' : '营业中'}</Text>
-                    </View>
+                    <Text className='student-takeout-merchant__desc'>{merchant.subtitle}</Text>
+                    <Text className={`student-takeout-merchant__action${resting ? ' student-takeout-merchant__action--disabled' : ''}`}>
+                      {jumping ? '打开中' : resting ? '暂未营业' : '进入商家'}
+                    </Text>
                   </View>
-                  <View className='student-takeout-merchant__bottom'>
-                    <Text className='student-takeout-merchant__hint'>微信小程序商家</Text>
-                    <View className={`student-takeout-merchant__action${resting ? ' student-takeout-merchant__action--disabled' : ''}`}>
-                      <Text>{jumping ? '打开中' : resting ? '暂未营业' : '进入商家'}</Text>
-                      {!resting && <AppIcon name='chevron-right' className='student-takeout-merchant__arrow app-icon--chevron' />}
-                    </View>
-                  </View>
+                  {!resting && (
+                    <AppIcon name='chevron-right' className='student-takeout-merchant__arrow app-icon--chevron' />
+                  )}
                 </View>
               )
             })}
           </View>
         )}
 
-        {status === 'ready' && <Text className='student-takeout-footer'>— 已显示全部合作商家 —</Text>}
+        {visibility?.takeout && status === 'ready' && <Text className='student-takeout-footer'>已显示全部合作商家</Text>}
       </View>
 
       <StudentBottomNav active='takeout' />
     </View>
   )
 }
+
+export default withFeaturePage(StudentTakeoutPage)

@@ -1,6 +1,10 @@
 import TencentCloudChat, { type Message } from '@tencentcloud/chat'
 import { request } from './api'
-import { ensureTencentIMReady } from './e-im'
+import { ensureTencentIMReady, type IMCredentials } from './e-im'
+
+function readyForDeliveryIM() {
+  return ensureTencentIMReady('', () => request<IMCredentials>('/delivery/im-credentials'))
+}
 
 export type DeliveryConversationStatus =
   | 'provisioning'
@@ -125,7 +129,7 @@ export function resolveDeliveryConversationImage(
 export async function loadDeliveryTencentMessages(
   conversation: DeliveryConversation
 ): Promise<Message[]> {
-  const chat = await ensureTencentIMReady()
+  const chat = await readyForDeliveryIM()
   await chat.getConversationProfile(conversation.tencentConversationId)
   const result = await chat.getMessageList({
     conversationID: conversation.tencentConversationId
@@ -138,7 +142,7 @@ export async function sendDeliveryTencentText(
   conversation: DeliveryConversation,
   text: string
 ): Promise<Message> {
-  const chat = await ensureTencentIMReady()
+  const chat = await readyForDeliveryIM()
   const message = chat.createTextMessage({
     to: groupIDFromConversationID(conversation.tencentConversationId),
     conversationType: TencentCloudChat.TYPES.CONV_GROUP,
@@ -157,7 +161,7 @@ export async function sendDeliveryTencentImage(
     conversation.conversationPublicId,
     assetPublicId
   )
-  const chat = await ensureTencentIMReady()
+  const chat = await readyForDeliveryIM()
   const message = chat.createCustomMessage({
     to: groupIDFromConversationID(conversation.tencentConversationId),
     conversationType: TencentCloudChat.TYPES.CONV_GROUP,
@@ -175,7 +179,7 @@ export async function sendDeliveryTencentImage(
 export async function getDeliveryConversationUnread(
   conversationID: string
 ): Promise<number> {
-  const chat = await ensureTencentIMReady()
+  const chat = await readyForDeliveryIM()
   const result = await chat.getConversationProfile(conversationID) as ConversationProfileResult
   return Number(result.data?.conversation?.unreadCount || 0)
 }
@@ -194,7 +198,7 @@ export async function subscribeDeliveryTencentMessages(
   conversation: DeliveryConversation,
   handler: (messages: Message[]) => void
 ): Promise<() => void> {
-  const chat = await ensureTencentIMReady()
+  const chat = await readyForDeliveryIM()
   const listener = (event: MessageEvent) => {
     handler((event.data || []).filter((item) => item.conversationID === conversation.tencentConversationId))
   }
@@ -206,7 +210,7 @@ export async function subscribeDeliveryConversationUnread(
   conversationID: string,
   handler: (unreadCount: number) => void
 ): Promise<() => void> {
-  const chat = await ensureTencentIMReady()
+  const chat = await readyForDeliveryIM()
   const listener = (event: ConversationListEvent) => {
     const value = (event.data || []).find((item) => item.conversationID === conversationID)
     if (value) handler(Number(value.unreadCount || 0))

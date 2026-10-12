@@ -1,3 +1,4 @@
+import { withFeaturePage } from '../../components/feature-page-gate'
 import React, { useEffect, useState } from 'react'
 import { Button, ScrollView, Text, View } from '@tarojs/components'
 import { BottomNav } from '../../components'
@@ -14,7 +15,7 @@ import Taro from '../../services/taro'
 import { useTakeoutCartStore } from '../../stores/cart'
 import './index.scss'
 
-export default function TakeoutPage() {
+function TakeoutPage() {
   const [loading, setLoading] = useState(false)
   const [merchants, setMerchants] = useState<BuyerMerchant[]>([])
   const [selectedMerchant, setSelectedMerchant] = useState<BuyerMerchant | null>(null)
@@ -142,3 +143,5 @@ export default function TakeoutPage() {
 function showError(error: unknown, fallback: string) {
   void Taro.showToast({ title: error instanceof Error ? error.message : fallback, icon: 'none' })
 }
+
+export default withFeaturePage(TakeoutPage)

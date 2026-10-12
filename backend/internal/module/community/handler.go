@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"campus-circle/backend/internal/module/admin/review"
+	"campus-circle/backend/internal/module/featureflags"
 	"campus-circle/backend/internal/module/user"
 	"campus-circle/backend/internal/pkg/response"
 )
@@ -111,16 +112,28 @@ func (h *Handler) viewerState(c *gin.Context) {
 	write(c, value, err)
 }
 func (h *Handler) feed(c *gin.Context) {
+	if !featureflags.Can(featureflags.KeyForum) {
+		response.Fail(c, http.StatusForbidden, "社区功能暂未开放")
+		return
+	}
 	page, size := pagination(c)
 	result, err := h.service.Feed(c, FeedQuery{Topic: c.Query("topic"), Keyword: c.Query("keyword"), Sort: c.Query("sort"), Page: page, PageSize: size})
 	write(c, result, err)
 }
 func (h *Handler) followingFeed(c *gin.Context) {
+	if !featureflags.Can(featureflags.KeyFollowing) {
+		response.Fail(c, http.StatusForbidden, "关注功能暂未开放")
+		return
+	}
 	page, size := pagination(c)
 	result, err := h.service.FollowingFeed(c, user.CurrentUserID(c), FeedQuery{Page: page, PageSize: size})
 	write(c, result, err)
 }
 func (h *Handler) post(c *gin.Context) {
+	if !featureflags.Can(featureflags.KeyForum) {
+		response.Fail(c, http.StatusForbidden, "社区功能暂未开放")
+		return
+	}
 	id, ok := paramID(c)
 	if !ok {
 		return
@@ -129,6 +142,11 @@ func (h *Handler) post(c *gin.Context) {
 	write(c, result, err)
 }
 func (h *Handler) create(c *gin.Context) {
+	cu := user.CurrentUser(c)
+	if !featureflags.CanPost(cu.Role) {
+		response.Fail(c, http.StatusForbidden, "posting is currently restricted")
+		return
+	}
 	var req struct {
 		Title           string   `json:"title"`
 		Content         string   `json:"content"`
@@ -146,7 +164,7 @@ func (h *Handler) create(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	currentUser := user.CurrentUser(c)
+	currentUser := cu
 	risk := h.safety.CheckText(c.Request.Context(), currentUser.OpenID, req.Title+"\n"+req.Content)
 	input := CreatePostInput{UserID: currentUser.ID, Title: req.Title, Content: req.Content, Topic: req.Topic, Tags: req.Tags, ImageAssetIDs: req.ImageAssetIDs}
 	if keyed {
@@ -162,6 +180,10 @@ func (h *Handler) create(c *gin.Context) {
 	response.Created(c, result)
 }
 func (h *Handler) comments(c *gin.Context) {
+	if !featureflags.Can(featureflags.KeyForum) {
+		response.Fail(c, http.StatusForbidden, "社区功能暂未开放")
+		return
+	}
 	id, ok := paramID(c)
 	if !ok {
 		return
@@ -171,6 +193,11 @@ func (h *Handler) comments(c *gin.Context) {
 	write(c, result, err)
 }
 func (h *Handler) addComment(c *gin.Context) {
+	currentUser := user.CurrentUser(c)
+	if !featureflags.CanComment(currentUser.Role) {
+		response.Fail(c, http.StatusForbidden, "comments are currently disabled")
+		return
+	}
 	id, ok := paramID(c)
 	if !ok {
 		return
@@ -188,7 +215,6 @@ func (h *Handler) addComment(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	currentUser := user.CurrentUser(c)
 	risk := h.safety.CheckText(c.Request.Context(), currentUser.OpenID, req.Content)
 	if keyed {
 		result, err := h.service.AddCommentKeyed(c, id, currentUser.ID, req.Content, clientRequestID, risk)
@@ -260,6 +286,10 @@ func (h *Handler) favorite(c *gin.Context) {
 	write(c, gin.H{"favorited": favorited}, err)
 }
 func (h *Handler) follow(c *gin.Context) {
+	if !featureflags.Can(featureflags.KeyFollowing) {
+		response.Fail(c, http.StatusForbidden, "关注功能暂未开放")
+		return
+	}
 	id, ok := paramID(c)
 	if !ok {
 		return
@@ -289,6 +319,10 @@ func (h *Handler) setFavorite(desired bool) gin.HandlerFunc {
 }
 func (h *Handler) setFollow(desired bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !featureflags.Can(featureflags.KeyFollowing) {
+			response.Fail(c, http.StatusForbidden, "关注功能暂未开放")
+			return
+		}
 		id, ok := paramID(c)
 		if !ok {
 			return

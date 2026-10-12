@@ -34,6 +34,7 @@ import (
 	"campus-circle/backend/internal/module/adminauth"
 	"campus-circle/backend/internal/module/community"
 	"campus-circle/backend/internal/module/delivery"
+	"campus-circle/backend/internal/module/featureflags"
 	"campus-circle/backend/internal/module/identityapplication"
 	"campus-circle/backend/internal/module/im"
 	coremedia "campus-circle/backend/internal/module/media"
@@ -58,6 +59,9 @@ func main() {
 	db, err := database.Open(cfg)
 	if err != nil {
 		log.Fatalf("open database: %v", err)
+	}
+	if err := featureflags.ConfigureStore(context.Background(), cfg.EnableFeaturePolicy, featureflags.NewGormStore(db)); err != nil {
+		log.Fatalf("configure feature policy: %v", err)
 	}
 	identityApplicationRepository := identityapplication.NewRepository(db)
 	// Composition root: repositories are private to their domain; only services cross boundaries.
@@ -317,6 +321,7 @@ func main() {
 			log.Fatalf("configure delivery conversation image token: %v", tokenErr)
 		}
 		deliveryRuntime.conversations = conversations
+		deliveryRuntime.imCredentials = func(ctx context.Context, id uint64) (any, error) { return imService.Credentials(ctx, uint(id)) }
 		deliveryRuntime.conversationLifecycle = lifecycle
 		deliveryRuntime.conversationImageTokens = imageTokens
 		deliveryRuntime.conversationImagesEnabled = localMockWechatMode(cfg)
@@ -372,6 +377,7 @@ func main() {
 	registerOperationalRoutes(router, db, searchIndex.Ready)
 
 	api := router.Group("/api/v1")
+	api.Use(featureflags.GuardRequests())
 	authRoutes := api.Group("/auth")
 	user.NewHandler(userService, mediaService).Register(authRoutes)
 	adminauth.NewHandler(adminAuthService, adminAuthMiddleware).Register(api.Group("/admin-auth"))
@@ -402,6 +408,7 @@ func main() {
 	communityRoutes := api.Group("/community")
 	community.NewHandler(communityService, userService, safety).Register(communityRoutes)
 	community.NewSearchHandler(communityService, userService, communityMetrics).Register(communityRoutes)
+	api.GET("/features", featureflags.PublicHandler)
 	tradeRoutes := api.Group("/trade")
 	trade.NewHandler(tradeService, userService, safety).Register(tradeRoutes)
 	trade.NewProductCommentHandler(tradeCommentService, userService, safety).Register(tradeRoutes)
@@ -484,6 +491,7 @@ type deliveryRuntime struct {
 	conversationImagesEnabled      bool
 	conversationReadReceiptEnabled bool
 	allowMockConfirm               bool
+	imCredentials                  func(context.Context, uint64) (any, error)
 }
 
 func newDeliveryRuntime(cfg config.Config, db *gorm.DB, proofPorts ...delivery.MediaProofPort) (*deliveryRuntime, error) {
@@ -587,7 +595,7 @@ func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, user
 		deliveryim.NewHandler(
 			runtime.conversations, currentUserID, runtime.conversationImageTokens,
 			runtime.conversationImagesEnabled, runtime.conversationReadReceiptEnabled,
-		).Register(conversationRoutes)
+		).WithCredentials(runtime.imCredentials).Register(conversationRoutes)
 	}
 	adminAuthentication := userService.AuthRequired()
 	if len(adminAuth) > 0 {

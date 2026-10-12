@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"campus-circle/backend/internal/module/featureflags"
 	"campus-circle/backend/internal/module/user"
 	"campus-circle/backend/internal/pkg/response"
 	"campus-circle/backend/internal/pkg/searchmetrics"
@@ -53,6 +54,10 @@ func (h *SearchHandler) Register(group *gin.RouterGroup) {
 }
 
 func (h *SearchHandler) search(c *gin.Context) {
+	if !featureflags.Can(featureflags.KeySecondhand) {
+		response.Fail(c, http.StatusForbidden, "二手功能暂未开放")
+		return
+	}
 	var request struct {
 		Keyword  string `json:"keyword"`
 		Page     int    `json:"page"`
@@ -76,6 +81,10 @@ func (h *SearchHandler) search(c *gin.Context) {
 }
 
 func (h *SearchHandler) history(c *gin.Context) {
+	if !featureflags.Can(featureflags.KeySecondhand) {
+		response.Fail(c, http.StatusForbidden, "二手功能暂未开放")
+		return
+	}
 	value, err := h.metrics.History(c, user.CurrentUserID(c))
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, "list trade search history failed")
@@ -85,6 +94,10 @@ func (h *SearchHandler) history(c *gin.Context) {
 }
 
 func (h *SearchHandler) clearHistory(c *gin.Context) {
+	if !featureflags.Can(featureflags.KeySecondhand) {
+		response.Fail(c, http.StatusForbidden, "二手功能暂未开放")
+		return
+	}
 	if err := h.metrics.ClearHistory(c, user.CurrentUserID(c)); err != nil {
 		response.Fail(c, http.StatusInternalServerError, "clear trade search history failed")
 		return
@@ -93,6 +106,10 @@ func (h *SearchHandler) clearHistory(c *gin.Context) {
 }
 
 func (h *SearchHandler) hotSearches(c *gin.Context) {
+	if !featureflags.Can(featureflags.KeySecondhand) {
+		response.Fail(c, http.StatusForbidden, "二手功能暂未开放")
+		return
+	}
 	value, err := h.metrics.Hot(c)
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, "list trade hot searches failed")

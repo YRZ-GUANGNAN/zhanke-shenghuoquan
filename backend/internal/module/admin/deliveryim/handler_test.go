@@ -15,9 +15,10 @@ import (
 )
 
 type conversationQueryStub struct {
-	currentErr error
-	prepared   delivery.Conversation
-	resolved   string
+	currentErr      error
+	noConversations bool
+	prepared        delivery.Conversation
+	resolved        string
 }
 
 func (s *conversationQueryStub) Current(context.Context, uint64, string) (delivery.Conversation, error) {
@@ -27,6 +28,9 @@ func (s *conversationQueryStub) FindForParticipant(context.Context, uint64, stri
 	return s.prepared, delivery.Order{}, s.currentErr
 }
 func (s *conversationQueryStub) ListForParticipant(context.Context, uint64, delivery.Page) ([]delivery.Conversation, int64, error) {
+	if s.noConversations {
+		return nil, 0, s.currentErr
+	}
 	return []delivery.Conversation{s.prepared}, 1, s.currentErr
 }
 func (s *conversationQueryStub) PrepareImage(context.Context, uint64, string, string) (uint16, delivery.Conversation, error) {
@@ -142,5 +146,42 @@ func TestHandlerProductionImagePrepareIsFailClosed(t *testing.T) {
 	))
 	if recorder.Code != http.StatusNotFound {
 		t.Fatalf("production image gate status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestCredentialsRequireAnAuthorizedOrderConversation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, test := range []struct {
+		name       string
+		empty      bool
+		queryErr   error
+		wantStatus int
+		wantCalls  int
+	}{
+		{"no accessible conversation", true, nil, http.StatusForbidden, 0},
+		{"participant lookup rejected", false, delivery.ErrConversationForbidden, http.StatusNotFound, 0},
+		{"authorized participant", false, nil, http.StatusOK, 1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			calls := 0
+			stub := &conversationQueryStub{noConversations: test.empty, currentErr: test.queryErr}
+			router := gin.New()
+			NewHandler(stub, func(*gin.Context) uint64 { return 7 }, nil, false, false).
+				WithCredentials(func(_ context.Context, userID uint64) (any, error) {
+					calls++
+					if userID != 7 {
+						t.Fatalf("wrong credential subject: %d", userID)
+					}
+					return gin.H{"userId": "7"}, nil
+				}).Register(router.Group("/delivery"))
+			recorder := httptest.NewRecorder()
+			router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/delivery/im-credentials", nil))
+			if recorder.Code != test.wantStatus || calls != test.wantCalls {
+				t.Fatalf("status=%d calls=%d; want %d/%d", recorder.Code, calls, test.wantStatus, test.wantCalls)
+			}
+			if calls > 0 && recorder.Header().Get("Cache-Control") != "no-store" {
+				t.Fatal("credentials must not be cached")
+			}
+		})
 	}
 }

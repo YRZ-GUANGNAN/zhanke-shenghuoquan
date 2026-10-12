@@ -1,3 +1,4 @@
+import { withFeaturePage } from '../../components/feature-page-gate'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Image, Input, ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
@@ -78,7 +79,7 @@ function formatTime(value: number): string {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
-export default function SecondhandChatPage() {
+function SecondhandChatPage() {
   const params = Taro.getCurrentInstance().router?.params ?? {}
   const entry = parseChatEntry(params)
   const sessionUserId = useSessionStore((state) => state.profile.id)
@@ -413,3 +414,5 @@ export default function SecondhandChatPage() {
     </View>
   )
 }
+
+export default withFeaturePage(SecondhandChatPage)

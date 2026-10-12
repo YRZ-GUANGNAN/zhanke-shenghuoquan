@@ -15,6 +15,7 @@ interface BackendUser {
   avatar: string
   school: string
   campus: string
+  role?: 'user' | 'admin' | 'superadmin'
 }
 
 interface LoginResult {
@@ -162,6 +163,7 @@ function toProfile(value: BackendUser): UserProfile {
     nickname: value.nickname,
     avatar: value.avatar,
     school: value.school,
-    campus: value.campus
+    campus: value.campus,
+    role: value.role
   }
 }

@@ -1,3 +1,4 @@
+import { withFeaturePage } from '../../components/feature-page-gate'
 import React, { useEffect, useState } from 'react'
 import { Button, Image, Text, View } from '@tarojs/components'
 import { AvatarMark } from '../../components'
@@ -9,7 +10,7 @@ import './index.scss'
 
 const statusLabels:Record<Product['status'],string>={selling:'出售中',reserved:'已预定',sold:'已售出'}
 
-export default function ProductDetailPage(){
+function ProductDetailPage(){
   const params=Taro.getCurrentInstance().router?.params||{}
   const profile=useSessionStore(state=>state.profile)
   const[product,setProduct]=useState<Product|null>(null)
@@ -36,3 +37,5 @@ export default function ProductDetailPage(){
 }
 
 function showError(error:unknown){void Taro.showToast({title:error instanceof Error?error.message:'操作失败',icon:'none'})}
+
+export default withFeaturePage(ProductDetailPage)

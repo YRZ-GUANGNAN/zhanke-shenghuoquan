@@ -2,6 +2,7 @@ package trade
 
 import (
 	"campus-circle/backend/internal/module/admin/review"
+	"campus-circle/backend/internal/module/featureflags"
 	"campus-circle/backend/internal/module/user"
 	"campus-circle/backend/internal/pkg/response"
 	"context"
@@ -40,6 +41,9 @@ func (h *Handler) Register(rg *gin.RouterGroup) {
 }
 
 func (h *Handler) userProducts(c *gin.Context) {
+	if !requireFeature(c, featureflags.KeySecondhand) {
+		return
+	}
 	id, ok := paramID(c)
 	if !ok {
 		return
@@ -49,6 +53,9 @@ func (h *Handler) userProducts(c *gin.Context) {
 	write(c, value, err)
 }
 func (h *Handler) viewerState(c *gin.Context) {
+	if !requireFeature(c, featureflags.KeySecondhand) {
+		return
+	}
 	id, ok := paramID(c)
 	if !ok {
 		return
@@ -57,6 +64,9 @@ func (h *Handler) viewerState(c *gin.Context) {
 	writeTargetState(c, value, err)
 }
 func (h *Handler) myProducts(c *gin.Context) {
+	if !requireFeature(c, featureflags.KeySecondhand) {
+		return
+	}
 	page, size := pagination(c)
 	value, err := h.service.MyProducts(c, user.CurrentUserID(c), page, size)
 	write(c, value, err)
@@ -75,11 +85,17 @@ type productRequest struct {
 }
 
 func (h *Handler) list(c *gin.Context) {
+	if !requireFeature(c, featureflags.KeySecondhand) {
+		return
+	}
 	page, size := pagination(c)
 	value, err := h.service.List(c, ListQuery{Keyword: c.Query("keyword"), Category: c.Query("category"), Status: ProductStatus(c.Query("status")), Page: page, PageSize: size})
 	write(c, value, err)
 }
 func (h *Handler) product(c *gin.Context) {
+	if !requireFeature(c, featureflags.KeySecondhand) {
+		return
+	}
 	id, ok := paramID(c)
 	if !ok {
 		return
@@ -88,6 +104,9 @@ func (h *Handler) product(c *gin.Context) {
 	write(c, value, err)
 }
 func (h *Handler) create(c *gin.Context) {
+	if !requireFeature(c, featureflags.KeySecondhandPublish) {
+		return
+	}
 	req, ok := bindProduct(c)
 	if !ok {
 		return
@@ -161,6 +180,9 @@ func resolveCreateRequestID(headerValue, bodyValue string) (string, error) {
 	return value, nil
 }
 func (h *Handler) update(c *gin.Context) {
+	if !requireFeature(c, featureflags.KeySecondhandPublish) {
+		return
+	}
 	id, ok := paramID(c)
 	if !ok {
 		return
@@ -176,6 +198,9 @@ func (h *Handler) update(c *gin.Context) {
 	write(c, value, err)
 }
 func (h *Handler) delete(c *gin.Context) {
+	if !requireFeature(c, featureflags.KeySecondhandPublish) {
+		return
+	}
 	id, ok := paramID(c)
 	if !ok {
 		return
@@ -184,6 +209,9 @@ func (h *Handler) delete(c *gin.Context) {
 	write(c, gin.H{"deleted": err == nil}, err)
 }
 func (h *Handler) status(c *gin.Context) {
+	if !requireFeature(c, featureflags.KeySecondhandPublish) {
+		return
+	}
 	id, ok := paramID(c)
 	if !ok {
 		return
@@ -199,6 +227,9 @@ func (h *Handler) status(c *gin.Context) {
 	write(c, gin.H{"updated": err == nil}, err)
 }
 func (h *Handler) favorite(c *gin.Context) {
+	if !requireFeature(c, featureflags.KeySecondhand) {
+		return
+	}
 	id, ok := paramID(c)
 	if !ok {
 		return
@@ -208,6 +239,9 @@ func (h *Handler) favorite(c *gin.Context) {
 }
 func (h *Handler) setFavorite(desired bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !requireFeature(c, featureflags.KeySecondhand) {
+			return
+		}
 		id, ok := paramID(c)
 		if !ok {
 			return
@@ -217,6 +251,9 @@ func (h *Handler) setFavorite(desired bool) gin.HandlerFunc {
 	}
 }
 func (h *Handler) contact(c *gin.Context) {
+	if !requireFeature(c, featureflags.KeySecondhandChat) {
+		return
+	}
 	id, ok := paramID(c)
 	if !ok {
 		return
@@ -225,6 +262,9 @@ func (h *Handler) contact(c *gin.Context) {
 	write(c, value, err)
 }
 func (h *Handler) ensureContact(c *gin.Context) {
+	if !requireFeature(c, featureflags.KeySecondhandChat) {
+		return
+	}
 	id, ok := paramID(c)
 	if !ok {
 		return
@@ -239,6 +279,14 @@ func bindProduct(c *gin.Context) (productRequest, bool) {
 		return req, false
 	}
 	return req, true
+}
+
+func requireFeature(c *gin.Context, key string) bool {
+	if featureflags.Can(key) {
+		return true
+	}
+	response.Fail(c, http.StatusForbidden, "该功能暂未开放")
+	return false
 }
 func toInput(r productRequest, sellerID uint) ProductInput {
 	return ProductInput{SellerID: sellerID, Title: r.Title, Description: r.Description, Category: r.Category, Price: r.Price, OriginalPrice: r.OriginalPrice, Condition: r.Condition, Campus: r.Campus, ImageAssetIDs: r.ImageAssetIDs}

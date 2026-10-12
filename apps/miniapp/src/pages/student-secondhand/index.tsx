@@ -1,3 +1,4 @@
+import { withFeaturePage } from '../../components/feature-page-gate'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDidShow } from '@tarojs/taro'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
@@ -7,6 +8,7 @@ import { getProductsPage } from '../../services/c-trade'
 import Taro from '../../services/taro'
 import type { Product } from '../../types'
 import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
+import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import './index.scss'
 
 type CategoryKey = '全部' | '数码' | '书籍资料' | '生活用品' | '代步'
@@ -62,7 +64,7 @@ function splitProducts(cards: ProductCard[]) {
   }
 }
 
-export default function StudentSecondhandPage() {
+function StudentSecondhandPage() {
   const [activeCategory, setActiveCategory] = useState<CategoryKey>('全部')
   const [items, setItems] = useState<Product[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'empty' | 'error'>('loading')
@@ -70,6 +72,7 @@ export default function StudentSecondhandPage() {
   const [total, setTotal] = useState(0)
   const [loadingMore, setLoadingMore] = useState(false)
   const [pagingError, setPagingError] = useState(false)
+  const visibility = useFeatureVisibility()
   const [failedImageKeys, setFailedImageKeys] = useState<Set<string>>(() => new Set())
   const queryVersion = useRef(0)
   const categoryRef = useRef<CategoryKey>('全部')
@@ -115,6 +118,12 @@ export default function StudentSecondhandPage() {
   }, [])
 
   useEffect(() => {
+    if (!visibility) return
+    if (!visibility.secondhand) {
+      setItems([])
+      setStatus('empty')
+      return
+    }
     categoryRef.current = activeCategory
     const version = queryVersion.current + 1
     queryVersion.current = version
@@ -126,7 +135,7 @@ export default function StudentSecondhandPage() {
     return () => {
       queryVersion.current += 1
     }
-  }, [activeCategory, fetchProductsPage])
+  }, [activeCategory, fetchProductsPage, visibility])
 
   const loadMoreProducts = useCallback(() => {
     if (status !== 'ready' || loadingMore || items.length >= total) return
@@ -237,10 +246,10 @@ export default function StudentSecondhandPage() {
           className='student-secondhand-header__title-row'
           left={<Text className='student-secondhand-header__title'>二手集市</Text>}
           center={
-            <View className='student-secondhand-search' onClick={openSearch}>
+            visibility.search ? <View className='student-secondhand-search' onClick={openSearch}>
               <View className='student-secondhand-search__icon' />
               <Text>搜二手好物</Text>
-            </View>
+            </View> : undefined
           }
           divider={false}
         />
@@ -268,12 +277,16 @@ export default function StudentSecondhandPage() {
         lowerThreshold={120}
         onScrollToLower={loadMoreProducts}
       >
+        {!visibility && <View className='student-secondhand-notice'><Text>正在读取功能状态…</Text></View>}
+        {visibility && !visibility.secondhand && <View className='student-secondhand-notice'><Text>二手市场暂未开放</Text></View>}
+        {visibility?.secondhand && (
         <View className='student-secondhand-notice'>
           <Text className='student-secondhand-notice__icon'>i</Text>
           <Text>平台仅展示信息，交易请与卖家私下当面交付，验货后再付款。</Text>
         </View>
+        )}
 
-        <View className='student-secondhand-waterfall'>
+        {visibility?.secondhand && <View className='student-secondhand-waterfall'>
           <View className='student-secondhand-waterfall__column'>
             {status === 'loading'
               ? [
@@ -305,10 +318,12 @@ export default function StudentSecondhandPage() {
               <Text>— 到底了 —</Text>
             </View>
           )}
-        </View>
+        </View>}
       </ScrollView>
 
       <StudentBottomNav active='market' className='student-bottom-nav--secondhand' />
     </View>
   )
 }
+
+export default withFeaturePage(StudentSecondhandPage)

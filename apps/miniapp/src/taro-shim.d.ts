@@ -1,5 +1,7 @@
 declare module '@tarojs/taro' {
   export function useDidShow(callback: () => void): void
+  export function useDidHide(callback: () => void): void
+  export function useRouter(): { path: string; params: Record<string, string | undefined> }
 
   interface NavigateOptions {
     url: string

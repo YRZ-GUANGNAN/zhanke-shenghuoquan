@@ -1,3 +1,4 @@
+import { withFeaturePage } from '../../components/feature-page-gate'
 import React, { useState } from 'react'
 import { Button, Image, Input, Text, Textarea, View } from '@tarojs/components'
 import Taro from '../../services/taro'
@@ -6,7 +7,7 @@ import { createProduct } from '../../services/c-trade'
 import { chooseAndUploadImages, getMediaStatus, type UploadedMedia } from '../../services/media'
 import './index.scss'
 
-export default function PublishPage() {
+function PublishPage() {
   const router = Taro.getCurrentInstance().router
   const isProduct = router?.params.type === 'product'
   const [title, setTitle] = useState('')
@@ -108,3 +109,5 @@ export default function PublishPage() {
     </View>
   )
 }
+
+export default withFeaturePage(PublishPage)

@@ -27,6 +27,7 @@ type Handler struct {
 	imageTokens        *ImageTokenCodec
 	imagesEnabled      bool
 	readReceiptEnabled bool
+	credentials        func(context.Context, uint64) (any, error)
 }
 
 func NewHandler(
@@ -44,10 +45,38 @@ func NewHandler(
 }
 
 func (h *Handler) Register(group *gin.RouterGroup) {
+	if h.credentials != nil {
+		group.GET("/im-credentials", h.imCredentials)
+	}
 	group.GET("/orders/:orderId/conversation", h.current)
 	group.GET("/conversations", h.list)
 	group.POST("/conversations/:id/images/prepare", h.prepareImage)
 	group.GET("/conversations/:id/images/:imageId/resolve", h.resolveImage)
+}
+
+func (h *Handler) WithCredentials(issuer func(context.Context, uint64) (any, error)) *Handler {
+	h.credentials = issuer
+	return h
+}
+
+func (h *Handler) imCredentials(c *gin.Context) {
+	id := h.currentUserID(c)
+	items, _, err := h.service.ListForParticipant(c.Request.Context(), id, delivery.Page{Page: 1, Size: 1})
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+	if len(items) == 0 {
+		response.Fail(c, http.StatusForbidden, "没有可访问的订单会话")
+		return
+	}
+	value, err := h.credentials(c.Request.Context(), id)
+	if err != nil {
+		response.Fail(c, http.StatusServiceUnavailable, "订单沟通暂时不可用")
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	response.OK(c, value)
 }
 
 type ConversationView struct {

@@ -1,6 +1,7 @@
 import React from 'react'
 import { Text, View } from '@tarojs/components'
 import Taro from '../services/taro'
+import { useFeatureVisibility } from '../hooks/use-feature-visibility'
 import AppIcon from './app-icon'
 import './student-bottom-nav.scss'
 
@@ -8,7 +9,7 @@ export type StudentNavKey = 'home' | 'takeout' | 'market' | 'profile'
 
 const navItems = [
   { key: 'home', label: '首页', icon: 'home', url: '/pages/home/index' },
-  { key: 'takeout', label: '外卖', icon: 'takeaway', url: '/pages/student-takeout/index' },
+  { key: 'takeout', label: '服务', icon: 'takeaway', url: '/pages/student-takeout/index' },
   { key: 'market', label: '二手', icon: 'market', url: '/pages/student-secondhand/index' },
   { key: 'profile', label: '我的', icon: 'profile', url: '/pages/profile/index' }
 ] as const
@@ -19,6 +20,13 @@ interface StudentBottomNavProps {
 }
 
 export default function StudentBottomNav({ active, className = '' }: StudentBottomNavProps) {
+  const visibility = useFeatureVisibility()
+  const visibleItems = navItems.filter((item) => {
+    if (item.key === 'takeout') return visibility.takeout || visibility.campus_tools
+    if (item.key === 'market') return visibility.secondhand
+    return true
+  })
+  const canPublish = visibility.publish && (visibility.post || visibility.secondhand_publish)
   const openPage = (key: StudentNavKey, url: string) => {
     if (key === active) return
     void Taro.redirectTo({ url })
@@ -38,15 +46,15 @@ export default function StudentBottomNav({ active, className = '' }: StudentBott
   )
 
   return (
-    <View className={`student-bottom-nav ${className}`.trim()}>
-      {navItems.slice(0, 2).map(renderItem)}
-      <View
-        className='student-bottom-nav__publish'
-        onClick={() => void Taro.navigateTo({ url: '/pages/publish-entry/index' })}
-      >
-        <Text className='student-bottom-nav__publish-label'>+</Text>
-      </View>
-      {navItems.slice(2).map(renderItem)}
+    <View className={`student-bottom-nav ${className}`.trim()} style={{ gridTemplateColumns: `repeat(${visibleItems.length + (canPublish ? 1 : 0)}, 1fr)` }}>
+      {visibleItems.filter((item) => item.key === 'home' || item.key === 'takeout').map(renderItem)}
+      {canPublish && <View
+          className='student-bottom-nav__publish'
+          onClick={() => void Taro.navigateTo({ url: '/pages/publish-entry/index' })}
+        >
+          <Text className='student-bottom-nav__publish-label'>+</Text>
+        </View>}
+      {visibleItems.filter((item) => item.key === 'market' || item.key === 'profile').map(renderItem)}
     </View>
   )
 }

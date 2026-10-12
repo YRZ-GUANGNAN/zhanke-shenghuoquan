@@ -1,5 +1,5 @@
 // Domain F presentation contracts. Admin never queries domain databases directly.
-export type AdminSection = 'dashboard' | 'users' | 'identities' | 'moderation' | 'media' | 'delivery' | 'takeout' | 'community' | 'trade' | 'reports' | 'feedbacks' | 'navigation'
+export type AdminSection = 'dashboard' | 'users' | 'identities' | 'moderation' | 'media' | 'delivery' | 'takeout' | 'community' | 'trade' | 'reports' | 'feedbacks' | 'navigation' | 'feature-policy'
 export interface AdminUser{id:number;nickname:string;role:'admin'|'superadmin'}
 export interface AdminSession{user:AdminUser;csrfToken:string;expiresAt:string}
 export interface Page<T>{items:T[];page:number;pageSize:number;total:number}
@@ -22,6 +22,19 @@ export interface ExternalTakeoutMerchant{id:number;title:string;subtitle:string;
 export interface ExternalTakeoutMerchantDirectory{categoryEnabled:boolean;items:ExternalTakeoutMerchant[]}
 export interface ExternalTakeoutMerchantInput{title:string;subtitle:string;iconText:string;appId:string;path:string;color:string;sort:number}
 export interface Stats{totals:{users:number;posts:number;products:number;pendingReview:number};today:{users:number;posts:number;products:number}}
+
+export const FEATURE_POLICY_KEYS = ['forum','post','comment','secondhand','secondhand_publish','secondhand_chat','takeout','campus_tools','delivery','merchant','rider','messages','following','search','likes','favorites','notifications','identity_application','publish','secondhand_comments'] as const
+export type FeaturePolicyKey = typeof FEATURE_POLICY_KEYS[number]
+export type PostingMode = 'admin_only'|'all_users'
+export interface FeaturePolicy {
+  flags: Record<FeaturePolicyKey, boolean>
+  postingMode: PostingMode
+  rowVersion: number
+  updatedBy: number
+  updatedAt: string
+  labEnabled: boolean
+  enabled: boolean
+}
 
 export type IdentityApplicationRole='rider'|'merchant'
 export type IdentityApplicationStatus='pending'|'approved'|'rejected'

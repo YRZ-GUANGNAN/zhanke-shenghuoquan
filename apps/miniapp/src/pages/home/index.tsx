@@ -13,6 +13,7 @@ import { getProduct, getProductsPage, type IMConversationContext, type ProductPa
 import { listIMConversations } from '../../services/e-im'
 import { listNavigationItems } from '../../services/d-navigation'
 import { requestWithSingleSessionRecovery } from '../../services/session-recovery'
+import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
 import './index.scss'
@@ -143,6 +144,7 @@ function HomeContent() {
   const [conversationItems, setConversationItems] = useState<ConversationItem[]>([])
   const [conversationStatus, setConversationStatus] = useState<ConversationStatus>('idle')
   const [tools, setTools] = useState<ToolLink[]>([])
+  const visibility = useFeatureVisibility()
   const [toolStatus, setToolStatus] = useState<ToolStatus>('idle')
   const sourceRef = useRef({ communityPage: 0, tradePage: 0, communityTotal: 0, tradeTotal: 0 })
   const loadingRef = useRef(false)
@@ -153,17 +155,25 @@ function HomeContent() {
   const conversationOwnerRef = useRef('')
   const toolLoadingRef = useRef(false)
   const cards = useMemo(
-    () => interleaveCards(postCards, productCards),
-    [postCards, productCards]
+    () => interleaveCards(visibility.forum ? postCards : [], visibility.secondhand ? productCards : []),
+    [postCards, productCards, visibility.forum, visibility.secondhand]
   )
   const columns = useMemo(() => splitCards(cards), [cards])
   const identityAllowed = useIdentityGuard('student')
   const currentUserId = useSessionStore((state) => state.profile.id)
   const currentSessionKey = useSessionStore((state) => `${state.token}:${state.profile.id}`)
+  const visibleTabs = useMemo(() => {
+    if (!visibility) return []
+    return tabs.filter((tab) => (
+      tab.key === 'messages' ? visibility.messages && visibility.secondhand_chat :
+      tab.key === 'discover' ? visibility.forum || visibility.secondhand :
+      visibility.campus_tools
+    ))
+  }, [visibility])
 
   const loadDiscover = useCallback(async (
     reset = false,
-    sources = { community: true, trade: true }
+    sources = { community: visibility.forum, trade: visibility.secondhand }
   ) => {
     if (!mountedRef.current || loadingRef.current) return
     loadingRef.current = true
@@ -249,7 +259,7 @@ function HomeContent() {
         if (mountedRef.current) setLoadingMore(false)
       }
     }
-  }, [])
+  }, [visibility.forum, visibility.secondhand])
 
   const loadConversations = useCallback(async (ownerKey: string) => {
     if (
@@ -327,8 +337,11 @@ function HomeContent() {
   }, [])
 
   useEffect(() => {
-    void loadDiscover(true)
-  }, [loadDiscover])
+    if (!visibility) return
+    void loadDiscover(true, { community: visibility.forum, trade: visibility.secondhand })
+    const nextTab = visibleTabs.some((tab) => tab.key === activeTab) ? activeTab : visibleTabs[0]?.key
+    if (nextTab && nextTab !== activeTab) setActiveTab(nextTab)
+  }, [activeTab, loadDiscover, visibility, visibleTabs])
 
   useEffect(() => {
     conversationRequestVersion.current += 1
@@ -336,19 +349,23 @@ function HomeContent() {
     conversationOwnerRef.current = currentSessionKey
     setConversationItems([])
     setConversationStatus('idle')
-    if (activeTab === 'messages') void loadConversations(currentSessionKey)
-  }, [activeTab, currentSessionKey, loadConversations])
+    if (activeTab === 'messages' && visibility.messages && visibility.secondhand_chat) void loadConversations(currentSessionKey)
+  }, [activeTab, currentSessionKey, loadConversations, visibility.messages, visibility.secondhand_chat])
 
   useEffect(() => {
-    if (activeTab === 'tools' && toolStatus === 'idle') void loadTools()
-  }, [activeTab, loadTools, toolStatus])
+    if (activeTab === 'tools' && toolStatus === 'idle' && visibility?.campus_tools) void loadTools()
+  }, [activeTab, loadTools, toolStatus, visibility?.campus_tools])
 
   useDidShow(() => {
-    if (activeTab === 'messages') void loadConversations(currentSessionKey)
+    if (activeTab === 'messages' && visibility.messages && visibility.secondhand_chat) void loadConversations(currentSessionKey)
   })
 
   const openSearch = () => {
-    void Taro.navigateTo({ url: '/pages/search/index?scope=community' })
+    void Taro.navigateTo({
+      url: visibility?.forum
+        ? '/pages/search/index?scope=community'
+        : '/pages/search/index?scope=secondhand'
+    })
   }
 
   const openCard = (card: DiscoverCard) => {
@@ -402,10 +419,10 @@ function HomeContent() {
               <Text>{card.avatar}</Text>
             </View>
             <Text className='student-post-card__author'>{card.author}</Text>
-            <View className='student-post-card__like'>
+            {(card.target === 'secondhand' ? visibility.favorites : visibility.likes) && <View className='student-post-card__like'>
               <AppIcon name='heart' className='student-post-card__heart' />
               <Text>{card.likes}</Text>
-            </View>
+            </View>}
           </View>
         </View>
       </View>
@@ -445,7 +462,7 @@ function HomeContent() {
         className='student-home-header'
         center={
           <View className='student-home-header__tabs'>
-            {tabs.map((tab) => (
+            {visibleTabs.map((tab) => (
               <View
                 key={tab.key}
                 className={`student-home-header__tab ${activeTab === tab.key ? 'student-home-header__tab--active' : ''}`}
@@ -456,7 +473,7 @@ function HomeContent() {
             ))}
           </View>
         }
-        right={<View className='student-home-header__search' onClick={openSearch} />}
+        right={visibility.search && (visibility.forum || visibility.secondhand) ? <View className='student-home-header__search' onClick={openSearch} /> : undefined}
       />
 
       <ScrollView
@@ -479,6 +496,7 @@ function HomeContent() {
         }}
       >
         {activeTab === 'messages' && (
+          visibility.messages && visibility.secondhand_chat && (
           <View className='student-message-panel'>
             {conversationStatus === 'loading' || conversationStatus === 'idle' ? (
               <View className='student-message-state'><Text>正在读取真实私信...</Text></View>
@@ -516,12 +534,13 @@ function HomeContent() {
             )}
             {conversationStatus === 'ready' && <Text className='student-home-footnote'>仅展示最近 20 个会话</Text>}
           </View>
+          )
         )}
 
-        {activeTab === 'discover' && (
+        {activeTab === 'discover' && (visibility?.forum || visibility?.secondhand) && (
           initialStatus !== 'ready' ? renderDiscoverState() : (
             <>
-              <View className='student-waterfall'>
+                <View className='student-waterfall'>
                 <View className='student-waterfall__column'>
                   {columns.left.map(renderDiscoverCard)}
                 </View>
@@ -545,7 +564,7 @@ function HomeContent() {
           )
         )}
 
-        {activeTab === 'tools' && (
+        {visibility.campus_tools && <>{activeTab === 'tools' && (
           toolStatus === 'ready' ? (
             <View className='student-tools-grid'>
               {tools.map((tool) => (
@@ -565,8 +584,9 @@ function HomeContent() {
           ) : (
             <View className='student-tool-state'><Text>正在加载真实工具...</Text></View>
           )
-        )}
+        )}</>}
 
+        {visibleTabs.length === 0 && <View className='student-tool-state'><Text>{visibility.available ? '当前暂无开放的模块，可前往“我的”管理账号。' : '功能状态读取失败，请检查网络后重新进入。'}</Text></View>}
       </ScrollView>
 
       <StudentBottomNav active='home' />

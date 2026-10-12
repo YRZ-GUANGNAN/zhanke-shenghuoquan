@@ -11,12 +11,15 @@ const backendDockerfile = fs.readFileSync(path.join(root, 'backend', 'Dockerfile
 const compose = fs.readFileSync(path.join(root, 'deploy', 'docker-compose.yml'), 'utf8')
 const dockerignorePath = path.join(root, '.dockerignore')
 const nativeBuildScriptPath = path.join(root, 'scripts', 'build-native-backend.ps1')
+const domainMigrationScriptPath = path.join(nativeRoot, 'migrate-admin-domain.ps1')
 const requiredFiles = [
   '00-campus-log-format.conf',
   'campus-api.service',
   'campus-journald.conf',
   'campus-meilisearch.service',
   'nginx-zhanduiwang.top.conf',
+  'nginx-zhandui.top.acme.conf',
+  'nginx-zhandui.top.conf',
   'README.md'
 ]
 
@@ -29,6 +32,8 @@ for (const name of requiredFiles) {
 
 if (!fs.existsSync(nativeBuildScriptPath)) throw new Error('missing fixed native backend build script')
 const nativeBuildScript = fs.readFileSync(nativeBuildScriptPath, 'utf8')
+if (!fs.existsSync(domainMigrationScriptPath)) throw new Error('missing admin domain migration script')
+const domainMigrationScript = fs.readFileSync(domainMigrationScriptPath, 'utf8')
 for (const token of [
   '[Parameter(Mandatory = $true)]',
   '$env:GOOS = "linux"',
@@ -62,12 +67,66 @@ if (process.platform === 'win32') {
     throw new Error(`scripts/build-native-backend.ps1 is not parseable by Windows PowerShell 5.1:\n${parsed.stderr || parsed.stdout}`)
   }
 }
+if (process.platform === 'win32') {
+  const escapedPath = domainMigrationScriptPath.replaceAll("'", "''")
+  const parseCommand = [
+    '$tokens = $null',
+    '$errors = $null',
+    `[System.Management.Automation.Language.Parser]::ParseFile('${escapedPath}', [ref]$tokens, [ref]$errors) | Out-Null`,
+    'if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_.ToString() }; exit 1 }'
+  ].join('; ')
+  const parsed = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', parseCommand], {
+    encoding: 'utf8'
+  })
+  if (parsed.status !== 0) {
+    throw new Error(`deploy/native/migrate-admin-domain.ps1 is not parseable by Windows PowerShell 5.1:\n${parsed.stderr || parsed.stdout}`)
+  }
+}
+for (const token of [
+  "[switch]$Deploy",
+  "[switch]$RequestCertificate",
+  "[switch]$EnableHttps",
+  "-Deploy requires -RequestCertificate or -EnableHttps",
+  "ExpectedAddress -ne $HostAddress",
+  "Resolve-DnsName",
+  "Resolve-DnsName -Name $Domain -Type AAAA",
+  "Get-FileHash -LiteralPath $archivePath -Algorithm SHA256",
+  "sha256sum '$remoteArchive'",
+  "'$adminRoot/current.next'",
+  "mv -Tf '$adminRoot/current.next' '$adminRoot/current'",
+  "oldNginxLink",
+  "oldCurrent",
+  "$adminRoot = '/var/www/campus-admin-zhandui'",
+  "rollback failed and needs manual review",
+  "/var/www/letsencrypt/.well-known/acme-challenge",
+  "certbot certonly --webroot",
+  "nginx -t",
+  "systemctl reload nginx"
+]) {
+  if (!domainMigrationScript.includes(token)) throw new Error(`migrate-admin-domain.ps1: missing ${token}`)
+}
 
 function requireTokens(name, tokens) {
   const source = files.get(name)
   for (const token of tokens) {
     if (!source.includes(token)) throw new Error(`${name}: missing ${token}`)
   }
+}
+
+function extractBlock(source, marker) {
+  const markerStart = source.indexOf(marker)
+  if (markerStart < 0) throw new Error(`missing block marker ${marker}`)
+  const open = source.indexOf('{', markerStart)
+  if (open < 0) throw new Error(`missing opening brace for ${marker}`)
+  let depth = 0
+  for (let index = open; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1
+    if (source[index] === '}') {
+      depth -= 1
+      if (depth === 0) return source.slice(open, index + 1)
+    }
+  }
+  throw new Error(`unclosed block ${marker}`)
 }
 
 requireTokens('campus-api.service', [
@@ -105,6 +164,46 @@ requireTokens('nginx-zhanduiwang.top.conf', [
   'try_files $uri $uri/ /index.html;'
 ])
 
+requireTokens('nginx-zhandui.top.conf', [
+  'server_name zhandui.top;',
+  'ssl_certificate /etc/letsencrypt/live/zhandui.top/fullchain.pem;',
+  'ssl_certificate_key /etc/letsencrypt/live/zhandui.top/privkey.pem;',
+  'root /var/www/campus-admin-zhandui/current;',
+  'proxy_pass http://127.0.0.1:8080/healthz;',
+  'allow 127.0.0.1;',
+  'allow ::1;',
+  'deny all;',
+  'location ^~ /api/',
+  'proxy_pass http://127.0.0.1:8080;',
+  'Strict-Transport-Security',
+  'try_files $uri $uri/ /index.html;'
+])
+
+requireTokens('nginx-zhandui.top.acme.conf', [
+  'server_name zhandui.top;',
+  'location ^~ /.well-known/acme-challenge/',
+  'root /var/www/letsencrypt;',
+  'try_files $uri =404;',
+  'return 404;'
+])
+
+const zhanduiNginx = files.get('nginx-zhandui.top.conf')
+const zhanduiReadyBlock = extractBlock(zhanduiNginx, 'location = /readyz')
+for (const token of ['allow 127.0.0.1;', 'allow ::1;', 'deny all;', 'proxy_pass http://127.0.0.1:8080/readyz;']) {
+  if (!zhanduiReadyBlock.includes(token)) throw new Error(`nginx-zhandui.top.conf /readyz block must contain ${token}`)
+}
+const zhanduiAssetsBlock = extractBlock(zhanduiNginx, 'location ^~ /assets/')
+for (const token of ['X-Content-Type-Options', 'X-Frame-Options', 'Referrer-Policy', 'Strict-Transport-Security', 'Cache-Control "public, immutable"']) {
+  if (!zhanduiAssetsBlock.includes(token)) throw new Error(`nginx-zhandui.top.conf /assets/ block must contain ${token}`)
+}
+const zhanduiAcme = files.get('nginx-zhandui.top.acme.conf')
+const zhanduiAcmeBlock = extractBlock(zhanduiAcme, 'location ^~ /.well-known/acme-challenge/')
+for (const token of ['root /var/www/letsencrypt;', 'try_files $uri =404;']) {
+  if (!zhanduiAcmeBlock.includes(token)) throw new Error(`nginx-zhandui.top.acme.conf ACME block must contain ${token}`)
+}
+const zhanduiAcmeFallback = extractBlock(zhanduiAcme, 'location /')
+if (!zhanduiAcmeFallback.includes('return 404;')) throw new Error('nginx-zhandui.top.acme.conf must return 404 outside the ACME path')
+
 requireTokens('00-campus-log-format.conf', [
   'log_format campus',
   '$request_time',
@@ -120,6 +219,8 @@ requireTokens('campus-journald.conf', [
 
 requireTokens('README.md', [
   'Secrets are intentionally excluded.',
+  '`https://zhandui.top/` is the management website.',
+  '`https://zhanduiwang.top/` remains the mini-program API',
   '`002_seed_dev.sql` explicitly skipped',
   'TARO_APP_API_BASE=https://zhanduiwang.top/api/v1',
   'Only Nginx exposes ports 80',

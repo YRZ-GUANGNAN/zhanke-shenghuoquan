@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"campus-circle/backend/internal/module/featureflags"
 	"campus-circle/backend/internal/pkg/response"
 	"campus-circle/backend/internal/pkg/searchmetrics"
 )
@@ -113,6 +114,10 @@ func (h *SearchHandler) Register(group *gin.RouterGroup) {
 }
 
 func (h *SearchHandler) search(c *gin.Context) {
+	if !featureflags.Can(featureflags.KeyTakeout) {
+		response.Fail(c, http.StatusForbidden, "外卖功能暂未开放")
+		return
+	}
 	var request struct {
 		Keyword  string `json:"keyword"`
 		Page     int    `json:"page"`
@@ -140,6 +145,10 @@ func (h *SearchHandler) search(c *gin.Context) {
 }
 
 func (h *SearchHandler) history(c *gin.Context) {
+	if !featureflags.Can(featureflags.KeyTakeout) {
+		response.Fail(c, http.StatusForbidden, "外卖功能暂未开放")
+		return
+	}
 	value, err := h.metrics.History(c, h.currentUserID(c))
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, "list external takeout search history failed")
@@ -149,6 +158,10 @@ func (h *SearchHandler) history(c *gin.Context) {
 }
 
 func (h *SearchHandler) clearHistory(c *gin.Context) {
+	if !featureflags.Can(featureflags.KeyTakeout) {
+		response.Fail(c, http.StatusForbidden, "外卖功能暂未开放")
+		return
+	}
 	if err := h.metrics.ClearHistory(c, h.currentUserID(c)); err != nil {
 		response.Fail(c, http.StatusInternalServerError, "clear external takeout search history failed")
 		return
@@ -157,6 +170,10 @@ func (h *SearchHandler) clearHistory(c *gin.Context) {
 }
 
 func (h *SearchHandler) hotSearches(c *gin.Context) {
+	if !featureflags.Can(featureflags.KeyTakeout) {
+		response.Fail(c, http.StatusForbidden, "外卖功能暂未开放")
+		return
+	}
 	value, err := h.metrics.Hot(c)
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, "list external takeout hot searches failed")

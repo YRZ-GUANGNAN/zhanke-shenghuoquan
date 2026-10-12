@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Image, Text, View } from '@tarojs/components'
 import { useDidShow } from '@tarojs/taro'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
@@ -14,6 +14,7 @@ import { useSessionStore } from '../../stores/session'
 import type { IdentityAvailability, IdentityRoleKey } from '../../types'
 import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import './index.scss'
+import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 
 type RoleKey = IdentityRoleKey
 type MyContentTabKey = 'favorites' | 'posts' | 'comments' | 'items'
@@ -102,6 +103,7 @@ function roleStatus(
 }
 
 function ProfileContent() {
+  const visibility = useFeatureVisibility()
   const [pendingRole, setPendingRole] = useState<RoleKey | null>(null)
   const [switching, setSwitching] = useState(false)
   const [switchError, setSwitchError] = useState('')
@@ -118,17 +120,31 @@ function ProfileContent() {
   const campusLabel = Array.from(new Set([schoolName, campusName].filter(Boolean))).join(' · ') || '学校未设置'
   const identityAllowed = useIdentityGuard('student')
 
+  const countsRequestVersion = useRef(0)
+  const loadContentCounts = useCallback(() => {
+    const version = ++countsRequestVersion.current
+    void Promise.all([
+      visibility.forum ? getMyCommunitySummary() : Promise.resolve({ favorites: 0, posts: 0, comments: 0 }),
+      visibility.secondhand ? getMyProductsPage(1, 1) : Promise.resolve({ total: 0 }),
+    ]).then(([community, products]) => {
+      if (version === countsRequestVersion.current) setContentCounts({ ...community, items: products.total })
+    }).catch(() => {
+      // The destination pages provide their own retry states.
+    })
+  }, [visibility.forum, visibility.secondhand])
+
+  useEffect(() => {
+    loadContentCounts()
+    return () => { countsRequestVersion.current += 1 }
+  }, [loadContentCounts])
+
   useDidShow(() => {
     profileNavigationLockRef.current = false
     void refreshIdentity().catch(() => {
       // Keep the last known summary for transient failures. A 401 is handled
       // centrally by the session store and returns the app to login state.
     })
-		void Promise.all([getMyCommunitySummary(), getMyProductsPage(1, 1)]).then(([community, products]) => {
-			setContentCounts({ ...community, items: products.total })
-		}).catch(() => {
-			// Counts are secondary; the content pages still expose their own retry states.
-		})
+    loadContentCounts()
   })
 
 	const stats: Array<{ value: string; label: string; tab: MyContentTabKey }> = [
@@ -136,7 +152,7 @@ function ProfileContent() {
 		{ value: String(contentCounts.posts), label: '帖子', tab: 'posts' },
 		{ value: String(contentCounts.comments), label: '评论', tab: 'comments' },
 		{ value: String(contentCounts.items), label: '宝贝', tab: 'items' }
-	]
+	].filter(item => item.tab === 'items' ? visibility.secondhand : item.tab === 'favorites' ? visibility.forum && visibility.favorites : item.tab === 'comments' ? visibility.forum && visibility.comment : visibility.forum) as Array<{ value: string; label: string; tab: MyContentTabKey }>
 
   const handleRoleClick = (role: RoleOption) => {
     if (role.key === activeRole) {
@@ -146,6 +162,7 @@ function ProfileContent() {
     const availability = identity?.identities.find((item) => item.identity === role.key)
     if (!availability?.available) {
       if ((role.key === 'rider' || role.key === 'merchant') && availability?.status === 'missing') {
+        if (!visibility.identity_application) { showPlaceholder('身份申请暂未开放'); return }
         void Taro.navigateTo({ url: `/pages/identity-application/index?role=${role.key}` })
         return
       }
@@ -217,13 +234,13 @@ function ProfileContent() {
       </View>
 
       <View className='student-profile-content'>
-        <View className='student-profile-card student-profile-content-card'>
+        {stats.length > 0 && <View className='student-profile-card student-profile-content-card'>
           <View className='student-profile-card__header'>
             <View>
               <Text className='student-profile-card__title'>我的内容</Text>
               <Text className='student-profile-card__description'>收藏与发布内容集中管理</Text>
             </View>
-            <View className='student-profile-card__link' onClick={() => void Taro.navigateTo({ url: '/pages/my-content/index?tab=posts' })}>
+            <View className='student-profile-card__link' onClick={() => void Taro.navigateTo({ url: `/pages/my-content/index?tab=${stats[0].tab}` })}>
               <Text>查看全部</Text>
               <AppIcon name='chevron-right' className='student-profile-card__link-icon' />
             </View>
@@ -240,7 +257,7 @@ function ProfileContent() {
               </View>
             ))}
           </View>
-        </View>
+        </View>}
 
         <View className='student-profile-card student-profile-roles'>
           <View className='student-profile-card__header'>
@@ -250,7 +267,7 @@ function ProfileContent() {
             </View>
           </View>
           <View className='student-profile-role-grid'>
-            {roles.map((role) => {
+            {roles.filter(role => role.key === 'student' || visibility.delivery && visibility[role.key]).map((role) => {
               const availability = identity?.identities.find((item) => item.identity === role.key)
               const status = roleStatus(role.key, activeRole, availability)
               return (
@@ -272,6 +289,8 @@ function ProfileContent() {
             })}
           </View>
         </View>
+
+        {identity?.identities.filter(item => item.identity !== 'student' && item.available && (!visibility.delivery || !visibility[item.identity])).map(item => <View className='student-profile-card' key={item.identity} onClick={() => handleRoleClick(roles.find(role => role.key === item.identity)!)}><Text>已有{item.identity === 'merchant' ? '商家' : '骑手'}订单与资金</Text><Text> 新业务暂停，历史订单仍可处理</Text></View>)}
 
         <View className='student-profile-card student-profile-settings'>
           <View className='student-profile-settings__header'>

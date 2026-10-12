@@ -1,0 +1,6 @@
+.feature-page-state {
+  min-height: 100vh; box-sizing: border-box; padding: 180px 40px 64px;
+  background: #fff; display: flex; flex-direction: column; align-items: stretch; gap: 24px;
+}
+.feature-page-state__title { font-size: 36px; font-weight: 600; text-align: center; color: #273244; }
+.feature-page-state__description { margin-bottom: 24px; font-size: 28px; line-height: 1.6; text-align: center; color: #697586; }

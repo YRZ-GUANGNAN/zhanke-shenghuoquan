@@ -58,6 +58,7 @@ type Config struct {
 	AllowMockDeliveryFeeConfirmation bool
 	AllowMockDeliveryPayment         bool
 	EnableDeliveryIMReadReceipt      bool
+	EnableFeaturePolicy              bool
 	DeliveryWechatPayNotifyURL       string
 	DeliveryWechatRefundNotifyURL    string
 	WeComRiderWebhookURL             string
@@ -107,6 +108,10 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	enableFeaturePolicy, err := envBool("ENABLE_FEATURE_POLICY", true)
+	if err != nil {
+		return Config{}, err
+	}
 
 	cfg := Config{
 		AppEnv:             appEnv,
@@ -152,6 +157,7 @@ func Load() (Config, error) {
 		AllowMockDeliveryFeeConfirmation: allowMockDeliveryFeeConfirmation,
 		AllowMockDeliveryPayment:         allowMockDeliveryPayment,
 		EnableDeliveryIMReadReceipt:      enableDeliveryIMReadReceipt,
+		EnableFeaturePolicy:              enableFeaturePolicy,
 		DeliveryWechatPayNotifyURL:       env("DELIVERY_WECHAT_PAY_NOTIFY_URL", ""),
 		DeliveryWechatRefundNotifyURL:    env("DELIVERY_WECHAT_REFUND_NOTIFY_URL", ""),
 		WeComRiderWebhookURL:             env("WECOM_RIDER_WEBHOOK_URL", ""),

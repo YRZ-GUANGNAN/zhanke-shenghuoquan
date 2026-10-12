@@ -25,4 +25,12 @@ export const adminNavigation: AdminNavigationItem[] = [
   { key: 'navigation', label: '导航管理', description: '维护普通导航入口与合作商家目录', icon: 'navigation', group: '平台管理' },
 ]
 
+export const featurePolicyNavigationItem: AdminNavigationItem = {
+  key: 'feature-policy',
+  label: '小程序功能设置',
+  description: '控制模块入口、互动能力与新业务的开放状态',
+  icon: 'settings',
+  group: '平台管理'
+}
+
 export const adminNavigationGroups: AdminNavigationGroup[] = ['运营中心', '内容治理', '平台管理']

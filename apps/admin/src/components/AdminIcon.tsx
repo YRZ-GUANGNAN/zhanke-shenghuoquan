@@ -1,4 +1,4 @@
-export type AdminIconName = 'media' | 'delivery' | 'dashboard' | 'users' | 'identities' | 'moderation' | 'community' | 'trade' | 'reports' | 'navigation' | 'search' | 'close' | 'refresh' | 'chevron-right'
+export type AdminIconName = 'media' | 'delivery' | 'dashboard' | 'users' | 'identities' | 'moderation' | 'community' | 'trade' | 'reports' | 'navigation' | 'settings' | 'search' | 'close' | 'refresh' | 'chevron-right'
 interface AdminIconProps { name: AdminIconName; size?: number; className?: string }
 
 const paths: Record<AdminIconName, JSX.Element> = {
@@ -12,6 +12,7 @@ const paths: Record<AdminIconName, JSX.Element> = {
   trade: <><path d='M4 8h16l-1 12H5zM8 8a4 4 0 0 1 8 0'/></>,
   reports: <><path d='M12 3 3 20h18z'/><path d='M12 9v5M12 17h.01'/></>,
   navigation: <><circle cx='12' cy='12' r='9'/><path d='m15.5 8.5-2.2 5-4.8 2 2.2-5z'/></>,
+  settings: <><path d='M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z'/><path d='m19.4 15 .1.1a1.8 1.8 0 0 1-2.5 2.5l-.1-.1a1.8 1.8 0 0 0-3 .9v.2a1.8 1.8 0 0 1-3.6 0v-.2a1.8 1.8 0 0 0-3-.9l-.1.1a1.8 1.8 0 1 1-2.5-2.5l.1-.1a1.8 1.8 0 0 0-.9-3H3.7a1.8 1.8 0 0 1 0-3h.2a1.8 1.8 0 0 0 .9-3l-.1-.1a1.8 1.8 0 1 1 2.5-2.5l.1.1a1.8 1.8 0 0 0 3-.9v-.2a1.8 1.8 0 0 1 3.6 0v.2a1.8 1.8 0 0 0 3 .9l.1-.1a1.8 1.8 0 1 1 2.5 2.5l-.1.1a1.8 1.8 0 0 0 .9 3h.2a1.8 1.8 0 0 1 0 3h-.2a1.8 1.8 0 0 0-.9 3Z'/></>,
   search: <><circle cx='10.5' cy='10.5' r='6.5'/><path d='m15.5 15.5 5 5'/></>,
   close: <path d='m6 6 12 12M18 6 6 18'/>,
   refresh: <><path d='M20 7v5h-5'/><path d='M19 12a7 7 0 1 0-1.5 5'/></>,

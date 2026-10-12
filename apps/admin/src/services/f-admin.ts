@@ -1,5 +1,5 @@
 // Domain F client: management and the unified review workflow only.
-import type { ExternalTakeoutMerchant, ExternalTakeoutMerchantDirectory, ExternalTakeoutMerchantInput, ExternalTakeoutOperatingStatus, FeedbackRow, IdentityApplicationAdminList, IdentityApplicationDetail, IdentityApplicationQuery, IdentityApplicationRow, MediaAssetDetail, MediaAssetRow, MediaDeadletters, MediaDecisionRow, MediaEventRow, MediaGCJobRow, MediaQuery, MediaSummary, NavigationCategory, NavigationCategoryInput, NavigationItem, NavigationItemInput, Page, PageQuery, PostRow, ProductRow, ReportRow, ReviewTask, Stats, UserRow } from '../types'
+import type { ExternalTakeoutMerchant, ExternalTakeoutMerchantDirectory, ExternalTakeoutMerchantInput, ExternalTakeoutOperatingStatus, FeaturePolicy, FeaturePolicyKey, FeedbackRow, IdentityApplicationAdminList, IdentityApplicationDetail, IdentityApplicationQuery, IdentityApplicationRow, MediaAssetDetail, MediaAssetRow, MediaDeadletters, MediaDecisionRow, MediaEventRow, MediaGCJobRow, MediaQuery, MediaSummary, NavigationCategory, NavigationCategoryInput, NavigationItem, NavigationItemInput, Page, PageQuery, PostRow, ProductRow, ReportRow, ReviewTask, Stats, UserRow } from '../types'
 import { adminRequest } from './http'
 type ReviewQuery={status?:ReviewTask['status']|'';page?:number;pageSize?:number}
 export class AdminAPIError extends Error {
@@ -45,6 +45,8 @@ export const adminAPI={
 	setExternalTakeoutOperatingStatus:(id:number,operatingStatus:ExternalTakeoutOperatingStatus)=>api<{updated:boolean}>(`/admin/navigation/external-takeout-merchants/${id}/operating-status`,{method:'PATCH',body:JSON.stringify({operatingStatus})}),
 	setExternalTakeoutVisibility:(id:number,enabled:boolean)=>api<{updated:boolean}>(`/admin/navigation/external-takeout-merchants/${id}/visibility`,{method:'PATCH',body:JSON.stringify({enabled})}),
 	setExternalTakeoutCategoryVisibility:(enabled:boolean)=>api<{updated:boolean}>('/admin/navigation/external-takeout-merchants/category-visibility',{method:'PATCH',body:JSON.stringify({enabled})}),
+	featurePolicy:()=>api<FeaturePolicy>('/admin/feature-policy'),
+	updateFeaturePolicy:(input:{flags:Record<FeaturePolicyKey,boolean>;postingMode:FeaturePolicy['postingMode'];expectedRowVersion:number})=>api<FeaturePolicy>('/admin/feature-policy',{method:'PATCH',body:JSON.stringify(input)}),
 	mediaSummary:()=>api<MediaSummary>('/admin/media/summary'),
 	mediaAssets:(query:MediaQuery={})=>api<Page<MediaAssetRow>>(`/admin/media/assets${queryString(query)}`),
 	mediaAsset:(assetId:string)=>api<MediaAssetDetail>(`/admin/media/assets/${encodeURIComponent(assetId)}`),

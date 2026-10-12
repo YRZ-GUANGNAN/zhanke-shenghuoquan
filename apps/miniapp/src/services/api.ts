@@ -1,4 +1,6 @@
 import Taro, { type RequestOptions } from './taro'
+import { featureRequestKeys } from './feature-policy-model'
+import { getFeatureVisibility } from './feature-visibility'
 
 declare const TARO_APP_API_BASE: string | undefined
 
@@ -37,6 +39,13 @@ export function isRetryableNetworkError(error: unknown): boolean {
 export async function request<T>(url: string, options: RequestOptions = { url: '' }): Promise<T> {
   if (!API_BASE) {
     throw new ApiError('API base is not configured', 0, -1)
+  }
+
+  const method = options.method || 'GET'
+  const required = featureRequestKeys(method, url)
+  if (required.length) {
+    const visibility = await getFeatureVisibility(method !== 'GET')
+    if (required.some(key => !visibility[key])) throw new ApiError('该功能暂未开放', 403)
   }
 
   const token = Taro.getStorageSync<string>('domainA.token')
