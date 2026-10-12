@@ -12,7 +12,7 @@
 
 1. 提交经过审查的后端源码，再通过 `scripts/build-native-backend.ps1` 生成 Linux amd64 二进制和 SHA-256；不能绕过源码未提交检查。
 2. 将二进制、`038_feature_policy.sql`、`039_feature_policy_modules.sql` 和 `release-feature-policy.py` 上传到现有服务器的独立 staging 目录。
-3. 先运行部署工具的只读预检，再加 `--deploy`。工具会保存权限为 0600 的数据库备份，仅执行 038/039 增量迁移，创建独立 API release，检查版本、依赖健康和公开策略。失败则恢复旧 API 链接；保留新增策略表与审计，绝不重放历史迁移或开发 seed。
+3. 先运行部署工具的只读预检，再加 `--deploy`。迁移使用服务器现有的 `/etc/campus-circle/mysql-admin.cnf`（仅 root 可读），运行时账号仍只保留读写业务权限，不授予建表权限。工具会保存权限为 0600 的数据库备份，仅执行 038/039 增量迁移，创建独立 API release，检查版本、依赖健康和公开策略。失败则恢复旧 API 链接；保留新增策略表与审计，绝不重放历史迁移或开发 seed。
 4. 在 Cloudflare 将 `zhandui.top` 根域 A 改为 `8.138.227.107`。确认不存在指向其他服务器的根域 AAAA。不要改变 `zhanduiwang.top`，后者继续作为小程序 API。
 5. 执行 `deploy/native/migrate-admin-domain.ps1 -BuildAdmin -Deploy -RequestCertificate -EnableHttps`，创建独立 Admin release 与 TLS。DNS 不正确时工具拒绝远程写入；原后台目录和原 API 域名继续保留。
 6. 以 `TARO_APP_API_BASE=https://zhanduiwang.top/api/v1` 构建并上传小程序新包。必须完成微信实际版本发布后，线上客户端才具备入口显隐、旧链接门控和前台刷新；旧客户端只能受到新增 API 守卫约束，无法凭空获得新界面代码。

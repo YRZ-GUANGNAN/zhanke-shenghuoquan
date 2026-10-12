@@ -75,6 +75,15 @@ def main():
     def sql(query):
         return run(['mysql', *options, '-N', database], input=query, env=process_env, text=True).strip()
 
+    migration_config = Path('/etc/campus-circle/mysql-admin.cnf')
+    if not migration_config.is_file() or migration_config.is_symlink() or migration_config.stat().st_mode & 0o077:
+        raise RuntimeError('A private, existing database migration configuration is required')
+
+    def migrate(query):
+        return run(['mysql', f'--defaults-extra-file={migration_config}', '-N', database], input=query, text=True).strip()
+
+    migrate('SELECT 1;')
+
     column = sql("SELECT IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='feature_policy_configs' AND COLUMN_NAME='extra_flags';")
     if shutil.disk_usage(ROOT).free < 512 * 1024 * 1024:
         raise RuntimeError('Insufficient disk space for a safe release')
@@ -104,13 +113,13 @@ def main():
             raise RuntimeError('Empty database backup; migrations were not attempted')
     # Only these two additive migrations are allowed. Never replay dev seed or
     # the full historical migration set against an existing production database.
-    sql((stage / '038_feature_policy.sql').read_text())
+    migrate((stage / '038_feature_policy.sql').read_text())
     extension = (stage / '039_feature_policy_modules.sql').read_text()
     if not column:
-        sql(extension)
+        migrate(extension)
     elif column == 'YES':
         # Resume an interrupted 039 after its first DDL statement.
-        sql(extension.split(';', 1)[1])
+        migrate(extension.split(';', 1)[1])
     if sql("SELECT IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='feature_policy_configs' AND COLUMN_NAME='extra_flags';") != 'NO':
         raise RuntimeError('Feature policy migration did not finish')
 
