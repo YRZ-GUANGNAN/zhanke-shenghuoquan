@@ -22,5 +22,5 @@ CREATE TABLE IF NOT EXISTS share_settings_audit_logs (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 INSERT INTO share_settings (id, home_title, secondhand_title, services_title, detail_title_suffix, updated_at)
-SELECT 1, '湛科生活圈', '校园二手 · 湛科生活圈', '校园服务 · 湛科生活圈', '湛科生活圈', UTC_TIMESTAMP(6)
+SELECT 1, '湛科生活圈', '校园二手 · 湛科生活圈', '校园服务 · 湛科生活圈', '湛科生活圈', CURRENT_TIMESTAMP(6)
 WHERE NOT EXISTS (SELECT 1 FROM share_settings WHERE id = 1);

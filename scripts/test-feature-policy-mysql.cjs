@@ -38,7 +38,7 @@ async function run() {
     const database = `${shareSettings ? 'campus_share_test_' : 'campus_feature_policy_test_'}${process.pid}`
     const created = sql(`CREATE DATABASE ${database} CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci`)
     if (created.status !== 0) throw new Error(created.stderr)
-    const testDSN = `root@tcp(127.0.0.1:${port})/${database}?charset=utf8mb4&parseTime=True&loc=UTC`
+    const testDSN = `root@tcp(127.0.0.1:${port})/${database}?charset=utf8mb4&parseTime=True&loc=${shareSettings ? 'Local' : 'UTC'}`
     const moduleName = shareSettings ? 'sharesettings' : 'featureflags'
     const testName = shareSettings ? 'TestTemporaryMySQLPersistenceCASAndAuditRollback' : 'TestGormTemporaryMySQLPersistenceAndAudit'
     const testKey = shareSettings ? 'SHARE_SETTINGS_TEST_MYSQL_DSN' : 'FEATURE_POLICY_TEST_MYSQL_DSN'

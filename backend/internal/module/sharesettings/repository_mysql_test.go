@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	driver "github.com/go-sql-driver/mysql"
 	"gorm.io/driver/mysql"
@@ -50,6 +51,9 @@ func TestTemporaryMySQLPersistenceCASAndAuditRollback(t *testing.T) {
 	initial, err := store.Load(ctx)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if delta := time.Since(initial.UpdatedAt); delta < -time.Minute || delta > time.Minute {
+		t.Fatal("initial timestamp does not match the database runtime timezone")
 	}
 	changed := initial.Cards
 	changed.HomeTitle = "保存后的标题"
