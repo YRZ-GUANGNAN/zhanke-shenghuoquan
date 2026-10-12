@@ -1,8 +1,11 @@
 import { withFeaturePage } from '../../components/feature-page-gate'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
+import { usePageShare } from '../../hooks/use-page-share'
+import { publicShareId } from '../../services/share-model'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Image, Input, ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
+import RuntimeSessionGate from '../../components/runtime-session-gate'
 import AppIcon from '../../components/app-icon'
 import { AppIconButton, AppState } from '../../components/ui'
 import Taro from '../../services/taro'
@@ -76,7 +79,7 @@ const readableError = (error: unknown): string => {
 function PostDetailPage() {
   const visibility = useFeatureVisibility()
   const params = Taro.getCurrentInstance().router?.params ?? {}
-  const postId = params.id ? decodeURIComponent(params.id) : ''
+  const postId = publicShareId(params.id)
   const [post, setPost] = useState<CommunityPost | null>(null)
   const [comments, setComments] = useState<CommunityComment[]>([])
   const [commentPage, setCommentPage] = useState(1)
@@ -106,6 +109,7 @@ function PostDetailPage() {
   }, [post])
   const isApproved = post?.reviewStatus === 'approved'
   const reviewState = post?.reviewStatus ? reviewCopy[post.reviewStatus] : null
+  usePageShare({ kind: 'post', enabled: visibility.forum && !loading && !error, id: postId, content: post })
 
   useEffect(() => {
     let alive = true
@@ -428,4 +432,4 @@ function PostDetailPage() {
   )
 }
 
-export default withFeaturePage(PostDetailPage)
+export default withFeaturePage(PostDetailPage, RuntimeSessionGate)

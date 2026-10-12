@@ -14,6 +14,7 @@ import Taro from '../../services/taro'
 import type { ToolLink } from '../../types'
 import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
+import { usePageShare } from '../../hooks/use-page-share'
 import './index.scss'
 
 type DirectoryStatus = 'loading' | 'empty' | 'ready' | 'error'
@@ -33,6 +34,7 @@ function StudentTakeoutPage() {
   const [filter, setFilter] = useState<MerchantFilter>('all')
   const [jumpingTarget, setJumpingTarget] = useState<string | null>(null)
   const visibility = useFeatureVisibility()
+  usePageShare({ kind: 'services', enabled: visibility.takeout || visibility.campus_tools })
   const toolRequestVersion = useRef(0)
   const merchantRequestVersion = useRef(0)
   const jumpingRef = useRef<string | null>(null)

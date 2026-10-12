@@ -9,6 +9,7 @@ import Taro from '../../services/taro'
 import type { Product } from '../../types'
 import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
+import { usePageShare } from '../../hooks/use-page-share'
 import './index.scss'
 
 type CategoryKey = '全部' | '数码' | '书籍资料' | '生活用品' | '代步'
@@ -73,6 +74,7 @@ function StudentSecondhandPage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [pagingError, setPagingError] = useState(false)
   const visibility = useFeatureVisibility()
+  usePageShare({ kind: 'secondhand', enabled: visibility.secondhand })
   const [failedImageKeys, setFailedImageKeys] = useState<Set<string>>(() => new Set())
   const queryVersion = useRef(0)
   const categoryRef = useRef<CategoryKey>('全部')

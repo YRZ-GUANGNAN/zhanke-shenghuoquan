@@ -16,6 +16,7 @@ const allowedDomains = new Set([
   'adminauth',
   'identityapplication',
   'featureflags',
+  'sharesettings',
 ])
 const transactionOrchestrators = new Set([
   path.join('identityapplication', 'media.go'),

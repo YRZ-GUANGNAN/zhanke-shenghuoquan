@@ -1,6 +1,7 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Button, Text, View } from '@tarojs/components'
-import { useRouter } from '@tarojs/taro'
+import { getCurrentInstance, hideShareMenu, useRouter, useDidShow } from '@tarojs/taro'
+import { useSessionStore } from '../stores/session'
 import { useFeatureVisibility } from '../hooks/use-feature-visibility'
 import { featurePageKeys } from '../services/feature-policy-model'
 import { getFeatureVisibility } from '../services/feature-visibility'
@@ -14,6 +15,13 @@ export function FeaturePageGate({ children }: { children: React.ReactNode }) {
   const servicePage = router.path.includes('student-takeout')
   const contentPage = router.path.includes('my-content')
   const allowed = keys.every(key => visibility[key]) && (!servicePage || visibility.takeout || visibility.campus_tools) && (!contentPage || visibility.forum || visibility.secondhand)
+  const hideBlockedShare = () => {
+    if ((!visibility.available || !allowed) && getCurrentInstance().router?.$taroPath === router.$taroPath) {
+      void hideShareMenu({ menus: ['shareAppMessage', 'shareTimeline'] }).catch(() => undefined)
+    }
+  }
+  useEffect(hideBlockedShare, [visibility.available, allowed, router.path])
+  useDidShow(hideBlockedShare)
   if (visibility.available && allowed) return <>{children}</>
   return <View className='feature-page-state'>
     <Text className='feature-page-state__title'>{visibility.available ? '该功能暂未开放' : '正在确认功能状态'}</Text>
@@ -25,8 +33,17 @@ export function FeaturePageGate({ children }: { children: React.ReactNode }) {
 }
 
 // A closed page never mounts its business component or starts its effects.
-export function withFeaturePage<P extends object>(Page: React.ComponentType<P>) {
+export function withFeaturePage<P extends object>(Page: React.ComponentType<P>, SessionGate?: React.ComponentType<{ children: React.ReactNode }>) {
   return function FeatureProtectedPage(props: P) {
-    return <FeaturePageGate><Page {...props} /></FeaturePageGate>
+    const status = useSessionStore(state => state.status)
+    const router = useRouter()
+    const hideWhileLogin = () => {
+      if (SessionGate && status !== 'authenticated' && getCurrentInstance().router?.$taroPath === router.$taroPath) {
+        void hideShareMenu({ menus: ['shareAppMessage', 'shareTimeline'] }).catch(() => undefined)
+      }
+    }
+    useEffect(hideWhileLogin, [status, router.path])
+    useDidShow(hideWhileLogin)
+    return <FeaturePageGate>{SessionGate ? <SessionGate><Page {...props} /></SessionGate> : <Page {...props} />}</FeaturePageGate>
   }
 }

@@ -1,8 +1,10 @@
 import { withFeaturePage } from '../../components/feature-page-gate'
+import { usePageShare } from '../../hooks/use-page-share'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
+import RuntimeSessionGate from '../../components/runtime-session-gate'
 import AppIcon from '../../components/app-icon'
 import { AppActionSheet, AppDialog, AppNotice } from '../../components/ui'
 import { isApiError } from '../../services/api'
@@ -49,6 +51,7 @@ function SecondhandDetailPage() {
   const [scrollTarget, setScrollTarget] = useState('')
   const commentsLoadMoreRef = useRef<(() => void) | null>(null)
   const retryProduct = useCallback(() => setReloadKey((value) => value + 1), [])
+  usePageShare({ kind: 'product', enabled: visibility.secondhand && status === 'ready', id: requestedId, content: product })
 
   useEffect(() => {
     if (!validId) {
@@ -87,6 +90,7 @@ function SecondhandDetailPage() {
   }
 
   const openSellerProfile = () => {
+    if (!visibility.forum) return
     if (!product?.sellerId) {
       showToast('卖家资料暂不可用')
       return
@@ -266,9 +270,9 @@ function SecondhandDetailPage() {
                   <Text className='secondhand-detail-seller__name'>{product.sellerName}</Text>
                   <Text className='secondhand-detail-seller__meta'>{sellerMeta}</Text>
                 </View>
-                <View className='secondhand-detail-seller__button' onClick={openSellerProfile}>
+                {visibility.forum && <View className='secondhand-detail-seller__button' onClick={openSellerProfile}>
                   <Text>主页</Text>
-                </View>
+                </View>}
               </View>
 
               <View className='secondhand-detail-warning'>
@@ -370,4 +374,4 @@ function SecondhandDetailPage() {
   )
 }
 
-export default withFeaturePage(SecondhandDetailPage)
+export default withFeaturePage(SecondhandDetailPage, RuntimeSessionGate)

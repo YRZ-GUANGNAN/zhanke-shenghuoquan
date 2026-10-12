@@ -23,6 +23,7 @@ export const adminNavigation: AdminNavigationItem[] = [
   { key: 'dashboard', label: '数据统计', description: '查看平台总量、今日新增与待处理内容', icon: 'dashboard', group: '平台管理' },
   { key: 'users', label: '用户管理', description: '管理用户状态和管理员角色', icon: 'users', group: '平台管理' },
   { key: 'navigation', label: '导航管理', description: '维护普通导航入口与合作商家目录', icon: 'navigation', group: '平台管理' },
+  { key: 'share-settings', label: '分享卡片设置', description: '维护小程序转发标题、封面与内容卡片规则', icon: 'settings', group: '平台管理' },
 ]
 
 export const featurePolicyNavigationItem: AdminNavigationItem = {

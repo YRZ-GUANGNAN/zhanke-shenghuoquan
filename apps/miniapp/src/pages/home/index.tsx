@@ -14,6 +14,7 @@ import { listIMConversations } from '../../services/e-im'
 import { listNavigationItems } from '../../services/d-navigation'
 import { requestWithSingleSessionRecovery } from '../../services/session-recovery'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
+import { usePageShare } from '../../hooks/use-page-share'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
 import './index.scss'
@@ -145,6 +146,7 @@ function HomeContent() {
   const [conversationStatus, setConversationStatus] = useState<ConversationStatus>('idle')
   const [tools, setTools] = useState<ToolLink[]>([])
   const visibility = useFeatureVisibility()
+  usePageShare({ kind: 'home', enabled: visibility.available && activeTab !== 'messages' })
   const [toolStatus, setToolStatus] = useState<ToolStatus>('idle')
   const sourceRef = useRef({ communityPage: 0, tradePage: 0, communityTotal: 0, tradeTotal: 0 })
   const loadingRef = useRef(false)

@@ -1,8 +1,10 @@
 import { withFeaturePage } from '../../components/feature-page-gate'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
+import { usePageShare } from '../../hooks/use-page-share'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Image, ScrollView, Text, View } from '@tarojs/components'
+import { Button, Image, ScrollView, Text, View } from '@tarojs/components'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
+import RuntimeSessionGate from '../../components/runtime-session-gate'
 import { AppActionSheet, AppDialog } from '../../components/ui'
 import { blockUser } from '../../services/a-user'
 import {
@@ -58,6 +60,7 @@ function UserProfilePage() {
   const [blockPending, setBlockPending] = useState(false)
   const [error, setError] = useState('')
   const requestVersion = useRef(0)
+  const shareReady = usePageShare({ kind: 'profile', enabled: visibility.forum && status === 'ready', id: userId, loadedId: String(profile?.profile.id || ''), nickname: profile?.profile.nickname || '' })
   useEffect(() => { if (!visibility.secondhand && activeTab === 'secondhand') setActiveTab('posts') }, [visibility.secondhand, activeTab])
 
   useEffect(() => {
@@ -161,10 +164,6 @@ function UserProfilePage() {
   }
 
   const secondaryAction = () => {
-    if (isSelf) {
-      void Taro.setClipboardData({ data: `pages/user-profile/index?userId=${userId}` }).then(() => showToast('主页路径已复制'))
-      return
-    }
     const selling = products.find((item) => item.status === 'selling')
     if (!selling) {
       showToast('该用户当前没有可联系的在售商品')
@@ -276,9 +275,8 @@ function UserProfilePage() {
           {(isSelf || visibility.following) && <View className={`public-profile-action public-profile-action--primary ${following ? 'public-profile-action--active' : ''}`} onClick={isSelf ? () => void Taro.navigateTo({ url: '/pages/edit-profile/index' }) : () => void toggleFollow()}>
             <Text>{isSelf ? '编辑资料' : busy ? '处理中…' : following ? '已关注' : '+ 关注'}</Text>
           </View>}
-          {(isSelf || visibility.secondhand) && <View className='public-profile-action public-profile-action--secondary' onClick={secondaryAction}>
-            <Text>{isSelf ? '分享主页' : '查看在售商品'}</Text>
-          </View>}
+          {isSelf ? <Button className='public-profile-action public-profile-action--secondary' openType='share' disabled={!shareReady}>分享主页</Button>
+            : visibility.secondhand && <View className='public-profile-action public-profile-action--secondary' onClick={secondaryAction}><Text>查看在售商品</Text></View>}
         </View>
       </View>
       <View className='public-profile-tabs'>
@@ -328,4 +326,4 @@ function UserProfilePage() {
   )
 }
 
-export default withFeaturePage(UserProfilePage)
+export default withFeaturePage(UserProfilePage, RuntimeSessionGate)

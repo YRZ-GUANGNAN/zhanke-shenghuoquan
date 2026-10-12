@@ -40,6 +40,7 @@ import (
 	coremedia "campus-circle/backend/internal/module/media"
 	"campus-circle/backend/internal/module/media/miniappflow"
 	"campus-circle/backend/internal/module/navigation"
+	"campus-circle/backend/internal/module/sharesettings"
 	"campus-circle/backend/internal/module/takeout"
 	"campus-circle/backend/internal/module/trade"
 	"campus-circle/backend/internal/module/user"
@@ -86,6 +87,10 @@ func main() {
 	}
 	adminAuthMiddleware := adminauth.NewMiddleware(adminAuthService, userService)
 	adminAuthRequired := adminAuthMiddleware.Required()
+	shareStore := sharesettings.NewGormStore(db)
+	if err := shareStore.Ensure(context.Background()); err != nil {
+		log.Fatalf("configure share settings: %v", err)
+	}
 	cosClient, err := legacymedia.NewTencentCOS(cfg.COSSecretID, cfg.COSSecretKey, cfg.COSBucket, cfg.COSRegion, cfg.COSAppID)
 	if err != nil {
 		log.Fatalf("configure Tencent COS: %v", err)
@@ -409,6 +414,7 @@ func main() {
 	community.NewHandler(communityService, userService, safety).Register(communityRoutes)
 	community.NewSearchHandler(communityService, userService, communityMetrics).Register(communityRoutes)
 	api.GET("/features", featureflags.PublicHandler)
+	sharesettings.NewHandler(shareStore).Register(api, adminAuthRequired)
 	tradeRoutes := api.Group("/trade")
 	trade.NewHandler(tradeService, userService, safety).Register(tradeRoutes)
 	trade.NewProductCommentHandler(tradeCommentService, userService, safety).Register(tradeRoutes)
