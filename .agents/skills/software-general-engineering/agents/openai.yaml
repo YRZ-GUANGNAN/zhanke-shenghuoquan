@@ -1,4 +1,0 @@
-interface:
-  display_name: "软件通用工程"
-  short_description: "从需求与契约梳理到分层验收和可追溯交付，保留现有工作与业务边界。"
-  default_prompt: "使用 $software-general-engineering，按当前项目的边界和真实证据推进这次任务，完成相关验证并说明交付状态。"
