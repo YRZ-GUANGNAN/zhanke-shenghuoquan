@@ -65,7 +65,6 @@ func main() {
 	if err := featureflags.ConfigureStore(context.Background(), cfg.EnableFeaturePolicy, featureflags.NewGormStore(db)); err != nil {
 		log.Fatalf("configure feature policy: %v", err)
 	}
-	featureflags.RestrictToCampusInfo()
 	campusGuides, err := campusinfo.NewHandler()
 	if err != nil {
 		log.Fatalf("load campus guides: %v", err)

@@ -1,6 +1,6 @@
 const fs = require('node:fs')
 const path = require('node:path')
-const { assertCampusInfoHome } = require('./lib/campus-info-contract.cjs')
+const { assertSyntheticStaticToolsRejected, homeToolsDataFlowViolations } = require('./lib/home-tools-contract.cjs')
 
 const root = path.resolve(__dirname, '..')
 const src = path.join(root, 'apps', 'miniapp', 'src')
@@ -60,7 +60,10 @@ const home = fs.readFileSync(path.join(src, 'pages/home/index.tsx'), 'utf8')
 if (/静态占位|showTodoToast|特价影票|学生兼职|校园群聊|校园地图/.test(home)) {
   violations.push('pages/home/index.tsx: static fake tools must not be registered')
 }
-assertCampusInfoHome(home)
+for (const violation of homeToolsDataFlowViolations(home)) {
+  violations.push(`pages/home/index.tsx: ${violation}`)
+}
+assertSyntheticStaticToolsRejected(home)
 
 const identityGuard = fs.readFileSync(path.join(src, 'hooks/use-identity-guard.ts'), 'utf8')
 if (!identityGuard.includes("merchant: '/pages/merchant-home/index'")) {

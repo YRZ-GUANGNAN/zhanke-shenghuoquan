@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish the fixed campus-info scope and embedded guides without database changes."""
+"""Add the presentation selector while preserving the original saved policy."""
 import argparse
 import gzip
 import hashlib
@@ -36,7 +36,7 @@ def probe(path, status=200):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ('release', 'sha256', 'commit', 'expected-release', 'expected-commit'):
+    for name in ('release', 'sha256', 'migration-sha256', 'commit', 'expected-release', 'expected-commit'):
         parser.add_argument('--' + name, required=True)
     parser.add_argument('--deploy', action='store_true')
     args = parser.parse_args()
@@ -45,16 +45,16 @@ def main():
     for identity in (args.release, args.expected_release):
         if not re.fullmatch(r'[A-Za-z0-9._-]{1,80}', identity):
             raise ValueError('Invalid release identity')
-    for value in (args.sha256,):
+    for value in (args.sha256, args.migration_sha256):
         if not re.fullmatch(r'[a-f0-9]{64}', value):
             raise ValueError('Invalid checksum')
     for value in (args.commit, args.expected_commit):
         if not re.fullmatch(r'[a-f0-9]{12,40}', value):
             raise ValueError('Invalid source commit')
-    stage = Path('/home/admin') / ('campus-info-' + args.release)
+    stage = Path('/home/admin') / ('campus-mode-' + args.release)
     if stage.is_symlink():
         raise RuntimeError('Unexpected staging symlink')
-    for name, digest in (('campus-api', args.sha256),):
+    for name, digest in (('campus-api', args.sha256), ('041_feature_policy_presentation.sql', args.migration_sha256)):
         target = stage / name
         if target.is_symlink() or not target.is_file() or hashlib.sha256(target.read_bytes()).hexdigest() != digest:
             raise RuntimeError('Missing or mismatched release asset: ' + name)
@@ -65,9 +65,11 @@ def main():
     if probe('/version')['data']['commit'] != args.expected_commit:
         raise RuntimeError('Running build no longer matches the inspected baseline')
     before_policy = probe('/api/v1/features')['data']
+    if before_policy.get('presentationMode', 'standard') != 'standard':
+        raise RuntimeError('Inspect active presentation before updating the original release')
     probe('/readyz')
     release = ROOT / 'releases' / args.release
-    pending = ROOT / 'current.info-next'
+    pending = ROOT / 'current.mode-next'
     if release.exists() or os.path.lexists(pending):
         raise RuntimeError('Release ID or pending transition already exists')
     if shutil.disk_usage(ROOT).free < 512 * 1024 * 1024:
@@ -93,7 +95,7 @@ def main():
 
     backup_dir = Path('/var/backups/campus-circle')
     backup_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-    backup = backup_dir / (args.release + '-before-campus-info.sql.gz')
+    backup = backup_dir / (args.release + '-before-presentation.sql.gz')
     with backup.open('xb') as raw:
         os.chmod(backup, 0o600)
         dump = subprocess.Popen(['mysqldump', *options, '--single-transaction', '--no-tablespaces', database], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -102,13 +104,18 @@ def main():
         dump.stdout.close()
         dump.communicate()
         if dump.returncode:
-            raise RuntimeError('Backup failed; release not attempted')
+            raise RuntimeError('Backup failed; migration not attempted')
     with gzip.open(backup, 'rb') as check:
         if not check.read(128):
             raise RuntimeError('Backup is empty')
+    column_count = run(['mysql', *options, '-N', database], input="SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'feature_policy_configs' AND COLUMN_NAME = 'presentation_mode';", text=True).strip()
+    if column_count == '0':
+        run(['mysql', *options, '--default-character-set=utf8mb4', database], input=(stage / '041_feature_policy_presentation.sql').read_text(), text=True)
+    elif column_count != '1':
+        raise RuntimeError('Unexpected presentation schema state')
     # Recheck before switching; an independent operator may have published meanwhile.
     if current.resolve() != previous or probe('/version')['data']['commit'] != args.expected_commit:
-        raise RuntimeError('Production changed during preparation')
+        raise RuntimeError('Production changed during preparation; additive schema retained')
     release.mkdir(mode=0o755)
     (release / 'bin').mkdir(mode=0o755)
     shutil.copyfile(stage / 'campus-api', release / 'bin/campus-api')
@@ -132,19 +139,18 @@ def main():
                 if version['commit'] != args.commit or settings['rowVersion'] < 1:
                     raise RuntimeError('New backend identity or settings mismatch')
                 policy = probe('/api/v1/features')['data']
-                if policy.get('releaseScope') != 'campus_info' or any(policy['flags'].values()) or policy['rowVersion'] != before_policy['rowVersion']:
-                    raise RuntimeError('Fixed release scope or saved policy version mismatch')
+                if policy.get('presentationMode') != 'standard':
+                    raise RuntimeError('Deployment unexpectedly changed presentation')
+                original_policy = {key: value for key, value in policy.items() if key != 'presentationMode'}
+                baseline_policy = {key: value for key, value in before_policy.items() if key != 'presentationMode'}
+                if original_policy != baseline_policy:
+                    raise RuntimeError('Original saved flags or policy version changed during release')
                 guides = probe('/api/v1/campus-info/guides')['data']['items']
-                if len(guides) != 5 or any(not item['sections'] for item in guides):
-                    raise RuntimeError('Published campus guides are incomplete')
-                for item in guides:
-                    if probe('/api/v1/campus-info/guides/' + item['id'])['data']['id'] != item['id']:
-                        raise RuntimeError('Guide detail mismatch')
-                probe('/api/v1/trade/products', 403)
-                probe('/api/v1/community/posts', 403)
+                if len(guides) != 5:
+                    raise RuntimeError('Independent campus guides missing')
                 probe('/api/v1/admin/feature-policy', 401)
                 probe('/api/v1/admin/share-settings', 401)
-                result.update(deployed=True, backup=str(backup), version=version, shareSettingsVersion=settings['rowVersion'], releaseScope='campus_info', savedPolicyVersionUnchanged=True, guideCount=len(guides))
+                result.update(deployed=True, backup=str(backup), version=version, shareSettingsVersion=settings['rowVersion'], featurePolicyUnchanged=True, presentationMode='standard', guideCount=len(guides))
                 break
             except Exception:
                 if attempt == 11:
@@ -153,9 +159,9 @@ def main():
     except Exception:
         if current.resolve() == release:
             activate(previous)
-        # No database writes or migration were performed by this release.
+        # Keep additive tables and audit history; the old binary ignores them.
         raise
-    (release / 'campus-info-receipt.json').write_text(json.dumps(result, indent=2) + '\n')
+    (release / 'presentation-receipt.json').write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(result))
 
 

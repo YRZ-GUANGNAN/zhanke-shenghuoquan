@@ -103,8 +103,9 @@ if (/const\s+conversations\s*[:=]/.test(homeSource)) {
 if (/\/pages\/secondhand-chat\/index\?[^`'"\r\n]*(?:conversationId|peerUserId|buyerId|sellerId|peerName|peerAvatar|scene)=/.test(homeSource)) {
   throw new Error('home conversation navigation must carry relationId only')
 }
-if (/secondhand-chat|listIMConversations/.test(homeSource)) {
-  throw new Error('campus-info home must not expose chat navigation')
+const safeRelationTarget = '/pages/secondhand-chat/index?relationId=${encodeURIComponent(String(item.context.relationId))}'
+if (!homeSource.includes(safeRelationTarget)) {
+  throw new Error('home conversation navigation must use the authorized relationId')
 }
 if (!/RuntimeSessionGate\s+preserveAuthenticatedChildrenDuringRetry/.test(homeSource)) {
   throw new Error('home must preserve an authenticated mount during one-shot session recovery')

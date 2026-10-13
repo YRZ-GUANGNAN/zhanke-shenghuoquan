@@ -18,7 +18,8 @@ func PublicHandler(c *gin.Context) {
 		response.Fail(c, http.StatusServiceUnavailable, err.Error())
 		return
 	}
-	response.OK(c, gin.H{"flags": value.Flags, "postingMode": value.PostingMode, "rowVersion": value.RowVersion, "enabled": value.Enabled, "releaseScope": value.ReleaseScope})
+	value = EffectivePolicy(value)
+	response.OK(c, gin.H{"flags": value.Flags, "postingMode": value.PostingMode, "rowVersion": value.RowVersion, "enabled": value.Enabled, "presentationMode": value.PresentationMode})
 }
 
 func AdminGetHandler(c *gin.Context) {
@@ -64,7 +65,7 @@ func AdminUpdateHandler(c *gin.Context) {
 		response.Fail(c, http.StatusNotFound, err.Error())
 	case errors.Is(err, ErrUnavailable):
 		response.Fail(c, http.StatusServiceUnavailable, err.Error())
-	case errors.Is(err, ErrInvalidKey), errors.Is(err, ErrInvalidPostingMode), errors.Is(err, ErrReleaseRestricted):
+	case errors.Is(err, ErrInvalidKey), errors.Is(err, ErrInvalidPostingMode), errors.Is(err, ErrInvalidPresentationMode):
 		response.Fail(c, http.StatusBadRequest, err.Error())
 	case err != nil:
 		response.Fail(c, http.StatusInternalServerError, "update feature policy failed")

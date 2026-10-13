@@ -50,20 +50,21 @@ var (
 )
 
 type Policy struct {
-	ReleaseScope string          `json:"releaseScope,omitempty"`
-	Flags        map[string]bool `json:"flags"`
-	PostingMode  string          `json:"postingMode"`
-	RowVersion   uint64          `json:"rowVersion"`
-	UpdatedBy    uint            `json:"updatedBy"`
-	UpdatedAt    time.Time       `json:"updatedAt"`
-	LabEnabled   bool            `json:"labEnabled"`
-	Enabled      bool            `json:"enabled"`
+	PresentationMode string          `json:"presentationMode"`
+	Flags            map[string]bool `json:"flags"`
+	PostingMode      string          `json:"postingMode"`
+	RowVersion       uint64          `json:"rowVersion"`
+	UpdatedBy        uint            `json:"updatedBy"`
+	UpdatedAt        time.Time       `json:"updatedAt"`
+	LabEnabled       bool            `json:"labEnabled"`
+	Enabled          bool            `json:"enabled"`
 }
 
 type UpdateInput struct {
 	Flags              map[string]bool `json:"flags"`
 	PostingMode        string          `json:"postingMode"`
 	ExpectedRowVersion uint64          `json:"expectedRowVersion"`
+	PresentationMode   *string         `json:"presentationMode,omitempty"`
 }
 
 type Store interface {
@@ -75,12 +76,11 @@ type Store interface {
 
 var state = struct {
 	sync.RWMutex
-	labEnabled   bool
-	policy       Policy
-	store        Store
-	refreshedAt  time.Time
-	loadError    error
-	releaseScope string
+	labEnabled  bool
+	policy      Policy
+	store       Store
+	refreshedAt time.Time
+	loadError   error
 }{policy: newDefaultPolicy(false)}
 
 func newDefaultFlags() map[string]bool {
@@ -92,7 +92,7 @@ func newDefaultFlags() map[string]bool {
 }
 
 func newDefaultPolicy(labEnabled bool) Policy {
-	return Policy{Flags: newDefaultFlags(), PostingMode: "admin_only", RowVersion: 1, LabEnabled: labEnabled, Enabled: labEnabled}
+	return Policy{PresentationMode: PresentationStandard, Flags: newDefaultFlags(), PostingMode: "admin_only", RowVersion: 1, LabEnabled: labEnabled, Enabled: labEnabled}
 }
 
 // Configure without a store is reserved for tests. The server uses ConfigureStore.
@@ -104,7 +104,6 @@ func Configure(enabled bool) {
 	state.store = nil
 	state.refreshedAt = time.Time{}
 	state.loadError = nil
-	state.releaseScope = ""
 }
 
 // ConfigureStore requires an explicitly migrated schema and durable storage.
@@ -137,6 +136,9 @@ func ConfigureStore(ctx context.Context, enabled bool, store Store) error {
 	}
 	value.LabEnabled = true
 	value.Enabled = true
+	if !validPresentationMode(value.PresentationMode) {
+		return ErrInvalidPresentationMode
+	}
 	state.Lock()
 	state.policy = clonePolicy(value)
 	state.store = store
@@ -155,7 +157,7 @@ func Snapshot() Policy {
 	refresh(false)
 	state.RLock()
 	defer state.RUnlock()
-	return releasePolicy(state.policy)
+	return clonePolicy(state.policy)
 }
 
 func Get() Policy { return Snapshot() }
@@ -165,9 +167,9 @@ func ReadPolicy(force bool) (Policy, error) {
 	state.RLock()
 	defer state.RUnlock()
 	if state.loadError != nil {
-		return releasePolicy(state.policy), ErrUnavailable
+		return clonePolicy(state.policy), ErrUnavailable
 	}
-	return releasePolicy(state.policy), nil
+	return clonePolicy(state.policy), nil
 }
 
 func Update(actorID uint, input UpdateInput) (Policy, error) {
@@ -191,6 +193,13 @@ func UpdateContext(ctx context.Context, actorID uint, input UpdateInput) (Policy
 	if mode != "admin_only" && mode != "all_users" {
 		return clonePolicy(state.policy), ErrInvalidPostingMode
 	}
+	presentation := state.policy.PresentationMode
+	if input.PresentationMode != nil {
+		presentation = *input.PresentationMode
+	}
+	if !validPresentationMode(presentation) {
+		return clonePolicy(state.policy), ErrInvalidPresentationMode
+	}
 	if input.Flags == nil || len(input.Flags) != len(AllKeys) {
 		return clonePolicy(state.policy), ErrInvalidKey
 	}
@@ -201,19 +210,10 @@ func UpdateContext(ctx context.Context, actorID uint, input UpdateInput) (Policy
 		}
 		flags[key] = value
 	}
-	if state.releaseScope == CampusInfoScope {
-		for _, enabled := range flags {
-			if enabled {
-				return releasePolicy(state.policy), ErrReleaseRestricted
-			}
-		}
-		if mode != "admin_only" {
-			return releasePolicy(state.policy), ErrReleaseRestricted
-		}
-	}
 	next := clonePolicy(state.policy)
 	next.Flags = flags
 	next.PostingMode = mode
+	next.PresentationMode = presentation
 	next.RowVersion++
 	next.UpdatedBy = actorID
 	next.UpdatedAt = time.Now().UTC()
@@ -224,7 +224,7 @@ func UpdateContext(ctx context.Context, actorID uint, input UpdateInput) (Policy
 	}
 	state.policy = next
 	state.refreshedAt = time.Now()
-	return releasePolicy(next), nil
+	return clonePolicy(next), nil
 }
 
 func Set(next Policy) Policy {
@@ -242,6 +242,9 @@ func Set(next Policy) Policy {
 	}
 	state.policy.Flags = flags
 	state.policy.PostingMode = mode
+	if validPresentationMode(next.PresentationMode) {
+		state.policy.PresentationMode = next.PresentationMode
+	}
 	state.policy.RowVersion++
 	state.policy.UpdatedBy = next.UpdatedBy
 	state.policy.UpdatedAt = time.Now().UTC()
@@ -249,7 +252,7 @@ func Set(next Policy) Policy {
 }
 
 func Can(key string) bool {
-	value := Snapshot()
+	value := EffectivePolicy(Snapshot())
 	if !value.Enabled {
 		return true
 	}
@@ -257,7 +260,7 @@ func Can(key string) bool {
 }
 
 func CanPost(role user.Role) bool {
-	value := Snapshot()
+	value := EffectivePolicy(Snapshot())
 	if !value.Enabled {
 		return true
 	}
@@ -268,7 +271,7 @@ func CanPost(role user.Role) bool {
 }
 
 func CanComment(role user.Role) bool {
-	value := Snapshot()
+	value := EffectivePolicy(Snapshot())
 	if !value.Enabled {
 		return true
 	}
@@ -308,7 +311,7 @@ func refresh(force bool) {
 	defer cancel()
 	value, found, err := state.store.Load(ctx)
 	state.refreshedAt = time.Now()
-	if err != nil || !found {
+	if err != nil || !found || !validPresentationMode(value.PresentationMode) {
 		state.loadError = ErrUnavailable
 		for key := range state.policy.Flags {
 			state.policy.Flags[key] = false

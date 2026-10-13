@@ -1,8 +1,8 @@
 export const FEATURE_KEYS = ['forum', 'post', 'comment', 'secondhand', 'secondhand_publish', 'secondhand_chat', 'takeout', 'campus_tools', 'delivery', 'merchant', 'rider', 'messages', 'following', 'search', 'likes', 'favorites', 'notifications', 'identity_application', 'publish', 'secondhand_comments'] as const
 export type FeaturePolicyKey = typeof FEATURE_KEYS[number]
-// Remote policy can close capabilities, never expand this release's scope.
-export const RELEASE_ALLOWED_FEATURES: readonly FeaturePolicyKey[] = []
+export type PresentationMode = 'standard' | 'campus_info'
 export type FeatureVisibility = Record<FeaturePolicyKey, boolean> & {
+  presentationMode: PresentationMode
   postingMode: 'admin_only' | 'all_users'
   enabled: boolean
   labEnabled: boolean
@@ -12,14 +12,18 @@ export type FeatureVisibility = Record<FeaturePolicyKey, boolean> & {
 
 export const CLOSED_VISIBILITY: FeatureVisibility = {
   ...FEATURE_KEYS.reduce((flags, key) => { flags[key] = false; return flags }, {} as Record<FeaturePolicyKey, boolean>),
-  postingMode: 'admin_only', enabled: true, labEnabled: false, rowVersion: 0, available: false,
+  presentationMode: 'standard', postingMode: 'admin_only', enabled: true, labEnabled: false, rowVersion: 0, available: false,
 }
 
 export function parseFeatureVisibility(value: unknown): FeatureVisibility {
   if (!value || typeof value !== 'object') return CLOSED_VISIBILITY
-  const data = value as { flags?: Record<string, unknown>; postingMode?: string; enabled?: boolean; rowVersion?: number }
+  const data = value as { flags?: Record<string, unknown>; postingMode?: string; enabled?: boolean; rowVersion?: number; presentationMode?: unknown }
+  // Missing mode is a legacy original-product response. Unknown explicit modes
+  // fail closed instead of guessing which product a visitor should receive.
+  const presentationMode = data.presentationMode === undefined ? 'standard' : data.presentationMode
+  if (presentationMode !== 'standard' && presentationMode !== 'campus_info') return CLOSED_VISIBILITY
   if (data.enabled !== true || !data.flags || !Number.isSafeInteger(data.rowVersion) || (data.rowVersion || 0) < 1 || !['admin_only', 'all_users'].includes(data.postingMode || '') || FEATURE_KEYS.some(key => typeof data.flags?.[key] !== 'boolean')) return CLOSED_VISIBILITY
-  const flags = FEATURE_KEYS.reduce((flags, key) => { flags[key] = RELEASE_ALLOWED_FEATURES.includes(key) && data.flags?.[key] === true; return flags }, {} as Record<FeaturePolicyKey, boolean>)
+  const flags = FEATURE_KEYS.reduce((flags, key) => { flags[key] = presentationMode === 'standard' && data.flags?.[key] === true; return flags }, {} as Record<FeaturePolicyKey, boolean>)
   flags.post = flags.post && flags.forum && flags.publish
   flags.comment = flags.comment && flags.forum
   flags.following = flags.following && flags.forum
@@ -27,7 +31,7 @@ export function parseFeatureVisibility(value: unknown): FeatureVisibility {
   flags.secondhand_publish = flags.secondhand_publish && flags.secondhand && flags.publish
   flags.secondhand_chat = flags.secondhand_chat && flags.secondhand && flags.messages
   flags.secondhand_comments = flags.secondhand_comments && flags.secondhand
-  return { ...CLOSED_VISIBILITY, ...flags, postingMode: data.postingMode as FeatureVisibility['postingMode'], rowVersion: data.rowVersion!, available: true }
+  return { ...CLOSED_VISIBILITY, ...flags, presentationMode, postingMode: presentationMode === 'campus_info' ? 'admin_only' : data.postingMode as FeatureVisibility['postingMode'], rowVersion: data.rowVersion!, available: true }
 }
 
 export function featurePageKeys(path: string, params: Record<string, string | undefined> = {}): FeaturePolicyKey[] {

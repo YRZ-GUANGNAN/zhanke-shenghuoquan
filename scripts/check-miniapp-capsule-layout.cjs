@@ -186,7 +186,13 @@ assert.match(
 )
 
 const homeStyle = fs.readFileSync(path.join(miniappPagesRoot, 'home', 'index.scss'), 'utf8')
-assert.doesNotMatch(homeStyle, /student-home-header__search/, 'campus guides do not expose the retired community search control')
+assert.match(homeStyle, /\.student-home-header__search::before[\s\S]*width:\s*14px/)
+assert.match(homeStyle, /\.student-home-header__search::after[\s\S]*width:\s*8px/)
+assert.doesNotMatch(
+  homeStyle.match(/\.student-home-header__search::(?:before|after)[\s\S]*?(?=\n\})/g)?.join('\n') || '',
+  /\d+rpx/,
+  'search icon geometry must not mix rpx and px',
+)
 
 const editProfileSource = fs.readFileSync(path.join(miniappPagesRoot, 'edit-profile', 'index.tsx'), 'utf8')
 const editProfileStyle = fs.readFileSync(path.join(miniappPagesRoot, 'edit-profile', 'index.scss'), 'utf8')

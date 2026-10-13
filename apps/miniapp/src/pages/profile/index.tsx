@@ -259,7 +259,7 @@ function ProfileContent() {
           </View>
         </View>}
 
-        {visibility.delivery && <View className='student-profile-card student-profile-roles'>
+        {(visibility.presentationMode === 'standard' || visibility.delivery) && <View className='student-profile-card student-profile-roles'>
           <View className='student-profile-card__header'>
             <View>
               <Text className='student-profile-card__title'>身份与工作台</Text>

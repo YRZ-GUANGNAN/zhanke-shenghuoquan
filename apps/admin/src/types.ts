@@ -26,8 +26,9 @@ export interface Stats{totals:{users:number;posts:number;products:number;pending
 export const FEATURE_POLICY_KEYS = ['forum','post','comment','secondhand','secondhand_publish','secondhand_chat','takeout','campus_tools','delivery','merchant','rider','messages','following','search','likes','favorites','notifications','identity_application','publish','secondhand_comments'] as const
 export type FeaturePolicyKey = typeof FEATURE_POLICY_KEYS[number]
 export type PostingMode = 'admin_only'|'all_users'
+export type PresentationMode = 'standard'|'campus_info'
 export interface FeaturePolicy {
-  releaseScope?: string
+  presentationMode?: PresentationMode
   flags: Record<FeaturePolicyKey, boolean>
   postingMode: PostingMode
   rowVersion: number

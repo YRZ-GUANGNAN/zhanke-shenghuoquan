@@ -54,7 +54,7 @@ function GuideContent() {
           <Button className='campus-info-text-button' onClick={copySource}>复制官方来源链接</Button>
           <Text>本应用非学校官方应用，提供公开信息的阅读指引，不代办借阅或预约。服务安排以馆方最新通知为准。</Text>
         </View>
-        <View className='campus-guide-actions'><Button className='campus-info-text-button' onClick={goHome}>查看其他指南</Button><Button className='campus-info-text-button' onClick={() => void Taro.navigateTo({ url: '/pages/feedback/index' })}>反馈信息变化</Button></View>
+        <View className='campus-guide-actions'><Button className='campus-info-text-button' onClick={goHome}>返回首页</Button><Button className='campus-info-text-button' onClick={() => void Taro.navigateTo({ url: '/pages/feedback/index' })}>反馈信息变化</Button></View>
       </View>}
     </ScrollView>
   </View>
