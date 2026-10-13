@@ -40,6 +40,7 @@
     "check:miniapp-business-closure": "node scripts/check-miniapp-business-closure.cjs",
     "check:miniapp-no-fake-pages": "node scripts/check-miniapp-no-fake-pages.cjs",
     "check:miniapp-regression-fixes": "node scripts/check-miniapp-regression-contract.cjs",
+    "check:miniapp-back-navigation": "node scripts/check-miniapp-back-navigation.cjs",
     "check:secondhand-comments-contract": "node scripts/check-secondhand-comments-contract.cjs",
     "check:delivery-order-clipboard": "node scripts/check-delivery-order-clipboard.cjs",
     "check:profile-center-ui": "node scripts/check-profile-center-ui.cjs",
@@ -51,7 +52,7 @@
     "build:admin": "npm --workspace apps/admin run build",
     "build": "npm run build:miniapp && npm run build:admin",
     "typecheck": "npm --workspace apps/admin run typecheck && npm --workspace apps/miniapp run typecheck",
-    "verify": "npm run check:external-takeout-directory && npm run check:publish-takeout-ui && npm run check:miniapp-static-routes && npm run check:miniapp-business-closure && npm run check:miniapp-no-fake-pages && npm run check:miniapp-regression-fixes && npm run check:secondhand-comments-contract && npm run check:delivery-order-clipboard && npm run check:profile-center-ui && npm run check:student-entry-avatar-contract && npm run check:boundaries && npm run check:miniapp-publish-contract && npm run check:miniapp-domain-search && npm run check:miniapp-settings-contract && npm run check:miniapp-ui-system && npm run check:admin-ui-system && npm run check:role-workbench-ui && npm run check:identity-application-contract && npm run check:admin-password-session-contract && npm run check:miniapp-capsule-layout && npm run check:home-real-tools-contract && npm run check:native-deployment && npm run check:real-wechat-secret-hygiene && npm run check:merchant-home-clarity && npm run check:rider-workbench-clarity && npm run typecheck && npm run test:backend"
+    "verify": "npm run check:external-takeout-directory && npm run check:publish-takeout-ui && npm run check:miniapp-static-routes && npm run check:miniapp-business-closure && npm run check:miniapp-no-fake-pages && npm run check:miniapp-regression-fixes && npm run check:miniapp-back-navigation && npm run check:secondhand-comments-contract && npm run check:delivery-order-clipboard && npm run check:profile-center-ui && npm run check:student-entry-avatar-contract && npm run check:boundaries && npm run check:miniapp-publish-contract && npm run check:miniapp-domain-search && npm run check:miniapp-settings-contract && npm run check:miniapp-ui-system && npm run check:admin-ui-system && npm run check:role-workbench-ui && npm run check:identity-application-contract && npm run check:admin-password-session-contract && npm run check:miniapp-capsule-layout && npm run check:home-real-tools-contract && npm run check:native-deployment && npm run check:real-wechat-secret-hygiene && npm run check:merchant-home-clarity && npm run check:rider-workbench-clarity && npm run typecheck && npm run test:backend"
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",

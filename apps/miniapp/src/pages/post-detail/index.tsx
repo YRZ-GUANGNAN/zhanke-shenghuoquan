@@ -23,6 +23,7 @@ import {
   setUserFollowing,
 } from '../../services/b-community'
 import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
+import { navigateBackOrHome } from '../../utils/navigation'
 import './index.scss'
 
 const commentTone = ['sky', 'peach', 'green', 'mint'] as const
@@ -301,7 +302,7 @@ function PostDetailPage() {
       <CapsulePageHeader
         className='post-detail-nav'
         variant='standard'
-        left={<AppIconButton name='back' label='返回' className='post-detail-nav__back' onClick={() => void Taro.navigateBack()} />}
+        left={<AppIconButton name='back' label='返回' className='post-detail-nav__back' onClick={() => void navigateBackOrHome()} />}
         center={headerCenter}
         right={post && isApproved && visibility.following ? (
           <View className='post-detail-follow-hitbox' onClick={handleFollow}>
