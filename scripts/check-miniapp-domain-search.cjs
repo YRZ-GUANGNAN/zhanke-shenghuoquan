@@ -15,8 +15,8 @@ const tradeRepository = read('backend', 'internal', 'module', 'trade', 'reposito
 const communitySearch = read('backend', 'internal', 'module', 'community', 'search.go')
 const tradeSearch = read('backend', 'internal', 'module', 'trade', 'search_api.go')
 
-if (!home.includes('/pages/search/index?scope=community')) {
-  throw new Error('home search must use community scope')
+if (home.includes('/pages/search/index') || /services\/(b-community|c-trade)/.test(home)) {
+  throw new Error('campus-info home must not expose community or trade search')
 }
 if (!secondhand.includes('/pages/search/index?scope=secondhand')) {
   throw new Error('secondhand search must use secondhand scope')

@@ -17,6 +17,7 @@ const allowedDomains = new Set([
   'identityapplication',
   'featureflags',
   'sharesettings',
+  'campusinfo',
 ])
 const transactionOrchestrators = new Set([
   path.join('identityapplication', 'media.go'),

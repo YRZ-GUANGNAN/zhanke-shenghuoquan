@@ -13,13 +13,14 @@ const parse = flags => parseFeatureVisibility({ flags, enabled: true, rowVersion
 assert.equal(FEATURE_KEYS.length, 20)
 assert.equal(parse(flags).available, true)
 assert.equal(parse({ ...flags, forum: false }).post, false)
-assert.equal(parse({ ...flags, forum: false }).secondhand_comments, true)
+assert.equal(parse({ ...flags, forum: false }).secondhand_comments, false)
 assert.equal(parse({ ...flags, publish: false }).secondhand_publish, false)
 assert.equal(parse({ ...flags, messages: false }).secondhand_chat, false)
-assert.equal(parse({ ...flags, takeout: false }).campus_tools, true)
+assert.equal(parse({ ...flags, takeout: false }).campus_tools, false)
 assert.deepEqual(parseFeatureVisibility({ flags: { forum: true }, enabled: true, rowVersion: 1 }), CLOSED_VISIBILITY)
 assert.deepEqual(parseFeatureVisibility(null), CLOSED_VISIBILITY)
 for (const key of FEATURE_KEYS) {
+  assert.equal(parse(flags)[key], false, `remote policy must not expand the campus-info release: ${key}`)
   const value = parse({ ...flags, [key]: false })
   assert.equal(value[key], false, `${key} unexpectedly reopened`)
   const booleanMismatch = { ...flags, [key]: 1 }

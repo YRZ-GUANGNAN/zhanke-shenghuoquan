@@ -1,4 +1,5 @@
 import type { CommunityPost, Product } from '../types'
+import type { CampusGuide } from './campus-info-model'
 
 export interface ShareSettings {
   homeTitle: string
@@ -14,6 +15,7 @@ export const DEFAULT_SHARE_SETTINGS: ShareSettings = {
 }
 export interface ShareCard { title: string; path: string; imageUrl?: string }
 export type ShareTarget =
+  | { kind: 'guide'; enabled: boolean; id: string; content: CampusGuide | null }
   | { kind: 'home' | 'secondhand' | 'services'; enabled: boolean }
   | { kind: 'post'; enabled: boolean; id: string; content: CommunityPost | null }
   | { kind: 'product'; enabled: boolean; id: string; content: Product | null }
@@ -51,6 +53,9 @@ export function buildShareCard(target: ShareTarget, settings: ShareSettings): Sh
   }
   const detailTitle = (text: string) => title(`${title(text)}${settings.detailTitleSuffix ? ` · ${settings.detailTitleSuffix}` : ''}`)
   switch (target.kind) {
+    case 'guide':
+      if (!target.content || target.content.id !== target.id || !/^[a-z][a-z0-9-]{0,63}$/.test(target.id)) return null
+      return card(detailTitle(target.content.title), `/pages/campus-guide/index?id=${target.id}`)
     case 'home': return card(settings.homeTitle, '/pages/home/index')
     case 'secondhand': return card(settings.secondhandTitle, '/pages/student-secondhand/index')
     case 'services': return card(settings.servicesTitle, '/pages/student-takeout/index')

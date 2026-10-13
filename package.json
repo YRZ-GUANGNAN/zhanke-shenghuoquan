@@ -7,6 +7,7 @@
     "apps/*"
   ],
   "scripts": {
+    "check:campus-info": "node scripts/check-campus-info.cjs && node scripts/check-feature-policy.cjs && node scripts/check-share-cards.cjs",
     "check:share-cards": "node scripts/check-share-cards.cjs",
     "test:share-settings:mysql": "node scripts/test-feature-policy-mysql.cjs --share-settings",
     "dev:miniapp": "npm --workspace apps/miniapp run dev:weapp",

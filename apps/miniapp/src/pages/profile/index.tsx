@@ -259,7 +259,7 @@ function ProfileContent() {
           </View>
         </View>}
 
-        <View className='student-profile-card student-profile-roles'>
+        {visibility.delivery && <View className='student-profile-card student-profile-roles'>
           <View className='student-profile-card__header'>
             <View>
               <Text className='student-profile-card__title'>身份与工作台</Text>
@@ -288,7 +288,7 @@ function ProfileContent() {
               )
             })}
           </View>
-        </View>
+        </View>}
 
         {identity?.identities.filter(item => item.identity !== 'student' && item.available && (!visibility.delivery || !visibility[item.identity])).map(item => <View className='student-profile-card' key={item.identity} onClick={() => handleRoleClick(roles.find(role => role.key === item.identity)!)}><Text>已有{item.identity === 'merchant' ? '商家' : '骑手'}订单与资金</Text><Text> 新业务暂停，历史订单仍可处理</Text></View>)}
 

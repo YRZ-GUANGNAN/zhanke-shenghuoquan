@@ -14,6 +14,7 @@ import {
 import { isApiError } from '../../services/api'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
+import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import './index.scss'
 
 type ToggleKey = 'orderNotice' | 'socialNotice' | 'quietHours' | 'personalized'
@@ -51,6 +52,10 @@ function currentVersion(): string {
 export default function SettingsPage() {
   const logout = useSessionStore((state) => state.logout)
   const identity = useSessionStore((state) => state.identity)
+  const visibility = useFeatureVisibility()
+  const hasHistoricalWork = Boolean(identity?.identities.some(item => item.identity !== 'student' && item.available))
+  const visibleNoticeRows = noticeRows.filter(row => row.key === 'orderNotice' ? hasHistoricalWork : row.key === 'socialNotice' ? visibility.notifications || visibility.messages : hasHistoricalWork || visibility.messages)
+  const visiblePrivacyRows = privacyRows.filter(() => visibility.forum || visibility.secondhand)
   const [settings, setSettings] = useState<UserSettingsView>(defaults)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -148,12 +153,12 @@ export default function SettingsPage() {
         <View className='student-settings-section'>
           <Text className='student-settings-section__label'>账号与绑定</Text>
           <View className='student-settings-card'>
-            <View className='student-settings-row'>
+            {(settings.phoneBound || hasHistoricalWork) && <View className='student-settings-row'>
               <Text className='student-settings-row__title'>手机号</Text>
               <Button className='student-settings-phone' openType='getPhoneNumber' onGetPhoneNumber={bindPhone}>
                 {settings.phoneBound ? settings.maskedPhone : '绑定手机号'}
               </Button>
-            </View>
+            </View>}
             <View className='student-settings-row'>
               <Text className='student-settings-row__title'>当前身份</Text>
               <Text className='student-settings-row__value'>{identityName}</Text>
@@ -161,10 +166,10 @@ export default function SettingsPage() {
           </View>
         </View>
 
-        <View className='student-settings-section'>
+        {visibleNoticeRows.length > 0 && <View className='student-settings-section'>
           <Text className='student-settings-section__label'>消息通知</Text>
           <View className='student-settings-card'>
-            {noticeRows.map((row) => (
+            {visibleNoticeRows.map((row) => (
               <View key={row.key} className='student-settings-row student-settings-row--tall'>
                 <View className='student-settings-row__main'>
                   <Text className='student-settings-row__title'>{row.title}</Text>
@@ -176,12 +181,12 @@ export default function SettingsPage() {
               </View>
             ))}
           </View>
-        </View>
+        </View>}
 
-        <View className='student-settings-section'>
+        {(visiblePrivacyRows.length > 0 || settings.blacklistCount > 0) && <View className='student-settings-section'>
           <Text className='student-settings-section__label'>隐私</Text>
           <View className='student-settings-card'>
-            {privacyRows.map((row) => (
+            {visiblePrivacyRows.map((row) => (
               <View key={row.key} className='student-settings-row student-settings-row--tall'>
                 <View className='student-settings-row__main'>
                   <Text className='student-settings-row__title'>{row.title}</Text>
@@ -200,7 +205,7 @@ export default function SettingsPage() {
               </View>
             </View>
           </View>
-        </View>
+        </View>}
 
         <View className='student-settings-section'>
           <Text className='student-settings-section__label'>通用</Text>

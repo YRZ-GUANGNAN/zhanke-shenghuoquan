@@ -7,6 +7,7 @@ const configPath = path.join(src, 'app.config.ts')
 
 const expectedRoutes = [
   'pages/home/index',
+  'pages/campus-guide/index',
   'pages/search/index',
   'pages/publish-entry/index',
   'pages/publish-post/index',
@@ -102,9 +103,8 @@ if (/const\s+conversations\s*[:=]/.test(homeSource)) {
 if (/\/pages\/secondhand-chat\/index\?[^`'"\r\n]*(?:conversationId|peerUserId|buyerId|sellerId|peerName|peerAvatar|scene)=/.test(homeSource)) {
   throw new Error('home conversation navigation must carry relationId only')
 }
-const safeRelationTarget = '/pages/secondhand-chat/index?relationId=${encodeURIComponent(String(item.context.relationId))}'
-if (!homeSource.includes(safeRelationTarget)) {
-  throw new Error('home conversation navigation must use the authorized relationId')
+if (/secondhand-chat|listIMConversations/.test(homeSource)) {
+  throw new Error('campus-info home must not expose chat navigation')
 }
 if (!/RuntimeSessionGate\s+preserveAuthenticatedChildrenDuringRetry/.test(homeSource)) {
   throw new Error('home must preserve an authenticated mount during one-shot session recovery')

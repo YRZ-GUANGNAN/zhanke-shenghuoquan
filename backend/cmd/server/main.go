@@ -32,6 +32,7 @@ import (
 	"campus-circle/backend/internal/module/admin/takeoutpayment"
 	"campus-circle/backend/internal/module/admin/takeoutrider"
 	"campus-circle/backend/internal/module/adminauth"
+	"campus-circle/backend/internal/module/campusinfo"
 	"campus-circle/backend/internal/module/community"
 	"campus-circle/backend/internal/module/delivery"
 	"campus-circle/backend/internal/module/featureflags"
@@ -63,6 +64,11 @@ func main() {
 	}
 	if err := featureflags.ConfigureStore(context.Background(), cfg.EnableFeaturePolicy, featureflags.NewGormStore(db)); err != nil {
 		log.Fatalf("configure feature policy: %v", err)
+	}
+	featureflags.RestrictToCampusInfo()
+	campusGuides, err := campusinfo.NewHandler()
+	if err != nil {
+		log.Fatalf("load campus guides: %v", err)
 	}
 	identityApplicationRepository := identityapplication.NewRepository(db)
 	// Composition root: repositories are private to their domain; only services cross boundaries.
@@ -414,6 +420,7 @@ func main() {
 	community.NewHandler(communityService, userService, safety).Register(communityRoutes)
 	community.NewSearchHandler(communityService, userService, communityMetrics).Register(communityRoutes)
 	api.GET("/features", featureflags.PublicHandler)
+	campusGuides.Register(api)
 	sharesettings.NewHandler(shareStore).Register(api, adminAuthRequired)
 	tradeRoutes := api.Group("/trade")
 	trade.NewHandler(tradeService, userService, safety).Register(tradeRoutes)

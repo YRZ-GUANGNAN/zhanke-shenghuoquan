@@ -1,0 +1,15 @@
+@use '../../styles/campus-info.scss';
+
+.campus-guide-article { padding: 40rpx 40rpx calc(48rpx + env(safe-area-inset-bottom)); }
+.campus-guide-category { display: block; color: var(--guide-accent); font-size: 26rpx; line-height: 1.5; }
+.campus-guide-title { display: block; margin-top: 20rpx; font-size: 44rpx; font-weight: 650; line-height: 1.5; }
+.campus-guide-meta { display: block; margin-top: 24rpx; color: var(--guide-secondary); font-size: 24rpx; line-height: 1.6; }
+.campus-guide-summary { display: block; margin: 32rpx 0 48rpx; padding-left: 24rpx; border-left: 4rpx solid #d8c6b6; color: #6e655c; font-size: 30rpx; line-height: 1.8; }
+.campus-guide-section { margin-top: 40rpx; }
+.campus-guide-section__heading { display: flex; align-items: baseline; gap: 16rpx; margin-bottom: 16rpx; font-size: 34rpx; font-weight: 600; line-height: 1.6; }
+.campus-guide-section__number { color: var(--guide-accent); font-size: 24rpx; font-weight: 500; font-variant-numeric: tabular-nums; }
+.campus-guide-paragraph { display: block; margin-top: 20rpx; font-size: 32rpx; line-height: 1.85; color: #44413c; overflow-wrap: anywhere; }
+.campus-guide-source { display: flex; flex-direction: column; gap: 12rpx; margin-top: 56rpx; padding-top: 32rpx; border-top: 1rpx solid var(--guide-line); font-size: 24rpx; line-height: 1.8; color: var(--guide-secondary); }
+.campus-guide-source__label { color: var(--guide-text); font-size: 28rpx; font-weight: 600; }
+.campus-guide-source__url { font-size: 22rpx; word-break: break-all; color: #8b847d; }
+.campus-guide-actions { display: flex; align-items: center; justify-content: space-between; margin-top: 32rpx; padding-top: 16rpx; border-top: 1rpx solid var(--guide-line); }

@@ -50,13 +50,14 @@ var (
 )
 
 type Policy struct {
-	Flags       map[string]bool `json:"flags"`
-	PostingMode string          `json:"postingMode"`
-	RowVersion  uint64          `json:"rowVersion"`
-	UpdatedBy   uint            `json:"updatedBy"`
-	UpdatedAt   time.Time       `json:"updatedAt"`
-	LabEnabled  bool            `json:"labEnabled"`
-	Enabled     bool            `json:"enabled"`
+	ReleaseScope string          `json:"releaseScope,omitempty"`
+	Flags        map[string]bool `json:"flags"`
+	PostingMode  string          `json:"postingMode"`
+	RowVersion   uint64          `json:"rowVersion"`
+	UpdatedBy    uint            `json:"updatedBy"`
+	UpdatedAt    time.Time       `json:"updatedAt"`
+	LabEnabled   bool            `json:"labEnabled"`
+	Enabled      bool            `json:"enabled"`
 }
 
 type UpdateInput struct {
@@ -74,11 +75,12 @@ type Store interface {
 
 var state = struct {
 	sync.RWMutex
-	labEnabled  bool
-	policy      Policy
-	store       Store
-	refreshedAt time.Time
-	loadError   error
+	labEnabled   bool
+	policy       Policy
+	store        Store
+	refreshedAt  time.Time
+	loadError    error
+	releaseScope string
 }{policy: newDefaultPolicy(false)}
 
 func newDefaultFlags() map[string]bool {
@@ -102,6 +104,7 @@ func Configure(enabled bool) {
 	state.store = nil
 	state.refreshedAt = time.Time{}
 	state.loadError = nil
+	state.releaseScope = ""
 }
 
 // ConfigureStore requires an explicitly migrated schema and durable storage.
@@ -152,7 +155,7 @@ func Snapshot() Policy {
 	refresh(false)
 	state.RLock()
 	defer state.RUnlock()
-	return clonePolicy(state.policy)
+	return releasePolicy(state.policy)
 }
 
 func Get() Policy { return Snapshot() }
@@ -162,9 +165,9 @@ func ReadPolicy(force bool) (Policy, error) {
 	state.RLock()
 	defer state.RUnlock()
 	if state.loadError != nil {
-		return clonePolicy(state.policy), ErrUnavailable
+		return releasePolicy(state.policy), ErrUnavailable
 	}
-	return clonePolicy(state.policy), nil
+	return releasePolicy(state.policy), nil
 }
 
 func Update(actorID uint, input UpdateInput) (Policy, error) {
@@ -198,6 +201,16 @@ func UpdateContext(ctx context.Context, actorID uint, input UpdateInput) (Policy
 		}
 		flags[key] = value
 	}
+	if state.releaseScope == CampusInfoScope {
+		for _, enabled := range flags {
+			if enabled {
+				return releasePolicy(state.policy), ErrReleaseRestricted
+			}
+		}
+		if mode != "admin_only" {
+			return releasePolicy(state.policy), ErrReleaseRestricted
+		}
+	}
 	next := clonePolicy(state.policy)
 	next.Flags = flags
 	next.PostingMode = mode
@@ -211,7 +224,7 @@ func UpdateContext(ctx context.Context, actorID uint, input UpdateInput) (Policy
 	}
 	state.policy = next
 	state.refreshedAt = time.Now()
-	return clonePolicy(next), nil
+	return releasePolicy(next), nil
 }
 
 func Set(next Policy) Policy {

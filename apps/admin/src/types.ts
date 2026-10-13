@@ -27,6 +27,7 @@ export const FEATURE_POLICY_KEYS = ['forum','post','comment','secondhand','secon
 export type FeaturePolicyKey = typeof FEATURE_POLICY_KEYS[number]
 export type PostingMode = 'admin_only'|'all_users'
 export interface FeaturePolicy {
+  releaseScope?: string
   flags: Record<FeaturePolicyKey, boolean>
   postingMode: PostingMode
   rowVersion: number

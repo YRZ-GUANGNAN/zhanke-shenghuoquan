@@ -17,10 +17,11 @@ function forbidMatch(source, pattern, message) {
 
 const home = read('apps/miniapp/src/pages/home/index.tsx')
 requireMatch(home, /import\s*\{[^}]*ScrollView[^}]*\}\s*from\s*'@tarojs\/components'/s, '首页必须使用原生 ScrollView')
-requireMatch(home, /<ScrollView[\s\S]*scrollY[\s\S]*onScrollToLower=/, '首页必须通过 onScrollToLower 触发翻页')
+requireMatch(home, /<ScrollView[\s\S]*scrollY/, '有限篇目的指南首页必须可滚动阅读')
 forbidMatch(home, /createIntersectionObserver|home-discover-sentinel/, '首页不得继续使用不稳定的 IntersectionObserver sentinel')
-requireMatch(home, /conversationOwnerRef\.current\s*!==\s*ownerKey/, '私信列表必须拒绝旧账号请求写回')
-requireMatch(home, /key=\{activeTab\}/, '首页标签切换时必须隔离 ScrollView 滚动位置')
+forbidMatch(home, /listIMConversations|e-im/, '资讯首页不得请求私信')
+requireMatch(home, /if \(!cancelled\)/, '指南必须拒绝已卸载页面的请求写回')
+requireMatch(home, /key=\{category\}/, '分类切换时必须隔离 ScrollView 滚动位置')
 
 const chatPage = read('apps/miniapp/src/pages/secondhand-chat/index.tsx')
 requireMatch(chatPage, /<AppIcon\s+name='home'/, '聊天页主页入口必须使用标准 home 图标')

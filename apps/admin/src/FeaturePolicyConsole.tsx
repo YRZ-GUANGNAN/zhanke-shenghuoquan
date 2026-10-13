@@ -51,8 +51,9 @@ const allKeys = groups.flatMap((group) => group.keys.map((item) => item.key))
 
 export function FeaturePolicyConsole() {
   const sessionUser = useAdminStore((state) => state.user)
-  const canEdit = sessionUser?.role === 'superadmin'
   const [data, setData] = useState<FeaturePolicy | null>(null)
+  const releaseRestricted = data?.releaseScope === 'campus_info'
+  const canEdit = sessionUser?.role === 'superadmin' && !releaseRestricted
   const [draft, setDraft] = useState<Record<FeaturePolicyKey, boolean> | null>(null)
   const [mode, setMode] = useState<FeaturePolicy['postingMode']>('admin_only')
   const [loading, setLoading] = useState(true)
@@ -110,14 +111,14 @@ export function FeaturePolicyConsole() {
     <div className='feature-policy-console'>
       <AdminPanel
         title='小程序功能显隐中心'
-        description='选择需要开放的模块，保存后控制所有用户的小程序入口和新业务。账号安全、隐私、反馈与已有订单的必要处理保持可用。'
+        description='这里显示本发行版本的有效能力。账号安全、隐私、反馈与已有订单的必要处理保持可用。'
         actions={<><AdminButton tone='ghost' loading={loading} disabled={saving} onClick={() => void load()}>读取已保存配置</AdminButton><AdminButton tone='ghost' disabled={!canEdit || saving} onClick={() => setDraft(Object.fromEntries(allKeys.map(key => [key, false])) as Record<FeaturePolicyKey, boolean>)}>全部隐藏</AdminButton><AdminButton tone='primary' loading={saving} disabled={!canEdit || !changed || loading} onClick={() => void save()}>保存配置</AdminButton></>}
       >
         {error && <AdminNotice tone='danger' title='保存失败'>{error}</AdminNotice>}
         {notice && <AdminNotice tone='success'>{notice}</AdminNotice>}
-        {!canEdit && <AdminNotice tone='info' title='当前为只读视图'>只有超级管理员可以保存功能策略。</AdminNotice>}
+        {releaseRestricted ? <AdminNotice tone='info' title='当前发行范围：校园指南与基础账号服务'>校园指南由核验后的公开资料整理，随内容版本发布。以下业务不属于当前发行范围，不能通过后台重新开启；新增业务需要发布新版本并重新审核。历史数据和已有订单仍按原权限处理。</AdminNotice> : !canEdit && <AdminNotice tone='info' title='当前为只读视图'>只有超级管理员可以保存功能策略。</AdminNotice>}
         <div className='feature-policy-callout'>
-          <strong>{changed ? '有未保存的修改' : '当前显示服务器已保存配置'}</strong>
+          <strong>{releaseRestricted ? '当前显示发行范围限制后的有效配置' : changed ? '有未保存的修改' : '当前显示服务器已保存配置'}</strong>
           <span>版本 {data.rowVersion} · 操作人 #{data.updatedBy} · 最近更新 {data.updatedAt ? new Date(data.updatedAt).toLocaleString('zh-CN') : '尚未更新'}</span>
         </div>
         <section className='feature-policy-mode' aria-label='发帖评论模式'>

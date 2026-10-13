@@ -1,5 +1,7 @@
 export const FEATURE_KEYS = ['forum', 'post', 'comment', 'secondhand', 'secondhand_publish', 'secondhand_chat', 'takeout', 'campus_tools', 'delivery', 'merchant', 'rider', 'messages', 'following', 'search', 'likes', 'favorites', 'notifications', 'identity_application', 'publish', 'secondhand_comments'] as const
 export type FeaturePolicyKey = typeof FEATURE_KEYS[number]
+// Remote policy can close capabilities, never expand this release's scope.
+export const RELEASE_ALLOWED_FEATURES: readonly FeaturePolicyKey[] = []
 export type FeatureVisibility = Record<FeaturePolicyKey, boolean> & {
   postingMode: 'admin_only' | 'all_users'
   enabled: boolean
@@ -17,7 +19,7 @@ export function parseFeatureVisibility(value: unknown): FeatureVisibility {
   if (!value || typeof value !== 'object') return CLOSED_VISIBILITY
   const data = value as { flags?: Record<string, unknown>; postingMode?: string; enabled?: boolean; rowVersion?: number }
   if (data.enabled !== true || !data.flags || !Number.isSafeInteger(data.rowVersion) || (data.rowVersion || 0) < 1 || !['admin_only', 'all_users'].includes(data.postingMode || '') || FEATURE_KEYS.some(key => typeof data.flags?.[key] !== 'boolean')) return CLOSED_VISIBILITY
-  const flags = FEATURE_KEYS.reduce((flags, key) => { flags[key] = data.flags?.[key] === true; return flags }, {} as Record<FeaturePolicyKey, boolean>)
+  const flags = FEATURE_KEYS.reduce((flags, key) => { flags[key] = RELEASE_ALLOWED_FEATURES.includes(key) && data.flags?.[key] === true; return flags }, {} as Record<FeaturePolicyKey, boolean>)
   flags.post = flags.post && flags.forum && flags.publish
   flags.comment = flags.comment && flags.forum
   flags.following = flags.following && flags.forum

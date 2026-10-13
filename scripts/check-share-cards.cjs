@@ -33,7 +33,12 @@ assert.deepEqual(buildShareCard({ kind: 'home', enabled: true, token: 'secret', 
 assert.equal(buildShareCard({ kind: 'home', enabled: false }, defaults), null)
 assert.equal(parseShareSettings({ homeTitle: 'x' }), null)
 assert.deepEqual(parseShareSettings(defaults), defaults)
-for (const page of ['home', 'student-secondhand', 'student-takeout', 'post-detail', 'secondhand-detail', 'user-profile']) {
+const guide = { id: 'library-hours', title: '图书馆开放时间' }
+assert.equal(buildShareCard({kind: 'guide', enabled: true, id: 'library-hours', content: guide}, defaults).path, '/pages/campus-guide/index?id=library-hours')
+for (const id of ['', '../library-hours', 'library-hours?token=secret', '%6cibrary-hours', 'campus-addresses']) assert.equal(buildShareCard({kind: 'guide', enabled: true, id, content: guide}, defaults), null)
+assert.equal(buildShareCard({kind: 'guide', enabled: true, id: guide.id, content: null}, defaults), null)
+assert.equal(buildShareCard({kind: 'guide', enabled: false, id: guide.id, content: guide}, defaults), null)
+for (const page of ['home', 'campus-guide', 'student-secondhand', 'student-takeout', 'post-detail', 'secondhand-detail', 'user-profile']) {
   const config = fs.readFileSync(path.join(root, `apps/miniapp/src/pages/${page}/index.config.ts`), 'utf8')
   assert.match(config, /enableShareAppMessage:\s*true/, `${page} native callback not enabled`)
 }
