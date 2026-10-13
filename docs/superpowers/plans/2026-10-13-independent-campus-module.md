@@ -11,14 +11,14 @@
 ## 执行步骤
 
 - [x] 核验两套release与原分支隔离，切回API/Admin前一版本；检查 `/readyz`、`/version`、`/features` 及公网首页，保留数据库和原20项开关。
-- [ ] 修改 `backend/internal/module/featureflags/{service,repository,handler}.go`，移除固定release限制，新增 `presentation.go`。新增迁移 `041_feature_policy_presentation.sql`；默认 `standard`，新增字段不更新旧配置。
-- [ ] 新行为测试放 `presentation_test.go`，在 `repository_mysql_test.go` 使用真实迁移验证 `standard -> campus_info -> standard`、重启、CAS、审计回滚。示例断言：`Snapshot().Flags[KeyForum]` 保持原值，资讯模式 `Can(KeyForum)` 为false，返回原版后按原值恢复。
-- [ ] 从 `d8b175e` 精确恢复原首页和相关契约，用 `apply_patch` 应用；将现资讯首页移到独立组件。首页依据 `visibility.presentationMode` 选择组件，未知/失败策略不挂载业务。MiniApp解析器和关于/协议/设置同步真实模式。
-- [ ] `apps/admin/src/{FeaturePolicyConsole.tsx,types.ts,services/f-admin.ts}` 增加类型和模式选择；保存时包含 `presentationMode`，旧服务缺失该字段时禁用模式编辑并说明需更新后端。原开关保留。
-- [ ] 恢复原首页契约，并为独立资讯模块、模式解析和分享补充断言。运行 `npm.cmd run check:campus-info`、`npm.cmd run verify`、`node scripts/test-feature-policy-mysql.cjs`、两端build。只使用安全后端测试入口。
-- [ ] 用真实开发工具/后台页面验证可达到的交互，无法验证的环节如实记录，不冒充真实登录。
-- [ ] 精确提交本轮源码，保留已有两个project配置改动；按现有release脚本模式备份数据库、增加字段、核验哈希、原子发布API/Admin，默认保持原版；检查新模式字段与原开关一致。
-- [ ] 生成交付记录、上传目录和模式使用说明，不调用微信上传、提审或发布。
+- [x] 修改 `backend/internal/module/featureflags/{service,repository,handler}.go`，移除固定release限制，新增 `presentation.go`。新增迁移 `041_feature_policy_presentation.sql`；默认 `standard`，新增字段不更新旧配置。
+- [x] 新行为测试放 `presentation_test.go`，在 `repository_mysql_test.go` 使用真实迁移验证 `standard -> campus_info -> standard`、重启、CAS、审计回滚。示例断言：`Snapshot().Flags[KeyForum]` 保持原值，资讯模式 `Can(KeyForum)` 为false，返回原版后按原值恢复。
+- [x] 从 `d8b175e` 精确恢复原首页和相关契约，用 `apply_patch` 应用；将现资讯首页移到独立组件。首页依据 `visibility.presentationMode` 选择组件，未知/失败策略不挂载业务。MiniApp解析器和关于/协议/设置同步真实模式。
+- [x] `apps/admin/src/{FeaturePolicyConsole.tsx,types.ts,services/f-admin.ts}` 增加类型和模式选择；保存时包含 `presentationMode`，旧服务缺失该字段时禁用模式编辑并说明需更新后端。原开关保留。
+- [x] 恢复原首页契约，并为独立资讯模块、模式解析和分享补充断言。运行 `npm.cmd run check:campus-info`、`npm.cmd run verify`、`node scripts/test-feature-policy-mysql.cjs`、两端build。只使用安全后端测试入口。
+- [x] 用真实开发工具验证原版首页和独立指南详情并保存截图。后台真实登录会话缺失，未替代或伪造登录；管理员登录保存/回读与手机端往返切换留待用户验收。
+- [x] 精确提交本轮源码 `702332695ba5`，保留已有两个project配置改动；备份数据库、增加字段、核验哈希、原子发布API/Admin，默认保持原版；新模式字段和原开关经线上回读确认。
+- [x] 生成交付记录、上传目录和模式使用说明，未调用微信上传、提审或发布。
 
 ## 失败处理
 
