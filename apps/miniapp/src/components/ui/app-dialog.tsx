@@ -54,7 +54,12 @@ export function AppDialog({
   const handleConfirm = () => {
     if (interactive && !loading && !confirmLockRef.current) {
       confirmLockRef.current = true
-      onConfirm()
+      try {
+        onConfirm()
+      } catch (error) {
+        confirmLockRef.current = false
+        throw error
+      }
       queueMicrotask(() => {
         if (!loadingRef.current) confirmLockRef.current = false
       })
