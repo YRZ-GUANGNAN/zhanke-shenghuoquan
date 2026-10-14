@@ -52,24 +52,24 @@ function showPlaceholder(title: string) {
   void Taro.showToast({ title, icon: 'none', duration: 1400 })
 }
 
-function handleSettingClick(item: SettingItem) {
+function handleSettingClick(item: SettingItem, navigate: (url: string) => void) {
   if (item.key === 'settings') {
-    void Taro.navigateTo({ url: '/pages/settings/index' })
+    navigate('/pages/settings/index')
     return
   }
 
   if (item.key === 'privacy') {
-    void Taro.navigateTo({ url: '/pages/legal/index' })
+    navigate('/pages/legal/index')
     return
   }
 
 	if (item.key === 'feedback') {
-		void Taro.navigateTo({ url: '/pages/feedback/index' })
+		navigate('/pages/feedback/index')
 		return
 	}
 
 	if (item.key === 'about') {
-		void Taro.navigateTo({ url: '/pages/about/index' })
+		navigate('/pages/about/index')
 		return
 	}
 
@@ -102,13 +102,55 @@ function roleStatus(
   return { label: '暂不可用', tone: 'unavailable' }
 }
 
+async function getMyItemCount() {
+  return (await getMyProductsPage(1, 1)).total
+}
+
+// Each domain owns its failure/loading state. An unread value is not zero.
+function useProfileCount<T>(enabled: boolean, read: () => Promise<T>) {
+  const [state, setState] = useState<{ data: T | null; loading: boolean; error: boolean }>({ data: null, loading: enabled, error: false })
+  const versionRef = useRef(0)
+  const busyRef = useRef(false)
+  const enabledRef = useRef(enabled)
+  enabledRef.current = enabled
+
+  const reload = useCallback(async () => {
+    if (!enabledRef.current || busyRef.current) return
+    busyRef.current = true
+    const version = ++versionRef.current
+    setState((current) => ({ ...current, loading: true, error: false }))
+    try {
+      const data = await read()
+      if (version === versionRef.current && enabledRef.current) setState({ data, loading: false, error: false })
+    } catch {
+      if (version === versionRef.current && enabledRef.current) setState((current) => ({ ...current, loading: false, error: true }))
+    } finally {
+      if (version === versionRef.current) busyRef.current = false
+    }
+  }, [read])
+
+  useEffect(() => {
+    if (enabled) void reload()
+    else setState({ data: null, loading: false, error: false })
+    return () => { versionRef.current += 1; busyRef.current = false }
+  }, [enabled, reload])
+
+  return { ...state, reload }
+}
+
+function countValue(value: number | null | undefined): string {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? String(value) : '—'
+}
+
 function ProfileContent() {
   const visibility = useFeatureVisibility()
   const [pendingRole, setPendingRole] = useState<RoleKey | null>(null)
   const [switching, setSwitching] = useState(false)
   const [switchError, setSwitchError] = useState('')
-	const [contentCounts, setContentCounts] = useState({ favorites: 0, posts: 0, comments: 0, items: 0 })
+  const [failedAvatar, setFailedAvatar] = useState('')
   const profileNavigationLockRef = useRef(false)
+  const roleSwitchLockRef = useRef(false)
+  const didShowOnce = useRef(false)
   const profile = useSessionStore((state) => state.profile)
   const identity = useSessionStore((state) => state.identity)
   const refreshIdentity = useSessionStore((state) => state.refreshIdentity)
@@ -119,24 +161,10 @@ function ProfileContent() {
   const campusName = profile.campus && profile.campus !== '未设置' ? profile.campus : ''
   const campusLabel = Array.from(new Set([schoolName, campusName].filter(Boolean))).join(' · ') || '学校未设置'
   const identityAllowed = useIdentityGuard('student')
-
-  const countsRequestVersion = useRef(0)
-  const loadContentCounts = useCallback(() => {
-    const version = ++countsRequestVersion.current
-    void Promise.all([
-      visibility.forum ? getMyCommunitySummary() : Promise.resolve({ favorites: 0, posts: 0, comments: 0 }),
-      visibility.secondhand ? getMyProductsPage(1, 1) : Promise.resolve({ total: 0 }),
-    ]).then(([community, products]) => {
-      if (version === countsRequestVersion.current) setContentCounts({ ...community, items: products.total })
-    }).catch(() => {
-      // The destination pages provide their own retry states.
-    })
-  }, [visibility.forum, visibility.secondhand])
-
-  useEffect(() => {
-    loadContentCounts()
-    return () => { countsRequestVersion.current += 1 }
-  }, [loadContentCounts])
+  const communityCount = useProfileCount(identityAllowed && visibility.forum, getMyCommunitySummary)
+  const itemCount = useProfileCount(identityAllowed && visibility.secondhand, getMyItemCount)
+  const countsLoading = visibility.forum && communityCount.loading || visibility.secondhand && itemCount.loading
+  const countsError = visibility.forum && communityCount.error || visibility.secondhand && itemCount.error
 
   useDidShow(() => {
     profileNavigationLockRef.current = false
@@ -144,17 +172,29 @@ function ProfileContent() {
       // Keep the last known summary for transient failures. A 401 is handled
       // centrally by the session store and returns the app to login state.
     })
-    loadContentCounts()
+    if (!didShowOnce.current) { didShowOnce.current = true; return }
+    void communityCount.reload()
+    void itemCount.reload()
   })
 
 	const stats: Array<{ value: string; label: string; tab: MyContentTabKey }> = [
-		{ value: String(contentCounts.favorites), label: '收藏', tab: 'favorites' },
-		{ value: String(contentCounts.posts), label: '帖子', tab: 'posts' },
-		{ value: String(contentCounts.comments), label: '评论', tab: 'comments' },
-		{ value: String(contentCounts.items), label: '宝贝', tab: 'items' }
+		{ value: countValue(communityCount.data?.favorites), label: '收藏', tab: 'favorites' },
+		{ value: countValue(communityCount.data?.posts), label: '帖子', tab: 'posts' },
+		{ value: countValue(communityCount.data?.comments), label: '评论', tab: 'comments' },
+		{ value: countValue(itemCount.data), label: '宝贝', tab: 'items' }
 	].filter(item => item.tab === 'items' ? visibility.secondhand : item.tab === 'favorites' ? visibility.forum && visibility.favorites : item.tab === 'comments' ? visibility.forum && visibility.comment : visibility.forum) as Array<{ value: string; label: string; tab: MyContentTabKey }>
 
+  const navigateProfile = (url: string) => {
+    if (profileNavigationLockRef.current || roleSwitchLockRef.current) return
+    profileNavigationLockRef.current = true
+    void Taro.navigateTo({ url }).catch(() => {
+      profileNavigationLockRef.current = false
+      showPlaceholder('页面打开失败，请重试')
+    })
+  }
+
   const handleRoleClick = (role: RoleOption) => {
+    if (roleSwitchLockRef.current || profileNavigationLockRef.current) return
     if (role.key === activeRole) {
       showPlaceholder(`当前为${role.title}身份`)
       return
@@ -163,7 +203,7 @@ function ProfileContent() {
     if (!availability?.available) {
       if ((role.key === 'rider' || role.key === 'merchant') && availability?.status === 'missing') {
         if (!visibility.identity_application) { showPlaceholder('身份申请暂未开放'); return }
-        void Taro.navigateTo({ url: `/pages/identity-application/index?role=${role.key}` })
+        navigateProfile(`/pages/identity-application/index?role=${role.key}`)
         return
       }
       showPlaceholder(unavailableMessage(availability))
@@ -174,15 +214,12 @@ function ProfileContent() {
   }
 
   const openProfileEditor = () => {
-    if (profileNavigationLockRef.current) return
-    profileNavigationLockRef.current = true
-    void Taro.navigateTo({ url: '/pages/edit-profile/index' }).catch(() => {
-      profileNavigationLockRef.current = false
-    })
+    navigateProfile('/pages/edit-profile/index')
   }
 
   const confirmRoleSwitch = async () => {
-    if (!pendingRole || switching) return
+    if (!pendingRole || roleSwitchLockRef.current) return
+    roleSwitchLockRef.current = true
     const target = pendingRole
     setSwitching(true)
     setSwitchError('')
@@ -193,6 +230,7 @@ function ProfileContent() {
     } catch (error) {
       setSwitchError(error instanceof Error ? error.message : '身份切换失败，请重试')
     } finally {
+      roleSwitchLockRef.current = false
       setSwitching(false)
     }
   }
@@ -201,12 +239,13 @@ function ProfileContent() {
 
   return (
     <View className='student-profile-page' style={getCapsuleSafeStyle()}>
-      <View className='student-profile-hero' onClick={openProfileEditor}>
+      <View className='student-profile-hero'>
         <CapsuleSystemRow />
-        <View className='student-profile-user'>
+        <Text className='student-profile-hero__title'>我的</Text>
+        <View className='student-profile-user' onClick={openProfileEditor} ariaRole='button' ariaLabel='编辑个人资料'>
           <View className='student-profile-user__avatar'>
-            {profile.avatar ? (
-              <Image className='student-profile-user__avatar-image' src={profile.avatar} mode='aspectFill' />
+            {profile.avatar && profile.avatar !== failedAvatar ? (
+              <Image className='student-profile-user__avatar-image' src={profile.avatar} mode='aspectFill' onError={() => setFailedAvatar(profile.avatar)} />
             ) : (
               <Text>{profile.nickname.trim().slice(0, 1) || '同'}</Text>
             )}
@@ -238,25 +277,31 @@ function ProfileContent() {
           <View className='student-profile-card__header'>
             <View>
               <Text className='student-profile-card__title'>我的内容</Text>
-              <Text className='student-profile-card__description'>收藏与发布内容集中管理</Text>
+              <Text className='student-profile-card__description'>{countsLoading ? '正在读取内容数量…' : countsError ? '部分数量暂未更新，已有内容仍可查看' : '收藏与发布内容集中管理'}</Text>
             </View>
-            <View className='student-profile-card__link' onClick={() => void Taro.navigateTo({ url: `/pages/my-content/index?tab=${stats[0].tab}` })}>
+            <View className='student-profile-card__link' ariaRole='button' ariaLabel='查看全部我的内容' onClick={() => navigateProfile(`/pages/my-content/index?tab=${stats[0].tab}`)}>
               <Text>查看全部</Text>
               <AppIcon name='chevron-right' className='student-profile-card__link-icon' />
             </View>
           </View>
-          <View className='student-profile-stats'>
+          <View className='student-profile-stats' style={{ gridTemplateColumns: `repeat(${stats.length}, minmax(0, 1fr))` }}>
             {stats.map((item) => (
               <View
-                key={item.label}
+                key={item.tab}
                 className='student-profile-stats__item'
-                onClick={() => void Taro.navigateTo({ url: `/pages/my-content/index?tab=${item.tab}` })}
+                ariaRole='button'
+                ariaLabel={`我的${item.label}，${item.value === '—' ? '数量暂未读取' : item.value}`}
+                onClick={() => navigateProfile(`/pages/my-content/index?tab=${item.tab}`)}
               >
                 <Text className='student-profile-stats__value'>{item.value}</Text>
                 <Text className='student-profile-stats__label'>{item.label}</Text>
               </View>
             ))}
           </View>
+          {countsError && <View className='student-profile-count-retry' ariaRole='button' ariaLabel='重新读取未更新的内容数量' onClick={() => {
+            if (communityCount.error) void communityCount.reload()
+            if (itemCount.error) void itemCount.reload()
+          }}><AppIcon name='refresh' /><Text>重新读取未更新的数量</Text></View>}
         </View>}
 
         {(visibility.presentationMode === 'standard' || visibility.delivery) && <View className='student-profile-card student-profile-roles'>
@@ -275,22 +320,25 @@ function ProfileContent() {
                   key={role.key}
                   className={`student-profile-role ${activeRole === role.key ? 'student-profile-role--active' : ''}`}
                   onClick={() => handleRoleClick(role)}
+                  ariaRole='button'
+                  ariaLabel={`${role.title}，${status.label}`}
                 >
-                  <View className='student-profile-role__top'>
-                    <View className='student-profile-role__icon'>
-                      <AppIcon name={role.key} active={activeRole === role.key} className='student-profile-role__icon-image' />
-                    </View>
-                    <Text className={`student-profile-role__status student-profile-role__status--${status.tone}`}>{status.label}</Text>
+                  <View className='student-profile-role__icon'>
+                    <AppIcon name={role.key} active={activeRole === role.key} className='student-profile-role__icon-image' />
                   </View>
-                  <Text className='student-profile-role__title'>{role.title}</Text>
-                  <Text className='student-profile-role__subtitle'>{role.subtitle}</Text>
+                  <View className='student-profile-role__copy'>
+                    <Text className='student-profile-role__title'>{role.title}</Text>
+                    <Text className='student-profile-role__subtitle'>{role.subtitle}</Text>
+                  </View>
+                  <Text className={`student-profile-role__status student-profile-role__status--${status.tone}`}>{status.label}</Text>
+                  <AppIcon name='chevron-right' className='student-profile-role__arrow' />
                 </View>
               )
             })}
           </View>
         </View>}
 
-        {identity?.identities.filter(item => item.identity !== 'student' && item.available && (!visibility.delivery || !visibility[item.identity])).map(item => <View className='student-profile-card' key={item.identity} onClick={() => handleRoleClick(roles.find(role => role.key === item.identity)!)}><Text>已有{item.identity === 'merchant' ? '商家' : '骑手'}订单与资金</Text><Text> 新业务暂停，历史订单仍可处理</Text></View>)}
+        {identity?.identities.filter(item => item.identity !== 'student' && item.available && (!visibility.delivery || !visibility[item.identity])).map(item => <View className='student-profile-card student-profile-history' key={item.identity} ariaRole='button' ariaLabel={`查看已有${item.identity === 'merchant' ? '商家' : '骑手'}订单与资金`} onClick={() => handleRoleClick(roles.find(role => role.key === item.identity)!)}><View><Text className='student-profile-card__title'>已有{item.identity === 'merchant' ? '商家' : '骑手'}订单与资金</Text><Text className='student-profile-card__description'>新业务暂停，历史订单仍可处理</Text></View><AppIcon name='chevron-right' className='student-profile-role__arrow' /></View>)}
 
         <View className='student-profile-card student-profile-settings'>
           <View className='student-profile-settings__header'>
@@ -300,7 +348,9 @@ function ProfileContent() {
             <View
               key={item.key}
               className='student-profile-setting'
-              onClick={() => handleSettingClick(item)}
+              onClick={() => handleSettingClick(item, navigateProfile)}
+              ariaRole='button'
+              ariaLabel={item.title}
             >
               <View className='student-profile-setting__icon'>
                 <AppIcon name={item.icon} className='student-profile-setting__icon-image' />
@@ -331,9 +381,10 @@ function ProfileContent() {
 }
 
 export default function ProfilePage() {
+  const accountScope = useSessionStore((state) => `${state.profile.id}:${state.token}`)
   return (
     <RuntimeSessionGate>
-      <ProfileContent />
+      <ProfileContent key={accountScope} />
     </RuntimeSessionGate>
   )
 }

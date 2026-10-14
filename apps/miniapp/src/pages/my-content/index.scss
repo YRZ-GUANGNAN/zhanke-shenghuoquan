@@ -23,6 +23,8 @@
 
 .my-content-tabs {
   height: 88rpx;
+  min-height: 44PX;
+  flex: 0 0 auto;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   align-items: center;
@@ -33,6 +35,7 @@
 .my-content-tab {
   position: relative;
   height: 88rpx;
+  min-height: 44PX;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -76,7 +79,35 @@
 }
 
 .my-content-load-more--retry {
+  min-height: 44PX;
+  box-sizing: border-box;
   color: $brand-primary;
+}
+
+.my-content-refresh {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8rpx;
+  min-height: 44PX;
+  color: $brand-primary-strong;
+  font-size: 24rpx;
+  line-height: 32rpx;
+  white-space: nowrap;
+}
+
+.my-content-refresh--retry:active {
+  opacity: .65;
+}
+
+.my-content-refresh--pending {
+  color: $text-secondary;
+  font-size: 22rpx;
+}
+
+.my-content-refresh__icon {
+  width: 28rpx;
+  height: 28rpx;
 }
 
 .my-content-list {
@@ -121,6 +152,9 @@
   color: $text-secondary;
   font-size: 22rpx;
   font-weight: 500;
+  padding: 12rpx;
+  box-sizing: border-box;
+  text-align: center;
 }
 
 .my-content-row__main {
@@ -270,6 +304,10 @@
 }
 
 .my-content-state__action {
+  display: flex;
+  align-items: center;
+  min-height: 44PX;
+  box-sizing: border-box;
   margin-top: 24rpx;
   padding: 12rpx 24rpx;
   border-radius: 999rpx;
@@ -282,4 +320,13 @@
 
 .my-content-state--retry {
   transition: transform 120ms ease, background-color 120ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .my-content-tab,
+  .my-content-row,
+  .my-content-comment,
+  .my-content-state--retry {
+    transition: none;
+  }
 }

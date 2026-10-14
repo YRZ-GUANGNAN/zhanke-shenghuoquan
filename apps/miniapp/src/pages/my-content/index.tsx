@@ -1,6 +1,7 @@
 import { withFeaturePage } from '../../components/feature-page-gate'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useRef, useState } from 'react'
+import { useDidShow } from '@tarojs/taro'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import AppIcon from '../../components/app-icon'
@@ -10,9 +11,18 @@ import { getMyComments, getMyFavoritePosts, getMyPosts, type MyCommunityComment 
 import { getMyProductsPage } from '../../services/c-trade'
 import Taro from '../../services/taro'
 import { formatPostDate } from '../../utils/post-presentation'
+import { useSessionStore } from '../../stores/session'
+import { useContentTabs, type ContentReaders, type ContentTabKey } from './use-content-tabs'
 import './index.scss'
 
-type TabKey = 'favorites' | 'posts' | 'comments' | 'items'
+type TabKey = ContentTabKey
+
+const contentReaders: ContentReaders = {
+  favorites: (page) => getMyFavoritePosts(page, 20),
+  posts: (page) => getMyPosts(page, 20),
+  comments: (page) => getMyComments(page, 20),
+  items: (page) => getMyProductsPage(page, 20),
+}
 
 const tabs: Array<{ key: TabKey; label: string }> = [
   { key: 'favorites', label: '收藏' },
@@ -39,117 +49,42 @@ function productStatusLabel(value: Product): string {
 }
 
 function ContentThumb({ src, label = '无图' }: { src?: string; label?: string }) {
-  return src
-    ? <Image className='my-content-thumb' src={src} mode='aspectFill' />
-    : <View className='my-content-thumb my-content-thumb--empty'><Text>{label}</Text></View>
+  const [failedSrc, setFailedSrc] = useState('')
+  return src && src !== failedSrc
+    ? <Image className='my-content-thumb' src={src} mode='aspectFill' lazyLoad onError={() => setFailedSrc(src)} />
+    : <View className='my-content-thumb my-content-thumb--empty'><Text>{src ? '图片暂不可用' : label}</Text></View>
 }
 
-function mergeById<T extends { id: string }>(current: T[], incoming: T[]): T[] {
-  const byId = new Map(current.map((item) => [item.id, item]))
-  incoming.forEach((item) => byId.set(item.id, item))
-  return Array.from(byId.values())
-}
-
-function MyContentPage() {
+function MyContentContent() {
   const visibility = useFeatureVisibility()
   const visibleTabs = tabs.filter(tab => tab.key === 'items' ? visibility.secondhand : tab.key === 'favorites' ? visibility.forum && visibility.favorites : tab.key === 'comments' ? visibility.forum && visibility.comment : visibility.forum)
-  const [activeTab, setActiveTab] = useState<TabKey>(getInitialTab)
-  const [favorites, setFavorites] = useState<CommunityPost[]>([])
-  const [posts, setPosts] = useState<CommunityPost[]>([])
-  const [comments, setComments] = useState<MyCommunityComment[]>([])
-  const [items, setItems] = useState<Product[]>([])
-  const [loading, setLoading] = useState(false)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(0)
-  const [error, setError] = useState('')
-  const [loadMoreError, setLoadMoreError] = useState('')
-  const requestVersion = useRef(0)
+  const { activeTab, setActiveTab, states, current, scrollTop, rememberScroll, loadMore, reload } = useContentTabs(getInitialTab(), visibleTabs.map((tab) => tab.key), contentReaders)
+  const favorites = states.favorites.items as CommunityPost[]
+  const posts = states.posts.items as CommunityPost[]
+  const comments = states.comments.items as MyCommunityComment[]
+  const items = states.items.items as Product[]
+  const currentLength = current.items.length
+  const { loadingMore, loadMoreError, error } = current
+  const navigating = useRef(false)
+  useDidShow(() => { navigating.current = false })
 
-  const load = async (tab = activeTab, nextPage = 1, append = false) => {
-    const version = append ? requestVersion.current : requestVersion.current + 1
-    if (!append) requestVersion.current = version
-    if (append) setLoadingMore(true)
-    else {
-      setLoading(true)
-      setLoadingMore(false)
-    }
-    if (append) setLoadMoreError('')
-    else setError('')
-    try {
-      if (tab === 'favorites') {
-        const result = await getMyFavoritePosts(nextPage, 20)
-        if (requestVersion.current !== version) return
-        setFavorites((current) => append ? mergeById(current, result.items) : result.items)
-        setTotal(result.total)
-        setPage(result.page || nextPage)
-      }
-      if (tab === 'posts') {
-        const result = await getMyPosts(nextPage, 20)
-        if (requestVersion.current !== version) return
-        setPosts((current) => append ? mergeById(current, result.items) : result.items)
-        setTotal(result.total)
-        setPage(result.page || nextPage)
-      }
-      if (tab === 'comments') {
-        const result = await getMyComments(nextPage, 20)
-        if (requestVersion.current !== version) return
-        setComments((current) => append ? mergeById(current, result.items) : result.items)
-        setTotal(result.total)
-        setPage(result.page || nextPage)
-      }
-      if (tab === 'items') {
-        const result = await getMyProductsPage(nextPage, 20)
-        if (requestVersion.current !== version) return
-        setItems((current) => append ? mergeById(current, result.items) : result.items)
-        setTotal(result.total)
-        setPage(result.page || nextPage)
-      }
-    } catch (cause) {
-      if (requestVersion.current !== version) return
-      const message = cause instanceof Error ? cause.message : '内容加载失败'
-      if (append) setLoadMoreError(`${message}，点击重试`)
-      else setError(message)
-    } finally {
-      if (requestVersion.current === version) {
-        if (append) setLoadingMore(false)
-        else setLoading(false)
-      }
-    }
-  }
-
-  useEffect(() => {
-    if (!visibleTabs.some(tab => tab.key === activeTab)) {
-      if (visibleTabs[0]) setActiveTab(visibleTabs[0].key)
-      return
-    }
-    setPage(1)
-    setTotal(0)
-    setLoadMoreError('')
-    void load(activeTab, 1, false)
-  }, [activeTab, visibility.forum, visibility.secondhand, visibility.favorites, visibility.comment])
-
-  const currentLength = activeTab === 'favorites'
-    ? favorites.length
-    : activeTab === 'posts'
-      ? posts.length
-      : activeTab === 'comments'
-        ? comments.length
-        : items.length
-
-  const loadMore = () => {
-    if (loading || loadingMore || currentLength >= total) return
-    void load(activeTab, page + 1, true)
+  const navigate = (url: string) => {
+    if (navigating.current) return
+    navigating.current = true
+    void Taro.navigateTo({ url }).catch(() => {
+      navigating.current = false
+      void Taro.showToast({ title: '页面打开失败，请重试', icon: 'none' })
+    })
   }
 
   const openPost = (postId: string, anchor?: string) => {
     const anchorQuery = anchor ? `&anchor=${encodeURIComponent(anchor)}` : ''
-    void Taro.navigateTo({ url: `/pages/post-detail/index?id=${encodeURIComponent(postId)}${anchorQuery}` })
+    navigate(`/pages/post-detail/index?id=${encodeURIComponent(postId)}${anchorQuery}`)
   }
-  const openProduct = (productId: string) => void Taro.navigateTo({ url: `/pages/secondhand-detail/index?id=${encodeURIComponent(productId)}` })
+  const openProduct = (productId: string) => navigate(`/pages/secondhand-detail/index?id=${encodeURIComponent(productId)}`)
 
   const state = () => {
-    if (loading) {
+    if (current.phase === 'idle' || current.phase === 'loading') {
       return (
         <View className='my-content-state'>
           <Text className='my-content-state__title'>正在加载</Text>
@@ -159,7 +94,7 @@ function MyContentPage() {
     }
     if (error) {
       return (
-        <View className='my-content-state my-content-state--retry' onClick={() => void load()}>
+        <View className='my-content-state my-content-state--retry' onClick={reload} ariaRole='button' ariaLabel='重新读取我的内容'>
           <Text className='my-content-state__title'>内容加载失败</Text>
           <Text className='my-content-state__desc'>{error}</Text>
           <Text className='my-content-state__action'>点击重试</Text>
@@ -254,14 +189,25 @@ function MyContentPage() {
 
   return (
     <View className='my-content-page'>
-      <CapsulePageHeader title='我的内容' left={<AppIconButton name='back' label='返回' className='my-content-header__back' onClick={() => void Taro.navigateBack()} />} />
-      <View className='my-content-tabs' style={{ gridTemplateColumns: `repeat(${Math.max(1, visibleTabs.length)}, 1fr)` }}>{visibleTabs.map((tab) => <View key={tab.key} className={`my-content-tab ${activeTab === tab.key ? 'my-content-tab--active' : ''}`} onClick={() => setActiveTab(tab.key)}><Text>{tab.label}</Text></View>)}</View>
+      <CapsulePageHeader
+        title='我的内容'
+        left={<AppIconButton name='back' label='返回' className='my-content-header__back' onClick={() => void Taro.navigateBack()} />}
+        right={current.refreshError ? (
+          <View className='my-content-refresh my-content-refresh--retry' onClick={reload} ariaRole='button' ariaLabel={current.refreshError}>
+            <AppIcon name='refresh' className='my-content-refresh__icon' /><Text>重试</Text>
+          </View>
+        ) : current.refreshing ? <Text className='my-content-refresh my-content-refresh--pending'>更新中</Text> : null}
+      />
+      <View className='my-content-tabs' style={{ gridTemplateColumns: `repeat(${Math.max(1, visibleTabs.length)}, 1fr)` }}>{visibleTabs.map((tab) => <View key={tab.key} className={`my-content-tab ${activeTab === tab.key ? 'my-content-tab--active' : ''}`} ariaRole='button' ariaLabel={`${tab.label}${activeTab === tab.key ? '，已选中' : ''}`} onClick={() => setActiveTab(tab.key)}><Text>{tab.label}</Text></View>)}</View>
       <ScrollView
+        key={activeTab}
         className='my-content-body'
         scrollY
         enhanced
         showScrollbar={false}
         lowerThreshold={120}
+        scrollTop={scrollTop}
+        onScroll={(event) => rememberScroll(event.detail.scrollTop)}
         onScrollToLower={loadMore}
       >
         {renderContent()}
@@ -269,12 +215,17 @@ function MyContentPage() {
           <Text className='my-content-load-more my-content-load-more--retry' onClick={loadMore}>{loadMoreError}</Text>
         ) : loadingMore ? (
           <Text className='my-content-load-more'>正在加载更多内容…</Text>
-        ) : currentLength > 0 && currentLength >= total ? (
+        ) : currentLength > 0 && !current.hasMore ? (
           <Text className='my-content-load-more'>— 已显示全部内容 —</Text>
         ) : null}
       </ScrollView>
     </View>
   )
+}
+
+function MyContentPage() {
+  const accountScope = useSessionStore((state) => `${state.profile.id}:${state.token}`)
+  return <MyContentContent key={accountScope} />
 }
 
 export default withFeaturePage(MyContentPage)
