@@ -13,6 +13,7 @@ interface BackendUser {
   id: number
   nickname: string
   avatar: string
+  cover?: string
   school: string
   campus: string
   role?: 'user' | 'admin' | 'superadmin'
@@ -64,6 +65,7 @@ export const emptyProfile: UserProfile = {
   id: '',
   nickname: '未登录',
   avatar: '',
+  cover: '',
   school: '',
   campus: ''
 }
@@ -101,6 +103,13 @@ export async function updateProfile(profile: UserProfile, avatarAssetId?: string
 
 export async function currentIdentity(): Promise<IdentitySummary> {
   return request('/auth/identity', { url: '', timeout: 12000 })
+}
+
+// Only the cover changes; never resend editable nickname/avatar form fields.
+export async function updateProfileCover(assetId: string): Promise<UserProfile> {
+  return toProfile(await request<BackendUser>('/auth/me/cover', {
+    url: '', method: 'PUT', data: { assetId }, timeout: 20000
+  }))
 }
 
 export async function switchIdentity(identity: IdentityRoleKey): Promise<IdentitySummary> {
@@ -162,6 +171,7 @@ function toProfile(value: BackendUser): UserProfile {
     id: String(value.id),
     nickname: value.nickname,
     avatar: value.avatar,
+    cover: value.cover || '',
     school: value.school,
     campus: value.campus,
     role: value.role

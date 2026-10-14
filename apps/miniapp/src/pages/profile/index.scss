@@ -23,14 +23,14 @@ page {
 }
 
 .student-profile-hero {
-  padding: 0 32rpx 24rpx;
+  padding: 0 0 24rpx;
   background: $bg-surface;
   box-sizing: border-box;
 }
 
 .student-profile-hero__title {
   display: block;
-  padding: 16rpx 0 24rpx;
+  padding: 16rpx 32rpx 16rpx;
   color: $text-strong;
   font-size: 36rpx;
   font-weight: 700;
@@ -38,15 +38,47 @@ page {
 }
 
 .student-profile-user {
+  position: relative;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 24rpx;
   min-height: 160rpx;
-  padding: 8rpx 0 16rpx;
+  margin: -40rpx 32rpx 0;
+  padding: 0 0 16rpx;
   border-radius: 16rpx;
   box-sizing: border-box;
   transition: opacity $duration-fast ease;
 }
+
+.student-profile-cover {
+  position: relative;
+  height: 280rpx;
+  background: $profile-accent-soft;
+}
+
+.student-profile-cover__image { display: block; width: 100%; height: 100%; }
+
+.student-profile-cover__edit {
+  position: absolute;
+  right: 24rpx;
+  bottom: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  min-height: 44PX;
+  padding: 0 20rpx;
+  border: 1rpx solid $border-subtle;
+  border-radius: 12rpx;
+  color: $text-primary;
+  background: rgba($bg-surface, .96);
+  font-size: 24rpx;
+  font-weight: 500;
+  line-height: 34rpx;
+  box-sizing: border-box;
+}
+.student-profile-cover__edit .app-icon { width: 30rpx; height: 30rpx; }
+.student-profile-cover__edit:active { background: $bg-surface; opacity: .8; }
 
 .student-profile-user:active {
   opacity: .72;
@@ -57,17 +89,17 @@ page {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 112rpx;
-  height: 112rpx;
+  width: 128rpx;
+  height: 128rpx;
   overflow: hidden;
-  border: 3rpx solid $bg-surface;
+  border: 6rpx solid $bg-surface;
   border-radius: 50%;
   color: $brand-primary-strong;
   font-size: 38rpx;
   font-weight: 700;
   line-height: 1;
   background: $profile-accent-soft;
-  box-shadow: 0 0 0 1rpx $border-subtle;
+  box-shadow: none;
   box-sizing: border-box;
 }
 
@@ -79,6 +111,7 @@ page {
 .student-profile-user__main {
   flex: 1 1 auto;
   min-width: 0;
+  padding-top: 48rpx;
 }
 
 .student-profile-user__title-row {
@@ -166,6 +199,7 @@ page {
   gap: 4rpx;
   min-width: 112rpx;
   min-height: 44PX;
+  margin-top: 40rpx;
   padding: 0 0 0 8rpx;
   color: $brand-primary-strong;
   font-size: 24rpx;

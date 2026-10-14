@@ -19,6 +19,7 @@ func TestCoordinatorKeepsAtomicBlockerAndAnonymizationContract(t *testing.T) {
 		"takeout_orders", "takeout_payment_attempts", "takeout_withdraw_requests", "takeout_rider_earning_records",
 		"账号已注销", "token_version", "community_search_histories", "trade_search_histories",
 		"navigation_search_histories", "user_follows", "status <> ?", "takeout_merchants", "takeout_riders",
+		"\"cover\": \"\", \"cover_asset_id\": nil", "coremedia.PurposeProfileCover", "bindings.Revoke(dbtx.WithDB(ctx, tx)",
 	}
 	for _, fragment := range fragments {
 		if !strings.Contains(source, fragment) {

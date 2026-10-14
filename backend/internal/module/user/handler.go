@@ -14,6 +14,7 @@ import (
 type Handler struct {
 	service *Service
 	media   media.Gateway
+	covers  *ProfileCoverService
 }
 
 func NewHandler(service *Service, mediaGateway ...media.Gateway) *Handler {
@@ -28,6 +29,7 @@ func (h *Handler) Register(rg *gin.RouterGroup) {
 	rg.POST("/wechat-login", h.login)
 	rg.GET("/me", h.service.AuthRequired(), h.me)
 	rg.PATCH("/me", h.service.AuthRequired(), UnmutedRequired(), h.updateMe)
+	rg.PUT("/me/cover", h.service.AuthRequired(), UnmutedRequired(), h.updateCover)
 	rg.GET("/identity", h.service.AuthRequired(), h.identity)
 	rg.POST("/identity", h.service.AuthRequired(), h.switchIdentity)
 	rg.GET("/settings", h.service.AuthRequired(), h.settings)

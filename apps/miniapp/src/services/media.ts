@@ -1,7 +1,7 @@
 import Taro from './taro'
 import { request } from './api'
 
-export type MediaPurpose = 'post_image' | 'product_image' | 'avatar' | 'dish' | 'merchant_logo' | 'delivery_proof' | 'delivery_im' | 'feedback' | 'identity_application'
+export type MediaPurpose = 'post_image' | 'product_image' | 'avatar' | 'profile_cover' | 'dish' | 'merchant_logo' | 'delivery_proof' | 'delivery_im' | 'feedback' | 'identity_application'
 export type MediaClientState =
   | 'waiting_upload'
   | 'processing'
@@ -16,7 +16,7 @@ export type MediaClientState =
 export interface MediaStatus {
   assetId: string
   ticketId: string
-  purpose: 'post' | 'product' | 'avatar' | 'dish' | 'merchant_logo' | 'delivery_proof' | 'delivery_im' | 'feedback' | 'identity_application'
+  purpose: 'post' | 'product' | 'avatar' | 'profile_cover' | 'dish' | 'merchant_logo' | 'delivery_proof' | 'delivery_im' | 'feedback' | 'identity_application'
   state: MediaClientState
   technicalStatus: string
   reviewStatus: string
@@ -71,6 +71,7 @@ const MAX_EDGE: Record<MediaPurpose, number> = {
   post_image: 1920,
   product_image: 1920,
   avatar: 1024,
+  profile_cover: 1920,
   dish: 1920,
   merchant_logo: 1024,
   delivery_proof: 1920,
@@ -83,13 +84,15 @@ const DELIVERY_PROOF_MAX_BYTES = 5 * 1024 * 1024
 export async function chooseAndUploadImages(
   purpose: MediaPurpose,
   count: number,
-  onProgress?: (value: UploadProgress) => void
+  onProgress?: (value: UploadProgress) => void,
+  shouldContinue?: () => boolean
 ): Promise<UploadedMedia[]> {
   const selected = await Taro.chooseMedia({ count, mediaType: ['image'], sourceType: ['album', 'camera'], sizeType: ['original'] })
+  assertUploadActive(shouldContinue)
   return mapConcurrent(selected.tempFiles, 3, async (file, index) =>
-    uploadImage(file.tempFilePath, purpose, (percent, stage, message) =>
+    uploadImage(file.tempFilePath, purpose, (percent, stage, message) => {
       onProgress?.({ index, total: selected.tempFiles.length, percent, stage, message })
-    )
+    }, shouldContinue)
   )
 }
 
@@ -176,13 +179,19 @@ export async function waitForMediaApprovals(
 async function uploadImage(
   sourcePath: string,
   purpose: MediaPurpose,
-  progress: (percent: number, stage: UploadProgress['stage'], message: string) => void
+  progress: (percent: number, stage: UploadProgress['stage'], message: string) => void,
+  shouldContinue?: () => boolean
 ): Promise<UploadedMedia> {
+  assertUploadActive(shouldContinue)
   progress(5, 'compressing', '正在压缩图片')
   const prepared = await prepareImage(sourcePath, purpose)
   const file = await Taro.getFileInfo({ filePath: prepared.path, digestAlgorithm: 'md5' })
+  assertUploadActive(shouldContinue)
   if (purpose === 'delivery_proof' && file.size > DELIVERY_PROOF_MAX_BYTES) {
     throw new Error('凭证照片压缩后仍超过 5 MiB，请重新拍摄')
+  }
+  if (purpose === 'profile_cover' && file.size > 10 * 1024 * 1024) {
+    throw new Error('封面压缩后仍超过 10 MB，请选择较小的照片')
   }
   const bytes = readFileBytes(prepared.path)
   if (bytes.byteLength !== file.size) throw new Error('压缩文件大小校验失败，请重新选择图片')
@@ -199,10 +208,13 @@ async function uploadImage(
     }
   })
 
+  assertUploadActive(shouldContinue)
   progress(35, 'uploading', '正在直传腾讯云 COS')
   await putSignedObject(session, bytes)
+  assertUploadActive(shouldContinue)
   progress(85, 'completing', '正在校验图片并提交审核')
   const status = await retryUploadCompletion(session.ticketId)
+  assertUploadActive(shouldContinue)
   progress(100, 'done', status.message)
   return { ...status, ticketId: session.ticketId, previewPath: prepared.path }
 }
@@ -273,9 +285,10 @@ function readFileBytes(path: string): ArrayBuffer {
   return copy.buffer
 }
 
-function domainPurpose(value: MediaPurpose): 'post' | 'product' | 'avatar' | 'dish' | 'merchant_logo' | 'delivery_proof' | 'delivery_im' | 'feedback' | 'identity_application' {
+function domainPurpose(value: MediaPurpose): MediaStatus['purpose'] {
   if (value === 'post_image') return 'post'
   if (value === 'product_image') return 'product'
+  if (value === 'profile_cover') return 'profile_cover'
   if (value === 'dish') return 'dish'
   if (value === 'merchant_logo') return 'merchant_logo'
   if (value === 'delivery_proof') return 'delivery_proof'
@@ -283,6 +296,10 @@ function domainPurpose(value: MediaPurpose): 'post' | 'product' | 'avatar' | 'di
   if (value === 'feedback') return 'feedback'
   if (value === 'identity_application') return 'identity_application'
   return 'avatar'
+}
+
+function assertUploadActive(shouldContinue?: () => boolean): void {
+  if (shouldContinue && !shouldContinue()) throw new Error('图片上传已取消')
 }
 
 function delay(milliseconds: number): Promise<void> {

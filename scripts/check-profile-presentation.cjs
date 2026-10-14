@@ -146,6 +146,14 @@ async function run() {
     await profile.render()
     assert.equal(profile.props('.student-profile-user__avatar-image').src, 'isolated-avatar-b', '编辑后的新头像重新显示')
     assert.ok(profile.container.textContent.includes('已更新昵称'), '资料读取同一个会话源')
+    profile.options.session.profile = { ...profile.options.session.profile, cover: 'isolated-cover-a' }
+    await profile.render()
+    assert.equal(profile.props('.student-profile-cover__image').src, 'isolated-cover-a')
+    await profile.event(() => profile.props('.student-profile-cover__image').onError())
+    assert.equal(profile.container.querySelector('.student-profile-cover__image'), null, '封面失败不破坏资料区')
+    profile.options.session.profile = { ...profile.options.session.profile, cover: 'isolated-cover-b' }
+    await profile.render()
+    assert.equal(profile.props('.student-profile-cover__image').src, 'isolated-cover-b', '新封面不沿用旧图失败状态')
     profile.options.session.switchIdentity = () => { const task = deferred(); switches.push(task); return task.promise }
     await profile.render()
     await profile.event(() => profile.all('.student-profile-role')[1].onClick())

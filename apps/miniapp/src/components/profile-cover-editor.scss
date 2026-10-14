@@ -1,0 +1,39 @@
+@use 'sass:color';
+@use '../styles/design-tokens.scss' as *;
+
+.profile-cover-editor {
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid $border-subtle;
+}
+.profile-cover-editor__heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16rpx; }
+.profile-cover-editor__title { color: $text-primary; font-size: 30rpx; font-weight: 600; line-height: 44rpx; }
+.profile-cover-editor__scope { color: $text-secondary; font-size: 22rpx; line-height: 32rpx; }
+.profile-cover-editor__preview {
+  position: relative;
+  height: 0;
+  padding-bottom: 37.3333%;
+  overflow: hidden;
+  border-radius: 16rpx;
+  background: color.mix($brand-primary, $bg-surface, 7%);
+}
+.profile-cover-editor__image, .profile-cover-editor__empty { position: absolute; inset: 0; width: 100%; height: 100%; }
+.profile-cover-editor__empty { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 16rpx; color: $text-secondary; font-size: 24rpx; }
+.profile-cover-editor__empty .app-icon { width: 40rpx; height: 40rpx; opacity: .7; }
+.profile-cover-editor__hint { display: block; min-height: 64rpx; padding-top: 16rpx; color: $text-secondary; font-size: 23rpx; line-height: 34rpx; overflow-wrap: anywhere; }
+.profile-cover-editor__hint--error { color: $danger; }
+.profile-cover-editor__actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8rpx 16rpx; margin-top: 8rpx; }
+.profile-cover-editor__choose, .profile-cover-editor__save, .profile-cover-editor__clear, .profile-cover-editor__discard {
+  display: flex; align-items: center; justify-content: center; gap: 8rpx;
+  min-height: 44PX; margin: 0; padding: 0 24rpx; box-sizing: border-box; border-radius: 12rpx; border: 0; background: transparent;
+  color: $brand-primary-strong; font-size: 25rpx; font-weight: 500; line-height: 36rpx;
+  transition: opacity $duration-fast ease;
+}
+.profile-cover-editor__choose { border: 1rpx solid $border-subtle; background: $bg-surface; }
+.profile-cover-editor__choose .app-icon { width: 30rpx; height: 30rpx; }
+.profile-cover-editor__save { background: $brand-primary; color: $text-on-color; }
+.profile-cover-editor__clear, .profile-cover-editor__discard { padding: 0 8rpx; color: $text-secondary; }
+.profile-cover-editor__action--disabled { opacity: .5; }
+.profile-cover-editor button::after { border: 0; }
+.profile-cover-editor button:active { opacity: .65; }
+.profile-cover-editor button:focus-visible { outline: 2rpx solid $brand-primary; outline-offset: 4rpx; }
+@media (prefers-reduced-motion: reduce) { .profile-cover-editor button { transition: none; } }

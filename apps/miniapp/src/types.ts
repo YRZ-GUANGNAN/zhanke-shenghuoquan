@@ -51,6 +51,7 @@ export interface UserProfile {
   id: string
   nickname: string
   avatar: string
+  cover?: string
   school: string
   campus: string
   role?: 'user' | 'admin' | 'superadmin'

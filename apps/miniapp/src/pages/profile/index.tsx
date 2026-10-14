@@ -148,6 +148,7 @@ function ProfileContent() {
   const [switching, setSwitching] = useState(false)
   const [switchError, setSwitchError] = useState('')
   const [failedAvatar, setFailedAvatar] = useState('')
+  const [failedCover, setFailedCover] = useState('')
   const profileNavigationLockRef = useRef(false)
   const roleSwitchLockRef = useRef(false)
   const didShowOnce = useRef(false)
@@ -242,6 +243,12 @@ function ProfileContent() {
       <View className='student-profile-hero'>
         <CapsuleSystemRow />
         <Text className='student-profile-hero__title'>我的</Text>
+        <View className='student-profile-cover'>
+          {profile.cover && profile.cover !== failedCover && <Image className='student-profile-cover__image' src={profile.cover} mode='aspectFill' ariaLabel='我的个人封面' onError={() => setFailedCover(profile.cover || '')} />}
+          <View className='student-profile-cover__edit' ariaRole='button' ariaLabel={profile.cover ? '更换个人封面' : '设置个人封面'} onClick={openProfileEditor}>
+            <AppIcon name='image' /><Text>{profile.cover ? '更换封面' : '设置封面'}</Text>
+          </View>
+        </View>
         <View className='student-profile-user' onClick={openProfileEditor} ariaRole='button' ariaLabel='编辑个人资料'>
           <View className='student-profile-user__avatar'>
             {profile.avatar && profile.avatar !== failedAvatar ? (

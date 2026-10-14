@@ -16,6 +16,7 @@ const (
 	PurposePost                Purpose = "post"
 	PurposeProduct             Purpose = "product"
 	PurposeAvatar              Purpose = "avatar"
+	PurposeProfileCover        Purpose = "profile_cover"
 	PurposeDish                Purpose = "dish"
 	PurposeMerchantLogo        Purpose = "merchant_logo"
 	PurposeDeliveryProof       Purpose = "delivery_proof"
@@ -26,7 +27,7 @@ const (
 
 func (v Purpose) Valid() bool {
 	switch v {
-	case PurposePost, PurposeProduct, PurposeAvatar, PurposeDish, PurposeMerchantLogo, PurposeDeliveryProof, PurposeDeliveryIM, PurposeFeedback, PurposeIdentityApplication:
+	case PurposePost, PurposeProduct, PurposeAvatar, PurposeProfileCover, PurposeDish, PurposeMerchantLogo, PurposeDeliveryProof, PurposeDeliveryIM, PurposeFeedback, PurposeIdentityApplication:
 		return true
 	default:
 		return false
@@ -38,7 +39,7 @@ func (v Purpose) Valid() bool {
 // participant fence has been checked.
 func (v Purpose) PubliclyResolvable() bool {
 	switch v {
-	case PurposePost, PurposeProduct, PurposeAvatar, PurposeDish, PurposeMerchantLogo:
+	case PurposePost, PurposeProduct, PurposeAvatar, PurposeProfileCover, PurposeDish, PurposeMerchantLogo:
 		return true
 	default:
 		return false

@@ -28,6 +28,8 @@ type User struct {
 	Nickname        string         `json:"nickname" gorm:"size:64"`
 	Avatar          string         `json:"avatar" gorm:"size:512"`
 	AvatarAssetID   *uint64        `json:"-" gorm:"index"`
+	Cover           string         `json:"cover" gorm:"size:512;not null;default:''"`
+	CoverAssetID    *uint64        `json:"-" gorm:"index"`
 	School          string         `json:"school" gorm:"size:80"`
 	Campus          string         `json:"campus" gorm:"size:80"`
 	CurrentIdentity Identity       `json:"currentIdentity" gorm:"column:current_identity;size:24;not null;default:student"`

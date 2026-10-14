@@ -5,9 +5,12 @@ package accountclosure
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
+	coremedia "campus-circle/backend/internal/module/media"
 	"campus-circle/backend/internal/module/user"
+	"campus-circle/backend/internal/pkg/dbtx"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -66,9 +69,19 @@ func (c *Coordinator) Close(ctx context.Context, userID uint) ([]user.AccountClo
 		}
 
 		now := c.now().UTC()
+		if account.CoverAssetID != nil {
+			bindings, err := coremedia.NewReferenceBindingService(coremedia.NewReferenceBindingRepository(tx), nil)
+			if err != nil {
+				return err
+			}
+			if err := bindings.Revoke(dbtx.WithDB(ctx, tx), coremedia.PurposeProfileCover, strconv.FormatUint(uint64(userID), 10), nil); err != nil {
+				return err
+			}
+		}
 		openID := fmt.Sprintf("closed:%d:%d", account.ID, account.TokenVersion+1)
 		updates := map[string]any{
 			"open_id": openID, "phone": nil, "nickname": "账号已注销", "avatar": "", "avatar_asset_id": nil,
+			"cover": "", "cover_asset_id": nil,
 			"school": "", "campus": "", "current_identity": "student", "role": "user", "status": user.StatusClosed,
 			"token_version": gorm.Expr("token_version + 1"), "closed_at": now,
 		}

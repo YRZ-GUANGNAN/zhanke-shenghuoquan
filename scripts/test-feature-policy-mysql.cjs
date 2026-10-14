@@ -5,6 +5,7 @@ const net = require('node:net')
 const { spawn, spawnSync } = require('node:child_process')
 const root = path.resolve(__dirname, '..')
 const shareSettings = process.argv.includes('--share-settings')
+const profileCover = process.argv.includes('--profile-cover')
 const mysqlDirectory = 'C:\\Program Files\\MySQL\\MySQL Server 8.4\\bin'
 const mysql = path.join(mysqlDirectory, 'mysql.exe')
 const mysqld = path.join(mysqlDirectory, 'mysqld.exe')
@@ -35,13 +36,13 @@ async function run() {
       await wait(250)
     }
     if (!ready) throw new Error('Isolated MySQL startup timed out.')
-    const database = `${shareSettings ? 'campus_share_test_' : 'campus_feature_policy_test_'}${process.pid}`
+    const database = `${profileCover ? 'campus_cover_test_' : shareSettings ? 'campus_share_test_' : 'campus_feature_policy_test_'}${process.pid}`
     const created = sql(`CREATE DATABASE ${database} CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci`)
     if (created.status !== 0) throw new Error(created.stderr)
     const testDSN = `root@tcp(127.0.0.1:${port})/${database}?charset=utf8mb4&parseTime=True&loc=${shareSettings ? 'Local' : 'UTC'}`
-    const moduleName = shareSettings ? 'sharesettings' : 'featureflags'
-    const testName = shareSettings ? 'TestTemporaryMySQLPersistenceCASAndAuditRollback' : 'TestGormTemporaryMySQLPersistenceAndAudit'
-    const testKey = shareSettings ? 'SHARE_SETTINGS_TEST_MYSQL_DSN' : 'FEATURE_POLICY_TEST_MYSQL_DSN'
+    const moduleName = profileCover ? 'user' : shareSettings ? 'sharesettings' : 'featureflags'
+    const testName = profileCover ? 'TestProfileCoverTemporaryMySQL' : shareSettings ? 'TestTemporaryMySQLPersistenceCASAndAuditRollback' : 'TestGormTemporaryMySQLPersistenceAndAudit'
+    const testKey = profileCover ? 'PROFILE_COVER_TEST_MYSQL_DSN' : shareSettings ? 'SHARE_SETTINGS_TEST_MYSQL_DSN' : 'FEATURE_POLICY_TEST_MYSQL_DSN'
     const result = spawnSync('go.exe', ['test', `./internal/module/${moduleName}`, '-run', testName, '-count=1', '-v'], { cwd: path.join(root, 'backend'), env: { ...process.env, [testKey]: testDSN }, stdio: 'inherit', windowsHide: true })
     if (result.status !== 0) throw new Error(`${moduleName} MySQL integration test failed.`)
   } finally {

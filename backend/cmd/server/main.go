@@ -389,7 +389,13 @@ func main() {
 	api := router.Group("/api/v1")
 	api.Use(featureflags.GuardRequests())
 	authRoutes := api.Group("/auth")
-	user.NewHandler(userService, mediaService).Register(authRoutes)
+	profileCovers, err := user.NewProfileCoverService(user.NewRepository(db), bindingService, cfg.MediaPublicBaseURL)
+	if err != nil {
+		log.Fatalf("configure profile covers: %v", err)
+	}
+	userHandler := user.NewHandler(userService, mediaService)
+	userHandler.SetProfileCovers(profileCovers)
+	userHandler.Register(authRoutes)
 	adminauth.NewHandler(adminAuthService, adminAuthMiddleware).Register(api.Group("/admin-auth"))
 	registerIdentityApplicationRoutes(
 		api, authRoutes, identityapplication.NewHandler(identityApplicationService),
