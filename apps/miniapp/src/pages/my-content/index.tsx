@@ -9,6 +9,7 @@ import type { CommunityPost, Product } from '../../types'
 import { getMyComments, getMyFavoritePosts, getMyPosts, type MyCommunityComment } from '../../services/b-community'
 import { getMyProductsPage } from '../../services/c-trade'
 import Taro from '../../services/taro'
+import { formatPostDate } from '../../utils/post-presentation'
 import './index.scss'
 
 type TabKey = 'favorites' | 'posts' | 'comments' | 'items'
@@ -177,7 +178,7 @@ function MyContentPage() {
             <Text className='my-content-row__title'>{item.title || item.content}</Text>
             <Text className='my-content-row__meta'>
               {favorite
-                ? `${item.author || '校园用户'} · ${item.createdAt}`
+                ? `${item.author || '校园用户'} · ${formatPostDate(item.createdAt)}`
                 : `${item.likedCount} 赞 · ${item.commentCount} 评论`}
             </Text>
           </View>
@@ -203,7 +204,7 @@ function MyContentPage() {
           <Text className='my-content-comment__content'>{item.content}</Text>
           <View className='my-content-comment__source'>
             <Text className='my-content-comment__source-title'>评论了《{item.postTitle}》</Text>
-            <Text className='my-content-comment__meta'>{item.createdAt} · {reviewLabel(item.reviewStatus)}</Text>
+            <Text className='my-content-comment__meta'>{formatPostDate(item.createdAt)} · {reviewLabel(item.reviewStatus)}</Text>
           </View>
         </View>
       ))}
@@ -254,7 +255,7 @@ function MyContentPage() {
   return (
     <View className='my-content-page'>
       <CapsulePageHeader title='我的内容' left={<AppIconButton name='back' label='返回' className='my-content-header__back' onClick={() => void Taro.navigateBack()} />} />
-      <View className='my-content-tabs'>{visibleTabs.map((tab) => <View key={tab.key} className={`my-content-tab ${activeTab === tab.key ? 'my-content-tab--active' : ''}`} onClick={() => setActiveTab(tab.key)}><Text>{tab.label}</Text></View>)}</View>
+      <View className='my-content-tabs' style={{ gridTemplateColumns: `repeat(${Math.max(1, visibleTabs.length)}, 1fr)` }}>{visibleTabs.map((tab) => <View key={tab.key} className={`my-content-tab ${activeTab === tab.key ? 'my-content-tab--active' : ''}`} onClick={() => setActiveTab(tab.key)}><Text>{tab.label}</Text></View>)}</View>
       <ScrollView
         className='my-content-body'
         scrollY

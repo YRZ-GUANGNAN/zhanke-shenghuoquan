@@ -1,4 +1,5 @@
 declare module '@tarojs/taro' {
+  export function nextTick(callback: () => void): void
   export function useDidShow(callback: () => void): void
   export function useDidHide(callback: () => void): void
   export function useShareAppMessage(callback: (payload: { from?: string; target?: unknown; webViewUrl?: string }) => { title?: string; path?: string; imageUrl?: string }): void

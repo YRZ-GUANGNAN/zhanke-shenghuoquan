@@ -3,7 +3,8 @@ import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import { usePageShare } from '../../hooks/use-page-share'
 import { publicShareId } from '../../services/share-model'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Image, Input, ScrollView, Text, View } from '@tarojs/components'
+import { nextTick } from '@tarojs/taro'
+import { Image, Input, ScrollView, Swiper, SwiperItem, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import AppIcon from '../../components/app-icon'
@@ -24,9 +25,9 @@ import {
 } from '../../services/b-community'
 import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import { navigateBackOrHome } from '../../utils/navigation'
+import { formatPostDate, postBodyWithoutTitle, postMediaHeight, preparePostMedia, type PostMedia } from '../../utils/post-presentation'
 import './index.scss'
 
-const commentTone = ['sky', 'peach', 'green', 'mint'] as const
 const COMMENT_PAGE_SIZE = 20
 
 interface PendingCommentSubmission {
@@ -96,11 +97,18 @@ function PostDetailPage() {
   const [actioning, setActioning] = useState(false)
   const [submittingComment, setSubmittingComment] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
-  const [heroAvailable, setHeroAvailable] = useState(false)
+  const [media, setMedia] = useState<PostMedia[]>([])
+  const [mediaPending, setMediaPending] = useState(false)
+  const [mediaIndex, setMediaIndex] = useState(0)
+  const [mediaHeight, setMediaHeight] = useState(560)
+  const [commentsAnchor, setCommentsAnchor] = useState('')
   const pendingComment = useRef<PendingCommentSubmission | null>(null)
+  const actionLock = useRef(false)
+  const commentLock = useRef(false)
+  const commentsLoadLock = useRef(false)
 
-  const heroImage = post?.images[0] ?? ''
-  const showHero = Boolean(heroImage && heroAvailable)
+  const showHero = media.length > 0
+  const body = post ? postBodyWithoutTitle(post.title, post.content) : ''
   const tags = useMemo(() => {
     if (!post) return []
     const values = [post.topic, ...(post.tags ?? [])]
@@ -109,27 +117,38 @@ function PostDetailPage() {
     return Array.from(new Set(values))
   }, [post])
   const isApproved = post?.reviewStatus === 'approved'
+  const hasActions = isApproved && (visibility.canComment || visibility.comment || visibility.likes || visibility.favorites)
   const reviewState = post?.reviewStatus ? reviewCopy[post.reviewStatus] : null
   usePageShare({ kind: 'post', enabled: visibility.forum && !loading && !error, id: postId, content: post })
 
   useEffect(() => {
     let alive = true
-    setHeroAvailable(false)
-
-    if (heroImage) {
-      void Taro.getImageInfo({ src: heroImage })
-        .then(() => {
-          if (alive) setHeroAvailable(true)
-        })
-        .catch(() => {
-          if (alive) setHeroAvailable(false)
-        })
-    }
+    const images = post?.images ?? []
+    setMedia([])
+    setMediaIndex(0)
+    setMediaPending(images.length > 0)
+    void preparePostMedia(images, (src) => Taro.getImageInfo({ src })).then((items) => {
+      if (!alive) return
+      setMedia(items)
+      setMediaHeight(postMediaHeight(items[0]))
+      setMediaPending(false)
+    })
 
     return () => {
       alive = false
     }
-  }, [postId, heroImage])
+  }, [postId, post?.images])
+
+  useEffect(() => {
+    if (!loading && !mediaPending && isApproved && visibility.comment && params.anchor === 'comments') {
+      setCommentsAnchor('post-comments')
+    }
+  }, [loading, mediaPending, isApproved, visibility.comment, params.anchor])
+
+  const showComments = () => {
+    setCommentsAnchor('')
+    nextTick(() => setCommentsAnchor('post-comments'))
+  }
 
   useEffect(() => {
     let alive = true
@@ -196,7 +215,8 @@ function PostDetailPage() {
   }, [postId, reloadKey, visibility.comment])
 
   const loadMoreComments = async () => {
-    if (!visibility.comment || !post || !isApproved || commentsLoadingMore || comments.length >= commentTotal) return
+    if (!visibility.comment || !post || !isApproved || commentsLoadLock.current || comments.length >= commentTotal) return
+    commentsLoadLock.current = true
     const nextPage = commentPage + 1
     setCommentsLoadingMore(true)
     setCommentError('')
@@ -209,12 +229,14 @@ function PostDetailPage() {
       console.error('load more post comments failed', loadError)
       setCommentError('更多评论加载失败，点击重试')
     } finally {
+      commentsLoadLock.current = false
       setCommentsLoadingMore(false)
     }
   }
 
   const withActionGuard = async (run: () => Promise<void>) => {
-    if (actioning || !post || !isApproved) return
+    if (actionLock.current || !post || !isApproved) return
+    actionLock.current = true
     setActioning(true)
     try {
       await run()
@@ -222,13 +244,14 @@ function PostDetailPage() {
       console.error('post action failed', actionError)
       showToast('操作失败，请稍后再试', 'error')
     } finally {
+      actionLock.current = false
       setActioning(false)
     }
   }
 
   const handleFollow = () =>
     withActionGuard(async () => {
-      if (!post) return
+      if (!post || !visibility.following) return
       const next = !following
       await setUserFollowing(post.authorId, next)
       setFollowing(next)
@@ -237,7 +260,7 @@ function PostDetailPage() {
 
   const handleLike = () =>
     withActionGuard(async () => {
-      if (!post) return
+      if (!post || !visibility.likes) return
       const next = !liked
       await setPostLiked(post.id, next)
       setLiked(next)
@@ -246,7 +269,7 @@ function PostDetailPage() {
 
   const handleFavorite = () =>
     withActionGuard(async () => {
-      if (!post) return
+      if (!post || !visibility.favorites) return
       const next = !favorited
       await setPostFavorited(post.id, next)
       setFavorited(next)
@@ -260,7 +283,8 @@ function PostDetailPage() {
       showToast('先写一句评论吧')
       return
     }
-    if (submittingComment) return
+    if (commentLock.current) return
+    commentLock.current = true
     const clientRequestId = pendingComment.current?.key === content
       ? pendingComment.current.clientRequestId
       : createCommunityClientRequestId()
@@ -281,6 +305,7 @@ function PostDetailPage() {
       }
       showToast('评论失败，请稍后再试', 'error')
     } finally {
+      commentLock.current = false
       setSubmittingComment(false)
     }
   }
@@ -305,7 +330,7 @@ function PostDetailPage() {
         left={<AppIconButton name='back' label='返回' className='post-detail-nav__back' onClick={() => void navigateBackOrHome()} />}
         center={headerCenter}
         right={post && isApproved && visibility.following ? (
-          <View className='post-detail-follow-hitbox' onClick={handleFollow}>
+          <View className={`post-detail-follow-hitbox${actioning ? ' post-detail-follow-hitbox--pending' : ''}`} role='button' aria-label={following ? '取消关注' : '关注作者'} onClick={handleFollow}>
             <Text className={`post-detail-follow${following ? ' post-detail-follow--active' : ''}`}>
               {following ? '已关注' : '关注'}
             </Text>
@@ -326,8 +351,10 @@ function PostDetailPage() {
       ) : (
         <>
           <ScrollView
-            className="post-detail-scroll"
+            className={`post-detail-scroll${hasActions ? ' post-detail-scroll--with-actions' : ''}`}
             scrollY
+            scrollIntoView={commentsAnchor}
+            scrollWithAnimation
             enhanced
             showScrollbar={false}
             lowerThreshold={120}
@@ -340,42 +367,57 @@ function PostDetailPage() {
               </View>
             ) : null}
 
-            {showHero ? (
-              <View className='post-detail-hero'>
-                <Image
-                  className='post-detail-hero__image'
-                  src={heroImage}
-                  mode='aspectFill'
-                  onError={() => setHeroAvailable(false)}
-                />
+            {mediaPending ? (
+              <View className='post-detail-hero post-detail-hero--loading'><Text>正在读取图片…</Text></View>
+            ) : showHero ? (
+              <View className='post-detail-hero' style={{ height: `${mediaHeight}rpx` }}>
+                <Swiper
+                  className='post-detail-gallery'
+                  current={Math.min(mediaIndex, media.length - 1)}
+                  circular={false}
+                  duration={200}
+                  onChange={(event) => setMediaIndex(event.detail.current)}
+                >
+                  {media.map((image) => (
+                    <SwiperItem key={image.src}>
+                      <Image
+                        className='post-detail-hero__image'
+                        src={image.src}
+                        mode='aspectFit'
+                        onError={() => setMedia((current) => current.filter((item) => item.src !== image.src))}
+                      />
+                    </SwiperItem>
+                  ))}
+                </Swiper>
+                {media.length > 1 && <Text className='post-detail-gallery__count'>{Math.min(mediaIndex + 1, media.length)} / {media.length}</Text>}
               </View>
-            ) : null}
+            ) : post.images.length > 0 ? <Text className='post-detail-media-error'>图片暂时无法显示，正文仍可阅读</Text> : null}
 
             <View className={`post-detail-content${showHero ? '' : ' post-detail-content--without-media'}`}>
               <Text className="post-detail-content__title">{post.title || '校园动态'}</Text>
-              <Text className="post-detail-content__body">{post.content}</Text>
+              {body ? <Text className="post-detail-content__body" selectable>{body}</Text> : null}
               {tags.length > 0 ? (
                 <View className="post-detail-tags">
                   {tags.map((tag) => <Text className="post-detail-tag" key={tag}>#{tag}</Text>)}
                 </View>
               ) : null}
               <Text className="post-detail-content__meta">
-                {[post.createdAt ? `${post.createdAt} 发布` : '', post.school].filter(Boolean).join(' · ')}
+                {[post.createdAt ? `${formatPostDate(post.createdAt)} 发布` : '', post.school].filter(Boolean).join(' · ')}
               </Text>
             </View>
 
             {isApproved && visibility.comment ? (
-              <View className="post-detail-comments">
+              <View className="post-detail-comments" id='post-comments'>
                 <Text className="post-detail-comments__title">共 {commentTotal || post.commentCount || comments.length} 条评论</Text>
-                {comments.map((comment, index) => (
+                {comments.map((comment) => (
                   <View className="post-detail-comment" key={comment.id}>
-                    <View className={`post-detail-comment__avatar post-detail-comment__avatar--${commentTone[index % commentTone.length]}`}>
+                    <View className='post-detail-comment__avatar'>
                       {comment.avatar ? <Image src={comment.avatar} mode='aspectFill' /> : (comment.author || '同').slice(0, 1)}
                     </View>
                     <View className="post-detail-comment__main">
                       <Text className="post-detail-comment__author">{comment.author || '同学'}</Text>
                       <Text className="post-detail-comment__content">{comment.content}</Text>
-                      <Text className="post-detail-comment__meta">{comment.createdAt}　回复</Text>
+                      <Text className="post-detail-comment__meta">{formatPostDate(comment.createdAt)}</Text>
                     </View>
                   </View>
                 ))}
@@ -400,11 +442,12 @@ function PostDetailPage() {
             ) : null}
           </ScrollView>
 
-          {isApproved ? (
+          {hasActions ? (
             <View className="post-detail-actionbar">
               {visibility.canComment && <Input
                 className="post-detail-input"
                 value={commentText}
+                disabled={submittingComment}
                 placeholder={submittingComment ? '发送中…' : '说点什么…'}
                 onInput={(event) => {
                   setCommentText(event.detail.value)
@@ -413,18 +456,24 @@ function PostDetailPage() {
                 confirmType="send"
                 onConfirm={handleSubmitComment}
               />}
-              {visibility.likes && <View className={`post-detail-action${liked ? ' post-detail-action--active' : ''}`} onClick={handleLike}>
+              {visibility.canComment && commentText.trim() ? (
+                <View className={`post-detail-send${submittingComment ? ' post-detail-send--pending' : ''}`} role='button' aria-label='发送评论' onClick={handleSubmitComment}>
+                  <Text>{submittingComment ? '发送中' : '发送'}</Text>
+                </View>
+              ) : <>
+              {visibility.likes && <View className={`post-detail-action${liked ? ' post-detail-action--active' : ''}${actioning ? ' post-detail-action--pending' : ''}`} role='button' aria-label={liked ? '取消点赞' : '点赞'} onClick={handleLike}>
                 <AppIcon name='heart' active={liked} className='post-detail-action__icon' />
                 <Text>{post.likedCount}</Text>
               </View>}
-              {visibility.favorites && <View className={`post-detail-action${favorited ? ' post-detail-action--active post-detail-action--favorite' : ''}`} onClick={handleFavorite}>
+              {visibility.favorites && <View className={`post-detail-action${favorited ? ' post-detail-action--active post-detail-action--favorite' : ''}${actioning ? ' post-detail-action--pending' : ''}`} role='button' aria-label={favorited ? '取消收藏' : '收藏'} onClick={handleFavorite}>
                 <AppIcon name='star' active={favorited} className='post-detail-action__icon' />
                 <Text>{post.favoriteCount}</Text>
               </View>}
-              {visibility.canComment && <View className="post-detail-action" onClick={handleSubmitComment}>
+              {visibility.comment && <View className="post-detail-action" role='button' aria-label='查看评论' onClick={showComments}>
                 <AppIcon name='comment' className='post-detail-action__icon' />
                 <Text>{post.commentCount || comments.length}</Text>
               </View>}
+              </>}
             </View>
           ) : null}
         </>

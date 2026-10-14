@@ -25,6 +25,7 @@ import {
   type ExternalTakeoutMerchantLink,
 } from '../../services/d-navigation'
 import './index.scss'
+import { formatPostDate, postBodyWithoutTitle } from '../../utils/post-presentation'
 
 type SearchScope = 'community' | 'secondhand' | 'takeout'
 type SearchResult = CommunityPost | Product | ExternalTakeoutMerchantLink
@@ -57,6 +58,7 @@ function SearchPage() {
   const copy = scope ? scopeCopy[scope] : null
   const initialKeyword = Taro.getCurrentInstance().router?.params?.keyword ?? ''
   const [keyword, setKeyword] = useState(initialKeyword)
+  const [submittedKeyword, setSubmittedKeyword] = useState('')
   const [history, setHistory] = useState<string[]>([])
   const [hot, setHot] = useState<string[]>([])
   const [results, setResults] = useState<SearchResult[]>([])
@@ -118,6 +120,7 @@ function SearchPage() {
       return
     }
     setKeyword(normalized)
+    setSubmittedKeyword(normalized)
     setLoading(true)
     setLoadingMore(false)
     setError('')
@@ -147,7 +150,7 @@ function SearchPage() {
   const loadMore = async () => {
     if (!scope || loading || loadingMore || results.length >= total) return
     const nextPage = page + 1
-    const normalized = keyword.trim()
+    const normalized = submittedKeyword
     const version = searchVersion.current
     setLoadingMore(true)
     setError('')
@@ -209,13 +212,13 @@ function SearchPage() {
       return (
         <View className='student-search-result' key={post.id} onClick={() => void openResult(post)}>
           <Text className='student-search-result__title'>{post.title}</Text>
-          <Text className='student-search-result__summary'>{post.content || '暂无正文'}</Text>
+          {postBodyWithoutTitle(post.title, post.content) && <Text className='student-search-result__summary'>{postBodyWithoutTitle(post.title, post.content)}</Text>}
           {(post.tags ?? []).length > 0 && (
             <View className='student-search-result__tags'>
               {(post.tags ?? []).map((tag) => <Text key={tag}>#{tag.replace(/^#+/, '')}</Text>)}
             </View>
           )}
-          <Text className='student-search-result__meta'>{post.author} · {post.createdAt}</Text>
+          <Text className='student-search-result__meta'>{post.author} · {formatPostDate(post.createdAt)}</Text>
         </View>
       )
     }
@@ -324,7 +327,7 @@ function SearchPage() {
         {hasSearched && (
           <View className='student-search-results'>
             <View className='student-search-results__head'>
-              <Text>{error && results.length === 0 ? '搜索失败' : `找到 ${total} 条结果`}</Text>
+              <Text>{loading ? '正在搜索…' : error && results.length === 0 ? '搜索失败' : `找到 ${total} 条结果`}</Text>
               <Text className='student-search-results__reset' onClick={() => setHasSearched(false)}>返回推荐</Text>
             </View>
             {error && (

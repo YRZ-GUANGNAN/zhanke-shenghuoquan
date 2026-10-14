@@ -1,6 +1,6 @@
 import { withFeaturePage } from '../../components/feature-page-gate'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Input, Text, Textarea, View } from '@tarojs/components'
+import { Image, Input, Text, Textarea, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import Taro from '../../services/taro'
 import { isApiError } from '../../services/api'
@@ -132,7 +132,7 @@ function PublishPostPage() {
       toast('先写点内容吧')
       return
     }
-    if (submitting) return
+    if (uploading || submitting) return
     const clientRequestId = clientRequestIdRef.current ?? createCommunityClientRequestId()
     clientRequestIdRef.current = clientRequestId
     setSubmitting(true)
@@ -205,14 +205,18 @@ function PublishPostPage() {
       />
 
       <View className='publish-post-body'>
-        <View className='publish-post-upload' onClick={() => void handlePickImages()}>
+        <View className='publish-post-media'>
+          {images.map((image) => <Image className='publish-post-media__image' key={image.assetId} src={image.previewPath} mode='aspectFill' />)}
+        <View className='publish-post-upload' role='button' aria-label='添加帖子图片' onClick={() => void handlePickImages()}>
           <Text className='publish-post-upload__icon'>{images.length > 0 ? '✓' : '＋'}</Text>
           <Text className='publish-post-upload__count'>{uploading ? uploadHint : `${images.length}/${MAX_IMAGES}`}</Text>
+        </View>
         </View>
 
         <Textarea
           className='publish-post-textarea'
           value={content}
+          disabled={submitting}
           maxlength={600}
           autoHeight={false}
           placeholder='分享你的校园生活：好吃的、求助、找搭子、攻略……'
@@ -221,6 +225,7 @@ function PublishPostPage() {
             setContent(event.detail.value)
           }}
         />
+        <Text className='publish-post-length'>{content.length} / 600</Text>
 
         <View className='publish-post-divider' />
 

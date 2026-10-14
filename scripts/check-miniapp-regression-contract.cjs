@@ -117,9 +117,9 @@ for (const className of [
 }
 requireMatch(myContent, /my-content-thumb--empty/, '无图片内容必须使用紧凑无图样式')
 requireMatch(myContent, /label\s*=\s*'无图'/, '无图片内容必须显示真实无图文案')
-requireMatch(postDetail, /heroAvailable[\s\S]*onError=\{\(\) => setHeroAvailable\(false\)\}/, '帖子首图加载失败后必须收起媒体区')
-requireMatch(postDetail, /Taro\.getImageInfo\(\{\s*src:\s*heroImage\s*\}\)/, '帖子首图展示前必须先校验媒体资源可用')
-requireMatch(postDetail, /showHero\s*\?[\s\S]*post-detail-hero/, '帖子详情必须只在首图有效时渲染媒体区')
+requireMatch(postDetail, /onError=\{\(\) => setMedia\([\s\S]*item\.src !== image\.src/, '附件渲染失败时必须移除失效图片并保留其他附件')
+requireMatch(postDetail, /preparePostMedia\(images,\s*\(src\) => Taro\.getImageInfo\(\{ src \}\)\)/, '帖子全部附件展示前必须校验媒体资源可用')
+requireMatch(postDetail, /showHero\s*\?[\s\S]*post-detail-hero/, '帖子详情必须只在存在有效附件时展示图集')
 forbidMatch(postDetailStyle, /post-detail-hero[\s\S]{0,240}background:\s*\$like-active/, '帖子媒体区不得恢复粉色占位背景')
 requireMatch(postDetail, /post-detail-follow-hitbox/, '帖子关注按钮必须使用独立点击热区')
 requireMatch(postDetail, /post-detail-comments__empty[\s\S]*还没有评论[\s\S]*成为第一个评论的人/, '无评论状态必须使用紧凑语义空态')

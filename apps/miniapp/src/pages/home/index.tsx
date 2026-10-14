@@ -4,6 +4,7 @@ import { useDidShow } from '@tarojs/taro'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import AppIcon from '../../components/app-icon'
+import { AppState } from '../../components/ui'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import StudentBottomNav from '../../components/student-bottom-nav'
 import CampusInfoHome from '../../components/campus-info-home'
@@ -19,6 +20,7 @@ import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import { usePageShare } from '../../hooks/use-page-share'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
+import { postBodyWithoutTitle } from '../../utils/post-presentation'
 import './index.scss'
 
 type HomeTab = 'messages' | 'discover' | 'tools'
@@ -26,13 +28,15 @@ type HomeTab = 'messages' | 'discover' | 'tools'
 type DiscoverCard = {
   id: string
   target: 'post' | 'secondhand'
-  tone: 'peach' | 'sky' | 'mint' | 'lilac' | 'lemon' | 'cyan'
-  mediaLabel: string
+  category: string
   title: string
+  summary: string
   author: string
   avatar: string
+  avatarUrl: string
   likes: number
-  height: 'short' | 'medium' | 'tall'
+  mediaCount: number
+  price?: number
   imageUrl?: string
 }
 
@@ -46,23 +50,11 @@ const tabs: Array<{ key: HomeTab; label: string }> = [
   { key: 'tools', label: '工具' }
 ]
 
-const tones: DiscoverCard['tone'][] = ['peach', 'sky', 'mint', 'lilac', 'lemon', 'cyan']
-const heights: DiscoverCard['height'][] = ['medium', 'tall', 'medium', 'medium', 'short']
-
 function settle<T>(promise: Promise<T>): Promise<SettledResult<T>> {
   return promise.then(
     (value) => ({ status: 'fulfilled', value }),
     (reason: unknown) => ({ status: 'rejected', reason })
   )
-}
-
-function stableNumber(value: string) {
-  return Array.from(value).reduce((hash, char) => ((hash * 31) + char.charCodeAt(0)) >>> 0, 7)
-}
-
-function visualFor(key: string) {
-  const value = stableNumber(key)
-  return { tone: tones[value % tones.length], height: heights[value % heights.length] }
 }
 
 function mergeUnique(current: DiscoverCard[], incoming: DiscoverCard[]) {
@@ -72,31 +64,34 @@ function mergeUnique(current: DiscoverCard[], incoming: DiscoverCard[]) {
 }
 
 function toPostCard(post: CommunityPost): DiscoverCard {
-  const visual = visualFor(`post:${post.id}`)
   return {
     id: post.id,
     target: 'post',
-    ...visual,
-    mediaLabel: `图 · ${post.topic || '校园'}`,
+    category: post.topic || '校园帖子',
     imageUrl: post.images[0],
+    mediaCount: post.images.length,
     title: post.title || post.content,
+    summary: postBodyWithoutTitle(post.title, post.content),
     author: post.author,
     avatar: post.author.slice(0, 1) || '校',
+    avatarUrl: post.avatar,
     likes: post.likedCount
   }
 }
 
 function toProductCard(product: Product): DiscoverCard {
-  const visual = visualFor(`product:${product.id}`)
   return {
     id: product.id,
     target: 'secondhand',
-    ...visual,
-    mediaLabel: `图 · ${product.category || '二手'}`,
+    category: `二手 · ${product.category || '闲置'}`,
     imageUrl: product.images[0],
+    mediaCount: product.images.length,
     title: product.title,
+    summary: product.description,
     author: product.sellerName,
     avatar: product.sellerName.slice(0, 1) || '校',
+    avatarUrl: product.sellerAvatar,
+    price: product.price,
     likes: product.favoriteCount
   }
 }
@@ -248,10 +243,8 @@ function HomeContent() {
       } else if (
         !communityFailed &&
         !tradeFailed &&
-        state.communityPage > 0 &&
-        state.tradePage > 0 &&
-        state.communityTotal === 0 &&
-        state.tradeTotal === 0
+        (!sources.community || (state.communityPage > 0 && state.communityTotal === 0)) &&
+        (!sources.trade || (state.tradePage > 0 && state.tradeTotal === 0))
       ) {
         setInitialStatus('empty')
       } else {
@@ -393,19 +386,23 @@ function HomeContent() {
   }
 
   const renderDiscoverCard = (card: DiscoverCard) => {
-    const imageKey = `${card.target}:${card.id}`
+    const cardKey = `${card.target}:${card.id}`
+    const imageKey = `${cardKey}:${card.imageUrl}`
     return (
       <View
-        key={imageKey}
-        className='student-post-card'
+        key={cardKey}
+        className={`student-post-card${card.imageUrl ? '' : ' student-post-card--text'}`}
+        role='button'
+        aria-label={card.title}
         onClick={() => openCard(card)}
       >
-        <View className={`student-post-card__media student-post-card__media--${card.tone} student-post-card__media--${card.height}`}>
-          {card.imageUrl && !failedImageKeys.has(imageKey) ? (
+        {card.imageUrl ? <View className={`student-post-card__media student-post-card__media--${card.target}`}>
+          {!failedImageKeys.has(imageKey) ? (
             <Image
               className='student-post-card__image'
               src={card.imageUrl}
               mode='aspectFill'
+              lazyLoad
               onError={() => setFailedImageKeys((current) => {
                 const next = new Set(current)
                 next.add(imageKey)
@@ -413,18 +410,22 @@ function HomeContent() {
               })}
             />
           ) : (
-            <Text>{card.mediaLabel}</Text>
+            <Text className='student-post-card__media-error'>图片暂时无法显示</Text>
           )}
-        </View>
+          {card.mediaCount > 1 && !failedImageKeys.has(imageKey) && <Text className='student-post-card__media-count'>{card.mediaCount} 图</Text>}
+        </View> : null}
         <View className='student-post-card__body'>
+          <Text className='student-post-card__category'>{card.category}</Text>
           <Text className='student-post-card__title'>{card.title}</Text>
+          {!card.imageUrl && card.summary && card.summary !== card.title && <Text className='student-post-card__summary'>{card.summary}</Text>}
+          {card.target === 'secondhand' && <Text className='student-post-card__price'>¥{card.price}</Text>}
           <View className='student-post-card__meta'>
-            <View className={`student-post-card__avatar student-post-card__avatar--${card.tone}`}>
-              <Text>{card.avatar}</Text>
+            <View className='student-post-card__avatar'>
+              {card.avatarUrl ? <Image src={card.avatarUrl} mode='aspectFill' lazyLoad /> : <Text>{card.avatar}</Text>}
             </View>
             <Text className='student-post-card__author'>{card.author}</Text>
             {(card.target === 'secondhand' ? visibility.favorites : visibility.likes) && <View className='student-post-card__like'>
-              <AppIcon name='heart' className='student-post-card__heart' />
+              <AppIcon name={card.target === 'secondhand' ? 'star' : 'heart'} className='student-post-card__heart' />
               <Text>{card.likes}</Text>
             </View>}
           </View>
@@ -435,25 +436,15 @@ function HomeContent() {
 
   const renderDiscoverState = () => {
     const retrying = initialStatus === 'error' && loadingMore
-    const copy = initialStatus === 'loading' || retrying
-      ? { media: '正在加载', title: retrying ? '正在重新连接社区与二手集市...' : '正在加载校园新鲜事...' }
-      : initialStatus === 'empty'
-        ? { media: '暂无内容', title: '社区与二手集市暂时还没有内容' }
-        : { media: '加载失败', title: '社区与二手集市加载失败，点击重试' }
+    const pending = initialStatus === 'loading' || retrying
     return (
-      <View className='student-waterfall student-waterfall--state'>
-        <View
-          className={`student-post-card student-post-card--state ${initialStatus === 'error' && !retrying ? 'student-post-card--retry' : ''}`}
-          onClick={initialStatus === 'error' && !retrying ? () => void loadDiscover(false, sourceError) : undefined}
-        >
-          <View className='student-post-card__media student-post-card__media--sky student-post-card__media--medium'>
-            <Text>{copy.media}</Text>
-          </View>
-          <View className='student-post-card__body'>
-            <Text className='student-post-card__title'>{copy.title}</Text>
-          </View>
-        </View>
-      </View>
+      <AppState
+        kind={pending ? 'loading' : initialStatus === 'empty' ? 'empty' : 'error'}
+        title={pending ? '正在读取校园动态' : initialStatus === 'empty' ? '暂时还没有内容' : '内容加载失败'}
+        description={pending ? '请稍候…' : initialStatus === 'empty' ? '有新内容时会显示在这里' : '请检查网络后重新试试'}
+        actionText={initialStatus === 'error' && !retrying ? '重新加载' : undefined}
+        onAction={() => void loadDiscover(false, sourceError)}
+      />
     )
   }
 
