@@ -1,10 +1,12 @@
 @use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
 
 page {
   background: $bg-app;
 }
 
 .delivery-chat-page {
+  @include ref.page-foundation;
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -46,34 +48,35 @@ page {
 }
 
 .delivery-chat-order__title {
-  font-size: 29rpx;
-  font-weight: 700;
+  @include ref.type(label);
+  @include ref.wrap;
 }
 
 .delivery-chat-order__id {
+  @include ref.type(meta);
   max-width: 500rpx;
   margin-top: 6rpx;
   overflow: hidden;
   color: $text-tertiary;
-  font-size: 20rpx;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
 .delivery-chat-order__back {
+  @include ref.touch;
+  flex: 0 0 auto;
   min-width: 144rpx;
-  min-height: 68rpx;
 }
 
 .delivery-chat-safe {
+  @include ref.type(meta);
+  @include ref.wrap;
   flex: 0 0 auto;
   padding: 16rpx 28rpx;
   border-bottom: 1rpx solid $border-subtle;
   color: $text-secondary;
   background: $brand-tint;
-  font-size: 21rpx;
-  line-height: 1.5;
 }
 
 .delivery-chat-scroll {
@@ -84,6 +87,8 @@ page {
 }
 
 .delivery-chat-state {
+  @include ref.type(meta);
+  @include ref.wrap;
   max-width: 560rpx;
   margin: 42rpx auto;
   padding: 28rpx 30rpx;
@@ -92,8 +97,6 @@ page {
   color: $text-secondary;
   background: $bg-surface;
   text-align: center;
-  font-size: 24rpx;
-  line-height: 1.55;
 }
 
 .delivery-chat-state--error {
@@ -103,7 +106,7 @@ page {
 }
 
 .delivery-chat-state__retry {
-  min-height: 64rpx;
+  @include ref.touch;
   margin-top: 10rpx;
   display: flex;
   align-items: center;
@@ -122,15 +125,14 @@ page {
 }
 
 .delivery-chat-bubble {
+  @include ref.type(comment);
+  @include ref.wrap;
   max-width: 76%;
   padding: 18rpx 20rpx 12rpx;
   border: 1rpx solid $border-subtle;
   border-radius: 8rpx 22rpx 22rpx 22rpx;
   background: $bg-surface;
   box-shadow: 0 6rpx 18rpx rgba(42, 73, 108, .05);
-  font-size: 26rpx;
-  line-height: 1.55;
-  word-break: break-word;
 }
 
 .delivery-chat-bubble--mine {
@@ -143,7 +145,9 @@ page {
 .delivery-chat-time {
   margin-top: 7rpx;
   opacity: .68;
-  font-size: 18rpx;
+  font-size: 22rpx;
+  line-height: 32rpx;
+  white-space: nowrap;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -169,9 +173,10 @@ page {
 }
 
 .delivery-chat-input {
+  @include ref.touch;
   flex: 1;
   min-width: 0;
-  height: 88rpx;
+  min-height: 44PX;
   padding: 0 24rpx;
   border: 2rpx solid transparent;
   border-radius: $radius-control;
@@ -187,20 +192,24 @@ page {
 
 .delivery-chat-image-button,
 .delivery-chat-send {
+  @include ref.touch;
   flex: 0 0 auto;
-  height: 88rpx;
+  min-height: 44PX;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   margin: 0;
   padding: 0;
   border: 0;
   border-radius: $radius-control;
   font-size: 24rpx;
-  line-height: 88rpx;
+  line-height: 1.35;
   box-sizing: border-box;
 }
 
 .delivery-chat-image-button {
   width: 88rpx;
-  min-width: 88rpx;
+  min-width: max(44PX, 88rpx);
   display: flex;
   align-items: center;
   justify-content: center;

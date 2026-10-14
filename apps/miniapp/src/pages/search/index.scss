@@ -1,6 +1,8 @@
 @use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
 
 .student-search-page {
+  @include ref.page-foundation;
   position: relative;
   height: 100vh;
   display: flex;
@@ -210,22 +212,20 @@
 }
 
 .student-search-filter-title {
+  @include ref.type(title);
+  @include ref.wrap;
   display: block;
   color: $text-strong;
-  font-size: 18PX;
-  line-height: 44rpx;
-  font-weight: 700;
 }
 
 .student-search-filter-description,
 .student-search-filter-hint,
 .student-search-filter-unit {
+  @include ref.type(meta);
+  @include ref.wrap;
   display: block;
   margin-top: 6rpx;
   color: $text-secondary;
-  font-size: 12PX;
-  line-height: 18PX;
-  font-weight: 400;
 }
 
 .student-search-filter-cancel,
@@ -253,10 +253,10 @@
 }
 
 .student-search-filter-label {
+  @include ref.type(label);
   display: block;
   margin-bottom: 18rpx;
   color: $text-strong;
-  font-size: 14PX;
   font-weight: 700;
 }
 
@@ -267,10 +267,12 @@
 }
 
 .student-search-filter-option {
+  @include ref.type(author);
+  @include ref.wrap;
   box-sizing: border-box;
   min-width: 132rpx;
   min-height: 44PX;
-  padding: 0 22rpx;
+  padding: 12rpx 22rpx;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -278,7 +280,8 @@
   border-radius: 12rpx;
   color: $text-secondary;
   background: $bg-surface;
-  font-size: 13PX;
+  max-width: 100%;
+  text-align: center;
 }
 
 .student-search-filter-option--selected {
@@ -314,11 +317,11 @@
 }
 
 .student-search-filter-error {
+  @include ref.type(meta);
+  @include ref.wrap;
   display: block;
   margin: 0 0 12rpx;
   color: #c74848;
-  font-size: 23rpx;
-  line-height: 34rpx;
 }
 
 .student-search-filter-footer {
@@ -366,17 +369,19 @@
 
 .student-search-section__title,
 .student-search-results__head {
-  font-size: 28rpx;
+  @include ref.type(label);
+  @include ref.wrap;
   font-weight: 700;
   color: $text-strong;
 }
 
 .student-search-section__clear,
 .student-search-results__reset {
+  @include ref.touch;
+  @include ref.type(meta);
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
-  min-height: 64rpx;
-  font-size: 24rpx;
   color: $brand-primary;
 }
 
@@ -389,15 +394,17 @@
 }
 
 .student-search-chip {
+  @include ref.type(author);
+  @include ref.wrap;
+  @include ref.touch;
   box-sizing: border-box;
-  min-height: 64rpx;
-  padding: 0 24rpx;
+  max-width: 100%;
+  padding: 12rpx 24rpx;
   border-radius: 28rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10rpx;
-  font-size: 26rpx;
 }
 
 .student-search-chip--history {
@@ -421,11 +428,11 @@
 .student-search-muted,
 .student-search-state,
 .student-search-invalid {
+  @include ref.type(meta);
+  @include ref.wrap;
   display: block;
   padding: 40rpx 0;
   color: $text-muted;
-  font-size: 26rpx;
-  line-height: 40rpx;
   text-align: center;
 }
 
@@ -448,29 +455,27 @@
 }
 
 .student-search-result__title {
+  @include ref.type(body);
+  @include ref.wrap;
   display: -webkit-box;
   min-width: 0;
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   flex: 1;
-  font-size: 30rpx;
-  line-height: 44rpx;
   font-weight: 600;
   color: $text-strong;
-  word-break: break-word;
 }
 
 .student-search-result__summary {
+  @include ref.type(comment);
+  @include ref.wrap;
   display: -webkit-box;
   margin-top: 8rpx;
   overflow: hidden;
   color: $text-secondary;
-  font-size: 25rpx;
-  line-height: 38rpx;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  word-break: break-word;
 }
 
 .student-search-result--post {
@@ -494,7 +499,7 @@
 .student-search-result--product .student-search-result__row { flex-wrap: wrap; gap: 8rpx; }
 .student-search-result--product .student-search-result__title { flex: 0 0 100%; }
 .student-search-result--product .student-search-result__price { font-variant-numeric: tabular-nums; }
-.student-search-result--product .student-search-result__meta { line-height: 32rpx; }
+.student-search-result--product .student-search-result__meta { line-height: 36rpx; }
 
 .student-search-result__main {
   flex: 1;
@@ -517,12 +522,16 @@
 }
 
 .student-search-result__media-error {
+  @include ref.type(meta);
+  @include ref.wrap;
+  padding: 12rpx;
+  box-sizing: border-box;
+  text-align: center;
   display: flex;
   height: 100%;
   align-items: center;
   justify-content: center;
   color: $text-secondary;
-  font-size: 22rpx;
 }
 
 .student-search-result--read .student-search-result__title {
@@ -535,7 +544,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  line-height: 32rpx;
+  line-height: 36rpx;
 }
 
 .student-search-result--post .student-search-result__tags text + text {
@@ -544,12 +553,12 @@
 
 .student-search-result__meta,
 .student-search-result__tags {
+  @include ref.type(meta);
   display: flex;
   flex-wrap: wrap;
   gap: 12rpx;
   margin-top: 16rpx;
   color: $text-secondary;
-  font-size: 22rpx;
 }
 
 .student-search-result__tags {
@@ -557,6 +566,11 @@
 }
 
 .student-search-result__price {
+  flex: 0 0 auto;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: #e3572b;
   font-size: 30rpx;
   font-weight: 800;
@@ -583,16 +597,17 @@
 }
 
 .student-search-state--action {
+  @include ref.touch;
   padding-top: 0;
   color: $brand-primary;
 }
 
 .student-search-suggestion-status {
+  @include ref.type(meta);
+  @include ref.wrap;
   display: block;
   padding: 0 0 24rpx;
   color: $text-secondary;
-  font-size: 24rpx;
-  line-height: 36rpx;
 }
 
 .student-search-skeleton {

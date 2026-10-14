@@ -1,6 +1,8 @@
 @use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
 
 .secondhand-chat-page {
+  @include ref.page-foundation;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -14,23 +16,24 @@
 
 .secondhand-chat-header__back {
   position: relative;
-  width: 44px;
-  height: 44px;
+  width: 44PX;
+  height: 44PX;
 }
 
 .secondhand-chat-header__back::before {
   position: absolute;
-  top: 13px;
-  left: 15px;
-  width: 14px;
-  height: 14px;
-  border-bottom: 3px solid $text-strong;
-  border-left: 3px solid $text-strong;
+  top: 15PX;
+  left: 17PX;
+  width: 12PX;
+  height: 12PX;
+  border-bottom: 2PX solid $text-strong;
+  border-left: 2PX solid $text-strong;
   content: '';
   transform: rotate(45deg);
 }
 
 .secondhand-chat-seller {
+  flex: 1;
   display: flex;
   align-items: center;
   min-width: 0;
@@ -52,6 +55,7 @@
 }
 
 .secondhand-chat-seller__avatar {
+  flex: 0 0 auto;
   overflow: hidden;
 }
 
@@ -70,10 +74,11 @@
 }
 
 .secondhand-chat-seller__name {
+  @include ref.type(label);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: $text-strong;
-  font-size: 30rpx;
-  font-weight: 900;
-  line-height: 1.1;
 }
 
 .secondhand-chat-seller__state {
@@ -99,8 +104,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 44PX;
+  height: 44PX;
   border: 1rpx solid $divider-nav;
   border-radius: 50%;
   box-sizing: border-box;
@@ -132,7 +137,7 @@
   z-index: 4;
   flex: 0 0 auto;
   display: grid;
-  grid-template-columns: 72rpx 1fr 72rpx;
+  grid-template-columns: 72rpx minmax(0, 1fr) minmax(44PX, auto);
   align-items: center;
   gap: 18rpx;
   padding: 20rpx 36rpx;
@@ -183,10 +188,11 @@
 }
 
 .secondhand-chat-product__button {
+  @include ref.touch;
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 46rpx;
+  padding: 8rpx 14rpx;
   border-radius: 999rpx;
   background: $brand-tint;
   color: $brand-primary;
@@ -207,7 +213,7 @@
 
 .secondhand-chat-scroll__inner {
   min-height: 100%;
-  padding: 22rpx 30rpx 150rpx;
+  padding: 24rpx 30rpx calc(44PX + 72rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
 }
 
@@ -223,14 +229,14 @@
 }
 
 .secondhand-chat-safe-tip text {
+  @include ref.type(meta);
+  @include ref.wrap;
   display: inline-flex;
   max-width: 560rpx;
   padding: 10rpx 24rpx;
   border-radius: 999rpx;
   background: rgba($brand-primary, .07);
   color: $text-muted;
-  font-size: 22rpx;
-  line-height: 1.3;
 }
 
 .secondhand-chat-state {
@@ -259,10 +265,10 @@
 }
 
 .secondhand-chat-state__desc {
+  @include ref.type(meta);
+  @include ref.wrap;
   margin-top: 14rpx;
   color: $text-muted;
-  font-size: 23rpx;
-  line-height: 1.55;
 }
 
 .secondhand-chat-row {
@@ -292,22 +298,23 @@
 }
 
 .secondhand-chat-bubble {
+  @include ref.type(comment);
+  @include ref.wrap;
   display: flex;
   flex-direction: column;
   gap: 8rpx;
-  max-width: 456rpx;
+  max-width: min(456rpx, calc(100% - 72rpx));
   padding: 22rpx 26rpx;
   border-radius: 18rpx;
-  font-size: 27rpx;
-  line-height: 1.55;
   box-shadow: $shadow-card;
 }
 
 .secondhand-chat-bubble__time {
   align-self: flex-end;
   color: $text-faint;
-  font-size: 19rpx;
-  line-height: 1;
+  font-size: 22rpx;
+  line-height: 32rpx;
+  white-space: nowrap;
 }
 
 .secondhand-chat-bubble--me .secondhand-chat-bubble__time {
@@ -331,6 +338,7 @@
   align-items: center;
   justify-content: center;
   width: 246rpx;
+  max-width: calc(100% - 72rpx);
   height: 176rpx;
   overflow: hidden;
   border-radius: 20rpx;
@@ -352,9 +360,9 @@
   left: 0;
   z-index: 10;
   display: grid;
-  grid-template-columns: 64rpx 1fr 92rpx;
+  grid-template-columns: minmax(0, 1fr) minmax(44PX, auto);
   align-items: center;
-  gap: 18rpx;
+  gap: 12rpx;
   padding: 18rpx 28rpx calc(30rpx + env(safe-area-inset-bottom));
   border-top: 1rpx solid $divider-nav;
   background: rgba($bg-surface, .98);
@@ -365,10 +373,11 @@
 }
 
 .secondhand-chat-input-wrap {
+  @include ref.touch;
   display: flex;
   align-items: center;
   min-width: 0;
-  height: 64rpx;
+  min-height: 44PX;
   padding: 0 24rpx;
   border-radius: 999rpx;
   background: $bg-screen;
@@ -378,6 +387,7 @@
   width: 100%;
   color: $text-strong;
   font-size: 26rpx;
+  min-height: 44PX;
 }
 
 .secondhand-chat-input__placeholder {
@@ -385,10 +395,12 @@
 }
 
 .secondhand-chat-send {
+  @include ref.touch;
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 64rpx;
+  min-height: 44PX;
+  padding: 8rpx 12rpx;
   border-radius: 999rpx;
   background: #CAD8E6;
   color: $text-on-color;

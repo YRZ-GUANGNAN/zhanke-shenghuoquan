@@ -1,6 +1,8 @@
 @use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
 
 .student-secondhand-page {
+  @include ref.page-foundation;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -27,10 +29,9 @@
   padding-left: 24rpx;
 }
 .student-secondhand-header__title {
+  @include ref.type(title);
   color: $text-strong;
-  font-size: 36rpx;
   font-weight: 700;
-  line-height: 48rpx;
   white-space: nowrap;
 }
 .student-secondhand-search {
@@ -82,15 +83,14 @@
   padding: 0 24rpx;
 }
 .student-secondhand-category {
+  @include ref.touch;
+  @include ref.type(label);
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 64rpx;
   height: 88rpx;
   color: $text-secondary;
-  font-size: 28rpx;
-  font-weight: 500;
 }
 .student-secondhand-category--active {
   color: $brand-primary;
@@ -112,14 +112,14 @@
   min-height: 0;
 }
 .student-secondhand-notice {
+  @include ref.type(meta);
+  @include ref.wrap;
   display: flex;
   align-items: center;
   gap: 12rpx;
   margin: 0 24rpx;
   padding: 24rpx 0;
   color: $text-secondary;
-  font-size: 23rpx;
-  line-height: 32rpx;
 }
 .student-secondhand-notice__icon {
   flex: 0 0 auto;
@@ -158,13 +158,17 @@
   height: 100%;
 }
 .secondhand-card__no-image {
+  @include ref.type(meta);
+  @include ref.wrap;
+  padding: 16rpx;
+  box-sizing: border-box;
+  text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 16rpx;
   color: $text-secondary;
-  font-size: 22rpx;
 }
 .secondhand-card__no-image .app-icon {
   width: 48rpx;
@@ -181,6 +185,8 @@
   color: $text-on-color;
   font-size: 20rpx;
   line-height: 28rpx;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
 }
 .secondhand-card__status {
   position: absolute;
@@ -196,25 +202,23 @@
   padding: 16rpx 8rpx 0;
 }
 .secondhand-card__title {
+  @include ref.type(label);
+  @include ref.wrap;
   display: -webkit-box;
   height: 80rpx;
   overflow: hidden;
   color: $text-primary;
-  font-size: 28rpx;
   font-weight: 600;
-  line-height: 40rpx;
-  word-break: break-all;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 .secondhand-card__meta {
+  @include ref.type(meta);
   display: block;
-  height: 32rpx;
+  height: 36rpx;
   margin-top: 8rpx;
   overflow: hidden;
   color: $text-secondary;
-  font-size: 22rpx;
-  line-height: 32rpx;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -256,10 +260,11 @@
   text-align: center;
 }
 .secondhand-card__seller-name {
+  @include ref.type(meta);
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   color: $text-secondary;
-  font-size: 22rpx;
-  line-height: 32rpx;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -273,14 +278,15 @@
   width: 60%;
 }
 .student-secondhand-footer {
+  @include ref.type(meta);
+  @include ref.wrap;
   min-height: 88rpx;
   padding: 32rpx 24rpx calc(152rpx + env(safe-area-inset-bottom));
   color: $text-secondary;
-  font-size: 24rpx;
-  line-height: 40rpx;
   text-align: center;
 }
 .student-secondhand-footer__retry {
+  @include ref.touch;
   display: block;
   padding: 24rpx 0;
   color: $brand-primary;

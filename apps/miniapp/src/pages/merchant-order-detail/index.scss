@@ -1,5 +1,6 @@
 @use 'sass:color';
 @use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
 
 $detail-orange: color.adjust($like-active, $hue: 30deg, $saturation: -7%, $lightness: 1%);
 $detail-orange-soft: color.mix($detail-orange, $bg-surface, 13%);
@@ -15,6 +16,7 @@ page {
 }
 
 .merchant-order-detail-page {
+  @include ref.page-foundation;
   height: 100vh;
   background: $bg-app;
   color: $text-primary;
@@ -36,11 +38,11 @@ page {
 }
 
 .merchant-detail-nav__refresh {
+  @include ref.touch;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  min-width: 64px;
-  min-height: 44px;
+  min-width: 64PX;
   color: $brand-primary;
   font-size: 25rpx;
   white-space: nowrap;
@@ -53,7 +55,7 @@ page {
 }
 
 .merchant-detail-content {
-  padding: 26rpx 34rpx 56rpx;
+  padding: 24rpx 32rpx calc(48rpx + env(safe-area-inset-bottom));
 }
 
 .merchant-detail-status-card,
@@ -102,11 +104,11 @@ page {
 }
 
 .merchant-detail-status-card__sub {
+  @include ref.type(meta);
+  @include ref.wrap;
   display: block;
   margin-top: 16rpx;
   color: $text-tertiary;
-  font-size: 22rpx;
-  line-height: 1.25;
 }
 
 .merchant-detail-status-card__fee {
@@ -125,10 +127,9 @@ page {
 }
 
 .merchant-detail-status-card__pay {
+  @include ref.type(meta);
   margin-top: 12rpx;
   color: $text-tertiary;
-  font-size: 22rpx;
-  line-height: 1;
 }
 
 .merchant-detail-status-card__divider {
@@ -139,14 +140,15 @@ page {
 }
 
 .merchant-detail-status-card__meta {
+  @include ref.type(meta);
+  @include ref.wrap;
   width: 100%;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 24rpx;
+  gap: 12rpx;
   color: $text-secondary;
-  font-size: 22rpx;
-  line-height: 1.2;
 }
 
 .merchant-detail-rider-card {
@@ -179,27 +181,30 @@ page {
 }
 
 .merchant-detail-rider-card__name {
+  @include ref.type(author);
+  @include ref.wrap;
   color: $text-primary;
-  font-size: 24rpx;
-  line-height: 1.22;
 }
 
 .merchant-detail-rider-card__phone {
+  @include ref.type(meta);
+  @include ref.wrap;
   margin-top: 8rpx;
   color: $text-secondary;
-  font-size: 23rpx;
-  line-height: 1;
 }
 
 .merchant-detail-rider-card__actions {
+  flex: 0 0 auto;
+  margin-left: 16rpx;
   display: flex;
   align-items: center;
   gap: 16rpx;
 }
 
 .merchant-detail-rider-card__circle {
-  width: 60rpx;
-  height: 60rpx;
+  @include ref.touch;
+  width: 44PX;
+  height: 44PX;
   border: 1rpx solid $divider-nav;
   border-radius: 999rpx;
   background: $bg-surface;
@@ -217,11 +222,9 @@ page {
 }
 
 .merchant-detail-section-title {
+  @include ref.type(label);
   display: block;
   color: $text-strong;
-  font-size: 28rpx;
-  font-weight: 850;
-  line-height: 1.2;
 }
 
 .merchant-detail-timeline {
@@ -292,13 +295,14 @@ page {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 22rpx;
+  flex-wrap: wrap;
+  gap: 6rpx 16rpx;
 }
 
 .merchant-detail-timeline__title {
+  @include ref.type(author);
+  @include ref.wrap;
   color: $text-primary;
-  font-size: 25rpx;
-  line-height: 1.18;
 }
 
 .merchant-detail-timeline__title--current {
@@ -311,18 +315,17 @@ page {
 }
 
 .merchant-detail-timeline__time {
+  @include ref.type(meta);
   flex: 0 0 auto;
   color: $text-tertiary;
-  font-size: 22rpx;
-  line-height: 1;
 }
 
 .merchant-detail-timeline__note {
+  @include ref.type(meta);
+  @include ref.wrap;
   display: block;
   margin-top: 10rpx;
   color: $text-tertiary;
-  font-size: 22rpx;
-  line-height: 1.25;
 }
 
 .merchant-detail-photo-card {
@@ -334,17 +337,17 @@ page {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 20rpx;
 }
 
 .merchant-detail-photo-card__privacy {
+  @include ref.type(meta);
   flex: 0 0 auto;
   padding: 8rpx 16rpx;
   border-radius: 8rpx;
   background: $detail-orange-soft;
   color: $detail-orange;
-  font-size: 20rpx;
-  line-height: 1;
 }
 
 .merchant-detail-photo-grid {
@@ -359,8 +362,9 @@ page {
 }
 
 .merchant-detail-photo-item__thumb {
-  height: 146rpx;
-  border-radius: 18rpx;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: 12rpx;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -401,10 +405,9 @@ page {
 }
 
 .merchant-detail-photo-item__caption {
+  @include ref.type(meta);
   display: block;
   margin-top: 16rpx;
-  font-size: 20rpx;
-  line-height: 1.2;
 }
 
 .merchant-detail-photo-item__caption--ready {

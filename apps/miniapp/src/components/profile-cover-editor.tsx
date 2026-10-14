@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Button, Image, Text, View } from '@tarojs/components'
 import AppIcon from './app-icon'
 import { updateProfileCover } from '../services/a-user'
+import { isApiError } from '../services/api'
 import { chooseAndUploadImages, waitForMediaApproval, type UploadedMedia } from '../services/media'
 import Taro from '../services/taro'
 import { useSessionStore } from '../stores/session'
@@ -58,7 +59,9 @@ export default function ProfileCoverEditor({ disabled = false, isProfileBusy, on
       setMessage('图片已通过审核，保存封面后生效')
     } catch (reason) {
       if (!isCurrent()) return
-      const text = reason instanceof Error ? reason.message : String((reason as { errMsg?: string })?.errMsg || '封面上传失败，请重试')
+      const text = isApiError(reason) && reason.status === 400 && reason.message === 'invalid media upload request'
+        ? '服务器未接受封面上传请求，请确认封面功能已更新后重试。'
+        : reason instanceof Error ? reason.message : String((reason as { errMsg?: string })?.errMsg || '封面上传失败，请重试')
       if (!/cancel|取消/i.test(text)) setError(text)
       setMessage('')
     } finally { finish() }

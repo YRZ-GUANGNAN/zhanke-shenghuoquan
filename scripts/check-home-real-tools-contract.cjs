@@ -82,14 +82,16 @@ const openToolStart = home.indexOf('  const openTool = async')
 const openToolEnd = home.indexOf('\n\n  const renderDiscoverCard', openToolStart)
 const openTool = home.slice(openToolStart, openToolEnd)
 assert.match(openTool, /await Taro\.showToast[\s\S]*catch/)
-// The profile row remains one editor target; system/capsule whitespace is not clickable.
-assert.match(profile, /student-profile-user'[^\n]*onClick=\{openProfileEditor\}/)
+// Explicit editor targets share a navigation lock; surrounding whitespace is inert.
+assert.doesNotMatch(profile, /student-profile-user'[^\n]*onClick=/)
+for (const target of ['avatar', 'main', 'edit']) {
+  assert.ok(new RegExp(`student-profile-user__${target}'[^\\n]*onClick=\\{openProfileEditor\\}`).test(profile), `${target} keeps the existing editor destination`)
+}
 assert.doesNotMatch(profile, /student-profile-hero'[^\n]*onClick=/)
 assert.match(profile, /const openProfileEditor = \(\) =>/)
 assert.match(profile, /profileNavigationLockRef/)
 assert.match(profile, /if \(profileNavigationLockRef\.current \|\| roleSwitchLockRef\.current\) return/)
 assert.match(profile, /profileNavigationLockRef\.current = true[\s\S]*Taro\.navigateTo[\s\S]*\.catch\(\(\) => \{[\s\S]*profileNavigationLockRef\.current = false/)
-assert.doesNotMatch(profile, /student-profile-user__edit' onClick=/)
-assert.match(profileStyle, /\.student-profile-user:active/)
+assert.match(profileStyle, /\.student-profile-user__edit:active/)
 
 console.log('home real tools contract: ok')

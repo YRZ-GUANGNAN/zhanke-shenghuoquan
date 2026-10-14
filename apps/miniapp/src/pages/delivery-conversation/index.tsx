@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Button, Image, Input, ScrollView, Text, View } from '@tarojs/components'
-import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import AppIcon from '../../components/app-icon'
 import { isApiError } from '../../services/api'
 import {
@@ -191,7 +190,6 @@ export default function DeliveryConversationPage() {
   return (
     <View className='delivery-chat-page'>
       <View className='delivery-chat-header'>
-        <CapsuleSystemRow />
         <View className='delivery-chat-order'>
           <View className='delivery-chat-order__main'>
             <Text className='delivery-chat-order__title'>配送单沟通</Text>

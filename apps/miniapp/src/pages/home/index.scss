@@ -1,6 +1,8 @@
 @use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
 
 .student-home-page {
+  @include ref.page-foundation;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -32,11 +34,11 @@
 }
 
 .student-home-header__tab {
+  @include ref.touch;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
   padding: 0 4rpx;
   color: $text-tertiary;
   font-size: 32rpx;
@@ -143,6 +145,8 @@
 }
 
 .student-post-card__media-error {
+  @include ref.type(meta);
+  @include ref.wrap;
   position: absolute;
   inset: 0;
   display: flex;
@@ -150,7 +154,6 @@
   justify-content: center;
   padding: 24rpx;
   color: $text-secondary;
-  font-size: 22rpx;
   text-align: center;
 }
 
@@ -173,6 +176,8 @@
   color: $text-on-color;
   font-size: 20rpx;
   line-height: 28rpx;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
 }
 
 .student-post-card__body {
@@ -191,25 +196,23 @@
 }
 
 .student-post-card__title {
+  @include ref.type(label);
+  @include ref.wrap;
   display: -webkit-box;
   overflow: hidden;
   color: $text-primary;
-  font-size: 28rpx;
   font-weight: 600;
-  line-height: 40rpx;
-  word-break: break-word;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
 .student-post-card__summary {
+  @include ref.type(comment);
+  @include ref.wrap;
   display: -webkit-box;
   margin-top: 12rpx;
   overflow: hidden;
   color: $text-secondary;
-  font-size: 26rpx;
-  line-height: 40rpx;
-  word-break: break-word;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 5;
 }
@@ -253,25 +256,22 @@
 }
 
 .student-post-card__author {
+  @include ref.type(meta);
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   color: $text-secondary;
-  font-size: 22rpx;
-  font-weight: 400;
-  line-height: 32rpx;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
 .student-post-card__like {
+  @include ref.type(meta);
   flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 8rpx;
   color: $like-idle-count;
-  font-size: 22rpx;
-  font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
 
@@ -286,6 +286,8 @@
 }
 
 .student-discover-feedback {
+  @include ref.type(meta);
+  @include ref.wrap;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -293,7 +295,6 @@
   margin: 0 24rpx 16rpx;
   background: $bg-surface;
   color: $text-secondary;
-  font-size: 23rpx;
 }
 
 .student-discover-feedback--retry {
@@ -340,12 +341,13 @@
 }
 
 .student-message-state {
+  @include ref.type(meta);
+  @include ref.wrap;
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 240rpx;
   color: $text-muted;
-  font-size: 25rpx;
   text-align: center;
 }
 
@@ -378,22 +380,29 @@
 }
 
 .student-message-row__name {
+  @include ref.type(label);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: $text-strong;
-  font-size: 28rpx;
   font-weight: 600;
 }
 
 .student-message-row__time {
+  @include ref.type(meta);
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
   color: $text-faint;
-  font-size: 21rpx;
 }
 
 .student-message-row__preview {
+  @include ref.type(author);
   display: block;
   overflow: hidden;
   margin-top: 12rpx;
   color: $text-muted;
-  font-size: 25rpx;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -403,10 +412,10 @@
 }
 
 .student-home-footnote {
+  @include ref.type(meta);
   display: block;
   padding: 22rpx 0 30rpx;
   color: $text-faint;
-  font-size: 23rpx;
   text-align: center;
 }
 
@@ -418,6 +427,8 @@
 }
 
 .student-tool-state {
+  @include ref.type(meta);
+  @include ref.wrap;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -426,7 +437,6 @@
   border-radius: 32rpx;
   background: $bg-surface;
   color: $text-muted;
-  font-size: 25rpx;
   text-align: center;
 }
 
@@ -458,19 +468,20 @@
 }
 
 .student-tool-card__label {
+  @include ref.type(author);
+  @include ref.wrap;
+  text-align: center;
   margin-top: 18rpx;
   color: $text-primary;
-  font-size: 25rpx;
-  font-weight: 500;
 }
 
 .student-tool-card__sub {
+  @include ref.type(meta);
   display: block;
   overflow: hidden;
   max-width: 100%;
   margin-top: 8rpx;
   color: $text-muted;
-  font-size: 22rpx;
   white-space: nowrap;
   text-overflow: ellipsis;
 }

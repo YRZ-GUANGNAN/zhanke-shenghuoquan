@@ -1,6 +1,8 @@
 @use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
 
 .edit-profile-page {
+  @include ref.page-foundation;
   min-height: 100vh;
   background: $bg-app;
   color: $text-primary;
@@ -36,7 +38,7 @@
 }
 
 .edit-profile-content {
-  padding: 0 36rpx 70rpx;
+  padding: 0 32rpx calc(64rpx + env(safe-area-inset-bottom));
 }
 
 .edit-profile-avatar-panel {
@@ -129,10 +131,10 @@
 }
 
 .edit-profile-avatar-panel__hint {
+  @include ref.type(meta);
+  @include ref.wrap;
   margin-top: 22rpx;
   color: $text-muted;
-  font-size: 23rpx;
-  line-height: 1;
 }
 
 .edit-profile-avatar-panel__hint--ready {
@@ -152,6 +154,8 @@
 }
 
 .edit-profile-row {
+  gap: 16rpx;
+  padding: 8rpx 0;
   display: flex;
   align-items: center;
   min-height: 92rpx;
@@ -164,13 +168,14 @@
 }
 
 .edit-profile-row__label {
+  @include ref.type(label);
   flex: 0 0 auto;
   color: $text-secondary;
-  font-size: 27rpx;
-  line-height: 1;
 }
 
 .edit-profile-row__input {
+  min-width: 0;
+  min-height: 44PX;
   flex: 1 1 auto;
   height: 66rpx;
   padding: 0;
@@ -185,10 +190,10 @@
 }
 
 .edit-profile-row__value {
+  @include ref.type(label);
+  @include ref.wrap;
   flex: 1 1 auto;
   color: $text-strong;
-  font-size: 27rpx;
-  line-height: 1;
   text-align: right;
 }
 
@@ -197,6 +202,8 @@
 }
 
 .edit-profile-genders {
+  min-width: 0;
+  flex-wrap: wrap;
   flex: 1 1 auto;
   display: flex;
   justify-content: flex-end;
@@ -204,10 +211,11 @@
 }
 
 .edit-profile-gender {
+  @include ref.touch;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 76rpx;
+  min-width: max(44PX, 76rpx);
   height: 48rpx;
   padding: 0 18rpx;
   border-radius: 999rpx;
@@ -249,11 +257,10 @@
 }
 
 .edit-profile-signature-card__textarea {
+  @include ref.type(body);
   width: 100%;
   min-height: 88rpx;
   margin-top: 24rpx;
   padding: 0;
   color: $text-strong;
-  font-size: 27rpx;
-  line-height: 1.6;
 }

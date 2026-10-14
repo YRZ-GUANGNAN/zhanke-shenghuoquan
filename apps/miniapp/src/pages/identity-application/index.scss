@@ -1,6 +1,8 @@
 @use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
 
 .identity-application-page {
+  @include ref.page-foundation;
   min-height: 100vh;
   padding-bottom: calc(72rpx + env(safe-area-inset-bottom));
   background: $bg-app;
@@ -37,8 +39,8 @@
 }
 
 .identity-application-intro__title {
-  font-size: 34rpx;
-  font-weight: 800;
+  @include ref.type(title);
+  @include ref.wrap;
 }
 
 .identity-application-intro__copy {
@@ -136,6 +138,7 @@
 }
 
 .identity-application-field {
+  gap: 16rpx;
   display: flex;
   align-items: center;
   min-height: 96rpx;
@@ -147,12 +150,13 @@
 }
 
 .identity-application-field__label {
+  @include ref.type(label);
   flex: 0 0 154rpx;
   color: $text-secondary;
-  font-size: 25rpx;
 }
 
 .identity-application-field__input {
+  min-height: 44PX;
   flex: 1 1 auto;
   min-width: 0;
   color: $text-strong;
@@ -217,6 +221,10 @@
 }
 
 .identity-application-proof__remove {
+  @include ref.touch;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   padding: 8rpx 16rpx 14rpx;
   color: #B64A42;
   font-size: 21rpx;
@@ -339,3 +347,19 @@
   color: $text-on-color;
   background: $gradient-primary;
 }
+
+.identity-application-card__title,
+.identity-application-status__title { @include ref.type(label); @include ref.wrap; }
+.identity-application-intro__copy,
+.identity-application-card__hint,
+.identity-application-status__copy,
+.identity-application-proof__state,
+.identity-application-progress,
+.identity-application-privacy,
+.identity-application-state-card__error,
+.identity-application-state__copy { @include ref.type(meta); @include ref.wrap; }
+.identity-application-submit,
+.identity-application-secondary,
+.identity-application-state__action,
+.identity-application-inline-action,
+.identity-application-nav__back { @include ref.touch; }

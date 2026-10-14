@@ -1,6 +1,8 @@
 @use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
 
 .student-blacklist-page {
+  @include ref.page-foundation;
   min-height: 100vh;
   background: $bg-app;
   color: $text-primary;
@@ -18,7 +20,7 @@
 }
 
 .student-blacklist-content {
-  padding: 28rpx 36rpx 0;
+  padding: 32rpx 32rpx calc(48rpx + env(safe-area-inset-bottom));
 }
 
 .student-blacklist-tip {
@@ -86,21 +88,24 @@
 }
 
 .student-blacklist-user__name {
+  @include ref.type(author);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   color: $text-strong;
-  font-size: 27rpx;
-  font-weight: 700;
-  line-height: 1.25;
 }
 
 .student-blacklist-user__meta {
+  @include ref.type(meta);
+  @include ref.wrap;
   color: $text-muted;
-  font-size: 22rpx;
-  line-height: 1.35;
 }
 
 .student-blacklist-user__remove {
-  min-width: 84rpx;
-  height: 50rpx;
+  @include ref.touch;
+  flex: 0 0 auto;
+  min-width: max(44PX, 84rpx);
+  height: auto;
   padding: 0 18rpx;
   margin-left: 18rpx;
   border: 1rpx solid $divider-nav;

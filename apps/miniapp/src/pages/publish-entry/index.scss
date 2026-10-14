@@ -1,14 +1,17 @@
 @use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
 
 .publish-entry-page {
+  @include ref.page-foundation;
   min-height: 100vh;
   box-sizing: border-box;
-  padding: 0 0 64rpx;
+  padding: 0 0 calc(64rpx + env(safe-area-inset-bottom));
   background: $bg-app;
   color: $text-strong;
 }
 
 .publish-entry-topbar__back {
+  @include ref.touch;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -31,16 +34,14 @@
 
   &__title {
     color: $text-strong;
-    font-size: 38rpx;
-    font-weight: 900;
-    line-height: 1.25;
+    @include ref.type(title);
   }
 
   &__desc {
     margin-top: 8rpx;
     color: $text-secondary;
-    font-size: 24rpx;
-    line-height: 1.45;
+    @include ref.type(meta);
+    @include ref.wrap;
   }
 }
 
@@ -116,23 +117,21 @@
   }
 
   &__title {
-    font-size: 34rpx;
-    font-weight: 900;
-    line-height: 1.22;
+    @include ref.type(title);
+    @include ref.wrap;
   }
 
   &__subtitle {
     min-height: 72rpx;
     margin-top: 12rpx;
-    font-size: 23rpx;
-    line-height: 1.5;
+    @include ref.type(meta);
+    @include ref.wrap;
   }
 
   &__meta {
     margin-top: auto;
     padding-top: 20rpx;
-    font-size: 21rpx;
-    font-weight: 700;
+    @include ref.type(meta);
     letter-spacing: .5rpx;
   }
 }

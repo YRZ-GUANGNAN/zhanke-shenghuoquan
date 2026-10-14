@@ -1,6 +1,8 @@
 @use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
 
 .my-content-page {
+  @include ref.page-foundation;
   height: 100vh;
   display: flex;
   flex-direction: column;
@@ -11,6 +13,7 @@
 }
 
 .my-content-header__back {
+  @include ref.touch;
   width: 88rpx;
   height: 88rpx;
   display: flex;
@@ -33,6 +36,7 @@
 }
 
 .my-content-tab {
+  @include ref.type(label);
   position: relative;
   height: 88rpx;
   min-height: 44PX;
@@ -40,8 +44,6 @@
   align-items: center;
   justify-content: center;
   color: $text-secondary;
-  font-size: 28rpx;
-  font-weight: 500;
   transition: color 160ms ease;
 }
 
@@ -71,10 +73,11 @@
 }
 
 .my-content-load-more {
+  @include ref.type(meta);
+  @include ref.wrap;
   display: block;
   padding: 28rpx 0 10rpx;
   color: $text-muted;
-  font-size: 23rpx;
   text-align: center;
 }
 
@@ -163,35 +166,35 @@
 }
 
 .my-content-row__title {
+  @include ref.type(label);
+  @include ref.wrap;
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   color: $text-strong;
-  font-size: 28rpx;
   font-weight: 600;
-  line-height: 40rpx;
-  word-break: break-word;
 }
 
 .my-content-row__meta {
+  @include ref.type(meta);
   display: block;
-  margin-top: 10rpx;
+  margin-top: 8rpx;
   overflow: hidden;
   color: $text-secondary;
-  font-size: 23rpx;
-  line-height: 32rpx;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .my-content-row__price {
+  @include ref.wrap;
   display: block;
   margin-top: 8rpx;
   color: $like-active;
   font-size: 30rpx;
   font-weight: 800;
   line-height: 38rpx;
+  font-variant-numeric: tabular-nums;
 }
 
 .my-content-row__tail {
@@ -237,15 +240,14 @@
 }
 
 .my-content-comment__content {
+  @include ref.type(comment);
+  @include ref.wrap;
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
   color: $text-strong;
-  font-size: 29rpx;
   font-weight: 600;
-  line-height: 43rpx;
-  word-break: break-word;
 }
 
 .my-content-comment__source {
@@ -256,21 +258,19 @@
 }
 
 .my-content-comment__source-title {
+  @include ref.type(meta);
   display: block;
   overflow: hidden;
   color: $text-muted;
-  font-size: 24rpx;
-  line-height: 34rpx;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .my-content-comment__meta {
+  @include ref.type(meta);
   display: block;
   margin-top: 4rpx;
   color: $text-faint;
-  font-size: 21rpx;
-  line-height: 30rpx;
 }
 
 .my-content-state {
@@ -287,23 +287,23 @@
 }
 
 .my-content-state__title {
+  @include ref.type(label);
+  @include ref.wrap;
   color: $text-strong;
-  font-size: 30rpx;
   font-weight: 700;
-  line-height: 42rpx;
 }
 
 .my-content-state__desc {
+  @include ref.type(meta);
+  @include ref.wrap;
   display: block;
   max-width: 560rpx;
   margin-top: 10rpx;
   color: $text-muted;
-  font-size: 24rpx;
-  line-height: 36rpx;
-  word-break: break-word;
 }
 
 .my-content-state__action {
+  @include ref.type(meta);
   display: flex;
   align-items: center;
   min-height: 44PX;
@@ -313,9 +313,14 @@
   border-radius: 999rpx;
   background: $brand-tint;
   color: $brand-primary;
-  font-size: 24rpx;
   font-weight: 650;
-  line-height: 32rpx;
+}
+
+@media (max-width: 360px) {
+  .my-content-row { gap: 16rpx; }
+  .my-content-thumb { width: 104rpx; height: 104rpx; }
+  .my-content-row__tail { min-width: 0; }
+  .my-content-row__status { max-width: 96rpx; }
 }
 
 .my-content-state--retry {

@@ -1,9 +1,11 @@
 @use 'sass:color';
 @use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
 
 $secondhand-orange: #FF7B4A;
 
 .publish-secondhand-page {
+  @include ref.page-foundation;
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -14,6 +16,7 @@ $secondhand-orange: #FF7B4A;
   font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 }
 .publish-secondhand-nav__back {
+  @include ref.touch;
   width: 88rpx;
   height: 88rpx;
 }
@@ -132,6 +135,7 @@ $secondhand-orange: #FF7B4A;
   width: 80rpx;
 }
 .publish-secondhand-field__input {
+  min-height: 44PX;
   flex: 1;
   min-width: 0;
   height: 88rpx;
@@ -155,6 +159,7 @@ $secondhand-orange: #FF7B4A;
   font-size: 28rpx;
 }
 .publish-secondhand-price__input {
+  min-height: 44PX;
   flex: 1;
   min-width: 0;
   width: 100%;
@@ -167,10 +172,10 @@ $secondhand-orange: #FF7B4A;
   line-height: 88rpx;
 }
 .publish-secondhand-field__aside {
-  flex: 0 0 168rpx;
+  @include ref.type(meta);
+  @include ref.wrap;
+  flex: 0 1 168rpx;
   color: $text-secondary;
-  font-size: 22rpx;
-  line-height: 32rpx;
   text-align: right;
 }
 .publish-secondhand-section {
@@ -184,11 +189,12 @@ $secondhand-orange: #FF7B4A;
   margin-top: 16rpx;
 }
 .publish-secondhand-category {
+  @include ref.touch;
   display: flex;
   align-items: center;
   justify-content: center;
   min-width: 112rpx;
-  min-height: 80rpx;
+  height: 80rpx;
   padding: 0 24rpx;
   border: 1rpx solid $divider-nav;
   border-radius: 12rpx;
@@ -215,16 +221,16 @@ $secondhand-orange: #FF7B4A;
   line-height: 36rpx;
 }
 .publish-secondhand-description__textarea {
+  @include ref.type(body);
   width: 100%;
   height: 256rpx;
   margin-top: 16rpx;
   padding: 16rpx 0;
   color: $text-primary;
-  font-size: 28rpx;
-  line-height: 44rpx;
   box-sizing: border-box;
 }
 .publish-secondhand-warning {
+  @include ref.wrap;
   display: flex;
   align-items: flex-start;
   gap: 12rpx;
@@ -259,10 +265,10 @@ $secondhand-orange: #FF7B4A;
   box-sizing: border-box;
 }
 .publish-secondhand-footer__button {
+  @include ref.touch;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 88rpx;
   border-radius: 16rpx;
   background: $gradient-primary;
   color: $text-on-color;

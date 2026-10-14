@@ -176,8 +176,8 @@ export default function SettingsPage() {
                   <Text className='student-settings-row__title'>{row.title}</Text>
                   <Text className='student-settings-row__subtitle'>{row.subtitle}</Text>
                 </View>
-                <View className={`student-settings-switch ${settings[row.key] ? 'student-settings-switch--on' : ''}`} onClick={() => void toggle(row.key)}>
-                  <View className='student-settings-switch__knob' />
+                <View className='student-settings-switch-target' ariaRole='button' ariaLabel={`${row.title}，${settings[row.key] ? '已开启' : '已关闭'}`} onClick={() => void toggle(row.key)}>
+                  <View className={`student-settings-switch ${settings[row.key] ? 'student-settings-switch--on' : ''}`}><View className='student-settings-switch__knob' /></View>
                 </View>
               </View>
             ))}
@@ -193,8 +193,8 @@ export default function SettingsPage() {
                   <Text className='student-settings-row__title'>{row.title}</Text>
                   <Text className='student-settings-row__subtitle'>{row.subtitle}</Text>
                 </View>
-                <View className={`student-settings-switch ${settings[row.key] ? 'student-settings-switch--on' : ''}`} onClick={() => void toggle(row.key)}>
-                  <View className='student-settings-switch__knob' />
+                <View className='student-settings-switch-target' ariaRole='button' ariaLabel={`${row.title}，${settings[row.key] ? '已开启' : '已关闭'}`} onClick={() => void toggle(row.key)}>
+                  <View className={`student-settings-switch ${settings[row.key] ? 'student-settings-switch--on' : ''}`}><View className='student-settings-switch__knob' /></View>
                 </View>
               </View>
             ))}

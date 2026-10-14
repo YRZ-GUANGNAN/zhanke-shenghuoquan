@@ -1,5 +1,6 @@
 @use 'sass:color';
 @use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
 
 $rider-accent-soft: color.mix($brand-primary, $bg-surface, 9%);
 $rider-success: #23856d;
@@ -14,6 +15,7 @@ page {
 }
 
 .rider-grab-page {
+  @include ref.page-foundation;
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -85,21 +87,23 @@ page {
   border-radius: 8rpx;
   background: $rider-accent-soft;
   color: $brand-primary-strong;
-  font-size: 19rpx;
+  font-size: 22rpx;
+  line-height: 30rpx;
   font-weight: 650;
 }
 
 .rider-grab-user__meta {
+  @include ref.type(meta);
+  @include ref.wrap;
   display: block;
   margin-top: 8rpx;
   color: $text-secondary;
-  font-size: 23rpx;
-  line-height: 1.3;
 }
 
 .rider-grab-user__switch {
+  @include ref.touch;
   min-width: 132rpx;
-  min-height: 64rpx;
+  flex: 0 0 auto;
   padding: 0 18rpx;
   border: 1rpx solid $border-default;
   border-radius: 18rpx;
@@ -140,9 +144,8 @@ page {
 }
 
 .rider-grab-task-summary__label {
+  @include ref.type(meta);
   color: $text-tertiary;
-  font-size: 21rpx;
-  line-height: 1.2;
 }
 
 .rider-grab-task-summary__value-row {
@@ -195,6 +198,7 @@ page {
 
 .rider-grab-task-summary__stat-value,
 .rider-grab-task-summary__stat-label {
+  @include ref.type(meta);
   display: block;
 }
 
@@ -208,7 +212,6 @@ page {
 .rider-grab-task-summary__stat-label {
   margin-top: 8rpx;
   color: $text-tertiary;
-  font-size: 20rpx;
 }
 
 .rider-grab-task-summary__divider {
@@ -219,6 +222,7 @@ page {
 }
 
 .rider-grab-refresh {
+  @include ref.touch;
   width: 88rpx;
   flex: 0 0 auto;
   border-left: 1rpx solid $border-subtle;
@@ -228,7 +232,7 @@ page {
   justify-content: center;
   gap: 7rpx;
   color: $brand-primary;
-  font-size: 19rpx;
+  font-size: 22rpx;
   font-weight: 650;
   transition: background $duration-fast ease, opacity $duration-fast ease;
 }
@@ -267,6 +271,7 @@ page {
 }
 
 .rider-grab-tabs__item {
+  @include ref.touch;
   position: relative;
   min-width: 0;
   display: flex;
@@ -297,7 +302,7 @@ page {
 
 .rider-grab-tabs__count {
   min-width: 30rpx;
-  height: 30rpx;
+  min-height: 32rpx;
   padding: 0 7rpx;
   border-radius: 10rpx;
   display: flex;
@@ -305,7 +310,8 @@ page {
   justify-content: center;
   background: $bg-muted;
   color: $text-tertiary;
-  font-size: 18rpx;
+  font-size: 22rpx;
+  line-height: 32rpx;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   box-sizing: border-box;
@@ -355,13 +361,13 @@ page {
 }
 
 .rider-order-card__serial {
+  @include ref.type(meta);
   min-width: 0;
   display: flex;
   align-items: center;
   gap: 8rpx;
   overflow: hidden;
   color: $text-secondary;
-  font-size: 21rpx;
   font-variant-numeric: tabular-nums;
 }
 
@@ -448,18 +454,16 @@ page {
 }
 
 .rider-order-route__label {
+  @include ref.type(meta);
   color: $text-tertiary;
-  font-size: 20rpx;
-  line-height: 1.35;
 }
 
 .rider-order-route__place {
+  @include ref.type(comment);
+  @include ref.wrap;
   margin-top: 5rpx;
   color: $text-primary;
-  font-size: 26rpx;
   font-weight: 650;
-  line-height: 1.45;
-  word-break: break-word;
 }
 
 .rider-order-route__drop-row {
@@ -496,14 +500,14 @@ page {
 }
 
 .rider-order-card__remark {
+  @include ref.type(meta);
+  @include ref.wrap;
   margin-top: 20rpx;
   padding: 16rpx 18rpx;
   border-left: 5rpx solid color.mix($brand-primary, $bg-surface, 35%);
   border-radius: 0 14rpx 14rpx 0;
   background: $bg-subtle;
   color: $text-secondary;
-  font-size: 22rpx;
-  line-height: 1.5;
 }
 
 .rider-order-card__remark--assigned {
@@ -524,15 +528,16 @@ page {
 }
 
 .rider-order-card__privacy {
+  @include ref.type(meta);
+  @include ref.wrap;
   min-width: 0;
   color: $text-tertiary;
-  font-size: 20rpx;
-  line-height: 1.4;
 }
 
 .rider-order-card__grab {
+  @include ref.touch;
   min-width: 148rpx;
-  min-height: 72rpx;
+  flex: 0 0 auto;
   padding: 0 24rpx;
   border-radius: 18rpx;
   display: flex;
@@ -569,8 +574,9 @@ page {
 }
 
 .rider-order-card__secondary {
-  min-width: 100rpx;
-  min-height: 68rpx;
+  @include ref.touch;
+  @include ref.type(meta);
+  min-width: max(44PX, 100rpx);
   padding: 0 16rpx;
   border: 1rpx solid $border-default;
   border-radius: 17rpx;
@@ -580,7 +586,6 @@ page {
   gap: 8rpx;
   background: $bg-surface;
   color: $text-secondary;
-  font-size: 22rpx;
   font-weight: 620;
   box-sizing: border-box;
   transition: background $duration-fast ease, transform $duration-fast ease;
@@ -625,14 +630,14 @@ page {
 }
 
 .rider-grab-error {
+  @include ref.type(meta);
+  @include ref.wrap;
   margin-bottom: 18rpx;
   padding: 18rpx 20rpx;
   border: 1rpx solid color.mix($rider-warning, $border-subtle, 24%);
   border-radius: 16rpx;
   background: $rider-warning-soft;
   color: $rider-warning;
-  font-size: 22rpx;
-  line-height: 1.5;
 }
 
 .rider-workbench-icon {
@@ -670,6 +675,8 @@ page {
 .rider-load-error__title,
 .rider-empty-state__desc,
 .rider-load-error__desc {
+  @include ref.type(meta);
+  @include ref.wrap;
   display: block;
 }
 
@@ -685,8 +692,6 @@ page {
   max-width: 500rpx;
   margin-top: 10rpx;
   color: $text-tertiary;
-  font-size: 23rpx;
-  line-height: 1.55;
 }
 
 .rider-load-error {
@@ -702,8 +707,8 @@ page {
 }
 
 .rider-load-error__action {
+  @include ref.touch;
   min-width: 176rpx;
-  min-height: 68rpx;
   margin-top: 24rpx;
   padding: 0 24rpx;
   border-radius: 17rpx;
@@ -718,10 +723,11 @@ page {
 }
 
 .rider-grab-content__loading-more {
+  @include ref.type(meta);
+  @include ref.touch;
   display: block;
   padding: 28rpx 0 16rpx;
   color: $text-muted;
-  font-size: 23rpx;
   text-align: center;
 }
 
@@ -778,6 +784,8 @@ page {
 
 .rider-grab-placeholder__title,
 .rider-grab-placeholder__desc {
+  @include ref.type(meta);
+  @include ref.wrap;
   display: block;
 }
 
@@ -792,13 +800,11 @@ page {
   max-width: 520rpx;
   margin-top: 12rpx;
   color: $text-secondary;
-  font-size: 25rpx;
-  line-height: 1.6;
 }
 
 .rider-grab-placeholder__action {
+  @include ref.touch;
   min-width: 230rpx;
-  min-height: 88rpx;
   margin-top: 34rpx;
   padding: 0 34rpx;
   border-radius: $radius-control;

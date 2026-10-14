@@ -1,7 +1,9 @@
 @use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
 
 .post-detail-page {
-  --post-actionbar-height: 112rpx;
+  @include ref.page-foundation;
+  --post-actionbar-height: max(112rpx, calc(44PX + 16rpx));
   position: relative;
   height: 100vh;
   min-height: 100vh;
@@ -24,6 +26,7 @@
 }
 
 .post-detail-nav__back {
+  @include ref.touch;
   width: 88rpx;
   height: 88rpx;
   display: flex;
@@ -88,10 +91,8 @@
 }
 
 .post-detail-author__name {
+  @include ref.type(author);
   color: $text-strong;
-  font-size: 26rpx;
-  font-weight: 700;
-  line-height: 32rpx;
 }
 
 .post-detail-author__meta {
@@ -102,6 +103,7 @@
 }
 
 .post-detail-follow-hitbox {
+  @include ref.touch;
   width: 116rpx;
   height: 88rpx;
   display: flex;
@@ -169,17 +171,16 @@
 }
 
 .post-detail-review__title {
+  @include ref.type(label);
+  @include ref.wrap;
   display: block;
-  font-size: 28rpx;
-  font-weight: 800;
-  line-height: 40rpx;
 }
 
 .post-detail-review__desc {
+  @include ref.type(meta);
+  @include ref.wrap;
   display: block;
   margin-top: 8rpx;
-  font-size: 24rpx;
-  line-height: 38rpx;
 }
 
 .post-detail-hero {
@@ -218,6 +219,7 @@
 
 .post-detail-hero--loading,
 .post-detail-media-error {
+  @include ref.wrap;
   color: $text-secondary;
   font-size: 24rpx;
   line-height: 36rpx;
@@ -247,22 +249,19 @@
 }
 
 .post-detail-content__title {
+  @include ref.type(title);
+  @include ref.wrap;
   display: block;
   color: $text-strong;
-  font-size: 36rpx;
-  font-weight: 600;
-  line-height: 50rpx;
-  word-break: break-word;
 }
 
 .post-detail-content__body {
+  @include ref.type(body);
+  @include ref.wrap;
   display: block;
   margin-top: 16rpx;
   color: $text-primary;
-  font-size: 30rpx;
-  line-height: 48rpx;
   white-space: pre-wrap;
-  word-break: break-word;
 }
 
 .post-detail-tags {
@@ -273,21 +272,21 @@
 }
 
 .post-detail-tag {
+  @include ref.type(author);
+  @include ref.wrap;
+  max-width: 100%;
   min-height: 40rpx;
   display: flex;
   align-items: center;
   color: $brand-primary-strong;
-  font-size: 26rpx;
-  font-weight: 500;
-  line-height: 40rpx;
 }
 
 .post-detail-content__meta {
+  @include ref.type(meta);
+  @include ref.wrap;
   display: block;
   margin-top: 24rpx;
   color: $text-secondary;
-  font-size: 22rpx;
-  line-height: 32rpx;
 }
 
 .post-detail-comments {
@@ -296,12 +295,11 @@
 }
 
 .post-detail-comments__title {
+  @include ref.type(label);
   display: block;
   margin-bottom: 8rpx;
   color: $text-strong;
-  font-size: 28rpx;
   font-weight: 600;
-  line-height: 42rpx;
 }
 
 .post-detail-comment {
@@ -338,40 +336,37 @@
 }
 
 .post-detail-comment__author {
+  @include ref.type(author);
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: $text-secondary;
-  font-size: 24rpx;
-  font-weight: 700;
-  line-height: 34rpx;
 }
 
 .post-detail-comment__content {
+  @include ref.type(comment);
+  @include ref.wrap;
   display: block;
   margin-top: 8rpx;
   color: $text-primary;
-  font-size: 28rpx;
-  line-height: 44rpx;
   white-space: pre-wrap;
-  word-break: break-word;
 }
 
 .post-detail-comment__meta {
+  @include ref.type(meta);
+  @include ref.wrap;
   display: block;
-  margin-top: 10rpx;
+  margin-top: 8rpx;
   color: $text-secondary;
-  font-size: 22rpx;
-  line-height: 32rpx;
 }
 
 .post-detail-comments__bottom {
+  @include ref.type(meta);
+  @include ref.wrap;
   display: block;
   padding: 32rpx 0 12rpx;
   color: $text-faint;
-  font-size: 23rpx;
-  line-height: 34rpx;
   text-align: center;
 }
 
@@ -387,21 +382,20 @@
 }
 
 .post-detail-comments__empty-title {
+  @include ref.type(label);
   color: $text-secondary;
-  font-size: 26rpx;
-  font-weight: 700;
-  line-height: 36rpx;
 }
 
 .post-detail-comments__empty-desc {
+  @include ref.type(meta);
+  @include ref.wrap;
   display: block;
   margin-top: 6rpx;
   color: $text-secondary;
-  font-size: 22rpx;
-  line-height: 32rpx;
 }
 
 .post-detail-comments__bottom--retry {
+  @include ref.touch;
   color: $brand-primary;
   font-weight: 700;
 }
@@ -432,7 +426,7 @@
 }
 
 .post-detail-input {
-  min-width: 0;
+  @include ref.touch;
   height: 72rpx;
   padding: 0 22rpx;
   flex: 1;
@@ -456,10 +450,9 @@
 }
 
 .post-detail-action {
+  @include ref.touch;
   flex: none;
   width: 88rpx;
-  min-width: 88rpx;
-  min-height: 88rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -500,12 +493,12 @@
 }
 
 .post-detail-send {
+  @include ref.touch;
   display: flex;
   flex: none;
   align-items: center;
   justify-content: center;
-  min-width: 104rpx;
-  min-height: 88rpx;
+  min-width: max(44PX, 104rpx);
   color: $brand-primary;
   font-size: 28rpx;
   font-weight: 600;

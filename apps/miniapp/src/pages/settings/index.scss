@@ -1,6 +1,8 @@
 @use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
 
 .student-settings-page {
+  @include ref.page-foundation;
   min-height: 100vh;
   background: $bg-app;
   color: $text-primary;
@@ -43,6 +45,7 @@
 }
 
 .student-settings-row {
+  gap: 16rpx;
   position: relative;
   display: flex;
   align-items: center;
@@ -67,22 +70,22 @@
 }
 
 .student-settings-row__main {
+  @include ref.wrap;
+  flex: 1 1 auto;
+  padding: 16rpx 0;
   display: flex;
   flex-direction: column;
   gap: 8rpx;
 }
 
 .student-settings-row__title {
+  @include ref.type(label);
   color: $text-strong;
-  font-size: 28rpx;
-  font-weight: 500;
-  line-height: 1.15;
 }
 
 .student-settings-row__subtitle {
+  @include ref.type(meta);
   color: $text-muted;
-  font-size: 22rpx;
-  line-height: 1.2;
 }
 
 .student-settings-row__value,
@@ -94,6 +97,7 @@
 
 .student-settings-row__right,
 .student-settings-bind {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
 }
@@ -126,6 +130,16 @@
   transition: background .16s ease;
 }
 
+// Keep the switch artwork compact while the actual target remains finger-sized.
+.student-settings-switch-target {
+  @include ref.touch;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.student-settings-switch-target:active { opacity: .72; }
+
 .student-settings-switch__knob {
   position: absolute;
   top: 4rpx;
@@ -147,6 +161,7 @@
 }
 
 .student-settings-logout {
+  @include ref.touch;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -161,6 +176,7 @@
 }
 
 .student-settings-phone {
+  @include ref.touch;
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -176,6 +192,7 @@
 }
 
 .student-settings-close {
+  @include ref.touch;
   display: flex;
   align-items: center;
   justify-content: center;

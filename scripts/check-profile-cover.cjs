@@ -15,6 +15,15 @@ const deferred = () => {
 
 async function run() {
   // Exercise the real API mapping as well as the editor. No network is used.
+  const apiFile = path.resolve(__dirname, '../apps/miniapp/src/services/api.ts')
+  const apiModule = new Module(apiFile, module)
+  apiModule.require = id => {
+    if (id === './taro') return { default: {} }
+    if (id === './feature-policy-model' || id === './feature-visibility') return {}
+    throw new Error(`Unexpected API dependency: ${id}`)
+  }
+  apiModule._compile(ts.transpileModule(fs.readFileSync(apiFile, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText, apiFile)
+  const { ApiError } = apiModule.exports
   const apiCalls = []
   let apiValue = { id: 7, nickname: '原昵称', avatar: 'original-avatar', school: '', campus: '' }
   const clientFile = path.resolve(__dirname, '../apps/miniapp/src/services/a-user.ts')
@@ -49,6 +58,7 @@ async function run() {
     if (id.endsWith('/stores/session')) return { useSessionStore: store }
     if (id.endsWith('/services/taro')) return { default: { showModal: () => { const value = deferred(); modals.push(value); return value.promise } } }
     if (id.endsWith('/services/a-user')) return { updateProfileCover: assetId => { const value = { ...deferred(), assetId }; requests.push(value); return value.promise } }
+    if (id.endsWith('/services/api')) return apiModule.exports
     if (id.endsWith('/services/media')) return {
       chooseAndUploadImages: (purpose, count, progress, active) => { assert.equal(purpose, 'profile_cover'); assert.equal(count, 1); const value = { ...deferred(), progress, active }; uploads.push(value); return value.promise },
       waitForMediaApproval: (id, progress, timeout, active) => { const value = { ...deferred(), id, active }; reviews.push(value); return value.promise }
@@ -119,11 +129,23 @@ async function run() {
     assert.equal(session.profile.cover, '', '旧账号请求不更新新账号')
     assert.equal(updates.length, 2)
     await event(choose)
+    await event(() => uploads[4].reject(new ApiError('invalid media upload request', 400)))
+    assert.match(document.body.textContent, /服务器未接受封面上传请求/)
+    assert.equal(session.profile.cover, '', '服务器拒绝不写入未上传的照片')
+    await event(choose)
+    await event(() => uploads[5].reject(new ApiError('图片大小无效', 400)))
+    assert.match(document.body.textContent, /图片大小无效/)
+    assert.ok(!document.body.textContent.includes('服务器未接受封面上传请求'), '其他400不能误报为用途不支持')
+    await event(choose)
+    await event(() => uploads[6].reject(new ApiError('invalid media upload request', 503)))
+    assert.match(document.body.textContent, /invalid media upload request/)
+    assert.ok(!document.body.textContent.includes('服务器未接受封面上传请求'), '非400错误不使用旧上传协议提示')
+    await event(choose)
     await React.act(async () => root.unmount())
-    assert.equal(uploads[4].active(), false, '离开页面后停止上传后续步骤')
-    await event(() => uploads[4].resolve([uploaded]))
+    assert.equal(uploads[7].active(), false, '离开页面后停止上传后续步骤')
+    await event(() => uploads[7].resolve([uploaded]))
     assert.equal(reviews.length, 3, '离开页面不再启动审核轮询')
-    assert.equal(busyEvents.filter(Boolean).length, 10)
+    assert.equal(busyEvents.filter(Boolean).length, 13)
     console.log('profile cover: real component behavior, review gating, retries, clear, click locks and session isolation ok')
   } finally {
     await React.act(async () => root.unmount())

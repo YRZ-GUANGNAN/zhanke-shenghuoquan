@@ -1,5 +1,6 @@
 @use 'sass:color';
 @use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
 
 $publish-orange: color.adjust($like-active, $hue: 28deg, $saturation: -3%, $lightness: 2%);
 $publish-orange-pale: color.mix($publish-orange, $bg-surface, 11%);
@@ -15,6 +16,7 @@ page {
 }
 
 .merchant-publish-page {
+  @include ref.page-foundation;
   height: 100vh;
   background: $bg-app;
   color: $text-primary;
@@ -81,6 +83,8 @@ page {
 
 .merchant-publish-import-card__title,
 .merchant-publish-import-card__description {
+  @include ref.type(meta);
+  @include ref.wrap;
   display: block;
 }
 
@@ -94,8 +98,6 @@ page {
 .merchant-publish-import-card__description {
   margin-top: 8rpx;
   color: $text-muted;
-  font-size: 21rpx;
-  line-height: 1.35;
 }
 
 .merchant-publish-import-card__actions {
@@ -107,14 +109,14 @@ page {
 
 .merchant-publish-import-card__secondary,
 .merchant-publish-import-card__primary {
-  min-height: 68rpx;
+  @include ref.touch;
+  @include ref.type(meta);
   padding: 0 16rpx;
   border-radius: 18rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  font-size: 23rpx;
   font-weight: 750;
 }
 
@@ -144,6 +146,8 @@ page {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12rpx 16rpx;
   margin-bottom: 16rpx;
 }
 
@@ -175,16 +179,14 @@ page {
 }
 
 .merchant-publish-section-head__title {
+  @include ref.type(label);
   color: $text-strong;
-  font-size: 28rpx;
-  font-weight: 850;
-  line-height: 1;
 }
 
 .merchant-publish-section-head__hint {
+  @include ref.type(meta);
+  @include ref.wrap;
   color: $text-muted;
-  font-size: 21rpx;
-  line-height: 1;
 }
 
 .merchant-publish-pill {
@@ -199,7 +201,9 @@ page {
 }
 
 .merchant-publish-field {
-  height: 92rpx;
+  min-height: 44PX;
+  padding: 8rpx 0;
+  gap: 16rpx;
   border-bottom: 1rpx solid $divider-hairline;
   display: flex;
   align-items: center;
@@ -210,18 +214,18 @@ page {
 }
 
 .merchant-publish-field__label {
+  @include ref.type(author);
   width: 144rpx;
   flex: 0 0 144rpx;
   color: $text-secondary;
-  font-size: 24rpx;
-  line-height: 1;
 }
 
 .merchant-publish-field__input {
+  min-height: 44PX;
   min-width: 0;
   flex: 1;
   color: $text-primary;
-  font-size: 25rpx;
+  font-size: 28rpx;
   line-height: 1.3;
   text-align: right;
 }
@@ -237,6 +241,7 @@ page {
 }
 
 .merchant-publish-textarea {
+  @include ref.type(comment);
   width: 100%;
   min-height: 124rpx;
   padding: 22rpx 24rpx;
@@ -244,12 +249,10 @@ page {
   border-radius: 18rpx;
   background: $publish-blue-field;
   color: $text-primary;
-  font-size: 24rpx;
-  line-height: 1.45;
 }
 
 .merchant-publish-fee-card {
-  height: 136rpx;
+  min-height: 136rpx;
   padding: 26rpx 28rpx;
   display: flex;
   align-items: center;
@@ -257,6 +260,7 @@ page {
 }
 
 .merchant-publish-fee-card__main {
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
@@ -269,10 +273,10 @@ page {
 }
 
 .merchant-publish-fee-card__hint {
+  @include ref.type(meta);
+  @include ref.wrap;
   margin-top: 16rpx;
   color: $text-muted;
-  font-size: 22rpx;
-  line-height: 1;
 }
 
 .merchant-publish-fee-card__amount {
@@ -295,7 +299,8 @@ page {
 }
 
 .merchant-publish-footer {
-  height: 144rpx;
+  flex: 0 0 auto;
+  min-height: calc(44PX + 38rpx + env(safe-area-inset-bottom));
   padding: 20rpx 28rpx calc(18rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
   background: $bg-surface;
@@ -304,15 +309,15 @@ page {
 
 .merchant-publish-footer__button,
 .merchant-publish-confirm {
-  height: 88rpx;
+  @include ref.touch;
+  @include ref.type(label);
+  padding: 16rpx 24rpx;
   border-radius: 24rpx;
   background: $brand-primary;
   color: $text-on-color;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28rpx;
-  font-weight: 650;
   box-shadow: 0 10rpx 24rpx rgba($brand-primary-strong, .16);
 }
 
@@ -360,20 +365,16 @@ page {
 }
 
 .merchant-publish-import-preview__label {
+  @include ref.type(meta);
   color: $text-tertiary;
-  font-size: 21rpx;
-  line-height: 1.2;
 }
 
 .merchant-publish-import-preview__value {
+  @include ref.type(comment);
+  @include ref.wrap;
   margin-top: 7rpx;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   color: $text-primary;
-  font-size: 25rpx;
   font-weight: 650;
-  line-height: 1.35;
 }
 
 .merchant-publish-import-preview__state {
@@ -398,10 +399,10 @@ page {
 }
 
 .merchant-publish-import-sheet__notice {
+  @include ref.type(meta);
+  @include ref.wrap;
   display: block;
   color: $text-muted;
-  font-size: 22rpx;
-  line-height: 1.5;
 }
 
 .merchant-publish-payments { display: grid; gap: 18rpx; }
@@ -450,17 +451,16 @@ page {
 }
 
 .merchant-publish-payment__title {
+  @include ref.type(author);
+  @include ref.wrap;
   color: $text-strong;
-  font-size: 26rpx;
-  font-weight: 850;
-  line-height: 1;
 }
 
 .merchant-publish-payment__desc {
+  @include ref.type(meta);
+  @include ref.wrap;
   margin-top: 13rpx;
   color: $text-muted;
-  font-size: 21rpx;
-  line-height: 1.25;
 }
 
 .merchant-publish-payment__radio {

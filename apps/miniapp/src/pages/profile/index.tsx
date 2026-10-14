@@ -252,15 +252,15 @@ function ProfileContent() {
             <AppIcon name='image' /><Text>{profile.cover ? '更换封面' : '设置封面'}</Text>
           </View>
         </View>
-        <View className='student-profile-user' onClick={openProfileEditor} ariaRole='button' ariaLabel='编辑个人资料'>
-          <View className='student-profile-user__avatar'>
+        <View className='student-profile-user'>
+          <View className='student-profile-user__avatar' onClick={openProfileEditor} ariaRole='button' ariaLabel='编辑头像与个人资料'>
             {profile.avatar && profile.avatar !== failedAvatar ? (
               <Image className='student-profile-user__avatar-image' src={profile.avatar} mode='aspectFill' onError={() => setFailedAvatar(profile.avatar)} />
             ) : (
               <Text>{profile.nickname.trim().slice(0, 1) || '同'}</Text>
             )}
           </View>
-          <View className='student-profile-user__main'>
+          <View className='student-profile-user__main' onClick={openProfileEditor} ariaRole='button' ariaLabel='编辑个人资料'>
             <View className='student-profile-user__title-row'>
               <Text className='student-profile-user__name'>{profile.nickname || '校园用户'}</Text>
               <View className='student-profile-user__identity'>
@@ -275,9 +275,8 @@ function ProfileContent() {
               </View>
             </View>
           </View>
-          <View className='student-profile-user__edit'>
+          <View className='student-profile-user__edit' onClick={openProfileEditor} ariaRole='button' ariaLabel='编辑个人资料'>
             <Text>编辑资料</Text>
-            <AppIcon name='chevron-right' className='student-profile-user__edit-icon' />
           </View>
         </View>
       </View>

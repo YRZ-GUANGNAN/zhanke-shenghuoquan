@@ -1,6 +1,8 @@
 @use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
 
 .secondhand-detail-page {
+  @include ref.page-foundation;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -15,6 +17,7 @@
   margin-top: -8px;
 }
 .secondhand-detail-header__back {
+  @include ref.touch;
   width: 88rpx;
   height: 88rpx;
 }
@@ -95,22 +98,19 @@
   font-weight: 500;
 }
 .secondhand-detail-info__title {
+  @include ref.type(title);
+  @include ref.wrap;
   display: block;
   margin-top: 24rpx;
   color: $text-strong;
-  font-size: 36rpx;
-  font-weight: 600;
-  line-height: 50rpx;
-  word-break: break-all;
 }
 .secondhand-detail-info__desc {
+  @include ref.type(body);
+  @include ref.wrap;
   display: block;
   margin-top: 24rpx;
   color: $text-primary;
-  font-size: 30rpx;
-  line-height: 48rpx;
   white-space: pre-wrap;
-  word-break: break-all;
 }
 .secondhand-detail-tags {
   display: flex;
@@ -119,21 +119,21 @@
   margin-top: 24rpx;
 }
 .secondhand-detail-tag {
+  @include ref.type(meta);
+  @include ref.wrap;
+  box-sizing: border-box;
   max-width: 100%;
   padding: 6rpx 16rpx;
   border-radius: 8rpx;
   background: $bg-screen;
   color: $text-secondary;
-  font-size: 24rpx;
-  line-height: 32rpx;
-  word-break: break-all;
 }
 .secondhand-detail-info__meta {
+  @include ref.type(meta);
+  @include ref.wrap;
   display: block;
   margin-top: 24rpx;
   color: $text-secondary;
-  font-size: 24rpx;
-  line-height: 36rpx;
 }
 .secondhand-detail-section {
   padding: 0 32rpx calc(32rpx + env(safe-area-inset-bottom));
@@ -172,41 +172,38 @@
   gap: 8rpx;
 }
 .secondhand-detail-seller__name {
+  @include ref.type(label);
   overflow: hidden;
   color: $text-strong;
-  font-size: 28rpx;
   font-weight: 600;
-  line-height: 40rpx;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .secondhand-detail-seller__meta {
+  @include ref.type(meta);
   overflow: hidden;
   color: $text-secondary;
-  font-size: 24rpx;
-  line-height: 32rpx;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .secondhand-detail-seller__button {
+  @include ref.touch;
+  @include ref.type(author);
   flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 96rpx;
-  min-height: 88rpx;
+  min-width: max(44PX, 96rpx);
   color: $brand-primary;
-  font-size: 26rpx;
-  font-weight: 500;
 }
 .secondhand-detail-warning {
+  @include ref.type(meta);
+  @include ref.wrap;
   display: flex;
   align-items: flex-start;
   gap: 12rpx;
   padding: 24rpx 0;
   color: $badge-unread;
-  font-size: 24rpx;
-  line-height: 36rpx;
 }
 .secondhand-detail-warning__icon {
   flex: 0 0 auto;
@@ -228,13 +225,13 @@
   box-sizing: border-box;
 }
 .secondhand-detail-favorite {
+  @include ref.touch;
   flex: 0 0 104rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 4rpx;
-  min-height: 88rpx;
   color: $text-secondary;
   font-size: 22rpx;
   line-height: 32rpx;
@@ -255,17 +252,19 @@
   opacity: .6;
 }
 .secondhand-detail-contact {
+  @include ref.touch;
+  @include ref.type(body);
   flex: 1;
-  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12rpx;
-  min-height: 88rpx;
+  padding: 12rpx;
+  box-sizing: border-box;
+  text-align: center;
   border-radius: 16rpx;
   background: $gradient-primary;
   color: $text-on-color;
-  font-size: 30rpx;
   font-weight: 600;
 }
 .secondhand-detail-contact--disabled {
@@ -289,17 +288,19 @@
   min-width: 0;
 }
 .secondhand-detail-seller-action {
+  @include ref.touch;
+  @include ref.type(label);
   display: flex;
   flex: 1;
   align-items: center;
   justify-content: center;
-  min-width: 0;
-  min-height: 88rpx;
+  padding: 12rpx;
+  box-sizing: border-box;
+  text-align: center;
   border: 1rpx solid $brand-primary;
   border-radius: 16rpx;
   background: $bg-surface;
   color: $brand-primary;
-  font-size: 28rpx;
   font-weight: 600;
 }
 .secondhand-detail-seller-action--primary {
@@ -333,20 +334,37 @@
   gap: 8rpx;
 }
 .secondhand-contact-option__title {
+  @include ref.type(body);
+  @include ref.wrap;
   color: $text-strong;
-  font-size: 30rpx;
-  line-height: 40rpx;
   font-weight: 600;
 }
 .secondhand-contact-option__desc {
+  @include ref.type(meta);
+  @include ref.wrap;
   overflow: hidden;
   color: $text-secondary;
-  font-size: 24rpx;
-  line-height: 36rpx;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .secondhand-contact-option__arrow {
+  flex: 0 0 auto;
   width: 32rpx;
   height: 32rpx;
+}
+
+// The comment component keeps its own data and reply flow; only text geometry is
+// scoped here so author truncation never propagates to comment bodies.
+.secondhand-detail-page {
+  .product-comments__title { @include ref.type(label); }
+  .product-comment__author { @include ref.type(author); min-width: 0; }
+  .product-comment__content { @include ref.type(comment); @include ref.wrap; }
+  .product-comments__closed,
+  .product-comments__error,
+  .product-comments__state { @include ref.type(meta); @include ref.wrap; }
+  .product-comment__reply-action,
+  .product-comments__cancel,
+  .product-comments__send { @include ref.touch; display: flex; align-items: center; }
+  .product-comments__input { min-height: 44PX; }
+  .product-comments__reply-name { min-width: 0; }
 }
