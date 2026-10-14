@@ -7,8 +7,9 @@
     "apps/*"
   ],
   "scripts": {
-    "preverify": "npm run check:post-presentation && npm run check:secondhand-presentation && npm run check:gallery-presentation && npm run check:profile-presentation",
+    "preverify": "npm run check:post-presentation && npm run check:secondhand-presentation && npm run check:gallery-presentation && npm run check:profile-presentation && npm run check:search-filters",
     "check:profile-presentation": "node scripts/check-profile-presentation.cjs",
+    "check:search-filters": "node scripts/check-search-filters.cjs",
     "check:post-presentation": "node scripts/check-post-presentation.cjs",
     "check:gallery-presentation": "node scripts/check-gallery-presentation.cjs",
     "check:secondhand-presentation": "node scripts/check-secondhand-presentation.cjs",

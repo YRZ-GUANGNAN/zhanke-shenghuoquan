@@ -65,26 +65,53 @@ type GormRepository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *GormRepository { return &GormRepository{db: db} }
 
-func (r *GormRepository) SearchPosts(ctx context.Context, viewerID uint, keyword string, page, size int) ([]Post, int64, error) {
+func (r *GormRepository) searchPostsQuery(ctx context.Context, viewerID uint, keyword string, filters SearchFilters, now time.Time) *gorm.DB {
 	like, prefix := "%"+keyword+"%", keyword+"%"
 	query := r.db.WithContext(ctx).Model(&Post{}).
 		Where("review_status = ?", review.StatusApproved).
 		Where("NOT EXISTS (SELECT 1 FROM user_blocks AS ub WHERE ub.blocker_id = ? AND ub.blocked_id = posts.user_id)", viewerID).
 		Where("title LIKE ? OR content LIKE ? OR CAST(tags AS CHAR) LIKE ?", like, like, like)
+	if filters.ContentType == "image" {
+		query = query.Where("EXISTS (SELECT 1 FROM post_images AS media WHERE media.post_id = posts.id AND TRIM(media.url) <> '')")
+	} else if filters.ContentType == "text" {
+		query = query.Where("NOT EXISTS (SELECT 1 FROM post_images AS media WHERE media.post_id = posts.id AND TRIM(media.url) <> '')")
+	}
+	if filters.WithinDays > 0 {
+		query = query.Where("posts.created_at >= ?", now.Add(-time.Duration(filters.WithinDays)*24*time.Hour))
+	}
+	switch filters.Sort {
+	case "recent":
+		return query.Order("created_at DESC, id DESC")
+	case "likes":
+		return query.Order("liked_count DESC, created_at DESC, id DESC")
+	case "comments":
+		return query.Order("comment_count DESC, created_at DESC, id DESC")
+	case "favorites":
+		return query.Order("favorite_count DESC, created_at DESC, id DESC")
+	default:
+		// Order(clause.Expr) is ignored by GORM; an OrderBy expression preserves the intended relevance ranking.
+		return query.Clauses(clause.OrderBy{Expression: clause.Expr{SQL: `CASE
+			WHEN title = ? THEN 0 WHEN title LIKE ? THEN 1 WHEN title LIKE ? THEN 2
+			WHEN content LIKE ? THEN 3 ELSE 4 END,
+			created_at DESC, (liked_count + comment_count + favorite_count) DESC, id DESC`, Vars: []any{keyword, prefix, like, like}}})
+	}
+}
+
+func (r *GormRepository) SearchPosts(ctx context.Context, viewerID uint, keyword string, page, size int, options ...SearchFilters) ([]Post, int64, error) {
+	filters := SearchFilters{}
+	if len(options) > 0 {
+		filters = options[0]
+	}
+	if err := validateSearchFilters(filters); err != nil {
+		return nil, 0, err
+	}
+	query := r.searchPostsQuery(ctx, viewerID, keyword, filters, time.Now())
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 	values := make([]Post, 0, size)
-	rank := clause.Expr{SQL: `CASE
-		WHEN title = ? THEN 0
-		WHEN title LIKE ? THEN 1
-		WHEN title LIKE ? THEN 2
-		WHEN content LIKE ? THEN 3
-		ELSE 4 END`, Vars: []any{keyword, prefix, like, like}}
 	err := query.Preload("Images", func(db *gorm.DB) *gorm.DB { return db.Order("sort ASC") }).
-		Order(rank).Order("created_at DESC").
-		Order("(liked_count + comment_count + favorite_count) DESC").Order("id DESC").
 		Offset((page - 1) * size).Limit(size).Find(&values).Error
 	return values, total, err
 }

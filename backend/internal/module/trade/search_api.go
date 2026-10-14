@@ -14,10 +14,17 @@ import (
 )
 
 type tradeSearchRepository interface {
-	SearchProducts(context.Context, uint, string, int, int) ([]Product, int64, error)
+	SearchProducts(context.Context, uint, string, int, int, ...SearchFilters) ([]Product, int64, error)
 }
 
-func (s *Service) SearchProducts(ctx context.Context, viewerID uint, keyword string, page, size int) (Page, error) {
+func (s *Service) SearchProducts(ctx context.Context, viewerID uint, keyword string, page, size int, options ...SearchFilters) (Page, error) {
+	filters := SearchFilters{}
+	if len(options) > 0 {
+		filters = options[0]
+	}
+	if err := validateSearchFilters(filters); err != nil {
+		return Page{}, err
+	}
 	display, _, err := searchmetrics.Normalize(keyword)
 	if err != nil {
 		return Page{}, err
@@ -27,7 +34,7 @@ func (s *Service) SearchProducts(ctx context.Context, viewerID uint, keyword str
 	if !ok {
 		return Page{}, ErrSearchUnavailable
 	}
-	values, total, err := repository.SearchProducts(ctx, viewerID, display, page, size)
+	values, total, err := repository.SearchProducts(ctx, viewerID, display, page, size, filters)
 	if err != nil {
 		return Page{}, err
 	}
@@ -59,12 +66,17 @@ func (h *SearchHandler) search(c *gin.Context) {
 		return
 	}
 	var request struct {
-		Keyword  string `json:"keyword"`
-		Page     int    `json:"page"`
-		PageSize int    `json:"pageSize"`
+		Keyword  string        `json:"keyword"`
+		Page     int           `json:"page"`
+		PageSize int           `json:"pageSize"`
+		Filters  SearchFilters `json:"filters"`
 	}
 	if c.ShouldBindJSON(&request) != nil {
 		response.Fail(c, http.StatusBadRequest, "invalid trade search")
+		return
+	}
+	if err := validateSearchFilters(request.Filters); err != nil {
+		response.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
 	keyword, err := h.metrics.Confirm(c, user.CurrentUserID(c), request.Keyword)
@@ -76,8 +88,11 @@ func (h *SearchHandler) search(c *gin.Context) {
 		response.Fail(c, http.StatusInternalServerError, "record trade search failed")
 		return
 	}
-	value, err := h.service.SearchProducts(c, user.CurrentUserID(c), keyword, request.Page, request.PageSize)
-	write(c, value, err)
+	value, err := h.service.SearchProducts(c, user.CurrentUserID(c), keyword, request.Page, request.PageSize, request.Filters)
+	write(c, struct {
+		Page
+		FilterVersion int `json:"filterVersion"`
+	}{value, 1}, err)
 }
 
 func (h *SearchHandler) history(c *gin.Context) {

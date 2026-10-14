@@ -51,7 +51,7 @@ async function pageBehavior() {
     const taro = { getCurrentInstance: () => ({ router: { params: options.params || {} } }), showToast: async () => {}, navigateTo: async () => {}, getImageInfo: async () => ({ width: 600, height: 800 }), ...options.taro }
     modulePage.require = (id) => {
       if (id === 'react' || id === 'react/jsx-runtime') return require(id)
-      if (id === '@tarojs/taro') return { nextTick: (callback) => queueMicrotask(callback), useDidShow: (callback) => React.useEffect(() => callback(), []), useDidHide: () => {}, useResize: () => {} }
+      if (id === '@tarojs/taro') return { hideKeyboard: async () => {}, nextTick: (callback) => queueMicrotask(callback), useDidShow: (callback) => React.useEffect(() => callback(), []), useDidHide: () => {}, useResize: () => {} }
       if (id === '@tarojs/components') return Object.fromEntries(['Image', 'Input', 'ScrollView', 'Swiper', 'SwiperItem', 'Text', 'Textarea', 'View'].map((name) => [name, component(name)]))
       if (id.endsWith('.scss')) return {}
       if (id.endsWith('/feature-page-gate')) return { withFeaturePage: (pageComponent) => pageComponent, FeaturePageGate: View }
@@ -69,6 +69,13 @@ async function pageBehavior() {
       if (id.endsWith('/services/taro')) return { default: taro }
       if (id.endsWith('/capsule-safe')) return { getCapsuleSafeStyle: () => ({}) }
       if (id.endsWith('/navigation')) return { navigateBackOrHome: async () => {} }
+      if (id === './search-filter-panel' || id === './search-filters') {
+        const helperPath = path.resolve(__dirname, '../apps/miniapp/src/pages/search', id === './search-filter-panel' ? 'search-filter-panel.tsx' : 'search-filters.ts')
+        const helper = new Module(helperPath, module)
+        helper.require = modulePage.require
+        helper._compile(ts.transpileModule(fs.readFileSync(helperPath, 'utf8'), { fileName: helperPath, compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText, helperPath)
+        return helper.exports
+      }
       if (id.endsWith('/post-presentation')) return loaded.exports
       if (id.endsWith('/use-gallery-presentation') || id.endsWith('/gallery-presentation')) {
         const helperPath = path.resolve(__dirname, '../apps/miniapp/src', id.endsWith('/use-gallery-presentation') ? 'hooks/use-gallery-presentation.ts' : 'utils/gallery-presentation.ts')

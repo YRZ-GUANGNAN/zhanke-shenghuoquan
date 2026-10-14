@@ -304,10 +304,18 @@ export async function getPublicUserPosts(userId: string, page = 1, pageSize = 20
 	return normalizePage(data, normalizePost)
 }
 
-export async function searchCommunityPosts(keyword: string, page = 1, pageSize = 20): Promise<PageResult<CommunityPost>> {
+export interface CommunitySearchFilters {
+  sort?: 'relevance' | 'recent' | 'likes' | 'comments' | 'favorites'
+  contentType?: 'all' | 'image' | 'text'
+  withinDays?: 0 | 1 | 7 | 180
+}
+
+export async function searchCommunityPosts(keyword: string, page = 1, pageSize = 20, filters: CommunitySearchFilters = {}): Promise<PageResult<CommunityPost>> {
+  const filtered = Boolean((filters.sort && filters.sort !== 'relevance') || (filters.contentType && filters.contentType !== 'all') || filters.withinDays)
   const data = await request<unknown>('/community/searches', {
-    url: '', method: 'POST', data: { keyword, page, pageSize }, timeout: 10000,
+    url: '', method: 'POST', data: { keyword, page, pageSize, ...(filtered ? { filters } : {}) }, timeout: 10000,
   })
+  if (filtered && (!isRecord(data) || data.filterVersion !== 1)) throw new Error('当前服务暂不支持筛选，请清除筛选后重试')
   return normalizePage(data, normalizePost)
 }
 

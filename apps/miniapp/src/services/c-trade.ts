@@ -18,7 +18,20 @@ export interface CreateProductInput{title:string;description:string;price:number
 export interface TradeViewerState{favorited:boolean;contactedSeller:boolean}
 
 export async function getProductsPage(query:ProductListQuery={}):Promise<ProductPageResult>{const page=query.page??1;const pageSize=query.pageSize??20;const status=query.status??'selling';const params=[`page=${page}`,`pageSize=${pageSize}`,`status=${status}`];if(query.keyword?.trim())params.push(`keyword=${encodeURIComponent(query.keyword.trim())}`);if(query.category?.trim())params.push(`category=${encodeURIComponent(query.category.trim())}`);const result=await request<BackendPage<BackendProduct>>(`/trade/products?${params.join('&')}`);return{...result,items:result.items.map(normalizeProduct)}}
-export async function searchTradeProducts(keyword:string,page=1,pageSize=20):Promise<ProductPageResult>{const result=await request<BackendPage<BackendProduct>>('/trade/searches',{url:'',method:'POST',data:{keyword,page,pageSize},timeout:10000});return{...result,items:result.items.map(normalizeProduct)}}
+export interface TradeSearchFilters {
+  sort?: 'relevance' | 'recent' | 'price_asc' | 'price_desc'
+  category?: string
+  minPrice?: number
+  maxPrice?: number
+}
+export async function searchTradeProducts(keyword: string, page = 1, pageSize = 20, filters: TradeSearchFilters = {}): Promise<ProductPageResult> {
+  const filtered = Boolean((filters.sort && filters.sort !== 'relevance') || filters.category || filters.minPrice !== undefined || filters.maxPrice !== undefined)
+  const result = await request<BackendPage<BackendProduct> & { filterVersion?: number }>('/trade/searches', {
+    url: '', method: 'POST', data: { keyword, page, pageSize, ...(filtered ? { filters } : {}) }, timeout: 10000,
+  })
+  if (filtered && result.filterVersion !== 1) throw new Error('当前服务暂不支持筛选，请清除筛选后重试')
+  return { ...result, items: result.items.map(normalizeProduct) }
+}
 export function listTradeSearchHistory():Promise<string[]>{return request<string[]>('/trade/search-history')}
 export async function clearTradeSearchHistory():Promise<void>{await request('/trade/search-history',{url:'',method:'DELETE'})}
 export function listTradeHotSearches():Promise<TradeHotSearchKeyword[]>{return request<TradeHotSearchKeyword[]>('/trade/hot-searches')}
