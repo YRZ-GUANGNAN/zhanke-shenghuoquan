@@ -1,0 +1,34 @@
+@use './design-tokens.scss' as *;
+
+// Keep real photos beneath the whole profile, with light reading surfaces rather
+// than a separate card. Overlays never intercept profile/editor interactions.
+@mixin surface($top-space: var(--capsule-system-row-height, 72px), $detail-height: calc(320rpx + 44PX)) {
+  overflow: hidden;
+  &::before,
+  &::after {
+    position: absolute;
+    z-index: 1;
+    right: 0;
+    left: 0;
+    pointer-events: none;
+    content: '';
+  }
+  &::before {
+    top: 0;
+    height: calc(#{$top-space} + 176rpx);
+    background: linear-gradient(to bottom,
+      rgba($bg-surface, .94) 0,
+      rgba($bg-surface, .9) #{$top-space},
+      rgba($bg-surface, .86) calc(#{$top-space} + 88rpx),
+      rgba($bg-surface, 0) 100%);
+  }
+  &::after {
+    bottom: 0;
+    height: $detail-height;
+    background: linear-gradient(to bottom,
+      rgba($bg-surface, 0) 0,
+      rgba($bg-surface, .78) 24%,
+      rgba($bg-surface, .92) 72%,
+      $bg-surface 100%);
+  }
+}

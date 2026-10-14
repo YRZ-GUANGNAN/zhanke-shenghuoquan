@@ -123,6 +123,10 @@ async function run() {
     await profile.event(() => navigations[1].resolve())
     await profile.show()
     assert.equal(profile.props('.student-profile-hero').onClick, undefined, '系统留白不触发编辑')
+    assert.ok(!profile.container.querySelector('.student-profile-cover .student-profile-cover__edit'), '照片层只负责背景，不再是独立可操作横幅')
+    assert.ok(profile.container.querySelector('.student-profile-hero__toolbar .student-profile-cover__edit'), '封面入口与标题组成同一工具行')
+    assert.ok(profile.container.querySelector('.student-profile-hero > .student-profile-user'), '个人资料处于同一个背景头部')
+    assert.equal(profile.container.querySelector('.student-profile-hero--with-cover'), null, '无图状态不冒充已设置照片')
     await profile.event(() => { profile.props('.student-profile-user').onClick(); profile.props('.student-profile-user').onClick() })
     assert.equal(navigations.length, 3, '资料整行保留编辑入口并防止重复导航')
     assert.equal(navigations[2].url, '/pages/edit-profile/index')
@@ -149,11 +153,22 @@ async function run() {
     profile.options.session.profile = { ...profile.options.session.profile, cover: 'isolated-cover-a' }
     await profile.render()
     assert.equal(profile.props('.student-profile-cover__image').src, 'isolated-cover-a')
+    assert.ok(profile.container.querySelector('.student-profile-hero--with-cover'), '真实封面启用融合背景状态')
     await profile.event(() => profile.props('.student-profile-cover__image').onError())
     assert.equal(profile.container.querySelector('.student-profile-cover__image'), null, '封面失败不破坏资料区')
+    assert.equal(profile.container.querySelector('.student-profile-hero--with-cover'), null, '图片失败同时恢复浅色背景状态')
     profile.options.session.profile = { ...profile.options.session.profile, cover: 'isolated-cover-b' }
     await profile.render()
     assert.equal(profile.props('.student-profile-cover__image').src, 'isolated-cover-b', '新封面不沿用旧图失败状态')
+    assert.ok(profile.container.querySelector('.student-profile-hero--with-cover'))
+    profile.options.session.profile = { ...profile.options.session.profile, cover: '' }
+    await profile.render()
+    assert.equal(profile.container.querySelector('.student-profile-hero--with-cover'), null, '恢复默认后移除照片状态')
+    await profile.show()
+    await profile.event(() => { profile.props('.student-profile-cover__edit').onClick(); profile.props('.student-profile-user').onClick() })
+    assert.equal(navigations.length, 4, '封面和资料共用防重导航，不改变原编辑入口')
+    assert.equal(navigations[3].url, '/pages/edit-profile/index')
+    await profile.event(() => navigations[3].reject(new Error('isolated editor navigation failure')))
     profile.options.session.switchIdentity = () => { const task = deferred(); switches.push(task); return task.promise }
     await profile.render()
     await profile.event(() => profile.all('.student-profile-role')[1].onClick())

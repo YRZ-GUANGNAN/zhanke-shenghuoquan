@@ -91,7 +91,7 @@ export default function ProfileCoverEditor({ disabled = false, isProfileBusy, on
           : <View className='profile-cover-editor__empty'><AppIcon name='image' /><Text>{source ? '图片暂时无法加载' : '让主页多一点你的样子'}</Text></View>}
       </View>
       <Text className={`profile-cover-editor__hint${error ? ' profile-cover-editor__hint--error' : ''}`}>
-        {error || message || '建议选用横向照片，居中展示；不设置也可保留浅色背景。'}
+        {error || message || '照片会铺在头像和资料背后，居中裁切，下沿自然融入页面。不设置也可保留浅色背景。'}
       </Text>
       <View className='profile-cover-editor__actions'>
         <Button className={`profile-cover-editor__choose${busy ? ' profile-cover-editor__action--disabled' : ''}`} ariaLabel='选择个人封面照片' disabled={busy} onClick={() => void choose()}>

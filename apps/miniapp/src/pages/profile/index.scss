@@ -1,7 +1,9 @@
 @use 'sass:color';
 @use '../../styles/design-tokens.scss' as *;
+@use '../../styles/profile-cover-surface.scss' as cover;
 
 $profile-accent-soft: color.mix($brand-primary, $bg-surface, 8%);
+$profile-text-secondary: color.mix($text-primary, $text-secondary, 16%);
 $profile-success: #23856d;
 $profile-success-soft: #eaf7f2;
 $profile-warning: #a86418;
@@ -23,62 +25,74 @@ page {
 }
 
 .student-profile-hero {
-  padding: 0 0 24rpx;
+  position: relative;
+  padding: 0 0 48rpx;
   background: $bg-surface;
   box-sizing: border-box;
 }
 
+.student-profile-hero > .capsule-system-row,
+.student-profile-hero__toolbar,
+.student-profile-user {
+  position: relative;
+  z-index: 1;
+}
+
+.student-profile-hero__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+  min-height: 44PX;
+  height: 88rpx;
+  margin: 0 32rpx;
+}
+
 .student-profile-hero__title {
   display: block;
-  padding: 16rpx 32rpx 16rpx;
   color: $text-strong;
-  font-size: 36rpx;
-  font-weight: 700;
-  line-height: 48rpx;
+  font-size: 32rpx;
+  font-weight: 600;
+  line-height: 44rpx;
 }
 
 .student-profile-user {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  gap: 24rpx;
-  min-height: 160rpx;
-  margin: -40rpx 32rpx 0;
-  padding: 0 0 16rpx;
-  border-radius: 16rpx;
+  display: grid;
+  grid-template-columns: 128rpx minmax(0, 1fr);
+  align-items: start;
+  gap: 16rpx 24rpx;
+  margin: 96rpx 32rpx 0;
   box-sizing: border-box;
   transition: opacity $duration-fast ease;
 }
 
 .student-profile-cover {
-  position: relative;
-  height: 280rpx;
+  @include cover.surface;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
   background: $profile-accent-soft;
 }
 
-.student-profile-cover__image { display: block; width: 100%; height: 100%; }
+.student-profile-cover__image { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
 
 .student-profile-cover__edit {
-  position: absolute;
-  right: 24rpx;
-  bottom: 24rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8rpx;
   min-height: 44PX;
-  padding: 0 20rpx;
-  border: 1rpx solid $border-subtle;
+  padding: 0 8rpx;
   border-radius: 12rpx;
   color: $text-primary;
-  background: rgba($bg-surface, .96);
   font-size: 24rpx;
   font-weight: 500;
   line-height: 34rpx;
   box-sizing: border-box;
+  transition: opacity $duration-fast ease;
 }
 .student-profile-cover__edit .app-icon { width: 30rpx; height: 30rpx; }
-.student-profile-cover__edit:active { background: $bg-surface; opacity: .8; }
+.student-profile-cover__edit:active { opacity: .65; }
 
 .student-profile-user:active {
   opacity: .72;
@@ -92,7 +106,7 @@ page {
   width: 128rpx;
   height: 128rpx;
   overflow: hidden;
-  border: 6rpx solid $bg-surface;
+  border: 4rpx solid rgba($bg-surface, .88);
   border-radius: 50%;
   color: $brand-primary-strong;
   font-size: 38rpx;
@@ -109,9 +123,7 @@ page {
 }
 
 .student-profile-user__main {
-  flex: 1 1 auto;
   min-width: 0;
-  padding-top: 48rpx;
 }
 
 .student-profile-user__title-row {
@@ -131,7 +143,7 @@ page {
   min-width: 0;
   overflow: hidden;
   color: $text-primary;
-  font-size: 38rpx;
+  font-size: 40rpx;
   font-weight: 700;
   line-height: 52rpx;
   text-overflow: ellipsis;
@@ -157,7 +169,7 @@ page {
 .student-profile-user__meta {
   display: block;
   overflow: hidden;
-  color: $text-secondary;
+  color: $profile-text-secondary;
   font-size: 22rpx;
   line-height: 32rpx;
   font-variant-numeric: tabular-nums;
@@ -184,7 +196,7 @@ page {
 .student-profile-user__campus {
   min-width: 0;
   overflow: hidden;
-  color: $text-secondary;
+  color: $profile-text-secondary;
   font-size: 23rpx;
   line-height: 32rpx;
   text-overflow: ellipsis;
@@ -192,19 +204,28 @@ page {
 }
 
 .student-profile-user__edit {
-  flex: 0 0 auto;
+  grid-column: 2;
+  justify-self: start;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 4rpx;
   min-width: 112rpx;
   min-height: 44PX;
-  margin-top: 40rpx;
-  padding: 0 0 0 8rpx;
+  padding: 0 20rpx;
+  border: 1rpx solid rgba($brand-primary, .16);
+  border-radius: 12rpx;
+  background: rgba($bg-surface, .7);
   color: $brand-primary-strong;
   font-size: 24rpx;
   font-weight: 600;
   box-sizing: border-box;
+}
+
+.student-profile-hero--with-cover {
+  .student-profile-user__meta,
+  .student-profile-user__campus { color: $text-primary; }
+  .student-profile-user__badge { background: rgba($bg-surface, .86); }
 }
 
 .student-profile-user__edit-icon {
@@ -221,6 +242,12 @@ page {
   padding-bottom: 24rpx;
   border-top: 1rpx solid $border-subtle;
   background: $bg-surface;
+}
+
+.student-profile-content > .student-profile-card:first-child {
+  border-top: 0;
+  .student-profile-card__header,
+  .student-profile-settings__header { padding-top: 16rpx; }
 }
 
 .student-profile-card__header {
@@ -539,12 +566,13 @@ page {
 
 @media (max-width: 340px) {
   .student-profile-user {
+    grid-template-columns: 112rpx minmax(0, 1fr);
     gap: 16rpx;
   }
 
   .student-profile-user__avatar {
-    width: 96rpx;
-    height: 96rpx;
+    width: 112rpx;
+    height: 112rpx;
   }
 
   .student-profile-user__edit {
@@ -560,6 +588,7 @@ page {
 
 @media (prefers-reduced-motion: reduce) {
   .student-profile-user,
+  .student-profile-cover__edit,
   .student-profile-stats__item,
   .student-profile-setting,
   .student-profile-role {

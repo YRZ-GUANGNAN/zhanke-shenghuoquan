@@ -1,5 +1,6 @@
 @use 'sass:color';
 @use '../styles/design-tokens.scss' as *;
+@use '../styles/profile-cover-surface.scss' as cover;
 
 .profile-cover-editor {
   padding: 24rpx 0;
@@ -9,15 +10,16 @@
 .profile-cover-editor__title { color: $text-primary; font-size: 30rpx; font-weight: 600; line-height: 44rpx; }
 .profile-cover-editor__scope { color: $text-secondary; font-size: 22rpx; line-height: 32rpx; }
 .profile-cover-editor__preview {
+  @include cover.surface($top-space: 0px, $detail-height: 80%);
   position: relative;
   height: 0;
-  padding-bottom: 37.3333%;
+  padding-bottom: 78%;
   overflow: hidden;
   border-radius: 16rpx;
   background: color.mix($brand-primary, $bg-surface, 7%);
 }
 .profile-cover-editor__image, .profile-cover-editor__empty { position: absolute; inset: 0; width: 100%; height: 100%; }
-.profile-cover-editor__empty { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 16rpx; color: $text-secondary; font-size: 24rpx; }
+.profile-cover-editor__empty { z-index: 2; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 16rpx; color: $text-secondary; font-size: 24rpx; }
 .profile-cover-editor__empty .app-icon { width: 40rpx; height: 40rpx; opacity: .7; }
 .profile-cover-editor__hint { display: block; min-height: 64rpx; padding-top: 16rpx; color: $text-secondary; font-size: 23rpx; line-height: 34rpx; overflow-wrap: anywhere; }
 .profile-cover-editor__hint--error { color: $danger; }

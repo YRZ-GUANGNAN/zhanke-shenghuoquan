@@ -153,6 +153,7 @@ function ProfileContent() {
   const roleSwitchLockRef = useRef(false)
   const didShowOnce = useRef(false)
   const profile = useSessionStore((state) => state.profile)
+  const hasCover = Boolean(profile.cover && profile.cover !== failedCover)
   const identity = useSessionStore((state) => state.identity)
   const refreshIdentity = useSessionStore((state) => state.refreshIdentity)
   const switchIdentity = useSessionStore((state) => state.switchIdentity)
@@ -240,11 +241,13 @@ function ProfileContent() {
 
   return (
     <View className='student-profile-page' style={getCapsuleSafeStyle()}>
-      <View className='student-profile-hero'>
-        <CapsuleSystemRow />
-        <Text className='student-profile-hero__title'>我的</Text>
+      <View className={`student-profile-hero${hasCover ? ' student-profile-hero--with-cover' : ''}`}>
         <View className='student-profile-cover'>
-          {profile.cover && profile.cover !== failedCover && <Image className='student-profile-cover__image' src={profile.cover} mode='aspectFill' ariaLabel='我的个人封面' onError={() => setFailedCover(profile.cover || '')} />}
+          {hasCover && <Image className='student-profile-cover__image' src={profile.cover || ''} mode='aspectFill' ariaLabel='我的个人封面' onError={() => setFailedCover(profile.cover || '')} />}
+        </View>
+        <CapsuleSystemRow />
+        <View className='student-profile-hero__toolbar'>
+          <Text className='student-profile-hero__title'>我的</Text>
           <View className='student-profile-cover__edit' ariaRole='button' ariaLabel={profile.cover ? '更换个人封面' : '设置个人封面'} onClick={openProfileEditor}>
             <AppIcon name='image' /><Text>{profile.cover ? '更换封面' : '设置封面'}</Text>
           </View>
