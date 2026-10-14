@@ -2,6 +2,7 @@ declare module '@tarojs/taro' {
   export function nextTick(callback: () => void): void
   export function useDidShow(callback: () => void): void
   export function useDidHide(callback: () => void): void
+  export function useResize(callback: () => void): void
   export function useShareAppMessage(callback: (payload: { from?: string; target?: unknown; webViewUrl?: string }) => { title?: string; path?: string; imageUrl?: string }): void
   export function getCurrentInstance(): CurrentInstance
   export function showShareMenu(options?: { menus?: Array<'shareAppMessage' | 'shareTimeline'> }): Promise<unknown>
@@ -52,6 +53,8 @@ declare module '@tarojs/taro' {
 
   interface WindowInfo {
     windowWidth: number
+    windowHeight?: number
+    screenHeight?: number
     statusBarHeight: number
     pixelRatio: number
     safeArea?: {

@@ -7,187 +7,145 @@
   height: 100vh;
   min-height: 100vh;
   overflow: hidden;
-  background: $bg-screen;
+  background: $bg-surface;
   color: $text-primary;
   font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 }
-
 .capsule-page-header.secondhand-detail-header .capsule-page-header__business-row {
   margin-top: -8px;
 }
-
 .secondhand-detail-header__back {
-  position: relative;
-  width: 44px;
-  height: 44px;
+  width: 88rpx;
+  height: 88rpx;
 }
-
-.secondhand-detail-header__back::before {
-  position: absolute;
-  top: 13px;
-  left: 15px;
-  width: 14px;
-  height: 14px;
-  border-bottom: 3px solid $text-strong;
-  border-left: 3px solid $text-strong;
-  content: '';
-  transform: rotate(45deg);
-}
-
 .secondhand-detail-scroll {
   flex: 1 1 auto;
+  height: 0;
   min-height: 0;
-  background: $bg-screen;
 }
-
 .secondhand-detail-hero {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 430rpx;
-  background: $placeholder-stripe, $brand-tint;
-  color: $placeholder-label;
-  font-size: 24rpx;
+  height: 750rpx;
+  background: $bg-screen;
+  color: $text-secondary;
+  font-size: 26rpx;
 }
-
-.secondhand-detail-hero__image {
-  display: block;
+.secondhand-detail-hero--empty {
+  height: 144rpx;
+}
+.secondhand-detail-gallery, .secondhand-detail-hero__image {
   width: 100%;
   height: 100%;
 }
-
+.secondhand-detail-gallery__count {
+  position: absolute;
+  right: 24rpx;
+  bottom: 24rpx;
+  padding: 8rpx 16rpx;
+  border-radius: 12rpx;
+  background: rgba($text-strong, .6);
+  color: $text-on-color;
+  font-size: 22rpx;
+  line-height: 32rpx;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+.secondhand-detail-gallery__count--visible {
+  opacity: 1;
+}
 .secondhand-detail-info {
-  padding: 32rpx 40rpx 34rpx;
+  padding: 32rpx;
   background: $bg-surface;
 }
-
-.secondhand-detail-info--state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 430rpx;
-  text-align: center;
-}
-
-.secondhand-detail-info--retry {
-  cursor: pointer;
-}
-
-.secondhand-detail-state__title {
-  color: $text-strong;
-  font-size: 30rpx;
-  font-weight: 800;
-  line-height: 1.35;
-}
-
-.secondhand-detail-info--retry .secondhand-detail-state__title {
-  color: $brand-primary;
-}
-
-.secondhand-detail-state__desc {
-  margin-top: 14rpx;
-  color: $text-muted;
-  font-size: 24rpx;
-  line-height: 1.5;
-}
-
 .secondhand-detail-info__price-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 24rpx;
 }
-
 .secondhand-detail-info__price {
+  min-width: 0;
+  overflow: hidden;
   color: $badge-unread;
-  font-size: 58rpx;
-  font-weight: 900;
-  line-height: 1;
+  font-size: 56rpx;
+  font-weight: 700;
+  line-height: 64rpx;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-
 .secondhand-detail-info__currency {
   margin-right: 8rpx;
-  font-size: 27rpx;
-  font-weight: 800;
-  vertical-align: 6rpx;
+  font-size: 28rpx;
+  font-weight: 600;
 }
-
 .secondhand-detail-info__status {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 96rpx;
-  height: 42rpx;
-  padding: 0 18rpx;
-  border-radius: 999rpx;
-  background: rgba($brand-primary, .10);
+  flex: 0 0 auto;
+  padding: 8rpx 16rpx;
+  border-radius: 8rpx;
+  background: $brand-tint;
   color: $brand-primary-strong;
   font-size: 24rpx;
-  font-weight: 700;
+  line-height: 32rpx;
+  font-weight: 500;
 }
-
 .secondhand-detail-info__title {
   display: block;
   margin-top: 24rpx;
   color: $text-strong;
-  font-size: 32rpx;
-  font-weight: 900;
-  line-height: 1.35;
+  font-size: 36rpx;
+  font-weight: 600;
+  line-height: 50rpx;
+  word-break: break-all;
 }
-
 .secondhand-detail-info__desc {
   display: block;
-  margin-top: 20rpx;
+  margin-top: 24rpx;
   color: $text-primary;
-  font-size: 28rpx;
-  font-weight: 400;
-  line-height: 1.65;
+  font-size: 30rpx;
+  line-height: 48rpx;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
-
 .secondhand-detail-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 16rpx;
-  margin-top: 28rpx;
+  gap: 12rpx;
+  margin-top: 24rpx;
 }
-
 .secondhand-detail-tag {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 44rpx;
-  padding: 0 22rpx;
-  border-radius: 999rpx;
-  background: $brand-tint;
-  color: $brand-primary;
+  max-width: 100%;
+  padding: 6rpx 16rpx;
+  border-radius: 8rpx;
+  background: $bg-screen;
+  color: $text-secondary;
   font-size: 24rpx;
-  font-weight: 600;
+  line-height: 32rpx;
+  word-break: break-all;
 }
-
 .secondhand-detail-info__meta {
   display: block;
-  margin-top: 26rpx;
-  color: $text-muted;
+  margin-top: 24rpx;
+  color: $text-secondary;
   font-size: 24rpx;
-  line-height: 1.3;
+  line-height: 36rpx;
 }
-
 .secondhand-detail-section {
-  padding: 24rpx 32rpx 176rpx;
-  background: $bg-screen;
+  padding: 0 32rpx calc(32rpx + env(safe-area-inset-bottom));
 }
-
 .secondhand-detail-seller {
   display: flex;
   align-items: center;
-  gap: 20rpx;
-  padding: 30rpx 28rpx;
-  border: 1rpx solid $divider-nav;
-  border-radius: 28rpx;
-  background: $bg-surface;
+  gap: 16rpx;
+  padding: 24rpx 0;
+  border-top: 1rpx solid $divider-nav;
+  border-bottom: 1rpx solid $divider-nav;
 }
-
 .secondhand-detail-seller__avatar {
   flex: 0 0 auto;
   display: flex;
@@ -195,260 +153,200 @@
   justify-content: center;
   width: 72rpx;
   height: 72rpx;
-  border-radius: 50%;
-  background: rgba($brand-primary, .58);
-  color: $text-on-color;
-  font-size: 30rpx;
-  font-weight: 800;
-}
-
-.secondhand-detail-seller__main {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6rpx;
-}
-
-.secondhand-detail-seller__name {
-  color: $text-strong;
-  font-size: 29rpx;
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.secondhand-detail-seller__meta {
   overflow: hidden;
-  color: $text-muted;
-  font-size: 23rpx;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.secondhand-detail-seller__button {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 82rpx;
-  height: 48rpx;
-  padding: 0 20rpx;
-  border: 1rpx solid $divider-nav;
-  border-radius: 999rpx;
-  background: $bg-surface;
-  color: $brand-primary;
-  font-size: 24rpx;
-  font-weight: 700;
-}
-
-.secondhand-detail-warning {
-  display: flex;
-  align-items: flex-start;
-  gap: 12rpx;
-  margin-top: 24rpx;
-  padding: 22rpx 26rpx;
-  border-radius: 20rpx;
-  background: rgba($badge-unread, .08);
-  color: $badge-unread;
-  font-size: 24rpx;
-  line-height: 1.55;
-}
-
-.secondhand-detail-warning__icon {
-  flex: 0 0 auto;
-  margin-top: 1rpx;
-  font-size: 23rpx;
-  font-weight: 900;
-}
-
-.secondhand-detail-actionbar {
-  position: fixed;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 12;
-  display: grid;
-  grid-template-columns: 110rpx 1fr;
-  align-items: center;
-  gap: 18rpx;
-  min-height: 122rpx;
-  padding: 18rpx 28rpx calc(32rpx + env(safe-area-inset-bottom));
-  border-top: 1rpx solid $divider-nav;
-  background: rgba($bg-surface, .98);
-}
-
-.secondhand-detail-favorite {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 5rpx;
-  color: $text-secondary;
-  font-size: 20rpx;
-  font-weight: 500;
-}
-
-.secondhand-detail-favorite__star {
-  width: 40rpx;
-  height: 40rpx;
-  transform: scale(1);
-  transition: transform 120ms ease;
-}
-
-.secondhand-detail-favorite--active {
-  color: $like-active;
-}
-
-.secondhand-detail-favorite--pending,
-.secondhand-detail-contact--pending {
-  opacity: .62;
-}
-
-.secondhand-detail-contact--disabled {
-  background: $bg-app;
-  color: $text-muted;
-  box-shadow: none;
-}
-
-.secondhand-detail-contact {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 14rpx;
-  height: 72rpx;
-  border-radius: 18rpx;
-  background: $gradient-primary;
-  box-shadow: 0 18rpx 34rpx -18rpx rgba($brand-primary-strong, .70);
-  color: $text-on-color;
-  font-size: 30rpx;
-  font-weight: 900;
-}
-
-.secondhand-detail-actionbar--seller {
-  display: block;
-}
-
-.secondhand-detail-seller-actions {
-  display: flex;
-  gap: 18rpx;
-}
-
-.secondhand-detail-seller-action {
-  flex: 1 1 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 72rpx;
-  border: 1rpx solid $brand-primary;
-  border-radius: 18rpx;
-  background: $bg-surface;
-  color: $brand-primary;
-  font-size: 27rpx;
-  font-weight: 800;
-}
-
-.secondhand-detail-seller-action--primary {
-  background: $gradient-primary;
-  color: $text-on-color;
-}
-
-.secondhand-detail-contact__icon {
-  position: relative;
-  width: 32rpx;
-  height: 30rpx;
-}
-
-.secondhand-detail-contact__icon::before {
-  position: absolute;
-  inset: 4rpx 2rpx 7rpx;
-  border: 4rpx solid currentColor;
-  border-radius: 5rpx;
-  content: '';
-}
-
-.secondhand-detail-contact__icon::after {
-  position: absolute;
-  left: 10rpx;
-  bottom: 1rpx;
-  width: 12rpx;
-  height: 12rpx;
-  border-right: 4rpx solid currentColor;
-  border-bottom: 4rpx solid currentColor;
-  content: '';
-  transform: skew(-20deg);
-}
-
-.secondhand-contact-sheet__content { display: grid; gap: 18rpx; }
-
-.secondhand-contact-option {
-  display: flex;
-  align-items: center;
-  gap: 22rpx;
-  min-height: 108rpx;
-  padding: 24rpx;
-  border: 1rpx solid $divider-nav;
-  border-radius: 22rpx;
-  background: $bg-surface;
-}
-
-.secondhand-contact-option__icon {
-  position: relative;
-  flex: 0 0 auto;
-  width: 68rpx;
-  height: 68rpx;
-  border-radius: 18rpx;
-}
-
-.secondhand-contact-option__icon--chat {
+  border-radius: 50%;
   background: $brand-tint;
+  color: $brand-primary;
+  font-size: 30rpx;
+  font-weight: 600;
 }
-
-.secondhand-contact-option__icon--chat::before {
-  position: absolute;
-  inset: 20rpx 16rpx 23rpx;
-  border: 4rpx solid $brand-primary;
-  border-radius: 5rpx;
-  content: '';
+.secondhand-detail-seller__avatar image {
+  width: 100%;
+  height: 100%;
 }
-
-.secondhand-contact-option__icon--chat::after {
-  position: absolute;
-  left: 29rpx;
-  bottom: 17rpx;
-  width: 12rpx;
-  height: 12rpx;
-  border-right: 4rpx solid $brand-primary;
-  border-bottom: 4rpx solid $brand-primary;
-  content: '';
-  transform: skew(-20deg);
-}
-
-.secondhand-contact-option__main {
+.secondhand-detail-seller__main {
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 8rpx;
 }
-
-.secondhand-contact-option__title {
+.secondhand-detail-seller__name {
+  overflow: hidden;
   color: $text-strong;
   font-size: 28rpx;
-  font-weight: 800;
-}
-
-.secondhand-contact-option__desc {
-  overflow: hidden;
-  color: $text-secondary;
-  font-size: 23rpx;
-  line-height: 1.35;
+  font-weight: 600;
+  line-height: 40rpx;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.secondhand-detail-seller__meta {
+  overflow: hidden;
+  color: $text-secondary;
+  font-size: 24rpx;
+  line-height: 32rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.secondhand-detail-seller__button {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 96rpx;
+  min-height: 88rpx;
+  color: $brand-primary;
+  font-size: 26rpx;
+  font-weight: 500;
+}
+.secondhand-detail-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+  padding: 24rpx 0;
+  color: $badge-unread;
+  font-size: 24rpx;
+  line-height: 36rpx;
+}
+.secondhand-detail-warning__icon {
+  flex: 0 0 auto;
+  width: 28rpx;
+  height: 28rpx;
+  margin-top: 4rpx;
+}
 
+// The bar is a flex sibling of the scroll viewport, so it cannot cover the last comment.
+.secondhand-detail-actionbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  min-height: calc(120rpx + env(safe-area-inset-bottom));
+  padding: 16rpx 32rpx calc(16rpx + env(safe-area-inset-bottom));
+  border-top: 1rpx solid $divider-nav;
+  background: $bg-surface;
+  box-sizing: border-box;
+}
+.secondhand-detail-favorite {
+  flex: 0 0 104rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4rpx;
+  min-height: 88rpx;
+  color: $text-secondary;
+  font-size: 22rpx;
+  line-height: 32rpx;
+}
+.secondhand-detail-favorite:only-child {
+  flex: 1;
+  flex-direction: row;
+  gap: 12rpx;
+}
+.secondhand-detail-favorite__star {
+  width: 36rpx;
+  height: 36rpx;
+}
+.secondhand-detail-favorite--active {
+  color: $like-active;
+}
+.secondhand-detail-favorite--pending, .secondhand-detail-contact--pending {
+  opacity: .6;
+}
+.secondhand-detail-contact {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  min-height: 88rpx;
+  border-radius: 16rpx;
+  background: $gradient-primary;
+  color: $text-on-color;
+  font-size: 30rpx;
+  font-weight: 600;
+}
+.secondhand-detail-contact--disabled {
+  background: $bg-app;
+  color: $text-secondary;
+}
+.secondhand-detail-contact__icon {
+  width: 36rpx;
+  height: 36rpx;
+}
+.secondhand-detail-contact__icon {
+  filter: brightness(0) invert(1);
+}
+.secondhand-detail-contact--disabled .secondhand-detail-contact__icon {
+  filter: none;
+}
+.secondhand-detail-seller-actions {
+  display: flex;
+  flex: 1;
+  gap: 16rpx;
+  min-width: 0;
+}
+.secondhand-detail-seller-action {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 88rpx;
+  border: 1rpx solid $brand-primary;
+  border-radius: 16rpx;
+  background: $bg-surface;
+  color: $brand-primary;
+  font-size: 28rpx;
+  font-weight: 600;
+}
+.secondhand-detail-seller-action--primary {
+  background: $gradient-primary;
+  color: $text-on-color;
+}
+.secondhand-detail-control--pressed, .secondhand-detail-contact:active, .secondhand-detail-seller-action:active {
+  opacity: .72;
+}
+.secondhand-contact-sheet__content {
+  display: grid;
+  gap: 24rpx;
+}
+.secondhand-contact-option {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  min-height: 112rpx;
+  padding: 16rpx;
+}
+.secondhand-contact-option__icon {
+  flex: 0 0 auto;
+  width: 48rpx;
+  height: 48rpx;
+}
+.secondhand-contact-option__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+.secondhand-contact-option__title {
+  color: $text-strong;
+  font-size: 30rpx;
+  line-height: 40rpx;
+  font-weight: 600;
+}
+.secondhand-contact-option__desc {
+  overflow: hidden;
+  color: $text-secondary;
+  font-size: 24rpx;
+  line-height: 36rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .secondhand-contact-option__arrow {
-  color: $text-faint;
-  font-size: 42rpx;
-  line-height: 1;
+  width: 32rpx;
+  height: 32rpx;
 }

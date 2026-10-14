@@ -7,7 +7,10 @@
     "apps/*"
   ],
   "scripts": {
+    "preverify": "npm run check:post-presentation && npm run check:secondhand-presentation && npm run check:gallery-presentation",
     "check:post-presentation": "node scripts/check-post-presentation.cjs",
+    "check:gallery-presentation": "node scripts/check-gallery-presentation.cjs",
+    "check:secondhand-presentation": "node scripts/check-secondhand-presentation.cjs",
     "check:campus-info": "node scripts/check-campus-info.cjs && node scripts/check-feature-policy.cjs && node scripts/check-share-cards.cjs",
     "check:share-cards": "node scripts/check-share-cards.cjs",
     "test:share-settings:mysql": "node scripts/test-feature-policy-mysql.cjs --share-settings",

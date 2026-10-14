@@ -7,362 +7,261 @@
   height: 100vh;
   min-height: 100vh;
   overflow: hidden;
-  background: $bg-app;
+  background: $bg-surface;
   color: $text-primary;
   font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 }
 
 .student-secondhand-header {
-  position: relative;
   z-index: 6;
   flex: 0 0 auto;
-  padding: 0 0 22rpx;
   background: $bg-surface;
-  box-shadow: $shadow-header;
+  border-bottom: 1rpx solid $divider-nav;
 }
-
 .student-secondhand-header__title-row {
   box-shadow: none;
 }
-
 .student-secondhand-header__title-row .capsule-page-header__business-row {
-  gap: 20rpx;
-  padding-right: 28rpx;
-  padding-left: 28rpx;
+  gap: 24rpx;
+  padding-right: 24rpx;
+  padding-left: 24rpx;
 }
-
 .student-secondhand-header__title {
-  flex: 0 0 auto;
   color: $text-strong;
-  font-size: 40rpx;
-  font-weight: 900;
-  line-height: 1;
+  font-size: 36rpx;
+  font-weight: 700;
+  line-height: 48rpx;
 }
-
 .student-secondhand-search {
-  flex: 1 1 auto;
   display: flex;
   align-items: center;
+  gap: 12rpx;
   min-width: 0;
-  height: 64rpx;
-  padding: 0 28rpx;
-  border-radius: 999rpx;
-  background: $divider-nav;
-  color: $text-faint;
-  font-size: 25rpx;
+  height: 72rpx;
+  padding: 0 24rpx;
+  border-radius: 16rpx;
+  background: $bg-screen;
+  color: $text-secondary;
+  font-size: 26rpx;
 }
-
 .student-secondhand-search__icon {
-  position: relative;
   flex: 0 0 auto;
   width: 32rpx;
   height: 32rpx;
-  margin-right: 12rpx;
 }
-
-.student-secondhand-search__icon::before {
-  position: absolute;
-  top: 5rpx;
-  left: 5rpx;
-  width: 16rpx;
-  height: 16rpx;
-  border: 3rpx solid $text-muted;
-  border-radius: 50%;
-  content: '';
+.student-secondhand-search--pressed {
+  background: $divider-nav;
 }
-
-.student-secondhand-search__icon::after {
-  position: absolute;
-  top: 22rpx;
-  left: 22rpx;
-  width: 10rpx;
-  height: 3rpx;
-  border-radius: 3rpx;
-  background: $text-muted;
-  content: '';
-  transform: rotate(45deg);
-  transform-origin: left center;
-}
-
 .student-secondhand-categories {
-  margin: 24rpx 0 0;
   white-space: nowrap;
 }
-
 .student-secondhand-categories__inner {
   display: inline-flex;
-  gap: 18rpx;
-  padding: 0 28rpx;
+  gap: 32rpx;
+  padding: 0 24rpx;
 }
-
 .student-secondhand-category {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 108rpx;
-  height: 56rpx;
-  padding: 0 28rpx;
-  border: 1.5rpx solid $divider-nav;
-  border-radius: 999rpx;
-  background: $bg-surface;
+  min-width: 64rpx;
+  height: 88rpx;
   color: $text-secondary;
-  font-size: 25rpx;
+  font-size: 28rpx;
   font-weight: 500;
 }
-
 .student-secondhand-category--active {
-  border-color: $brand-primary;
-  background: $brand-primary;
-  color: $text-on-color;
+  color: $brand-primary;
+  font-weight: 700;
 }
-
+.student-secondhand-category--active::after {
+  position: absolute;
+  right: 18%;
+  bottom: 8rpx;
+  left: 18%;
+  height: 4rpx;
+  border-radius: 4rpx;
+  background: $brand-primary;
+  content: '';
+}
 .student-secondhand-scroll {
   flex: 1 1 auto;
+  height: 0;
   min-height: 0;
-  background: $bg-app;
 }
-
 .student-secondhand-notice {
   display: flex;
-  align-items: flex-start;
-  gap: 14rpx;
-  margin: 22rpx 24rpx 18rpx;
-  padding: 18rpx 24rpx;
-  border-radius: 20rpx;
-  background: rgba($brand-primary, .08);
-  color: $brand-primary;
+  align-items: center;
+  gap: 12rpx;
+  margin: 0 24rpx;
+  padding: 24rpx 0;
+  color: $text-secondary;
   font-size: 23rpx;
-  line-height: 1.45;
+  line-height: 32rpx;
 }
-
 .student-secondhand-notice__icon {
   flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26rpx;
-  height: 26rpx;
-  margin-top: 2rpx;
-  border: 2rpx solid currentColor;
-  border-radius: 50%;
-  font-size: 18rpx;
-  font-weight: 800;
-  line-height: 1;
+  width: 28rpx;
+  height: 28rpx;
 }
-
-.student-secondhand-waterfall {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 18rpx;
-  padding: 0 24rpx 200rpx;
+.student-secondhand-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32rpx 16rpx;
+  padding: 0 24rpx;
 }
-
-.student-secondhand-waterfall__column {
-  flex: 1 1 0;
-  display: flex;
-  flex-direction: column;
-  gap: 18rpx;
-  min-width: 0;
-}
-
 .secondhand-card {
-  overflow: hidden;
-  border-radius: 22rpx;
+  min-width: 0;
   background: $bg-surface;
-  box-shadow: $shadow-card;
 }
-
-.secondhand-card--sold {
+.secondhand-card--pressed {
   opacity: .72;
 }
-
+.secondhand-card--sold {
+  opacity: .65;
+}
 .secondhand-card__media {
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: $placeholder-label;
-  font-size: 22rpx;
-  font-weight: 400;
+  width: 100%;
+  height: 0;
+  padding-top: 100%;
+  overflow: hidden;
+  border-radius: 16rpx;
+  background: $bg-screen;
 }
-
-.secondhand-card__image {
-  display: block;
+.secondhand-card__image, .secondhand-card__no-image {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
 }
-
-.secondhand-card__media--short {
-  height: 220rpx;
-}
-
-.secondhand-card__media--medium {
-  height: 250rpx;
-}
-
-.secondhand-card__media--tall {
-  height: 330rpx;
-}
-
-.secondhand-card__media--lemon {
-  background: $placeholder-stripe, rgba($like-active, .08);
-}
-
-.secondhand-card__media--lilac {
-  background: $placeholder-stripe, rgba($brand-primary-light, .08);
-}
-
-.secondhand-card__media--sky {
-  background: $placeholder-stripe, $brand-tint;
-}
-
-.secondhand-card__media--peach {
-  background: $placeholder-stripe, rgba($badge-unread, .08);
-}
-
-.secondhand-card__media--mint {
-  background: $placeholder-stripe, rgba($brand-primary, .06);
-}
-
-.secondhand-card__sold-badge {
-  position: absolute;
-  top: 50%;
-  left: 50%;
+.secondhand-card__no-image {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-width: 104rpx;
-  height: 44rpx;
-  padding: 0 20rpx;
-  border: 1.5rpx solid $divider-nav;
-  border-radius: 999rpx;
-  background: rgba($bg-surface, .80);
+  gap: 16rpx;
   color: $text-secondary;
-  font-size: 24rpx;
-  transform: translate(-50%, -50%);
+  font-size: 22rpx;
 }
-
+.secondhand-card__no-image .app-icon {
+  width: 48rpx;
+  height: 48rpx;
+  opacity: .6;
+}
+.secondhand-card__image-count {
+  position: absolute;
+  right: 12rpx;
+  bottom: 12rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  background: rgba($text-strong, .6);
+  color: $text-on-color;
+  font-size: 20rpx;
+  line-height: 28rpx;
+}
+.secondhand-card__status {
+  position: absolute;
+  top: 12rpx;
+  left: 12rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  background: $bg-surface;
+  color: $text-secondary;
+  font-size: 22rpx;
+}
 .secondhand-card__body {
-  padding: 18rpx 20rpx 20rpx;
+  padding: 16rpx 8rpx 0;
 }
-
 .secondhand-card__title {
   display: -webkit-box;
+  height: 80rpx;
   overflow: hidden;
-  min-height: 76rpx;
   color: $text-primary;
-  font-size: 29rpx;
-  font-weight: 500;
-  line-height: 1.35;
+  font-size: 28rpx;
+  font-weight: 600;
+  line-height: 40rpx;
+  word-break: break-all;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
-
-.secondhand-card__bottom {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14rpx;
-  margin-top: 18rpx;
-}
-
-.secondhand-card__price {
-  flex: 0 0 auto;
-  color: $like-active;
-  font-size: 34rpx;
-  font-weight: 900;
-  line-height: 1;
-}
-
-.secondhand-card--sold .secondhand-card__price {
-  color: $text-muted;
-}
-
-.secondhand-card__status {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 74rpx;
-  height: 34rpx;
-  padding: 0 14rpx;
-  border-radius: 999rpx;
-  font-size: 20rpx;
-  font-weight: 700;
-}
-
-.secondhand-card__status--selling {
-  background: rgba($brand-primary, .10);
-  color: $brand-primary-strong;
-}
-
-.secondhand-card__status--sold {
-  background: $bg-screen;
-  color: $text-tertiary;
-}
-
-.secondhand-card--skeleton {
-  pointer-events: none;
-}
-
-.secondhand-card--skeleton .secondhand-card__media,
-.secondhand-card__skeleton-line {
-  animation: secondhand-skeleton-pulse 1.25s ease-in-out infinite alternate;
-}
-
-.secondhand-card__skeleton-line {
-  height: 24rpx;
-  border-radius: 999rpx;
-  background: $bg-screen;
-}
-
-.secondhand-card__skeleton-line--title {
-  width: 88%;
-}
-
-.secondhand-card__skeleton-line--meta {
-  width: 54%;
-  margin-top: 22rpx;
-}
-
-.secondhand-card--state {
-  cursor: default;
-}
-
-.secondhand-card__state-action {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 76rpx;
-  color: $brand-primary;
-  font-size: 24rpx;
-  font-weight: 700;
-}
-
-.student-secondhand-waterfall__footer {
-  flex: 0 0 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 64rpx;
-  color: $text-muted;
+.secondhand-card__meta {
+  display: block;
+  height: 32rpx;
+  margin-top: 8rpx;
+  overflow: hidden;
+  color: $text-secondary;
   font-size: 22rpx;
+  line-height: 32rpx;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
-
-.student-secondhand-waterfall__footer--retry {
-  color: $brand-primary;
+.secondhand-card__price {
+  display: block;
+  margin-top: 8rpx;
+  overflow: hidden;
+  color: $like-active;
+  font-size: 36rpx;
   font-weight: 700;
+  line-height: 48rpx;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-
-@keyframes secondhand-skeleton-pulse {
-  from {
-    opacity: .48;
-  }
-
-  to {
-    opacity: .92;
-  }
+.secondhand-card__currency {
+  margin-right: 4rpx;
+  font-size: 24rpx;
+  font-weight: 600;
 }
-
+.secondhand-card__seller {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-top: 12rpx;
+  min-width: 0;
+}
+.secondhand-card__avatar {
+  flex: 0 0 auto;
+  width: 32rpx;
+  height: 32rpx;
+  border-radius: 50%;
+}
+.secondhand-card__avatar--text {
+  background: $brand-tint;
+  color: $brand-primary;
+  font-size: 20rpx;
+  line-height: 32rpx;
+  text-align: center;
+}
+.secondhand-card__seller-name {
+  overflow: hidden;
+  color: $text-secondary;
+  font-size: 22rpx;
+  line-height: 32rpx;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.secondhand-card__skeleton-line {
+  height: 32rpx;
+  margin: 8rpx 0;
+  border-radius: 4rpx;
+  background: $bg-screen;
+}
+.secondhand-card__skeleton-line--short {
+  width: 60%;
+}
+.student-secondhand-footer {
+  min-height: 88rpx;
+  padding: 32rpx 24rpx calc(152rpx + env(safe-area-inset-bottom));
+  color: $text-secondary;
+  font-size: 24rpx;
+  line-height: 40rpx;
+  text-align: center;
+}
+.student-secondhand-footer__retry {
+  display: block;
+  padding: 24rpx 0;
+  color: $brand-primary;
+}
 // Shared bottom navigation styles are owned by StudentBottomNav.

@@ -38,12 +38,6 @@ export async function preparePostMedia(
   return results.filter((item): item is PostMedia => item !== null)
 }
 
-/** Use one viewport for the whole post; changing images must not move the body. */
-export function postMediaHeight(media?: Pick<PostMedia, 'width' | 'height'>): number {
-  if (!media || !Number.isFinite(media.width) || !Number.isFinite(media.height) || media.width <= 0 || media.height <= 0) return 560
-  return Math.round(Math.min(820, Math.max(360, 750 * media.height / media.width)))
-}
-
 export function postBodyWithoutTitle(title: string, content: string): string {
   const lines = content.trim().split(/\r?\n/)
   // Publishing derives a title from the first line. Only omit an exact duplicate.

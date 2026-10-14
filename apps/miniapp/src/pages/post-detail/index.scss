@@ -186,7 +186,6 @@
   position: relative;
   width: 100%;
   height: 560rpx;
-  max-height: 55vh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -211,7 +210,11 @@
   line-height: 32rpx;
   font-variant-numeric: tabular-nums;
   pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms ease;
 }
+
+.post-detail-gallery__count--visible { opacity: 1; }
 
 .post-detail-hero--loading,
 .post-detail-media-error {

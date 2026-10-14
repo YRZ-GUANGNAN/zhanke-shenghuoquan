@@ -43,6 +43,7 @@ function PublishPostPage() {
   const [images, setImages] = useState<UploadedMedia[]>([])
   const [uploading, setUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [publishedId, setPublishedId] = useState('')
   const [submitStage, setSubmitStage] = useState<SubmitStage>('idle')
   const [uploadHint, setUploadHint] = useState('0/9')
   const [editorError, setEditorError] = useState('')
@@ -50,6 +51,7 @@ function PublishPostPage() {
   const clientRequestIdRef = useRef<string | null>(null)
   const submitLock = useRef(false)
   const uploadLock = useRef(false)
+  const publishedIdRef = useRef('')
 
   const canPublish = useMemo(
     () => content.trim().length > 0 && !uploading && !submitting,
@@ -74,7 +76,7 @@ function PublishPostPage() {
   }
 
   const toggleTag = (rawTag: string) => {
-    if (submitLock.current) return
+    if (submitLock.current || publishedIdRef.current) return
     const tag = normalizeTag(rawTag)
     if (!tag) return
     resetClientRequestId()
@@ -90,7 +92,7 @@ function PublishPostPage() {
   }
 
   const addCustomTag = () => {
-    if (submitLock.current) return
+    if (submitLock.current || publishedIdRef.current) return
     const validationError = validateTag(customTag)
     if (validationError) {
       toast(validationError)
@@ -108,7 +110,7 @@ function PublishPostPage() {
   }
 
   const handlePickImages = async () => {
-    if (uploadLock.current || submitLock.current) return
+    if (uploadLock.current || submitLock.current || publishedIdRef.current) return
     const remaining = MAX_IMAGES - images.length
     if (remaining <= 0) {
       toast(`最多上传 ${MAX_IMAGES} 张图`)
@@ -140,6 +142,19 @@ function PublishPostPage() {
 
   const handlePublish = async () => {
     if (uploadLock.current || submitLock.current) return
+    if (publishedIdRef.current) {
+      submitLock.current = true
+      setSubmitting(true)
+      try {
+        await Taro.redirectTo({ url: `/pages/post-detail/index?id=${encodeURIComponent(publishedIdRef.current)}` })
+      } catch {
+        setEditorError('帖子已提交，页面打开失败，可点击“查看帖子”重试')
+      } finally {
+        submitLock.current = false
+        setSubmitting(false)
+      }
+      return
+    }
     if (!content.trim()) {
       toast('先写点内容吧')
       return
@@ -174,15 +189,17 @@ function PublishPostPage() {
         imageAssetIds: images.map((image) => image.assetId),
         clientRequestId,
       })
+      publishedIdRef.current = post.id
+      setPublishedId(post.id)
       clientRequestIdRef.current = null
       toast('发布成功', 'success')
-      void Taro.redirectTo({ url: `/pages/post-detail/index?id=${encodeURIComponent(post.id)}` })
+      await Taro.redirectTo({ url: `/pages/post-detail/index?id=${encodeURIComponent(post.id)}` })
     } catch (error) {
       console.error('publish community post failed', error)
       if (isApiError(error) && error.status >= 400 && error.status < 500) {
         clientRequestIdRef.current = null
       }
-      const message = !isApiError(error)
+      const message = publishedIdRef.current ? '帖子已提交，页面打开失败，可点击“查看帖子”重试' : !isApiError(error)
         ? error instanceof Error ? error.message : '发布失败，请稍后再试'
         : error.status === 0
           ? '网络异常，内容已保留'
@@ -217,7 +234,7 @@ function PublishPostPage() {
             className={`publish-post-nav__publish${canPublish ? ' publish-post-nav__publish--active' : ''}`}
             onClick={() => void handlePublish()}
           >
-            {submitting ? submitStage === 'reviewing' ? '审核中' : '发布中' : '发布'}
+            {publishedId ? submitting ? '打开中' : '查看帖子' : submitting ? submitStage === 'reviewing' ? '审核中' : '发布中' : '发布'}
           </Text>
         }
       />
@@ -236,13 +253,13 @@ function PublishPostPage() {
         <Textarea
           className='publish-post-textarea'
           value={content}
-          disabled={submitting}
+          disabled={submitting || Boolean(publishedId)}
           maxlength={600}
           autoHeight={false}
           placeholder='分享你的校园生活：好吃的、求助、找搭子、攻略……'
           placeholderClass='publish-post-textarea__placeholder'
           onInput={(event) => {
-            if (submitLock.current) return
+            if (submitLock.current || publishedIdRef.current) return
             resetClientRequestId()
             setContent(event.detail.value)
           }}
@@ -274,11 +291,11 @@ function PublishPostPage() {
           <Input
             className='publish-post-custom-tag__input'
             value={customTag}
-            disabled={submitting}
+            disabled={submitting || Boolean(publishedId)}
             maxlength={13}
             confirmType='done'
             placeholder='自定义标签，最多 12 个字'
-            onInput={(event) => { if (!submitLock.current) setCustomTag(event.detail.value) }}
+            onInput={(event) => { if (!submitLock.current && !publishedIdRef.current) setCustomTag(event.detail.value) }}
             onConfirm={addCustomTag}
           />
           <Text className={`publish-post-custom-tag__button${submitting ? ' publish-post-control--pending' : ''}`} onClick={addCustomTag}>添加</Text>

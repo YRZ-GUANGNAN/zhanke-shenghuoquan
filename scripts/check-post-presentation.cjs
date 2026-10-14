@@ -9,7 +9,7 @@ const loaded = new Module(sourcePath, module)
 loaded._compile(ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
 }).outputText, sourcePath)
-const { preparePostMedia, removeFailedPostMedia, postMediaHeight, postBodyWithoutTitle, formatPostDate } = loaded.exports
+const { preparePostMedia, removeFailedPostMedia, postBodyWithoutTitle, formatPostDate } = loaded.exports
 
 // Run real page hooks with isolated service doubles; no login, network or production writes.
 function deferred() {
@@ -45,29 +45,44 @@ async function pageBehavior() {
   const fakePost = { id: 'p1', authorId: 'u1', author: '测试作者', school: '测试学校', topic: '', tags: [], title: '测试标题', content: '保留的正文', images: [], reviewStatus: 'approved', commentCount: 1, likedCount: 0, favoriteCount: 0, createdAt: '' }
 
   async function mount(page, options) {
+    options.visibility ||= { ...visibility }
     const pagePath = path.resolve(__dirname, `../apps/miniapp/src/pages/${page}/index.tsx`)
     const modulePage = new Module(pagePath, module)
     const taro = { getCurrentInstance: () => ({ router: { params: options.params || {} } }), showToast: async () => {}, navigateTo: async () => {}, getImageInfo: async () => ({ width: 600, height: 800 }), ...options.taro }
     modulePage.require = (id) => {
       if (id === 'react' || id === 'react/jsx-runtime') return require(id)
-      if (id === '@tarojs/taro') return { nextTick: (callback) => queueMicrotask(callback) }
+      if (id === '@tarojs/taro') return { nextTick: (callback) => queueMicrotask(callback), useDidShow: (callback) => React.useEffect(() => callback(), []), useDidHide: () => {}, useResize: () => {} }
       if (id === '@tarojs/components') return Object.fromEntries(['Image', 'Input', 'ScrollView', 'Swiper', 'SwiperItem', 'Text', 'Textarea', 'View'].map((name) => [name, component(name)]))
       if (id.endsWith('.scss')) return {}
-      if (id.endsWith('/feature-page-gate')) return { withFeaturePage: (pageComponent) => pageComponent }
-      if (id.endsWith('/use-feature-visibility')) return { useFeatureVisibility: () => visibility }
+      if (id.endsWith('/feature-page-gate')) return { withFeaturePage: (pageComponent) => pageComponent, FeaturePageGate: View }
+      if (id.endsWith('/use-feature-visibility')) return { useFeatureVisibility: () => options.visibility }
+      if (id.endsWith('/use-identity-guard')) return { useIdentityGuard: () => true }
+      if (id.endsWith('/stores/session')) return { useSessionStore: (selector) => selector({ token: options.token || 'test-token', profile: { id: 'test-user' } }) }
+      if (id.endsWith('/session-recovery')) return { requestWithSingleSessionRecovery: (run) => run() }
       if (id.endsWith('/use-page-share')) return { usePageShare: () => {} }
       if (id.endsWith('/share-model')) return { publicShareId: (id) => id || '' }
       if (id.endsWith('/capsule-page-header')) return { default: (props) => React.createElement(View, { className: 'test-header' }, props.left, props.center, props.right) }
       if (id.endsWith('/runtime-session-gate') || id.endsWith('/app-icon')) return { default: View }
+      if (id.endsWith('/student-bottom-nav')) return { default: View }
+      if (id.endsWith('/campus-info-home')) return { default: () => React.createElement(View, { className: 'test-campus-info' }) }
       if (id.endsWith('/components/ui')) return { AppIconButton: View, AppState: View }
       if (id.endsWith('/services/taro')) return { default: taro }
       if (id.endsWith('/capsule-safe')) return { getCapsuleSafeStyle: () => ({}) }
       if (id.endsWith('/navigation')) return { navigateBackOrHome: async () => {} }
       if (id.endsWith('/post-presentation')) return loaded.exports
+      if (id.endsWith('/use-gallery-presentation') || id.endsWith('/gallery-presentation')) {
+        const helperPath = path.resolve(__dirname, '../apps/miniapp/src', id.endsWith('/use-gallery-presentation') ? 'hooks/use-gallery-presentation.ts' : 'utils/gallery-presentation.ts')
+        const helper = new Module(helperPath, module)
+        helper.require = modulePage.require
+        helper._compile(ts.transpileModule(fs.readFileSync(helperPath, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText, helperPath)
+        return helper.exports
+      }
       if (id.endsWith('/services/api')) return { isApiError: () => false }
       if (id.endsWith('/b-community')) return options.community || {}
       if (id.endsWith('/services/media')) return options.media || {}
-      if (id.endsWith('/c-trade') || id.endsWith('/d-navigation')) return {}
+      if (id.endsWith('/c-trade')) return options.trade || {}
+      if (id.endsWith('/d-navigation')) return options.navigation || { listNavigationItems: async () => [] }
+      if (id.endsWith('/e-im')) return { listIMConversations: async () => [] }
       throw new Error(`Unexpected page test dependency: ${id}`)
     }
     modulePage._compile(ts.transpileModule(fs.readFileSync(pagePath, 'utf8'), {
@@ -79,7 +94,9 @@ async function pageBehavior() {
     roots.push(root)
     await act(async () => { root.render(React.createElement(modulePage.exports.default)) })
     return {
-      container,
+      container, options,
+      render: async () => { await act(async () => root.render(React.createElement(modulePage.exports.default))) },
+      all: (selector) => Array.from(container.querySelectorAll(selector)).map((node) => node.taroProps),
       props: (selector) => {
         const element = container.querySelector(selector)
         assert.ok(element, `page element must exist: ${selector}`)
@@ -90,6 +107,54 @@ async function pageBehavior() {
   }
 
   try {
+    const homePostRequests = [], homeProductRequests = []
+    const home = await mount('home', {
+      visibility: { ...visibility, available: true, presentationMode: 'original', secondhand: true, messages: true, secondhand_chat: true, campus_tools: true, search: true },
+      community: { getCommunityPostsPage: (query) => { const task = deferred(); homePostRequests.push({ query, ...task }); return task.promise } },
+      trade: { getProductsPage: (query) => { const task = deferred(); homeProductRequests.push({ query, ...task }); return task.promise } },
+    })
+    assert.equal(homePostRequests.length, 1)
+    assert.equal(homeProductRequests.length, 1)
+    await home.event(() => {
+      homePostRequests[0].resolve({ items: [fakePost], page: 1, total: 11 })
+      homeProductRequests[0].resolve({ items: [], page: 1, total: 0 })
+    })
+    await home.event(() => home.props('.student-home-content').onScroll({ detail: { scrollTop: 640 } }))
+    await home.event(() => home.all('.student-home-header__tab')[2].onClick())
+    await home.event(() => home.props('.student-home-content').onScroll({ detail: { scrollTop: 96 } }))
+    await home.event(() => home.all('.student-home-header__tab')[1].onClick())
+    assert.equal(home.props('.student-home-content').scrollTop, 640, '切换栏目回来恢复发现滚动位置')
+    assert.equal(homePostRequests.length, 1, '切换栏目不重载发现内容')
+    const homeScroll = home.container.querySelector('.student-home-content')
+    const homeCard = home.container.querySelector('.student-post-card')
+    home.options.visibility = { ...home.options.visibility, favorites: false }
+    await home.render()
+    assert.equal(homePostRequests.length, 1, '无关功能更新不重载发现')
+    assert.equal(home.container.querySelector('.student-home-content'), homeScroll)
+    assert.equal(home.container.querySelector('.student-post-card'), homeCard)
+    await home.event(() => {
+      home.props('.student-home-content').onScrollToLower()
+      home.props('.student-home-content').onScrollToLower()
+    })
+    assert.equal(homePostRequests.length, 2, '发现分页同帧防重')
+    home.options.visibility = { ...home.options.visibility, forum: false }
+    await home.render()
+    assert.equal(homeProductRequests.length, 2, '数据来源改变立即重新读取，旧分页不能占住请求锁')
+    await home.event(() => homeProductRequests[1].resolve({ items: [], page: 1, total: 0 }))
+    await home.event(() => homePostRequests[1].resolve({ items: [{ ...fakePost, title: '不应回写的旧帖子' }], page: 2, total: 11 }))
+    assert.ok(!home.container.textContent.includes('不应回写的旧帖子'), '来源关闭后旧响应不能恢复被关闭的内容')
+    home.options.visibility = { ...home.options.visibility, forum: true }
+    await home.render()
+    await home.event(() => {
+      homePostRequests[2].resolve({ items: [fakePost], page: 1, total: 1 })
+      homeProductRequests[2].resolve({ items: [], page: 1, total: 0 })
+    })
+    assert.equal(home.props('.student-home-content').scrollTop, 0, '来源改变后新列表从顶部开始')
+    home.options.visibility = { ...home.options.visibility, presentationMode: 'campus_info' }
+    await home.render()
+    assert.ok(home.container.querySelector('.test-campus-info'), '校园指南模式继续使用独立首页')
+    assert.equal(home.container.querySelector('.student-home-content'), null)
+
     const searches = []
     const navigation = []
     const search = await mount('search', {
@@ -182,8 +247,33 @@ async function pageBehavior() {
     assert.ok(publish.container.querySelector('.publish-post-error'), '失败有持续内联说明')
     await publish.event(() => publish.props('.publish-post-nav__publish').onClick())
     assert.equal(publishCalls[1].clientRequestId, publishCalls[0].clientRequestId, '结果未知时重试沿用幂等身份')
+
+    let createdPosts = 0
+    const publishNavigation = []
+    const published = await mount('publish-post', {
+      community: {
+        listHotCommunityTags: async () => [], createCommunityClientRequestId: () => 'published-once',
+        createCommunityPost: async () => { createdPosts += 1; return { id: '123' } },
+      },
+      media: { waitForMediaApprovals: async () => {} },
+      taro: { redirectTo: (query) => { const task = deferred(); publishNavigation.push({ query, ...task }); return task.promise } },
+    })
+    await published.event(() => published.props('.publish-post-textarea').onInput({ detail: { value: '只发布一次的正文' } }))
+    await published.event(() => published.props('.publish-post-nav__publish').onClick())
+    await published.event(() => publishNavigation[0].reject(new Error('test navigation offline')))
+    assert.equal(createdPosts, 1)
+    assert.ok(published.container.textContent.includes('帖子已提交，页面打开失败'))
+    assert.equal(published.props('.publish-post-textarea').disabled, true)
+    await published.event(() => {
+      published.props('.publish-post-nav__publish').onClick()
+      published.props('.publish-post-nav__publish').onClick()
+    })
+    assert.equal(publishNavigation.length, 2, '成功后连续点击只重试一次导航')
+    assert.equal(createdPosts, 1, '跳转失败后不能重新创建帖子')
+    assert.equal(publishNavigation[1].query.url, '/pages/post-detail/index?id=123')
+    await published.event(() => publishNavigation[1].resolve())
     assert.ok(loggedErrors.every(([message]) => typeof message === 'string' && !message.startsWith('Warning:')), '页面状态测试不能产生 React 更新警告')
-    console.log('post page behavior: PASS (search races, navigation, comments retry, publishing snapshot)')
+    console.log('post page behavior: PASS (home retention, source races, search, comments, publishing snapshot and navigation retry)')
   } finally {
     for (const root of roots) await act(async () => { root.unmount() })
     dom.window.close()
@@ -221,11 +311,6 @@ async function main() {
   assert.deepEqual(emptyGallery, { items: [], index: 0 }, '全部失败时不能出现负索引')
   assert.equal(removeFailedPostMedia(gallery, 'missing'), gallery, '迟到的重复失败不触发额外重排')
   assert.deepEqual(gallery.items.map((item) => item.src), ['a', 'b', 'c'], '错误处理不能修改此前的状态快照')
-  assert.equal(postMediaHeight({ width: 600, height: 600 }), 750)
-  assert.equal(postMediaHeight({ width: 100, height: 5000 }), 820, '长截图不撑满正文滚动区')
-  assert.equal(postMediaHeight({ width: 5000, height: 100 }), 360, '横图仍有受控查看区域')
-  assert.equal(postMediaHeight({ width: 0, height: 10 }), 560)
-  assert.equal(postMediaHeight(), 560)
   assert.equal(postBodyWithoutTitle('第一行', '第一行\r\n\r\n正文\n第二段'), '正文\n第二段')
   assert.equal(postBodyWithoutTitle('一条内容', '一条内容'), '')
   assert.equal(postBodyWithoutTitle('前缀', '前缀后面还有内容'), '前缀后面还有内容', '不能把仅匹配前缀的正文截掉')
@@ -234,7 +319,7 @@ async function main() {
   assert.equal(formatPostDate('刚刚'), '刚刚', '无法解析的既有文案原样保留')
   const date = new Date(2026, 9, 14, 9, 5)
   assert.equal(formatPostDate(date.toISOString()), '2026.10.14 09:05')
-  console.log('post presentation behavior: PASS (24 assertions)')
+  console.log('post presentation behavior: PASS (media identity, failure recovery, text and dates)')
   await pageBehavior()
 }
 

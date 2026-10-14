@@ -11,6 +11,8 @@ export interface MenuButtonRect {
 
 export interface WindowInfo {
   windowWidth: number
+  windowHeight?: number
+  screenHeight?: number
   statusBarHeight: number
   pixelRatio: number
   safeArea?: {

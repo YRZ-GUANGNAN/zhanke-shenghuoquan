@@ -25,7 +25,8 @@ import {
 } from '../../services/b-community'
 import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import { navigateBackOrHome } from '../../utils/navigation'
-import { formatPostDate, postBodyWithoutTitle, postMediaHeight, preparePostMedia, removeFailedPostMedia, type PostGalleryState } from '../../utils/post-presentation'
+import { formatPostDate, postBodyWithoutTitle, preparePostMedia, removeFailedPostMedia, type PostGalleryState, type PostMedia } from '../../utils/post-presentation'
+import { useGalleryPresentation } from '../../hooks/use-gallery-presentation'
 import './index.scss'
 
 const COMMENT_PAGE_SIZE = 20
@@ -102,7 +103,7 @@ function PostDetailPage() {
   const [gallery, setGallery] = useState<PostGalleryState>({ items: [], index: 0 })
   const [mediaPending, setMediaPending] = useState(false)
   const [preparedMediaKey, setPreparedMediaKey] = useState('')
-  const [mediaHeight, setMediaHeight] = useState(560)
+  const [mediaSize, setMediaSize] = useState<PostMedia | undefined>()
   const [commentsAnchor, setCommentsAnchor] = useState('')
   const pendingComment = useRef<PendingCommentSubmission | null>(null)
   const actionLock = useRef(false)
@@ -123,6 +124,7 @@ function PostDetailPage() {
   }, [post])
   const isApproved = post?.reviewStatus === 'approved'
   const hasActions = isApproved && (visibility.canComment || visibility.comment || visibility.likes || visibility.favorites)
+  const galleryView = useGalleryPresentation(mediaKey, media.length, mediaSize, 'post', hasActions)
   const interactionPending = actioning || viewerLoading
   const reviewState = post?.reviewStatus ? reviewCopy[post.reviewStatus] : null
   usePageShare({ kind: 'post', enabled: visibility.forum && !loading && !error, id: postId, content: post })
@@ -131,12 +133,12 @@ function PostDetailPage() {
     let alive = true
     const images = post?.images ?? []
     setGallery({ items: [], index: 0 })
-    setMediaHeight(560)
+    setMediaSize(undefined)
     setMediaPending(images.length > 0)
     void preparePostMedia(images, (src) => Taro.getImageInfo({ src })).then((items) => {
       if (!alive) return
       setGallery({ items, index: 0 })
-      setMediaHeight(postMediaHeight(items[0]))
+      setMediaSize(items[0])
       setPreparedMediaKey(mediaKey)
       setMediaPending(false)
     })
@@ -400,18 +402,19 @@ function PostDetailPage() {
             ) : null}
 
             {mediaPending ? (
-              <View className='post-detail-hero post-detail-hero--loading'><Text>正在读取图片…</Text></View>
+              <View className='post-detail-hero post-detail-hero--loading' style={{ height: `${galleryView.height}px` }}><Text>正在读取图片…</Text></View>
             ) : showHero ? (
-              <View className='post-detail-hero' style={{ height: `${mediaHeight}rpx` }}>
+              <View className='post-detail-hero' style={{ height: `${galleryView.height}px` }} onTouchStart={galleryView.onTouchStart} onTouchEnd={galleryView.onTouchEnd} onTouchCancel={galleryView.onTouchEnd}>
                 <Swiper
                   className='post-detail-gallery'
                   current={Math.min(mediaIndex, media.length - 1)}
                   circular={false}
                   duration={200}
-                  onChange={(event) => setGallery((current) => ({
-                    ...current,
-                    index: Math.max(0, Math.min(event.detail.current, current.items.length - 1)),
-                  }))}
+                  onChange={(event) => {
+                    if (event.detail.source !== 'touch') return
+                    setGallery((current) => ({ ...current, index: Math.max(0, Math.min(event.detail.current, current.items.length - 1)) }))
+                    galleryView.revealCounter()
+                  }}
                 >
                   {media.map((image) => (
                     <SwiperItem key={image.src}>
@@ -424,10 +427,10 @@ function PostDetailPage() {
                     </SwiperItem>
                   ))}
                 </Swiper>
-                {media.length > 1 && <Text className='post-detail-gallery__count'>{Math.min(mediaIndex + 1, media.length)} / {media.length}</Text>}
+                {media.length > 1 && <Text className={`post-detail-gallery__count${galleryView.counterVisible ? ' post-detail-gallery__count--visible' : ''}`}>{Math.min(mediaIndex + 1, media.length)} / {media.length}</Text>}
               </View>
             ) : post.images.length > 0 ? (
-              <View className='post-detail-hero post-detail-media-error' style={{ height: `${mediaHeight}rpx` }}>
+              <View className='post-detail-hero post-detail-media-error' style={{ height: `${galleryView.height}px` }}>
                 <Text>图片暂时无法显示，正文仍可阅读</Text>
               </View>
             ) : null}

@@ -2,13 +2,6 @@
 @use '../../styles/design-tokens.scss' as *;
 
 $secondhand-orange: #FF7B4A;
-$secondhand-orange-pale: color.mix($secondhand-orange, $bg-surface, 10%);
-$secondhand-field: color.mix($brand-tint, $bg-surface, 38%);
-$secondhand-dash: color.mix($text-muted, $bg-surface, 68%);
-
-page {
-  background: $bg-app;
-}
 
 .publish-secondhand-page {
   display: flex;
@@ -16,312 +9,269 @@ page {
   height: 100vh;
   min-height: 100vh;
   overflow: hidden;
-  background: $bg-app;
+  background: $bg-surface;
   color: $text-primary;
   font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 }
-
 .publish-secondhand-nav__back {
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  color: $text-strong;
-  font-size: 52rpx;
-  line-height: 1;
+  width: 88rpx;
+  height: 88rpx;
 }
-
 .publish-secondhand-scroll {
   flex: 1 1 auto;
+  height: 0;
   min-height: 0;
   box-sizing: border-box;
 }
-
-.publish-secondhand-upload-card,
-.publish-secondhand-form-card {
-  margin: 24rpx 28rpx 0;
-  border-radius: 26rpx;
-  background: $bg-surface;
-  box-shadow: $shadow-card;
+.publish-secondhand-upload-card, .publish-secondhand-form-card {
+  margin: 0 32rpx;
+  padding: 32rpx 0;
   box-sizing: border-box;
 }
-
-.publish-secondhand-upload-card {
-  min-height: 222rpx;
-  padding: 26rpx 28rpx;
+.publish-secondhand-section-head {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-bottom: 24rpx;
+  font-size: 28rpx;
+  line-height: 40rpx;
+  font-weight: 600;
 }
-
-.publish-secondhand-upload {
+.publish-secondhand-section-head text:last-child {
+  color: $text-secondary;
+  font-size: 24rpx;
+  font-weight: 400;
+}
+.publish-secondhand-media-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16rpx;
+}
+.publish-secondhand-media, .publish-secondhand-upload {
   position: relative;
-  flex: 0 0 166rpx;
-  width: 166rpx;
-  height: 166rpx;
+  height: 0;
+  padding-top: 100%;
   overflow: hidden;
-  border: 2rpx dashed $secondhand-dash;
-  border-radius: 18rpx;
-  background: $divider-hairline;
-  color: $text-muted;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
+  border-radius: 12rpx;
+  background: $bg-screen;
 }
-
+.publish-secondhand-upload {
+  color: $text-secondary;
+}
+.publish-secondhand-upload--disabled {
+  opacity: .55;
+}
 .publish-secondhand-upload__preview {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
 }
-
-.publish-secondhand-upload__count {
+.publish-secondhand-upload__cover {
   position: absolute;
-  right: 10rpx;
-  bottom: 10rpx;
-  padding: 5rpx 11rpx;
-  border-radius: 999rpx;
-  background: rgba($text-strong, .66);
+  bottom: 0;
+  left: 0;
+  padding: 4rpx 12rpx;
+  border-top-right-radius: 8rpx;
+  background: rgba($text-strong, .65);
   color: $text-on-color;
-  font-size: 19rpx;
-  line-height: 1;
+  font-size: 20rpx;
+  line-height: 28rpx;
 }
-
 .publish-secondhand-upload__icon {
-  position: relative;
-  width: 34rpx;
-  height: 28rpx;
-  border: 3rpx solid $text-muted;
-  border-radius: 5rpx;
-  box-sizing: border-box;
-}
-
-.publish-secondhand-upload__icon::before,
-.publish-secondhand-upload__icon::after {
   position: absolute;
-  content: '';
+  top: 24%;
+  left: 50%;
+  width: 40rpx;
+  height: 40rpx;
+  transform: translateX(-50%);
 }
-
-.publish-secondhand-upload__icon::before {
-  right: 4rpx;
-  bottom: 4rpx;
-  left: 4rpx;
-  height: 12rpx;
-  border-left: 3rpx solid $text-muted;
-  border-bottom: 3rpx solid $text-muted;
-  transform: skewY(-38deg);
-}
-
-.publish-secondhand-upload__icon-sun {
-  position: absolute;
-  top: 5rpx;
-  right: 5rpx;
-  width: 5rpx;
-  height: 5rpx;
-  border: 2rpx solid $text-muted;
-  border-radius: 50%;
-  box-sizing: border-box;
-}
-
 .publish-secondhand-upload__label {
-  margin-top: 18rpx;
-  font-size: 23rpx;
-  line-height: 1;
+  position: absolute;
+  right: 0;
+  bottom: 18%;
+  left: 0;
+  font-size: 22rpx;
+  line-height: 32rpx;
+  text-align: center;
 }
-
 .publish-secondhand-upload-copy {
-  min-width: 0;
-  flex: 1;
-  margin-left: 22rpx;
   display: flex;
   flex-direction: column;
-  color: $text-tertiary;
+  align-items: flex-start;
+  margin-top: 16rpx;
+  color: $text-secondary;
   font-size: 24rpx;
-  line-height: 1.55;
+  line-height: 36rpx;
 }
-
 .publish-secondhand-upload-copy__remove {
-  margin-top: 12rpx;
+  display: block;
+  padding: 24rpx 16rpx 0 0;
   color: $brand-primary;
-  font-size: 22rpx;
 }
-
 .publish-secondhand-form-card {
-  padding: 20rpx 28rpx 28rpx;
+  padding-top: 0;
+  border-top: 1rpx solid $divider-nav;
 }
-
 .publish-secondhand-field {
-  min-height: 92rpx;
   display: flex;
   align-items: center;
+  gap: 16rpx;
+  min-height: 112rpx;
   border-bottom: 1rpx solid $divider-nav;
 }
-
-.publish-secondhand-field__label,
-.publish-secondhand-section__label {
+.publish-secondhand-field__label, .publish-secondhand-section__label {
   flex: 0 0 auto;
-  color: $text-secondary;
-  font-size: 27rpx;
-  line-height: 1;
+  color: $text-primary;
+  font-size: 28rpx;
+  line-height: 40rpx;
+  font-weight: 500;
 }
-
 .publish-secondhand-field__label {
-  width: 108rpx;
+  width: 80rpx;
 }
-
 .publish-secondhand-field__input {
-  min-width: 0;
   flex: 1;
-  height: 68rpx;
+  min-width: 0;
+  height: 88rpx;
   padding: 0;
   color: $text-primary;
-  font-size: 27rpx;
-  line-height: 68rpx;
+  font-size: 28rpx;
+  line-height: 88rpx;
 }
-
-.publish-secondhand-field__placeholder,
-.publish-secondhand-price__placeholder,
-.publish-secondhand-description__placeholder {
-  color: $text-faint;
+.publish-secondhand-field__placeholder, .publish-secondhand-price__placeholder, .publish-secondhand-description__placeholder {
+  color: $text-secondary;
 }
-
 .publish-secondhand-price {
-  min-width: 0;
-  flex: 1;
   display: flex;
+  flex: 1;
+  min-width: 0;
   align-items: center;
   color: $secondhand-orange;
 }
-
 .publish-secondhand-price__currency {
   margin-right: 8rpx;
   font-size: 28rpx;
-  line-height: 1;
 }
-
 .publish-secondhand-price__input {
-  width: 120rpx;
-  height: 68rpx;
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: 88rpx;
   padding: 0;
   color: $secondhand-orange;
-  font-size: 28rpx;
-  line-height: 68rpx;
+  font-size: 36rpx;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 88rpx;
 }
-
 .publish-secondhand-field__aside {
-  flex: 0 0 170rpx;
-  color: $text-muted;
+  flex: 0 0 168rpx;
+  color: $text-secondary;
   font-size: 22rpx;
-  line-height: 1.35;
+  line-height: 32rpx;
   text-align: right;
 }
-
 .publish-secondhand-section {
-  padding: 26rpx 0 8rpx;
+  padding: 32rpx 0;
+  border-bottom: 1rpx solid $divider-nav;
 }
-
 .publish-secondhand-categories {
   display: flex;
   flex-wrap: wrap;
-  gap: 14rpx 16rpx;
-  margin-top: 22rpx;
+  gap: 16rpx;
+  margin-top: 16rpx;
 }
-
 .publish-secondhand-category {
-  min-width: 102rpx;
-  height: 54rpx;
-  padding: 0 24rpx;
-  border: 1.5rpx solid $divider-nav;
-  border-radius: 999rpx;
-  background: $bg-surface;
-  color: $text-secondary;
-  font-size: 25rpx;
   display: flex;
   align-items: center;
   justify-content: center;
+  min-width: 112rpx;
+  min-height: 80rpx;
+  padding: 0 24rpx;
+  border: 1rpx solid $divider-nav;
+  border-radius: 12rpx;
+  background: $bg-surface;
+  color: $text-secondary;
+  font-size: 26rpx;
   box-sizing: border-box;
 }
-
 .publish-secondhand-category--active {
   border-color: $brand-primary;
-  background: $brand-primary;
-  color: $text-on-color;
-  box-shadow: $shadow-card;
+  background: $brand-tint;
+  color: $brand-primary;
+  font-weight: 500;
 }
-
 .publish-secondhand-description {
-  margin-top: 20rpx;
+  margin-top: 32rpx;
 }
-
 .publish-secondhand-description__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  color: $text-muted;
-  font-size: 20rpx;
+  color: $text-secondary;
+  font-size: 24rpx;
+  line-height: 36rpx;
 }
-
 .publish-secondhand-description__textarea {
   width: 100%;
-  height: 190rpx;
-  margin-top: 20rpx;
-  padding: 24rpx 24rpx;
-  border-radius: 18rpx;
-  background: $secondhand-field;
+  height: 256rpx;
+  margin-top: 16rpx;
+  padding: 16rpx 0;
   color: $text-primary;
-  font-size: 25rpx;
-  line-height: 1.55;
+  font-size: 28rpx;
+  line-height: 44rpx;
   box-sizing: border-box;
 }
-
 .publish-secondhand-warning {
-  min-height: 110rpx;
-  margin: 24rpx 28rpx 0;
-  padding: 22rpx 26rpx;
-  border-radius: 22rpx;
-  background: $secondhand-orange-pale;
-  color: color.adjust($secondhand-orange, $lightness: -8%);
-  font-size: 23rpx;
-  line-height: 1.55;
   display: flex;
   align-items: flex-start;
-  gap: 14rpx;
-  box-sizing: border-box;
+  gap: 12rpx;
+  margin: 0 32rpx;
+  padding: 24rpx 0;
+  border-top: 1rpx solid $divider-nav;
+  color: color.adjust($secondhand-orange, $lightness: -8%);
+  font-size: 24rpx;
+  line-height: 36rpx;
 }
-
 .publish-secondhand-warning__icon {
   flex: 0 0 auto;
-  font-size: 28rpx;
-  line-height: 1.1;
+  width: 28rpx;
+  height: 28rpx;
+  margin-top: 4rpx;
 }
-
+.publish-secondhand-error {
+  display: block;
+  margin: 0 32rpx;
+  color: $danger;
+  font-size: 26rpx;
+  line-height: 40rpx;
+}
 .publish-secondhand-scroll__spacer {
-  height: 48rpx;
+  height: 32rpx;
 }
-
 .publish-secondhand-footer {
   flex: 0 0 auto;
-  height: 142rpx;
-  padding: 20rpx 28rpx calc(16rpx + env(safe-area-inset-bottom));
+  padding: 16rpx 32rpx calc(16rpx + env(safe-area-inset-bottom));
   border-top: 1rpx solid $divider-nav;
   background: $bg-surface;
   box-sizing: border-box;
 }
-
 .publish-secondhand-footer__button {
-  height: 86rpx;
-  border-radius: 22rpx;
-  background: $gradient-primary;
-  color: $text-on-color;
-  box-shadow: 0 18rpx 34rpx -18rpx rgba($brand-primary-strong, .68);
-  font-size: 30rpx;
-  font-weight: 750;
   display: flex;
   align-items: center;
   justify-content: center;
+  min-height: 88rpx;
+  border-radius: 16rpx;
+  background: $gradient-primary;
+  color: $text-on-color;
+  font-size: 30rpx;
+  font-weight: 600;
 }
-
 .publish-secondhand-footer__button--disabled {
-  opacity: .62;
+  opacity: .6;
+}
+.publish-secondhand-footer__button:active {
+  opacity: .8;
 }

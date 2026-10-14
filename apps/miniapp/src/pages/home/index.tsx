@@ -153,6 +153,7 @@ function HomeContent() {
   const conversationRequestVersion = useRef(0)
   const conversationOwnerRef = useRef('')
   const toolLoadingRef = useRef(false)
+  const tabScrollPositions = useRef<Record<HomeTab, number>>({ discover: 0, messages: 0, 'tools': 0 })
   const cards = useMemo(
     () => interleaveCards(visibility.forum ? postCards : [], visibility.secondhand ? productCards : []),
     [postCards, productCards, visibility.forum, visibility.secondhand]
@@ -334,11 +335,19 @@ function HomeContent() {
   }, [])
 
   useEffect(() => {
-    if (!visibility) return
+    discoverRequestVersion.current += 1
+    loadingRef.current = false
+    tabScrollPositions.current.discover = 0
+    setFailedImageKeys(new Set())
+    setPostCards([])
+    setProductCards([])
     void loadDiscover(true, { community: visibility.forum, trade: visibility.secondhand })
+  }, [currentSessionKey, loadDiscover, visibility.forum, visibility.secondhand])
+
+  useEffect(() => {
     const nextTab = visibleTabs.some((tab) => tab.key === activeTab) ? activeTab : visibleTabs[0]?.key
     if (nextTab && nextTab !== activeTab) setActiveTab(nextTab)
-  }, [activeTab, loadDiscover, visibility, visibleTabs])
+  }, [activeTab, visibleTabs])
 
   useEffect(() => {
     conversationRequestVersion.current += 1
@@ -475,6 +484,8 @@ function HomeContent() {
         key={activeTab}
         className='student-home-content'
         scrollY
+        scrollTop={tabScrollPositions.current[activeTab]}
+        onScroll={(event) => { tabScrollPositions.current[activeTab] = event.detail.scrollTop }}
         enhanced
         showScrollbar={false}
         lowerThreshold={120}
