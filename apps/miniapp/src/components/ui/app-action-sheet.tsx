@@ -21,7 +21,7 @@ export function AppActionSheet({ visible, title, description, children, loading 
     if (interactive && !loading) onClose()
   }
   return (
-    <View className={`app-action-sheet-layer app-action-sheet-layer--${phase}`}>
+    <View className={`app-action-sheet-layer app-action-sheet-layer--${phase}`} onClick={(event) => event.stopPropagation()}>
       <View className='app-action-sheet-layer__mask' onClick={handleClose} />
       <View className={`app-action-sheet app-action-sheet--${phase}`} role='dialog' aria-modal>
         <View className='app-action-sheet__handle' />

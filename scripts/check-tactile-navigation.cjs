@@ -3,6 +3,17 @@ const fs = require('node:fs')
 const path = require('node:path')
 const Module = require('node:module')
 const ts = require('typescript')
+const sass = require('sass')
+const postcss = require('postcss')
+const pxtransform = require('postcss-pxtransform')
+
+function pixels(value, viewport) {
+  const unit = value.trim().match(/^([\d.]+)(rpx|px)$/i)
+  if (unit) return Number(unit[1]) * (unit[2].toLowerCase() === 'rpx' ? viewport / 750 : 1)
+  const maximum = value.trim().match(/^max\((.+)\)$/)
+  if (maximum) return Math.max(...maximum[1].split(',').map(part => pixels(part, viewport)))
+  throw new Error(`无法验证导航尺寸: ${value}`)
+}
 
 function deferred() {
   let resolve
@@ -118,6 +129,19 @@ async function run() {
     await event(() => publish().onClick())
     assert.equal(navigations.length, 5, '发布失败或返回后仍可再次打开')
 
+    // A late failure from a previous page lifetime must not release the lock
+    // for a newer request to the same destination.
+    await event(() => { for (const ref of shows) ref.current() })
+    await event(() => publish().onClick())
+    assert.equal(navigations.length, 6)
+    await event(() => navigations[4].reject(new Error('stale publish failure')))
+    await event(() => publish().onClick())
+    assert.equal(navigations.length, 6, '旧请求失败不能解锁返回前台后的同目标新请求')
+    await event(() => navigations[5].reject(new Error('current publish failure')))
+    await event(() => publish().onClick())
+    assert.equal(navigations.length, 7, '当前请求失败后仍允许重试')
+    await event(() => navigations[6].resolve())
+
     options.visibility = { ...visibility, publish: false, post: false, secondhand_publish: false }
     await render()
     assert.equal(container.querySelector('.student-bottom-nav__publish'), null, '关闭发布策略时不渲染发布入口')
@@ -125,14 +149,33 @@ async function run() {
     await render()
     assert.equal(container.querySelectorAll('.student-bottom-nav__item').length, 3, '关闭二手只移除二手入口')
 
-    const scss = fs.readFileSync(path.resolve(__dirname, '../apps/miniapp/src/components/student-bottom-nav.scss'), 'utf8')
-    assert.match(scss, /\.student-bottom-nav__item\s*\{[\s\S]*?min-width:\s*88rpx;/, '导航外层触控宽度不少于 44px')
-    assert.match(scss, /\.student-bottom-nav__item\s*\{[\s\S]*?min-height:\s*88rpx;/, '导航外层触控高度不少于 44px')
-    assert.match(scss, /\.student-bottom-nav__publish\s*\{[\s\S]*?min-width:\s*88rpx;/, '发布入口触控宽度不少于 44px')
-    assert.match(scss, /\.student-bottom-nav__publish\s*\{[\s\S]*?min-height:\s*88rpx;/, '发布入口触控高度不少于 44px')
+    const stylePath = path.resolve(__dirname, '../apps/miniapp/src/components/student-bottom-nav.scss')
+    const scss = fs.readFileSync(stylePath, 'utf8')
+    const compiled = sass.compile(stylePath, { silenceDeprecations: ['legacy-js-api', 'global-builtin', 'color-functions', 'import'] }).css
+    const transformed = postcss([pxtransform({ platform: 'weapp', designWidth: 750 })]).process(compiled, { from: stylePath }).root
+    const declarationsFor = (selector) => {
+      const declarations = {}
+      transformed.walkRules(selector, rule => rule.walkDecls(decl => { declarations[decl.prop] = decl.value }))
+      return declarations
+    }
+    for (const selector of ['.student-bottom-nav__item', '.student-bottom-nav__publish']) {
+      const declarations = declarationsFor(selector)
+      for (const width of [320, 375, 390, 430, 768]) {
+        for (const property of ['min-width', 'min-height']) {
+          assert.ok(declarations[property] && pixels(declarations[property], width) >= 44,
+            `${selector} 的 ${property} 经 Sass + Taro PostCSS 后在 ${width}px 屏仍须至少 44px，实际为 ${declarations[property]}`)
+        }
+      }
+    }
+    const publishVisual = declarationsFor('.student-bottom-nav__publish-visual')
+    assert.equal(publishVisual.width, '72rpx', '发布按钮视觉宽度保持原值，仅扩大外层触控区')
+    assert.equal(publishVisual.height, '64rpx', '发布按钮视觉高度保持原值，仅扩大外层触控区')
+    const icon = declarationsFor('.student-bottom-nav__icon-asset')
+    assert.equal(icon.width, '44rpx', '导航图标保留现有视觉宽度')
+    assert.equal(icon.height, '44rpx', '导航图标保留现有视觉高度')
     assert.match(scss, /__item:active\s+\.student-bottom-nav__item-visual/, '按压反馈仅作用于导航内部视觉层')
     assert.match(scss, /@media\s*\(prefers-reduced-motion:\s*reduce\)/, '提供减少动效降级')
-    console.log('tactile navigation: isolated behavior and geometry checks passed')
+    console.log('tactile navigation: isolated behavior and Sass + Taro PostCSS geometry checks passed (320–768px)')
   } finally {
     await act(async () => { for (const root of roots) root.unmount() })
     previous.forEach((descriptor, index) => {

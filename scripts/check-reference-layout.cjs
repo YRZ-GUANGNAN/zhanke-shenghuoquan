@@ -38,11 +38,19 @@ const touchCases = {
   'merchant-order-detail': ['.merchant-detail-nav__refresh']
 }
 function pixels(value, viewport) {
-  const unit = value.trim().match(/^([\d.]+)(rpx|px)$/i)
-  if (unit) return Number(unit[1]) * (unit[2].toLowerCase() === 'rpx' ? viewport / 750 : 1)
-  const maximum = value.match(/^max\((.+)\)$/)
+  const unit = value.trim().match(/^([\d.]+)(rpx|px|vw)$/i)
+  if (unit) {
+    const scale = { rpx: viewport / 750, px: 1, vw: viewport / 100 }[unit[2].toLowerCase()]
+    return Number(unit[1]) * scale
+  }
+  const maximum = value.trim().match(/^max\((.+)\)$/)
   if (maximum) return Math.max(...maximum[1].split(',').map(part => pixels(part, viewport)))
-  throw new Error(`无法验证触控下限: ${value}`)
+  const clamped = value.trim().match(/^clamp\((.+)\)$/)
+  if (clamped) {
+    const [minimum, preferred, maximum] = clamped[1].split(',').map(part => pixels(part, viewport))
+    return Math.max(minimum, Math.min(preferred, maximum))
+  }
+  throw new Error(`无法验证物理尺寸: ${value}`)
 }
 for (const [route, selectors] of Object.entries(touchCases)) {
   const css = postcss([pxtransform({ platform: 'weapp', designWidth: 750 })]).process(compiled.get(route), { from: undefined }).css
@@ -62,14 +70,44 @@ for (const [route, selectors] of Object.entries(touchCases)) {
 }
 const shared = read('styles/reference-layout.scss')
 assert.doesNotMatch(shared, /^\s*(page|:root|\*)\s*\{/m, '不能通过全局选择器修改咨询分支')
-const probe = sass.compileString("@use 'reference-layout.scss' as ref; .test-title { @include ref.type(title); } .test-body { @include ref.type(body); } .test-comment { @include ref.type(comment); }", { loadPaths: [path.join(src, 'styles')] }).css
+const fontCases = {
+  title: { minimum: 17, maximum: 21, fluid: 4.8, lineHeight: 1.44 },
+  body: { minimum: 15, maximum: 17, fluid: 4, lineHeight: 1.47 },
+  comment: { minimum: 14, maximum: 16, fluid: 3.733, lineHeight: 1.5 },
+  author: { minimum: 13, maximum: 15, fluid: 3.467, lineHeight: 1.38 },
+  meta: { minimum: 12, maximum: 14, fluid: 3.2, lineHeight: 1.5 },
+  label: { minimum: 14, maximum: 16, fluid: 3.733, lineHeight: 1.43 }
+}
+const probe = sass.compileString("@use 'reference-layout.scss' as ref; " + Object.keys(fontCases).map(role => `.test-${role} { @include ref.type(${role}); }`).join(' '), { loadPaths: [path.join(src, 'styles')] }).css
 assert.match(probe, /font-size: 36rpx;\s*line-height: 52rpx/)
 assert.match(probe, /font-size: 30rpx;\s*line-height: 44rpx/)
 assert.match(probe, /font-size: 28rpx;\s*line-height: 42rpx/)
 assert.match(probe, /font-size: clamp\(/, '语义字号需要有受控的流式上限')
 assert.match(probe, /line-height: 1\.4/, '语义字号需要保持比例行高')
+// Sass alone preserves lowercase px. Only the real Taro PostCSS transform
+// reveals whether the physical bounds accidentally became responsive rpx.
+const transformedProbe = postcss([pxtransform({ platform: 'weapp', designWidth: 750 })]).process(probe, { from: undefined }).root
+for (const [role, expected] of Object.entries(fontCases)) {
+  const declarations = {}
+  transformedProbe.walkRules(`.test-${role}`, rule => rule.walkDecls(decl => { declarations[decl.prop] = decl.value }))
+  assert.equal(Number(declarations['line-height']), expected.lineHeight, `${role} 转换后保留比例行高`)
+  for (const width of [320, 375, 390, 430, 768, 1280]) {
+    const wanted = Math.max(expected.minimum, Math.min(width * expected.fluid / 100, expected.maximum))
+    assert.ok(Math.abs(pixels(declarations['font-size'], width) - wanted) < 0.001,
+      `${role} 在 ${width}px 屏的构建后字号不正确: ${declarations['font-size']}，应为 ${wanted}px`)
+  }
+}
+for (const [route, css] of compiled) {
+  const transformed = postcss([pxtransform({ platform: 'weapp', designWidth: 750 })]).process(css, { from: undefined }).root
+  transformed.walkDecls('font-size', decl => {
+    if (!decl.value.startsWith('clamp(')) return
+    const bounds = decl.value.slice(6, -1).split(',').map(value => value.trim())
+    assert.match(bounds[0], /^[\d.]+px$/i, `${route} 字号下限必须在构建后保留物理像素`)
+    assert.match(bounds[2], /^[\d.]+px$/i, `${route} 字号上限必须在构建后保留物理像素`)
+  })
+}
 assert.match(read('styles/design-tokens.scss'), /\$brand-primary: #2E7DD4;/, '保持既有蓝色品牌')
 assert.ok(/className=['"]post-detail-comment__content['"][^>]*>\{comment\.content\}<\/Text>/.test(read('pages/post-detail/post-comments.tsx')), '评论正文完整显示，不将头像首字截取误判为正文截断')
 assert.doesNotMatch(read('pages/delivery-conversation/index.config.ts'), /navigationStyle:\s*['"]custom['"]/, '配送沟通仍由原生导航保留系统区')
 assert.doesNotMatch(read('pages/delivery-conversation/index.tsx'), /CapsuleSystemRow/, '原生导航页面不再叠加自定义系统区')
-console.log(`参考排版检查通过：${routes.length - excluded.length} 个页面接入，${excluded.length} 个咨询页保留；色调、长文本与物理触控检查通过。`)
+console.log(`参考排版检查通过：${routes.length - excluded.length} 个页面接入，${excluded.length} 个咨询页保留；Sass + Taro PostCSS 后六类字号在 320–1280px 屏受控，色调、长文本与物理触控检查通过。`)

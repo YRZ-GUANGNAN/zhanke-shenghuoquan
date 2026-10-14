@@ -16,13 +16,15 @@ $typography: (
 // engines, then cap the same roles with a small fluid range. This avoids tiny
 // type on compact phones and runaway type on tablets without changing the
 // page hierarchy or the consultation pages that do not opt into this mixin.
+// Uppercase PX opts out of Taro's px-to-rpx transform: these bounds are
+// physical CSS pixels, not values in the 750-unit design coordinate space.
 $fluid-font-size: (
-  title: (17px, 4.8vw, 21px),
-  body: (15px, 4vw, 17px),
-  comment: (14px, 3.733vw, 16px),
-  author: (13px, 3.467vw, 15px),
-  meta: (12px, 3.2vw, 14px),
-  label: (14px, 3.733vw, 16px)
+  title: (17PX, 4.8vw, 21PX),
+  body: (15PX, 4vw, 17PX),
+  comment: (14PX, 3.733vw, 16PX),
+  author: (13PX, 3.467vw, 15PX),
+  meta: (12PX, 3.2vw, 14PX),
+  label: (14PX, 3.733vw, 16PX)
 );
 
 $fluid-line-height: (

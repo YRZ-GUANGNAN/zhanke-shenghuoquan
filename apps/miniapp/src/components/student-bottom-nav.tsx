@@ -22,7 +22,7 @@ interface StudentBottomNavProps {
 
 export default function StudentBottomNav({ active, className = '' }: StudentBottomNavProps) {
   const visibility = useFeatureVisibility()
-  const navigationLockRef = useRef<string | null>(null)
+  const navigationLockRef = useRef<{ key: string } | null>(null)
 
   useDidShow(() => {
     navigationLockRef.current = null
@@ -36,13 +36,14 @@ export default function StudentBottomNav({ active, className = '' }: StudentBott
   const canPublish = visibility.publish && (visibility.post || visibility.secondhand_publish)
   const runNavigation = (lockKey: string, navigate: () => Promise<unknown>) => {
     if (navigationLockRef.current) return
-    navigationLockRef.current = lockKey
+    const request = { key: lockKey }
+    navigationLockRef.current = request
     try {
       void navigate().catch(() => {
-        if (navigationLockRef.current === lockKey) navigationLockRef.current = null
+        if (navigationLockRef.current === request) navigationLockRef.current = null
       })
     } catch {
-      if (navigationLockRef.current === lockKey) navigationLockRef.current = null
+      if (navigationLockRef.current === request) navigationLockRef.current = null
     }
   }
   const openPage = (key: StudentNavKey, url: string) => {

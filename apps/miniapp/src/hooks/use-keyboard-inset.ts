@@ -25,14 +25,22 @@ function eventHeight(event: KeyboardHeightEvent): unknown {
  */
 export function useKeyboardInset() {
   const baselineHeightRef = useRef(readWindowHeight())
+  const awaitingWindowRestoreRef = useRef(false)
   const lastReportedHeightRef = useRef(0)
   const activeRef = useRef(false)
   const [inset, setInset] = useState(0)
 
   const reset = useCallback(() => {
+    const currentHeight = readWindowHeight()
+    // blur、零高度事件和前后台切换可能早于窗口还原；连续清理期间也要
+    // 保留完整基线。没有输入生命周期时，show 仍可接收真实的新窗口尺寸。
+    awaitingWindowRestoreRef.current = (activeRef.current || awaitingWindowRestoreRef.current)
+      && (currentHeight <= 0 || currentHeight < baselineHeightRef.current)
+    if (!awaitingWindowRestoreRef.current && currentHeight > 0) {
+      baselineHeightRef.current = currentHeight
+    }
     activeRef.current = false
     lastReportedHeightRef.current = 0
-    baselineHeightRef.current = readWindowHeight()
     setInset(0)
   }, [])
 
@@ -66,7 +74,10 @@ export function useKeyboardInset() {
   useResize(() => {
     const currentHeight = readWindowHeight()
     if (!activeRef.current) {
-      if (currentHeight > 0) baselineHeightRef.current = currentHeight
+      if (currentHeight > 0) {
+        baselineHeightRef.current = currentHeight
+        awaitingWindowRestoreRef.current = false
+      }
       return
     }
     setInset(resolveKeyboardInset(lastReportedHeightRef.current, {

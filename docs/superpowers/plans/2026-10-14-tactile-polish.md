@@ -43,5 +43,5 @@
 ## 5. 汇总验证
 
 - [x] 把新检查纳入 preverify；保留已有图集生命周期检查，不增加自定义拖拽阈值或共享元素转场；`npm.cmd run verify`、`npm.cmd run build:miniapp`、`git diff --check` 全通过。
-- [ ] 实际组件截图与几何验收，检查按压/退出/窄屏状态；真机键盘、持续触摸反向、转场中断仍待设备验收。
+- [x] 已用实际 React 组件、Sass/Taro PostCSS 构建结果和 Edge 隔离审查页完成截图与几何验收：320/360/375/390/430/768 宽度、精简导航、安全区模型、按压触控区、弹层退出拦截、快速重开、loading 重试、减少动效和低高度弹层均通过。产物在 `C:/Users/33141/.codex/visualizations/2026/07/28/019fa89e-0db5-7d30-bbae-fcf9d7f9fcc7/content-reference-tactile-review.html` 与同目录 `content-reference-tactile-metrics.json`；截图使用中性结构，无接口、登录或业务图片。真机键盘、持续触摸反向、转场中断仍待设备验收。
 - [x] 实现回执、原工作区核对、白名单暂存与中文提交。不部署、不上传，不提交两份用户 project 配置。
