@@ -1,4 +1,4 @@
-import type { CommunityComment, CommunityNotification, CommunityPost } from '../types'
+import type { CommunityComment, CommunityNotification, CommunityPost, CommunityThreadComment } from '../types'
 import { request } from './api'
 import { createClientRequestId } from './client-request-id'
 
@@ -9,6 +9,7 @@ export interface PageResult<T> {
   page: number
   pageSize: number
   total: number
+  publicCount?: number
 }
 
 export interface CreateCommunityPostInput {
@@ -22,6 +23,7 @@ export interface CreateCommunityPostInput {
 
 export interface CommunityViewerState {
   liked: boolean
+  likedCount: number
   favorited: boolean
   followingAuthor: boolean
 }
@@ -163,11 +165,59 @@ const normalizeComment = (raw: unknown): CommunityComment => {
   const authorRecord = isRecord(record.author) ? record.author : {}
   return {
     id: asString(first(record, ['id', 'commentId', 'comment_id'])),
-    author: asString(first(record, ['authorName', 'author_name', 'author'], first(authorRecord, ['name', 'nickname'])), '同学'),
+    author: asString(first(record, ['authorName', 'author_name'], first(authorRecord, ['name', 'nickname'], typeof record.author === 'string' ? record.author : '同学')), '同学'),
     avatar: asString(first(record, ['avatar', 'avatarUrl', 'avatar_url'], first(authorRecord, ['avatar', 'avatarUrl', 'avatar_url']))),
     content: asString(first(record, ['content', 'body', 'text']), ''),
     createdAt: dateLabel(first(record, ['createdAt', 'created_at'])),
   }
+}
+
+const normalizeThreadComment = (raw: unknown): CommunityThreadComment => {
+  const record = isRecord(raw) ? raw : {}
+  const replyTo = isRecord(record.replyTo) ? record.replyTo : {}
+  const status = asString(record.reviewStatus)
+  return {
+    ...normalizeComment(raw),
+    authorId: asString(record.userId),
+    parentCommentId: asString(record.parentCommentId, '0'),
+    replyToCommentId: asString(record.replyToCommentId, '0'),
+    replyToUserId: asString(record.replyToUserId, '0'),
+    replyToAuthor: asString(replyTo.nickname, '同学'),
+    reviewStatus: ['approved', 'reviewing', 'rejected', 'taken_down'].includes(status) ? status as CommunityThreadComment['reviewStatus'] : 'submitted',
+    liked: typeof record.liked === 'boolean' ? record.liked : undefined,
+    likedCount: Math.max(0, asNumber(record.likedCount)),
+    replyCount: Math.max(0, asNumber(record.replyCount)),
+  }
+}
+
+export interface LikeState { liked: boolean; likedCount: number }
+
+const normalizeLikeState = (raw: unknown): LikeState => {
+  if (!isRecord(raw) || typeof raw.liked !== 'boolean' || typeof raw.likedCount !== 'number' || !Number.isSafeInteger(raw.likedCount) || raw.likedCount < 0) {
+    throw new Error('点赞状态暂未确认，请重新读取')
+  }
+  return { liked: raw.liked, likedCount: raw.likedCount }
+}
+
+export async function getCommentThreads(postId: string, page = 1): Promise<PageResult<CommunityThreadComment>> {
+  return normalizePage(await request(`/community/posts/${encodeURIComponent(postId)}/comments/threads?page=${page}&pageSize=20`), normalizeThreadComment)
+}
+
+export async function getCommentReplies(postId: string, rootId: string, page = 1): Promise<PageResult<CommunityThreadComment>> {
+  return normalizePage(await request(`/community/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(rootId)}/replies?page=${page}&pageSize=20`), normalizeThreadComment)
+}
+
+export async function submitThreadComment(postId: string, content: string, clientRequestId: string, targetId?: string): Promise<CommunityThreadComment> {
+  const suffix = targetId ? `/${encodeURIComponent(targetId)}/replies` : ''
+  return normalizeThreadComment(await request(`/community/posts/${encodeURIComponent(postId)}/comments${suffix}`, {
+    url: '', method: 'POST', data: { content, clientRequestId }, header: { 'Idempotency-Key': clientRequestId },
+  }))
+}
+
+export async function setCommentLiked(postId: string, commentId: string, liked: boolean): Promise<LikeState> {
+  return normalizeLikeState(await request(`/community/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}/like`, {
+    url: '', method: liked ? 'PUT' : 'DELETE',
+  }))
 }
 
 const normalizeNotification = (raw: unknown): CommunityNotification => {
@@ -203,6 +253,7 @@ const normalizePage = <T>(raw: unknown, mapper: (item: unknown) => T): PageResul
     page: asNumber(first(record, ['page', 'pageNo', 'page_no']), 1),
     pageSize: asNumber(first(record, ['pageSize', 'page_size', 'limit']), items.length || 20),
     total: asNumber(first(record, ['total', 'count']), items.length),
+    ...(typeof record.publicCount === 'number' ? { publicCount: Math.max(0, record.publicCount) } : {}),
   }
 }
 
@@ -367,17 +418,17 @@ export async function getCommunityViewerState(postId: string): Promise<Community
   const data = await request<unknown>(`/community/posts/${encodeURIComponent(postId)}/viewer-state`)
   const record = isRecord(data) ? data : {}
   return {
-    liked: asBoolean(first(record, ['liked', 'isLiked', 'is_liked'])),
+    ...normalizeLikeState(record),
     favorited: asBoolean(first(record, ['favorited', 'favorite', 'isFavorited', 'is_favorited'])),
     followingAuthor: asBoolean(first(record, ['followingAuthor', 'following_author', 'isFollowingAuthor'])),
   }
 }
 
-export async function setPostLiked(postId: string, liked: boolean): Promise<void> {
-  await request(`/community/posts/${encodeURIComponent(postId)}/like`, {
+export async function setPostLiked(postId: string, liked: boolean): Promise<LikeState> {
+  return normalizeLikeState(await request(`/community/posts/${encodeURIComponent(postId)}/like`, {
     url: '',
     method: liked ? 'PUT' : 'DELETE',
-  })
+  }))
 }
 
 export async function setPostFavorited(postId: string, favorited: boolean): Promise<void> {

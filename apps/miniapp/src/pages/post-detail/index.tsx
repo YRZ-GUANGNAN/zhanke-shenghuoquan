@@ -10,15 +10,12 @@ import RuntimeSessionGate from '../../components/runtime-session-gate'
 import AppIcon from '../../components/app-icon'
 import { AppIconButton, AppState } from '../../components/ui'
 import Taro from '../../services/taro'
-import type { CommunityComment, CommunityPost } from '../../types'
+import type { CommunityPost, CommunityThreadComment } from '../../types'
 import { isApiError } from '../../services/api'
 import {
-  addPostComment,
-  createCommunityClientRequestId,
   getCommunityPost,
   getCommunityViewerState,
   getMyCommunityPost,
-  getPostCommentsPage,
   setPostFavorited,
   setPostLiked,
   setUserFollowing,
@@ -27,20 +24,9 @@ import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import { navigateBackOrHome } from '../../utils/navigation'
 import { formatPostDate, postBodyWithoutTitle, preparePostMedia, removeFailedPostMedia, type PostGalleryState, type PostMedia } from '../../utils/post-presentation'
 import { useGalleryPresentation } from '../../hooks/use-gallery-presentation'
+import { useSessionStore } from '../../stores/session'
+import { PostCommentList, usePostComments } from './post-comments'
 import './index.scss'
-
-const COMMENT_PAGE_SIZE = 20
-
-interface PendingCommentSubmission {
-  key: string
-  clientRequestId: string
-}
-
-function mergeComments(current: CommunityComment[], incoming: CommunityComment[]): CommunityComment[] {
-  const byId = new Map(current.map((comment) => [comment.id, comment]))
-  incoming.forEach((comment) => byId.set(comment.id, comment))
-  return Array.from(byId.values())
-}
 
 const showToast = (title: string, icon: 'success' | 'error' | 'none' = 'none') => {
   void Taro.showToast({ title, icon, duration: 1600 })
@@ -84,31 +70,25 @@ function PostDetailPage() {
   const params = Taro.getCurrentInstance().router?.params ?? {}
   const postId = publicShareId(params.id)
   const [post, setPost] = useState<CommunityPost | null>(null)
-  const [comments, setComments] = useState<CommunityComment[]>([])
-  const [commentPage, setCommentPage] = useState(0)
-  const [commentTotal, setCommentTotal] = useState(0)
-  const [commentsLoading, setCommentsLoading] = useState(false)
-  const [commentsLoadingMore, setCommentsLoadingMore] = useState(false)
   const [liked, setLiked] = useState(false)
   const [favorited, setFavorited] = useState(false)
   const [following, setFollowing] = useState(false)
-  const [commentText, setCommentText] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [commentError, setCommentError] = useState('')
   const [actioning, setActioning] = useState(false)
   const [viewerLoading, setViewerLoading] = useState(true)
-  const [submittingComment, setSubmittingComment] = useState(false)
+  const [viewerError, setViewerError] = useState('')
+  const [inputFocused, setInputFocused] = useState(false)
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
+  const sessionToken = useSessionStore(value => value.token)
   const [reloadKey, setReloadKey] = useState(0)
   const [gallery, setGallery] = useState<PostGalleryState>({ items: [], index: 0 })
   const [mediaPending, setMediaPending] = useState(false)
   const [preparedMediaKey, setPreparedMediaKey] = useState('')
   const [mediaSize, setMediaSize] = useState<PostMedia | undefined>()
   const [commentsAnchor, setCommentsAnchor] = useState('')
-  const pendingComment = useRef<PendingCommentSubmission | null>(null)
   const actionLock = useRef(false)
-  const commentLock = useRef(false)
-  const commentsLoadLock = useRef(false)
+  const viewerLock = useRef(false)
   const detailVersion = useRef(0)
 
   const { items: media, index: mediaIndex } = gallery
@@ -123,11 +103,21 @@ function PostDetailPage() {
     return Array.from(new Set(values))
   }, [post])
   const isApproved = post?.reviewStatus === 'approved'
+  const { session: commentSession, state: commentState } = usePostComments(postId ?? '', Boolean(isApproved && visibility.comment))
+  const commentText = commentState.draft
+  const submittingComment = commentState.submitting
+  const commentsLoading = commentState.roots.loading
+  const pageStyle = { ...getCapsuleSafeStyle(), '--comment-keyboard-height': `${keyboardHeight}px` }
   const hasActions = isApproved && (visibility.canComment || visibility.comment || visibility.likes || visibility.favorites)
   const galleryView = useGalleryPresentation(mediaKey, media.length, mediaSize, 'post', hasActions)
-  const interactionPending = actioning || viewerLoading
+  const interactionPending = actioning || viewerLoading || Boolean(viewerError)
   const reviewState = post?.reviewStatus ? reviewCopy[post.reviewStatus] : null
   usePageShare({ kind: 'post', enabled: visibility.forum && !loading && !error, id: postId, content: post })
+
+  useEffect(() => {
+    const message = commentState.error || commentState.notice
+    if (message) showToast(message)
+  }, [commentState.error, commentState.notice])
 
   useEffect(() => {
     let alive = true
@@ -159,27 +149,25 @@ function PostDetailPage() {
     nextTick(() => setCommentsAnchor('post-comments'))
   }
 
-  const loadCommentsPage = async (id: string, nextPage: number, version: number) => {
-    if (commentsLoadLock.current || commentLock.current) return
-    commentsLoadLock.current = true
-    setCommentsLoading(nextPage === 1)
-    setCommentsLoadingMore(nextPage > 1)
-    setCommentError('')
+  const loadViewerState = async (id: string, version: number) => {
+    if (viewerLock.current) return
+    viewerLock.current = true
+    setViewerLoading(true)
+    setViewerError('')
     try {
-      const result = await getPostCommentsPage(id, { page: nextPage, pageSize: COMMENT_PAGE_SIZE })
+      const result = await getCommunityViewerState(id)
       if (detailVersion.current !== version) return
-      setComments((current) => nextPage === 1 ? result.items : mergeComments(current, result.items))
-      setCommentPage(result.page || nextPage)
-      setCommentTotal(result.total)
-    } catch (loadError) {
+      setLiked(result.liked)
+      setFavorited(result.favorited)
+      setFollowing(result.followingAuthor)
+      setPost(current => current?.id === id ? { ...current, likedCount: result.likedCount } : current)
+    } catch {
       if (detailVersion.current !== version) return
-      console.error('load post comments failed', loadError)
-      setCommentError(nextPage === 1 ? '评论暂时无法读取，点击重试' : '更多评论加载失败，点击重试')
+      setViewerError('互动状态暂时无法确认，点击重新读取')
     } finally {
       if (detailVersion.current === version) {
-        commentsLoadLock.current = false
-        setCommentsLoading(false)
-        setCommentsLoadingMore(false)
+        viewerLock.current = false
+        setViewerLoading(false)
       }
     }
   }
@@ -187,17 +175,14 @@ function PostDetailPage() {
   useEffect(() => {
     let alive = true
     const version = ++detailVersion.current
-    commentsLoadLock.current = false
+    viewerLock.current = false
+    actionLock.current = false
     const load = async () => {
       setLoading(true)
       setError('')
-      setCommentError('')
       setPost(null)
-      setComments([])
-      setCommentPage(0)
-      setCommentTotal(0)
-      setCommentsLoading(false)
-      setCommentsLoadingMore(false)
+      setViewerError('')
+      setActioning(false)
       setViewerLoading(true)
       setCommentsAnchor('')
       if (!postId) {
@@ -222,20 +207,7 @@ function PostDetailPage() {
         setLoading(false)
 
         if (nextPost.reviewStatus === 'approved') {
-          await Promise.all([
-            visibility.comment ? loadCommentsPage(postId, 1, version) : Promise.resolve(),
-            getCommunityViewerState(postId).catch(() => ({
-              liked: false,
-              favorited: false,
-              followingAuthor: false,
-            })).then((viewerState) => {
-              if (!alive) return
-              setLiked(viewerState.liked)
-              setFavorited(viewerState.favorited)
-              setFollowing(viewerState.followingAuthor)
-              setViewerLoading(false)
-            }),
-          ])
+          await loadViewerState(postId, version)
         }
       } catch (loadError) {
         console.error('load post detail failed', loadError)
@@ -249,99 +221,72 @@ function PostDetailPage() {
       alive = false
       detailVersion.current += 1
     }
-  }, [postId, reloadKey, visibility.comment])
+  }, [postId, reloadKey, sessionToken])
 
   const loadMoreComments = async () => {
-    if (!visibility.comment || !post || !isApproved || commentPage === 0 || comments.length >= commentTotal) return
-    await loadCommentsPage(post.id, commentPage + 1, detailVersion.current)
+    if (!visibility.comment || !isApproved || !commentState.roots.hasMore) return
+    await commentSession.load()
   }
 
-  const retryComments = () => {
-    if (!visibility.comment || !post || !isApproved) return
-    void loadCommentsPage(post.id, commentPage === 0 ? 1 : commentPage + 1, detailVersion.current)
-  }
-
-  const withActionGuard = async (run: () => Promise<void>) => {
-    if (actionLock.current || viewerLoading || !post || !isApproved) return
+  const withActionGuard = async (run: (isCurrent: () => boolean) => Promise<void>) => {
+    if (actionLock.current || interactionPending || !post || !isApproved) return
+    const version = detailVersion.current
+    const isCurrent = () => detailVersion.current === version
     actionLock.current = true
     setActioning(true)
     try {
-      await run()
+      await run(isCurrent)
     } catch (actionError) {
       console.error('post action failed', actionError)
-      showToast('操作失败，请稍后再试', 'error')
+      if (isCurrent()) showToast('操作未确认，请重试', 'error')
     } finally {
-      actionLock.current = false
-      setActioning(false)
+      if (isCurrent()) {
+        actionLock.current = false
+        setActioning(false)
+      }
     }
   }
 
   const handleFollow = () =>
-    withActionGuard(async () => {
+    withActionGuard(async (isCurrent) => {
       if (!post || !visibility.following) return
       const next = !following
       await setUserFollowing(post.authorId, next)
+      if (!isCurrent()) return
       setFollowing(next)
       showToast(next ? '已关注' : '已取消关注', 'success')
     })
 
   const handleLike = () =>
-    withActionGuard(async () => {
+    withActionGuard(async (isCurrent) => {
       if (!post || !visibility.likes) return
       const next = !liked
-      await setPostLiked(post.id, next)
-      setLiked(next)
-      setPost((current) => current ? { ...current, likedCount: Math.max(0, current.likedCount + (next ? 1 : -1)) } : current)
+      const confirmed = await setPostLiked(post.id, next)
+      if (!isCurrent()) return
+      setLiked(confirmed.liked)
+      setPost((current) => current ? { ...current, likedCount: confirmed.likedCount } : current)
     })
 
   const handleFavorite = () =>
-    withActionGuard(async () => {
+    withActionGuard(async (isCurrent) => {
       if (!post || !visibility.favorites) return
       const next = !favorited
       await setPostFavorited(post.id, next)
+      if (!isCurrent()) return
       setFavorited(next)
       setPost((current) => current ? { ...current, favoriteCount: Math.max(0, current.favoriteCount + (next ? 1 : -1)) } : current)
     })
 
   const handleSubmitComment = async () => {
     if (!visibility.canComment || !post || !isApproved) return
-    if (commentsLoadLock.current) {
-      showToast('评论正在读取，请稍候')
-      return
-    }
-    const content = commentText.trim()
-    if (!content) {
-      showToast('先写一句评论吧')
-      return
-    }
-    if (commentLock.current) return
-    commentLock.current = true
-    const clientRequestId = pendingComment.current?.key === content
-      ? pendingComment.current.clientRequestId
-      : createCommunityClientRequestId()
-    pendingComment.current = { key: content, clientRequestId }
-    const version = detailVersion.current
-    setSubmittingComment(true)
-    try {
-      const comment = await addPostComment(post.id, content, clientRequestId)
-      if (detailVersion.current !== version) return
-      setComments((current) => mergeComments([comment], current))
-      setCommentTotal((current) => current + 1)
-      setPost((current) => current ? { ...current, commentCount: current.commentCount + 1 } : current)
-      setCommentText('')
-      pendingComment.current = null
-      showToast('评论已提交审核', 'success')
-    } catch (commentSubmitError) {
-      if (detailVersion.current !== version) return
-      console.error('submit comment failed', commentSubmitError)
-      if (isApiError(commentSubmitError) && commentSubmitError.status >= 400 && commentSubmitError.status < 500) {
-        pendingComment.current = null
-      }
-      showToast('评论失败，请稍后再试', 'error')
-    } finally {
-      commentLock.current = false
-      if (detailVersion.current === version) setSubmittingComment(false)
-    }
+    await commentSession.submit()
+  }
+
+  const replyToComment = (comment: CommunityThreadComment) => {
+    if (!visibility.canComment || submittingComment) return
+    commentSession.replyTo(comment)
+    setInputFocused(false)
+    nextTick(() => setInputFocused(true))
   }
 
   const headerCenter = post ? (
@@ -357,7 +302,7 @@ function PostDetailPage() {
   ) : <Text className='post-detail-nav__title'>帖子详情</Text>
 
   return (
-    <View className="post-detail-page" style={getCapsuleSafeStyle()}>
+    <View className={`post-detail-page${commentState.target ? ' post-detail-page--replying' : ''}${keyboardHeight > 0 ? ' post-detail-page--keyboard' : ''}`} style={pageStyle}>
       <CapsulePageHeader
         className='post-detail-nav'
         variant='standard'
@@ -449,51 +394,40 @@ function PostDetailPage() {
             </View>
 
             {isApproved && visibility.comment ? (
-              <View className="post-detail-comments" id='post-comments'>
-                <Text className="post-detail-comments__title">共 {commentPage > 0 ? commentTotal : post.commentCount} 条评论</Text>
-                {comments.map((comment) => (
-                  <View className="post-detail-comment" key={comment.id}>
-                    <View className='post-detail-comment__avatar'>
-                      {comment.avatar ? <Image src={comment.avatar} mode='aspectFill' /> : (comment.author || '同').slice(0, 1)}
-                    </View>
-                    <View className="post-detail-comment__main">
-                      <Text className="post-detail-comment__author">{comment.author || '同学'}</Text>
-                      <Text className="post-detail-comment__content">{comment.content}</Text>
-                      <Text className="post-detail-comment__meta">{formatPostDate(comment.createdAt)}</Text>
-                    </View>
-                  </View>
-                ))}
-                {commentsLoading ? <Text className='post-detail-comments__bottom'>正在读取评论…</Text> : commentError ? (
-                  <Text
-                    className="post-detail-comments__bottom post-detail-comments__bottom--retry"
-                    onClick={retryComments}
-                  >
-                    {commentError}
-                  </Text>
-                ) : comments.length === 0 ? (
-                  <View className="post-detail-comments__empty">
-                    <Text className="post-detail-comments__empty-title">还没有评论</Text>
-                    <Text className="post-detail-comments__empty-desc">说说你的看法，成为第一个评论的人</Text>
-                  </View>
-                ) : commentsLoadingMore ? (
-                  <Text className="post-detail-comments__bottom">正在加载更多评论…</Text>
-                ) : comments.length >= commentTotal ? (
-                  <Text className="post-detail-comments__bottom">— 到底了 —</Text>
-                ) : null}
-              </View>
+              <PostCommentList state={commentState} publicCount={commentState.publicCount ?? post.commentCount}
+                canReply={visibility.canComment} canLike={visibility.likes}
+                onReply={replyToComment}
+                onLike={id => { if (visibility.likes) void commentSession.like(id) }}
+                onLoad={rootId => void commentSession.load(rootId)}
+                onExpand={rootId => void commentSession.expand(rootId)}
+                onCollapse={commentSession.collapse}
+              />
             ) : null}
+            {viewerError && <View className='post-detail-viewer-retry' role='button' onClick={() => void loadViewerState(post.id, detailVersion.current)}><Text>{viewerError}</Text></View>}
+            {(commentState.error || commentState.notice) && <View className='post-detail-comment-feedback' role='status'><Text>{commentState.error || commentState.notice}</Text></View>}
           </ScrollView>
 
           {hasActions ? (
             <View className="post-detail-actionbar">
+              {commentState.target && <View className='post-detail-reply-context'>
+                <Text>回复 {commentState.target.author}</Text>
+                <View role='button' aria-label='取消回复' className='post-detail-reply-context__cancel' onClick={() => commentSession.replyTo(null)}><AppIcon name='close' /></View>
+              </View>}
+              <View className='post-detail-actionbar__row'>
               {visibility.canComment && <Input
                 className="post-detail-input"
                 value={commentText}
                 disabled={submittingComment}
-                placeholder={submittingComment ? '发送中…' : '说点什么…'}
+                focus={inputFocused}
+                adjustPosition={false}
+                cursorSpacing={12}
+                maxlength={1000}
+                onFocus={() => setInputFocused(true)}
+                onBlur={() => { setInputFocused(false); setKeyboardHeight(0) }}
+                onKeyboardHeightChange={event => setKeyboardHeight(Math.max(0, Number(event.detail.height) || 0))}
+                placeholder={submittingComment ? '发送中…' : commentState.target ? `回复 ${commentState.target.author}` : '说点什么…'}
                 onInput={(event) => {
-                  setCommentText(event.detail.value)
-                  if (pendingComment.current?.key !== event.detail.value.trim()) pendingComment.current = null
+                  commentSession.setDraft(event.detail.value)
                 }}
                 confirmType="send"
                 onConfirm={handleSubmitComment}
@@ -513,9 +447,10 @@ function PostDetailPage() {
               </View>}
               {visibility.comment && <View className="post-detail-action" role='button' aria-label='查看评论' onClick={showComments}>
                 <AppIcon name='comment' className='post-detail-action__icon' />
-                <Text>{post.commentCount || comments.length}</Text>
+                <Text>{commentState.publicCount ?? post.commentCount}</Text>
               </View>}
               </>}
+              </View>
             </View>
           ) : null}
         </>

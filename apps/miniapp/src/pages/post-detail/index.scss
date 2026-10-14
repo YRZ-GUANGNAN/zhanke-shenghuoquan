@@ -430,6 +430,7 @@
   height: 72rpx;
   padding: 0 22rpx;
   flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   border-radius: 999rpx;
@@ -511,5 +512,31 @@
 
 @media (prefers-reduced-motion: reduce) {
   .post-detail-action,
-  .post-detail-follow { transition: none; }
+  .post-detail-follow,
+  .post-detail-gallery__count { transition: none; }
 }
+
+.post-detail-page {
+  --comment-keyboard-height: 0px;
+  --comment-reply-height: 0px;
+  --comment-bottom-inset: env(safe-area-inset-bottom);
+}
+.post-detail-page--replying { --comment-reply-height: 44PX; }
+.post-detail-page--keyboard { --comment-bottom-inset: 0px; }
+.post-detail-scroll--with-actions {
+  height: calc(100% - var(--post-actionbar-height) - var(--comment-bottom-inset) - var(--comment-keyboard-height) - var(--comment-reply-height));
+}
+.post-detail-actionbar {
+  bottom: var(--comment-keyboard-height);
+  height: calc(var(--post-actionbar-height) + var(--comment-bottom-inset) + var(--comment-reply-height));
+  padding-bottom: calc(8rpx + var(--comment-bottom-inset));
+  flex-direction: column;
+  gap: 0;
+}
+.post-detail-actionbar__row { display: flex; align-items: center; gap: 8rpx; width: 100%; min-width: 0; flex: 1; }
+.post-detail-reply-context { display: flex; align-items: center; width: 100%; height: 44PX; flex: none; gap: 8PX; color: $text-secondary; font-size: clamp(12PX, 24rpx, 14PX); }
+.post-detail-reply-context > text { min-width: 0; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.post-detail-reply-context__cancel { @include ref.touch; display: flex; align-items: center; justify-content: center; flex: none; }
+.post-detail-reply-context__cancel .app-icon { width: 16PX; height: 16PX; }
+.post-detail-viewer-retry { @include ref.touch; display: flex; align-items: center; padding: 8PX 16PX; font-size: 13PX; line-height: 1.5; color: $brand-primary; }
+.post-detail-comment-feedback { display: block; padding: 12PX 16PX; font-size: 13PX; line-height: 1.5; color: $text-secondary; }

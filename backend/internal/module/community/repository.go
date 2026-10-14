@@ -42,9 +42,10 @@ type Repository interface {
 }
 
 type PostViewerState struct {
-	Liked           bool `json:"liked"`
-	Favorited       bool `json:"favorited"`
-	FollowingAuthor bool `json:"followingAuthor"`
+	Liked           bool  `json:"liked"`
+	LikedCount      int64 `json:"likedCount"`
+	Favorited       bool  `json:"favorited"`
+	FollowingAuthor bool  `json:"followingAuthor"`
 }
 
 func (r *GormRepository) ListFollowingPosts(ctx context.Context, userID uint, q FeedQuery) ([]Post, int64, error) {
@@ -189,14 +190,14 @@ func (r *GormRepository) CreateComment(ctx context.Context, value *Comment) erro
 func (r *GormRepository) ListComments(ctx context.Context, postID uint, page, size int, publicOnly bool) ([]Comment, int64, error) {
 	var values []Comment
 	var total int64
-	query := r.db.WithContext(ctx).Model(&Comment{}).Where("post_id = ?", postID)
+	query := r.db.WithContext(ctx).Model(&Comment{}).Where("post_id = ? AND parent_comment_id = 0", postID)
 	if publicOnly {
 		query = query.Where("review_status = ?", review.StatusApproved)
 	}
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
-	err := query.Order("created_at ASC").Offset((page - 1) * size).Limit(size).Find(&values).Error
+	err := query.Order("created_at ASC, id ASC").Offset((page - 1) * size).Limit(size).Find(&values).Error
 	return values, total, err
 }
 
@@ -285,30 +286,27 @@ func (r *GormRepository) ToggleFollow(ctx context.Context, followerID, followeeI
 
 func (r *GormRepository) ViewerState(ctx context.Context, postID, viewerID, authorID uint) (PostViewerState, error) {
 	var state PostViewerState
-	queries := []struct {
-		destination *bool
-		model       any
-		where       string
-		args        []any
-	}{
-		{&state.Liked, &PostLike{}, "post_id = ? AND user_id = ?", []any{postID, viewerID}},
-		{&state.Favorited, &PostFavorite{}, "post_id = ? AND user_id = ?", []any{postID, viewerID}},
-		{&state.FollowingAuthor, &UserFollow{}, "follower_id = ? AND followee_id = ?", []any{viewerID, authorID}},
+	result := r.db.WithContext(ctx).Model(&Post{}).Where("id = ? AND review_status = ?", postID, review.StatusApproved).
+		Select(`liked_count,
+		 EXISTS (SELECT 1 FROM post_likes WHERE post_id = posts.id AND user_id = ?) AS liked,
+		 EXISTS (SELECT 1 FROM post_favorites WHERE post_id = posts.id AND user_id = ?) AS favorited,
+		 EXISTS (SELECT 1 FROM user_follows WHERE follower_id = ? AND followee_id = posts.user_id) AS following_author`, viewerID, viewerID, viewerID).Scan(&state)
+	if result.Error == nil && result.RowsAffected == 0 {
+		return PostViewerState{}, ErrNotFound
 	}
-	for _, query := range queries {
-		var count int64
-		if err := r.db.WithContext(ctx).Model(query.model).Where(query.where, query.args...).Limit(1).Count(&count).Error; err != nil {
-			return PostViewerState{}, err
-		}
-		*query.destination = count > 0
-	}
-	return state, nil
+	return state, result.Error
 }
 
 func (r *GormRepository) SetLike(ctx context.Context, postID, userID uint, desired bool) (bool, error) {
+	state, err := r.SetLikeState(ctx, postID, userID, desired)
+	return state.Liked, err
+}
+
+func (r *GormRepository) SetLikeState(ctx context.Context, postID, userID uint, desired bool) (CommentLikeState, error) {
+	state := CommentLikeState{Liked: desired}
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var post Post
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Select("id", "review_status").First(&post, postID).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Select("id", "review_status", "liked_count").First(&post, postID).Error; errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrNotFound
 		} else if err != nil {
 			return err
@@ -316,6 +314,7 @@ func (r *GormRepository) SetLike(ctx context.Context, postID, userID uint, desir
 		if post.ReviewStatus != review.StatusApproved {
 			return ErrNotFound
 		}
+		state.LikedCount = post.LikedCount
 		if desired {
 			result := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&PostLike{PostID: postID, UserID: userID})
 			if result.Error != nil || result.RowsAffected == 0 {
@@ -325,16 +324,18 @@ func (r *GormRepository) SetLike(ctx context.Context, postID, userID uint, desir
 				UpdateColumn("liked_count", gorm.Expr("liked_count + 1"))); err != nil {
 				return err
 			}
+			state.LikedCount++
 			return r.createPostNotification(tx, postID, userID, NotificationLike, 0)
 		}
 		result := tx.Where("post_id = ? AND user_id = ?", postID, userID).Delete(&PostLike{})
 		if result.Error != nil || result.RowsAffected == 0 {
 			return result.Error
 		}
+		state.LikedCount--
 		return requireInteractionUpdate(tx.Model(&Post{}).Where("id = ? AND liked_count > 0", postID).
 			UpdateColumn("liked_count", gorm.Expr("liked_count - 1")))
 	})
-	return desired, err
+	return state, err
 }
 
 func (r *GormRepository) SetFavorite(ctx context.Context, postID, userID uint, desired bool) (bool, error) {
@@ -442,24 +443,40 @@ func (r *GormRepository) SetReviewStatus(ctx context.Context, objectType string,
 		return errors.New("unsupported community review target")
 	}
 	return dbtx.DB(ctx, r.db).Transaction(func(tx *gorm.DB) error {
-		var value Comment
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&value, id).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+		var coordinates Comment
+		if err := tx.Select("id", "post_id").First(&coordinates, id).Error; errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrNotFound
 		} else if err != nil {
 			return err
 		}
+		value, root, err := lockThreadComment(tx, coordinates.PostID, id)
+		if err != nil {
+			return err
+		}
+		if value.ReviewStatus == status {
+			return nil
+		}
 		if err := tx.Model(&Comment{}).Where("id = ?", id).Update("review_status", status).Error; err != nil {
 			return err
 		}
-		if status == review.StatusApproved && value.ReviewStatus != review.StatusApproved {
-			if err := tx.Model(&Post{}).Where("id = ?", value.PostID).UpdateColumn("comment_count", gorm.Expr("comment_count + 1")).Error; err != nil {
+		amount := int64(1)
+		if value.ParentCommentID == 0 {
+			var replies int64
+			if err := tx.Model(&Comment{}).Clauses(clause.Locking{Strength: "UPDATE"}).Where("post_id = ? AND parent_comment_id = ? AND review_status = ?", value.PostID, id, review.StatusApproved).Count(&replies).Error; err != nil {
+				return err
+			}
+			amount += replies
+		} else if root.ReviewStatus != review.StatusApproved {
+			return nil
+		}
+		if status == review.StatusApproved {
+			if err := tx.Model(&Post{}).Where("id = ?", value.PostID).UpdateColumn("comment_count", gorm.Expr("comment_count + ?", amount)).Error; err != nil {
 				return err
 			}
 			return r.createPostNotification(tx, value.PostID, value.UserID, NotificationComment, value.ID)
 		}
-		if status != review.StatusApproved && value.ReviewStatus == review.StatusApproved {
-			return tx.Model(&Post{}).Where("id = ?", value.PostID).
-				UpdateColumn("comment_count", gorm.Expr("GREATEST(comment_count - 1, 0)")).Error
+		if value.ReviewStatus == review.StatusApproved {
+			return tx.Model(&Post{}).Where("id = ?", value.PostID).UpdateColumn("comment_count", gorm.Expr("GREATEST(comment_count - ?, 0)", amount)).Error
 		}
 		return nil
 	})

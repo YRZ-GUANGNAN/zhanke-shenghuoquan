@@ -92,10 +92,11 @@ type NotificationPage struct {
 	Unread   int64              `json:"unread"`
 }
 type Page[T any] struct {
-	Items    []T   `json:"items"`
-	Page     int   `json:"page"`
-	PageSize int   `json:"pageSize"`
-	Total    int64 `json:"total"`
+	Items       []T    `json:"items"`
+	Page        int    `json:"page"`
+	PageSize    int    `json:"pageSize"`
+	Total       int64  `json:"total"`
+	PublicCount *int64 `json:"publicCount,omitempty"`
 }
 
 func (s *Service) CreatePost(ctx context.Context, input CreatePostInput, risk string) (Post, error) {
@@ -244,8 +245,9 @@ func (s *Service) Post(ctx context.Context, id uint) (PostView, error) {
 	return views[0], nil
 }
 func (s *Service) AddComment(ctx context.Context, postID, userID uint, content, risk string) (Comment, error) {
-	if content == "" {
-		return Comment{}, errors.New("comment is required")
+	content = strings.TrimSpace(content)
+	if utf8.RuneCountInString(content) < 1 || utf8.RuneCountInString(content) > 1000 {
+		return Comment{}, ErrInvalidComment
 	}
 	if _, err := s.repo.FindPost(ctx, postID, true); err != nil {
 		return Comment{}, err
@@ -261,8 +263,9 @@ func (s *Service) AddComment(ctx context.Context, postID, userID uint, content, 
 }
 
 func (s *Service) AddCommentKeyed(ctx context.Context, postID, userID uint, content, clientRequestID, risk string) (KeyedCreateResult[Comment], error) {
-	if content == "" {
-		return KeyedCreateResult[Comment]{}, errors.New("comment is required")
+	content = strings.TrimSpace(content)
+	if utf8.RuneCountInString(content) < 1 || utf8.RuneCountInString(content) > 1000 {
+		return KeyedCreateResult[Comment]{}, ErrInvalidComment
 	}
 	if !validWriteContractULID(clientRequestID) {
 		return KeyedCreateResult[Comment]{}, ErrWriteContractInvalid
@@ -399,6 +402,9 @@ func (s *Service) awaitPostReplay(ctx context.Context, ownerID uint, clientReque
 	return KeyedCreateResult[Post]{}, nil, false
 }
 func (s *Service) Comments(ctx context.Context, postID uint, page, size int) (Page[CommentView], error) {
+	if _, err := s.repo.FindPost(ctx, postID, true); err != nil {
+		return Page[CommentView]{}, err
+	}
 	page, size = normalize(page, size)
 	values, total, err := s.repo.ListComments(ctx, postID, page, size, true)
 	if err != nil {
@@ -457,6 +463,20 @@ func (s *Service) SetLike(ctx context.Context, postID, userID uint, desired bool
 		return false, err
 	}
 	return s.repo.SetLike(ctx, postID, userID, desired)
+}
+
+func (s *Service) SetLikeState(ctx context.Context, postID, userID uint, desired bool) (CommentLikeState, error) {
+	if repo, ok := s.repo.(interface {
+		SetLikeState(context.Context, uint, uint, bool) (CommentLikeState, error)
+	}); ok {
+		return repo.SetLikeState(ctx, postID, userID, desired)
+	}
+	liked, err := s.SetLike(ctx, postID, userID, desired)
+	if err != nil {
+		return CommentLikeState{}, err
+	}
+	post, err := s.repo.FindPost(ctx, postID, true)
+	return CommentLikeState{Liked: liked, LikedCount: post.LikedCount}, err
 }
 
 func (s *Service) SetFavorite(ctx context.Context, postID, userID uint, desired bool) (bool, error) {

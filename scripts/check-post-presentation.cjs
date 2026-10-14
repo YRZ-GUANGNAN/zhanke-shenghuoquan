@@ -69,6 +69,13 @@ async function pageBehavior() {
       if (id.endsWith('/services/taro')) return { default: taro }
       if (id.endsWith('/capsule-safe')) return { getCapsuleSafeStyle: () => ({}) }
       if (id.endsWith('/navigation')) return { navigateBackOrHome: async () => {} }
+      if (id === './post-comments' || id.endsWith('/comment-session')) {
+        const helperPath = path.resolve(__dirname, '../apps/miniapp/src', id === './post-comments' ? 'pages/post-detail/post-comments.tsx' : 'services/comment-session.ts')
+        const helper = new Module(helperPath, module)
+        helper.require = modulePage.require
+        helper._compile(ts.transpileModule(fs.readFileSync(helperPath, 'utf8'), { fileName: helperPath, compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText, helperPath)
+        return helper.exports
+      }
       if (id === './search-filter-panel' || id === './search-filters') {
         const helperPath = path.resolve(__dirname, '../apps/miniapp/src/pages/search', id === './search-filter-panel' ? 'search-filter-panel.tsx' : 'search-filters.ts')
         const helper = new Module(helperPath, module)
@@ -205,27 +212,67 @@ async function pageBehavior() {
     assert.equal(search.container.querySelector('.student-search-result'), null)
 
     let postLoads = 0
-    const commentRequests = []
+    const commentRequests = [], viewerRequests = [], postLikes = [], submits = [], replyRequests = []
+    const comment = (id, extra = {}) => ({ id, content: `评论 ${id}`, author: '作者', avatar: '', authorId: '2', parentCommentId: '0', replyToCommentId: '0', replyToUserId: '0', replyToAuthor: '', liked: false, likedCount: 0, replyCount: 1, createdAt: '', reviewStatus: 'approved', ...extra })
     const detail = await mount('post-detail', {
       params: { id: fakePost.id, anchor: 'comments' },
       community: {
         getCommunityPost: async () => { postLoads += 1; return fakePost },
-        getCommunityViewerState: async () => ({ liked: false, favorited: false, followingAuthor: false }),
-        getPostCommentsPage: (id, args) => { const task = deferred(); commentRequests.push({ id, ...args, ...task }); return task.promise },
+        getCommunityViewerState: () => { const task = deferred(); viewerRequests.push(task); return task.promise },
+        setPostLiked: (id, liked) => { const task = deferred(); postLikes.push({ id, liked, ...task }); return task.promise },
+        getCommentThreads: (id, page) => { const task = deferred(); commentRequests.push({ id, page, ...task }); return task.promise },
+        getCommentReplies: (id, root, page) => { const task = deferred(); replyRequests.push({ id, root, page, ...task }); return task.promise },
+        createCommunityClientRequestId: () => '01J00000000000000000000000',
+        submitThreadComment: (...args) => { const task = deferred(); submits.push({ args, ...task }); return task.promise },
       },
     })
     assert.ok(detail.container.textContent.includes('保留的正文'), '评论请求未完成时正文仍可阅读')
     assert.equal(detail.props('.post-detail-scroll').scrollIntoView, '', '评论未完成布局时不提前定位到底部')
-    await detail.event(() => commentRequests[0].reject(new Error('test comments offline')))
+    await detail.event(() => { commentRequests[0].reject(new Error('comments offline')); viewerRequests[0].reject(new Error('viewer offline')) })
     const bodyNode = detail.container.querySelector('.post-detail-content')
     await detail.event(() => detail.props('.post-detail-input').onInput({ detail: { value: '保留输入' } }))
-    await detail.event(() => detail.props('.post-detail-comments__bottom--retry').onClick())
+    await detail.event(() => detail.props('.post-detail-comments__more').onClick())
     assert.equal(postLoads, 1, '评论失败重试不能重载整篇帖子')
     assert.equal(detail.container.querySelector('.post-detail-content'), bodyNode)
     assert.equal(detail.props('.post-detail-input').value, '保留输入')
-    await detail.event(() => commentRequests[1].resolve({ items: [], page: 1, total: 0 }))
+    await detail.event(() => commentRequests[1].resolve({ items: [], page: 1, pageSize: 20, total: 0, publicCount: 0 }))
     assert.ok(detail.container.textContent.includes('共 0 条评论'), '真实零评论计数不能被详情旧计数覆盖')
     assert.equal(detail.props('.post-detail-scroll').scrollIntoView, 'post-comments', '评论读取结束后应用来源锚点')
+    await detail.event(() => detail.props('.post-detail-input').onInput({ detail: { value: '' } }))
+    await detail.event(() => detail.all('.post-detail-action')[0].onClick())
+    assert.equal(postLikes.length, 0, '读取失败不能把未知状态当作未赞然后发请求')
+    await detail.event(() => detail.props('.post-detail-viewer-retry').onClick())
+    await detail.event(() => viewerRequests[1].resolve({ liked: true, likedCount: 5, favorited: false, followingAuthor: false }))
+    await detail.event(() => { detail.all('.post-detail-action')[0].onClick(); detail.all('.post-detail-action')[0].onClick() })
+    assert.equal(postLikes.length, 1, '帖子点赞连续点击只发一次')
+    assert.equal(postLikes[0].liked, false)
+    await detail.event(() => postLikes[0].resolve({ liked: false, likedCount: 12 }))
+    assert.equal(detail.all('.post-detail-action')[0]['aria-label'], '点赞，12', '必须使用服务端确认计数，不做本地减一')
+    await detail.event(() => detail.props('.post-detail-input').onInput({ detail: { value: '保留输入' } }))
+    await detail.event(() => detail.props('.post-detail-send').onClick())
+    await detail.event(() => submits[0].resolve(comment('4', { reviewStatus: 'submitted' })))
+    assert.ok(detail.container.textContent.includes('待审核'), '本人新评论显示实际审核状态')
+    assert.ok(detail.container.textContent.includes('共 0 条评论'), '待审核不增加公开计数')
+    // Switching account invalidates a late post-like response.
+    await detail.event(() => detail.all('.post-detail-action')[0].onClick())
+    detail.options.token = 'other-account-token'
+    await detail.render()
+    await detail.event(() => viewerRequests[2].resolve({ liked: false, likedCount: 20, favorited: false, followingAuthor: false }))
+    await detail.event(() => postLikes[1].resolve({ liked: true, likedCount: 99 }))
+    assert.equal(detail.all('.post-detail-action')[0]['aria-label'], '点赞，20', '旧账号点赞回执不能污染新账号')
+    await detail.event(() => commentRequests[commentRequests.length - 1].resolve({ items: [comment('1')], page: 1, pageSize: 20, total: 1, publicCount: 2 }))
+    await detail.event(() => detail.props('.post-detail-comments__more').onClick())
+    await detail.event(() => replyRequests[0].resolve({ items: [comment('2', { parentCommentId: '1', replyToCommentId: '1', replyToAuthor: '原作者' })], page: 1, pageSize: 20, total: 1, publicCount: 2 }))
+    assert.ok(detail.container.textContent.includes('回复 原作者'))
+    await detail.event(() => detail.all('.post-detail-comment__reply-button')[1].onClick())
+    assert.ok(detail.container.querySelector('.post-detail-reply-context'), '二级评论也可选择继续回复')
+    await detail.event(() => detail.props('.post-detail-input').onInput({ detail: { value: '回复二楼' } }))
+    await detail.event(() => detail.props('.post-detail-send').onClick())
+    assert.equal(submits[1].args[3], '2', '回复的直接对象使用二级评论ID')
+    await detail.event(() => submits[1].reject(new Error('offline')))
+    assert.equal(detail.props('.post-detail-input').value, '回复二楼', '失败后不丢草稿')
+    await detail.event(() => detail.props('.post-detail-reply-context__cancel').onClick())
+    assert.equal(detail.container.querySelector('.post-detail-reply-context'), null)
 
     const approval = deferred()
     const publishCalls = []

@@ -2,6 +2,7 @@ package community
 
 import (
 	"bytes"
+	"campus-circle/backend/internal/module/admin/review"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -162,6 +163,18 @@ func (r *GormRepository) CreateCommentOrReplay(ctx context.Context, value *Comme
 	}
 	replayed := false
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if value.ParentCommentID != 0 {
+			target, root, err := lockThreadComment(tx, value.PostID, value.ReplyToCommentID)
+			if err != nil {
+				return err
+			}
+			if root.ID != value.ParentCommentID || target.UserID != value.ReplyToUserID || root.ReviewStatus != review.StatusApproved || target.ReviewStatus != review.StatusApproved {
+				return ErrNotFound
+			}
+			if err := requireApprovedPost(tx, value.PostID); err != nil {
+				return err
+			}
+		}
 		create := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(value)
 		if create.Error != nil {
 			return create.Error

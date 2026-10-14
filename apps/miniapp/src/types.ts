@@ -84,6 +84,18 @@ export interface CommunityComment {
   createdAt: string
 }
 
+export interface CommunityThreadComment extends CommunityComment {
+  authorId: string
+  parentCommentId: string
+  replyToCommentId: string
+  replyToUserId: string
+  replyToAuthor: string
+  reviewStatus: NonNullable<CommunityPost['reviewStatus']>
+  liked?: boolean
+  likedCount: number
+  replyCount: number
+}
+
 export interface CommunityNotification {
   id: string
   type:
