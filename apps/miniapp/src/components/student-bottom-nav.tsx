@@ -1,5 +1,6 @@
-import React from 'react'
+import { useRef } from 'react'
 import { Text, View } from '@tarojs/components'
+import { useDidShow } from '@tarojs/taro'
 import Taro from '../services/taro'
 import { useFeatureVisibility } from '../hooks/use-feature-visibility'
 import AppIcon from './app-icon'
@@ -21,15 +22,32 @@ interface StudentBottomNavProps {
 
 export default function StudentBottomNav({ active, className = '' }: StudentBottomNavProps) {
   const visibility = useFeatureVisibility()
+  const navigationLockRef = useRef<string | null>(null)
+
+  useDidShow(() => {
+    navigationLockRef.current = null
+  })
+
   const visibleItems = navItems.filter((item) => {
     if (item.key === 'takeout') return visibility.takeout || visibility.campus_tools
     if (item.key === 'market') return visibility.secondhand
     return true
   })
   const canPublish = visibility.publish && (visibility.post || visibility.secondhand_publish)
+  const runNavigation = (lockKey: string, navigate: () => Promise<unknown>) => {
+    if (navigationLockRef.current) return
+    navigationLockRef.current = lockKey
+    try {
+      void navigate().catch(() => {
+        if (navigationLockRef.current === lockKey) navigationLockRef.current = null
+      })
+    } catch {
+      if (navigationLockRef.current === lockKey) navigationLockRef.current = null
+    }
+  }
   const openPage = (key: StudentNavKey, url: string) => {
     if (key === active) return
-    void Taro.redirectTo({ url })
+    runNavigation(`tab:${key}`, () => Taro.redirectTo({ url }))
   }
 
   const renderItem = (item: typeof navItems[number]) => (
@@ -38,10 +56,12 @@ export default function StudentBottomNav({ active, className = '' }: StudentBott
       className={`student-bottom-nav__item ${item.key === active ? 'student-bottom-nav__item--active' : ''}`}
       onClick={() => openPage(item.key, item.url)}
     >
-      <View className='student-bottom-nav__icon-asset'>
-        <AppIcon name={item.icon} active={item.key === active} />
+      <View className='student-bottom-nav__item-visual'>
+        <View className='student-bottom-nav__icon-asset'>
+          <AppIcon name={item.icon} active={item.key === active} />
+        </View>
+        <Text>{item.label}</Text>
       </View>
-      <Text>{item.label}</Text>
     </View>
   )
 
@@ -50,9 +70,11 @@ export default function StudentBottomNav({ active, className = '' }: StudentBott
       {visibleItems.filter((item) => item.key === 'home' || item.key === 'takeout').map(renderItem)}
       {canPublish && <View
           className='student-bottom-nav__publish'
-          onClick={() => void Taro.navigateTo({ url: '/pages/publish-entry/index' })}
+          onClick={() => runNavigation('publish', () => Taro.navigateTo({ url: '/pages/publish-entry/index' }))}
         >
-          <Text className='student-bottom-nav__publish-label'>+</Text>
+          <View className='student-bottom-nav__publish-visual'>
+            <Text className='student-bottom-nav__publish-label'>+</Text>
+          </View>
         </View>}
       {visibleItems.filter((item) => item.key === 'market' || item.key === 'profile').map(renderItem)}
     </View>

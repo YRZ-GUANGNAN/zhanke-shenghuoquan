@@ -10,8 +10,8 @@ import {
   listHotCommunityTags,
 } from '../../services/b-community'
 import { chooseAndUploadImages, waitForMediaApprovals, type UploadedMedia } from '../../services/media'
-import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
+import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
 import './index.scss'
 
 const MAX_IMAGES = 9
@@ -36,6 +36,7 @@ const validateTag = (value: string): string => {
 }
 
 function PublishPostPage() {
+  const capsuleStyle = useViewportRefresh()
   const [content, setContent] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [hotTags, setHotTags] = useState<string[]>([])
@@ -222,7 +223,7 @@ function PublishPostPage() {
     return <View className='publish-post-page'><Text>发帖功能暂未开放</Text></View>
   }
   return (
-    <View className='publish-post-page' style={getCapsuleSafeStyle()}>
+    <View className='publish-post-page' style={capsuleStyle}>
       <CapsulePageHeader
         title='发布帖子'
         left={<Text className={`publish-post-nav__side${submitting ? ' publish-post-control--pending' : ''}`} onClick={() => {

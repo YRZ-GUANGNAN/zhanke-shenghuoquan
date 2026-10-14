@@ -10,6 +10,7 @@
   transition: background $duration-fast $ease-standard,
     opacity $duration-fast $ease-standard,
     transform $duration-fast $ease-standard;
+  will-change: transform;
 }
 
 .app-icon-button--regular {
@@ -31,7 +32,7 @@
   background: $brand-tint;
 }
 
-.app-icon-button:active {
+.app-icon-button:not(.app-icon-button--disabled):active {
   background: $bg-surface-subtle;
   transform: scale(.94);
 }

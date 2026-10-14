@@ -6,7 +6,7 @@ import CapsulePageHeader from '../../components/capsule-page-header'
 import AppIcon from '../../components/app-icon'
 import type { CommunityPost, Product } from '../../types'
 import Taro from '../../services/taro'
-import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
+import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
 import {
   clearCommunitySearchHistory,
   listCommunityHotSearches,
@@ -65,6 +65,7 @@ function errorMessage(error: unknown): string {
 }
 
 function SearchContent() {
+  const capsuleStyle = useViewportRefresh()
   const rawScope = Taro.getCurrentInstance().router?.params?.scope
   const scope = isSearchScope(rawScope) ? rawScope : null
   const copy = scope ? scopeCopy[scope] : null
@@ -377,7 +378,7 @@ function SearchContent() {
 
   if (!scope || !copy) {
     return (
-      <View className='student-search-page' style={getCapsuleSafeStyle()}>
+      <View className='student-search-page' style={capsuleStyle}>
         <CapsulePageHeader
           className='student-search-header'
           title='搜索入口无效'
@@ -391,7 +392,7 @@ function SearchContent() {
   }
 
   return (
-    <View className='student-search-page' style={getCapsuleSafeStyle()}>
+    <View className='student-search-page' style={capsuleStyle}>
       <CapsulePageHeader
         variant='search'
         className='student-search-header'

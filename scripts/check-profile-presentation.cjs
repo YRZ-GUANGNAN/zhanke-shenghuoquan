@@ -62,6 +62,7 @@ async function run() {
         if (id.endsWith('/student-bottom-nav') || id.endsWith('/app-icon')) return { default: View }
         if (id.endsWith('/IdentitySwitchModal')) return { default: (props) => React.createElement(View, { ...props, className: 'test-identity-modal' }) }
         if (id.endsWith('/capsule-page-header')) return { CapsuleSystemRow: View, default: (props) => React.createElement(View, { className: 'test-header' }, props.left, props.right) }
+        if (id.endsWith('/use-viewport-refresh')) return { useViewportRefresh: () => ({}) }
         if (id.endsWith('/capsule-safe')) return { getCapsuleSafeStyle: () => ({}) }
         if (id.endsWith('/components/ui')) return { AppIconButton: View }
         if (id.endsWith('/services/taro')) return { default: taro }

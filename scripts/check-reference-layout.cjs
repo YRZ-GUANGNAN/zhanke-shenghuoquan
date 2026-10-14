@@ -66,6 +66,8 @@ const probe = sass.compileString("@use 'reference-layout.scss' as ref; .test-tit
 assert.match(probe, /font-size: 36rpx;\s*line-height: 52rpx/)
 assert.match(probe, /font-size: 30rpx;\s*line-height: 44rpx/)
 assert.match(probe, /font-size: 28rpx;\s*line-height: 42rpx/)
+assert.match(probe, /font-size: clamp\(/, '语义字号需要有受控的流式上限')
+assert.match(probe, /line-height: 1\.4/, '语义字号需要保持比例行高')
 assert.match(read('styles/design-tokens.scss'), /\$brand-primary: #2E7DD4;/, '保持既有蓝色品牌')
 assert.ok(/className=['"]post-detail-comment__content['"][^>]*>\{comment\.content\}<\/Text>/.test(read('pages/post-detail/post-comments.tsx')), '评论正文完整显示，不将头像首字截取误判为正文截断')
 assert.doesNotMatch(read('pages/delivery-conversation/index.config.ts'), /navigationStyle:\s*['"]custom['"]/, '配送沟通仍由原生导航保留系统区')

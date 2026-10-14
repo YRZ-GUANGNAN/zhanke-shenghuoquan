@@ -9,8 +9,8 @@ import StudentBottomNav from '../../components/student-bottom-nav'
 import { getProductsPage } from '../../services/c-trade'
 import Taro from '../../services/taro'
 import type { Product } from '../../types'
-import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
+import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
 import { usePageShare } from '../../hooks/use-page-share'
 import './index.scss'
 
@@ -24,6 +24,7 @@ function mergeProductsById(current: Product[], incoming: Product[]) {
 }
 
 function StudentSecondhandPage() {
+  const capsuleStyle = useViewportRefresh()
   const [activeCategory, setActiveCategory] = useState<CategoryKey>('全部')
   const [items, setItems] = useState<Product[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'empty' | 'error'>('loading')
@@ -204,7 +205,7 @@ function StudentSecondhandPage() {
   }
 
   return (
-    <View className='student-secondhand-page' style={getCapsuleSafeStyle()}>
+    <View className='student-secondhand-page' style={capsuleStyle}>
       <View className='student-secondhand-header'>
         <CapsulePageHeader
           variant='search'

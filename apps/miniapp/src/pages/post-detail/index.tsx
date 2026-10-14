@@ -20,10 +20,11 @@ import {
   setPostLiked,
   setUserFollowing,
 } from '../../services/b-community'
-import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
+import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
 import { navigateBackOrHome } from '../../utils/navigation'
 import { formatPostDate, postBodyWithoutTitle, preparePostMedia, removeFailedPostMedia, type PostGalleryState, type PostMedia } from '../../utils/post-presentation'
 import { useGalleryPresentation } from '../../hooks/use-gallery-presentation'
+import { useKeyboardInset } from '../../hooks/use-keyboard-inset'
 import { useSessionStore } from '../../stores/session'
 import { PostCommentList, usePostComments } from './post-comments'
 import './index.scss'
@@ -66,6 +67,7 @@ const readableError = (error: unknown): string => {
 }
 
 function PostDetailPage() {
+  const capsuleStyle = useViewportRefresh()
   const visibility = useFeatureVisibility()
   const params = Taro.getCurrentInstance().router?.params ?? {}
   const postId = publicShareId(params.id)
@@ -79,7 +81,7 @@ function PostDetailPage() {
   const [viewerLoading, setViewerLoading] = useState(true)
   const [viewerError, setViewerError] = useState('')
   const [inputFocused, setInputFocused] = useState(false)
-  const [keyboardHeight, setKeyboardHeight] = useState(0)
+  const { inset: keyboardHeight, onFocus: onKeyboardFocus, onKeyboardHeightChange, reset: resetKeyboardInset } = useKeyboardInset()
   const sessionToken = useSessionStore(value => value.token)
   const [reloadKey, setReloadKey] = useState(0)
   const [gallery, setGallery] = useState<PostGalleryState>({ items: [], index: 0 })
@@ -107,7 +109,7 @@ function PostDetailPage() {
   const commentText = commentState.draft
   const submittingComment = commentState.submitting
   const commentsLoading = commentState.roots.loading
-  const pageStyle = { ...getCapsuleSafeStyle(), '--comment-keyboard-height': `${keyboardHeight}px` }
+  const pageStyle = { ...capsuleStyle, '--comment-keyboard-height': `${keyboardHeight}px` }
   const hasActions = isApproved && (visibility.canComment || visibility.comment || visibility.likes || visibility.favorites)
   const galleryView = useGalleryPresentation(mediaKey, media.length, mediaSize, 'post', hasActions)
   const interactionPending = actioning || viewerLoading || Boolean(viewerError)
@@ -422,9 +424,9 @@ function PostDetailPage() {
                 adjustPosition={false}
                 cursorSpacing={12}
                 maxlength={1000}
-                onFocus={() => setInputFocused(true)}
-                onBlur={() => { setInputFocused(false); setKeyboardHeight(0) }}
-                onKeyboardHeightChange={event => setKeyboardHeight(Math.max(0, Number(event.detail.height) || 0))}
+                onFocus={() => { setInputFocused(true); onKeyboardFocus() }}
+                onBlur={() => { setInputFocused(false); resetKeyboardInset() }}
+                onKeyboardHeightChange={onKeyboardHeightChange}
                 placeholder={submittingComment ? '发送中…' : commentState.target ? `回复 ${commentState.target.author}` : '说点什么…'}
                 onInput={(event) => {
                   commentSession.setDraft(event.detail.value)

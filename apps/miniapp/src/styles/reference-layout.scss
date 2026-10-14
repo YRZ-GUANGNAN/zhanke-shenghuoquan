@@ -12,12 +12,39 @@ $typography: (
   label: (28rpx, 40rpx, 500)
 );
 
+// Keep the existing rpx declarations as the baseline for older WebView
+// engines, then cap the same roles with a small fluid range. This avoids tiny
+// type on compact phones and runaway type on tablets without changing the
+// page hierarchy or the consultation pages that do not opt into this mixin.
+$fluid-font-size: (
+  title: (17px, 4.8vw, 21px),
+  body: (15px, 4vw, 17px),
+  comment: (14px, 3.733vw, 16px),
+  author: (13px, 3.467vw, 15px),
+  meta: (12px, 3.2vw, 14px),
+  label: (14px, 3.733vw, 16px)
+);
+
+$fluid-line-height: (
+  title: 1.44,
+  body: 1.47,
+  comment: 1.5,
+  author: 1.38,
+  meta: 1.5,
+  label: 1.43
+);
+
 @mixin type($role) {
   $values: map.get($typography, $role);
   @if $values == null { @error 'Unknown reference typography role: #{$role}'; }
   font-size: list.nth($values, 1);
   line-height: list.nth($values, 2);
   font-weight: list.nth($values, 3);
+  $fluid-size: map.get($fluid-font-size, $role);
+  @if $fluid-size != null {
+    font-size: clamp(list.nth($fluid-size, 1), list.nth($fluid-size, 2), list.nth($fluid-size, 3));
+    line-height: map.get($fluid-line-height, $role);
+  }
 }
 
 @mixin wrap {

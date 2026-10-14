@@ -62,6 +62,8 @@ async function pageBehavior() {
       if (id.endsWith('/use-page-share')) return { usePageShare: () => {} }
       if (id.endsWith('/share-model')) return { publicShareId: (id) => id || '' }
       if (id.endsWith('/capsule-page-header')) return { default: (props) => React.createElement(View, { className: 'test-header' }, props.left, props.center, props.right) }
+      if (id.endsWith('/use-viewport-refresh')) return { useViewportRefresh: () => ({}) }
+      if (id.endsWith('/use-keyboard-inset')) return { useKeyboardInset: () => ({ inset: 0, onFocus: () => {}, onKeyboardHeightChange: () => {}, reset: () => {} }) }
       if (id.endsWith('/runtime-session-gate') || id.endsWith('/app-icon')) return { default: View }
       if (id.endsWith('/student-bottom-nav')) return { default: View }
       if (id.endsWith('/campus-info-home')) return { default: () => React.createElement(View, { className: 'test-campus-info' }) }

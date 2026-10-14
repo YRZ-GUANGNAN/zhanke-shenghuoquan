@@ -17,7 +17,7 @@ import { getPublicUserProducts } from '../../services/c-trade'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
 import type { CommunityPost, Product } from '../../types'
-import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
+import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
 import './index.scss'
 
 type ProfileTab = 'posts' | 'secondhand'
@@ -35,6 +35,7 @@ function splitColumns<T>(items: T[]) {
 }
 
 function UserProfilePage() {
+  const capsuleStyle = useViewportRefresh()
   const visibility = useFeatureVisibility()
   const params = Taro.getCurrentInstance().router?.params || {}
   const userId = String(params.userId || '').trim()
@@ -248,7 +249,7 @@ function UserProfilePage() {
   const value = profile.profile
   const empty = activeTab === 'posts' ? posts.length === 0 : products.length === 0
   return (
-    <View className='public-profile-page' style={getCapsuleSafeStyle()}>
+    <View className='public-profile-page' style={capsuleStyle}>
       <View className='public-profile-hero'>
         <CapsuleSystemRow />
         <View className='public-profile-nav'>

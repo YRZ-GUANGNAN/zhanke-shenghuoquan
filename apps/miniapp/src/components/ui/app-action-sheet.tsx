@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Text, View } from '@tarojs/components'
+import { useLayerPresence } from '../../hooks/use-layer-presence'
 import { AppIconButton } from './app-icon-button'
 import './app-action-sheet.scss'
 
@@ -13,11 +14,16 @@ export interface AppActionSheetProps {
 }
 
 export function AppActionSheet({ visible, title, description, children, loading = false, onClose }: AppActionSheetProps) {
-  if (!visible) return null
+  const { mounted, phase } = useLayerPresence(visible)
+  if (!mounted) return null
+  const interactive = phase !== 'exit'
+  const handleClose = () => {
+    if (interactive && !loading) onClose()
+  }
   return (
-    <View className='app-action-sheet-layer'>
-      <View className='app-action-sheet-layer__mask' onClick={() => !loading && onClose()} />
-      <View className='app-action-sheet' role='dialog' aria-modal>
+    <View className={`app-action-sheet-layer app-action-sheet-layer--${phase}`}>
+      <View className='app-action-sheet-layer__mask' onClick={handleClose} />
+      <View className={`app-action-sheet app-action-sheet--${phase}`} role='dialog' aria-modal>
         <View className='app-action-sheet__handle' />
         <View className='app-action-sheet__header'>
           <View className='app-action-sheet__heading'>
@@ -31,7 +37,7 @@ export function AppActionSheet({ visible, title, description, children, loading 
             tone='surface'
             disabled={loading}
             className='app-action-sheet__close'
-            onClick={onClose}
+            onClick={handleClose}
           />
         </View>
         <View className='app-action-sheet__content'>{children}</View>

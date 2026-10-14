@@ -14,7 +14,7 @@
   font-size: 28rpx;
   font-weight: 700;
   line-height: 1;
-  transition: background-color $duration-fast $ease-standard, border-color $duration-fast $ease-standard, opacity $duration-fast $ease-standard;
+  transition: background-color $duration-fast $ease-standard, border-color $duration-fast $ease-standard, opacity $duration-fast $ease-standard, transform $duration-fast $ease-standard;
 }
 
 .app-button::after { border: 0; }
@@ -30,6 +30,7 @@
 .app-button--danger:active { background: #A93240; }
 .app-button--text { min-width: 0; height: 72rpx; padding: 0 $space-2; background: transparent; color: $brand-primary; }
 .app-button--text:active { background: $brand-tint; }
+.app-button:not(.app-button--disabled):active { transform: translateY(1rpx) scale(.985); }
 .app-button--disabled { box-shadow: none; opacity: .46; }
 
 .app-button__loading-dot {

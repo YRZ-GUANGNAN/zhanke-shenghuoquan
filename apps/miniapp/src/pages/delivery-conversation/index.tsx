@@ -17,6 +17,7 @@ import {
 import { chooseAndUploadImages, waitForMediaApproval } from '../../services/media'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
+import { useKeyboardInset } from '../../hooks/use-keyboard-inset'
 import './index.scss'
 
 type PageStatus = 'loading' | 'ready' | 'error'
@@ -58,6 +59,7 @@ export default function DeliveryConversationPage() {
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
+  const { inset: keyboardInset, onFocus: onKeyboardFocus, onKeyboardHeightChange, reset: resetKeyboardInset } = useKeyboardInset()
 
   useEffect(() => {
     let active = true
@@ -67,6 +69,7 @@ export default function DeliveryConversationPage() {
     setMessages([])
     setImageUrls({})
     setError('')
+    resetKeyboardInset()
 
     if (!orderId) {
       setStatus('error')
@@ -106,7 +109,7 @@ export default function DeliveryConversationPage() {
       active = false
       unsubscribe?.()
     }
-  }, [orderId, reloadKey])
+  }, [orderId, reloadKey, resetKeyboardInset])
 
   useEffect(() => {
     if (!conversation) return
@@ -201,7 +204,13 @@ export default function DeliveryConversationPage() {
 
       <View className='delivery-chat-safe'>仅限本配送单的商家与骑手沟通；图片会先经过内容安全审核。</View>
 
-      <ScrollView className='delivery-chat-scroll' scrollY enhanced showScrollbar={false}>
+      <ScrollView
+        className={`delivery-chat-scroll${keyboardInset > 0 ? ' delivery-chat-scroll--keyboard' : ''}`}
+        style={{ paddingBottom: `calc(64px + ${keyboardInset}px + env(safe-area-inset-bottom))` }}
+        scrollY
+        enhanced
+        showScrollbar={false}
+      >
         {status === 'loading' ? <View className='delivery-chat-state'>正在连接配送会话…</View> : null}
         {status === 'error' ? (
           <View className='delivery-chat-state delivery-chat-state--error' onClick={() => setReloadKey((value) => value + 1)}>
@@ -230,7 +239,10 @@ export default function DeliveryConversationPage() {
         {status === 'ready' && !canSend ? <View className='delivery-chat-state'>订单已结束或会话已只读，可查看历史消息但不能继续发送。</View> : null}
       </ScrollView>
 
-      <View className='delivery-chat-inputbar'>
+      <View
+        className={`delivery-chat-inputbar${keyboardInset > 0 ? ' delivery-chat-inputbar--keyboard' : ''}`}
+        style={keyboardInset > 0 ? { bottom: `${keyboardInset}px` } : undefined}
+      >
         <Button className='delivery-chat-image-button' disabled={!canSend || !conversation?.imagesEnabled || sending} onClick={() => void sendImage()}>
           <AppIcon name='image' className='delivery-chat-image-button__icon' />
         </Button>
@@ -241,7 +253,11 @@ export default function DeliveryConversationPage() {
           disabled={!canSend || sending}
           placeholder={canSend ? '输入消息' : '当前会话不可发送'}
           confirmType='send'
+          adjustPosition={false}
           onInput={(event) => setDraft(String(event.detail.value ?? ''))}
+          onFocus={onKeyboardFocus}
+          onKeyboardHeightChange={onKeyboardHeightChange}
+          onBlur={resetKeyboardInset}
           onConfirm={() => void sendText()}
         />
         <Button className='delivery-chat-send' disabled={!canSend || !draft.trim() || sending} onClick={() => void sendText()}>{sending ? '发送中' : '发送'}</Button>

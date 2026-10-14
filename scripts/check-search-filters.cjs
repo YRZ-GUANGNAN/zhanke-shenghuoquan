@@ -84,6 +84,7 @@ async function run() {
       '@tarojs/taro': { nextTick: (cb) => queueMicrotask(cb), hideKeyboard: async () => {} },
       '../../components/capsule-page-header': { default: (props) => React.createElement(View, {}, props.left, props.center, props.right) },
       '../../components/feature-page-gate': { withFeaturePage: (page) => page },
+      '../../hooks/use-viewport-refresh': { useViewportRefresh: () => ({}) },
       '../../components/app-icon': { default: View },
       '../../utils/capsule-safe': { getCapsuleSafeStyle: () => ({}) },
       '../../stores/session': { useSessionStore: (selector) => selector(state) },

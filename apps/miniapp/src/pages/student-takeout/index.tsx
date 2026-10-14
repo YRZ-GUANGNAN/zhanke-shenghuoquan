@@ -12,8 +12,8 @@ import {
 } from '../../services/d-navigation'
 import Taro from '../../services/taro'
 import type { ToolLink } from '../../types'
-import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
+import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
 import { usePageShare } from '../../hooks/use-page-share'
 import './index.scss'
 
@@ -27,6 +27,7 @@ const filters: Array<{ key: MerchantFilter; label: string }> = [
 ]
 
 function StudentTakeoutPage() {
+  const capsuleStyle = useViewportRefresh()
   const [tools, setTools] = useState<ToolLink[]>([])
   const [toolStatus, setToolStatus] = useState<DirectoryStatus>('loading')
   const [merchants, setMerchants] = useState<ExternalTakeoutMerchantLink[]>([])
@@ -138,7 +139,7 @@ function StudentTakeoutPage() {
   }
 
   return (
-    <View className='student-takeout-page' style={getCapsuleSafeStyle()}>
+    <View className='student-takeout-page' style={capsuleStyle}>
       <View className='student-takeout-header'>
         <CapsulePageHeader
           variant='standard'

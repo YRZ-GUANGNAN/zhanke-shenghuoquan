@@ -16,10 +16,10 @@ import {
 import { getDeliveryWallet } from '../../services/delivery-payment'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
-import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import MerchantHomeIcon, { type MerchantHomeIconName } from './merchant-home-icon'
 import './index.scss'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
+import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
 
 type MerchantTabKey = 'pending' | 'delivering' | 'completed'
 type MerchantOrdersByTab = Record<MerchantTabKey, MerchantDeliveryOrder[]>
@@ -178,6 +178,7 @@ function OrderCard({ order }: { order: MerchantDeliveryOrder }) {
 }
 
 function MerchantHomeContent() {
+  const capsuleStyle = useViewportRefresh()
   const visibility = useFeatureVisibility()
   const [activeTab, setActiveTab] = useState<MerchantTabKey>('pending')
   const [ordersByTab, setOrdersByTab] = useState<MerchantOrdersByTab>(emptyOrdersByTab)
@@ -313,7 +314,7 @@ function MerchantHomeContent() {
   if (!identityAllowed) return <View className='merchant-home-page' />
   if (approvalState !== 'approved') {
     return (
-      <View className='merchant-home-page merchant-home-page--review' style={getCapsuleSafeStyle()}>
+      <View className='merchant-home-page merchant-home-page--review' style={capsuleStyle}>
         <CapsuleSystemRow />
         <View className='merchant-home-review'>
           <Text className='merchant-home-review__title'>
@@ -331,7 +332,7 @@ function MerchantHomeContent() {
   }
 
   return (
-    <View className='merchant-home-page' style={getCapsuleSafeStyle()}>
+    <View className='merchant-home-page' style={capsuleStyle}>
       <View className='merchant-home-hero'>
         <CapsuleSystemRow />
         <View className='merchant-home-header'>

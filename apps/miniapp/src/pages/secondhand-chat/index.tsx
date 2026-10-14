@@ -17,7 +17,8 @@ import { requestWithSingleSessionRecovery } from '../../services/session-recover
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
 import type { Product } from '../../types'
-import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
+import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
+import { useKeyboardInset } from '../../hooks/use-keyboard-inset'
 import './index.scss'
 
 type PageStatus = 'loading' | 'ready' | 'error'
@@ -80,6 +81,7 @@ function formatTime(value: number): string {
 }
 
 function SecondhandChatPage() {
+  const capsuleStyle = useViewportRefresh()
   const params = Taro.getCurrentInstance().router?.params ?? {}
   const entry = parseChatEntry(params)
   const sessionUserId = useSessionStore((state) => state.profile.id)
@@ -96,7 +98,7 @@ function SecondhandChatPage() {
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
-  const [keyboardHeight, setKeyboardHeight] = useState(0)
+  const { inset: keyboardHeight, onFocus: onKeyboardFocus, onKeyboardHeightChange, reset: resetKeyboardInset } = useKeyboardInset()
 
   useEffect(() => {
     let active = true
@@ -113,7 +115,7 @@ function SecondhandChatPage() {
     setDraft('')
     setSending(false)
     setErrorMessage('')
-    setKeyboardHeight(0)
+    resetKeyboardInset()
 
     if (!entry) {
       setStatus('error')
@@ -197,7 +199,7 @@ function SecondhandChatPage() {
       active = false
       unsubscribe?.()
     }
-  }, [chatOperationKey, entry?.id, entry?.kind, reloadKey, sessionUserId])
+  }, [chatOperationKey, entry?.id, entry?.kind, reloadKey, resetKeyboardInset, sessionUserId])
 
   const visibleMessages = useMemo(
     () => messages.filter((message) => Boolean(messageText(message))),
@@ -265,7 +267,7 @@ function SecondhandChatPage() {
   }
 
   return (
-    <View className='secondhand-chat-page' style={getCapsuleSafeStyle()}>
+    <View className='secondhand-chat-page' style={capsuleStyle}>
       <CapsulePageHeader
         variant='standard'
         left={<View className='secondhand-chat-header__back' onClick={goBack} />}
@@ -399,8 +401,9 @@ function SecondhandChatPage() {
             adjustPosition={false}
             cursorSpacing={0}
             onInput={(event) => setDraft(String(event.detail.value ?? ''))}
-            onKeyboardHeightChange={(event) => setKeyboardHeight(Math.max(0, Number(event.detail.height) || 0))}
-            onBlur={() => setKeyboardHeight(0)}
+            onFocus={onKeyboardFocus}
+            onKeyboardHeightChange={onKeyboardHeightChange}
+            onBlur={resetKeyboardInset}
             onConfirm={() => void sendText()}
           />
         </View>

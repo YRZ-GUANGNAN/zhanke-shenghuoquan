@@ -1,8 +1,12 @@
 @use '../../styles/design-tokens.scss' as *;
 
 .app-action-sheet-layer { position: fixed; inset: 0; z-index: $z-dialog; }
-.app-action-sheet-layer__mask { position: absolute; inset: 0; background: rgba(15, 30, 48, .5); backdrop-filter: blur(4rpx); animation: app-sheet-mask $duration-layer $ease-standard both; }
-.app-action-sheet { position: absolute; right: 0; bottom: 0; left: 0; max-height: 82vh; overflow-y: auto; padding: 14rpx $space-4 calc(#{$space-4} + env(safe-area-inset-bottom)); border-radius: $radius-dialog $radius-dialog 0 0; background: $bg-surface; box-shadow: 0 -24rpx 72rpx -28rpx rgba($text-strong, .4); animation: app-sheet-enter $duration-layer $ease-standard both; }
+.app-action-sheet-layer--exit { pointer-events: none; }
+.app-action-sheet-layer__mask { position: absolute; inset: 0; background: rgba(15, 30, 48, .5); backdrop-filter: blur(4rpx); opacity: 1; transition: opacity 180ms $ease-standard; }
+.app-action-sheet-layer--enter .app-action-sheet-layer__mask, .app-action-sheet-layer--exit .app-action-sheet-layer__mask { opacity: 0; }
+.app-action-sheet { position: absolute; right: 0; bottom: 0; left: 0; max-height: 82vh; overflow-y: auto; padding: 14rpx $space-4 calc(#{$space-4} + env(safe-area-inset-bottom)); border-radius: $radius-dialog $radius-dialog 0 0; background: $bg-surface; box-shadow: 0 -24rpx 72rpx -28rpx rgba($text-strong, .4); transform: translateY(0); transition: transform 220ms $ease-standard; will-change: transform; }
+.app-action-sheet-layer--enter .app-action-sheet { transform: translateY(100%); }
+.app-action-sheet-layer--exit .app-action-sheet { transform: translateY(100%); }
 .app-action-sheet__handle { width: 72rpx; height: 8rpx; margin: 0 auto $space-3; border-radius: $radius-pill; background: $border-strong; }
 .app-action-sheet__header { display: flex; align-items: flex-start; gap: $space-3; min-height: 88rpx; }
 .app-action-sheet__heading { flex: 1; min-width: 0; }
@@ -12,6 +16,8 @@
 .app-action-sheet__close { flex: 0 0 auto; }
 .app-action-sheet__close:active { background: $divider-nav; }
 .app-action-sheet__content { padding-top: $space-2; }
-@keyframes app-sheet-mask { from { opacity: 0; } }
-@keyframes app-sheet-enter { from { transform: translateY(100%); } }
-@media (prefers-reduced-motion: reduce) { .app-action-sheet-layer__mask, .app-action-sheet { animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .app-action-sheet-layer__mask, .app-action-sheet { transition: none; }
+  .app-action-sheet-layer--enter .app-action-sheet-layer__mask { opacity: 1; }
+  .app-action-sheet-layer--enter .app-action-sheet { transform: none; }
+}

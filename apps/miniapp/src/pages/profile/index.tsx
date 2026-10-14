@@ -12,9 +12,9 @@ import { getMyCommunitySummary } from '../../services/b-community'
 import { getMyProductsPage } from '../../services/c-trade'
 import { useSessionStore } from '../../stores/session'
 import type { IdentityAvailability, IdentityRoleKey } from '../../types'
-import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
 import './index.scss'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
+import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
 
 type RoleKey = IdentityRoleKey
 type MyContentTabKey = 'favorites' | 'posts' | 'comments' | 'items'
@@ -143,6 +143,7 @@ function countValue(value: number | null | undefined): string {
 }
 
 function ProfileContent() {
+  const capsuleStyle = useViewportRefresh()
   const visibility = useFeatureVisibility()
   const [pendingRole, setPendingRole] = useState<RoleKey | null>(null)
   const [switching, setSwitching] = useState(false)
@@ -240,7 +241,7 @@ function ProfileContent() {
   if (!identityAllowed) return <View className='student-profile-page' />
 
   return (
-    <View className='student-profile-page' style={getCapsuleSafeStyle()}>
+    <View className='student-profile-page' style={capsuleStyle}>
       <View className={`student-profile-hero${hasCover ? ' student-profile-hero--with-cover' : ''}`}>
         <View className='student-profile-cover'>
           {hasCover && <Image className='student-profile-cover__image' src={profile.cover || ''} mode='aspectFill' ariaLabel='我的个人封面' onError={() => setFailedCover(profile.cover || '')} />}

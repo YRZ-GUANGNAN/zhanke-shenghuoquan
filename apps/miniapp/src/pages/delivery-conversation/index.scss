@@ -165,11 +165,20 @@ page {
 }
 
 .delivery-chat-inputbar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
   flex: 0 0 auto;
   gap: 12rpx;
   padding: 14rpx 18rpx calc(14rpx + env(safe-area-inset-bottom));
   border-top: 1rpx solid $border-subtle;
   background: $bg-surface;
+}
+
+.delivery-chat-inputbar--keyboard {
+  padding-bottom: 14rpx;
 }
 
 .delivery-chat-input {
