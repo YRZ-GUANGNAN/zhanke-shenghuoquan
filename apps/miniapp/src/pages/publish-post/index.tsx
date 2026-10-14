@@ -45,8 +45,11 @@ function PublishPostPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitStage, setSubmitStage] = useState<SubmitStage>('idle')
   const [uploadHint, setUploadHint] = useState('0/9')
+  const [editorError, setEditorError] = useState('')
   const visibility = useFeatureVisibility()
   const clientRequestIdRef = useRef<string | null>(null)
+  const submitLock = useRef(false)
+  const uploadLock = useRef(false)
 
   const canPublish = useMemo(
     () => content.trim().length > 0 && !uploading && !submitting,
@@ -67,9 +70,11 @@ function PublishPostPage() {
 
   const resetClientRequestId = () => {
     clientRequestIdRef.current = null
+    setEditorError('')
   }
 
   const toggleTag = (rawTag: string) => {
+    if (submitLock.current) return
     const tag = normalizeTag(rawTag)
     if (!tag) return
     resetClientRequestId()
@@ -85,6 +90,7 @@ function PublishPostPage() {
   }
 
   const addCustomTag = () => {
+    if (submitLock.current) return
     const validationError = validateTag(customTag)
     if (validationError) {
       toast(validationError)
@@ -102,13 +108,15 @@ function PublishPostPage() {
   }
 
   const handlePickImages = async () => {
-    if (uploading || submitting) return
+    if (uploadLock.current || submitLock.current) return
     const remaining = MAX_IMAGES - images.length
     if (remaining <= 0) {
       toast(`最多上传 ${MAX_IMAGES} 张图`)
       return
     }
+    uploadLock.current = true
     setUploading(true)
+    setEditorError('')
     setUploadHint('上传中')
     try {
       const uploaded = await chooseAndUploadImages('post_image', remaining, (progress) => {
@@ -121,21 +129,26 @@ function PublishPostPage() {
     } catch (error) {
       console.error('upload post image failed', error)
       setUploadHint(`${images.length}/${MAX_IMAGES}`)
-      toast(error instanceof Error ? error.message : '图片上传失败', 'error')
+      const message = error instanceof Error ? error.message : '图片上传失败'
+      setEditorError(message)
+      toast(message, 'error')
     } finally {
+      uploadLock.current = false
       setUploading(false)
     }
   }
 
   const handlePublish = async () => {
+    if (uploadLock.current || submitLock.current) return
     if (!content.trim()) {
       toast('先写点内容吧')
       return
     }
-    if (uploading || submitting) return
+    submitLock.current = true
     const clientRequestId = clientRequestIdRef.current ?? createCommunityClientRequestId()
     clientRequestIdRef.current = clientRequestId
     setSubmitting(true)
+    setEditorError('')
     setSubmitStage('reviewing')
     const deadline = Date.now() + SUBMIT_TIMEOUT_MS
     try {
@@ -179,7 +192,9 @@ function PublishPostPage() {
               ? '服务暂不可用，稍后可重试'
               : error.message || '发布内容不符合要求'
       toast(message)
+      setEditorError(message)
     } finally {
+      submitLock.current = false
       setSubmitting(false)
       setSubmitStage('idle')
       setUploadHint(`${images.length}/${MAX_IMAGES}`)
@@ -193,7 +208,10 @@ function PublishPostPage() {
     <View className='publish-post-page' style={getCapsuleSafeStyle()}>
       <CapsulePageHeader
         title='发布帖子'
-        left={<Text className='publish-post-nav__side' onClick={() => void Taro.navigateBack()}>取消</Text>}
+        left={<Text className={`publish-post-nav__side${submitting ? ' publish-post-control--pending' : ''}`} onClick={() => {
+          if (submitLock.current) { toast('内容正在提交，请稍候'); return }
+          void Taro.navigateBack()
+        }}>取消</Text>}
         right={
           <Text
             className={`publish-post-nav__publish${canPublish ? ' publish-post-nav__publish--active' : ''}`}
@@ -206,11 +224,13 @@ function PublishPostPage() {
 
       <View className='publish-post-body'>
         <View className='publish-post-media'>
-          {images.map((image) => <Image className='publish-post-media__image' key={image.assetId} src={image.previewPath} mode='aspectFill' />)}
-        <View className='publish-post-upload' role='button' aria-label='添加帖子图片' onClick={() => void handlePickImages()}>
-          <Text className='publish-post-upload__icon'>{images.length > 0 ? '✓' : '＋'}</Text>
-          <Text className='publish-post-upload__count'>{uploading ? uploadHint : `${images.length}/${MAX_IMAGES}`}</Text>
-        </View>
+          {images.map((image) => <View className='publish-post-media__item' key={image.assetId}>
+            <Image className='publish-post-media__image' src={image.previewPath} mode='aspectFill' />
+          </View>)}
+          <View className={`publish-post-upload${uploading || submitting || images.length === MAX_IMAGES ? ' publish-post-control--pending' : ''}`} role='button' aria-label='添加帖子图片' aria-disabled={uploading || submitting || images.length === MAX_IMAGES} onClick={() => void handlePickImages()}>
+            <Text className='publish-post-upload__icon'>{images.length === MAX_IMAGES ? '✓' : '＋'}</Text>
+            <Text className='publish-post-upload__count'>{uploading ? uploadHint : `${images.length}/${MAX_IMAGES}`}</Text>
+          </View>
         </View>
 
         <Textarea
@@ -220,12 +240,15 @@ function PublishPostPage() {
           maxlength={600}
           autoHeight={false}
           placeholder='分享你的校园生活：好吃的、求助、找搭子、攻略……'
+          placeholderClass='publish-post-textarea__placeholder'
           onInput={(event) => {
+            if (submitLock.current) return
             resetClientRequestId()
             setContent(event.detail.value)
           }}
         />
         <Text className='publish-post-length'>{content.length} / 600</Text>
+        {editorError && <View className='publish-post-error' role='alert'><Text>{editorError}</Text></View>}
 
         <View className='publish-post-divider' />
 
@@ -233,7 +256,7 @@ function PublishPostPage() {
           <Text className='publish-post-topic-head__title'>添加标签</Text>
           <Text className='publish-post-topic-head__hint'>最多选择 {MAX_TAGS} 个</Text>
         </View>
-        <View className='publish-post-topics'>
+        <View className={`publish-post-topics${submitting ? ' publish-post-control--pending' : ''}`}>
           {hotTags.length > 0
             ? hotTags.map((tag) => (
                 <Text
@@ -251,13 +274,14 @@ function PublishPostPage() {
           <Input
             className='publish-post-custom-tag__input'
             value={customTag}
+            disabled={submitting}
             maxlength={13}
             confirmType='done'
             placeholder='自定义标签，最多 12 个字'
-            onInput={(event) => setCustomTag(event.detail.value)}
+            onInput={(event) => { if (!submitLock.current) setCustomTag(event.detail.value) }}
             onConfirm={addCustomTag}
           />
-          <Text className='publish-post-custom-tag__button' onClick={addCustomTag}>添加</Text>
+          <Text className={`publish-post-custom-tag__button${submitting ? ' publish-post-control--pending' : ''}`} onClick={addCustomTag}>添加</Text>
         </View>
 
         {selectedTags.length > 0 && (

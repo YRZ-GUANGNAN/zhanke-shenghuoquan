@@ -209,17 +209,71 @@
   line-height: 44rpx;
   font-weight: 600;
   color: $text-strong;
+  word-break: break-word;
 }
 
 .student-search-result__summary {
   display: -webkit-box;
-  margin-top: 10rpx;
+  margin-top: 8rpx;
   overflow: hidden;
   color: $text-secondary;
   font-size: 25rpx;
   line-height: 38rpx;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  word-break: break-word;
+}
+
+.student-search-result--post {
+  display: flex;
+  align-items: flex-start;
+  gap: 24rpx;
+}
+
+.student-search-result__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.student-search-result__media {
+  flex: 0 0 160rpx;
+  width: 160rpx;
+  height: 160rpx;
+  overflow: hidden;
+  border-radius: 12rpx;
+  background: $bg-screen;
+}
+
+.student-search-result__cover {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.student-search-result__media-error {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  color: $text-secondary;
+  font-size: 22rpx;
+}
+
+.student-search-result--read .student-search-result__title {
+  color: $text-secondary;
+}
+
+.student-search-result--post .student-search-result__meta,
+.student-search-result--post .student-search-result__tags {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 32rpx;
+}
+
+.student-search-result--post .student-search-result__tags text + text {
+  margin-left: 12rpx;
 }
 
 .student-search-result__meta,
@@ -227,7 +281,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 12rpx;
-  margin-top: 14rpx;
+  margin-top: 16rpx;
   color: $text-secondary;
   font-size: 22rpx;
 }

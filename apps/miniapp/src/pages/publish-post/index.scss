@@ -14,8 +14,8 @@ page {
 .publish-post-nav__side {
   display: flex;
   align-items: center;
-  min-width: 44px;
-  min-height: 44px;
+  min-width: 88rpx;
+  min-height: 88rpx;
   font-size: 30rpx;
   line-height: 1;
   color: $text-secondary;
@@ -23,7 +23,7 @@ page {
 
 .publish-post-nav__publish {
   min-width: 104rpx;
-  min-height: 44px;
+  min-height: 88rpx;
   padding: 0 30rpx;
   border-radius: 999rpx;
   display: flex;
@@ -53,36 +53,52 @@ page {
   gap: 16rpx;
 }
 
-.publish-post-media__image {
+.publish-post-media__item,
+.publish-post-upload {
+  position: relative;
   width: 100%;
-  height: 160rpx;
+  height: 0;
+  padding-bottom: 100%;
+  overflow: hidden;
   border-radius: 16rpx;
+}
+
+.publish-post-media__image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   background: $bg-screen;
 }
 
 .publish-post-upload {
-  width: 100%;
-  height: 160rpx;
-  border-radius: 16rpx;
-  border: 2rpx dashed $text-faint;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  outline: 2rpx dashed $text-faint;
+  outline-offset: -2rpx;
   box-sizing: border-box;
   background: $bg-surface;
   color: $text-muted;
 }
 
 .publish-post-upload__icon {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  transform: translateY(-36rpx);
+  text-align: center;
   font-size: 36rpx;
   line-height: 40rpx;
   color: $text-muted;
 }
 
 .publish-post-upload__count {
-  margin-top: 14rpx;
-  font-size: 26rpx;
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  margin-top: 8rpx;
+  text-align: center;
+  font-size: 24rpx;
   line-height: 32rpx;
   color: $text-muted;
 }
@@ -121,7 +137,7 @@ page {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 22rpx;
+  margin-bottom: 24rpx;
 }
 
 .publish-post-topic-head__title {
@@ -140,7 +156,7 @@ page {
 .publish-post-topics {
   display: flex;
   flex-wrap: wrap;
-  gap: 16rpx 18rpx;
+  gap: 16rpx;
 }
 
 .publish-post-topics__empty {
@@ -199,11 +215,11 @@ page {
 }
 
 .publish-post-selected {
-  margin-top: 20rpx;
+  margin-top: 24rpx;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 14rpx;
+  gap: 16rpx;
   font-size: 24rpx;
 }
 
@@ -247,3 +263,17 @@ page {
   line-height: 20rpx;
   font-weight: 700;
 }
+
+.publish-post-error {
+  margin-top: 16rpx;
+  color: $danger;
+  font-size: 24rpx;
+  line-height: 36rpx;
+  word-break: break-word;
+}
+
+.publish-post-control--pending { opacity: .55; }
+
+.publish-post-topic:active,
+.publish-post-upload:active,
+.publish-post-custom-tag__button:active { opacity: .7; }

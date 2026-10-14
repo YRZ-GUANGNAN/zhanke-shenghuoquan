@@ -4,6 +4,22 @@ export interface PostMedia {
   height: number
 }
 
+export interface PostGalleryState {
+  items: PostMedia[]
+  index: number
+}
+
+/** A failed neighbour must not change the identity of the image being read. */
+export function removeFailedPostMedia(gallery: PostGalleryState, failedSrc: string): PostGalleryState {
+  const failedIndex = gallery.items.findIndex((item) => item.src === failedSrc)
+  if (failedIndex < 0) return gallery
+  const activeSrc = gallery.items[gallery.index]?.src
+  const items = gallery.items.filter((item) => item.src !== failedSrc)
+  const preservedIndex = items.findIndex((item) => item.src === activeSrc)
+  const index = preservedIndex >= 0 ? preservedIndex : Math.max(0, Math.min(failedIndex, items.length - 1))
+  return { items, index }
+}
+
 /** Check existing attachments without reordering them when requests finish out of order. */
 export async function preparePostMedia(
   images: string[],

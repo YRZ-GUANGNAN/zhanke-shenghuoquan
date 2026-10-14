@@ -1,6 +1,7 @@
 import { withFeaturePage } from '../../components/feature-page-gate'
 import { useEffect, useRef, useState } from 'react'
-import { Input, ScrollView, Text, View } from '@tarojs/components'
+import { nextTick } from '@tarojs/taro'
+import { Image, Input, ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import type { CommunityPost, Product } from '../../types'
 import Taro from '../../services/taro'
@@ -68,32 +69,30 @@ function SearchPage() {
   const [total, setTotal] = useState(0)
   const [hasSearched, setHasSearched] = useState(false)
   const [error, setError] = useState('')
+  const [readPostIds, setReadPostIds] = useState<Set<string>>(() => new Set())
+  const [failedCovers, setFailedCovers] = useState<Set<string>>(() => new Set())
+  const [scrollAnchor, setScrollAnchor] = useState('')
   const searchVersion = useRef(0)
+  const searchBusy = useRef(false)
+  const pageBusy = useRef(false)
+  const openingResult = useRef(false)
+  const activeQuery = useRef('')
 
-  const loadSuggestions = async (activeScope: SearchScope) => {
+  const loadSuggestions = async (activeScope: SearchScope, version = searchVersion.current) => {
     try {
-      if (activeScope === 'community') {
-        const [historyItems, hotItems] = await Promise.all([
+      const [historyItems, hotItems] = await (
+        activeScope === 'community' ? Promise.all([
           listCommunitySearchHistory(),
           listCommunityHotSearches(),
-        ])
-        setHistory(historyItems)
-        setHot(hotItems.map((item) => item.keyword))
-        return
-      }
-      if (activeScope === 'secondhand') {
-        const [historyItems, hotItems] = await Promise.all([
+        ]) : activeScope === 'secondhand' ? Promise.all([
           listTradeSearchHistory(),
           listTradeHotSearches(),
+        ]) : Promise.all([
+          listExternalTakeoutSearchHistory(),
+          listExternalTakeoutHotSearches(),
         ])
-        setHistory(historyItems)
-        setHot(hotItems.map((item) => item.keyword))
-        return
-      }
-      const [historyItems, hotItems] = await Promise.all([
-        listExternalTakeoutSearchHistory(),
-        listExternalTakeoutHotSearches(),
-      ])
+      )
+      if (version !== searchVersion.current) return
       setHistory(historyItems)
       setHot(hotItems.map((item) => item.keyword))
     } catch (loadError) {
@@ -104,7 +103,17 @@ function SearchPage() {
   useEffect(() => {
     if (!scope) return
     void loadSuggestions(scope)
+    return () => {
+      searchVersion.current += 1
+      searchBusy.current = false
+      pageBusy.current = false
+    }
   }, [scope])
+
+  const scrollToStart = () => {
+    setScrollAnchor('')
+    nextTick(() => setScrollAnchor('search-content-start'))
+  }
 
   const searchPage = async (activeScope: SearchScope, value: string, nextPage: number) => {
     if (activeScope === 'community') return searchCommunityPosts(value, nextPage, SEARCH_PAGE_SIZE)
@@ -113,12 +122,16 @@ function SearchPage() {
   }
 
   const submitSearch = async (candidate = keyword) => {
-    if (!scope || loading) return
+    if (!scope) return
     const normalized = candidate.trim()
     if (!normalized) {
       void Taro.showToast({ title: '请输入搜索词', icon: 'none' })
       return
     }
+    if (searchBusy.current && activeQuery.current === normalized) return
+    searchBusy.current = true
+    pageBusy.current = false
+    activeQuery.current = normalized
     setKeyword(normalized)
     setSubmittedKeyword(normalized)
     setLoading(true)
@@ -128,6 +141,8 @@ function SearchPage() {
     setResults([])
     setPage(1)
     setTotal(0)
+    setFailedCovers(new Set())
+    scrollToStart()
     const version = searchVersion.current + 1
     searchVersion.current = version
     try {
@@ -136,19 +151,23 @@ function SearchPage() {
       setResults(result.items)
       setPage(result.page || 1)
       setTotal(result.total)
-      await loadSuggestions(scope)
+      void loadSuggestions(scope, version)
     } catch (searchError) {
       if (searchVersion.current !== version) return
       console.error('domain search failed', searchError)
       setResults([])
       setError(errorMessage(searchError))
     } finally {
-      if (searchVersion.current === version) setLoading(false)
+      if (searchVersion.current === version) {
+        searchBusy.current = false
+        setLoading(false)
+      }
     }
   }
 
   const loadMore = async () => {
-    if (!scope || loading || loadingMore || results.length >= total) return
+    if (!scope || !hasSearched || !submittedKeyword || searchBusy.current || pageBusy.current || results.length >= total) return
+    pageBusy.current = true
     const nextPage = page + 1
     const normalized = submittedKeyword
     const version = searchVersion.current
@@ -165,8 +184,24 @@ function SearchPage() {
       console.error('load more search results failed', searchError)
       setError('更多结果加载失败，点击重试')
     } finally {
-      if (searchVersion.current === version) setLoadingMore(false)
+      if (searchVersion.current === version) {
+        pageBusy.current = false
+        setLoadingMore(false)
+      }
     }
+  }
+
+  const showSuggestions = () => {
+    searchVersion.current += 1
+    searchBusy.current = false
+    pageBusy.current = false
+    activeQuery.current = ''
+    setLoading(false)
+    setLoadingMore(false)
+    setHasSearched(false)
+    setError('')
+    scrollToStart()
+    if (scope) void loadSuggestions(scope)
   }
 
   const clearHistory = async () => {
@@ -184,13 +219,20 @@ function SearchPage() {
   }
 
   const openResult = async (item: SearchResult) => {
-    if (!scope) return
-    if (scope === 'community') {
-      await Taro.navigateTo({ url: `/pages/post-detail/index?id=${encodeURIComponent(item.id)}` })
-      return
-    }
-    if (scope === 'secondhand') {
-      await Taro.navigateTo({ url: `/pages/secondhand-detail/index?id=${encodeURIComponent(item.id)}` })
+    if (!scope || openingResult.current) return
+    if (scope === 'community' || scope === 'secondhand') {
+      openingResult.current = true
+      try {
+        await Taro.navigateTo({ url: scope === 'community'
+          ? `/pages/post-detail/index?id=${encodeURIComponent(item.id)}`
+          : `/pages/secondhand-detail/index?id=${encodeURIComponent(item.id)}` })
+        if (scope === 'community') setReadPostIds((current) => new Set(current).add(item.id))
+      } catch (jumpError) {
+        console.error('open search result failed', jumpError)
+        await Taro.showToast({ title: '暂时无法打开，请重试', icon: 'none' })
+      } finally {
+        openingResult.current = false
+      }
       return
     }
     const merchant = item as ExternalTakeoutMerchantLink
@@ -209,16 +251,30 @@ function SearchPage() {
   const renderResult = (item: SearchResult) => {
     if (scope === 'community') {
       const post = item as CommunityPost
+      const cover = post.images.find((src) => src.trim())?.trim()
+      const coverKey = `${post.id}:${cover}`
+      const summary = postBodyWithoutTitle(post.title, post.content)
       return (
-        <View className='student-search-result' key={post.id} onClick={() => void openResult(post)}>
-          <Text className='student-search-result__title'>{post.title}</Text>
-          {postBodyWithoutTitle(post.title, post.content) && <Text className='student-search-result__summary'>{postBodyWithoutTitle(post.title, post.content)}</Text>}
-          {(post.tags ?? []).length > 0 && (
-            <View className='student-search-result__tags'>
-              {(post.tags ?? []).map((tag) => <Text key={tag}>#{tag.replace(/^#+/, '')}</Text>)}
-            </View>
-          )}
-          <Text className='student-search-result__meta'>{post.author} · {formatPostDate(post.createdAt)}</Text>
+        <View className={`student-search-result student-search-result--post${readPostIds.has(post.id) ? ' student-search-result--read' : ''}`} key={post.id} onClick={() => void openResult(post)}>
+          <View className='student-search-result__main'>
+            <Text className='student-search-result__title'>{post.title}</Text>
+            {summary && <Text className='student-search-result__summary'>{summary}</Text>}
+            {(post.tags ?? []).length > 0 && (
+              <View className='student-search-result__tags'>
+                {(post.tags ?? []).map((tag) => <Text key={tag}>#{tag.replace(/^#+/, '')}</Text>)}
+              </View>
+            )}
+            <Text className='student-search-result__meta'>{[post.author, formatPostDate(post.createdAt)].filter(Boolean).join(' · ')}</Text>
+          </View>
+          {cover && <View className='student-search-result__media'>
+            {failedCovers.has(coverKey) ? <Text className='student-search-result__media-error'>图片未加载</Text> : <Image
+              className='student-search-result__cover'
+              src={cover}
+              mode='aspectFill'
+              lazyLoad
+              onError={() => setFailedCovers((current) => new Set(current).add(coverKey))}
+            />}
+          </View>}
         </View>
       )
     }
@@ -288,10 +344,12 @@ function SearchPage() {
         className='student-search-content'
         scrollY
         enhanced
+        scrollIntoView={scrollAnchor}
         showScrollbar={false}
         lowerThreshold={120}
         onScrollToLower={() => void loadMore()}
       >
+        <View id='search-content-start' />
         {!hasSearched && (
           <>
             <View className='student-search-section'>
@@ -328,18 +386,19 @@ function SearchPage() {
           <View className='student-search-results'>
             <View className='student-search-results__head'>
               <Text>{loading ? '正在搜索…' : error && results.length === 0 ? '搜索失败' : `找到 ${total} 条结果`}</Text>
-              <Text className='student-search-results__reset' onClick={() => setHasSearched(false)}>返回推荐</Text>
+              <Text className='student-search-results__reset' onClick={showSuggestions}>返回推荐</Text>
             </View>
-            {error && (
+            {error && results.length === 0 && (
               <Text
                 className='student-search-state student-search-state--error'
-                onClick={() => results.length > 0 ? void loadMore() : void submitSearch()}
+                onClick={() => void submitSearch(submittedKeyword)}
               >
                 {error}
               </Text>
             )}
             {!error && !loading && results.length === 0 && <Text className='student-search-state'>{copy.empty}</Text>}
             {results.map(renderResult)}
+            {error && results.length > 0 && <Text className='student-search-state student-search-state--error' onClick={() => void loadMore()}>{error}</Text>}
             {loadingMore && <Text className='student-search-state'>正在加载更多结果…</Text>}
             {!error && results.length > 0 && results.length >= total && (
               <Text className='student-search-state'>— 已显示全部结果 —</Text>
