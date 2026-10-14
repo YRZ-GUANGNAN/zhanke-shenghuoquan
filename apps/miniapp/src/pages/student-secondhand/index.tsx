@@ -211,7 +211,10 @@ function StudentSecondhandPage() {
           className='student-secondhand-header__title-row'
           left={<Text className='student-secondhand-header__title'>二手集市</Text>}
           center={visibility.search ? <View className='student-secondhand-search' onClick={() => void navigate('/pages/search/index?scope=secondhand')} hoverClass='student-secondhand-search--pressed' ariaRole='button' ariaLabel='搜索二手商品'>
-            <AppIcon name='search' className='student-secondhand-search__icon' /><Text>搜二手好物</Text>
+            <View className='student-secondhand-search__field'>
+              <AppIcon name='search' className='student-secondhand-search__icon' />
+              <Text className='student-secondhand-search__placeholder'>搜二手好物</Text>
+            </View>
           </View> : undefined}
           divider={false}
         />

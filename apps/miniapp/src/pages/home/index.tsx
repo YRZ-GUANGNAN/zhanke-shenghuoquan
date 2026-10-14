@@ -477,7 +477,17 @@ function HomeContent() {
             ))}
           </View>
         }
-        right={visibility.search && (visibility.forum || visibility.secondhand) ? <View className='student-home-header__search' onClick={openSearch} /> : undefined}
+        right={visibility.search && (visibility.forum || visibility.secondhand) ? (
+          <View
+            className='student-home-header__search'
+            onClick={openSearch}
+            hoverClass='student-home-header__search--pressed'
+            ariaRole='button'
+            ariaLabel='搜索'
+          >
+            <AppIcon name='search' className='student-home-header__search-icon' />
+          </View>
+        ) : undefined}
       />
 
       <ScrollView

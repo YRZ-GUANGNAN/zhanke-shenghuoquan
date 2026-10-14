@@ -185,14 +185,11 @@ assert.match(
   /\.capsule-page-header\.secondhand-detail-header\s+\.capsule-page-header__business-row[\s\S]*margin-top:\s*-8px/,
 )
 
+const homeSource = fs.readFileSync(path.join(miniappPagesRoot, 'home', 'index.tsx'), 'utf8')
 const homeStyle = fs.readFileSync(path.join(miniappPagesRoot, 'home', 'index.scss'), 'utf8')
-assert.match(homeStyle, /\.student-home-header__search::before[\s\S]*width:\s*14px/)
-assert.match(homeStyle, /\.student-home-header__search::after[\s\S]*width:\s*8px/)
-assert.doesNotMatch(
-  homeStyle.match(/\.student-home-header__search::(?:before|after)[\s\S]*?(?=\n\})/g)?.join('\n') || '',
-  /\d+rpx/,
-  'search icon geometry must not mix rpx and px',
-)
+assert.match(homeSource, /AppIcon name='search'/, 'home search must use the shared icon set')
+assert.match(homeSource, /student-home-header__search-icon/, 'home search icon class is required')
+assert.doesNotMatch(homeStyle, /student-home-header__search::(?:before|after)/, 'home search must not draw a second pseudo-element icon')
 
 const editProfileSource = fs.readFileSync(path.join(miniappPagesRoot, 'edit-profile', 'index.tsx'), 'utf8')
 const editProfileStyle = fs.readFileSync(path.join(miniappPagesRoot, 'edit-profile', 'index.scss'), 'utf8')

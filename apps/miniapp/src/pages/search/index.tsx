@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { hideKeyboard, nextTick } from '@tarojs/taro'
 import { Image, Input, ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
+import AppIcon from '../../components/app-icon'
 import type { CommunityPost, Product } from '../../types'
 import Taro from '../../services/taro'
 import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
@@ -380,7 +381,9 @@ function SearchContent() {
         <CapsulePageHeader
           className='student-search-header'
           title='搜索入口无效'
-          left={<View className='student-search-back' onClick={handleBack} />}
+          left={<View className='student-search-back' onClick={handleBack} hoverClass='student-search-control--pressed' ariaRole='button' ariaLabel='返回'>
+            <AppIcon name='back' className='student-search-back__icon' />
+          </View>}
         />
         <View className='student-search-invalid'>请从帖子、二手或外卖页面重新进入搜索。</View>
       </View>
@@ -392,10 +395,12 @@ function SearchContent() {
       <CapsulePageHeader
         variant='search'
         className='student-search-header'
-        left={<View className='student-search-back' onClick={handleBack} />}
+        left={<View className='student-search-back' onClick={handleBack} hoverClass='student-search-control--pressed' ariaRole='button' ariaLabel='返回'>
+          <AppIcon name='back' className='student-search-back__icon' />
+        </View>}
         center={
           <View className='student-search-box'>
-            <View className='student-search-box__icon' />
+            <AppIcon name='search' className='student-search-box__icon' />
             <Input
               className='student-search-box__input'
               value={keyword}
@@ -406,7 +411,9 @@ function SearchContent() {
             />
           </View>
         }
-        right={<Text className='student-search-submit' onClick={() => void submitSearch()}>{loading ? '搜索中' : '搜索'}</Text>}
+        right={<View className='student-search-submit' onClick={() => void submitSearch()} hoverClass='student-search-control--pressed' ariaRole='button' ariaLabel='搜索'>
+          <Text>{loading ? '搜索中' : '搜索'}</Text>
+        </View>}
       />
 
       {(scope === 'community' || scope === 'secondhand') && <View className='student-search-tools'>
