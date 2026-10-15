@@ -888,7 +888,7 @@ td span {
 .media-tabs button.active { border-bottom-color: #1677ff; color: #1677ff; }
 .media-filters { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
 .media-filters label { display: grid; gap: 5px; color: #64748b; font-size: 12px; }
-.media-filters input { min-width: 190px; padding: 9px 10px; border: 1px solid #dbe3ee; border-radius: 7px; }
+.media-filters input, .media-filters select { min-width: 190px; padding: 9px 10px; border: 1px solid #dbe3ee; border-radius: 7px; }
 .media-filters button, .media-detail button { padding: 9px 14px; border: 0; border-radius: 7px; background: #1677ff; color: #fff; cursor: pointer; }
 .media-filters button.secondary, .media-detail button { background: #eef2f7; color: #475569; }
 .media-error { margin: 12px 0; padding: 10px 12px; border-radius: 7px; background: #fff1f1; color: #c2410c; }
@@ -1579,6 +1579,7 @@ td button:hover:not(:disabled) { border-color: var(--color-border-strong); backg
 .takeout-form,
 .external-merchant-form { border-color: var(--color-border); border-radius: 9px; background: var(--color-surface-muted); }
 .media-filters input,
+.media-filters select,
 .delivery-controls input,
 .delivery-controls select,
 .delivery-form input,
@@ -1594,6 +1595,7 @@ td button:hover:not(:disabled) { border-color: var(--color-border-strong); backg
   color: var(--color-text);
 }
 .media-filters input:hover,
+.media-filters select:hover,
 .delivery-controls input:hover,
 .delivery-controls select:hover,
 .delivery-form input:hover,
@@ -1604,6 +1606,7 @@ td button:hover:not(:disabled) { border-color: var(--color-border-strong); backg
 .external-merchant-form input:hover,
 .identity-decision textarea:hover { border-color: var(--color-border-strong); }
 .media-filters input:focus,
+.media-filters select:focus,
 .delivery-controls input:focus,
 .delivery-controls select:focus,
 .delivery-form input:focus,

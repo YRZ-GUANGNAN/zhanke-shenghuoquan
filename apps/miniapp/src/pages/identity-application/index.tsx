@@ -6,12 +6,12 @@ import { AppIconButton } from '../../components/ui'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import { getIdentityApplication, submitIdentityApplication } from '../../services/a-user'
 import { isApiError } from '../../services/api'
-import { chooseAndUploadImagesSettled, getMediaStatus, type UploadedMedia } from '../../services/media'
+import { chooseAndUploadImagesSettled, getMediaStatus, isMediaUsable, type UploadedMedia } from '../../services/media'
 import Taro from '../../services/taro'
 import type { IdentityApplicationRole, IdentityApplicationView } from '../../types'
 import './index.scss'
 
-type ProofState = 'stored' | 'uploaded' | 'checking' | 'approved' | 'failed'
+type ProofState = 'stored' | 'uploaded' | 'checking' | 'ready' | 'failed'
 
 interface ProofItem {
   assetId: string
@@ -43,14 +43,14 @@ function uploadedProof(value: UploadedMedia): ProofItem {
   return {
     assetId: value.assetId,
     previewPath: value.previewPath,
-    state: value.canUse && value.state === 'approved' ? 'approved' : 'uploaded',
+    state: isMediaUsable(value) ? 'ready' : 'uploaded',
     message: value.message || '图片已上传'
   }
 }
 
 function proofStateLabel(value: ProofItem): string {
-  if (value.state === 'checking') return value.message || '正在确认审核状态'
-  if (value.state === 'approved') return '证明图片已通过安全审核'
+  if (value.state === 'checking') return value.message || '正在确认上传状态'
+  if (value.state === 'ready') return '材料已上传，提交申请后由管理员核验'
   if (value.state === 'failed') return value.message || '图片处理失败，请移除后重新上传'
   return value.message
 }
@@ -185,7 +185,7 @@ function IdentityApplicationContent() {
       const failureDetail = failed.map((item) => `第 ${item.index + 1} 张：${item.reason.message}`).join('；')
       const summary = failed.length > 0
         ? `已保留 ${uploaded.length} 张上传成功的图片。${failureDetail}`
-        : uploaded.length > 0 ? '图片已上传，提交时将确认安全审核结果' : ''
+        : uploaded.length > 0 ? '材料已上传，可提交申请，由管理员人工核验' : ''
       setProgress(summary)
       if (failed.length > 0 && isOperationActive(generation)) {
         await Taro.showToast({ title: summary, icon: 'none', duration: 2400 })
@@ -238,14 +238,14 @@ function IdentityApplicationContent() {
       }
       if (!isOperationActive(generation)) return
       setSubmitting(true)
-      setProgress('正在确认所有证明图片的安全审核状态')
+      setProgress('正在确认证明材料是否上传完成')
       for (const proof of proofs) {
         if (!isOperationActive(generation)) return
-        updateProof(proof.assetId, { state: 'checking', message: '正在确认安全审核状态' })
+        updateProof(proof.assetId, { state: 'checking', message: '正在确认上传状态' })
         const status = await getMediaStatus(proof.assetId)
         if (!isOperationActive(generation)) return
-        if (status.canUse && status.state === 'approved') {
-          updateProof(proof.assetId, { state: 'approved', message: '证明图片已通过安全审核' })
+        if (status.purpose === 'identity_application' && isMediaUsable(status)) {
+          updateProof(proof.assetId, { state: 'ready', message: '材料已上传，提交后由管理员人工核验' })
           continue
         }
         if (status.state === 'rejected' || status.state === 'review_failed' ||
@@ -260,10 +260,10 @@ function IdentityApplicationContent() {
           throw new Error(message)
         }
 
-        const pendingMessage = status.message || '证明图片仍在微信内容审核中，请稍后再提交'
+        const pendingMessage = status.message || '证明材料尚未上传完成，请稍后重试'
         updateProof(proof.assetId, { state: 'uploaded', message: pendingMessage })
         setProgress(`${pendingMessage}。无需停留在此页，稍后返回重试即可。`)
-        await Taro.showToast({ title: '图片仍在审核中，请稍后重试', icon: 'none', duration: 2400 })
+        await Taro.showToast({ title: '材料尚不可用，请重试或重新上传', icon: 'none', duration: 2400 })
         return
       }
 
@@ -279,7 +279,7 @@ function IdentityApplicationContent() {
       if (!isOperationActive(generation)) return
       applyApplication(result)
       setProgress('')
-      await Taro.showToast({ title: '申请已提交，等待平台审核', icon: 'success', duration: 1800 })
+      await Taro.showToast({ title: '申请已提交，等待人工审核', icon: 'success', duration: 1800 })
     } catch (error) {
       if (!isOperationActive(generation)) return
       const message = applicationErrorMessage(error)
@@ -386,7 +386,7 @@ function IdentityApplicationContent() {
         {!loading && !loadError && application?.status === 'pending' && (
           <View className='identity-application-card identity-application-status identity-application-status--pending'>
             <Text className='identity-application-status__badge'>审核中</Text>
-            <Text className='identity-application-status__title'>申请已提交，请等待平台审核</Text>
+            <Text className='identity-application-status__title'>申请已提交，请等待管理员人工审核</Text>
             <Text className='identity-application-status__copy'>提交时间：{readableTime(application.submittedAt)}</Text>
           </View>
         )}

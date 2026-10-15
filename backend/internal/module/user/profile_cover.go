@@ -122,7 +122,7 @@ func (h *Handler) updateCover(c *gin.Context) {
 	case errors.Is(err, ErrNotFound):
 		response.Fail(c, http.StatusNotFound, "账号不存在")
 	case errors.Is(err, coremedia.ErrBindingInvalidAsset), errors.Is(err, coremedia.ErrBindingConflict), errors.Is(err, coremedia.ErrBindingMismatch), errors.Is(err, coremedia.ErrBindingLegacySet), errors.Is(err, coremedia.ErrNotFound):
-		response.Fail(c, http.StatusConflict, "封面不可用，请确认图片已通过审核并重新选择")
+		response.Fail(c, http.StatusConflict, "封面不可用，请重新选择并完成上传")
 	default:
 		response.Fail(c, http.StatusInternalServerError, "封面保存失败，请重试")
 	}

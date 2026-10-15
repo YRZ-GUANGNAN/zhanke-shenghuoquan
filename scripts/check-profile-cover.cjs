@@ -61,7 +61,7 @@ async function run() {
     if (id.endsWith('/services/api')) return apiModule.exports
     if (id.endsWith('/services/media')) return {
       chooseAndUploadImages: (purpose, count, progress, active) => { assert.equal(purpose, 'profile_cover'); assert.equal(count, 1); const value = { ...deferred(), progress, active }; uploads.push(value); return value.promise },
-      waitForMediaApproval: (id, progress, timeout, active) => { const value = { ...deferred(), id, active }; reviews.push(value); return value.promise }
+      confirmDirectUpload: (uploaded, active) => { const value = { ...deferred(), id: uploaded.assetId, active }; reviews.push(value); return value.promise }
     }
     throw new Error(`Unexpected cover dependency: ${id}`)
   }
@@ -73,7 +73,7 @@ async function run() {
   const event = action => React.act(async () => { action() })
   const choose = () => props('.profile-cover-editor__choose').onClick()
   const save = () => props('.profile-cover-editor__save').onClick()
-  const approved = { state: 'approved', canUse: true }
+  const approved = { state: 'ready', reviewStatus: 'not_required', purpose: 'profile_cover', canUse: true }
   const uploaded = { assetId: '01J00000000000000000000001', previewPath: 'isolated-local-photo', ...approved }
   try {
     await render()
@@ -85,10 +85,10 @@ async function run() {
 
     await event(choose)
     await event(() => uploads[1].resolve([uploaded]))
-    assert.equal(props('.profile-cover-editor__image').src, 'existing-cover', '审核前不显示新封面')
+    assert.equal(props('.profile-cover-editor__image').src, 'existing-cover', '上传确认前不显示新封面')
     assert.equal(document.querySelector('.profile-cover-editor__save'), null)
-    await event(() => reviews[0].reject(new Error('审核不通过')))
-    assert.match(document.body.textContent, /审核不通过/)
+    await event(() => reviews[0].reject(new Error('上传未完成')))
+    assert.match(document.body.textContent, /上传未完成/)
     assert.equal(session.profile.cover, 'existing-cover')
 
     await event(choose)
@@ -99,7 +99,7 @@ async function run() {
     assert.equal(requests.length, 1, '同帧重复保存只发一次请求')
     await event(() => requests[0].reject(new Error('离线，稍后重试')))
     assert.equal(session.profile.cover, 'existing-cover')
-    assert.ok(document.querySelector('.profile-cover-editor__save'), '失败保留通过审核的候选图')
+    assert.ok(document.querySelector('.profile-cover-editor__save'), '失败保留上传完成的候选图')
     await event(save)
     await event(() => requests[1].resolve({ cover: 'formal-persisted-cover', nickname: '不能覆盖的响应昵称', avatar: '不能覆盖的响应头像' }))
     await render()
@@ -144,9 +144,9 @@ async function run() {
     await React.act(async () => root.unmount())
     assert.equal(uploads[7].active(), false, '离开页面后停止上传后续步骤')
     await event(() => uploads[7].resolve([uploaded]))
-    assert.equal(reviews.length, 3, '离开页面不再启动审核轮询')
+    assert.equal(reviews.length, 3, '离开页面不再确认上传')
     assert.equal(busyEvents.filter(Boolean).length, 13)
-    console.log('profile cover: real component behavior, review gating, retries, clear, click locks and session isolation ok')
+    console.log('profile cover: real component behavior, upload readiness, retries, clear, click locks and session isolation ok')
   } finally {
     await React.act(async () => root.unmount())
     previous.forEach(([key, value]) => { if (value) Object.defineProperty(globalThis, key, value); else delete globalThis[key] })

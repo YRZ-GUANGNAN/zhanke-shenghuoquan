@@ -10,7 +10,7 @@ import {
 } from '../../services/media'
 import './index.scss'
 
-const purposeLabel: Partial<Record<MediaStatus['purpose'], string>> = { post: '帖子图片', product: '商品图片', avatar: '用户头像', profile_cover: '个人封面' }
+const purposeLabel: Record<MediaStatus['purpose'], string> = { post: '帖子图片', product: '商品图片', avatar: '用户头像', profile_cover: '个人封面', identity_application: '身份申请材料', dish: '菜品图片', merchant_logo: '商家标志', delivery_proof: '配送凭证', delivery_im: '配送沟通图片', feedback: '反馈截图' }
 
 export default function MediaHistoryPage() {
   const [items, setItems] = useState<MediaStatus[]>([])
@@ -41,10 +41,14 @@ export default function MediaHistoryPage() {
   }
 
   const restart = async (value: MediaStatus) => {
-    const purpose: MediaPurpose = value.purpose === 'post' ? 'post_image' : value.purpose === 'product' ? 'product_image' : 'avatar'
+    const purpose: MediaPurpose = value.purpose === 'post' ? 'post_image' : value.purpose === 'product' ? 'product_image' : value.purpose
     try {
-      if (value.purpose === 'profile_cover') {
+      if (value.purpose === 'profile_cover' || value.purpose === 'avatar') {
         await Taro.navigateTo({ url: '/pages/edit-profile/index' })
+        return
+      }
+      if (value.purpose === 'identity_application') {
+        await Taro.navigateTo({ url: '/pages/profile/index' })
         return
       }
       await chooseAndUploadImages(purpose, 1)
@@ -58,7 +62,7 @@ export default function MediaHistoryPage() {
     <View className='page media-history'>
       <View className='card media-history__head'>
         <Text className='media-history__title'>图片上传与审核记录</Text>
-        <Text className='media-history__message'>所有状态均由媒体服务返回；审核通过前不会接入帖子、商品、头像或个人封面。</Text>
+        <Text className='media-history__message'>帖子和商品图片自动审核；头像、个人封面上传完成后可保存。身份申请材料仅供管理员人工核验。</Text>
         <Button className='cc-button' disabled={loading} onClick={load}>{loading ? '刷新中' : '刷新状态'}</Button>
       </View>
 

@@ -369,7 +369,7 @@ func classifyBindingAssetRows(rows []bindingAssetRow, lookupIDs []string) ([]bin
 func validCoreBindingAsset(row bindingAssetRow, ownerID uint64, purpose Purpose) bool {
 	return row.OwnerID == ownerID && row.Purpose == purpose && row.StorageStage == StorageStageFinal &&
 		row.TechnicalStatus == TechnicalFinalReady && row.FinalKey != "" && row.FinalVersionID != "" &&
-		row.HasProjection && row.ProjectionStatus == ProjectionApproved && row.DeleteRequestedAt == nil && row.DeletedAt == nil
+		row.HasProjection && ReviewAllowsUse(row.Purpose, row.ProjectionStatus) && row.DeleteRequestedAt == nil && row.DeletedAt == nil
 }
 
 func bindingRowIDs(rows []bindingAssetRow) []uint64 {

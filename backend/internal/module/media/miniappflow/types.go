@@ -14,6 +14,7 @@ const (
 	StateProcessing    ClientState = "processing"
 	StateReviewPending ClientState = "review_pending"
 	StateApproved      ClientState = "approved"
+	StateReady         ClientState = "ready"
 	StateRejected      ClientState = "rejected"
 	StateReviewFailed  ClientState = "review_failed"
 	StateExpired       ClientState = "expired"
@@ -91,6 +92,7 @@ type StatusFact struct {
 	StorageStage    coremedia.StorageStage
 	TechnicalStatus coremedia.TechnicalStatus
 	AssetReview     coremedia.ReviewStatus
+	DeleteRequested bool
 	TicketStatus    coremedia.TicketStatus
 	TicketID        string
 	Projection      *coremedia.ProjectionStatus

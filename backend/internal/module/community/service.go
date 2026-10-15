@@ -572,6 +572,11 @@ func (t ReviewTarget) SetReviewStatus(ctx context.Context, id uint, status revie
 	if t.objectType == "post" && status == review.StatusRejected && t.service.media != nil {
 		return t.service.media.DeleteReference(ctx, "post", uint64(id), nil)
 	}
+	if t.objectType == "post" && status == review.StatusApproved && t.service.media != nil {
+		if publisher, ok := t.service.media.(postMediaPublisher); ok {
+			return publisher.PublishPost(ctx, uint64(id))
+		}
+	}
 	return nil
 }
 

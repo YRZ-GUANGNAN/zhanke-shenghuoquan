@@ -118,7 +118,7 @@ func evaluateVisibility(value GatewaySnapshot) VisibilityReason {
 		!value.FinalIdentityReady || value.DeleteRequested {
 		return VisibilityNotReady
 	}
-	if value.ProjectionStatus != ProjectionApproved {
+	if !ReviewAllowsUse(value.Purpose, value.ProjectionStatus) {
 		return VisibilityNotApproved
 	}
 	if !value.HasReference || value.ReferenceStatus != ReferenceActive {

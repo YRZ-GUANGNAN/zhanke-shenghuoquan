@@ -69,12 +69,15 @@ func (c *Coordinator) Close(ctx context.Context, userID uint) ([]user.AccountClo
 		}
 
 		now := c.now().UTC()
-		if account.CoverAssetID != nil {
+		if account.CoverAssetID != nil || account.AvatarAssetID != nil {
 			bindings, err := coremedia.NewReferenceBindingService(coremedia.NewReferenceBindingRepository(tx), nil)
 			if err != nil {
 				return err
 			}
 			if err := bindings.Revoke(dbtx.WithDB(ctx, tx), coremedia.PurposeProfileCover, strconv.FormatUint(uint64(userID), 10), nil); err != nil {
+				return err
+			}
+			if err := bindings.Revoke(dbtx.WithDB(ctx, tx), coremedia.PurposeAvatar, strconv.FormatUint(uint64(userID), 10), nil); err != nil {
 				return err
 			}
 		}

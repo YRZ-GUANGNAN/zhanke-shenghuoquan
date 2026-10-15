@@ -3,7 +3,7 @@ import { Button, Image, Text, View } from '@tarojs/components'
 import AppIcon from './app-icon'
 import { updateProfileCover } from '../services/a-user'
 import { isApiError } from '../services/api'
-import { chooseAndUploadImages, waitForMediaApproval, type UploadedMedia } from '../services/media'
+import { chooseAndUploadImages, confirmDirectUpload, type UploadedMedia } from '../services/media'
 import Taro from '../services/taro'
 import { useSessionStore } from '../stores/session'
 import './profile-cover-editor.scss'
@@ -50,13 +50,11 @@ export default function ProfileCoverEditor({ disabled = false, isProfileBusy, on
         if (isCurrent()) setMessage(value.message)
       }, isCurrent)
       if (!uploaded || !isCurrent()) return
-      const approved = await waitForMediaApproval(uploaded.assetId, (value) => {
-        if (isCurrent()) setMessage(value.message)
-      }, 90000, isCurrent)
+      const usable = await confirmDirectUpload(uploaded, isCurrent)
       if (!isCurrent()) return
-      setCandidate({ ...uploaded, ...approved })
+      setCandidate({ ...uploaded, ...usable })
       setFailedSource('')
-      setMessage('图片已通过审核，保存封面后生效')
+      setMessage('图片已上传，保存封面后生效')
     } catch (reason) {
       if (!isCurrent()) return
       const text = isApiError(reason) && reason.status === 400 && reason.message === 'invalid media upload request'

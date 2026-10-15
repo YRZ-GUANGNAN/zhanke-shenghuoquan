@@ -68,6 +68,19 @@ func TestQueryServiceContextSpecificStatusAllowlist(t *testing.T) {
 	}
 }
 
+func TestQueryServiceExposesDirectPurposeStateWithoutInventingDecision(t *testing.T) {
+	repo := &queryRepositoryStub{}
+	service, _ := NewQueryService(repo)
+	for _, purpose := range []string{"avatar", "profile_cover", "identity_application"} {
+		if _, err := service.Assets(context.Background(), ListFilter{Purpose: purpose, ReviewStatus: "not_required"}); err != nil || repo.lastFilter.Purpose != purpose {
+			t.Fatalf("filter %s: %v", purpose, err)
+		}
+	}
+	if _, err := service.Decisions(context.Background(), ListFilter{Status: "not_required"}); !errors.Is(err, ErrInvalidQuery) {
+		t.Fatal("usage policy must not be presented as a review decision")
+	}
+}
+
 func timePointerForTest(value time.Time) *time.Time { return &value }
 
 var _ QueryRepository = (*queryRepositoryStub)(nil)

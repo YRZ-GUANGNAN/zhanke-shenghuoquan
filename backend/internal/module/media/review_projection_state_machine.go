@@ -7,6 +7,7 @@ var reviewProjectionTransitions = map[ProjectionStatus]map[ProjectionStatus]stru
 	ProjectionApproved:     {},
 	ProjectionRejected:     {},
 	ProjectionReviewFailed: {},
+	ProjectionNotRequired:  {},
 }
 
 func CanTransitionReviewProjection(from, to ProjectionStatus) bool {

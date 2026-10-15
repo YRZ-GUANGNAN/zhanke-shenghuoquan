@@ -16,7 +16,7 @@ func (r *GormRepository) FindVisibleDisplayObjectByReference(ctx context.Context
 		Where("a.storage_stage = ? AND a.technical_status = ?", StorageStageFinal, TechnicalFinalReady).
 		Where("a.final_key IS NOT NULL AND a.final_key <> '' AND a.final_version_id IS NOT NULL AND a.final_version_id <> ''").
 		Where("a.delete_requested_at IS NULL AND a.deleted_at IS NULL").
-		Where("p.status = ?", ProjectionApproved).
+		Where(displayReviewPredicate, ProjectionApproved, ProjectionNotRequired, directUsePurposes()).
 		Limit(1).
 		Scan(&value)
 	if result.Error != nil {
@@ -42,7 +42,7 @@ func (r *GormRepository) FindVisibleDisplayObjectByAsset(ctx context.Context, as
 		Where("a.storage_stage = ? AND a.technical_status = ?", StorageStageFinal, TechnicalFinalReady).
 		Where("a.final_key IS NOT NULL AND a.final_key <> '' AND a.final_version_id IS NOT NULL AND a.final_version_id <> ''").
 		Where("a.delete_requested_at IS NULL AND a.deleted_at IS NULL").
-		Where("p.status = ?", ProjectionApproved).
+		Where(displayReviewPredicate, ProjectionApproved, ProjectionNotRequired, directUsePurposes()).
 		Order("r.id ASC").
 		Limit(1).
 		Scan(&value)

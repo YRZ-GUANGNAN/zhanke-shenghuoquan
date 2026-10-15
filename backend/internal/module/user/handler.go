@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
+	coremedia "campus-circle/backend/internal/module/media"
 	"campus-circle/backend/internal/pkg/media"
 	"github.com/gin-gonic/gin"
 
@@ -12,9 +13,10 @@ import (
 )
 
 type Handler struct {
-	service *Service
-	media   media.Gateway
-	covers  *ProfileCoverService
+	service  *Service
+	media    media.Gateway
+	covers   *ProfileCoverService
+	profiles *ProfileUpdateService
 }
 
 func NewHandler(service *Service, mediaGateway ...media.Gateway) *Handler {
@@ -176,14 +178,12 @@ func (h *Handler) closeAccount(c *gin.Context) {
 }
 
 func (h *Handler) updateMe(c *gin.Context) {
-	var request struct {
-		Nickname      string `json:"nickname"`
-		School        string `json:"school"`
-		Campus        string `json:"campus"`
-		AvatarAssetID string `json:"avatarAssetId"`
-	}
+	var request ProfileUpdateInput
 	if err := c.ShouldBindJSON(&request); err != nil {
 		response.Fail(c, http.StatusBadRequest, "invalid profile")
+		return
+	}
+	if h.profiles != nil && h.updateCoreProfile(c, request) {
 		return
 	}
 	current := CurrentUser(c)
@@ -224,6 +224,12 @@ func (h *Handler) updateMe(c *gin.Context) {
 		if err := h.media.DeleteReference(c, "user", uint64(current.ID), keep); err != nil {
 			response.Fail(c, http.StatusInternalServerError, err.Error())
 			return
+		}
+		if h.profiles != nil {
+			if err := h.profiles.bindings.Revoke(c.Request.Context(), coremedia.PurposeAvatar, strconv.FormatUint(uint64(current.ID), 10), nil); err != nil {
+				response.Fail(c, http.StatusInternalServerError, "旧头像清理失败，请重试")
+				return
+			}
 		}
 	}
 	response.OK(c, value)

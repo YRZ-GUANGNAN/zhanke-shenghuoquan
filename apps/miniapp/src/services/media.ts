@@ -7,6 +7,7 @@ export type MediaClientState =
   | 'processing'
   | 'review_pending'
   | 'approved'
+  | 'ready'
   | 'rejected'
   | 'review_failed'
   | 'expired'
@@ -132,6 +133,28 @@ export async function retryUploadCompletion(ticketId: string): Promise<MediaStat
   })
 }
 
+export function isMediaUsable(status: MediaStatus): boolean {
+  if (!status.canUse) return false
+  if (status.state === 'approved') return true
+  return status.state === 'ready' && status.reviewStatus === 'not_required' &&
+    ['avatar', 'profile_cover', 'identity_application'].includes(status.purpose)
+}
+
+// Direct-use uploads finish their technical checks in the completion request.
+// Do not start a 90-second content-review spinner for profile/identity photos.
+export async function confirmDirectUpload(uploaded: UploadedMedia, shouldContinue?: () => boolean): Promise<MediaStatus> {
+  assertUploadActive(shouldContinue)
+  if (!['avatar', 'profile_cover', 'identity_application'].includes(uploaded.purpose)) {
+    throw new Error('此类图片仍需内容审核')
+  }
+  const status = isMediaUsable(uploaded) ? uploaded : await getMediaStatus(uploaded.assetId)
+  assertUploadActive(shouldContinue)
+  if (status.assetId !== uploaded.assetId || status.purpose !== uploaded.purpose || !isMediaUsable(status)) {
+    throw new Error(status.message || '图片尚不可用，请重新选择并完成上传')
+  }
+  return status
+}
+
 export async function waitForMediaApproval(
   assetId: string,
   onStatus?: (value: MediaStatus) => void,
@@ -212,7 +235,8 @@ async function uploadImage(
   progress(35, 'uploading', '正在直传腾讯云 COS')
   await putSignedObject(session, bytes)
   assertUploadActive(shouldContinue)
-  progress(85, 'completing', '正在校验图片并提交审核')
+  progress(85, 'completing', ['avatar', 'profile_cover', 'identity_application'].includes(purpose)
+    ? '正在确认图片上传' : '正在校验图片并提交自动审核')
   const status = await retryUploadCompletion(session.ticketId)
   assertUploadActive(shouldContinue)
   progress(100, 'done', status.message)

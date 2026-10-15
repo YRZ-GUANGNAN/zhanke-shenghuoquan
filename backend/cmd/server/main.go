@@ -395,6 +395,12 @@ func main() {
 	}
 	userHandler := user.NewHandler(userService, mediaService)
 	userHandler.SetProfileCovers(profileCovers)
+	profileUpdates, err := user.NewProfileUpdateService(user.NewRepository(db), bindingService, cfg.MediaPublicBaseURL)
+	if err != nil {
+		log.Fatalf("configure profile updates: %v", err)
+	}
+	userHandler.SetProfileUpdates(profileUpdates)
+	profileUpdates.SetLegacyAvatars(mediaService)
 	userHandler.Register(authRoutes)
 	adminauth.NewHandler(adminAuthService, adminAuthMiddleware).Register(api.Group("/admin-auth"))
 	registerIdentityApplicationRoutes(

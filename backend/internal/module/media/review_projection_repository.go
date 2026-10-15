@@ -26,6 +26,7 @@ func (r *GormRepository) CreateReviewProjection(ctx context.Context, assetPublic
 			return normalizeNotFound(err)
 		}
 		if asset.TechnicalStatus != TechnicalFinalReady || asset.StorageStage != StorageStageFinal ||
+			asset.DeleteRequestedAt != nil || asset.DeletedAt != nil ||
 			asset.FinalKey == nil || *asset.FinalKey == "" ||
 			asset.FinalVersionID == nil || *asset.FinalVersionID == "" {
 			return ErrReviewInvariant
@@ -41,6 +42,10 @@ func (r *GormRepository) CreateReviewProjection(ctx context.Context, assetPublic
 		value := ReviewProjection{
 			ProjectionID: projectionID, AssetID: asset.ID, Status: ProjectionPending,
 			RowVersion: 1, CreatedAt: now, UpdatedAt: now,
+		}
+		if !asset.Purpose.ContentReviewRequired() {
+			value.Status = ProjectionNotRequired
+			value.DecidedAt = timePointer(now)
 		}
 		if err := tx.Create(&value).Error; err != nil {
 			return err

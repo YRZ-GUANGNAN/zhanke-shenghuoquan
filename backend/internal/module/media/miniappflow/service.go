@@ -505,7 +505,7 @@ func projectStatus(fact StatusFact) AssetStatus {
 	state, message, recovery := StateProcessing, "图片正在进行技术处理", RecoveryPoll
 	canUse := false
 	switch {
-	case fact.TechnicalStatus == coremedia.TechnicalDeleted:
+	case fact.TechnicalStatus == coremedia.TechnicalDeleted || fact.DeleteRequested:
 		state, message, recovery = StateDeleted, "图片已删除", RecoveryNewUpload
 	case fact.TicketStatus == coremedia.TicketExpired:
 		state, message, recovery = StateExpired, "上传票据已过期，请重新选择图片", RecoveryNewUpload
@@ -513,6 +513,13 @@ func projectStatus(fact StatusFact) AssetStatus {
 		state, message, recovery = StateUploadFailed, "上传未完成，请重新上传", RecoveryNewUpload
 	case fact.TicketStatus == coremedia.TicketCreated || fact.TicketStatus == coremedia.TicketAuthorizationIssued:
 		state, message, recovery = StateWaitingUpload, "等待确认 COS 上传；已完成直传可继续确认，否则请重新上传", RecoveryComplete
+	case fact.TechnicalStatus != coremedia.TechnicalFinalReady || fact.StorageStage != coremedia.StorageStageFinal:
+		// Review or policy state can never make an incomplete/deleting object usable.
+	case fact.Projection != nil && *fact.Projection == coremedia.ProjectionNotRequired && !fact.Purpose.ContentReviewRequired():
+		state, message, recovery, canUse = StateReady, "图片已上传，保存后生效", RecoveryNone, true
+		if fact.Purpose == coremedia.PurposeIdentityApplication {
+			message = "证明材料已上传，提交申请后由管理员人工核验"
+		}
 	case fact.Projection != nil && *fact.Projection == coremedia.ProjectionApproved:
 		state, message, recovery, canUse = StateApproved, "图片审核通过，可以使用", RecoveryNone, true
 	case fact.Projection != nil && *fact.Projection == coremedia.ProjectionRejected:

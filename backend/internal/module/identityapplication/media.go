@@ -335,7 +335,7 @@ func validAdminProofSnapshot(snapshot coremedia.GatewaySnapshot, requestedPublic
 		snapshot.StorageStage == coremedia.StorageStageFinal &&
 		snapshot.TechnicalStatus == coremedia.TechnicalFinalReady &&
 		snapshot.FinalIdentityReady && !snapshot.DeleteRequested &&
-		snapshot.ProjectionStatus == coremedia.ProjectionApproved
+		coremedia.ReviewAllowsUse(coremedia.PurposeIdentityApplication, snapshot.ProjectionStatus)
 }
 
 func validAdminProofReference(reference coremedia.AssetReference, assetID uint64, applicationPublicID string, slot uint16) bool {

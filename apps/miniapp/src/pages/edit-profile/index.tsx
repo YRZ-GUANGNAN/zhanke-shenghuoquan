@@ -4,7 +4,7 @@ import CapsulePageHeader from '../../components/capsule-page-header'
 import ProfileCoverEditor from '../../components/profile-cover-editor'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import { currentUser, updateProfile } from '../../services/a-user'
-import { chooseAndUploadImages, waitForMediaApproval, type UploadedMedia } from '../../services/media'
+import { chooseAndUploadImages, confirmDirectUpload, type UploadedMedia } from '../../services/media'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
 import './index.scss'
@@ -35,10 +35,10 @@ function EditProfileContent() {
     try {
       const [uploaded] = await chooseAndUploadImages('avatar', 1, (value) => { if (isCurrentSession()) setProgress(value.message) }, isCurrentSession)
       if (!uploaded || !isCurrentSession()) return
-      await waitForMediaApproval(uploaded.assetId, (value) => { if (isCurrentSession()) setProgress(value.message) }, 90000, isCurrentSession)
+      const usable = await confirmDirectUpload(uploaded, isCurrentSession)
       if (!isCurrentSession()) return
-      setAvatar(uploaded)
-      setProgress('头像已通过审核，保存后生效')
+      setAvatar({ ...uploaded, ...usable })
+      setProgress('头像已上传，保存后生效')
     } catch (error) {
       if (!isCurrentSession()) return
       setAvatar(null)

@@ -32,7 +32,7 @@ assert.match(takeoutStyle, /\.student-takeout-state__visual/)
 
 for (const required of [
   "chooseAndUploadImages('avatar'",
-  'waitForMediaApproval',
+  'confirmDirectUpload',
   'updateProfile',
   'currentUser',
   'avatarAssetId',
