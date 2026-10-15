@@ -20,7 +20,8 @@ requireMatch(home, /import\s*\{[^}]*ScrollView[^}]*\}\s*from\s*'@tarojs\/compone
 requireMatch(home, /<ScrollView[\s\S]*scrollY[\s\S]*onScrollToLower=/, '首页必须通过 onScrollToLower 触发翻页')
 forbidMatch(home, /createIntersectionObserver|home-discover-sentinel/, '首页不得继续使用不稳定的 IntersectionObserver sentinel')
 requireMatch(home, /conversationOwnerRef\.current\s*!==\s*ownerKey/, '私信列表必须拒绝旧账号请求写回')
-requireMatch(home, /key=\{activeTab\}/, '首页标签切换时必须隔离 ScrollView 滚动位置')
+requireMatch(home, /key=\{channel\}/, '每个首页频道保留独立 ScrollView')
+requireMatch(home, /scrollTop=\{tabScrollPositions\.current\[channel\]\}/, '首页标签切换时必须独立保存滚动位置')
 
 const chatPage = read('apps/miniapp/src/pages/secondhand-chat/index.tsx')
 requireMatch(chatPage, /<AppIcon\s+name='home'/, '聊天页主页入口必须使用标准 home 图标')
@@ -139,7 +140,7 @@ requireMatch(postDetail, /usePostComments\(/, '帖子详情必须接入独立评
 requireMatch(commentSession, /same idempotency key|Keep text|submission/, '评论会话必须保留失败重试所需的幂等状态')
 requireMatch(commentSession, /like = async|api\.like/, '评论点赞必须走独立请求与确认状态')
 requireMatch(postComments, /查看 \{comment\.replyCount\} 条回复/, '评论组件必须提供楼内回复入口')
-requireMatch(postComments, /onClick=\{\(\) => props\.onLike\(comment\.id\)\}/, '评论组件必须提供单条点赞入口')
+requireMatch(postComments, /onClick=\{\(\) => \{ if \(interactive\) props\.onLike\(comment\.id\) \}\}/, '评论组件必须提供单条点赞入口并拦截退出中的点击')
 requireMatch(communityService, /\/community\/me\/posts\/\$\{encodeURIComponent\(postId\)\}/, '前端必须接入本人帖子详情接口')
 
 const communityHandler = read('backend/internal/module/community/handler.go')

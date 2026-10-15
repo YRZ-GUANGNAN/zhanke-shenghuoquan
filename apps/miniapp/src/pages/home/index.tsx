@@ -8,6 +8,7 @@ import ChannelPager, { useChannelInteraction } from '../../components/channel-pa
 import { AppState } from '../../components/ui'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import StudentBottomNav from '../../components/student-bottom-nav'
+import StudentSecondhandContent from '../student-secondhand/content'
 import CampusInfoHome from '../../components/campus-info-home'
 import { useIdentityGuard } from '../../hooks/use-identity-guard'
 import type { CommunityPost, Product, ToolLink } from '../../types'
@@ -24,7 +25,7 @@ import { useSessionStore } from '../../stores/session'
 import { postBodyWithoutTitle } from '../../utils/post-presentation'
 import './index.scss'
 
-type HomeTab = 'messages' | 'discover' | 'tools'
+type HomeTab = 'discover' | 'secondhand' | 'tools' | 'messages'
 
 type DiscoverCard = {
   id: string
@@ -46,8 +47,8 @@ type SettledResult<T> =
   | { status: 'rejected'; reason: unknown }
 
 const tabs: Array<{ key: HomeTab; label: string }> = [
-  { key: 'messages', label: '私信' },
   { key: 'discover', label: '发现' },
+  { key: 'secondhand', label: '二手' },
   { key: 'tools', label: '工具' }
 ]
 
@@ -133,7 +134,10 @@ function conversationPeerLabel(context: IMConversationContext, currentUserId: st
 }
 
 function HomeContent() {
-  const [activeTab, setActiveTab] = useState<HomeTab>('discover')
+  // Keep this page's entry mode when a pushed page becomes the current router.
+  const [isMessagesPage] = useState(() => Taro.getCurrentInstance().router?.params.tab === 'messages')
+  const [activeTab, setActiveTab] = useState<HomeTab>(isMessagesPage ? 'messages' : 'discover')
+  const [marketVisited, setMarketVisited] = useState(false)
   const channelInteraction = useChannelInteraction()
   const [postCards, setPostCards] = useState<DiscoverCard[]>([])
   const [productCards, setProductCards] = useState<DiscoverCard[]>([])
@@ -145,7 +149,7 @@ function HomeContent() {
   const [conversationStatus, setConversationStatus] = useState<ConversationStatus>('idle')
   const [tools, setTools] = useState<ToolLink[]>([])
   const visibility = useFeatureVisibility()
-  usePageShare({ kind: 'home', enabled: visibility.available && activeTab !== 'messages' })
+  usePageShare({ kind: activeTab === 'secondhand' ? 'secondhand' : 'home', enabled: visibility.available && !isMessagesPage })
   const [toolStatus, setToolStatus] = useState<ToolStatus>('idle')
   const sourceRef = useRef({ communityPage: 0, tradePage: 0, communityTotal: 0, tradeTotal: 0 })
   const loadingRef = useRef(false)
@@ -155,7 +159,7 @@ function HomeContent() {
   const conversationRequestVersion = useRef(0)
   const conversationOwnerRef = useRef('')
   const toolLoadingRef = useRef(false)
-  const tabScrollPositions = useRef<Record<HomeTab, number>>({ discover: 0, messages: 0, 'tools': 0 })
+  const tabScrollPositions = useRef<Record<HomeTab, number>>({ discover: 0, secondhand: 0, messages: 0, 'tools': 0 })
   const cards = useMemo(
     () => interleaveCards(visibility.forum ? postCards : [], visibility.secondhand ? productCards : []),
     [postCards, productCards, visibility.forum, visibility.secondhand]
@@ -166,13 +170,19 @@ function HomeContent() {
   const currentSessionKey = useSessionStore((state) => `${state.token}:${state.profile.id}`)
   const visibleTabs = useMemo(() => {
     if (!visibility) return []
+    if (isMessagesPage) return visibility.messages && visibility.secondhand_chat
+      ? [{ key: 'messages' as const, label: '私信' }] : []
     return tabs.filter((tab) => (
-      tab.key === 'messages' ? visibility.messages && visibility.secondhand_chat :
+      tab.key === 'secondhand' ? visibility.secondhand :
       tab.key === 'discover' ? visibility.forum || visibility.secondhand :
       visibility.campus_tools
     ))
-  }, [visibility])
+  }, [isMessagesPage, visibility])
   const channelKeys = useMemo(() => visibleTabs.map((tab) => tab.key), [visibleTabs])
+
+  useEffect(() => {
+    if (activeTab === 'secondhand' && visibility.secondhand) setMarketVisited(true)
+  }, [activeTab, visibility.secondhand])
 
   const loadDiscover = useCallback(async (
     reset = false,
@@ -387,7 +397,7 @@ function HomeContent() {
   const openSearch = () => {
     if (!channelInteraction.canActivate()) return
     void Taro.navigateTo({
-      url: visibility?.forum
+      url: activeTab !== 'secondhand' && visibility?.forum
         ? '/pages/search/index?scope=community'
         : '/pages/search/index?scope=secondhand'
     })
@@ -482,9 +492,9 @@ function HomeContent() {
   return (
     <View className='page student-home-page'>
       <CapsulePageHeader
-        variant='tabs'
+        variant={isMessagesPage ? 'standard' : 'tabs'}
         className='student-home-header'
-        center={
+        center={isMessagesPage ? <Text className='student-home-header__title'>私信</Text> :
           <View className='student-home-header__tabs'>
             {visibleTabs.map((tab) => (
               <View
@@ -497,7 +507,7 @@ function HomeContent() {
             ))}
           </View>
         }
-        right={visibility.search && (visibility.forum || visibility.secondhand) ? (
+        right={!isMessagesPage && visibility.search && (visibility.forum || visibility.secondhand) ? (
           <View
             className='student-home-header__search'
             onClick={openSearch}
@@ -515,7 +525,14 @@ function HomeContent() {
         activeKey={activeTab}
         onChange={setActiveTab}
         interaction={channelInteraction}
-        renderPage={(channel) => (
+        renderPage={(channel) => channel === 'secondhand' ? (
+          marketVisited && visibility.secondhand ? <StudentSecondhandContent
+            key={currentSessionKey}
+            embedded
+            active={activeTab === 'secondhand'}
+            interaction={channelInteraction}
+          /> : <AppState kind='loading' title='正在准备二手集市' />
+        ) : (
       <ScrollView
         key={channel}
         className='student-home-content'
@@ -635,7 +652,7 @@ function HomeContent() {
         )}
       /> : <View className='student-tool-state'><Text>{visibility.available ? '当前暂无开放的模块，可前往“我的”管理账号。' : '功能状态读取失败，请检查网络后重新进入。'}</Text></View>}
 
-      <StudentBottomNav active='home' />
+      <StudentBottomNav active={isMessagesPage ? 'messages' : 'home'} />
     </View>
   )
 }

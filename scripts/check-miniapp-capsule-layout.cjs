@@ -118,7 +118,11 @@ for (const pageName of publishingAndDetailPages) {
 const mainPages = ['home', 'search', 'student-secondhand', 'student-takeout']
 
 for (const pageName of mainPages) {
-  const source = fs.readFileSync(path.join(miniappPagesRoot, pageName, 'index.tsx'), 'utf8')
+  let source = fs.readFileSync(path.join(miniappPagesRoot, pageName, 'index.tsx'), 'utf8')
+  if (pageName === 'student-secondhand') {
+    assert.match(source, /return <StudentSecondhandContent \/>/, '二手直达页复用真实频道内容')
+    source += fs.readFileSync(path.join(miniappPagesRoot, pageName, 'content.tsx'), 'utf8')
+  }
   const style = fs.readFileSync(path.join(miniappPagesRoot, pageName, 'index.scss'), 'utf8')
   assert.match(source, /CapsulePageHeader/, `${pageName} must use CapsulePageHeader`)
   assert.doesNotMatch(style, /--capsule-safe-right/, `${pageName} must not squeeze business navigation beside the capsule`)
@@ -151,12 +155,13 @@ assert.equal(customNavigationPages.length, 28, 'custom navigation page inventory
 for (const pageName of customNavigationPages) {
   const sourcePath = path.join(miniappPagesRoot, pageName, 'index.tsx')
   assert.ok(fs.existsSync(sourcePath), `${pageName} custom navigation page source is missing`)
-  const source = fs.readFileSync(sourcePath, 'utf8')
+  let source = fs.readFileSync(sourcePath, 'utf8')
+  if (pageName === 'student-secondhand') source += fs.readFileSync(path.join(miniappPagesRoot, pageName, 'content.tsx'), 'utf8')
   assert.match(source, /CapsulePageHeader|CapsuleSystemRow/, `${pageName} custom navigation is not capsule-safe`)
 }
 
 const allCustomNavigationSource = customNavigationPages
-  .flatMap((pageName) => ['index.tsx', 'index.scss'].map((fileName) => path.join(miniappPagesRoot, pageName, fileName)))
+  .flatMap((pageName) => (pageName === 'student-secondhand' ? ['index.tsx', 'content.tsx', 'index.scss'] : ['index.tsx', 'index.scss']).map((fileName) => path.join(miniappPagesRoot, pageName, fileName)))
   .filter(fs.existsSync)
   .map((fileName) => fs.readFileSync(fileName, 'utf8'))
   .join('\n')

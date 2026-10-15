@@ -6,7 +6,7 @@ const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8')
 
 const page = read('apps', 'miniapp', 'src', 'pages', 'search', 'index.tsx')
 const home = read('apps', 'miniapp', 'src', 'pages', 'home', 'index.tsx')
-const secondhand = read('apps', 'miniapp', 'src', 'pages', 'student-secondhand', 'index.tsx')
+const secondhand = read('apps', 'miniapp', 'src', 'pages', 'student-secondhand', 'content.tsx')
 const community = read('apps', 'miniapp', 'src', 'services', 'b-community.ts')
 const trade = read('apps', 'miniapp', 'src', 'services', 'c-trade.ts')
 const navigation = read('apps', 'miniapp', 'src', 'services', 'd-navigation.ts')

@@ -14,6 +14,11 @@
   font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 }
 
+.student-secondhand-page--embedded {
+  height: 100%;
+  min-height: 0;
+}
+
 .student-secondhand-header {
   z-index: 6;
   flex: 0 0 auto;
@@ -91,12 +96,15 @@
   justify-content: center;
   height: 88rpx;
   color: $text-secondary;
+  transition: color $duration-fast $ease-standard;
+  text { transition: opacity $duration-fast $ease-standard; }
+  &:active text { opacity: .6; }
 }
 .student-secondhand-category--active {
   color: $brand-primary;
   font-weight: 700;
 }
-.student-secondhand-category--active::after {
+.student-secondhand-category::after {
   position: absolute;
   right: 18%;
   bottom: 8rpx;
@@ -105,6 +113,13 @@
   border-radius: 4rpx;
   background: $brand-primary;
   content: '';
+  transform: scaleX(0);
+  opacity: 0;
+  transition: transform $duration-standard $ease-standard, opacity $duration-fast $ease-standard;
+}
+.student-secondhand-category--active::after {
+  transform: scaleX(1);
+  opacity: 1;
 }
 .student-secondhand-scroll {
   flex: 1 1 auto;
@@ -137,7 +152,8 @@
   background: $bg-surface;
 }
 .secondhand-card--pressed {
-  opacity: .72;
+  .secondhand-card__media { transform: scale(.985); opacity: .82; }
+  .secondhand-card__body { opacity: .72; }
 }
 .secondhand-card--sold {
   opacity: .65;
@@ -150,6 +166,7 @@
   overflow: hidden;
   border-radius: 16rpx;
   background: $bg-screen;
+  transition: transform $duration-fast $ease-standard, opacity $duration-fast $ease-standard;
 }
 .secondhand-card__image, .secondhand-card__no-image {
   position: absolute;
@@ -200,6 +217,7 @@
 }
 .secondhand-card__body {
   padding: 16rpx 8rpx 0;
+  transition: opacity $duration-fast $ease-standard;
 }
 .secondhand-card__title {
   @include ref.type(label);
@@ -290,5 +308,22 @@
   display: block;
   padding: 24rpx 0;
   color: $brand-primary;
+}
+
+// A category replacement fades once; pagination never replays the whole grid.
+.student-secondhand-scroll { animation: market-category-reveal $duration-standard $ease-standard; }
+@keyframes market-category-reveal {
+  from { opacity: .65; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .student-secondhand-scroll { animation: none; }
+  .student-secondhand-category,
+  .student-secondhand-category text,
+  .student-secondhand-category::after,
+  .secondhand-card__media,
+  .secondhand-card__body { transition: none; }
+  .secondhand-card--pressed .secondhand-card__media { transform: none; }
 }
 // Shared bottom navigation styles are owned by StudentBottomNav.

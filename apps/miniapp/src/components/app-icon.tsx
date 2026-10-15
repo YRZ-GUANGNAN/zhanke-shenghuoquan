@@ -6,6 +6,8 @@ import navTakeaway from '../assets/icons/nav-takeaway.svg'
 import navTakeawayActive from '../assets/icons/nav-takeaway-active.svg'
 import navMarket from '../assets/icons/nav-market.svg'
 import navMarketActive from '../assets/icons/nav-market-active.svg'
+import navMessages from '../assets/icons/nav-messages.svg'
+import navMessagesActive from '../assets/icons/nav-messages-active.svg'
 import navProfile from '../assets/icons/nav-profile.svg'
 import navProfileActive from '../assets/icons/nav-profile-active.svg'
 import addWhite from '../assets/icons/add-white.svg'
@@ -39,6 +41,7 @@ export type AppIconName =
   | 'home'
   | 'takeaway'
   | 'market'
+  | 'messages'
   | 'profile'
   | 'add'
   | 'image'
@@ -65,6 +68,7 @@ const sources: Record<AppIconName, { normal: string; active: string }> = {
   home: { normal: navHome, active: navHomeActive },
   takeaway: { normal: navTakeaway, active: navTakeawayActive },
   market: { normal: navMarket, active: navMarketActive },
+  messages: { normal: navMessages, active: navMessagesActive },
   profile: { normal: navProfile, active: navProfileActive },
   add: { normal: addWhite, active: addWhite },
   image: { normal: image, active: image },

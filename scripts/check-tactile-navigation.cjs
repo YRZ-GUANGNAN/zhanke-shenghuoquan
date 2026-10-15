@@ -47,6 +47,8 @@ async function run() {
     publish: true,
     post: true,
     secondhand_publish: true,
+    messages: true,
+    secondhand_chat: true,
   }
   const shows = new Set()
   const navigations = []
@@ -109,7 +111,7 @@ async function run() {
 
     await event(() => { items()[2].onClick(); items()[2].onClick() })
     assert.equal(navigations.length, 1, '同帧点击同一入口只导航一次')
-    assert.equal(navigations[0].url, '/pages/student-secondhand/index')
+    assert.equal(navigations[0].url, '/pages/home/index?tab=messages')
     await event(() => navigations[0].reject(new Error('isolated navigation failure')))
     await event(() => items()[2].onClick())
     assert.equal(navigations.length, 2, '导航失败后可以立即重试')
@@ -145,7 +147,7 @@ async function run() {
     options.visibility = { ...visibility, publish: false, post: false, secondhand_publish: false }
     await render()
     assert.equal(container.querySelector('.student-bottom-nav__publish'), null, '关闭发布策略时不渲染发布入口')
-    options.visibility = { ...visibility, secondhand: false }
+    options.visibility = { ...visibility, messages: false, secondhand_chat: false }
     await render()
     assert.equal(container.querySelectorAll('.student-bottom-nav__item').length, 3, '关闭二手只移除二手入口')
 

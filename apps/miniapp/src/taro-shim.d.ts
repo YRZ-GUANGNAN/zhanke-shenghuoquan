@@ -1,4 +1,9 @@
 declare module '@tarojs/taro' {
+  export interface SelectorQuery {
+    select(selector: string): { boundingClientRect(): SelectorQuery }
+    exec(callback: (result: Array<{ height?: number } | null>) => void): void
+  }
+  export function createSelectorQuery(): SelectorQuery
   export function nextTick(callback: () => void): void
   export function hideKeyboard(): Promise<unknown>
   export function useDidShow(callback: () => void): void

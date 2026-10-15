@@ -6,6 +6,7 @@ import { Image, ScrollView, Swiper, SwiperItem, Text, View } from '@tarojs/compo
 import CapsulePageHeader from '../../components/capsule-page-header'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import AppIcon from '../../components/app-icon'
+import { ConfirmedIcon, ExpandableText } from '../../components/content-motion'
 import { AppActionSheet, AppDialog, AppIconButton, AppNotice, AppState } from '../../components/ui'
 import { isApiError } from '../../services/api'
 import { changeProductStatus, contactSeller, getProduct, getTradeViewerState, setProductFavorited } from '../../services/c-trade'
@@ -37,7 +38,12 @@ function SecondhandDetailPage() {
   const targetCommentId = Taro.getCurrentInstance().router?.params?.commentId ?? ''
   const validId = /^[1-9]\d*$/.test(requestedId)
   const currentUserId = useSessionStore((state) => state.profile.id)
+  const sessionToken = useSessionStore((state) => state.token)
+  const ownerKey = `${requestedId}:${currentUserId}:${sessionToken}`
+  const ownerRef = useRef(ownerKey)
+  ownerRef.current = ownerKey
   const [product, setProduct] = useState<Product | null>(null)
+  const [descriptionLayoutReady, setDescriptionLayoutReady] = useState(false)
   const [status, setStatus] = useState<'loading' | 'ready' | 'empty' | 'error'>(
     validId ? 'loading' : 'empty'
   )
@@ -51,6 +57,7 @@ function SecondhandDetailPage() {
   const [contactVisible, setContactVisible] = useState(false)
   const [favorited, setFavorited] = useState<boolean | null>(null)
   const [favoritePending, setFavoritePending] = useState(false)
+  const [favoriteFeedback, setFavoriteFeedback] = useState(0)
   const [contactPending, setContactPending] = useState(false)
   const [statusPending, setStatusPending] = useState(false)
   const [statusCandidate, setStatusCandidate] = useState<Product['status'] | null>(null)
@@ -68,28 +75,37 @@ function SecondhandDetailPage() {
     requestVersion.current = version
     let active = true
     setStatus('loading')
+    setDescriptionLayoutReady(false)
+    setScrollTarget('')
     setGallery({ items: [], index: 0 })
     setMediaPending(false)
     setAvatarFailed(false)
     setViewerLoading(true)
     setFavorited(null)
+    actionLocks.current = { favorite: false, contact: false, status: false }
+    setFavoritePending(false)
+    setFavoriteFeedback(0)
+    setContactPending(false)
+    setStatusPending(false)
+    setContactVisible(false)
+    setStatusCandidate(null)
 
     void getTradeViewerState(requestedId).catch(() => null).then((viewerState) => {
-      if (!active || requestVersion.current !== version) return
+      if (!active || requestVersion.current !== version || ownerRef.current !== ownerKey) return
       setFavorited(viewerState?.favorited ?? null)
       setViewerLoading(false)
     })
     void getProduct(requestedId).then(async (value) => {
-      if (!active || requestVersion.current !== version) return
+      if (!active || requestVersion.current !== version || ownerRef.current !== ownerKey) return
       setProduct(value)
       setStatus('ready')
       setMediaPending(value.images.length > 0)
       const media = await preparePostMedia(value.images, (src) => Taro.getImageInfo({ src }))
-      if (!active || requestVersion.current !== version) return
+      if (!active || requestVersion.current !== version || ownerRef.current !== ownerKey) return
       setGallery({ items: media, index: 0 })
       setMediaPending(false)
     }).catch((error: unknown) => {
-      if (!active || requestVersion.current !== version) return
+      if (!active || requestVersion.current !== version || ownerRef.current !== ownerKey) return
       setProduct(null)
       setStatus(isApiError(error) && error.status === 404 ? 'empty' : 'error')
     })
@@ -98,7 +114,7 @@ function SecondhandDetailPage() {
       active = false
       requestVersion.current += 1
     }
-  }, [reloadKey, requestedId, validId])
+  }, [reloadKey, requestedId, validId, ownerKey])
 
   const goBack = () => {
     void Taro.navigateBack().catch(() => Taro.redirectTo({ url: '/pages/student-secondhand/index' }))
@@ -129,34 +145,45 @@ function SecondhandDetailPage() {
 
   const handleFavorite = async () => {
     if (!product || !visibility.favorites || viewerLoading || actionLocks.current.favorite) return
+    const version = requestVersion.current
+    const isCurrent = () => requestVersion.current === version && ownerRef.current === ownerKey
     actionLocks.current.favorite = true
     setFavoritePending(true)
     try {
       const serverState = favorited === null ? await getTradeViewerState(product.id) : null
+      if (!isCurrent()) return
       const desired = !(serverState?.favorited ?? favorited)
       if (product.status === 'sold' && desired) {
         showToast('已售商品不能新增收藏')
         return
       }
       const next = await setProductFavorited(product.id, desired)
+      if (!isCurrent()) return
       setFavorited(next)
+      setFavoriteFeedback(value => value + 1)
       await Taro.showToast({ title: next ? '已收藏' : '已取消收藏', icon: 'success', duration: 1400 })
     } catch (error) {
+      if (!isCurrent()) return
       try {
         const serverState = await getTradeViewerState(product.id)
+        if (!isCurrent()) return
         setFavorited(serverState.favorited)
       } catch {
         // 结果未知时保留最后一次已确认状态，不在前端猜测成功。
       }
-      await Taro.showToast({ title: writeErrorMessage(error, '收藏'), icon: 'none', duration: 1800 })
+      if (isCurrent()) await Taro.showToast({ title: writeErrorMessage(error, '收藏'), icon: 'none', duration: 1800 })
     } finally {
-      actionLocks.current.favorite = false
-      setFavoritePending(false)
+      if (isCurrent()) {
+        actionLocks.current.favorite = false
+        setFavoritePending(false)
+      }
     }
   }
 
   const handleStartChat = async () => {
     if (!product || !visibility.secondhand_chat || actionLocks.current.contact) return
+    const version = requestVersion.current
+    const isCurrent = () => requestVersion.current === version && ownerRef.current === ownerKey
     if (product.status === 'sold') {
       showToast('已售商品不能新建私信会话')
       return
@@ -165,15 +192,18 @@ function SecondhandDetailPage() {
     setContactPending(true)
     try {
       const relation = await contactSeller(product.id)
+      if (!isCurrent()) return
       setContactVisible(false)
       await Taro.navigateTo({
         url: `/pages/secondhand-chat/index?relationId=${encodeURIComponent(String(relation.relationId))}`
       })
     } catch (error) {
-      await Taro.showToast({ title: writeErrorMessage(error, '联系卖家'), icon: 'none', duration: 1800 })
+      if (isCurrent()) await Taro.showToast({ title: writeErrorMessage(error, '联系卖家'), icon: 'none', duration: 1800 })
     } finally {
-      actionLocks.current.contact = false
-      setContactPending(false)
+      if (isCurrent()) {
+        actionLocks.current.contact = false
+        setContactPending(false)
+      }
     }
   }
 
@@ -186,18 +216,25 @@ function SecondhandDetailPage() {
     const nextStatus = statusCandidate
     if (!product || actionLocks.current.status || !isSeller) return
     if (!nextStatus) return
+    const version = requestVersion.current
+    const isCurrent = () => requestVersion.current === version && ownerRef.current === ownerKey
     actionLocks.current.status = true
     setStatusPending(true)
     try {
       await changeProductStatus(product.id, nextStatus)
-      setProduct(await getProduct(product.id))
+      if (!isCurrent()) return
+      const updated = await getProduct(product.id)
+      if (!isCurrent()) return
+      setProduct(updated)
       setStatusCandidate(null)
       await Taro.showToast({ title: '状态已更新', icon: 'success' })
     } catch (error) {
-      await Taro.showToast({ title: writeErrorMessage(error, '更新状态'), icon: 'none', duration: 1800 })
+      if (isCurrent()) await Taro.showToast({ title: writeErrorMessage(error, '更新状态'), icon: 'none', duration: 1800 })
     } finally {
-      actionLocks.current.status = false
-      setStatusPending(false)
+      if (isCurrent()) {
+        actionLocks.current.status = false
+        setStatusPending(false)
+      }
     }
   }
 
@@ -260,7 +297,7 @@ function SecondhandDetailPage() {
               </View>
 
               <Text className='secondhand-detail-info__title'>{product.title}</Text>
-              <Text className='secondhand-detail-info__desc' selectable>{product.description}</Text>
+              <ExpandableText key={product.id} text={product.description} lines={8} className='secondhand-detail-info__desc' onLayoutReady={setDescriptionLayoutReady} />
 
               <View className='secondhand-detail-tags'>
                 {tags.map((tag) => (
@@ -295,9 +332,11 @@ function SecondhandDetailPage() {
               </View>
 
               {visibility.secondhand_comments && <ProductComments
+                key={ownerKey}
                 productId={product.id}
                 productStatus={product.status}
                 targetCommentId={targetCommentId}
+                layoutReady={descriptionLayoutReady && !mediaPending}
                 onTargetReady={setScrollTarget}
                 onLoadMoreReady={(handler) => { commentsLoadMoreRef.current = handler }}
               />}
@@ -334,9 +373,11 @@ function SecondhandDetailPage() {
                 ariaLabel={favorited ? '取消收藏' : '收藏商品'}
                 onClick={() => void handleFavorite()}
               >
-                <AppIcon
+                <ConfirmedIcon
                   name='star'
                   active={Boolean(favorited)}
+                  event={favoriteFeedback}
+                  owner={ownerKey}
                   className='secondhand-detail-favorite__star'
                 />
                 <Text>{viewerLoading ? '读取中' : favoritePending ? '处理中' : favorited ? '已收藏' : '收藏'}</Text>

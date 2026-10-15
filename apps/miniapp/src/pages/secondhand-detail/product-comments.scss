@@ -206,3 +206,18 @@
   font-size: 24rpx;
   line-height: 36rpx;
 }
+
+.product-comments__disclosure {
+  display: flex; align-items: center; gap: 8PX;
+  min-height: 44PX; margin-left: 72rpx;
+  color: $brand-primary-strong; font-size: 13PX; line-height: 1.5;
+}
+.product-comments__connector { width: 16PX; height: 1PX; background: $divider-nav; }
+.product-comments__disclosure-icon { width: 12PX; height: 12PX; transform: rotate(90deg); transition: transform 180ms $ease-standard; }
+.product-comments__disclosure-icon--open { transform: rotate(-90deg); }
+.product-comments__send { transition: opacity 120ms $ease-standard, background-color 120ms $ease-standard; }
+.product-comments__disclosure:active, .product-comment__reply-action:active,
+.product-comments__send:not(.product-comments__send--disabled):active { opacity: .7; }
+@media (prefers-reduced-motion: reduce) {
+  .product-comments__disclosure-icon, .product-comments__send { transition: none; }
+}

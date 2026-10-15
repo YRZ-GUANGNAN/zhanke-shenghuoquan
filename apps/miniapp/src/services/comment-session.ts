@@ -19,6 +19,7 @@ export interface CommentSessionState {
   target: CommunityThreadComment | null
   submitting: boolean
   likeBusy: Record<string, boolean>
+  likeFeedback: Record<string, number>
   error: string
   notice: string
 }
@@ -45,7 +46,7 @@ export class CommentSession {
   private submission: { signature: string; key: string } | null = null
   private likeOverrides = new Map<string, LikeState>()
   private local = new Map<string, CommunityThreadComment>()
-  private state: CommentSessionState = { roots: emptyPage(), replies: {}, draft: '', target: null, submitting: false, likeBusy: {}, error: '', notice: '' }
+  private state: CommentSessionState = { roots: emptyPage(), replies: {}, draft: '', target: null, submitting: false, likeBusy: {}, likeFeedback: {}, error: '', notice: '' }
 
   constructor(private postId: string, private profile: Pick<UserProfile, 'id' | 'nickname' | 'avatar'>, private api: CommentSessionAPI) {}
 
@@ -127,6 +128,7 @@ export class CommentSession {
       if (!this.alive) return
       this.likeOverrides.set(id, state)
       this.patchComment(id, state)
+      this.update({ likeFeedback: { ...this.state.likeFeedback, [id]: (this.state.likeFeedback[id] ?? 0) + 1 } })
     } catch {
       this.update({ error: '点赞未确认，请重试；已确认的状态会保留' })
     } finally {

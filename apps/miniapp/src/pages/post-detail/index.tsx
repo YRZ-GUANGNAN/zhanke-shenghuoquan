@@ -8,6 +8,7 @@ import { Image, Input, ScrollView, Swiper, SwiperItem, Text, View } from '@taroj
 import CapsulePageHeader from '../../components/capsule-page-header'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import AppIcon from '../../components/app-icon'
+import { ConfirmedIcon, ExpandableText } from '../../components/content-motion'
 import { AppIconButton, AppState } from '../../components/ui'
 import Taro from '../../services/taro'
 import type { CommunityPost, CommunityThreadComment } from '../../types'
@@ -74,6 +75,8 @@ function PostDetailPage() {
   const [post, setPost] = useState<CommunityPost | null>(null)
   const [liked, setLiked] = useState(false)
   const [favorited, setFavorited] = useState(false)
+  const [likeFeedback, setLikeFeedback] = useState(0)
+  const [favoriteFeedback, setFavoriteFeedback] = useState(0)
   const [following, setFollowing] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -89,6 +92,8 @@ function PostDetailPage() {
   const [preparedMediaKey, setPreparedMediaKey] = useState('')
   const [mediaSize, setMediaSize] = useState<PostMedia | undefined>()
   const [commentsAnchor, setCommentsAnchor] = useState('')
+  const [bodyLayoutReady, setBodyLayoutReady] = useState(false)
+  const [commentsRequested, setCommentsRequested] = useState(false)
   const actionLock = useRef(false)
   const viewerLock = useRef(false)
   const detailVersion = useRef(0)
@@ -141,14 +146,20 @@ function PostDetailPage() {
   }, [mediaKey])
 
   useEffect(() => {
-    if (!loading && !commentsLoading && preparedMediaKey === mediaKey && isApproved && visibility.comment && params.anchor === 'comments') {
-      nextTick(() => setCommentsAnchor('post-comments'))
+    let alive = true
+    if (!loading && !commentsLoading && (!body || bodyLayoutReady) && preparedMediaKey === mediaKey && isApproved && visibility.comment && (params.anchor === 'comments' || commentsRequested)) {
+      nextTick(() => {
+        if (!alive) return
+        setCommentsAnchor('post-comments')
+        setCommentsRequested(false)
+      })
     }
-  }, [loading, commentsLoading, preparedMediaKey, mediaKey, isApproved, visibility.comment, params.anchor])
+    return () => { alive = false }
+  }, [loading, commentsLoading, body, bodyLayoutReady, preparedMediaKey, mediaKey, isApproved, visibility.comment, params.anchor, commentsRequested])
 
   const showComments = () => {
     setCommentsAnchor('')
-    nextTick(() => setCommentsAnchor('post-comments'))
+    setCommentsRequested(true)
   }
 
   const loadViewerState = async (id: string, version: number) => {
@@ -185,8 +196,12 @@ function PostDetailPage() {
       setPost(null)
       setViewerError('')
       setActioning(false)
+      setLikeFeedback(0)
+      setFavoriteFeedback(0)
       setViewerLoading(true)
       setCommentsAnchor('')
+      setBodyLayoutReady(false)
+      setCommentsRequested(false)
       if (!postId) {
         setError('帖子链接缺少编号，无法读取')
         setLoading(false)
@@ -266,6 +281,7 @@ function PostDetailPage() {
       const confirmed = await setPostLiked(post.id, next)
       if (!isCurrent()) return
       setLiked(confirmed.liked)
+      setLikeFeedback(value => value + 1)
       setPost((current) => current ? { ...current, likedCount: confirmed.likedCount } : current)
     })
 
@@ -276,6 +292,7 @@ function PostDetailPage() {
       await setPostFavorited(post.id, next)
       if (!isCurrent()) return
       setFavorited(next)
+      setFavoriteFeedback(value => value + 1)
       setPost((current) => current ? { ...current, favoriteCount: Math.max(0, current.favoriteCount + (next ? 1 : -1)) } : current)
     })
 
@@ -384,7 +401,7 @@ function PostDetailPage() {
 
             <View className={`post-detail-content${post.images.length > 0 ? '' : ' post-detail-content--without-media'}`}>
               <Text className="post-detail-content__title">{post.title || '校园动态'}</Text>
-              {body ? <Text className="post-detail-content__body" selectable>{body}</Text> : null}
+              {body ? <ExpandableText key={post.id} text={body} lines={8} className='post-detail-content__body' onLayoutReady={setBodyLayoutReady} /> : null}
               {tags.length > 0 ? (
                 <View className="post-detail-tags">
                   {tags.map((tag) => <Text className="post-detail-tag" key={tag}>#{tag}</Text>)}
@@ -396,7 +413,7 @@ function PostDetailPage() {
             </View>
 
             {isApproved && visibility.comment ? (
-              <PostCommentList state={commentState} publicCount={commentState.publicCount ?? post.commentCount}
+              <PostCommentList key={`${postId}:${sessionToken}`} state={commentState} publicCount={commentState.publicCount ?? post.commentCount}
                 canReply={visibility.canComment} canLike={visibility.likes}
                 onReply={replyToComment}
                 onLike={id => { if (visibility.likes) void commentSession.like(id) }}
@@ -440,11 +457,11 @@ function PostDetailPage() {
                 </View>
               ) : <>
               {visibility.likes && <View className={`post-detail-action${liked ? ' post-detail-action--active' : ''}${interactionPending ? ' post-detail-action--pending' : ''}`} role='button' aria-disabled={interactionPending} aria-label={`${liked ? '取消点赞' : '点赞'}，${post.likedCount}`} onClick={handleLike}>
-                <AppIcon name='heart' active={liked} className='post-detail-action__icon' />
+                <ConfirmedIcon name='heart' active={liked} event={likeFeedback} owner={`${postId}:${sessionToken}`} className='post-detail-action__icon' />
                 <Text>{post.likedCount}</Text>
               </View>}
               {visibility.favorites && <View className={`post-detail-action${favorited ? ' post-detail-action--active post-detail-action--favorite' : ''}${interactionPending ? ' post-detail-action--pending' : ''}`} role='button' aria-disabled={interactionPending} aria-label={`${favorited ? '取消收藏' : '收藏'}，${post.favoriteCount}`} onClick={handleFavorite}>
-                <AppIcon name='star' active={favorited} className='post-detail-action__icon' />
+                <ConfirmedIcon name='star' active={favorited} event={favoriteFeedback} owner={`${postId}:${sessionToken}`} className='post-detail-action__icon' />
                 <Text>{post.favoriteCount}</Text>
               </View>}
               {visibility.comment && <View className="post-detail-action" role='button' aria-label='查看评论' onClick={showComments}>

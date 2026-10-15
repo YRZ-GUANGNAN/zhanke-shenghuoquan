@@ -107,7 +107,8 @@ for (const [route, css] of compiled) {
   })
 }
 assert.match(read('styles/design-tokens.scss'), /\$brand-primary: #2E7DD4;/, '保持既有蓝色品牌')
-assert.ok(/className=['"]post-detail-comment__content['"][^>]*>\{comment\.content\}<\/Text>/.test(read('pages/post-detail/post-comments.tsx')), '评论正文完整显示，不将头像首字截取误判为正文截断')
+assert.match(read('pages/post-detail/post-comments.tsx'), /ExpandableText\s+text=\{comment\.content\}/, '评论折叠接收完整正文，不截断数据')
+assert.match(read('components/content-motion.tsx'), /selectable>\{text\}<\/Text>/, '完整正文保留在可展开组件中')
 assert.doesNotMatch(read('pages/delivery-conversation/index.config.ts'), /navigationStyle:\s*['"]custom['"]/, '配送沟通仍由原生导航保留系统区')
 assert.doesNotMatch(read('pages/delivery-conversation/index.tsx'), /CapsuleSystemRow/, '原生导航页面不再叠加自定义系统区')
 console.log(`参考排版检查通过：${routes.length - excluded.length} 个页面接入，${excluded.length} 个咨询页保留；Sass + Taro PostCSS 后六类字号在 320–1280px 屏受控，色调、长文本与物理触控检查通过。`)

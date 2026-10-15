@@ -245,6 +245,9 @@
   width: 36rpx;
   height: 36rpx;
 }
+.secondhand-detail-favorite { transition: opacity 120ms $ease-standard; }
+.secondhand-detail-favorite:active .secondhand-detail-favorite__star { opacity: .7; }
+.secondhand-detail-contact, .secondhand-detail-seller-action, .secondhand-contact-option { transition: opacity 120ms $ease-standard; }
 .secondhand-detail-favorite--active {
   color: $like-active;
 }
@@ -367,4 +370,10 @@
   .product-comments__send { @include ref.touch; display: flex; align-items: center; }
   .product-comments__input { min-height: 44PX; }
   .product-comments__reply-name { min-width: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .secondhand-detail-gallery__count, .secondhand-detail-favorite,
+  .secondhand-detail-contact, .secondhand-detail-seller-action,
+  .secondhand-contact-option { transition: none; }
 }

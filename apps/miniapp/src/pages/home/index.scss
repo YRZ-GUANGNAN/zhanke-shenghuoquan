@@ -20,6 +20,12 @@
   border-bottom: 1rpx solid $divider-nav;
 }
 
+.student-home-header__title {
+  @include ref.type(title);
+  color: $text-strong;
+  font-weight: 700;
+}
+
 .student-home-header .capsule-page-header__business-row {
   padding-right: 24rpx;
   padding-left: 32rpx;

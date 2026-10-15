@@ -50,7 +50,7 @@ async function main() {
       loaded.require = (id) => {
         if (id === 'react' || id === 'react/jsx-runtime') return require(id)
         if (id === '@tarojs/components') return Object.fromEntries(['Image', 'Input', 'ScrollView', 'Swiper', 'SwiperItem', 'Text', 'Textarea', 'View'].map((name) => [name, component(name)]))
-        if (id === '@tarojs/taro') return { useDidShow: (handler) => { showCallback = handler; React.useEffect(() => handler(), []) }, useDidHide: (handler) => { options.hide = handler }, useResize: (handler) => { options.resize = handler } }
+        if (id === '@tarojs/taro') return { nextTick: callback => queueMicrotask(callback), createSelectorQuery: () => ({ selectors: [], select(selector) { this.selectors.push(selector); return this }, boundingClientRect() { return this }, exec(callback) { if (options.measurements) options.measurements.push({ selectors: this.selectors, callback }); else callback([{ height: 22 }, { height: 22 }]) } }), useDidShow: (handler) => { showCallback = handler; React.useEffect(() => { if (!options.lazyMounted) handler() }, []) }, useDidHide: (handler) => { options.hide = handler }, useResize: (handler) => { options.resize = handler } }
         if (id.endsWith('.scss')) return {}
         if (id.endsWith('/feature-page-gate')) return { withFeaturePage: (Page) => Page }
         if (id.endsWith('/use-feature-visibility')) return { useFeatureVisibility: () => options.visibility }
@@ -66,11 +66,15 @@ async function main() {
         if (id.endsWith('/c-trade')) return { listProductComments: async () => pageResult([]), ...options.trade }
         if (id.endsWith('/services/media')) return options.media || {}
         if (id.endsWith('/client-request-id')) return { createClientRequestId: () => 'test-request-' + (++sequence) }
-        if (id.endsWith('/stores/session')) return { useSessionStore: (selector) => selector({ profile: { id: options.userId || 'viewer' } }) }
+        if (id.endsWith('/stores/session')) return { useSessionStore: (selector) => selector({ token: options.token || 'test-token', profile: { id: options.userId || 'viewer' } }) }
         if (id.endsWith('/post-presentation')) return load('utils/post-presentation.ts')
         if (id.endsWith('/gallery-presentation')) return load('utils/gallery-presentation.ts')
         if (id.endsWith('/use-gallery-presentation')) return load('hooks/use-gallery-presentation.ts')
         if (id === './product-comments') return load('pages/secondhand-detail/product-comments.tsx')
+        if (id === './content') return load('pages/student-secondhand/content.tsx')
+        if (id.endsWith('/content-motion')) return load('components/content-motion.tsx')
+        if (id.endsWith('/use-layer-presence')) return load('hooks/use-layer-presence.ts')
+        if (id.endsWith('/use-confirmed-feedback')) return load('hooks/use-confirmed-feedback.ts')
         throw new Error('Unexpected test dependency: ' + id)
       }
       loaded._compile(ts.transpileModule(fs.readFileSync(fullPath, 'utf8'), {
@@ -135,6 +139,33 @@ async function main() {
     assert.equal(requests.length, 7, '关闭二手使旧响应失效并停止返回刷新')
     assert.equal(list.container.querySelector('.secondhand-card'), null)
 
+    const embeddedRequests = [], destinations = []
+    let canActivate = true
+    const embedded = await mount('pages/student-secondhand/content.tsx', { lazyMounted: true, trade: {
+      getProductsPage: (query) => { const task = deferred(); embeddedRequests.push({ query, ...task }); return task.promise },
+    }, taro: { navigateTo: async ({ url }) => destinations.push(url) } }, { embedded: true, active: true, interaction: { canActivate: () => canActivate } })
+    await embedded.event(() => embeddedRequests[0].resolve(pageResult([product('embedded')], 1, 25)))
+    assert.equal(embedded.container.querySelector('.test-header'), null, '嵌入频道不重复显示顶栏')
+    const embeddedNode = embedded.container.querySelector('.student-secondhand-scroll')
+    canActivate = false
+    await embedded.event(() => embedded.props('.secondhand-card').onClick())
+    assert.equal(destinations.length, 0, '横滑后的点击不打开商品')
+    canActivate = true
+    await embedded.event(() => embedded.props('.secondhand-card').onClick())
+    assert.equal(destinations.length, 1)
+    await embedded.show()
+    assert.equal(embeddedRequests.length, 2, '懒挂载频道首次从详情返回也核对商品状态')
+    await embedded.event(() => embeddedRequests[1].resolve(pageResult([product('embedded', { status: 'sold' })], 1, 25)))
+    assert.ok(embedded.container.textContent.includes('已售出'))
+    await embedded.render({ embedded: true, active: false })
+    await embedded.show()
+    await embedded.event(() => embedded.props('.student-secondhand-scroll').onScrollToLower())
+    assert.equal(embeddedRequests.length, 2, '隐藏频道不刷新或加载下一页')
+    await embedded.render({ embedded: true, active: true })
+    assert.equal(embeddedRequests.length, 3, '重新进入时补做被推迟的刷新')
+    assert.equal(embedded.container.querySelector('.student-secondhand-scroll'), embeddedNode, '频道往返保留滚动容器')
+    await embedded.event(() => embeddedRequests[2].resolve(pageResult([product('embedded')], 1, 25)))
+
     const viewer = deferred(), favorite = deferred(), contact = deferred()
     let favorites = 0, contacts = 0, previews = []
     const detail = await mount('pages/secondhand-detail/index.tsx', {
@@ -153,6 +184,7 @@ async function main() {
     assert.equal(favorites, 1, '收藏同帧防重')
     await detail.event(() => favorite.resolve(true))
     assert.ok(detail.container.querySelector('.secondhand-detail-favorite--active'))
+    assert.ok(detail.container.querySelector('.confirmed-icon--pulse'), '收藏真实成功回执后才播放确认反馈')
     const heroNode = detail.container.querySelector('.secondhand-detail-hero')
     await detail.event(() => detail.props('.secondhand-detail-gallery').onChange({ detail: { current: 2, source: 'touch' } }))
     await detail.event(() => detail.all('.secondhand-detail-hero__image')[0].onError())
@@ -171,6 +203,35 @@ async function main() {
     detail.options.visibility = { ...detail.options.visibility, favorites: false, secondhand_chat: false }
     await detail.render()
     assert.equal(detail.container.querySelector('.secondhand-detail-actionbar'), null, '没有可用操作时不保留空底栏')
+
+    const isolatedViewers = [], isolatedWrites = []
+    const isolated = await mount('pages/secondhand-detail/index.tsx', { trade: {
+      getProduct: async id => product(id),
+      getTradeViewerState: () => { const task = deferred(); isolatedViewers.push(task); return task.promise },
+      setProductFavorited: () => { const task = deferred(); isolatedWrites.push(task); return task.promise },
+    } })
+    await isolated.event(() => isolatedViewers[0].resolve({ favorited: false }))
+    assert.equal(isolated.container.querySelector('.confirmed-icon--pulse'), null, '初次状态读取不播放确认反馈')
+    await isolated.event(() => isolated.props('.secondhand-detail-favorite').onClick())
+    await isolated.event(() => isolatedWrites[0].reject(new Error('uncertain write')))
+    assert.equal(isolatedViewers.length, 2, '失败后读取服务器权威状态')
+    isolated.options.token = 'new-account-token'
+    isolated.options.userId = 'new-account'
+    await isolated.render()
+    await isolated.event(() => isolatedViewers[2].resolve({ favorited: false }))
+    await isolated.event(() => isolated.props('.secondhand-detail-favorite').onClick())
+    await isolated.event(() => isolatedViewers[1].resolve({ favorited: true }))
+    assert.equal(isolated.container.querySelector('.secondhand-detail-favorite--active'), null, '旧账号失败回读不能改变新账号状态')
+    assert.ok(isolated.container.querySelector('.secondhand-detail-favorite--pending'), '旧账号 finally 不能释放新账号请求锁')
+    assert.equal(isolated.container.querySelector('.confirmed-icon--pulse'), null, '旧账号响应不触发新账号成功动画')
+    await isolated.event(() => isolatedWrites[1].resolve(true))
+    assert.ok(isolated.container.querySelector('.secondhand-detail-favorite--active'))
+    await isolated.event(() => isolated.props('.secondhand-detail-favorite').onClick())
+    isolated.options.params = { id: '2' }
+    await isolated.render()
+    await isolated.event(() => isolatedViewers[3].resolve({ favorited: false }))
+    await isolated.event(() => isolatedWrites[2].resolve(false))
+    assert.equal(isolated.container.querySelector('.confirmed-icon--pulse'), null, '旧商品成功回执不得给新商品播放反馈')
 
     const commentRequests = [], submissions = []
     let loadMore
@@ -214,6 +275,8 @@ async function main() {
     assert.ok(located.container.textContent.includes('测试留言 20'), '目标留言后续页失败不清空已取得首屏')
     await located.event(() => located.props('.product-comments__state--retry').onClick())
     await located.event(() => locatedRequests[2].resolve(pageResult([comment('30', { replies: [comment('32', { parentCommentId: '30' })] })], 2, 21)))
+    assert.ok(located.container.querySelector('#product-comment-32'), '通知目标在线程展开后可见')
+    await React.act(async () => new Promise(resolve => setTimeout(resolve, 240)))
     assert.deepEqual(targets, ['product-comment-32'], '加载到目标回复后只定位一次')
     await located.render({ productId: '2', productStatus: 'sold' })
     await located.render({ productId: '3', productStatus: 'sold' })
@@ -222,6 +285,47 @@ async function main() {
     assert.ok(!located.container.textContent.includes('旧商品留言'), '商品切换后的旧留言响应作废')
     assert.ok(located.container.textContent.includes('商品已售出，不能继续留言'))
     assert.equal(located.container.querySelector('.product-comments__input'), null)
+
+    const delayedBodies = [], delayedTargets = []
+    const delayedProps = { productId: '1', productStatus: 'selling', targetCommentId: '82', layoutReady: false, onTargetReady: target => delayedTargets.push(target) }
+    const delayedComments = await mount('pages/secondhand-detail/product-comments.tsx', {
+      measurements: delayedBodies,
+      trade: { listProductComments: async () => pageResult([
+        comment('70', { content: '目标之前也有需要折叠的长留言'.repeat(50) }),
+        comment('80', { replies: [comment('82', { parentCommentId: '80', content: '通知中的长回复'.repeat(50) })] }),
+      ]) },
+    }, delayedProps)
+    assert.ok(delayedComments.container.querySelector('.reply-reveal--immediate.reply-reveal--open'), '通知目标立即展开，不依赖动画帧到达')
+    await React.act(async () => new Promise(resolve => setTimeout(resolve, 280)))
+    assert.deepEqual(delayedTargets, [], '超过旧220ms但真实正文测量未完成时不得定位')
+    const resolveBody = async id => {
+      const bodyId = delayedComments.container.querySelector(`#product-comment-${id} .content-fold__text`).id
+      const index = delayedBodies.findIndex(query => query.selectors.includes('#' + bodyId))
+      assert.ok(index >= 0, '存在对应正文测量: ' + id)
+      const query = delayedBodies.splice(index, 1)[0]
+      await delayedComments.event(() => query.callback([{ height: 900 }, { height: 24 }]))
+    }
+    await resolveBody('82')
+    await resolveBody('80')
+    assert.deepEqual(delayedTargets, [], '目标已就绪但上方长留言仍未测量时继续等待')
+    await resolveBody('70')
+    assert.deepEqual(delayedTargets, [], '评论内部就绪但商品描述仍未完成布局时继续等待')
+    await delayedComments.render({ ...delayedProps, layoutReady: true })
+    assert.deepEqual(delayedTargets, ['product-comment-82'], '所有影响目标位置的正文落定后只定位一次')
+    await delayedComments.render({ ...delayedProps, layoutReady: true })
+    assert.deepEqual(delayedTargets, ['product-comment-82'])
+    await delayedComments.event(() => delayedComments.props('.product-comments__disclosure').onClick())
+    assert.equal(delayedComments.container.querySelector('.reply-reveal--immediate'), null, '通知定位后手动收起保留正常动画')
+
+    const canceledBodies = [], canceledTargets = []
+    const canceledJump = await mount('pages/secondhand-detail/product-comments.tsx', {
+      measurements: canceledBodies,
+      trade: { listProductComments: async () => pageResult([comment('90', { replies: [comment('92', { parentCommentId: '90' })] })]) },
+    }, { productId: '1', productStatus: 'selling', targetCommentId: '92', onTargetReady: target => canceledTargets.push(target) })
+    await canceledJump.event(() => canceledJump.props('.product-comments__disclosure').onClick())
+    assert.equal(canceledJump.props('.product-comments__disclosure')['aria-expanded'], false, '慢测量期间手动收起不能被通知定位自动重新打开')
+    await canceledJump.event(() => canceledBodies.splice(0).forEach(query => query.callback([{ height: 900 }, { height: 24 }])))
+    assert.deepEqual(canceledTargets, [], '用户手动改变目标线程后取消待完成的通知跳转')
 
     const upload = deferred(), approvals = [], publishes = []
     let uploads = 0, redirects = 0

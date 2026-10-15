@@ -1,10 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Image, Input, Text, View } from '@tarojs/components'
+import { nextTick } from '@tarojs/taro'
 import { isApiError } from '../../services/api'
 import { createProductComment, listProductComments, replyProductComment } from '../../services/c-trade'
 import { createClientRequestId } from '../../services/client-request-id'
 import Taro from '../../services/taro'
 import type { Product, ProductComment } from '../../types'
+import { ExpandableText, ReplyReveal } from '../../components/content-motion'
+import AppIcon from '../../components/app-icon'
 import { formatPostDate } from '../../utils/post-presentation'
 import './product-comments.scss'
 
@@ -14,6 +17,7 @@ interface ProductCommentsProps {
   productId: string
   productStatus: Product['status']
   targetCommentId?: string
+  layoutReady?: boolean
   onTargetReady?: (elementId: string) => void
   onLoadMoreReady?: (handler: (() => void) | null) => void
 }
@@ -45,7 +49,7 @@ function mergeComments(current: ProductComment[], incoming: ProductComment[]): P
   return Array.from(byId.values())
 }
 
-export default function ProductComments({ productId, productStatus, targetCommentId = '', onTargetReady, onLoadMoreReady }: ProductCommentsProps) {
+export default function ProductComments({ productId, productStatus, targetCommentId = '', layoutReady = true, onTargetReady, onLoadMoreReady }: ProductCommentsProps) {
   const [items, setItems] = useState<ProductComment[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
@@ -57,6 +61,10 @@ export default function ProductComments({ productId, productStatus, targetCommen
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [failedAvatars, setFailedAvatars] = useState<Set<string>>(() => new Set())
+  const [expandedThreads, setExpandedThreads] = useState<Set<string>>(() => new Set())
+  const [focusedCommentId, setFocusedCommentId] = useState(targetCommentId)
+  const [expandedBodies, setExpandedBodies] = useState<Record<string, boolean>>({})
+  const [bodyLayouts, setBodyLayouts] = useState<Record<string, boolean>>({})
   const pendingSubmission = useRef<PendingSubmission | null>(null)
   const requestVersion = useRef(0)
   const readingRef = useRef<number | null>(null)
@@ -120,6 +128,10 @@ export default function ProductComments({ productId, productStatus, targetCommen
     setSubmitting(false)
     setSubmitError('')
     setLoadingMore(false)
+    setExpandedThreads(new Set())
+    setFocusedCommentId(targetCommentId)
+    setExpandedBodies(targetCommentId ? { [targetCommentId]: true } : {})
+    setBodyLayouts({})
     void load()
     return () => { requestVersion.current += 1 }
   }, [load])
@@ -151,16 +163,43 @@ export default function ProductComments({ productId, productStatus, targetCommen
   }, [loadMore, onLoadMoreReady])
 
   useEffect(() => {
-    const targetKey = productId + ':' + targetCommentId
-    if (!targetCommentId || state !== 'ready' || locatedTarget.current === targetKey) return
-    if (items.some((item) => item.id === targetCommentId || item.replies.some((reply) => reply.id === targetCommentId))) {
-      locatedTarget.current = targetKey
-      onTargetReady?.('product-comment-' + targetCommentId)
+    const targetKey = productId + ':' + focusedCommentId
+    if (!focusedCommentId || state !== 'ready' || locatedTarget.current === targetKey) return
+    const root = items.find(item => item.id === focusedCommentId || item.replies.some(reply => reply.id === focusedCommentId))
+    if (!root) return
+    if (root.id !== focusedCommentId && !expandedThreads.has(root.id)) {
+      setExpandedThreads(current => new Set(current).add(root.id))
+      return
     }
-  }, [items, onTargetReady, productId, state, targetCommentId])
+    // Every visible body before the target can change its vertical position.
+    const precedingBodies: string[] = []
+    for (const item of items) {
+      precedingBodies.push(item.id)
+      if (item.id === focusedCommentId) break
+      if (expandedThreads.has(item.id)) {
+        for (const reply of item.replies) {
+          precedingBodies.push(reply.id)
+          if (reply.id === focusedCommentId) break
+        }
+      }
+      if (item.id === root.id) break
+    }
+    if (!layoutReady || precedingBodies.some(id => !bodyLayouts[id])) return
+    let alive = true
+    nextTick(() => {
+      if (!alive) return
+      locatedTarget.current = targetKey
+      onTargetReady?.('product-comment-' + focusedCommentId)
+    })
+    return () => { alive = false }
+  }, [bodyLayouts, expandedThreads, focusedCommentId, items, layoutReady, onTargetReady, productId, state])
+
+  const bodyLayoutChanged = useCallback((id: string, ready: boolean) => {
+    setBodyLayouts(current => current[id] === ready ? current : { ...current, [id]: ready })
+  }, [])
 
   const beginReply = (comment: ProductComment) => {
-    if (productStatus === 'sold' || submittingRef.current) return
+    if (productStatus === 'sold' || submittingRef.current || comment.reviewStatus !== 'approved') return
     setReplyTarget({ commentId: comment.id, parentCommentId: comment.parentCommentId || comment.id, authorName: comment.author.nickname })
     pendingSubmission.current = null
     setSubmitError('')
@@ -186,6 +225,9 @@ export default function ProductComments({ productId, productStatus, targetCommen
         : [...current.filter((value) => value.id !== created.id), created])
       if (!replyTarget && !items.some((item) => item.id === created.id)) setTotal((current) => current + 1)
       setState('ready')
+      if (replyTarget) setExpandedThreads(current => new Set(current).add(created.parentCommentId || replyTarget.parentCommentId))
+      setFocusedCommentId(created.id)
+      setExpandedBodies(current => ({ ...current, [created.id]: true }))
       setDraft('')
       setReplyTarget(null)
       pendingSubmission.current = null
@@ -229,25 +271,51 @@ export default function ProductComments({ productId, productStatus, targetCommen
                 {item.isSeller && <Text className='product-comment__seller'>卖家</Text>}
                 {reviewLabel(item.reviewStatus) && <Text className={'product-comment__review product-comment__review--' + item.reviewStatus}>{reviewLabel(item.reviewStatus)}</Text>}
               </View>
-              <Text className='product-comment__content'>{item.content}</Text>
-              <View className='product-comment__foot'><Text className='product-comment__time'>{formatPostDate(item.createdAt)}</Text>{productStatus !== 'sold' && <Text className='product-comment__reply-action'>回复</Text>}</View>
+              <ExpandableText text={item.content} className='product-comment__content'
+                expanded={expandedBodies[item.id] ?? false}
+                onLayoutReady={ready => bodyLayoutChanged(item.id, ready)}
+                onExpandedChange={value => setExpandedBodies(current => ({ ...current, [item.id]: value }))} />
+              <View className='product-comment__foot'><Text className='product-comment__time'>{formatPostDate(item.createdAt)}</Text>{productStatus !== 'sold' && item.reviewStatus === 'approved' && <Text className='product-comment__reply-action'>回复</Text>}</View>
             </View>
           </View>
+          {item.replies.length > 0 && <View className='product-comment-thread__replies'>
+          <ReplyReveal expanded={expandedThreads.has(item.id)}
+            immediate={item.replies.some(reply => reply.id === focusedCommentId) && locatedTarget.current !== productId + ':' + focusedCommentId}>{interactive => <>
           {item.replies.map((reply) => (
             <View className='product-comment product-comment--reply' id={'product-comment-' + reply.id} key={reply.id}>
               {renderAvatar(reply)}
-              <View className='product-comment__main' onClick={() => beginReply(reply)}>
+              <View className='product-comment__main' onClick={() => { if (interactive) beginReply(reply) }}>
                 <View className='product-comment__meta'>
                   <Text className='product-comment__author'>{reply.author.nickname}</Text>
                   {reply.isSeller && <Text className='product-comment__seller'>卖家</Text>}
                   {reply.replyTo && <Text className='product-comment__reply-to'>回复 {reply.replyTo.nickname}</Text>}
                   {reviewLabel(reply.reviewStatus) && <Text className={'product-comment__review product-comment__review--' + reply.reviewStatus}>{reviewLabel(reply.reviewStatus)}</Text>}
                 </View>
-                <Text className='product-comment__content'>{reply.content}</Text>
-                <View className='product-comment__foot'><Text className='product-comment__time'>{formatPostDate(reply.createdAt)}</Text>{productStatus !== 'sold' && <Text className='product-comment__reply-action'>回复</Text>}</View>
+                <ExpandableText text={reply.content} className='product-comment__content' disabled={!interactive}
+                  expanded={expandedBodies[reply.id] ?? false}
+                  onLayoutReady={ready => bodyLayoutChanged(reply.id, ready)}
+                  onExpandedChange={value => setExpandedBodies(current => ({ ...current, [reply.id]: value }))} />
+                <View className='product-comment__foot'><Text className='product-comment__time'>{formatPostDate(reply.createdAt)}</Text>{productStatus !== 'sold' && reply.reviewStatus === 'approved' && <Text className='product-comment__reply-action'>回复</Text>}</View>
               </View>
             </View>
           ))}
+          </>}</ReplyReveal>
+          <View className='product-comments__disclosure' role='button' aria-expanded={expandedThreads.has(item.id)}
+            aria-label={expandedThreads.has(item.id) ? '收起商品留言回复' : `查看 ${item.replies.length} 条回复`}
+            onClick={() => {
+              // A manual disclosure change takes precedence over a pending notification jump.
+              if (item.id === focusedCommentId || item.replies.some(reply => reply.id === focusedCommentId)) setFocusedCommentId('')
+              setExpandedThreads(current => {
+                const next = new Set(current)
+                next.has(item.id) ? next.delete(item.id) : next.add(item.id)
+                return next
+              })
+            }}>
+            <View className='product-comments__connector' />
+            <Text>{expandedThreads.has(item.id) ? '收起回复' : `查看 ${item.replies.length} 条回复`}</Text>
+            <AppIcon name='chevron-right' className={expandedThreads.has(item.id) ? 'product-comments__disclosure-icon product-comments__disclosure-icon--open' : 'product-comments__disclosure-icon'} />
+          </View>
+          </View>}
         </View>
       ))}
       {loadMoreError ? <Text className='product-comments__state product-comments__state--retry' onClick={() => void loadMore()}>{loadMoreError}</Text>

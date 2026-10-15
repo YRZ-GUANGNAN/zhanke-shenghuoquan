@@ -52,7 +52,7 @@ async function pageBehavior() {
     const taro = { getCurrentInstance: () => ({ router: { params: options.params || {} } }), showToast: async () => {}, navigateTo: async () => {}, getImageInfo: async () => ({ width: 600, height: 800 }), ...options.taro }
     modulePage.require = (id) => {
       if (id === 'react' || id === 'react/jsx-runtime') return require(id)
-      if (id === '@tarojs/taro') return { hideKeyboard: async () => {}, nextTick: (callback) => queueMicrotask(callback), useDidShow: (callback) => React.useEffect(() => callback(), []), useDidHide: () => {}, useResize: () => {} }
+      if (id === '@tarojs/taro') return { createSelectorQuery: () => ({ select() { return this }, boundingClientRect() { return this }, exec(callback) { if (options.measurements) options.measurements.push(callback); else callback([{ height: 22 }, { height: 22 }]) } }), hideKeyboard: async () => {}, nextTick: (callback) => queueMicrotask(callback), useDidShow: (callback) => React.useEffect(() => callback(), []), useDidHide: () => {}, useResize: () => {} }
       if (id === '@tarojs/components') return Object.fromEntries(['Image', 'Input', 'ScrollView', 'Swiper', 'SwiperItem', 'Text', 'Textarea', 'View'].map((name) => [name, component(name)]))
       if (id.endsWith('.scss')) return {}
       if (id.endsWith('/feature-page-gate')) return { withFeaturePage: (pageComponent) => pageComponent, FeaturePageGate: View }
@@ -67,6 +67,15 @@ async function pageBehavior() {
       if (id.endsWith('/use-keyboard-inset')) return { useKeyboardInset: () => ({ inset: 0, onFocus: () => {}, onKeyboardHeightChange: () => {}, reset: () => {} }) }
       if (id.endsWith('/runtime-session-gate') || id.endsWith('/app-icon')) return { default: View }
       if (id.endsWith('/student-bottom-nav')) return { default: View }
+      if (id === '../student-secondhand/content') return { default: View }
+      if (id.endsWith('/content-motion') || id.endsWith('/use-layer-presence') || id.endsWith('/use-confirmed-feedback')) {
+        const relative = id.endsWith('/content-motion') ? 'components/content-motion.tsx' : id.endsWith('/use-layer-presence') ? 'hooks/use-layer-presence.ts' : 'hooks/use-confirmed-feedback.ts'
+        const helperPath = path.resolve(__dirname, '../apps/miniapp/src', relative)
+        const helper = new Module(helperPath, module)
+        helper.require = modulePage.require
+        helper._compile(ts.transpileModule(fs.readFileSync(helperPath, 'utf8'), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText, helperPath)
+        return helper.exports
+      }
       if (id.endsWith('/campus-info-home')) return { default: () => React.createElement(View, { className: 'test-campus-info' }) }
       if (id.endsWith('/components/channel-pager')) {
         const helperPath = path.resolve(__dirname, '../apps/miniapp/src/components/channel-pager.tsx')
@@ -150,7 +159,7 @@ async function pageBehavior() {
     await home.event(() => discoverContent().onScroll({ detail: { scrollTop: 640 } }))
     await home.event(() => home.all('.student-home-header__tab')[2].onClick())
     await home.event(() => home.props('[data-item-id="tools"] .student-home-content').onScroll({ detail: { scrollTop: 96 } }))
-    await home.event(() => home.all('.student-home-header__tab')[1].onClick())
+    await home.event(() => home.all('.student-home-header__tab').find(tab => tab.children.props.children === '发现').onClick())
     assert.equal(discoverContent().scrollTop, 640, '切换栏目回来恢复发现滚动位置')
     assert.equal(homePostRequests.length, 1, '切换栏目不重载发现内容')
     const homeScroll = home.container.querySelector('[data-item-id="discover"] .student-home-content')
@@ -224,6 +233,21 @@ async function pageBehavior() {
     await search.event(() => search.props('.student-search-content').onScrollToLower())
     assert.equal(searches.length, 4, '退出结果态后旧响应和触底不能继续分页')
     assert.equal(search.container.querySelector('.student-search-result'), null)
+
+    const delayedMeasurements = []
+    const measuredDetail = await mount('post-detail', {
+      params: { id: fakePost.id, anchor: 'comments' }, measurements: delayedMeasurements,
+      community: {
+        getCommunityPost: async () => ({ ...fakePost, content: '需要折叠的长正文'.repeat(200) }),
+        getCommunityViewerState: async () => ({ liked: false, likedCount: 0, favorited: false, followingAuthor: false }),
+        getCommentThreads: async () => ({ items: [], page: 1, pageSize: 20, total: 0 }),
+      },
+    })
+    await act(async () => new Promise(resolve => setTimeout(resolve, 260)))
+    assert.equal(measuredDetail.props('.post-detail-scroll').scrollIntoView, '', '评论已加载但长正文仍在慢测量时不提前定位')
+    await measuredDetail.event(() => delayedMeasurements.shift()([{ height: 1200 }, { height: 24 }]))
+    assert.equal(measuredDetail.props('.post-detail-scroll').scrollIntoView, 'post-comments', '长正文折叠的真实高度提交后才定位评论')
+    assert.equal(measuredDetail.props('.content-fold__viewport').style.height, '192px')
 
     let postLoads = 0
     const commentRequests = [], viewerRequests = [], postLikes = [], submits = [], replyRequests = []

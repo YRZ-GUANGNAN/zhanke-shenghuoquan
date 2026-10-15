@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { Image, Text, View } from '@tarojs/components'
 import AppIcon from '../../components/app-icon'
+import { ConfirmedIcon, ExpandableText, ReplyReveal } from '../../components/content-motion'
 import { useSessionStore } from '../../stores/session'
 import { CommentSession, type CommentPageState, type CommentSessionState } from '../../services/comment-session'
 import { createCommunityClientRequestId, getCommentReplies, getCommentThreads, setCommentLiked, submitThreadComment } from '../../services/b-community'
@@ -40,7 +41,8 @@ export interface CommentListProps {
 
 export function PostCommentList(props: CommentListProps) {
   const { state, canReply, canLike } = props
-  const row = (comment: CommunityThreadComment, reply = false) => (
+  const [expandedBodies, setExpandedBodies] = useState<Record<string, boolean>>({})
+  const row = (comment: CommunityThreadComment, reply = false, interactive = true) => (
     <View className={`post-detail-comment${reply ? ' post-detail-comment--reply' : ''}`} key={comment.id}>
       <View className='post-detail-comment__avatar'>
         {comment.avatar ? <Image src={comment.avatar} mode='aspectFill' /> : (comment.author || '同').slice(0, 1)}
@@ -48,10 +50,13 @@ export function PostCommentList(props: CommentListProps) {
       <View className='post-detail-comment__main'>
         <Text className='post-detail-comment__author'>{comment.author || '同学'}</Text>
         {reply && <Text className='post-detail-comment__recipient'>回复 {comment.replyToAuthor || '同学'}</Text>}
-        <Text className='post-detail-comment__content' selectable>{comment.content}</Text>
+        <ExpandableText text={comment.content} className='post-detail-comment__content' disabled={!interactive}
+          layoutKey={String(canLike)}
+          expanded={expandedBodies[comment.id] ?? false}
+          onExpandedChange={value => setExpandedBodies(current => ({ ...current, [comment.id]: value }))} />
         <View className='post-detail-comment__footer'>
           <Text className='post-detail-comment__meta'>{formatPostDate(comment.createdAt)}</Text>
-          {canReply && comment.reviewStatus === 'approved' && <View className='post-detail-comment__reply-button' role='button' aria-label={`回复${comment.author}`} onClick={() => props.onReply(comment)}><Text>回复</Text></View>}
+          {canReply && comment.reviewStatus === 'approved' && <View className='post-detail-comment__reply-button' role='button' aria-label={`回复${comment.author}`} onClick={() => { if (interactive) props.onReply(comment) }}><Text>回复</Text></View>}
         </View>
         {statusLabel[comment.reviewStatus] && <Text className='post-detail-comment__status'>{statusLabel[comment.reviewStatus]}</Text>}
       </View>
@@ -59,19 +64,19 @@ export function PostCommentList(props: CommentListProps) {
         className={`post-detail-comment__like${comment.liked ? ' post-detail-comment__like--active' : ''}${state.likeBusy[comment.id] ? ' post-detail-comment__like--pending' : ''}`}
         role='button' aria-disabled={Boolean(state.likeBusy[comment.id]) || comment.liked === undefined}
         aria-label={`${comment.liked ? '取消点赞' : '点赞评论'}，${comment.likedCount}赞`}
-        onClick={() => props.onLike(comment.id)}
+        onClick={() => { if (interactive) props.onLike(comment.id) }}
       >
-        <AppIcon name='heart' active={Boolean(comment.liked)} className='post-detail-comment__like-icon' />
+        <ConfirmedIcon name='heart' active={Boolean(comment.liked)} event={state.likeFeedback[comment.id] ?? 0} owner={comment.id} className='post-detail-comment__like-icon' />
         <Text>{comment.likedCount > 0 ? countLabel(comment.likedCount) : '赞'}</Text>
       </View>}
     </View>
   )
-  const pageControl = (page: CommentPageState, rootId?: string) => page.loading ? (
+  const pageControl = (page: CommentPageState, rootId?: string, interactive = true) => page.loading ? (
     <View className='post-detail-comments__loading' role='status'><Text>{page.page ? '正在加载更多…' : '正在读取…'}</Text></View>
   ) : page.error ? (
-    <View className='post-detail-comments__more' role='button' onClick={() => props.onLoad(rootId)}><Text>{page.error}</Text></View>
+    <View className='post-detail-comments__more' role='button' onClick={() => { if (interactive) props.onLoad(rootId) }}><Text>{page.error}</Text></View>
   ) : page.hasMore ? (
-    <View className='post-detail-comments__more' role='button' onClick={() => props.onLoad(rootId)}><Text>{rootId ? '查看更多回复' : '查看更多评论'}</Text><AppIcon name='chevron-right' /></View>
+    <View className='post-detail-comments__more' role='button' onClick={() => { if (interactive) props.onLoad(rootId) }}><Text>{rootId ? '查看更多回复' : '查看更多评论'}</Text><AppIcon name='chevron-right' /></View>
   ) : null
 
   return <View className='post-detail-comments' id='post-comments'>
@@ -81,13 +86,14 @@ export function PostCommentList(props: CommentListProps) {
       return <View className='post-detail-comment-thread' key={comment.id}>
         {row(comment)}
         {(comment.replyCount > 0 || replies?.items.length) ? <View className='post-detail-comment-thread__replies'>
-          {replies?.expanded ? <>
-            {replies.items.map(value => row(value, true))}
+          <ReplyReveal expanded={Boolean(replies?.expanded)}>{interactive => replies ? <>
+            {replies.items.map(value => row(value, true, interactive))}
             <View className='post-detail-comments__reply-controls'>
-              {pageControl(replies, comment.id)}
-              <View className='post-detail-comments__collapse' role='button' aria-label='收起楼内回复' onClick={() => props.onCollapse(comment.id)}><Text>收起</Text></View>
+              {pageControl(replies, comment.id, interactive)}
+              <View className='post-detail-comments__collapse' role='button' aria-label='收起楼内回复' onClick={() => { if (interactive) props.onCollapse(comment.id) }}><Text>收起</Text></View>
             </View>
-          </> : <View className='post-detail-comments__more' role='button' aria-label={`查看${comment.replyCount}条回复`} onClick={() => props.onExpand(comment.id)}>
+          </> : null}</ReplyReveal>
+          {!replies?.expanded && <View className='post-detail-comments__more' role='button' aria-expanded={false} aria-label={`查看${comment.replyCount}条回复`} onClick={() => props.onExpand(comment.id)}>
             <View className='post-detail-comments__connector' /><Text>查看 {comment.replyCount} 条回复</Text><AppIcon name='chevron-right' />
           </View>}
         </View> : null}
