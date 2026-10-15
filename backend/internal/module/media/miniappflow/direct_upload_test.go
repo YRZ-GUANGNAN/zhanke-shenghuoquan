@@ -9,7 +9,7 @@ import (
 )
 
 func TestDirectPurposeCompletionDoesNotSubmitCloudReview(t *testing.T) {
-	for _, purpose := range []coremedia.Purpose{coremedia.PurposeAvatar, coremedia.PurposeProfileCover, coremedia.PurposeIdentityApplication} {
+	for _, purpose := range []coremedia.Purpose{coremedia.PurposeAvatar, coremedia.PurposeProfileCover, coremedia.PurposeIdentityApplication, coremedia.PurposeDish, coremedia.PurposeMerchantLogo} {
 		t.Run(string(purpose), func(t *testing.T) {
 			assetID, ticketID, projectionID := testULID(t), testULID(t), testULID(t)
 			asset := coremedia.Asset{ID: 41, OwnerID: 7, AssetPublicID: assetID, Purpose: purpose, TechnicalStatus: coremedia.TechnicalFinalReady, StorageStage: coremedia.StorageStageFinal}

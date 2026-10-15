@@ -85,14 +85,14 @@ export default function ProfileCoverEditor({ disabled = false, isProfileBusy, on
 
   return (
     <View className='profile-cover-editor' id='profile-cover-editor'>
-      <View className='profile-cover-editor__heading'><Text className='profile-cover-editor__title'>个人封面</Text><Text className='profile-cover-editor__scope'>独立保存</Text></View>
+      <View className='profile-cover-editor__heading'><Text className='profile-cover-editor__title'>主页背景</Text><Text className='profile-cover-editor__scope'>独立保存</Text></View>
       <View className='profile-cover-editor__preview'>
         {source && source !== failedSource
           ? <Image className='profile-cover-editor__image' src={source} mode='aspectFill' ariaLabel='个人封面预览' onError={() => setFailedSource(source)} />
           : <View className='profile-cover-editor__empty'><AppIcon name='image' /><Text>{source ? '图片暂时无法加载' : '让主页多一点你的样子'}</Text></View>}
       </View>
       <Text className={`profile-cover-editor__hint${error ? ' profile-cover-editor__hint--error' : ''}`}>
-        {error || message || '照片会铺在头像和资料背后，居中裁切，下沿自然融入页面。不设置也可保留浅色背景。'}
+        {error || message || '与主页使用相同取景，照片居中裁切，下沿自然融入白底。保存封面后生效。'}
       </Text>
       <View className='profile-cover-editor__actions'>
         <Button className={`profile-cover-editor__choose${busy ? ' profile-cover-editor__action--disabled' : ''}`} ariaLabel='选择个人封面照片' disabled={busy} onClick={() => void choose()}>

@@ -13,7 +13,7 @@
 
 ### 1. 媒体策略与数据库
 
-- [x] 增加 `backend/internal/module/media/review_policy.go`，唯一白名单为 avatar、profile_cover、identity_application；`ReviewAllowsUse(purpose, status)` 仅允许 approved 或白名单用途的 not_required。
+- [x] 增加 `backend/internal/module/media/review_policy.go`，免单独云审核白名单为 avatar、profile_cover、identity_application、dish、merchant_logo；`ReviewAllowsUse(purpose, status)` 仅允许 approved 或白名单用途的 not_required。菜品和商家图片仍由父级人工审核门禁。
 - [x] 在 `review_projection_types.go` 增加状态，Terminal 包含它，Decision 不包含它；`review_projection_repository.go` 在验证 final_ready、final 固定对象后，仅为新投影写入该状态及决定时间，旧记录原样返回。
 - [x] 增加 `backend/migrations/044_media_review_policy.sql`，使用一个原子 ALTER 扩展 projection CHECK，不修改审核决定表，不批量改历史状态。
 - [x] 在 `reference_binding_repository.go`、`gateway_service.go`、`display_repository.go` 和 `identityapplication/media.go` 使用同样的可用条件，保留所有原权限与引用判断。

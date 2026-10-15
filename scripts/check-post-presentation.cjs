@@ -37,6 +37,7 @@ async function pageBehavior() {
     className: props.className,
     id: props.id,
     'data-component': name,
+    'data-item-id': props.itemId,
     ref: (node) => { if (node) node.taroProps = props },
   }, props.children, props.title, props.description)
   const View = component('View')
@@ -67,6 +68,16 @@ async function pageBehavior() {
       if (id.endsWith('/runtime-session-gate') || id.endsWith('/app-icon')) return { default: View }
       if (id.endsWith('/student-bottom-nav')) return { default: View }
       if (id.endsWith('/campus-info-home')) return { default: () => React.createElement(View, { className: 'test-campus-info' }) }
+      if (id.endsWith('/components/channel-pager')) {
+        const helperPath = path.resolve(__dirname, '../apps/miniapp/src/components/channel-pager.tsx')
+        const helper = new Module(helperPath, module)
+        helper.require = modulePage.require
+        helper._compile(ts.transpileModule(fs.readFileSync(helperPath, 'utf8'), {
+          fileName: helperPath,
+          compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+        }).outputText, helperPath)
+        return helper.exports
+      }
       if (id.endsWith('/components/ui')) return { AppIconButton: View, AppState: View }
       if (id.endsWith('/services/taro')) return { default: taro }
       if (id.endsWith('/capsule-safe')) return { getCapsuleSafeStyle: () => ({}) }
@@ -135,22 +146,23 @@ async function pageBehavior() {
       homePostRequests[0].resolve({ items: [fakePost], page: 1, total: 11 })
       homeProductRequests[0].resolve({ items: [], page: 1, total: 0 })
     })
-    await home.event(() => home.props('.student-home-content').onScroll({ detail: { scrollTop: 640 } }))
+    const discoverContent = () => home.props('[data-item-id="discover"] .student-home-content')
+    await home.event(() => discoverContent().onScroll({ detail: { scrollTop: 640 } }))
     await home.event(() => home.all('.student-home-header__tab')[2].onClick())
-    await home.event(() => home.props('.student-home-content').onScroll({ detail: { scrollTop: 96 } }))
+    await home.event(() => home.props('[data-item-id="tools"] .student-home-content').onScroll({ detail: { scrollTop: 96 } }))
     await home.event(() => home.all('.student-home-header__tab')[1].onClick())
-    assert.equal(home.props('.student-home-content').scrollTop, 640, '切换栏目回来恢复发现滚动位置')
+    assert.equal(discoverContent().scrollTop, 640, '切换栏目回来恢复发现滚动位置')
     assert.equal(homePostRequests.length, 1, '切换栏目不重载发现内容')
-    const homeScroll = home.container.querySelector('.student-home-content')
+    const homeScroll = home.container.querySelector('[data-item-id="discover"] .student-home-content')
     const homeCard = home.container.querySelector('.student-post-card')
     home.options.visibility = { ...home.options.visibility, favorites: false }
     await home.render()
     assert.equal(homePostRequests.length, 1, '无关功能更新不重载发现')
-    assert.equal(home.container.querySelector('.student-home-content'), homeScroll)
+    assert.equal(home.container.querySelector('[data-item-id="discover"] .student-home-content'), homeScroll)
     assert.equal(home.container.querySelector('.student-post-card'), homeCard)
     await home.event(() => {
-      home.props('.student-home-content').onScrollToLower()
-      home.props('.student-home-content').onScrollToLower()
+      discoverContent().onScrollToLower()
+      discoverContent().onScrollToLower()
     })
     assert.equal(homePostRequests.length, 2, '发现分页同帧防重')
     home.options.visibility = { ...home.options.visibility, forum: false }
@@ -165,7 +177,7 @@ async function pageBehavior() {
       homePostRequests[2].resolve({ items: [fakePost], page: 1, total: 1 })
       homeProductRequests[2].resolve({ items: [], page: 1, total: 0 })
     })
-    assert.equal(home.props('.student-home-content').scrollTop, 0, '来源改变后新列表从顶部开始')
+    assert.equal(discoverContent().scrollTop, 0, '来源改变后新列表从顶部开始')
     home.options.visibility = { ...home.options.visibility, presentationMode: 'campus_info' }
     await home.render()
     assert.ok(home.container.querySelector('.test-campus-info'), '校园指南模式继续使用独立首页')

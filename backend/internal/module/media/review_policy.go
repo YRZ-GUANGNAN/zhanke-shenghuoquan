@@ -1,10 +1,11 @@
 package media
 
-// ContentReviewRequired is a server-owned purpose policy. Identity proof
-// uploads remain private and still require a separate human identity decision.
+// ContentReviewRequired is a server-owned purpose policy. Merchant and dish
+// media are gated by their parent review, so they do not wait on a second
+// Tencent Cloud image review before that human decision.
 func (p Purpose) ContentReviewRequired() bool {
 	switch p {
-	case PurposeAvatar, PurposeProfileCover, PurposeIdentityApplication:
+	case PurposeAvatar, PurposeProfileCover, PurposeIdentityApplication, PurposeDish, PurposeMerchantLogo:
 		return false
 	default:
 		return true
@@ -22,5 +23,5 @@ func ReviewAllowsUse(p Purpose, status ProjectionStatus) bool {
 const displayReviewPredicate = "(p.status = ? OR (p.status = ? AND a.purpose IN ?))"
 
 func directUsePurposes() []Purpose {
-	return []Purpose{PurposeAvatar, PurposeProfileCover, PurposeIdentityApplication}
+	return []Purpose{PurposeAvatar, PurposeProfileCover, PurposeIdentityApplication, PurposeDish, PurposeMerchantLogo}
 }

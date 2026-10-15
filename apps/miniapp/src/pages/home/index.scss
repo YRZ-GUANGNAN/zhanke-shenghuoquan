@@ -44,6 +44,7 @@
   font-size: 32rpx;
   font-weight: 500;
   line-height: 1;
+  transition: color $duration-fast $ease-standard;
 }
 
 .student-home-header__tab--active {
@@ -92,8 +93,8 @@
 }
 
 .student-home-content {
-  flex: 1 1 auto;
-  height: 0;
+  width: 100%;
+  height: 100%;
   min-height: 0;
   box-sizing: border-box;
   padding-bottom: calc(136rpx + env(safe-area-inset-bottom));
@@ -489,5 +490,6 @@
 // Shared bottom navigation styles are owned by StudentBottomNav.
 
 @media (prefers-reduced-motion: reduce) {
-  .student-post-card { transition: none; }
+  .student-post-card,
+  .student-home-header__tab { transition: none; }
 }

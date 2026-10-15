@@ -4,7 +4,7 @@
   "description": "Campus community and marketplace mini program.",
   "appid": "wx065d8f3ce4a056ee",
   "setting": {
-    "urlCheck": false,
+    "urlCheck": true,
     "es6": true,
     "enhance": true,
     "postcss": true,

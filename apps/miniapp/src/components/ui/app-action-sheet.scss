@@ -8,7 +8,9 @@
 .app-action-sheet-layer--enter .app-action-sheet { transform: translateY(100%); }
 .app-action-sheet-layer--exit .app-action-sheet { transform: translateY(100%); }
 .app-action-sheet-layer--exit .app-action-sheet { pointer-events: none; }
-.app-action-sheet__handle { width: 72rpx; height: 8rpx; margin: 0 auto $space-3; border-radius: $radius-pill; background: $border-strong; }
+.app-action-sheet--dragging { transition: none; }
+.app-action-sheet__drag-handle { display: flex; align-items: center; justify-content: center; min-height: 44PX; margin-top: -14rpx; touch-action: none; }
+.app-action-sheet__handle { width: 72rpx; height: 8rpx; border-radius: $radius-pill; background: $border-strong; pointer-events: none; }
 .app-action-sheet__header { display: flex; align-items: flex-start; gap: $space-3; min-height: 88rpx; }
 .app-action-sheet__heading { flex: 1; min-width: 0; }
 .app-action-sheet__title, .app-action-sheet__description { display: block; }

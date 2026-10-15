@@ -5,7 +5,7 @@ import "testing"
 func TestMediaReviewPolicyPurposeMatrix(t *testing.T) {
 	for _, purpose := range []Purpose{PurposePost, PurposeProduct, PurposeAvatar, PurposeProfileCover, PurposeIdentityApplication, PurposeDish, PurposeMerchantLogo, PurposeDeliveryProof, PurposeDeliveryIM, PurposeFeedback, "unknown"} {
 		t.Run(string(purpose), func(t *testing.T) {
-			direct := purpose == PurposeAvatar || purpose == PurposeProfileCover || purpose == PurposeIdentityApplication
+			direct := purpose == PurposeAvatar || purpose == PurposeProfileCover || purpose == PurposeIdentityApplication || purpose == PurposeDish || purpose == PurposeMerchantLogo
 			if got := purpose.ContentReviewRequired(); got == direct {
 				t.Fatalf("review required=%v, direct=%v", got, direct)
 			}
@@ -23,7 +23,7 @@ func TestMediaReviewPolicyPurposeMatrix(t *testing.T) {
 }
 
 func TestDirectMediaStillRequiresExactBindingAndVisibility(t *testing.T) {
-	for _, purpose := range []Purpose{PurposeAvatar, PurposeProfileCover, PurposeIdentityApplication} {
+	for _, purpose := range []Purpose{PurposeAvatar, PurposeProfileCover, PurposeIdentityApplication, PurposeDish, PurposeMerchantLogo} {
 		t.Run(string(purpose), func(t *testing.T) {
 			value := visibleGatewaySnapshot()
 			value.Purpose, value.ReferenceType, value.ProjectionStatus = purpose, purpose, ProjectionNotRequired

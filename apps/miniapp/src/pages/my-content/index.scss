@@ -10,6 +10,7 @@
   background: $bg-surface;
   box-sizing: border-box;
   color: $text-strong;
+  overflow: hidden;
 }
 
 .my-content-header__back {
@@ -66,9 +67,8 @@
 
 .my-content-body {
   box-sizing: border-box;
-  flex: 1 1 auto;
   min-height: 0;
-  height: 0;
+  height: 100%;
   padding: 8rpx 32rpx 48rpx;
 }
 

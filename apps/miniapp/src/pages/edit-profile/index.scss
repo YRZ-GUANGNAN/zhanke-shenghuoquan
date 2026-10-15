@@ -4,7 +4,7 @@
 .edit-profile-page {
   @include ref.page-foundation;
   min-height: 100vh;
-  background: $bg-app;
+  background: $bg-surface;
   color: $text-primary;
   font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 }
@@ -42,22 +42,42 @@
 }
 
 .edit-profile-avatar-panel {
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid $divider-hairline;
+}
+
+.edit-profile-avatar-row {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  padding: 40rpx 0 36rpx;
+  justify-content: space-between;
+  gap: 24rpx;
+  min-height: 120rpx;
+}
+
+.edit-profile-avatar-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.edit-profile-field-title {
+  display: block;
+  color: $text-primary;
+  font-size: 29rpx;
+  font-weight: 500;
+  line-height: 42rpx;
 }
 
 .edit-profile-avatar {
+  flex: 0 0 auto;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 132rpx;
-  height: 132rpx;
+  width: 120rpx;
+  height: 120rpx;
   border-radius: 50%;
   background: $gradient-primary;
-  box-shadow: $shadow-card;
+  box-shadow: none;
   transition: opacity $duration-fast $ease-standard, transform $duration-fast $ease-standard;
 }
 
@@ -133,7 +153,7 @@
 .edit-profile-avatar-panel__hint {
   @include ref.type(meta);
   @include ref.wrap;
-  margin-top: 22rpx;
+  margin-top: 6rpx;
   color: $text-muted;
 }
 
@@ -144,13 +164,12 @@
 
 .edit-profile-card,
 .edit-profile-signature-card {
-  border-radius: 26rpx;
-  background: $bg-surface;
-  box-shadow: $shadow-card;
+  background: transparent;
 }
 
 .edit-profile-card {
   overflow: hidden;
+  border-bottom: 1rpx solid $divider-hairline;
 }
 
 .edit-profile-row {
@@ -158,8 +177,8 @@
   padding: 8rpx 0;
   display: flex;
   align-items: center;
-  min-height: 92rpx;
-  margin: 0 30rpx;
+  min-height: 128rpx;
+  margin: 0;
   border-bottom: 1rpx solid $divider-hairline;
 }
 
@@ -170,7 +189,15 @@
 .edit-profile-row__label {
   @include ref.type(label);
   flex: 0 0 auto;
+  color: $text-primary;
+}
+
+.edit-profile-save-hint {
+  display: block;
+  margin-top: 16rpx;
   color: $text-secondary;
+  font-size: 23rpx;
+  line-height: 34rpx;
 }
 
 .edit-profile-row__input {

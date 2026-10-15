@@ -16,13 +16,13 @@ async function run() {
   mod._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText, filename)
   const { isMediaUsable, confirmDirectUpload, waitForMediaApproval } = mod.exports
   const ready = { assetId: 'asset-one', purpose: 'avatar', canUse: true, state: 'ready', reviewStatus: 'not_required' }
-  for (const purpose of ['avatar', 'profile_cover', 'identity_application']) {
+  for (const purpose of ['avatar', 'profile_cover', 'identity_application', 'dish', 'merchant_logo']) {
     const image = { ...ready, purpose }
     assert.equal(isMediaUsable(image), true)
     assert.deepEqual(await confirmDirectUpload(image), image)
   }
   assert.equal(requests, 0, 'ready profile uploads do not poll review')
-  for (const purpose of ['post', 'product', 'dish', 'merchant_logo', 'delivery_im']) {
+  for (const purpose of ['post', 'product', 'delivery_im']) {
     const image = { ...ready, purpose }
     assert.equal(isMediaUsable(image), false)
     await assert.rejects(confirmDirectUpload(image), /仍需内容审核/)

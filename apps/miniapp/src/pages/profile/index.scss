@@ -27,8 +27,9 @@ page {
 }
 
 .student-profile-hero {
+  --profile-toolbar-height: max(44PX, 88rpx);
   position: relative;
-  padding: 0 0 48rpx;
+  padding: 0 0 32rpx;
   background: $bg-surface;
   box-sizing: border-box;
 }
@@ -45,56 +46,55 @@ page {
   align-items: center;
   justify-content: space-between;
   gap: 24rpx;
-  min-height: 44PX;
-  height: 88rpx;
+  height: var(--profile-toolbar-height);
   margin: 0 32rpx;
 }
 
-.student-profile-hero__title {
-  display: block;
-  color: $text-strong;
-  font-size: 32rpx;
-  font-weight: 600;
-  line-height: 44rpx;
-}
-
 .student-profile-user {
-  display: grid;
-  grid-template-columns: 128rpx minmax(0, 1fr);
-  align-items: start;
-  gap: 16rpx 24rpx;
-  margin: 96rpx 32rpx 0;
+  display: block;
+  // Keep the avatar across the photo edge without allowing a tall system bar
+  // to overlap the cover spacing. The photo crop itself stays constant.
+  margin: max(24rpx, calc(#{cover.$height} - var(--capsule-system-row-height, 72px) - var(--profile-toolbar-height) - #{cover.$avatar-overlap})) 32rpx 0;
   box-sizing: border-box;
   transition: opacity $duration-fast ease;
 }
 
+.student-profile-user__top {
+  display: flex;
+  align-items: flex-end;
+  gap: 16rpx;
+  min-width: 0;
+}
+
+.student-profile-user__top-spacer {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 .student-profile-cover {
+  @include cover.frame;
   @include cover.surface;
   position: absolute;
-  inset: 0;
+  top: 0;
+  right: 0;
+  left: 0;
   pointer-events: none;
   background: $profile-accent-soft;
 }
 
-.student-profile-cover__image { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
-
-.student-profile-cover__edit {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8rpx;
-  min-height: 44PX;
-  padding: 0 8rpx;
-  border-radius: 12rpx;
-  color: $text-primary;
-  font-size: 24rpx;
-  font-weight: 500;
-  line-height: 34rpx;
-  box-sizing: border-box;
-  transition: opacity $duration-fast ease;
+.student-profile-cover::before {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--capsule-system-row-height, 72px);
+  background: linear-gradient(rgba($bg-surface, .18), rgba($bg-surface, 0));
+  pointer-events: none;
+  content: '';
 }
-.student-profile-cover__edit .app-icon { width: 30rpx; height: 30rpx; }
-.student-profile-cover__edit:active { opacity: .65; }
+
+.student-profile-cover__image { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
 
 .student-profile-user__avatar:active,
 .student-profile-user__main:active,
@@ -107,10 +107,10 @@ page {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 128rpx;
-  height: 128rpx;
+  width: 144rpx;
+  height: 144rpx;
   overflow: hidden;
-  border: 4rpx solid rgba($bg-surface, .88);
+  border: 4rpx solid $bg-surface;
   border-radius: 50%;
   color: $brand-primary-strong;
   font-size: 38rpx;
@@ -129,6 +129,7 @@ page {
 .student-profile-user__main {
   @include ref.touch;
   min-width: 0;
+  margin-top: 16rpx;
 }
 
 .student-profile-user__title-row {
@@ -145,12 +146,13 @@ page {
 }
 
 .student-profile-user__name {
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
-  color: $text-primary;
-  font-size: 40rpx;
-  font-weight: 700;
-  line-height: 52rpx;
+  color: $text-strong;
+  font-size: 42rpx;
+  font-weight: 600;
+  line-height: 56rpx;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -168,68 +170,37 @@ page {
 
 .student-profile-user__details {
   min-width: 0;
-  margin-top: 8rpx;
+  margin-top: 6rpx;
 }
 
 .student-profile-user__meta {
   @include ref.type(meta);
   display: block;
   overflow: hidden;
-  color: $profile-text-secondary;
+  color: $text-secondary;
+  font-size: 23rpx;
+  line-height: 34rpx;
   font-variant-numeric: tabular-nums;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.student-profile-user__campus-row {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-  min-width: 0;
-  margin-top: 8rpx;
-}
-
-.student-profile-user__campus-dot {
-  width: 8rpx;
-  height: 8rpx;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: $brand-primary;
-}
-
-.student-profile-user__campus {
-  min-width: 0;
-  overflow: hidden;
-  color: $profile-text-secondary;
-  font-size: 23rpx;
-  line-height: 32rpx;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .student-profile-user__edit {
-  grid-column: 1 / -1;
-  justify-self: end;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 4rpx;
-  min-width: 112rpx;
+  min-width: 216rpx;
   min-height: 44PX;
-  padding: 0 20rpx;
-  border: 1rpx solid rgba($brand-primary, .16);
-  border-radius: 12rpx;
-  background: rgba($bg-surface, .7);
-  color: $brand-primary-strong;
-  font-size: 24rpx;
+  padding: 0 32rpx;
+  border: 0;
+  border-radius: 14rpx;
+  background: $brand-primary;
+  color: $text-on-color;
+  font-size: 25rpx;
   font-weight: 600;
   box-sizing: border-box;
-}
-
-.student-profile-hero--with-cover {
-  .student-profile-user__meta,
-  .student-profile-user__campus { color: $text-primary; }
-  .student-profile-user__badge { background: rgba($bg-surface, .86); }
 }
 
 .student-profile-content {
@@ -564,19 +535,9 @@ page {
 }
 
 @media (max-width: 340px) {
-  .student-profile-user {
-    grid-template-columns: 112rpx minmax(0, 1fr);
-    gap: 16rpx;
-  }
-
-  .student-profile-user__avatar {
-    width: 112rpx;
-    height: 112rpx;
-  }
-
   .student-profile-user__edit {
-    min-width: 104rpx;
-    font-size: 22rpx;
+    min-width: 200rpx;
+    padding: 0 24rpx;
   }
 
   .student-profile-role {
@@ -587,7 +548,6 @@ page {
 
 @media (prefers-reduced-motion: reduce) {
   .student-profile-user,
-  .student-profile-cover__edit,
   .student-profile-stats__item,
   .student-profile-setting,
   .student-profile-role {

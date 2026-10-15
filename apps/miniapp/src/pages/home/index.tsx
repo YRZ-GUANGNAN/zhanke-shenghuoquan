@@ -4,6 +4,7 @@ import { useDidShow } from '@tarojs/taro'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import AppIcon from '../../components/app-icon'
+import ChannelPager, { useChannelInteraction } from '../../components/channel-pager'
 import { AppState } from '../../components/ui'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import StudentBottomNav from '../../components/student-bottom-nav'
@@ -133,6 +134,7 @@ function conversationPeerLabel(context: IMConversationContext, currentUserId: st
 
 function HomeContent() {
   const [activeTab, setActiveTab] = useState<HomeTab>('discover')
+  const channelInteraction = useChannelInteraction()
   const [postCards, setPostCards] = useState<DiscoverCard[]>([])
   const [productCards, setProductCards] = useState<DiscoverCard[]>([])
   const [initialStatus, setInitialStatus] = useState<'loading' | 'ready' | 'empty' | 'error'>('loading')
@@ -170,6 +172,7 @@ function HomeContent() {
       visibility.campus_tools
     ))
   }, [visibility])
+  const channelKeys = useMemo(() => visibleTabs.map((tab) => tab.key), [visibleTabs])
 
   const loadDiscover = useCallback(async (
     reset = false,
@@ -268,7 +271,7 @@ function HomeContent() {
     conversationLoadingRef.current = true
     const version = conversationRequestVersion.current + 1
     conversationRequestVersion.current = version
-    setConversationStatus('loading')
+    setConversationStatus((current) => current === 'ready' || current === 'empty' ? current : 'loading')
     try {
       const contexts = await requestWithSingleSessionRecovery(() => listIMConversations(1, 20))
       const items = await Promise.all(contexts.map(async (context): Promise<ConversationItem> => {
@@ -337,12 +340,21 @@ function HomeContent() {
   useEffect(() => {
     discoverRequestVersion.current += 1
     loadingRef.current = false
+    sourceRef.current = { communityPage: 0, tradePage: 0, communityTotal: 0, tradeTotal: 0 }
     tabScrollPositions.current.discover = 0
     setFailedImageKeys(new Set())
     setPostCards([])
     setProductCards([])
-    void loadDiscover(true, { community: visibility.forum, trade: visibility.secondhand })
-  }, [currentSessionKey, loadDiscover, visibility.forum, visibility.secondhand])
+    setInitialStatus('loading')
+    setLoadingMore(false)
+    setSourceError({ community: false, trade: false })
+  }, [currentSessionKey, visibility.forum, visibility.secondhand])
+
+  useEffect(() => {
+    if (activeTab === 'discover' && initialStatus === 'loading' && (visibility.forum || visibility.secondhand)) {
+      void loadDiscover(true, { community: visibility.forum, trade: visibility.secondhand })
+    }
+  }, [activeTab, currentSessionKey, initialStatus, loadDiscover, visibility.forum, visibility.secondhand])
 
   useEffect(() => {
     const nextTab = visibleTabs.some((tab) => tab.key === activeTab) ? activeTab : visibleTabs[0]?.key
@@ -352,11 +364,17 @@ function HomeContent() {
   useEffect(() => {
     conversationRequestVersion.current += 1
     conversationLoadingRef.current = false
-    conversationOwnerRef.current = currentSessionKey
+    conversationOwnerRef.current = visibility.messages && visibility.secondhand_chat ? currentSessionKey : ''
+    tabScrollPositions.current.messages = 0
     setConversationItems([])
     setConversationStatus('idle')
-    if (activeTab === 'messages' && visibility.messages && visibility.secondhand_chat) void loadConversations(currentSessionKey)
-  }, [activeTab, currentSessionKey, loadConversations, visibility.messages, visibility.secondhand_chat])
+  }, [currentSessionKey, visibility.messages, visibility.secondhand_chat])
+
+  useEffect(() => {
+    if (activeTab === 'messages' && conversationStatus === 'idle' && visibility.messages && visibility.secondhand_chat) {
+      void loadConversations(currentSessionKey)
+    }
+  }, [activeTab, conversationStatus, currentSessionKey, loadConversations, visibility.messages, visibility.secondhand_chat])
 
   useEffect(() => {
     if (activeTab === 'tools' && toolStatus === 'idle' && visibility?.campus_tools) void loadTools()
@@ -367,6 +385,7 @@ function HomeContent() {
   })
 
   const openSearch = () => {
+    if (!channelInteraction.canActivate()) return
     void Taro.navigateTo({
       url: visibility?.forum
         ? '/pages/search/index?scope=community'
@@ -375,6 +394,7 @@ function HomeContent() {
   }
 
   const openCard = (card: DiscoverCard) => {
+    if (!channelInteraction.canActivate()) return
     const url = card.target === 'secondhand'
       ? `/pages/secondhand-detail/index?id=${encodeURIComponent(card.id)}`
       : `/pages/post-detail/index?id=${encodeURIComponent(card.id)}`
@@ -382,7 +402,7 @@ function HomeContent() {
   }
 
   const openTool = async (tool: ToolLink) => {
-    if (!tool.appId || !tool.path) return
+    if (!channelInteraction.canActivate() || !tool.appId || !tool.path) return
     try {
       await Taro.navigateToMiniProgram({ appId: tool.appId, path: tool.path })
     } catch (error) {
@@ -452,7 +472,7 @@ function HomeContent() {
         title={pending ? '正在读取校园动态' : initialStatus === 'empty' ? '暂时还没有内容' : '内容加载失败'}
         description={pending ? '请稍候…' : initialStatus === 'empty' ? '有新内容时会显示在这里' : '请检查网络后重新试试'}
         actionText={initialStatus === 'error' && !retrying ? '重新加载' : undefined}
-        onAction={() => void loadDiscover(false, sourceError)}
+        onAction={() => { if (channelInteraction.canActivate()) void loadDiscover(false, sourceError) }}
       />
     )
   }
@@ -470,7 +490,7 @@ function HomeContent() {
               <View
                 key={tab.key}
                 className={`student-home-header__tab ${activeTab === tab.key ? 'student-home-header__tab--active' : ''}`}
-                onClick={() => setActiveTab(tab.key)}
+                onClick={() => { if (channelInteraction.canActivate()) setActiveTab(tab.key) }}
               >
                 <Text>{tab.label}</Text>
               </View>
@@ -490,18 +510,24 @@ function HomeContent() {
         ) : undefined}
       />
 
+      {channelKeys.length > 0 ? <ChannelPager
+        keys={channelKeys}
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        interaction={channelInteraction}
+        renderPage={(channel) => (
       <ScrollView
-        key={activeTab}
+        key={channel}
         className='student-home-content'
         scrollY
-        scrollTop={tabScrollPositions.current[activeTab]}
-        onScroll={(event) => { tabScrollPositions.current[activeTab] = event.detail.scrollTop }}
+        scrollTop={tabScrollPositions.current[channel]}
+        onScroll={(event) => { tabScrollPositions.current[channel] = event.detail.scrollTop }}
         enhanced
         showScrollbar={false}
         lowerThreshold={120}
         onScrollToLower={() => {
           if (
-            activeTab === 'discover' &&
+            channel === activeTab && channel === 'discover' &&
             initialStatus === 'ready' &&
             !sourceError.community &&
             !sourceError.trade &&
@@ -511,7 +537,7 @@ function HomeContent() {
           }
         }}
       >
-        {activeTab === 'messages' && (
+        {channel === 'messages' && (
           visibility.messages && visibility.secondhand_chat && (
           <View className='student-message-panel'>
             {conversationStatus === 'loading' || conversationStatus === 'idle' ? (
@@ -519,7 +545,7 @@ function HomeContent() {
             ) : conversationStatus === 'error' ? (
               <View
                 className='student-message-state student-message-state--retry'
-                onClick={() => void loadConversations(currentSessionKey)}
+                onClick={() => { if (channelInteraction.canActivate()) void loadConversations(currentSessionKey) }}
               >
                 <Text>私信加载失败，点击重试</Text>
               </View>
@@ -530,9 +556,12 @@ function HomeContent() {
                 <View
                   key={item.context.relationId}
                   className='student-message-row'
-                  onClick={() => void Taro.navigateTo({
-                    url: `/pages/secondhand-chat/index?relationId=${encodeURIComponent(String(item.context.relationId))}`
-                  })}
+                  onClick={() => {
+                    if (!channelInteraction.canActivate()) return
+                    void Taro.navigateTo({
+                      url: `/pages/secondhand-chat/index?relationId=${encodeURIComponent(String(item.context.relationId))}`
+                    })
+                  }}
                 >
                   <View className='student-message-row__avatar'>
                     {item.product?.images[0] ? (
@@ -553,7 +582,7 @@ function HomeContent() {
           )
         )}
 
-        {activeTab === 'discover' && (visibility?.forum || visibility?.secondhand) && (
+        {channel === 'discover' && (visibility?.forum || visibility?.secondhand) && (
           initialStatus !== 'ready' ? renderDiscoverState() : (
             <>
                 <View className='student-waterfall'>
@@ -567,7 +596,7 @@ function HomeContent() {
               {(sourceError.community || sourceError.trade) ? (
                 <View
                   className={`student-discover-feedback ${loadingMore ? '' : 'student-discover-feedback--retry'}`}
-                  onClick={loadingMore ? undefined : () => void loadDiscover(false, sourceError)}
+                  onClick={loadingMore ? undefined : () => { if (channelInteraction.canActivate()) void loadDiscover(false, sourceError) }}
                 >
                   <Text>{loadingMore ? '正在重试加载...' : '部分内容加载失败，点击重试'}</Text>
                 </View>
@@ -580,7 +609,7 @@ function HomeContent() {
           )
         )}
 
-        {visibility.campus_tools && <>{activeTab === 'tools' && (
+        {visibility.campus_tools && <>{channel === 'tools' && (
           toolStatus === 'ready' ? (
             <View className='student-tools-grid'>
               {tools.map((tool) => (
@@ -592,7 +621,7 @@ function HomeContent() {
               ))}
             </View>
           ) : toolStatus === 'error' ? (
-            <View className='student-tool-state student-tool-state--retry' onClick={() => void loadTools()}>
+            <View className='student-tool-state student-tool-state--retry' onClick={() => { if (channelInteraction.canActivate()) void loadTools() }}>
               <Text>工具加载失败，点击重试</Text>
             </View>
           ) : toolStatus === 'empty' ? (
@@ -602,8 +631,9 @@ function HomeContent() {
           )
         )}</>}
 
-        {visibleTabs.length === 0 && <View className='student-tool-state'><Text>{visibility.available ? '当前暂无开放的模块，可前往“我的”管理账号。' : '功能状态读取失败，请检查网络后重新进入。'}</Text></View>}
       </ScrollView>
+        )}
+      /> : <View className='student-tool-state'><Text>{visibility.available ? '当前暂无开放的模块，可前往“我的”管理账号。' : '功能状态读取失败，请检查网络后重新进入。'}</Text></View>}
 
       <StudentBottomNav active='home' />
     </View>

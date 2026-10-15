@@ -7,6 +7,7 @@ import { getCampusGuide, type CampusGuide } from '../../services/campus-info'
 import { validGuideId } from '../../services/campus-info-model'
 import { usePageShare } from '../../hooks/use-page-share'
 import Taro from '../../services/taro'
+import { navigateBackOrHome } from '../../utils/navigation'
 import './index.scss'
 
 function GuideContent() {
@@ -17,7 +18,7 @@ function GuideContent() {
   const [attempt, setAttempt] = useState(0)
   usePageShare({ kind: 'guide', enabled: !loading && !error, id, content: guide })
   const goHome = () => void Taro.reLaunch({ url: '/pages/home/index' })
-  const goBack = () => void Taro.navigateBack().catch(goHome)
+  const goBack = () => void navigateBackOrHome()
 
   useEffect(() => {
     let cancelled = false

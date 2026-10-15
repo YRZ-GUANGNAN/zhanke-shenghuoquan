@@ -160,9 +160,6 @@ function ProfileContent() {
   const switchIdentity = useSessionStore((state) => state.switchIdentity)
   const activeRole = identity?.currentIdentity ?? 'student'
   const roleName = roles.find((role) => role.key === activeRole)?.title ?? '学生'
-  const schoolName = profile.school && profile.school !== '未设置' ? profile.school : ''
-  const campusName = profile.campus && profile.campus !== '未设置' ? profile.campus : ''
-  const campusLabel = Array.from(new Set([schoolName, campusName].filter(Boolean))).join(' · ') || '学校未设置'
   const identityAllowed = useIdentityGuard('student')
   const communityCount = useProfileCount(identityAllowed && visibility.forum, getMyCommunitySummary)
   const itemCount = useProfileCount(identityAllowed && visibility.secondhand, getMyItemCount)
@@ -247,19 +244,20 @@ function ProfileContent() {
           {hasCover && <Image className='student-profile-cover__image' src={profile.cover || ''} mode='aspectFill' ariaLabel='我的个人封面' onError={() => setFailedCover(profile.cover || '')} />}
         </View>
         <CapsuleSystemRow />
-        <View className='student-profile-hero__toolbar'>
-          <Text className='student-profile-hero__title'>我的</Text>
-          <View className='student-profile-cover__edit' ariaRole='button' ariaLabel={profile.cover ? '更换个人封面' : '设置个人封面'} onClick={openProfileEditor}>
-            <AppIcon name='image' /><Text>{profile.cover ? '更换封面' : '设置封面'}</Text>
-          </View>
-        </View>
+        <View className='student-profile-hero__toolbar' aria-hidden />
         <View className='student-profile-user'>
-          <View className='student-profile-user__avatar' onClick={openProfileEditor} ariaRole='button' ariaLabel='编辑头像与个人资料'>
-            {profile.avatar && profile.avatar !== failedAvatar ? (
-              <Image className='student-profile-user__avatar-image' src={profile.avatar} mode='aspectFill' onError={() => setFailedAvatar(profile.avatar)} />
-            ) : (
-              <Text>{profile.nickname.trim().slice(0, 1) || '同'}</Text>
-            )}
+          <View className='student-profile-user__top'>
+            <View className='student-profile-user__avatar' onClick={openProfileEditor} ariaRole='button' ariaLabel='编辑头像与个人资料'>
+              {profile.avatar && profile.avatar !== failedAvatar ? (
+                <Image className='student-profile-user__avatar-image' src={profile.avatar} mode='aspectFill' onError={() => setFailedAvatar(profile.avatar)} />
+              ) : (
+                <Text>{profile.nickname.trim().slice(0, 1) || '同'}</Text>
+              )}
+            </View>
+            <View className='student-profile-user__top-spacer' />
+            <View className='student-profile-user__edit' onClick={openProfileEditor} ariaRole='button' ariaLabel='编辑个人资料'>
+              <Text>编辑资料</Text>
+            </View>
           </View>
           <View className='student-profile-user__main' onClick={openProfileEditor} ariaRole='button' ariaLabel='编辑个人资料'>
             <View className='student-profile-user__title-row'>
@@ -270,14 +268,7 @@ function ProfileContent() {
             </View>
             <View className='student-profile-user__details'>
               <Text className='student-profile-user__meta'>用户号 {profile.id || '--'}</Text>
-              <View className='student-profile-user__campus-row'>
-                <View className='student-profile-user__campus-dot' />
-                <Text className='student-profile-user__campus'>{campusLabel}</Text>
-              </View>
             </View>
-          </View>
-          <View className='student-profile-user__edit' onClick={openProfileEditor} ariaRole='button' ariaLabel='编辑个人资料'>
-            <Text>编辑资料</Text>
           </View>
         </View>
       </View>

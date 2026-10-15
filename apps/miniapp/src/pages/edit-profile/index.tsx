@@ -14,8 +14,6 @@ function EditProfileContent() {
   const token = useSessionStore((state) => state.token)
   const updateSessionProfile = useSessionStore((state) => state.updateProfile)
   const [nickname, setNickname] = useState(profile.nickname)
-  const [school, setSchool] = useState(profile.school)
-  const [campus, setCampus] = useState(profile.campus)
   const [avatar, setAvatar] = useState<UploadedMedia | null>(null)
   const [progress, setProgress] = useState('')
   const [choosingAvatar, setChoosingAvatar] = useState(false)
@@ -60,7 +58,9 @@ function EditProfileContent() {
     profileBusyRef.current = true
     setSaving(true)
     try {
-      const value = await updateProfile({ ...profile, nickname: name, school: school.trim(), campus: campus.trim() }, avatar?.assetId)
+      // Keep historical school/campus fields in the object sent to the API for
+      // compatibility, but do not expose or rewrite them in this editor.
+      const value = await updateProfile({ ...profile, nickname: name }, avatar?.assetId)
       if (!isCurrentSession()) return
       const refreshed = await currentUser().catch(() => value)
       if (!isCurrentSession()) return
@@ -94,31 +94,29 @@ function EditProfileContent() {
       />
 
       <View className='edit-profile-content'>
-        <ProfileCoverEditor disabled={saving || choosingAvatar} isProfileBusy={() => profileBusyRef.current} onBusyChange={onCoverBusyChange} />
         <View className='edit-profile-avatar-panel'>
-          <View className={`edit-profile-avatar${choosingAvatar ? ' edit-profile-avatar--busy' : ''}`} onClick={() => void chooseAvatar()}>
-            {avatarSource ? <Image className='edit-profile-avatar__image' src={avatarSource} mode='aspectFill' /> : <Text className='edit-profile-avatar__text'>{nameInitial(nickname)}</Text>}
-            <View className='edit-profile-avatar__camera'><View className='edit-profile-avatar__camera-body' /></View>
+          <View className='edit-profile-avatar-row'>
+            <View className='edit-profile-avatar-copy'>
+              <Text className='edit-profile-field-title'>头像</Text>
+              <Text className={`edit-profile-avatar-panel__hint${avatar ? ' edit-profile-avatar-panel__hint--ready' : ''}`}>
+                {progress || '点击更换，保存后生效'}
+              </Text>
+            </View>
+            <View className={`edit-profile-avatar${choosingAvatar ? ' edit-profile-avatar--busy' : ''}`} onClick={() => void chooseAvatar()} ariaRole='button' ariaLabel='更换头像'>
+              {avatarSource ? <Image className='edit-profile-avatar__image' src={avatarSource} mode='aspectFill' /> : <Text className='edit-profile-avatar__text'>{nameInitial(nickname)}</Text>}
+              <View className='edit-profile-avatar__camera' aria-hidden='true'><View className='edit-profile-avatar__camera-body' /></View>
+            </View>
           </View>
-          <Text className={`edit-profile-avatar-panel__hint${avatar ? ' edit-profile-avatar-panel__hint--ready' : ''}`}>
-            {progress || '点击更换头像'}
-          </Text>
         </View>
 
         <View className='edit-profile-card'>
-          <View className='edit-profile-row'>
+          <View className='edit-profile-row edit-profile-row--last'>
             <Text className='edit-profile-row__label'>昵称</Text>
             <Input className='edit-profile-row__input edit-profile-row__input--strong' value={nickname} maxlength={32} placeholder='请输入昵称' onInput={(event) => setNickname(String(event.detail.value ?? ''))} />
           </View>
-          <View className='edit-profile-row'>
-            <Text className='edit-profile-row__label'>学校</Text>
-            <Input className='edit-profile-row__input' value={school} maxlength={80} placeholder='请输入学校' onInput={(event) => setSchool(String(event.detail.value ?? ''))} />
-          </View>
-          <View className='edit-profile-row edit-profile-row--last'>
-            <Text className='edit-profile-row__label'>校区 / 学院</Text>
-            <Input className='edit-profile-row__input' value={campus} maxlength={80} placeholder='请输入校区或学院' onInput={(event) => setCampus(String(event.detail.value ?? ''))} />
-          </View>
         </View>
+        <Text className='edit-profile-save-hint'>头像和昵称修改后，点击右上角“保存”。</Text>
+        <ProfileCoverEditor disabled={saving || choosingAvatar} isProfileBusy={() => profileBusyRef.current} onBusyChange={onCoverBusyChange} />
       </View>
     </View>
   )

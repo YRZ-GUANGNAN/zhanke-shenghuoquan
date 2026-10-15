@@ -2,7 +2,7 @@
   "appid": "wx065d8f3ce4a056ee",
   "projectname": "campus-circle",
   "setting": {
-    "urlCheck": false,
+    "urlCheck": true,
     "es6": true,
     "enhance": true,
     "postcss": true,

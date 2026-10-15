@@ -4,6 +4,7 @@ import React, { useRef, useState } from 'react'
 import { useDidShow } from '@tarojs/taro'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
+import ChannelPager, { useChannelInteraction } from '../../components/channel-pager'
 import AppIcon from '../../components/app-icon'
 import { AppIconButton } from '../../components/ui'
 import type { CommunityPost, Product } from '../../types'
@@ -11,6 +12,7 @@ import { getMyComments, getMyFavoritePosts, getMyPosts, type MyCommunityComment 
 import { getMyProductsPage } from '../../services/c-trade'
 import Taro from '../../services/taro'
 import { formatPostDate } from '../../utils/post-presentation'
+import { navigateBackOrHome } from '../../utils/navigation'
 import { useSessionStore } from '../../stores/session'
 import { useContentTabs, type ContentReaders, type ContentTabKey } from './use-content-tabs'
 import './index.scss'
@@ -58,18 +60,17 @@ function ContentThumb({ src, label = '无图' }: { src?: string; label?: string 
 function MyContentContent() {
   const visibility = useFeatureVisibility()
   const visibleTabs = tabs.filter(tab => tab.key === 'items' ? visibility.secondhand : tab.key === 'favorites' ? visibility.forum && visibility.favorites : tab.key === 'comments' ? visibility.forum && visibility.comment : visibility.forum)
-  const { activeTab, setActiveTab, states, current, scrollTop, rememberScroll, loadMore, reload } = useContentTabs(getInitialTab(), visibleTabs.map((tab) => tab.key), contentReaders)
+  const { activeTab, setActiveTab, states, current, getScrollTop, rememberScrollFor, loadMoreFor, reloadFor, reload } = useContentTabs(getInitialTab(), visibleTabs.map((tab) => tab.key), contentReaders)
+  const interaction = useChannelInteraction()
   const favorites = states.favorites.items as CommunityPost[]
   const posts = states.posts.items as CommunityPost[]
   const comments = states.comments.items as MyCommunityComment[]
   const items = states.items.items as Product[]
-  const currentLength = current.items.length
-  const { loadingMore, loadMoreError, error } = current
   const navigating = useRef(false)
   useDidShow(() => { navigating.current = false })
 
   const navigate = (url: string) => {
-    if (navigating.current) return
+    if (!interaction.canActivate() || navigating.current) return
     navigating.current = true
     void Taro.navigateTo({ url }).catch(() => {
       navigating.current = false
@@ -83,8 +84,13 @@ function MyContentContent() {
   }
   const openProduct = (productId: string) => navigate(`/pages/secondhand-detail/index?id=${encodeURIComponent(productId)}`)
 
-  const state = () => {
-    if (current.phase === 'idle' || current.phase === 'loading') {
+  const retry = (tab: TabKey) => {
+    if (interaction.canActivate()) reloadFor(tab)
+  }
+
+  const state = (tab: TabKey) => {
+    const value = states[tab]
+    if (value.phase === 'idle' || value.phase === 'loading') {
       return (
         <View className='my-content-state'>
           <Text className='my-content-state__title'>正在加载</Text>
@@ -92,11 +98,11 @@ function MyContentContent() {
         </View>
       )
     }
-    if (error) {
+    if (value.error) {
       return (
-        <View className='my-content-state my-content-state--retry' onClick={reload} ariaRole='button' ariaLabel='重新读取我的内容'>
+        <View className='my-content-state my-content-state--retry' onClick={() => retry(tab)} ariaRole='button' ariaLabel='重新读取我的内容'>
           <Text className='my-content-state__title'>内容加载失败</Text>
-          <Text className='my-content-state__desc'>{error}</Text>
+          <Text className='my-content-state__desc'>{value.error}</Text>
           <Text className='my-content-state__action'>点击重试</Text>
         </View>
       )
@@ -178,47 +184,53 @@ function MyContentContent() {
     </View>
   )
 
-  const renderContent = () => {
-    const status = state()
+  const renderContent = (tab: TabKey) => {
+    const status = state(tab)
     if (status) return status
-    if (activeTab === 'posts') return renderPosts(posts)
-    if (activeTab === 'comments') return renderComments()
-    if (activeTab === 'items') return renderItems()
+    if (tab === 'posts') return renderPosts(posts)
+    if (tab === 'comments') return renderComments()
+    if (tab === 'items') return renderItems()
     return renderPosts(favorites, true)
+  }
+
+  const renderPage = (tab: TabKey) => {
+    const value = states[tab]
+    return (
+      <ScrollView
+        className={`my-content-body${activeTab === tab ? ' my-content-body--active' : ''}`}
+        scrollY
+        enhanced
+        showScrollbar={false}
+        lowerThreshold={120}
+        scrollTop={getScrollTop(tab)}
+        onScroll={(event) => rememberScrollFor(tab, event.detail.scrollTop)}
+        onScrollToLower={() => loadMoreFor(tab)}
+      >
+        {renderContent(tab)}
+        {value.loadMoreError ? (
+          <Text className='my-content-load-more my-content-load-more--retry' onClick={() => { if (interaction.canActivate()) loadMoreFor(tab) }}>{value.loadMoreError}</Text>
+        ) : value.loadingMore ? (
+          <Text className='my-content-load-more'>正在加载更多内容…</Text>
+        ) : value.items.length > 0 && !value.hasMore ? (
+          <Text className='my-content-load-more'>— 已显示全部内容 —</Text>
+        ) : null}
+      </ScrollView>
+    )
   }
 
   return (
     <View className='my-content-page'>
       <CapsulePageHeader
         title='我的内容'
-        left={<AppIconButton name='back' label='返回' className='my-content-header__back' onClick={() => void Taro.navigateBack()} />}
+        left={<AppIconButton name='back' label='返回' className='my-content-header__back' onClick={() => void navigateBackOrHome()} />}
         right={current.refreshError ? (
           <View className='my-content-refresh my-content-refresh--retry' onClick={reload} ariaRole='button' ariaLabel={current.refreshError}>
             <AppIcon name='refresh' className='my-content-refresh__icon' /><Text>重试</Text>
           </View>
         ) : current.refreshing ? <Text className='my-content-refresh my-content-refresh--pending'>更新中</Text> : null}
       />
-      <View className='my-content-tabs' style={{ gridTemplateColumns: `repeat(${Math.max(1, visibleTabs.length)}, 1fr)` }}>{visibleTabs.map((tab) => <View key={tab.key} className={`my-content-tab ${activeTab === tab.key ? 'my-content-tab--active' : ''}`} ariaRole='button' ariaLabel={`${tab.label}${activeTab === tab.key ? '，已选中' : ''}`} onClick={() => setActiveTab(tab.key)}><Text>{tab.label}</Text></View>)}</View>
-      <ScrollView
-        key={activeTab}
-        className='my-content-body'
-        scrollY
-        enhanced
-        showScrollbar={false}
-        lowerThreshold={120}
-        scrollTop={scrollTop}
-        onScroll={(event) => rememberScroll(event.detail.scrollTop)}
-        onScrollToLower={loadMore}
-      >
-        {renderContent()}
-        {loadMoreError ? (
-          <Text className='my-content-load-more my-content-load-more--retry' onClick={loadMore}>{loadMoreError}</Text>
-        ) : loadingMore ? (
-          <Text className='my-content-load-more'>正在加载更多内容…</Text>
-        ) : currentLength > 0 && !current.hasMore ? (
-          <Text className='my-content-load-more'>— 已显示全部内容 —</Text>
-        ) : null}
-      </ScrollView>
+      <View className='my-content-tabs' style={{ gridTemplateColumns: `repeat(${Math.max(1, visibleTabs.length)}, 1fr)` }}>{visibleTabs.map((tab) => <View key={tab.key} className={`my-content-tab ${activeTab === tab.key ? 'my-content-tab--active' : ''}`} ariaRole='button' ariaLabel={`${tab.label}${activeTab === tab.key ? '，已选中' : ''}`} onClick={() => { if (interaction.canActivate()) setActiveTab(tab.key) }}><Text>{tab.label}</Text></View>)}</View>
+      <ChannelPager keys={visibleTabs.map(tab => tab.key)} activeKey={activeTab} onChange={setActiveTab} renderPage={renderPage} interaction={interaction} className='my-content-pager' />
     </View>
   )
 }

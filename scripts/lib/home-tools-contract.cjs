@@ -54,6 +54,10 @@ function isStrictStringEquality(node, identifierName, stringValue) {
     (isString(value.left, stringValue) && isIdentifier(value.right, identifierName))
 }
 
+function isChannelEquality(node, stringValue) {
+  return isStrictStringEquality(node, 'activeTab', stringValue) || isStrictStringEquality(node, 'channel', stringValue)
+}
+
 function jsxName(node) {
   return node?.type === 'JSXIdentifier' ? node.name : ''
 }
@@ -92,6 +96,13 @@ function isVoidCallArrow(node, calleeName, argumentName) {
   if (call?.type !== 'CallExpression' || !isIdentifier(call.callee, calleeName)) return false
   if (argumentName === undefined) return call.arguments.length === 0
   return call.arguments.length === 1 && isIdentifier(call.arguments[0], argumentName)
+}
+
+function containsCall(node, calleeName) {
+  if (!node || typeof node !== 'object') return false
+  if (node.type === 'CallExpression' && isIdentifier(node.callee, calleeName)) return true
+  return Object.entries(node).some(([key, value]) => !ignoredASTKeys.has(key) &&
+    (Array.isArray(value) ? value.some(item => containsCall(item, calleeName)) : containsCall(value, calleeName)))
 }
 
 function isToolLinkArrayType(node) {
@@ -223,7 +234,9 @@ function validateStatusBranch(node, status, violations) {
     violations.push(`tools ${status} branch must use only the canonical status View`)
     return
   }
-  if (status === 'error' && !isVoidCallArrow(expressionAttribute(attributes, 'onClick'), 'loadTools')) {
+  if (status === 'error' && !isVoidCallArrow(expressionAttribute(attributes, 'onClick'), 'loadTools') &&
+      !(expressionAttribute(attributes, 'onClick')?.type === 'ArrowFunctionExpression' &&
+        containsCall(expressionAttribute(attributes, 'onClick').body, 'loadTools'))) {
     violations.push('tools error branch retry must call loadTools without rendering data')
   }
   const children = meaningfulJSXChildren(branch)
@@ -305,15 +318,15 @@ function homeToolsDataFlowViolations(home) {
     .map((node) => indexAST(unwrapExpression(node.argument)))
     .filter((index) => index.nodes.some((node) => node.type === 'JSXExpressionContainer' &&
       unwrapExpression(node.expression)?.type === 'LogicalExpression' && unwrapExpression(node.expression).operator === '&&' &&
-      isStrictStringEquality(unwrapExpression(node.expression).left, 'activeTab', 'tools')))
+      isChannelEquality(unwrapExpression(node.expression).left, 'tools')))
   if (renderCandidates.length !== 1) violations.push('HomeContent must have exactly one main JSX return containing the tools branch')
   const renderIndex = renderCandidates[0] || { nodes: [] }
   const toolsContainers = renderIndex.nodes.filter((node) => node.type === 'JSXExpressionContainer' &&
     unwrapExpression(node.expression)?.type === 'LogicalExpression' && unwrapExpression(node.expression).operator === '&&' &&
-    isStrictStringEquality(unwrapExpression(node.expression).left, 'activeTab', 'tools'))
+    isChannelEquality(unwrapExpression(node.expression).left, 'tools'))
   let readyMapCall = null
   if (toolsContainers.length !== 1) {
-    violations.push("HomeContent must have exactly one activeTab === 'tools' render branch")
+    violations.push("HomeContent must have exactly one tools channel render branch")
   } else {
     const toolsExpression = unwrapExpression(toolsContainers[0].expression)
     const readyConditional = unwrapExpression(toolsExpression.right)
@@ -382,7 +395,7 @@ function assertSyntheticStaticToolsRejected(home) {
   if (!home.includes(marker)) throw new Error('HomeContent marker is missing')
   const toolsState = '  const [tools, setTools] = useState<ToolLink[]>([])'
   const toolsMap = '{tools.map((tool) => ('
-  const messagesRender = "        {activeTab === 'messages' && ("
+  const messagesRender = "        {channel === 'messages' && ("
   if (!home.includes(toolsState) || !home.includes(toolsMap) || !home.includes(messagesRender)) {
     throw new Error('Home tools state or render marker is missing')
   }

@@ -137,14 +137,14 @@ export function isMediaUsable(status: MediaStatus): boolean {
   if (!status.canUse) return false
   if (status.state === 'approved') return true
   return status.state === 'ready' && status.reviewStatus === 'not_required' &&
-    ['avatar', 'profile_cover', 'identity_application'].includes(status.purpose)
+    ['avatar', 'profile_cover', 'identity_application', 'dish', 'merchant_logo'].includes(status.purpose)
 }
 
 // Direct-use uploads finish their technical checks in the completion request.
-// Do not start a 90-second content-review spinner for profile/identity photos.
+// Do not start a 90-second content-review spinner for profile or takeout media.
 export async function confirmDirectUpload(uploaded: UploadedMedia, shouldContinue?: () => boolean): Promise<MediaStatus> {
   assertUploadActive(shouldContinue)
-  if (!['avatar', 'profile_cover', 'identity_application'].includes(uploaded.purpose)) {
+  if (!['avatar', 'profile_cover', 'identity_application', 'dish', 'merchant_logo'].includes(uploaded.purpose)) {
     throw new Error('此类图片仍需内容审核')
   }
   const status = isMediaUsable(uploaded) ? uploaded : await getMediaStatus(uploaded.assetId)
@@ -235,7 +235,7 @@ async function uploadImage(
   progress(35, 'uploading', '正在直传腾讯云 COS')
   await putSignedObject(session, bytes)
   assertUploadActive(shouldContinue)
-  progress(85, 'completing', ['avatar', 'profile_cover', 'identity_application'].includes(purpose)
+  progress(85, 'completing', ['avatar', 'profile_cover', 'identity_application', 'dish', 'merchant_logo'].includes(purpose)
     ? '正在确认图片上传' : '正在校验图片并提交自动审核')
   const status = await retryUploadCompletion(session.ticketId)
   assertUploadActive(shouldContinue)

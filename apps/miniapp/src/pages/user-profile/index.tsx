@@ -18,6 +18,8 @@ import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
 import type { CommunityPost, Product } from '../../types'
 import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
+import ChannelPager, { useChannelInteraction } from '../../components/channel-pager'
+import { navigateBackOrHome } from '../../utils/navigation'
 import './index.scss'
 
 type ProfileTab = 'posts' | 'secondhand'
@@ -51,7 +53,8 @@ function UserProfilePage() {
   const [postPage, setPostPage] = useState(1)
   const [productPage, setProductPage] = useState(1)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [loadMoreError, setLoadMoreError] = useState('')
+  const [loadMoreErrors, setLoadMoreErrors] = useState<Record<ProfileTab, string>>({ posts: '', secondhand: '' })
+  const [loadingTab, setLoadingTab] = useState<ProfileTab | null>(null)
   const [activeTab, setActiveTab] = useState<ProfileTab>(initialTab)
   const [following, setFollowing] = useState(false)
   const [followerCount, setFollowerCount] = useState(0)
@@ -61,6 +64,10 @@ function UserProfilePage() {
   const [blockPending, setBlockPending] = useState(false)
   const [error, setError] = useState('')
   const requestVersion = useRef(0)
+  const loadingMoreRef = useRef(false)
+  const scrollPositions = useRef<Record<ProfileTab, number>>({ posts: 0, secondhand: 0 })
+  const interaction = useChannelInteraction()
+  const visibleTabs: ProfileTab[] = visibility.secondhand ? ['posts', 'secondhand'] : ['posts']
   const shareReady = usePageShare({ kind: 'profile', enabled: visibility.forum && status === 'ready', id: userId, loadedId: String(profile?.profile.id || ''), nickname: profile?.profile.nickname || '' })
   useEffect(() => { if (!visibility.secondhand && activeTab === 'secondhand') setActiveTab('posts') }, [visibility.secondhand, activeTab])
 
@@ -68,8 +75,10 @@ function UserProfilePage() {
     let active = true
     const version = requestVersion.current + 1
     requestVersion.current = version
+    loadingMoreRef.current = false
     setLoadingMore(false)
-    setLoadMoreError('')
+    setLoadingTab(null)
+    setLoadMoreErrors({ posts: '', secondhand: '' })
     setPostPage(1)
     setProductPage(1)
     setStatus('loading')
@@ -100,20 +109,26 @@ function UserProfilePage() {
       setStatus('error')
       setError(value instanceof Error ? value.message : '用户主页加载失败')
     })
-    return () => { active = false }
+    return () => { active = false; requestVersion.current += 1 }
   }, [reloadKey, userId, visibility.secondhand])
 
-  const loadMore = async () => {
-    if (loadingMore) return
-    const isPosts = activeTab === 'posts'
+  useEffect(() => {
+    scrollPositions.current = { posts: 0, secondhand: 0 }
+  }, [userId])
+
+  const loadMore = async (tab: ProfileTab = activeTab) => {
+    if (loadingMoreRef.current || tab !== activeTab || (tab === 'secondhand' && !visibility.secondhand)) return
+    const isPosts = tab === 'posts'
     const currentItems = isPosts ? posts : products
     const total = isPosts ? postTotal : productTotal
     if (currentItems.length >= total) return
     const nextPage = (isPosts ? postPage : productPage) + 1
     const version = requestVersion.current + 1
     requestVersion.current = version
+    loadingMoreRef.current = true
     setLoadingMore(true)
-    setLoadMoreError('')
+    setLoadingTab(tab)
+    setLoadMoreErrors((current) => ({ ...current, [tab]: '' }))
     try {
       if (isPosts) {
         const result = await getPublicUserPosts(userId, nextPage, 20)
@@ -138,10 +153,15 @@ function UserProfilePage() {
       }
     } catch (value) {
       if (requestVersion.current === version) {
-        setLoadMoreError(value instanceof Error ? `${value.message}，点击重试` : '更多内容加载失败，点击重试')
+        const message = value instanceof Error ? `${value.message}，点击重试` : '更多内容加载失败，点击重试'
+        setLoadMoreErrors((current) => ({ ...current, [tab]: message }))
       }
     } finally {
-      if (requestVersion.current === version) setLoadingMore(false)
+      if (requestVersion.current === version) {
+        loadingMoreRef.current = false
+        setLoadingMore(false)
+        setLoadingTab(null)
+      }
     }
   }
 
@@ -206,8 +226,13 @@ function UserProfilePage() {
     }
   }
 
+  const openContent = (url: string) => {
+    if (!interaction.canActivate() || menuVisible || blockConfirmVisible) return
+    void Taro.navigateTo({ url })
+  }
+
   const renderPost = (item: CommunityPost) => (
-    <View className='public-profile-card' key={item.id} onClick={() => void Taro.navigateTo({ url: `/pages/post-detail/index?id=${encodeURIComponent(item.id)}` })}>
+    <View className='public-profile-card' key={item.id} onClick={() => openContent(`/pages/post-detail/index?id=${encodeURIComponent(item.id)}`)}>
       <View className='public-profile-card__media public-profile-card__media--sky public-profile-card__media--medium'>
         {item.images[0] ? <Image className='public-profile-card__media-image' src={item.images[0]} mode='aspectFill' /> : <Text>帖 · {item.topic || '校园'}</Text>}
       </View>
@@ -219,7 +244,7 @@ function UserProfilePage() {
   )
 
   const renderProduct = (item: Product) => (
-    <View className='public-profile-card' key={item.id} onClick={() => void Taro.navigateTo({ url: `/pages/secondhand-detail/index?id=${encodeURIComponent(item.id)}` })}>
+    <View className='public-profile-card' key={item.id} onClick={() => openContent(`/pages/secondhand-detail/index?id=${encodeURIComponent(item.id)}`)}>
       <View className='public-profile-card__media public-profile-card__media--lemon public-profile-card__media--medium'>
         {item.images[0] ? <Image className='public-profile-card__media-image' src={item.images[0]} mode='aspectFill' /> : <Text>物 · {item.category || '二手'}</Text>}
         {item.status === 'sold' ? <Text className='public-profile-card__sold'>已售</Text> : null}
@@ -247,13 +272,12 @@ function UserProfilePage() {
   }
 
   const value = profile.profile
-  const empty = activeTab === 'posts' ? posts.length === 0 : products.length === 0
   return (
     <View className='public-profile-page' style={capsuleStyle}>
       <View className='public-profile-hero'>
         <CapsuleSystemRow />
         <View className='public-profile-nav'>
-          <View className='public-profile-nav__back' onClick={() => void Taro.navigateBack().catch(() => Taro.redirectTo({ url: '/pages/home/index' }))} />
+          <View className='public-profile-nav__back' ariaRole='button' ariaLabel='返回' onClick={() => void navigateBackOrHome()} />
           <View className='public-profile-nav__more' onClick={() => setMenuVisible(true)}><Text>•••</Text></View>
         </View>
         <View className='public-profile-user'>
@@ -281,28 +305,41 @@ function UserProfilePage() {
         </View>
       </View>
       <View className='public-profile-tabs'>
-        <View className={`public-profile-tab ${activeTab === 'posts' ? 'public-profile-tab--active' : ''}`} onClick={() => setActiveTab('posts')}><Text>帖子 {postTotal}</Text></View>
-        {visibility.secondhand && <View className={`public-profile-tab ${activeTab === 'secondhand' ? 'public-profile-tab--active' : ''}`} onClick={() => setActiveTab('secondhand')}><Text>二手 {productTotal}</Text></View>}
+        <View className={`public-profile-tab ${activeTab === 'posts' ? 'public-profile-tab--active' : ''}`} onClick={() => { if (interaction.canActivate()) setActiveTab('posts') }}><Text>帖子 {postTotal}</Text></View>
+        {visibility.secondhand && <View className={`public-profile-tab ${activeTab === 'secondhand' ? 'public-profile-tab--active' : ''}`} onClick={() => { if (interaction.canActivate()) setActiveTab('secondhand') }}><Text>二手 {productTotal}</Text></View>}
       </View>
       <View className='public-profile-content'>
+        <ChannelPager
+          keys={visibleTabs}
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          interaction={interaction}
+          renderPage={(tab) => (
         <ScrollView
           className='public-profile-scroll'
           scrollY
           enhanced
           showScrollbar={false}
           lowerThreshold={120}
-          onScrollToLower={() => void loadMore()}
+          scrollTop={scrollPositions.current[tab]}
+          onScroll={(event) => {
+            const top = event.detail.scrollTop
+            if (Number.isFinite(top)) scrollPositions.current[tab] = Math.max(0, top)
+          }}
+          onScrollToLower={() => void loadMore(tab)}
         >
-          {empty ? (
-            <View className='public-profile-empty'><Text className='public-profile-empty__title'>{activeTab === 'posts' ? '暂无公开帖子' : '暂无公开二手商品'}</Text></View>
-          ) : activeTab === 'posts' ? (
+          {(tab === 'posts' ? posts.length === 0 : products.length === 0) ? (
+            <View className='public-profile-empty'><Text className='public-profile-empty__title'>{tab === 'posts' ? '暂无公开帖子' : '暂无公开二手商品'}</Text></View>
+          ) : tab === 'posts' ? (
             <View className='public-profile-waterfall'><View className='public-profile-waterfall__column'>{postColumns.left.map(renderPost)}</View><View className='public-profile-waterfall__column'>{postColumns.right.map(renderPost)}</View></View>
           ) : (
             <View className='public-profile-waterfall'><View className='public-profile-waterfall__column'>{productColumns.left.map(renderProduct)}</View><View className='public-profile-waterfall__column'>{productColumns.right.map(renderProduct)}</View></View>
           )}
-          {loadMoreError ? <Text className='public-profile-load-more public-profile-load-more--retry' onClick={() => void loadMore()}>{loadMoreError}</Text> : null}
-          {loadingMore ? <Text className='public-profile-load-more'>正在加载更多内容…</Text> : null}
+          {loadMoreErrors[tab] ? <Text className='public-profile-load-more public-profile-load-more--retry' onClick={() => { if (interaction.canActivate()) void loadMore(tab) }}>{loadMoreErrors[tab]}</Text> : null}
+          {loadingMore && loadingTab === tab ? <Text className='public-profile-load-more'>正在加载更多内容…</Text> : null}
         </ScrollView>
+          )}
+        />
       </View>
       <AppActionSheet visible={menuVisible} title='更多操作' onClose={() => setMenuVisible(false)}>
         <View className='public-profile-sheet__content'>

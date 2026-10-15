@@ -116,14 +116,25 @@ export function useContentTabs(initialTab: ContentTabKey, enabledTabs: ContentTa
     void load(activeRef.current, 'refresh')
   })
 
-  const rememberScroll = (scrollTop: number) => {
-    if (Number.isFinite(scrollTop)) positions.current[activeTab] = Math.max(0, scrollTop)
+  // Native swipers keep neighbouring scroll views mounted. Their late scroll
+  // events must update their own position, never the newly selected channel.
+  const rememberScrollFor = (tab: ContentTabKey, scrollTop: number) => {
+    if (enabledRef.current.includes(tab) && Number.isFinite(scrollTop)) positions.current[tab] = Math.max(0, scrollTop)
+  }
+  const getScrollTop = (tab: ContentTabKey) => positions.current[tab]
+  const loadMoreFor = (tab: ContentTabKey) => {
+    if (tab === activeRef.current) void load(tab, 'more')
+  }
+  const reloadFor = (tab: ContentTabKey) => {
+    if (tab === activeRef.current) void load(tab, statesRef.current[tab].phase === 'ready' ? 'refresh' : 'initial')
   }
 
   return {
     activeTab, setActiveTab, states, current: states[activeTab],
-    scrollTop: positions.current[activeTab], rememberScroll,
-    loadMore: () => { void load(activeTab, 'more') },
-    reload: () => { void load(activeTab, statesRef.current[activeTab].phase === 'ready' ? 'refresh' : 'initial') },
+    scrollTop: positions.current[activeTab],
+    rememberScroll: (scrollTop: number) => rememberScrollFor(activeTab, scrollTop),
+    loadMore: () => loadMoreFor(activeTab),
+    reload: () => reloadFor(activeTab),
+    rememberScrollFor, getScrollTop, loadMoreFor, reloadFor,
   }
 }

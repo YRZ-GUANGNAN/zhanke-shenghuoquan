@@ -3,6 +3,7 @@ import { ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import { AppIconButton } from '../../components/ui'
 import Taro from '../../services/taro'
+import { navigateBackOrHome } from '../../utils/navigation'
 import './index.scss'
 
 type LegalTab = 'agreement' | 'privacy'
@@ -76,7 +77,7 @@ export default function LegalPage() {
     <View className='student-legal-page'>
       <CapsulePageHeader
         title='法律条款'
-        left={<AppIconButton name='back' label='返回' className='student-legal-nav__back' onClick={() => void Taro.navigateBack()} />}
+        left={<AppIconButton name='back' label='返回' className='student-legal-nav__back' onClick={() => void navigateBackOrHome()} />}
       />
       <View className='student-legal-tabs'>
         {tabs.map((tab) => (
