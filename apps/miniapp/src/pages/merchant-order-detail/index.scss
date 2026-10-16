@@ -58,6 +58,56 @@ page {
   padding: 24rpx 32rpx calc(48rpx + env(safe-area-inset-bottom));
 }
 
+.merchant-detail-notice {
+  @include ref.type(meta);
+  @include ref.wrap;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+  border-radius: 16rpx;
+  background: $bg-surface;
+  color: $text-tertiary;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8rpx 16rpx;
+}
+
+.merchant-detail-notice--error,
+.merchant-detail-status-card__funds-error,
+.merchant-detail-photo-card__error {
+  @include ref.type(meta);
+  @include ref.wrap;
+  @include ref.touch;
+  border-radius: 12rpx;
+  background: $detail-orange-soft;
+  color: $detail-orange;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8rpx 16rpx;
+  box-sizing: border-box;
+}
+
+.merchant-detail-status-card__funds-error {
+  width: 100%;
+  padding: 16rpx 20rpx;
+  margin-top: 24rpx;
+}
+
+.merchant-detail-photo-card__error {
+  margin-top: 20rpx;
+  padding: 16rpx 20rpx;
+}
+
+.merchant-detail-notice__retry {
+  color: $brand-primary;
+  font-weight: 600;
+}
+
+.merchant-detail-control--pressed {
+  opacity: .72;
+}
+
 .merchant-detail-status-card,
 .merchant-detail-rider-card,
 .merchant-detail-progress-card,
@@ -214,6 +264,19 @@ page {
   justify-content: center;
   font-size: 25rpx;
   box-shadow: 0 10rpx 24rpx -20rpx rgba($text-strong, .42);
+  transition: background $duration-fast ease, opacity $duration-fast ease;
+}
+
+.merchant-detail-rider-card__circle--pressed {
+  background: $detail-blue-soft;
+  opacity: .72;
+}
+
+.merchant-detail-rider-card__message-icon {
+  display: block;
+  width: 24PX;
+  height: 24PX;
+  flex: 0 0 24PX;
 }
 
 .merchant-detail-progress-card {

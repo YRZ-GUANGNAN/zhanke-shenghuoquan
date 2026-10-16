@@ -10,6 +10,20 @@
 
 ---
 
+## 实施校正与验收记录（2026-10-16）
+
+本轮已按方案 A 完成骑手、商家工作台及商家配送详情页。下面的任务步骤保留为实施依据；实际落地包含以下校正：
+
+- 分页初值 `1/1/1` 保持不变，与真实总量和 `loadedByTab` 分开管理。
+- 骑手动作使用 ref 防止同一渲染帧重复提交；成功后刷新失败只允许同步状态，不再次提交履约。
+- 上传/审核沿用现有媒体取消条件；身份变化、页面卸载使旧操作失效，系统相册暂时隐藏页面不取消操作。已发出的请求不宣称撤销。
+- 商家分组失败保留已有订单、总量和页码；详情资金、凭证独立呈现错误并保留上次成功数据。主请求再次失败不会清空尚未恢复的子区域错误。
+- 取消时间线只显示实际时间戳；没有 `cancelledAt` 时由订单状态展示已取消，不从更新时间补造时间。
+- `scripts/test-delivery-stage-workbench.cjs` 执行真实页面处理函数的隔离测试，覆盖订单并发、媒体审核、生命周期、分组分页、时间线、支付与凭证连续失败；不访问真实账号或写入数据库。
+- `npm run test:delivery-stage-workbench` 已接入 `check:delivery-stage-workbench`，随 `verify` 执行。
+
+验证范围：仓库 `verify`、小程序构建、配送页面行为检查和接口/守卫差异审计。微信真机与商家/骑手双端验收仍需在体验版完成，本轮不上传微信或 GitHub。
+
 ## 文件变更总览
 
 - Modify: `apps/miniapp/src/pages/delivery-rider/index.tsx` — 订单级操作状态、动作结果与刷新结果分层、骑手身份重新同步。
@@ -21,6 +35,7 @@
 - Modify: `scripts/check-rider-workbench-clarity.cjs` — 增加订单级锁定、凭证反馈和安全刷新契约断言。
 - Modify: `scripts/check-merchant-home-clarity.cjs` — 增加真实数量/加载态断言。
 - Create: `scripts/check-delivery-stage-workbench.cjs` — 组合检查配送阶段化行为的关键字符串和接口边界。
+- Create: `scripts/test-delivery-stage-workbench.cjs` — 隔离执行真实页面，验证并发、重试、分页和生命周期。
 
 ## Task 1: 骑手页改为订单级操作状态
 
@@ -215,7 +230,7 @@ git commit -m "完善骑手配送动作与凭证反馈"
 - Modify: `apps/miniapp/src/pages/merchant-home/index.tsx:34-55,180-450`
 - Modify: `apps/miniapp/src/pages/merchant-home/index.scss:206-447` — 统计数字加载态、订单标签和列表错误提示样式。
 
-- [ ] **Step 1: 删除加载期虚假数量**
+- [ ] **Step 1: 分离分页游标、总量与首次加载状态**
 
 将：
 
@@ -228,12 +243,16 @@ function initialNumbersByTab(): MerchantNumbersByTab {
 改为：
 
 ```ts
-function initialNumbersByTab(): MerchantNumbersByTab {
-  return { pending: 0, delivering: 0, completed: 0 }
+function initialPagesByTab(): MerchantNumbersByTab {
+  return { pending: 1, delivering: 1, completed: 1 }
+}
+
+function unloadedTabs(): Record<MerchantTabKey, boolean> {
+  return { pending: false, delivering: false, completed: false }
 }
 ```
 
-数量渲染时使用已有 `loading`：初次加载且该列表为空时显示 `—`，请求完成后显示真实 total。
+原来的 `1/1/1` 是页码，必须保留；总量继续由 `emptyTotalsByTab` 从 0 初始化。新增 `loadedByTab` 表示各分组首次成功读取，数量渲染使用 `loadedByTab[tab.key] ? ordersTotalByTab[tab.key] : '—'`，刷新失败保留已经读取的真实 total。
 
 - [ ] **Step 2: 保留已有列表数据并分离局部失败**
 
@@ -245,7 +264,7 @@ function initialNumbersByTab(): MerchantNumbersByTab {
 
 - [ ] **Step 4: 增加商家工作台契约检查**
 
-在 `scripts/check-merchant-home-clarity.cjs` 增加断言：源码不再匹配 `return { pending: 1, delivering: 1, completed: 1 }`，并匹配 `loading` 与真实 totals 的组合展示。
+在 `scripts/check-delivery-stage-workbench.cjs` 增加断言：分页初值保持 `1/1/1`、总量初值为 `0/0/0`，并检查 `loadedByTab` 与真实 totals 的组合展示及分组失败保留逻辑。
 
 - [ ] **Step 5: 运行检查并提交任务 3**
 
@@ -306,10 +325,11 @@ git commit -m "统一配送详情联系骑手入口"
 assert.match(riderSource, /busyByOrder/)
 assert.match(riderSource, /refreshAfterAction/)
 assert.doesNotMatch(riderSource, /disabled=\{!!busyOrderId\}/)
-assert.doesNotMatch(merchantHomeSource, /pending:\s*1,\s*delivering:\s*1,\s*completed:\s*1/)
+assert.match(merchantHomeSource, /function initialPagesByTab/)
+assert.match(merchantHomeSource, /loadedByTab\[tab\.key\]/)
 assert.match(detailSource, /MerchantHomeIcon.*message|name='message'/)
-assert.match(riderServiceSource, /\/delivery\/rider\/orders/)
-assert.match(merchantServiceSource, /\/delivery\/merchant\/orders/)
+assert.match(riderServiceSource, /const BASE = ['"]\/delivery\/rider['"]/)
+assert.match(merchantServiceSource, /const BASE = ['"]\/delivery\/merchant['"]/)
 ```
 
 脚本只检查源码契约，不连接后端、不伪造登录、不写数据库。

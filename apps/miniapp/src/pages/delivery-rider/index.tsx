@@ -126,6 +126,43 @@ export default function DeliveryRiderPage() {
   const [releaseCandidate, setReleaseCandidate] = useState<AssignedDeliveryOrder | null>(null)
   const requestVersion = useRef(0)
   const busyByOrderRef = useRef<BusyByOrder>({})
+  const operationEpochRef = useRef(0)
+  const pageMountedRef = useRef(true)
+  const pageActiveRef = useRef(identityAllowed)
+  const identityAllowedRef = useRef(identityAllowed)
+  identityAllowedRef.current = identityAllowed
+
+  const invalidatePageOperations = useCallback(() => {
+    pageActiveRef.current = false
+    operationEpochRef.current += 1
+    requestVersion.current += 1
+    busyByOrderRef.current = {}
+  }, [])
+
+  const createOperationGuard = useCallback(() => {
+    const epoch = operationEpochRef.current
+    return () => pageActiveRef.current
+      && identityAllowedRef.current
+      && operationEpochRef.current === epoch
+  }, [])
+
+  useEffect(() => {
+    pageMountedRef.current = true
+    return () => { pageMountedRef.current = false }
+  }, [])
+
+  // Opening the photo picker may hide the page temporarily; only unmounting or
+  // losing the rider identity invalidates its unfinished operations.
+  useEffect(() => {
+    pageActiveRef.current = identityAllowed
+    if (identityAllowed) {
+      setBusyByOrder({})
+      setProofProgressByOrder({})
+      setActionFeedbackByOrder({})
+      setReleaseCandidate(null)
+    }
+    return invalidatePageOperations
+  }, [identityAllowed, invalidatePageOperations])
 
   const activeTaskCount = pickupTotal + deliveryTotal
   useEffect(() => { if (!canClaim && activeTab === 'grab') setActiveTab('pickup') }, [canClaim, activeTab])
@@ -159,6 +196,8 @@ export default function DeliveryRiderPage() {
   }
 
   const refreshOrders = async (): Promise<boolean> => {
+    const shouldContinue = createOperationGuard()
+    if (!shouldContinue()) return false
     const version = requestVersion.current + 1
     requestVersion.current = version
     setLoading(true)
@@ -175,7 +214,7 @@ export default function DeliveryRiderPage() {
         ])),
         settleRequest(getDeliveryRiderMe())
       ])
-      if (requestVersion.current !== version) return false
+      if (!shouldContinue() || requestVersion.current !== version) return false
       if (riderResult.status === 'fulfilled') setMe(riderResult.value)
       if (ordersResult.status === 'fulfilled') {
         const [nextClaimable, nextPickup, nextDelivery, nextCompleted] = ordersResult.value
@@ -200,14 +239,17 @@ export default function DeliveryRiderPage() {
       }
       return true
     } finally {
-      if (requestVersion.current === version) setLoading(false)
+      if (shouldContinue() && requestVersion.current === version) setLoading(false)
     }
   }
 
   const refreshAfterAction = async (orderId: string, actionSucceeded: boolean): Promise<boolean> => {
+    const shouldContinue = createOperationGuard()
+    if (!shouldContinue()) return false
     try {
       return await refreshOrders()
     } catch (value) {
+      if (!shouldContinue()) return false
       const detail = errorMessage(value, '列表刷新失败，请点击重试')
       const message = actionSucceeded ? `操作已提交，${detail}` : detail
       if (actionSucceeded) {
@@ -219,7 +261,8 @@ export default function DeliveryRiderPage() {
   }
 
   const load = useCallback(async () => {
-    if (!identityAllowed) return
+    const shouldContinue = createOperationGuard()
+    if (!shouldContinue()) return
     const version = requestVersion.current + 1
     requestVersion.current = version
     setLoading(true)
@@ -228,7 +271,7 @@ export default function DeliveryRiderPage() {
     setLoadMoreError('')
     try {
       const rider = await getDeliveryRiderMe()
-      if (requestVersion.current !== version) return
+      if (!shouldContinue() || requestVersion.current !== version) return
       setMe(rider)
       if (!rider.registered || !rider.rider) {
         setClaimable([])
@@ -246,7 +289,7 @@ export default function DeliveryRiderPage() {
         listAssignedDeliveryOrders(1, 50, 'delivery'),
         listAssignedDeliveryOrders(1, 1, 'completed')
       ])
-      if (requestVersion.current !== version) return
+      if (!shouldContinue() || requestVersion.current !== version) return
       setClaimable(claimablePage.items)
       setClaimablePage(claimablePage.page || 1)
       setClaimableTotal(claimablePage.total)
@@ -260,21 +303,22 @@ export default function DeliveryRiderPage() {
       setHasLoadedOrders(true)
       setActionFeedbackByOrder(retainFailedActionFeedback)
     } catch (value) {
-      if (requestVersion.current !== version) return
+      if (!shouldContinue() || requestVersion.current !== version) return
       const message = errorMessage(value, '骑手订单加载失败')
       setError(message)
       await Taro.showToast({ title: message, icon: 'none' }).catch(() => {})
     } finally {
-      if (requestVersion.current === version) setLoading(false)
+      if (shouldContinue() && requestVersion.current === version) setLoading(false)
     }
-  }, [identityAllowed, canClaim])
+  }, [createOperationGuard, canClaim])
 
   useDidShow(() => {
     void load()
   })
 
   const loadMoreOrders = async () => {
-    if (loading || loadingMore) return
+    const shouldContinue = createOperationGuard()
+    if (!shouldContinue() || loading || loadingMore) return
     const isClaimable = activeTab === 'grab'
     const items = isClaimable ? claimable : activeTab === 'pickup' ? pickupOrders : deliveryOrders
     const total = isClaimable ? claimableTotal : activeTab === 'pickup' ? pickupTotal : deliveryTotal
@@ -287,7 +331,7 @@ export default function DeliveryRiderPage() {
     try {
       if (isClaimable) {
         const result = await listClaimableDeliveryOrders(nextPage, 50)
-        if (requestVersion.current !== version) return
+        if (!shouldContinue() || requestVersion.current !== version) return
         setClaimable((current) => {
           const byId = new Map(current.map((order) => [order.deliveryOrderPublicId, order]))
           result.items.forEach((order) => byId.set(order.deliveryOrderPublicId, order))
@@ -298,7 +342,7 @@ export default function DeliveryRiderPage() {
       } else {
         const statusGroup = requestedTab === 'pickup' ? 'pickup' : 'delivery'
         const result = await listAssignedDeliveryOrders(nextPage, 50, statusGroup)
-        if (requestVersion.current !== version) return
+        if (!shouldContinue() || requestVersion.current !== version) return
         const mergeOrders = (current: AssignedDeliveryOrder[]) => {
           const byId = new Map(current.map((order) => [order.deliveryOrderPublicId, order]))
           result.items.forEach((order) => byId.set(order.deliveryOrderPublicId, order))
@@ -315,17 +359,18 @@ export default function DeliveryRiderPage() {
         }
       }
     } catch (value) {
-      if (requestVersion.current === version) {
+      if (shouldContinue() && requestVersion.current === version) {
         setLoadMoreError(errorMessage(value, '更多订单加载失败，点击重试'))
       }
     } finally {
-      if (requestVersion.current === version) setLoadingMore(false)
+      if (shouldContinue() && requestVersion.current === version) setLoadingMore(false)
     }
   }
 
   const claim = async (order: ClaimableDeliveryOrder) => {
+    const shouldContinue = createOperationGuard()
     const orderId = order.deliveryOrderPublicId
-    if (isOrderBusy(orderId)) return
+    if (!shouldContinue() || isOrderBusy(orderId)) return
     if (actionFeedbackByOrder[orderId]?.needsRefresh) {
       await load()
       return
@@ -335,18 +380,22 @@ export default function DeliveryRiderPage() {
     updateActionFeedback(orderId)
     try {
       await claimDeliveryOrder(order)
+      if (!shouldContinue()) return
       requestVersion.current += 1
       setActiveTab('pickup')
       updateActionFeedback(orderId, { tone: 'success', message: '接单成功，正在同步订单状态', needsRefresh: true })
       await Taro.showToast({ title: '接单成功', icon: 'success' }).catch(() => {})
+      if (!shouldContinue()) return
       await refreshAfterAction(orderId, true)
     } catch (value) {
+      if (!shouldContinue()) return
       const message = errorMessage(value, '接单失败，请刷新后重试')
       updateActionFeedback(orderId, { tone: 'error', message })
       await Taro.showToast({ title: message, icon: 'none' }).catch(() => {})
+      if (!shouldContinue()) return
       await refreshAfterAction(orderId, false)
     } finally {
-      markBusy(orderId)
+      if (shouldContinue()) markBusy(orderId)
     }
   }
 
@@ -356,8 +405,9 @@ export default function DeliveryRiderPage() {
     success: string,
     busyAction: BusyAction = 'command'
   ) => {
+    const shouldContinue = createOperationGuard()
     const orderId = order.deliveryOrderPublicId
-    if (isOrderBusy(orderId)) return
+    if (!shouldContinue() || isOrderBusy(orderId)) return
     if (actionFeedbackByOrder[orderId]?.needsRefresh) {
       await load()
       return
@@ -366,17 +416,21 @@ export default function DeliveryRiderPage() {
     updateActionFeedback(orderId)
     try {
       await command(order)
+      if (!shouldContinue()) return
       requestVersion.current += 1
       updateActionFeedback(orderId, { tone: 'success', message: `${success}，正在同步订单状态`, needsRefresh: true })
       await Taro.showToast({ title: success, icon: 'success' }).catch(() => {})
+      if (!shouldContinue()) return
       await refreshAfterAction(orderId, true)
     } catch (value) {
+      if (!shouldContinue()) return
       const message = errorMessage(value, '操作失败，请刷新后重试')
       updateActionFeedback(orderId, { tone: 'error', message })
       await Taro.showToast({ title: message, icon: 'none' }).catch(() => {})
+      if (!shouldContinue()) return
       await refreshAfterAction(orderId, false)
     } finally {
-      markBusy(orderId)
+      if (shouldContinue()) markBusy(orderId)
     }
   }
 
@@ -385,8 +439,9 @@ export default function DeliveryRiderPage() {
     command: (value: AssignedDeliveryOrder, proofAssetPublicId: string) => Promise<AssignedDeliveryOrder>,
     success: string
   ) => {
+    const shouldContinue = createOperationGuard()
     const orderId = order.deliveryOrderPublicId
-    if (isOrderBusy(orderId)) return
+    if (!shouldContinue() || isOrderBusy(orderId)) return
     if (actionFeedbackByOrder[orderId]?.needsRefresh) {
       await load()
       return
@@ -397,9 +452,11 @@ export default function DeliveryRiderPage() {
     updateActionFeedback(orderId)
     try {
       const [uploaded] = await chooseAndUploadImages('delivery_proof', 1, (progress) => {
+        if (!shouldContinue()) return
         stage = 'uploading'
         setProofProgress(orderId, { stage, message: `${progress.message} ${progress.percent}%` })
-      })
+      }, shouldContinue)
+      if (!shouldContinue()) return
       if (!uploaded) {
         updateActionFeedback(orderId, { tone: 'warning', message: '未选择凭证，订单尚未提交' })
         return
@@ -407,17 +464,23 @@ export default function DeliveryRiderPage() {
       stage = 'reviewing'
       setProofProgress(orderId, { stage, message: '凭证审核中，请稍候' })
       await waitForMediaApproval(uploaded.assetId, (status) => {
+        if (!shouldContinue()) return
         setProofProgress(orderId, { stage: 'reviewing', message: status.message || '凭证审核中，请稍候' })
-      })
+      }, undefined, shouldContinue)
+      if (!shouldContinue()) return
       stage = 'submitting'
       setProofProgress(orderId, { stage, message: '正在提交履约状态，请稍候' })
       await command(order, uploaded.assetId)
+      // A sent command is not cancelled; only its stale page feedback is skipped.
+      if (!shouldContinue()) return
       requestVersion.current += 1
       setProofProgress(orderId)
       updateActionFeedback(orderId, { tone: 'success', message: `${success}，正在同步订单状态`, needsRefresh: true })
       await Taro.showToast({ title: success, icon: 'success' }).catch(() => {})
+      if (!shouldContinue()) return
       await refreshAfterAction(orderId, true)
     } catch (value) {
+      if (!shouldContinue()) return
       const selectionError = typeof value === 'object' && value !== null && 'errMsg' in value ? String(value.errMsg) : errorMessage(value, '')
       if (stage === 'selecting' && /cancel/i.test(selectionError)) {
         updateActionFeedback(orderId)
@@ -432,16 +495,20 @@ export default function DeliveryRiderPage() {
       const message = `${stageLabel}：${errorMessage(value, '请重试')}`
       updateActionFeedback(orderId, { tone: 'error', message })
       await Taro.showToast({ title: message, icon: 'none' }).catch(() => {})
+      if (!shouldContinue()) return
       if (stage === 'submitting') await refreshAfterAction(orderId, false)
     } finally {
-      markBusy(orderId)
-      setProofProgress(orderId)
+      if (shouldContinue()) {
+        markBusy(orderId)
+        setProofProgress(orderId)
+      }
     }
   }
 
   const release = async (order: AssignedDeliveryOrder) => {
+    const shouldContinue = createOperationGuard()
     await runCommand(order, releaseDeliveryOrder, '订单已释放', 'release')
-    setReleaseCandidate(null)
+    if (shouldContinue()) setReleaseCandidate(null)
   }
 
   const openConversation = (orderId: string) => {
@@ -451,12 +518,23 @@ export default function DeliveryRiderPage() {
   }
 
   const switchToStudent = async () => {
-    const store = await import('../../stores/session')
+    const shouldContinue = createOperationGuard()
+    if (!shouldContinue()) return
+    let identitySwitched = false
     try {
+      const store = await import('../../stores/session')
+      if (!shouldContinue()) return
       await store.useSessionStore.getState().switchIdentity('student')
+      identitySwitched = true
+      invalidatePageOperations()
+      if (!pageMountedRef.current) return
       await Taro.reLaunch({ url: identityRoute('student') })
     } catch (value) {
-      await Taro.showToast({ title: errorMessage(value, '身份切换失败'), icon: 'none' })
+      if (identitySwitched && pageMountedRef.current) {
+        await Taro.showToast({ title: '身份已切换，页面跳转失败，请重新进入小程序', icon: 'none' }).catch(() => {})
+      } else if (shouldContinue()) {
+        await Taro.showToast({ title: errorMessage(value, '身份切换失败'), icon: 'none' }).catch(() => {})
+      }
     }
   }
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import { AppIconButton } from '../../components/ui'
@@ -15,16 +15,17 @@ import {
 import { getDeliveryOrderFunds, type DeliveryOrderFunds } from '../../services/delivery-payment'
 import { loadPrivateDeliveryProofs, type DeliveryProofImage } from '../../services/delivery-proof'
 import Taro from '../../services/taro'
+import MerchantHomeIcon from '../merchant-home/merchant-home-icon'
 import './index.scss'
 
 type StepState = 'done' | 'current' | 'todo'
-type Settled<T> = { ok: true; value: T } | { ok: false }
+type Settled<T> = { ok: true; value: T } | { ok: false; error: unknown }
 
 async function settle<T>(promise: Promise<T>): Promise<Settled<T>> {
   try {
     return { ok: true, value: await promise }
-  } catch {
-    return { ok: false }
+  } catch (error) {
+    return { ok: false, error }
   }
 }
 
@@ -58,26 +59,76 @@ const stepTemplates: Array<{ key: keyof StageTimestamps | 'createdAt'; title: st
   { key: 'deliveredAt', title: '完成送达', note: '本单配送完成' },
 ]
 
+const currentStageByStatus: Record<DeliveryStatus, keyof StageTimestamps | 'createdAt'> = {
+  pending_fee_payment: 'createdAt',
+  payment_failed: 'createdAt',
+  ready_for_claim: 'readyForClaimAt',
+  claimed: 'claimedAt',
+  to_pickup: 'toPickupAt',
+  picked_up: 'pickedUpAt',
+  delivering: 'deliveringAt',
+  delivered: 'deliveredAt',
+  cancelled: 'cancelledAt',
+}
+
 function formatTime(value?: string | null) {
   return value ? value.replace('T', ' ').slice(0, 16) : ''
 }
 
-function buildProgressSteps(order: MerchantDeliveryOrder): ProgressStep[] {
-  const timestamps = stepTemplates.map((step) => (
-    step.key === 'createdAt' ? order.createdAt : order[step.key]
-  ))
-  const currentIndex = Math.min(
-    timestamps.findIndex((value) => !value),
-    stepTemplates.length - 1,
-  )
-  return stepTemplates.map((step, index) => {
-    const timestamp = timestamps[index]
+export function buildProgressSteps(order: MerchantDeliveryOrder): ProgressStep[] {
+  const currentIndex = stepTemplates.findIndex((step) => step.key === currentStageByStatus[order.status])
+  const steps: ProgressStep[] = stepTemplates.map((step, index) => {
+    const timestamp = step.key === 'createdAt' ? order.createdAt : order[step.key]
+    const current = index === currentIndex && order.status !== 'delivered'
     return {
       ...step,
       time: formatTime(timestamp),
-      state: timestamp ? 'done' : index === (currentIndex < 0 ? stepTemplates.length - 1 : currentIndex) ? 'current' : 'todo',
+      note: current
+        ? statusCopy[order.status].sub
+        : timestamp
+          ? step.note
+          : index < currentIndex ? '暂未记录此阶段时间' : '等待进入此阶段',
+      state: current ? 'current' : timestamp ? 'done' : 'todo',
     }
   })
+  if (order.status === 'cancelled') {
+    return order.cancelledAt
+      ? [
+          ...steps.filter((step) => step.time),
+          { key: 'cancelledAt', title: '配送单已取消', note: '本单配送已结束', time: formatTime(order.cancelledAt), state: 'done' },
+        ]
+      : steps.filter((step) => step.time)
+  }
+  if (order.status === 'delivered') {
+    return steps
+      .filter((step) => step.time || step.key === 'deliveredAt')
+      .map((step) => step.key === 'deliveredAt' ? { ...step, note: '本单配送完成', state: 'done' } : step)
+  }
+  return steps
+}
+
+export function deliveryFundsLabel(funds: DeliveryOrderFunds | null): string {
+  if (!funds) return '支付状态暂不可用'
+  if (funds.settlement?.status === 'refunded' || funds.refund?.status === 'succeeded') return '配送费已退还'
+  if (funds.refund?.status === 'failed') return '退款失败，请查看账单'
+  if (funds.settlement?.status === 'refund_pending' || funds.refund?.status === 'pending' || funds.refund?.status === 'refund_pending') return '退款处理中'
+  if (funds.settlement?.status === 'paid') return '配送费已支付'
+  if (funds.payment?.status === 'paid') return '支付结果待确认'
+  if (funds.payment?.status === 'failed') return '配送费支付失败'
+  if (funds.payment?.status === 'closed') return '支付已关闭'
+  if (funds.payment) return '等待支付配送费'
+  return '暂无支付记录'
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback
+}
+
+function proofStatusLabel(proof: DeliveryProofImage): string {
+  if (proof.status === 'binding') return '照片处理中'
+  if (proof.status === 'deadletter') return '照片处理失败'
+  if (proof.status === 'revoked') return '照片已撤回'
+  return proof.url ? '已提交' : '照片暂不可用'
 }
 
 function MerchantOrderDetailContent() {
@@ -86,37 +137,76 @@ function MerchantOrderDetailContent() {
   const [order, setOrder] = useState<MerchantDeliveryOrder | null>(null)
   const [funds, setFunds] = useState<DeliveryOrderFunds | null>(null)
   const [proofs, setProofs] = useState<DeliveryProofImage[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(Boolean(orderId))
   const [loadError, setLoadError] = useState('')
+  const [fundsLoaded, setFundsLoaded] = useState(false)
+  const [proofsLoaded, setProofsLoaded] = useState(false)
+  const [fundsError, setFundsError] = useState('')
+  const [proofsError, setProofsError] = useState('')
+  const requestVersion = useRef(0)
+  const loadingOrderId = useRef('')
 
   const loadDetail = useCallback(async () => {
-    if (!identityAllowed || !orderId || loading) return
+    if (!identityAllowed || !orderId || loadingOrderId.current === orderId) return
+    loadingOrderId.current = orderId
+    const version = ++requestVersion.current
     setLoading(true)
     setLoadError('')
     try {
       const orderValue = await getMerchantDeliveryOrder(orderId)
+      if (requestVersion.current !== version) return
       setOrder(orderValue)
+      setFundsError('')
+      setProofsError('')
       const [fundsResult, proofsResult] = await Promise.all([
         deliveryPaymentEnabled ? settle(getDeliveryOrderFunds(orderId)) : null,
         settle(loadPrivateDeliveryProofs(orderId)),
       ])
-      setFunds(fundsResult?.ok ? fundsResult.value : null)
-      setProofs(proofsResult.ok ? proofsResult.value : [])
+      if (requestVersion.current !== version) return
+      if (fundsResult?.ok) {
+        setFunds(fundsResult.value)
+        setFundsLoaded(true)
+      } else if (fundsResult && !fundsResult.ok) {
+        setFundsError(errorMessage(fundsResult.error, '支付状态加载失败'))
+      }
+      if (proofsResult.ok) {
+        setProofs(proofsResult.value)
+        setProofsLoaded(true)
+      } else {
+        setProofsError(errorMessage(proofsResult.error, '配送照片加载失败'))
+      }
     } catch (error) {
-      setOrder(null)
-      setFunds(null)
-      setProofs([])
-      setLoadError(error instanceof Error ? error.message : '配送单详情加载失败')
+      if (requestVersion.current === version) {
+        setLoadError(errorMessage(error, '配送单详情加载失败'))
+      }
     } finally {
-      setLoading(false)
+      if (requestVersion.current === version) {
+        loadingOrderId.current = ''
+        setLoading(false)
+      }
     }
-  }, [identityAllowed, loading, orderId])
+  }, [identityAllowed, orderId])
 
   useEffect(() => {
+    setOrder(null)
+    setFunds(null)
+    setProofs([])
+    setFundsLoaded(false)
+    setProofsLoaded(false)
+    setLoading(false)
     if (identityAllowed) void loadDetail()
-  }, [identityAllowed, orderId]) // eslint-disable-line react-hooks/exhaustive-deps
+    return () => {
+      requestVersion.current += 1
+      loadingOrderId.current = ''
+    }
+  }, [identityAllowed, orderId, loadDetail])
 
   const progressSteps = useMemo(() => order ? buildProgressSteps(order) : [], [order])
+  const paymentLabel = !deliveryPaymentEnabled
+    ? '支付功能未开放'
+    : fundsError
+      ? '支付状态暂未更新'
+      : !fundsLoaded ? '正在加载支付状态…' : deliveryFundsLabel(funds)
 
   const openConversation = () => {
     if (!order?.riderUserId) {
@@ -141,10 +231,11 @@ function MerchantOrderDetailContent() {
 
       <ScrollView scrollY className='merchant-detail-scroll' enhanced showScrollbar={false}>
         <View className='merchant-detail-content'>
-          {loading ? <View className='merchant-detail-status-card'><Text>正在加载真实配送单…</Text></View> : null}
+          {loading ? <View className='merchant-detail-notice'><Text>{order ? '正在更新配送单…' : '正在加载配送单…'}</Text></View> : null}
           {!loading && loadError ? (
-            <View className='merchant-detail-status-card' onClick={() => void loadDetail()}>
-              <Text>{loadError}，点击重试</Text>
+            <View className='merchant-detail-notice merchant-detail-notice--error' ariaRole='button' ariaLabel='重新加载配送单' hoverClass='merchant-detail-control--pressed' onClick={() => void loadDetail()}>
+              <Text>{loadError}{order ? '，当前保留上次读取的内容' : ''}</Text>
+              <Text className='merchant-detail-notice__retry'>点击重试</Text>
             </View>
           ) : null}
           {!loading && !loadError && !order ? (
@@ -164,9 +255,15 @@ function MerchantOrderDetailContent() {
                 <View className='merchant-detail-status-card__fee'>
                   <Text className='merchant-detail-status-card__amount'>¥{centsToYuan(order.deliveryFeeCents)}</Text>
                   <Text className='merchant-detail-status-card__pay'>
-                    {funds?.settlement ? '配送费已支付' : '配送费未支付'}
+                    {paymentLabel}
                   </Text>
                 </View>
+                {!loading && fundsError ? (
+                  <View className='merchant-detail-status-card__funds-error' ariaRole='button' ariaLabel='重新加载支付状态' hoverClass='merchant-detail-control--pressed' onClick={() => void loadDetail()}>
+                    <Text>{fundsError}{fundsLoaded ? `，上次状态：${deliveryFundsLabel(funds)}` : ''}</Text>
+                    <Text className='merchant-detail-notice__retry'>点击重试</Text>
+                  </View>
+                ) : null}
                 <View className='merchant-detail-status-card__divider' />
                 <View className='merchant-detail-status-card__meta'>
                   <Text>#{order.deliveryOrderPublicId} · {formatTime(order.createdAt)}</Text>
@@ -186,7 +283,15 @@ function MerchantOrderDetailContent() {
                 </View>
                 {order.riderUserId ? (
                   <View className='merchant-detail-rider-card__actions'>
-                    <View className='merchant-detail-rider-card__circle' onClick={openConversation}><Text>聊</Text></View>
+                    <View
+                      className='merchant-detail-rider-card__circle'
+                      hoverClass='merchant-detail-rider-card__circle--pressed'
+                      ariaRole='button'
+                      ariaLabel='联系骑手'
+                      onClick={openConversation}
+                    >
+                      <MerchantHomeIcon name='message' className='merchant-detail-rider-card__message-icon' />
+                    </View>
                   </View>
                 ) : null}
               </View>
@@ -221,7 +326,14 @@ function MerchantOrderDetailContent() {
                   <Text className='merchant-detail-section-title'>配送照片</Text>
                   <View className='merchant-detail-photo-card__privacy'><Text>仅本单商家与骑手可见</Text></View>
                 </View>
-                {proofs.length === 0 ? <Text className='merchant-detail-timeline__note'>骑手尚未提交取货或送达凭证</Text> : null}
+                {loading ? <Text className='merchant-detail-timeline__note'>正在更新配送照片…</Text> : null}
+                {!loading && proofsError ? (
+                  <View className='merchant-detail-photo-card__error' ariaRole='button' ariaLabel='重新加载配送照片' hoverClass='merchant-detail-control--pressed' onClick={() => void loadDetail()}>
+                    <Text>{proofsError}{proofsLoaded && proofs.length > 0 ? '，下方保留上次读取的照片' : ''}</Text>
+                    <Text className='merchant-detail-notice__retry'>点击重试</Text>
+                  </View>
+                ) : null}
+                {!loading && !proofsError && proofsLoaded && proofs.length === 0 ? <Text className='merchant-detail-timeline__note'>骑手尚未提交取货或送达凭证</Text> : null}
                 <View className='merchant-detail-photo-grid'>
                   {proofs.map((proof) => (
                     <View key={proof.proofPublicId} className='merchant-detail-photo-item'>
@@ -229,7 +341,7 @@ function MerchantOrderDetailContent() {
                         {proof.url ? (
                           <Image className='merchant-detail-photo-item__image' src={proof.url} mode='aspectFill' />
                         ) : (
-                          <Text>{proof.status === 'binding' ? '照片处理中' : '照片暂不可用'}</Text>
+                          <Text>{proofStatusLabel(proof)}</Text>
                         )}
                       </View>
                       <Text className={`merchant-detail-photo-item__caption ${proof.url ? 'merchant-detail-photo-item__caption--ready' : 'merchant-detail-photo-item__caption--pending'}`}>

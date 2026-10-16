@@ -433,6 +433,12 @@ page {
   color: $merchant-warning;
 }
 
+.merchant-home-metric__value--pending,
+.merchant-home-tab__count--pending,
+.merchant-home-tab--active .merchant-home-tab__count--pending {
+  color: $text-tertiary;
+}
+
 .merchant-home-orders {
   flex: 1;
   min-height: 0;
@@ -449,6 +455,43 @@ page {
   font-size: 24rpx;
   line-height: 1.55;
   text-align: center;
+}
+
+.merchant-home-orders__notice {
+  min-height: 92rpx;
+  margin-bottom: 16rpx;
+  padding: 24rpx 28rpx;
+  border-radius: 18rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8rpx 12rpx;
+  box-sizing: border-box;
+  color: $text-secondary;
+  font-size: 24rpx;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.merchant-home-orders__notice--loading {
+  background: $bg-surface;
+  color: $text-tertiary;
+}
+
+.merchant-home-orders__notice--error {
+  border: 1rpx solid color.mix($merchant-warning, $bg-surface, 30%);
+  background: color.mix($merchant-warning, $bg-surface, 8%);
+  color: $merchant-warning;
+}
+
+.merchant-home-orders__notice--pressed {
+  opacity: .72;
+}
+
+.merchant-home-orders__retry {
+  color: $brand-primary;
+  font-weight: 650;
 }
 
 .merchant-home-empty {

@@ -24,6 +24,8 @@ import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
 type MerchantTabKey = 'pending' | 'delivering' | 'completed'
 type MerchantOrdersByTab = Record<MerchantTabKey, MerchantDeliveryOrder[]>
 type MerchantNumbersByTab = Record<MerchantTabKey, number>
+type MerchantLoadedByTab = Record<MerchantTabKey, boolean>
+type MerchantErrorsByTab = Record<MerchantTabKey, string>
 type Settled<T> = { ok: true; value: T } | { ok: false; error: unknown }
 type ApprovalState = 'checking' | 'approved' | 'blocked'
 
@@ -31,12 +33,26 @@ function emptyOrdersByTab(): MerchantOrdersByTab {
   return { pending: [], delivering: [], completed: [] }
 }
 
-function initialNumbersByTab(): MerchantNumbersByTab {
+function initialPagesByTab(): MerchantNumbersByTab {
+  // 分页游标从第 1 页开始；是否已经拿到真实数量由 loadedByTab 记录。
   return { pending: 1, delivering: 1, completed: 1 }
 }
 
 function emptyTotalsByTab(): MerchantNumbersByTab {
   return { pending: 0, delivering: 0, completed: 0 }
+}
+
+function unloadedTabs(): MerchantLoadedByTab {
+  return { pending: false, delivering: false, completed: false }
+}
+
+function emptyErrorsByTab(): MerchantErrorsByTab {
+  return { pending: '', delivering: '', completed: '' }
+}
+
+function orderLoadError(result: Settled<unknown>): string {
+  if (result.ok) return ''
+  return result.error instanceof Error ? result.error.message : '配送单加载失败'
 }
 
 async function settle<T>(promise: Promise<T>): Promise<Settled<T>> {
@@ -182,8 +198,10 @@ function MerchantHomeContent() {
   const visibility = useFeatureVisibility()
   const [activeTab, setActiveTab] = useState<MerchantTabKey>('pending')
   const [ordersByTab, setOrdersByTab] = useState<MerchantOrdersByTab>(emptyOrdersByTab)
-  const [ordersPageByTab, setOrdersPageByTab] = useState<MerchantNumbersByTab>(initialNumbersByTab)
+  const [ordersPageByTab, setOrdersPageByTab] = useState<MerchantNumbersByTab>(initialPagesByTab)
   const [ordersTotalByTab, setOrdersTotalByTab] = useState<MerchantNumbersByTab>(emptyTotalsByTab)
+  const [loadedByTab, setLoadedByTab] = useState<MerchantLoadedByTab>(unloadedTabs)
+  const [loadErrorsByTab, setLoadErrorsByTab] = useState<MerchantErrorsByTab>(emptyErrorsByTab)
   const [loadingMore, setLoadingMore] = useState(false)
   const [balanceCents, setBalanceCents] = useState<number | null>(null)
   const [merchantName, setMerchantName] = useState('')
@@ -191,7 +209,6 @@ function MerchantHomeContent() {
   const [approvalState, setApprovalState] = useState<ApprovalState>('checking')
   const [approvalMessage, setApprovalMessage] = useState('正在核验商家审核状态…')
   const [loading, setLoading] = useState(false)
-  const [loadError, setLoadError] = useState('')
   const [showStudentSwitch, setShowStudentSwitch] = useState(false)
   const [switchingIdentity, setSwitchingIdentity] = useState(false)
   const [switchIdentityError, setSwitchIdentityError] = useState('')
@@ -206,7 +223,7 @@ function MerchantHomeContent() {
     requestVersion.current = version
     setLoading(true)
     setLoadingMore(false)
-    setLoadError('')
+    setLoadErrorsByTab(emptyErrorsByTab())
     setApprovalState('checking')
     setApprovalMessage('正在核验商家审核状态…')
     const applicationResult = await settle(getIdentityApplication('merchant'))
@@ -237,6 +254,11 @@ function MerchantHomeContent() {
       deliveryPaymentEnabled ? settle(getDeliveryWallet()) : null,
     ])
     if (requestVersion.current !== version) return
+    setLoadedByTab((current) => ({
+      pending: pendingResult.ok || current.pending,
+      delivering: deliveringResult.ok || current.delivering,
+      completed: completedResult.ok || current.completed,
+    }))
     setOrdersByTab((current) => ({
       pending: pendingResult.ok ? pendingResult.value.items : current.pending,
       delivering: deliveringResult.ok ? deliveringResult.value.items : current.delivering,
@@ -252,10 +274,11 @@ function MerchantHomeContent() {
       delivering: deliveringResult.ok ? deliveringResult.value.total : current.delivering,
       completed: completedResult.ok ? completedResult.value.total : current.completed,
     }))
-    const failedResult = [pendingResult, deliveringResult, completedResult].find((result) => !result.ok)
-    if (failedResult && !failedResult.ok) {
-      setLoadError(failedResult.error instanceof Error ? failedResult.error.message : '部分配送单加载失败')
-    }
+    setLoadErrorsByTab({
+      pending: orderLoadError(pendingResult),
+      delivering: orderLoadError(deliveringResult),
+      completed: orderLoadError(completedResult),
+    })
     setBalanceCents(walletResult?.ok ? walletResult.value.availableBalanceCents : null)
     setLoading(false)
   }, [identityAllowed])
@@ -272,7 +295,7 @@ function MerchantHomeContent() {
     const version = requestVersion.current
     const nextPage = ordersPageByTab[requestedTab] + 1
     setLoadingMore(true)
-    setLoadError('')
+    setLoadErrorsByTab((current) => ({ ...current, [requestedTab]: '' }))
     try {
       const result = await listMerchantDeliveryOrders(nextPage, 50, requestedTab)
       if (requestVersion.current !== version) return
@@ -285,7 +308,10 @@ function MerchantHomeContent() {
       setOrdersTotalByTab((current) => ({ ...current, [requestedTab]: result.total }))
     } catch (error) {
       if (requestVersion.current === version) {
-        setLoadError(error instanceof Error ? error.message : '更多配送单加载失败')
+        setLoadErrorsByTab((current) => ({
+          ...current,
+          [requestedTab]: error instanceof Error ? error.message : '更多配送单加载失败',
+        }))
       }
     } finally {
       if (requestVersion.current === version) setLoadingMore(false)
@@ -293,6 +319,8 @@ function MerchantHomeContent() {
   }, [activeTab, identityAllowed, loading, loadingMore, ordersByTab, ordersPageByTab, ordersTotalByTab])
 
   const totalOrderCount = ordersTotalByTab.pending + ordersTotalByTab.delivering + ordersTotalByTab.completed
+  const loadError = loadErrorsByTab[activeTab]
+  const allCountsLoaded = tabCopy.every((tab) => loadedByTab[tab.key])
   const shopName = merchantName || profile.nickname || '已认证商家'
   const shopAddress = merchantAddress || profile.campus || profile.school || '商家资料已通过审核'
 
@@ -366,11 +394,15 @@ function MerchantHomeContent() {
           </View>
           <View className='merchant-home-metric'>
             <Text className='merchant-home-metric__label'>累计单量</Text>
-            <Text className='merchant-home-metric__value'>{totalOrderCount}</Text>
+            <Text className={`merchant-home-metric__value${!allCountsLoaded ? ' merchant-home-metric__value--pending' : ''}`}>
+              {allCountsLoaded ? totalOrderCount : '—'}
+            </Text>
           </View>
           <View className='merchant-home-metric'>
             <Text className='merchant-home-metric__label'>配送中</Text>
-            <Text className='merchant-home-metric__value'>{ordersTotalByTab.delivering}</Text>
+            <Text className={`merchant-home-metric__value${!loadedByTab.delivering ? ' merchant-home-metric__value--pending' : ''}`}>
+              {loadedByTab.delivering ? ordersTotalByTab.delivering : '—'}
+            </Text>
           </View>
         </View>
       </View>
@@ -408,8 +440,8 @@ function MerchantHomeContent() {
             onClick={() => setActiveTab(tab.key)}
           >
             <Text className='merchant-home-tab__label'>{tab.label}</Text>
-            <Text className={`merchant-home-tab__count merchant-home-tab__count--${tab.key}`}>
-              {ordersTotalByTab[tab.key]}
+            <Text className={`merchant-home-tab__count merchant-home-tab__count--${tab.key}${!loadedByTab[tab.key] ? ' merchant-home-tab__count--pending' : ''}`}>
+              {loadedByTab[tab.key] ? ordersTotalByTab[tab.key] : '—'}
             </Text>
           </View>
         ))}
@@ -424,11 +456,13 @@ function MerchantHomeContent() {
         onScrollToLower={() => void loadMoreOrders()}
       >
         <View className='merchant-home-orders__inner'>
-          {loading ? <Text className='merchant-home-orders__end'>正在加载真实配送单…</Text> : null}
+          {loading ? <Text className='merchant-home-orders__notice merchant-home-orders__notice--loading'>正在加载真实配送单…</Text> : null}
           {!loading && loadError ? (
-            <Text className='merchant-home-orders__end' onClick={() => void loadWorkbench()}>
-              {loadError}，点击重试
-            </Text>
+            <View className='merchant-home-orders__notice merchant-home-orders__notice--error' hoverClass='merchant-home-orders__notice--pressed' ariaRole='button' ariaLabel='重试配送单加载' onClick={() => void loadWorkbench()}>
+              <Text>配送单{loadedByTab[activeTab] ? '刷新' : '加载'}失败</Text>
+              <Text>{loadError}</Text>
+              <Text className='merchant-home-orders__retry'>点击重试</Text>
+            </View>
           ) : null}
           {!loading && !loadError && ordersByTab[activeTab].length === 0 ? (
             <View className='merchant-home-empty'>
@@ -445,7 +479,7 @@ function MerchantHomeContent() {
           ) : null}
           {ordersByTab[activeTab].map((order) => <OrderCard key={order.deliveryOrderPublicId} order={order} />)}
           {loadingMore ? <Text className='merchant-home-orders__end'>正在加载更多配送单…</Text> : null}
-          {!loadError && ordersByTab[activeTab].length > 0 && ordersByTab[activeTab].length >= ordersTotalByTab[activeTab] ? (
+          {!loading && !loadingMore && !loadError && ordersByTab[activeTab].length > 0 && ordersByTab[activeTab].length >= ordersTotalByTab[activeTab] ? (
             <Text className='merchant-home-orders__end'>— 已显示全部配送单 —</Text>
           ) : null}
         </View>

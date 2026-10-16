@@ -31,12 +31,12 @@ assert.doesNotMatch(
 // 分页从第 1 页开始；总量和加载状态必须独立，不把页码当作订单数。
 assert.match(
   merchantHomeSource,
-  /function initialPagesByTab\(\)[^{]*\{\s*return \{ pending: 1, delivering: 1, completed: 1 \}/,
+  /function initialPagesByTab\([^)]*\)[^{]*\{[\s\S]*?return \{ pending: 1, delivering: 1, completed: 1 \}/,
   '商家订单分页应保留第 1 页起算',
 )
 assert.match(
   merchantHomeSource,
-  /function emptyTotalsByTab\(\)[^{]*\{\s*return \{ pending: 0, delivering: 0, completed: 0 \}/,
+  /function emptyTotalsByTab\([^)]*\)[^{]*\{[\s\S]*?return \{ pending: 0, delivering: 0, completed: 0 \}/,
   '商家订单总量应独立从 0 初始化',
 )
 assert.match(merchantHomeSource, /loadedByTab\[tab\.key\]\s*\?\s*ordersTotalByTab\[tab\.key\]\s*:\s*['"]—['"]/, '商家标签数量应区分尚未加载与真实总量')
