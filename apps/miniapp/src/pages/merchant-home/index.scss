@@ -6,9 +6,6 @@ $merchant-accent-soft: color.mix($brand-primary, $bg-surface, 9%);
 $merchant-success: #23856d;
 $merchant-success-soft: #eaf7f2;
 $merchant-warning: #a86418;
-$merchant-warning-soft: #fff4e6;
-$merchant-danger: #bd4a55;
-$merchant-danger-soft: #fff0f1;
 
 page {
   background: $bg-app;
@@ -19,6 +16,7 @@ page {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   background: $bg-app;
   color: $text-primary;
@@ -69,7 +67,6 @@ page {
   align-items: center;
   justify-content: center;
   background: $brand-primary;
-  box-shadow: 0 12rpx 28rpx rgba(30, 112, 208, 0.2);
   color: $text-on-color;
   font-size: 28rpx;
   font-weight: 650;
@@ -83,18 +80,17 @@ page {
 .merchant-home-hero {
   position: relative;
   flex: 0 0 auto;
-  padding: 0 28rpx 26rpx;
+  padding: 0 32rpx;
   box-sizing: border-box;
   background: $bg-surface;
-  border-bottom: 1rpx solid $border-subtle;
 }
 
 .merchant-home-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20rpx;
-  min-height: 104rpx;
+  gap: 16rpx;
+  min-height: 44PX;
 }
 
 .merchant-home-shop {
@@ -105,10 +101,10 @@ page {
 }
 
 .merchant-home-shop__avatar {
-  width: 76rpx;
-  height: 76rpx;
+  width: 64rpx;
+  height: 64rpx;
   flex: 0 0 auto;
-  border-radius: 24rpx;
+  border-radius: 16rpx;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -120,7 +116,7 @@ page {
 
 .merchant-home-shop__main {
   min-width: 0;
-  margin-left: 18rpx;
+  margin-left: 16rpx;
 }
 
 .merchant-home-shop__name-row {
@@ -132,21 +128,19 @@ page {
 
 .merchant-home-shop__name {
   min-width: 0;
-  max-width: 300rpx;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: $text-primary;
-  font-size: 31rpx;
+  font-size: 32rpx;
+  font-size: clamp(15PX, 4.267vw, 18PX);
   font-weight: 720;
   line-height: 1.25;
 }
 
 .merchant-home-shop__badge {
   flex: 0 0 auto;
-  padding: 5rpx 10rpx;
-  border-radius: 8rpx;
-  background: $merchant-success-soft;
+  padding: 0;
   color: $merchant-success;
   font-size: 22rpx;
   line-height: 30rpx;
@@ -157,14 +151,16 @@ page {
   display: flex;
   align-items: center;
   gap: 8rpx;
-  max-width: 360rpx;
+  min-width: 0;
   margin-top: 8rpx;
   color: $text-secondary;
-  font-size: 23rpx;
+  font-size: 24rpx;
+  font-size: clamp(12PX, 3.2vw, 14PX);
   line-height: 1.3;
 }
 
-.merchant-home-shop__status text {
+.merchant-home-shop__status text,
+.merchant-home-shop__status taro-text-core {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -177,16 +173,14 @@ page {
   flex: 0 0 auto;
   border-radius: 50%;
   background: $merchant-success;
-  box-shadow: 0 0 0 5rpx rgba(35, 133, 109, 0.1);
 }
 
 .merchant-home-switch {
   @include ref.touch;
-  min-width: 132rpx;
+  min-width: 44PX;
   flex: 0 0 auto;
-  padding: 0 18rpx;
-  border: 1rpx solid $border-default;
-  border-radius: 18rpx;
+  padding: 0 0 0 8rpx;
+  border-radius: $radius-control;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -206,28 +200,29 @@ page {
 .merchant-home-metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-top: 12rpx;
-  border: 1rpx solid $border-subtle;
-  border-radius: $radius-card;
+  margin-top: 4rpx;
   overflow: hidden;
-  background: $bg-subtle;
+  background: $bg-surface;
 }
 
 .merchant-home-metric {
   position: relative;
   min-width: 0;
-  min-height: 118rpx;
-  padding: 22rpx 18rpx 20rpx;
+  min-height: 72rpx;
+  padding: 12rpx 16rpx;
   display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4rpx 10rpx;
   box-sizing: border-box;
 }
 
 .merchant-home-metric + .merchant-home-metric::before {
   position: absolute;
-  top: 24rpx;
-  bottom: 24rpx;
+  top: 18rpx;
+  bottom: 18rpx;
   left: 0;
   width: 1rpx;
   background: $border-subtle;
@@ -245,9 +240,9 @@ page {
 }
 
 .merchant-home-metric__value {
-  margin-top: 12rpx;
+  margin-top: 0;
   color: $text-primary;
-  font-size: 36rpx;
+  font-size: 28rpx;
   font-weight: 760;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -258,12 +253,12 @@ page {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: $brand-primary-strong;
-  font-size: 31rpx;
+  font-size: 26rpx;
 }
 
 .merchant-home-tools {
   flex: 0 0 auto;
-  padding: 24rpx 28rpx 22rpx;
+  padding: 8rpx 32rpx 20rpx;
   background: $bg-surface;
 }
 
@@ -273,62 +268,82 @@ page {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 8rpx 16rpx;
-  margin-bottom: 18rpx;
-}
-
-.merchant-home-section-head__title {
-  color: $text-primary;
-  font-size: 28rpx;
-  font-weight: 700;
-}
-
-.merchant-home-section-head__hint {
+  margin-bottom: 12rpx;
+  color: $text-secondary;
   @include ref.type(meta);
-  color: $text-tertiary;
 }
 
 .merchant-home-shortcuts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14rpx;
+  gap: 16rpx;
+  align-items: center;
+}
+
+.merchant-home-shortcuts--existing-only {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.merchant-home-shortcuts__secondary {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .merchant-home-shortcut {
-  min-width: 0;
-  min-height: 104rpx;
-  padding: 16rpx;
-  border: 1rpx solid $border-subtle;
-  border-radius: 20rpx;
+  @include ref.touch;
+  padding: 4rpx;
+  border-radius: $radius-control;
   display: flex;
   align-items: center;
-  gap: 14rpx;
+  justify-content: center;
+  flex-direction: column;
+  gap: 4rpx;
   background: $bg-surface;
   box-sizing: border-box;
   transition: background $duration-fast ease, border-color $duration-fast ease, transform $duration-fast ease;
 }
 
+.merchant-home-shortcut--publish {
+  flex-direction: row;
+  gap: 12rpx;
+  padding: 12rpx 16rpx;
+  min-height: 44PX;
+  background: $brand-primary;
+  color: $text-on-color;
+}
+
+.merchant-home-shortcut--publish .merchant-home-shortcut__label {
+  color: inherit;
+  font-weight: 650;
+}
+
+.merchant-home-shortcut__aux-icon {
+  width: 40rpx;
+  height: 40rpx;
+  min-width: 20PX;
+  min-height: 20PX;
+}
+
 .merchant-home-shortcut:active {
-  border-color: color.mix($brand-primary, $border-default, 35%);
-  background: $bg-subtle;
   transform: scale(0.985);
+  opacity: .8;
 }
 
 .merchant-home-shortcut__icon {
-  width: 64rpx;
-  height: 64rpx;
+  width: 40rpx;
+  height: 40rpx;
   flex: 0 0 auto;
-  border-radius: 20rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: $merchant-accent-soft;
   color: $brand-primary;
 }
 
 .merchant-home-shortcut--publish .merchant-home-shortcut__icon {
-  background: $brand-primary;
+  background: transparent;
   color: $text-on-color;
-  box-shadow: 0 8rpx 18rpx rgba(30, 112, 208, 0.18);
 }
 
 .merchant-home-icon {
@@ -342,23 +357,13 @@ page {
   flex-direction: column;
 }
 
-.merchant-home-shortcut__label,
-.merchant-home-shortcut__description {
+.merchant-home-shortcut__label {
   display: block;
 }
 
 .merchant-home-shortcut__label {
-  @include ref.type(author);
-  color: $text-primary;
-}
-
-.merchant-home-shortcut__description {
   @include ref.type(meta);
-  margin-top: 6rpx;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: $text-tertiary;
+  color: $text-primary;
 }
 
 .merchant-home-tabs {
@@ -445,7 +450,7 @@ page {
 }
 
 .merchant-home-orders__inner {
-  padding: 22rpx 24rpx calc(48rpx + env(safe-area-inset-bottom));
+  padding: 16rpx 24rpx calc(32rpx + env(safe-area-inset-bottom));
 }
 
 .merchant-home-orders__end {
@@ -541,10 +546,8 @@ page {
 .merchant-order-card {
   margin-bottom: 18rpx;
   padding: 24rpx;
-  border: 1rpx solid $border-subtle;
-  border-radius: $radius-card;
+  border-radius: 20rpx;
   background: $bg-surface;
-  box-shadow: 0 8rpx 24rpx rgba(42, 73, 108, 0.055);
 }
 
 .merchant-order-card__top {
@@ -557,69 +560,49 @@ page {
 .merchant-order-card__serial {
   @include ref.type(meta);
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: $text-secondary;
+  @include ref.wrap;
+  display: block;
+  margin-top: 8rpx;
+  color: $text-tertiary;
   font-variant-numeric: tabular-nums;
 }
 
 .merchant-order-card__status {
-  flex: 0 0 auto;
-  padding: 8rpx 12rpx;
-  border-radius: 10rpx;
-  font-size: 22rpx;
-  line-height: 30rpx;
+  @include ref.type(label);
+  @include ref.wrap;
   font-weight: 650;
 }
 
+.merchant-order-card__time {
+  @include ref.type(meta);
+  flex: 0 0 auto;
+  color: $text-tertiary;
+  font-variant-numeric: tabular-nums;
+}
+
 .merchant-order-card__status--waiting {
-  background: $merchant-warning-soft;
   color: $merchant-warning;
 }
 
 .merchant-order-card__status--delivering,
 .merchant-order-card__status--pickup {
-  background: $merchant-accent-soft;
   color: $brand-primary-strong;
 }
 
 .merchant-order-card__status--completed {
-  background: $merchant-success-soft;
   color: $merchant-success;
 }
 
 .merchant-order-rider {
   display: flex;
   align-items: center;
-  margin-top: 20rpx;
-  padding: 16rpx;
-  border-radius: 18rpx;
-  background: $bg-subtle;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-top: 12rpx;
+  border-top: 1rpx solid $border-subtle;
 }
 
-.merchant-order-rider__avatar {
-  width: 56rpx;
-  height: 56rpx;
-  flex: 0 0 auto;
-  border-radius: 18rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: $merchant-accent-soft;
-  color: $brand-primary-strong;
-  font-size: 23rpx;
-  font-weight: 700;
-}
-
-.merchant-order-rider__main {
-  min-width: 0;
-  flex: 1;
-  margin-left: 14rpx;
-}
-
-.merchant-order-rider__name,
-.merchant-order-rider__phone {
+.merchant-order-rider__name {
   display: block;
 }
 
@@ -630,29 +613,18 @@ page {
   font-weight: 650;
 }
 
-.merchant-order-rider__phone {
-  @include ref.type(meta);
-  @include ref.wrap;
-  margin-top: 4rpx;
-  color: $text-tertiary;
-}
-
-.merchant-order-rider__actions {
-  flex: 0 0 auto;
-  margin-left: 12rpx;
-}
-
 .merchant-order-rider__circle {
   @include ref.touch;
-  width: 44PX;
-  height: 44PX;
-  border: 1rpx solid $border-default;
-  border-radius: 20rpx;
+  flex: 0 0 auto;
+  gap: 8rpx;
+  padding: 0 8rpx;
+  border-radius: $radius-control;
   display: flex;
   align-items: center;
   justify-content: center;
   background: $bg-surface;
   color: $brand-primary;
+  @include ref.type(meta);
 }
 
 .merchant-order-rider__circle:active {
@@ -667,41 +639,40 @@ page {
 
 .merchant-order-route {
   display: flex;
-  gap: 16rpx;
-  margin-top: 24rpx;
-}
-
-.merchant-order-route__rail {
-  width: 20rpx;
-  flex: 0 0 auto;
-  display: flex;
   flex-direction: column;
-  align-items: center;
-  padding-top: 10rpx;
+  gap: 16rpx;
+  margin-top: 20rpx;
 }
 
-.merchant-order-route__dot {
-  width: 13rpx;
-  height: 13rpx;
-  border: 3rpx solid $bg-surface;
-  border-radius: 50%;
-  box-shadow: 0 0 0 2rpx currentColor;
+.merchant-order-route__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16rpx;
+}
+
+.merchant-order-route__marker {
+  @include ref.type(meta);
+  width: 40rpx;
+  height: 40rpx;
+  min-width: 20PX;
+  min-height: 20PX;
+  flex: 0 0 auto;
+  border-radius: 10rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
   box-sizing: border-box;
 }
 
-.merchant-order-route__dot--pickup {
+.merchant-order-route__marker--pickup {
+  background: $merchant-accent-soft;
   color: $brand-primary;
 }
 
-.merchant-order-route__dot--dropoff {
+.merchant-order-route__marker--dropoff {
+  background: $merchant-success-soft;
   color: $merchant-success;
-}
-
-.merchant-order-route__line {
-  width: 2rpx;
-  height: 86rpx;
-  margin: 6rpx 0;
-  background: $border-default;
 }
 
 .merchant-order-route__body {
@@ -709,25 +680,15 @@ page {
   flex: 1;
 }
 
-.merchant-order-route__label,
 .merchant-order-route__place,
 .merchant-order-route__contact {
   display: block;
 }
 
-.merchant-order-route__label {
-  @include ref.type(meta);
-  color: $text-tertiary;
-}
-
-.merchant-order-route__label--dropoff {
-  margin-top: 20rpx;
-}
-
 .merchant-order-route__place {
   @include ref.type(comment);
   @include ref.wrap;
-  margin-top: 5rpx;
+  margin-top: 0;
   color: $text-primary;
   font-weight: 650;
 }
@@ -742,10 +703,9 @@ page {
 .merchant-order-remark {
   @include ref.type(meta);
   @include ref.wrap;
-  margin-top: 20rpx;
-  padding: 16rpx 18rpx;
-  border-left: 5rpx solid color.mix($brand-primary, $bg-surface, 35%);
-  border-radius: 0 14rpx 14rpx 0;
+  margin-top: 16rpx;
+  padding: 12rpx 16rpx;
+  border-radius: 10rpx;
   background: $bg-subtle;
   color: $text-secondary;
 }
@@ -758,18 +718,20 @@ page {
 
 .merchant-order-card__footer {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 18rpx;
-  margin-top: 22rpx;
-  padding-top: 20rpx;
+  margin-top: 8rpx;
+  padding-top: 12rpx;
   border-top: 1rpx solid $border-subtle;
 }
 
 .merchant-order-fee {
   display: flex;
-  flex-direction: column;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8rpx;
 }
 
 .merchant-order-fee__label,
@@ -814,19 +776,29 @@ page {
   box-sizing: border-box;
 }
 
-.merchant-order-button--ghost {
-  color: $text-secondary;
-}
-
 .merchant-order-button--primary {
-  border-color: $brand-primary;
-  background: $brand-primary;
-  color: $text-on-color;
-  box-shadow: 0 8rpx 20rpx rgba(30, 112, 208, 0.16);
+  border-color: $border-default;
+  background: $bg-surface;
+  color: $text-primary;
 }
 
 .merchant-order-button:active {
   transform: scale(0.97);
+}
+
+.merchant-home-control--pressed {
+  opacity: .72;
+}
+
+@media (max-width: 350PX) {
+  .merchant-home-hero { padding-right: 24rpx; padding-left: 24rpx; }
+  .merchant-home-tools { padding-right: 24rpx; padding-left: 24rpx; }
+  .merchant-home-shop__avatar { width: 56rpx; height: 56rpx; }
+  .merchant-home-shop__badge { font-size: 20rpx; }
+  .merchant-home-switch { font-size: 22rpx; }
+  .merchant-home-shortcuts { gap: 12rpx; }
+  .merchant-home-shortcut--publish { gap: 8rpx; padding-right: 8rpx; padding-left: 8rpx; }
+  .merchant-home-metric { padding-right: 4rpx; padding-left: 4rpx; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,5 +1,5 @@
 import { withFeaturePage } from '../../components/feature-page-gate'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Input, ScrollView, Text, Textarea, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import AppIcon from '../../components/app-icon'
@@ -9,10 +9,12 @@ import { AppActionSheet, AppButton } from '../../components/ui'
 import { deliveryMockFeeEnabled, deliveryPaymentEnabled } from '../../feature-flags'
 import { useIdentityGuard } from '../../hooks/use-identity-guard'
 import { getIdentityApplication } from '../../services/a-user'
+import { isApiError } from '../../services/api'
 import {
   createDeliveryClientRequestId,
   createMerchantDeliveryOrder,
   confirmMockDeliveryFee,
+  type CreateMerchantDeliveryInput,
   type MerchantDeliveryOrder,
 } from '../../services/delivery-merchant'
 import {
@@ -32,6 +34,26 @@ import {
 import './index.scss'
 
 type PaymentMethod = 'wallet' | 'wechat'
+type PublishMethod = PaymentMethod | 'mock'
+type PublishFeedback = { title: string; message: string; tone: 'pending' | 'success' | 'error' }
+type PublishAttempt = { input: CreateMerchantDeliveryInput; method: PublishMethod; order?: MerchantDeliveryOrder; hasUnknownCreate?: boolean }
+
+function errorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) return error.message
+  if (error && typeof error === 'object' && 'errMsg' in error) return String(error.errMsg || fallback)
+  return fallback
+}
+
+function isDefiniteRejection(error: unknown): boolean {
+  return isApiError(error) && [400, 401, 403, 404, 409, 422, 429].includes(error.status)
+}
+
+function paymentFeedback(status: string): PublishFeedback {
+  if (status === 'paid') return { title: '配送费已支付', message: '配送单已发布，可查看最新配送进度。', tone: 'success' }
+  if (status === 'failed') return { title: '支付失败', message: '配送单已创建，支付未完成。可查看订单核对资金状态。', tone: 'error' }
+  if (status === 'closed') return { title: '支付已关闭', message: '配送单已创建，本次支付已关闭。可查看订单核对资金状态。', tone: 'error' }
+  return { title: '支付结果待确认', message: '配送单已创建，暂未取得最终支付结果。请查看订单，勿重复发布或付款。', tone: 'pending' }
+}
 
 const clipboardFieldCopy: Record<DeliveryClipboardField, string> = {
   pickupContact: '取货联系人',
@@ -65,10 +87,90 @@ function MerchantPublishContent() {
   const [clipboardReading, setClipboardReading] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('wallet')
   const [submitting, setSubmitting] = useState(false)
+  const [operation, setOperation] = useState<'create' | 'pay' | 'navigate' | ''>('')
+  const [attemptPending, setAttemptPending] = useState(false)
+  const [createdOrder, setCreatedOrder] = useState<MerchantDeliveryOrder | null>(null)
+  const [feedback, setFeedback] = useState<PublishFeedback | null>(null)
+  const [navigationError, setNavigationError] = useState('')
+  const attemptRef = useRef<PublishAttempt | null>(null)
+  const submittingRef = useRef(false)
+  const lifecycleRef = useRef(0)
+  const activeRef = useRef(identityAllowed)
+  const identityRef = useRef(identityAllowed)
+  const accountRef = useRef(profile.id)
+  const sessionAccountRef = useRef(profile.id)
+  identityRef.current = identityAllowed
+  accountRef.current = profile.id
+  const formLocked = submitting || attemptPending || Boolean(createdOrder)
+
+  const operationGuard = () => {
+    const epoch = lifecycleRef.current
+    const account = accountRef.current
+    return () => activeRef.current && identityRef.current
+      && lifecycleRef.current === epoch && accountRef.current === account
+  }
+
+  // Native payment can temporarily cover this page. Only leaving the page or
+  // losing its account/identity invalidates the in-flight business operation.
+  useEffect(() => {
+    activeRef.current = identityAllowed
+    // Authentication retry can transiently clear the profile/identity while
+    // this page is preserved. Keep its idempotency key until a different actual
+    // account is known; otherwise a retry can create the same delivery twice.
+    const accountChanged = Boolean(profile.id && profile.id !== sessionAccountRef.current)
+    if (accountChanged) {
+      sessionAccountRef.current = profile.id
+      attemptRef.current = null
+      setAttemptPending(false)
+      setCreatedOrder(null)
+      setFeedback(null)
+      setNavigationError('')
+      setPickupContact('')
+      setPickupPhone('')
+      setPickupAddress('')
+      setReceiverName('')
+      setReceiverPhone('')
+      setReceiverAddress('')
+      setRemark('')
+      setBalanceCents(null)
+      setPaymentMethod('wallet')
+      setClipboardPreview(null)
+    } else if (submittingRef.current && attemptRef.current) {
+      if (attemptRef.current.order) {
+        setFeedback((current) => current?.tone === 'success' ? current : paymentFeedback(''))
+      } else {
+        attemptRef.current.hasUnknownCreate = true
+        setAttemptPending(true)
+        setFeedback({ title: '创建结果待确认', message: '身份核验中断了本次确认。已保留原配送信息，可继续确认结果或到工作台核对。', tone: 'pending' })
+      }
+    }
+    setSheetVisible(false)
+    setClipboardSheetVisible(false)
+    setClipboardReading(false)
+    submittingRef.current = false
+    setSubmitting(false)
+    setOperation('')
+    return () => {
+      activeRef.current = false
+      lifecycleRef.current += 1
+    }
+  }, [identityAllowed, profile.id])
+
+  const showToast = (title: string, success = false) => {
+    // Toasts are optional feedback; an unavailable native toast cannot turn a
+    // successful business response into a failed order or a second submission.
+    try {
+      void Taro.showToast({ title, icon: success ? 'success' : 'none', duration: 2400 }).catch(() => {})
+    } catch {
+      // Native bridges can also throw synchronously before returning a promise.
+    }
+  }
 
   useEffect(() => {
     if (!identityAllowed) return
+    const current = operationGuard()
     void getIdentityApplication('merchant').then((application) => {
+      if (!current() || attemptRef.current || submittingRef.current) return
       if (application.merchantName) setPickupContact(application.merchantName)
       if (application.merchantAddress) setPickupAddress(application.merchantAddress)
     }).catch(() => {
@@ -76,12 +178,13 @@ function MerchantPublishContent() {
     })
     if (deliveryPaymentEnabled) {
       void getDeliveryWallet().then((wallet) => {
+        if (!current()) return
         setBalanceCents(wallet.availableBalanceCents)
       }).catch(() => {
-        setBalanceCents(null)
+        if (current()) setBalanceCents(null)
       })
     }
-  }, [identityAllowed])
+  }, [identityAllowed, profile.id])
 
   const currentFormValues: Record<DeliveryClipboardField, string> = {
     pickupContact,
@@ -103,10 +206,12 @@ function MerchantPublishContent() {
   }
 
   const readClipboard = async () => {
-    if (clipboardReading) return
+    if (clipboardReading || submittingRef.current || attemptRef.current) return
+    const current = operationGuard()
     setClipboardReading(true)
     try {
       const result = await Taro.getClipboardData()
+      if (!current() || submittingRef.current || attemptRef.current) return
       const source = String(result.data ?? '')
       if (!source.trim()) {
         void Taro.showToast({ title: '剪贴板没有可导入的文字', icon: 'none' })
@@ -120,14 +225,14 @@ function MerchantPublishContent() {
       setClipboardPreview(parsed)
       setClipboardSheetVisible(true)
     } catch {
-      void Taro.showToast({ title: '读取剪贴板失败，请检查授权后重试', icon: 'none', duration: 2400 })
+      if (current()) showToast('读取剪贴板失败，请检查授权后重试')
     } finally {
-      setClipboardReading(false)
+      if (current()) setClipboardReading(false)
     }
   }
 
   const applyClipboardPreview = () => {
-    if (!clipboardPreview) return
+    if (!clipboardPreview || submittingRef.current || attemptRef.current) return
     const setters: Record<DeliveryClipboardField, (value: string) => void> = {
       pickupContact: setPickupContact,
       pickupPhone: setPickupPhone,
@@ -157,114 +262,218 @@ function MerchantPublishContent() {
     return true
   }
 
-  const publishWithMockFee = async () => {
-    if (submitting || !validate()) return
-    setSubmitting(true)
-    let order: MerchantDeliveryOrder | null = null
+  const navigateToOrder = async (order: MerchantDeliveryOrder, current: () => boolean) => {
+    if (!current()) return
+    setOperation('navigate')
+    setNavigationError('')
     try {
-      order = await createMerchantDeliveryOrder({
-        clientRequestId: createDeliveryClientRequestId(),
-        pickupName: pickupContact.trim(),
-        pickupPhone: pickupPhone.trim(),
-        pickupAddress: pickupAddress.trim(),
-        recipientName: receiverName.trim(),
-        recipientPhone: receiverPhone.trim(),
-        deliveryAddress: receiverAddress.trim(),
-        remark: remark.trim(),
-      })
-      await confirmMockDeliveryFee(order)
-      await Taro.showToast({ title: '测试配送单已发布', icon: 'success' })
       await Taro.redirectTo({
         url: `/pages/merchant-order-detail/index?orderId=${encodeURIComponent(order.deliveryOrderPublicId)}`,
       })
     } catch (error) {
-      const prefix = order ? '配送单已创建，但测试费用确认失败：' : ''
-      void Taro.showToast({
-        title: `${prefix}${error instanceof Error ? error.message : '发布失败'}`,
-        icon: 'none',
-        duration: 2400,
-      })
-      if (order) {
-        await Taro.redirectTo({
-          url: `/pages/merchant-order-detail/index?orderId=${encodeURIComponent(order.deliveryOrderPublicId)}`,
-        })
-      }
-    } finally {
-      setSubmitting(false)
+      if (current()) setNavigationError(errorMessage(error, '暂时无法打开订单，请重试查看'))
     }
   }
 
+  const viewCreatedOrder = async () => {
+    const order = attemptRef.current?.order
+    if (!order || submittingRef.current || !activeRef.current || !identityRef.current) return
+    const current = operationGuard()
+    submittingRef.current = true
+    setSubmitting(true)
+    try {
+      await navigateToOrder(order, current)
+    } finally {
+      if (current()) {
+        submittingRef.current = false
+        setSubmitting(false)
+        setOperation('')
+      }
+    }
+  }
+
+  const openWorkbench = async () => {
+    if (submittingRef.current || !activeRef.current || !identityRef.current) return
+    const current = operationGuard()
+    submittingRef.current = true
+    setSubmitting(true)
+    setOperation('navigate')
+    setNavigationError('')
+    try {
+      await Taro.redirectTo({ url: '/pages/merchant-home/index' })
+    } catch (error) {
+      if (current()) setNavigationError(errorMessage(error, '暂时无法打开工作台，请重试'))
+    } finally {
+      if (current()) {
+        submittingRef.current = false
+        setSubmitting(false)
+        setOperation('')
+      }
+    }
+  }
+
+  const finishWechatPayment = async (order: MerchantDeliveryOrder, current: () => boolean): Promise<PublishFeedback | null> => {
+    const result = await payDeliveryOrderWithWechat(order.deliveryOrderPublicId, order.rowVersion)
+    if (!current()) return null
+    if (!result.payment) throw new Error('后端未返回支付记录')
+    if (result.payment.status === 'paid' || result.payment.status === 'failed' || result.payment.status === 'closed') {
+      return paymentFeedback(result.payment.status)
+    }
+    if (result.payment.provider !== 'mock') {
+      if (!result.payment.wechat) throw new Error('后端未返回微信支付参数')
+      try {
+        await Taro.requestPayment(result.payment.wechat)
+      } catch (error) {
+        if (!current()) return null
+        if (/cancel/i.test(errorMessage(error, ''))) {
+          return { title: '已取消付款', message: '配送单已创建，本次未完成付款。可查看订单核对支付状态。', tone: 'pending' }
+        }
+        throw error
+      }
+      if (!current()) return null
+    }
+    const latest = await pollDeliveryPayment(result.payment.paymentPublicId)
+    return current() ? paymentFeedback(latest.status) : null
+  }
+
+  const submitAttempt = async (method: PublishMethod) => {
+    if (submittingRef.current || !activeRef.current || !identityRef.current) return
+    if (attemptRef.current?.order) {
+      await viewCreatedOrder()
+      return
+    }
+    if (!attemptRef.current && !validate()) return
+    const current = operationGuard()
+    submittingRef.current = true
+    setSubmitting(true)
+    setOperation('create')
+    setSheetVisible(false)
+    setClipboardSheetVisible(false)
+    setNavigationError('')
+    if (!attemptRef.current) {
+      attemptRef.current = {
+        method,
+        input: {
+          clientRequestId: createDeliveryClientRequestId(),
+          pickupName: pickupContact.trim(),
+          pickupPhone: pickupPhone.trim(),
+          pickupAddress: pickupAddress.trim(),
+          recipientName: receiverName.trim(),
+          recipientPhone: receiverPhone.trim(),
+          deliveryAddress: receiverAddress.trim(),
+          remark: remark.trim(),
+        },
+      }
+    }
+    const attempt = attemptRef.current
+    setAttemptPending(true)
+    setFeedback({ title: '正在创建配送单', message: '配送信息已锁定，请稍候。', tone: 'pending' })
+    try {
+      let order: MerchantDeliveryOrder
+      try {
+        order = await createMerchantDeliveryOrder(attempt.input)
+      } catch (error) {
+        if (!current()) return
+        if (isDefiniteRejection(error) && !attempt.hasUnknownCreate) {
+          attemptRef.current = null
+          setAttemptPending(false)
+          setFeedback({ title: '配送单未创建', message: errorMessage(error, '请检查配送信息后重试'), tone: 'error' })
+        } else {
+          attempt.hasUnknownCreate = true
+          setFeedback({
+            title: '创建结果待确认',
+            message: isDefiniteRejection(error)
+              ? `${errorMessage(error, '暂时无法确认原请求')}。此前请求可能已创建订单，请到工作台核对，勿重新发布。`
+              : '网络未返回明确结果，已保留本次信息。点击确认创建结果会使用原请求，也可到工作台核对。',
+            tone: 'pending',
+          })
+        }
+        return
+      }
+      if (!current()) return
+      attempt.order = order
+      setCreatedOrder(order)
+      setAttemptPending(false)
+      setFeedback({ title: '配送单已创建', message: '正在确认配送费，请勿重复发布。', tone: 'pending' })
+
+      // A retry may return a previously accepted order that has already moved
+      // forward. Never issue another payment against that returned snapshot.
+      if (order.status !== 'pending_fee_payment' && order.status !== 'payment_failed') {
+        setFeedback({ title: '配送单已创建', message: '此单已有更新，查看订单确认当前进度与资金状态。', tone: 'pending' })
+        await navigateToOrder(order, current)
+        return
+      }
+      setOperation('pay')
+      let result: PublishFeedback | null
+      try {
+        if (attempt.method === 'mock') {
+          if (!testPublishEnabled) throw new Error('测试配送费确认暂未开放')
+          const confirmedOrder = await confirmMockDeliveryFee(order)
+          if (!current()) return
+          result = confirmedOrder.status === 'ready_for_claim'
+            ? { title: '测试配送单已发布', message: '测试配送费已确认，可查看配送进度。', tone: 'success' }
+            : { title: '测试费用结果待确认', message: '配送单已创建，请查看订单核对最新状态。', tone: 'pending' }
+        } else if (attempt.method === 'wallet') {
+          const payment = await payDeliveryOrderWithWallet(order.deliveryOrderPublicId, order.rowVersion)
+          if (!current()) return
+          result = paymentFeedback(payment.settlement?.status === 'paid' ? 'paid' : payment.payment?.status || '')
+        } else {
+          result = await finishWechatPayment(order, current)
+        }
+      } catch (error) {
+        if (!current()) return
+        result = isDefiniteRejection(error)
+          ? { title: '配送费未完成支付', message: `${errorMessage(error, '支付请求未通过')}。配送单已保留，请查看订单。`, tone: 'error' }
+          : { title: '支付结果待确认', message: '配送单已创建，暂未取得明确支付结果。请查看订单核对，勿重复付款。', tone: 'pending' }
+      }
+      if (!current() || !result) return
+      setFeedback(result)
+      if (result.tone === 'success') {
+        showToast(attempt.method === 'mock' ? '测试配送单已发布' : '配送单已发布', true)
+        await navigateToOrder(order, current)
+      }
+    } finally {
+      if (current()) {
+        submittingRef.current = false
+        setSubmitting(false)
+        setOperation('')
+      }
+    }
+  }
+
+  const publishWithMockFee = async () => {
+    if (!testPublishEnabled) return
+    await submitAttempt('mock')
+  }
+
   const openPaymentSheet = () => {
-    if (submitting) return
+    if (submittingRef.current || !activeRef.current || !identityRef.current) return
+    if (attemptRef.current?.order) {
+      void viewCreatedOrder()
+      return
+    }
     if (testPublishEnabled) {
       void publishWithMockFee()
       return
     }
     if (!deliveryPaymentEnabled) {
-      void Taro.showToast({ title: '配送支付暂未开通，当前不能发布配送单', icon: 'none' })
+      showToast('配送支付暂未开通，当前不能发布配送单')
+      return
+    }
+    if (attemptRef.current) {
+      void submitAttempt(attemptRef.current.method)
       return
     }
     if (!validate()) return
     setSheetVisible(true)
   }
 
-  const finishWechatPayment = async (order: MerchantDeliveryOrder) => {
-    const result = await payDeliveryOrderWithWechat(order.deliveryOrderPublicId, order.rowVersion)
-    if (!result.payment) throw new Error('后端未返回支付记录')
-    if (result.payment.provider === 'mock') {
-      await pollDeliveryPayment(result.payment.paymentPublicId)
-      return
-    }
-    if (!result.payment.wechat) throw new Error('后端未返回微信支付参数')
-    await Taro.requestPayment(result.payment.wechat)
-    const latest = await pollDeliveryPayment(result.payment.paymentPublicId)
-    if (latest.status !== 'paid') throw new Error('微信支付尚未完成')
-  }
-
   const confirmPayment = async () => {
     if (!deliveryPaymentEnabled) {
-      void Taro.showToast({ title: '配送支付暂未开通', icon: 'none' })
+      showToast('配送支付暂未开通')
       return
     }
-    if (submitting || !validate()) return
-    setSubmitting(true)
-    setSheetVisible(false)
-    let order: MerchantDeliveryOrder | null = null
-    try {
-      order = await createMerchantDeliveryOrder({
-        clientRequestId: createDeliveryClientRequestId(),
-        pickupName: pickupContact.trim(),
-        pickupPhone: pickupPhone.trim(),
-        pickupAddress: pickupAddress.trim(),
-        recipientName: receiverName.trim(),
-        recipientPhone: receiverPhone.trim(),
-        deliveryAddress: receiverAddress.trim(),
-        remark: remark.trim(),
-      })
-      if (paymentMethod === 'wallet') {
-        await payDeliveryOrderWithWallet(order.deliveryOrderPublicId, order.rowVersion)
-      } else {
-        await finishWechatPayment(order)
-      }
-      await Taro.showToast({ title: '配送单已发布', icon: 'success' })
-      await Taro.redirectTo({
-        url: `/pages/merchant-order-detail/index?orderId=${encodeURIComponent(order.deliveryOrderPublicId)}`,
-      })
-    } catch (error) {
-      const prefix = order ? '配送单已创建，但支付未完成：' : ''
-      void Taro.showToast({
-        title: `${prefix}${error instanceof Error ? error.message : '发布失败'}`,
-        icon: 'none',
-        duration: 2400,
-      })
-      if (order) {
-        await Taro.redirectTo({
-          url: `/pages/merchant-order-detail/index?orderId=${encodeURIComponent(order.deliveryOrderPublicId)}`,
-        })
-      }
-    } finally {
-      setSubmitting(false)
-    }
+    await submitAttempt(paymentMethod)
   }
 
   if (!identityAllowed) return <View className='merchant-publish-page' />
@@ -293,14 +502,14 @@ function MerchantPublishContent() {
             <AppIcon name='order' />
           </View>
           <View className='merchant-publish-import-card__main'>
-            <Text className='merchant-publish-import-card__title'>批量导入配送信息</Text>
-            <Text className='merchant-publish-import-card__description'>本机解析，确认后才会写入表单</Text>
+            <Text className='merchant-publish-import-card__title'>导入配送信息</Text>
+            <Text className='merchant-publish-import-card__description'>{formLocked ? '本次信息已锁定，请先确认订单结果' : '粘贴填写好的信息，确认后导入'}</Text>
           </View>
           <View className='merchant-publish-import-card__actions'>
             <View className='merchant-publish-import-card__secondary' onClick={() => void copyImportTemplate()}>
               <Text>复制模板</Text>
             </View>
-            <View className='merchant-publish-import-card__primary' onClick={() => void readClipboard()}>
+            <View className={`merchant-publish-import-card__primary ${formLocked ? 'merchant-publish-control--disabled' : ''}`} ariaRole='button' ariaLabel='从剪贴板导入配送信息' onClick={() => void readClipboard()}>
               <Text>{clipboardReading ? '读取中…' : '从剪贴板导入'}</Text>
             </View>
           </View>
@@ -313,7 +522,7 @@ function MerchantPublishContent() {
               <Text className='merchant-publish-section-head__title'>取货信息</Text>
               <Text className='merchant-publish-pill'>本店</Text>
             </View>
-            <Text className='merchant-publish-section-head__hint'>来自审核资料，可修改</Text>
+            <Text className='merchant-publish-section-head__hint'>{formLocked ? '本次信息已锁定' : '来自商家资料，可修改'}</Text>
           </View>
           {[
             { label: '联系人', value: pickupContact, placeholder: '请输入联系人', change: setPickupContact },
@@ -322,12 +531,21 @@ function MerchantPublishContent() {
           ].map((field, index) => (
             <View key={field.label} className={`merchant-publish-field ${index === 2 ? 'merchant-publish-field--last' : ''}`}>
               <Text className='merchant-publish-field__label'>{field.label}</Text>
-              <Input
+              {index === 2 ? <Textarea
+                className='merchant-publish-field__input merchant-publish-field__input--address'
+                value={field.value}
+                placeholder={field.placeholder}
+                autoHeight
+                maxlength={140}
+                disabled={formLocked}
+                onInput={(event) => { if (!submittingRef.current && !attemptRef.current) field.change(inputValue(event)) }}
+              /> : <Input
                 className='merchant-publish-field__input'
                 value={field.value}
                 placeholder={field.placeholder}
-                onInput={(event) => field.change(inputValue(event))}
-              />
+                disabled={formLocked}
+                onInput={(event) => { if (!submittingRef.current && !attemptRef.current) field.change(inputValue(event)) }}
+              />}
             </View>
           ))}
         </View>
@@ -346,12 +564,21 @@ function MerchantPublishContent() {
           ].map((field, index) => (
             <View key={field.label} className={`merchant-publish-field ${index === 2 ? 'merchant-publish-field--last' : ''}`}>
               <Text className='merchant-publish-field__label'>{field.label}</Text>
-              <Input
+              {index === 2 ? <Textarea
+                className='merchant-publish-field__input merchant-publish-field__input--address'
+                value={field.value}
+                placeholder={field.placeholder}
+                autoHeight
+                maxlength={140}
+                disabled={formLocked}
+                onInput={(event) => { if (!submittingRef.current && !attemptRef.current) field.change(inputValue(event)) }}
+              /> : <Input
                 className='merchant-publish-field__input'
                 value={field.value}
                 placeholder={field.placeholder}
-                onInput={(event) => field.change(inputValue(event))}
-              />
+                disabled={formLocked}
+                onInput={(event) => { if (!submittingRef.current && !attemptRef.current) field.change(inputValue(event)) }}
+              />}
             </View>
           ))}
           <View className='merchant-publish-textarea-wrap'>
@@ -361,7 +588,8 @@ function MerchantPublishContent() {
               value={remark}
               placeholder='选填配送说明'
               maxlength={500}
-              onInput={(event) => setRemark(inputValue(event))}
+              disabled={formLocked}
+              onInput={(event) => { if (!submittingRef.current && !attemptRef.current) setRemark(inputValue(event)) }}
             />
           </View>
         </View>
@@ -369,25 +597,41 @@ function MerchantPublishContent() {
         <View className='merchant-publish-fee-card'>
           <View className='merchant-publish-fee-card__main'>
             <Text className='merchant-publish-fee-card__label'>配送费</Text>
-            <Text className='merchant-publish-fee-card__hint'>由服务端按平台规则计算，客户端不会修改金额</Text>
+            <Text className='merchant-publish-fee-card__hint'>按平台规则计算，以订单实际金额为准</Text>
           </View>
+          <Text className='merchant-publish-fee-card__summary'>{createdOrder ? `¥${(createdOrder.deliveryFeeCents / 100).toFixed(2)}` : '创建后确认'}</Text>
         </View>
         <View className='merchant-publish-scroll__spacer' />
       </ScrollView>
 
       <View className='merchant-publish-footer'>
+        {feedback ? (
+          <View className={`merchant-publish-feedback merchant-publish-feedback--${feedback.tone}`}>
+            <Text className='merchant-publish-feedback__title'>{feedback.title}</Text>
+            <Text className='merchant-publish-feedback__message'>{feedback.message}</Text>
+            {createdOrder ? <Text className='merchant-publish-feedback__order'>订单号 {createdOrder.deliveryOrderPublicId}</Text> : null}
+            {navigationError ? <Text className='merchant-publish-feedback__error'>{navigationError}，可点击下方重新查看。</Text> : null}
+            {attemptPending ? <View className='merchant-publish-feedback__workbench' ariaRole='button' ariaLabel='到商家工作台核对配送单' onClick={() => void openWorkbench()}><Text>到工作台核对</Text></View> : null}
+          </View>
+        ) : null}
         <View
-          className={`merchant-publish-footer__button ${!deliveryPaymentEnabled && !testPublishEnabled ? 'merchant-publish-footer__button--disabled' : ''}`}
+          className={`merchant-publish-footer__button ${submitting || (!deliveryPaymentEnabled && !testPublishEnabled && !createdOrder) ? 'merchant-publish-footer__button--disabled' : ''}`}
+          ariaRole='button'
+          ariaLabel={createdOrder ? '查看配送单' : attemptPending ? '确认创建结果' : '发布配送单'}
           onClick={openPaymentSheet}
         >
           <Text>
             {submitting
-              ? '正在提交…'
-              : testPublishEnabled
-                ? '发布测试配送单'
-                : !deliveryPaymentEnabled
-                  ? '支付功能暂未开通'
-                  : '发布并支付'}
+              ? operation === 'navigate' ? '正在打开订单…' : operation === 'pay' ? '正在确认付款…' : '正在创建配送单…'
+              : createdOrder
+                ? '查看配送单'
+                : attemptPending
+                  ? '确认创建结果'
+                  : testPublishEnabled
+                    ? '发布测试配送单'
+                    : !deliveryPaymentEnabled
+                      ? '支付功能暂未开通'
+                      : '发布并支付'}
           </Text>
         </View>
       </View>
@@ -434,7 +678,7 @@ function MerchantPublishContent() {
                 <View
                   key={option.key}
                   className={`merchant-publish-payment ${paymentMethod === option.key ? 'merchant-publish-payment--active' : ''}`}
-                  onClick={() => setPaymentMethod(option.key)}
+                  onClick={() => { if (!submittingRef.current && !attemptRef.current) setPaymentMethod(option.key) }}
                 >
                   <View className={`merchant-publish-payment__icon merchant-publish-payment__icon--${option.key}`}>
                     <Text>{option.icon}</Text>

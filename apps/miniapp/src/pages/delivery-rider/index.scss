@@ -26,7 +26,7 @@ page {
 
 .rider-grab-hero {
   flex: 0 0 auto;
-  padding: 0 28rpx 26rpx;
+  padding: 0 28rpx 12rpx;
   border-bottom: 1rpx solid $border-subtle;
   background: $bg-surface;
   box-sizing: border-box;
@@ -37,23 +37,23 @@ page {
 }
 
 .rider-grab-user {
-  min-height: 104rpx;
+  min-height: 88rpx;
   display: flex;
   align-items: center;
-  gap: 18rpx;
+  gap: 16rpx;
 }
 
 .rider-grab-user__avatar {
-  width: 76rpx;
-  height: 76rpx;
+  width: 64rpx;
+  height: 64rpx;
   flex: 0 0 auto;
-  border-radius: 24rpx;
+  border-radius: 18rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   background: $rider-accent-soft;
   color: $brand-primary-strong;
-  font-size: 32rpx;
+  font-size: 28rpx;
   font-weight: 750;
 }
 
@@ -96,17 +96,20 @@ page {
   @include ref.type(meta);
   @include ref.wrap;
   display: block;
-  margin-top: 8rpx;
+  margin-top: 4rpx;
   color: $text-secondary;
 }
+
+.rider-grab-user__meta--active { color: $rider-success; }
+.rider-grab-user__meta--suspended { color: $rider-danger; }
 
 .rider-grab-user__switch {
   @include ref.touch;
   min-width: 132rpx;
   flex: 0 0 auto;
   padding: 0 18rpx;
-  border: 1rpx solid $border-default;
-  border-radius: 18rpx;
+  border: 0;
+  border-radius: 12rpx;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -126,18 +129,17 @@ page {
 .rider-grab-task-summary {
   display: flex;
   align-items: stretch;
-  min-height: 132rpx;
-  margin-top: 12rpx;
-  border: 1rpx solid $border-subtle;
-  border-radius: $radius-card;
+  min-height: 88rpx;
+  margin-top: 8rpx;
+  border-top: 1rpx solid $border-subtle;
   overflow: hidden;
-  background: $bg-subtle;
+  background: $bg-surface;
 }
 
 .rider-grab-task-summary__primary {
   min-width: 0;
   flex: 1.2;
-  padding: 22rpx 20rpx;
+  padding: 16rpx 12rpx 12rpx 0;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -152,12 +154,12 @@ page {
   display: flex;
   align-items: baseline;
   gap: 7rpx;
-  margin-top: 12rpx;
+  margin-top: 4rpx;
 }
 
 .rider-grab-task-summary__value {
   color: $text-primary;
-  font-size: 48rpx;
+  font-size: 36rpx;
   font-weight: 780;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -178,8 +180,8 @@ page {
 
 .rider-grab-task-summary__stats::before {
   position: absolute;
-  top: 26rpx;
-  bottom: 26rpx;
+  top: 20rpx;
+  bottom: 16rpx;
   left: 0;
   width: 1rpx;
   background: $border-subtle;
@@ -189,7 +191,7 @@ page {
 .rider-grab-task-summary__stat {
   position: relative;
   min-width: 0;
-  padding: 23rpx 12rpx;
+  padding: 12rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -204,20 +206,20 @@ page {
 
 .rider-grab-task-summary__stat-value {
   color: $text-primary;
-  font-size: 31rpx;
+  font-size: 30rpx;
   font-weight: 740;
   font-variant-numeric: tabular-nums;
 }
 
 .rider-grab-task-summary__stat-label {
-  margin-top: 8rpx;
+  margin-top: 4rpx;
   color: $text-tertiary;
 }
 
 .rider-grab-task-summary__stat + .rider-grab-task-summary__stat::before {
   position: absolute;
-  top: 26rpx;
-  bottom: 26rpx;
+  top: 20rpx;
+  bottom: 16rpx;
   left: 0;
   width: 1rpx;
   background: $border-subtle;
@@ -287,6 +289,10 @@ page {
   transition: color $duration-fast ease;
 }
 
+.rider-grab-tabs--assigned-only {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .rider-grab-tabs__item--active {
   color: $text-primary;
 }
@@ -331,28 +337,31 @@ page {
 }
 
 .rider-grab-content__inner {
-  padding: 22rpx 24rpx calc(48rpx + env(safe-area-inset-bottom));
+  width: 100%;
+  max-width: 880PX;
+  margin: 0 auto;
+  padding: 16rpx 24rpx calc(40rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
 }
 
 .rider-grab-list {
   display: grid;
-  gap: 18rpx;
+  gap: 16rpx;
 }
 
 .rider-grab-list--assigned {
-  gap: 20rpx;
+  gap: 16rpx;
 }
 
 .rider-order-card {
   padding: 24rpx;
   border: 1rpx solid $border-subtle;
-  border-radius: $radius-card;
+  border-radius: 20rpx;
   background: $bg-surface;
-  box-shadow: 0 8rpx 24rpx rgba(42, 73, 108, 0.055);
 }
 
 .rider-order-card--assigned {
-  border-color: color.mix($brand-primary, $border-subtle, 22%);
+  border-color: $border-subtle;
 }
 
 .rider-order-card--busy {
@@ -371,6 +380,22 @@ page {
   justify-content: space-between;
   gap: 18rpx;
 }
+
+.rider-order-card__heading {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8rpx 16rpx;
+}
+
+.rider-order-card__stage {
+  @include ref.type(author);
+  color: $brand-primary-strong;
+  font-weight: 650;
+}
+
+.rider-order-card__stage--delivery { color: $rider-success; }
 
 .rider-order-card__serial {
   @include ref.type(meta);
@@ -397,7 +422,7 @@ page {
 .rider-order-card__created-at {
   @include ref.type(meta);
   display: block;
-  margin-top: 8rpx;
+  margin-top: 4rpx;
   color: $text-tertiary;
   font-variant-numeric: tabular-nums;
 }
@@ -412,7 +437,7 @@ page {
 
 .rider-order-card__fee-price {
   color: $text-primary;
-  font-size: 31rpx;
+  font-size: 34rpx;
   font-weight: 760;
   font-variant-numeric: tabular-nums;
 }
@@ -423,14 +448,14 @@ page {
 }
 
 .rider-order-route--assigned {
-  margin-top: 26rpx;
+  margin-top: 24rpx;
 }
 
 .rider-order-route__line {
   position: absolute;
-  top: 25rpx;
-  bottom: 25rpx;
-  left: 6rpx;
+  top: 32rpx;
+  bottom: 32rpx;
+  left: 16rpx;
   width: 2rpx;
   background: $border-default;
 }
@@ -439,7 +464,7 @@ page {
   position: relative;
   display: flex;
   align-items: flex-start;
-  gap: 17rpx;
+  gap: 16rpx;
 }
 
 .rider-order-route__row--drop {
@@ -447,20 +472,24 @@ page {
 }
 
 .rider-order-route__marker {
-  width: 14rpx;
-  height: 14rpx;
+  width: 34rpx;
+  height: 34rpx;
   flex: 0 0 auto;
-  margin-top: 10rpx;
-  border: 3rpx solid $bg-surface;
-  border-radius: 50%;
-  background: $brand-primary;
-  box-shadow: 0 0 0 2rpx $brand-primary;
+  margin-top: 2rpx;
+  border-radius: 10rpx;
+  background: $rider-accent-soft;
+  color: $brand-primary-strong;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22rpx;
+  font-weight: 650;
   box-sizing: border-box;
 }
 
 .rider-order-route__marker--drop {
-  background: $rider-success;
-  box-shadow: 0 0 0 2rpx $rider-success;
+  background: $rider-success-soft;
+  color: $rider-success;
 }
 
 .rider-order-route__info {
@@ -479,18 +508,16 @@ page {
 }
 
 .rider-order-route__place {
-  @include ref.type(comment);
+  @include ref.type(body);
   @include ref.wrap;
-  margin-top: 5rpx;
+  margin-top: 4rpx;
   color: $text-primary;
   font-weight: 650;
 }
 
 .rider-order-route__drop-row {
   min-width: 0;
-  display: flex;
-  align-items: flex-start;
-  gap: 12rpx;
+  display: block;
 }
 
 .rider-order-route__drop-row .rider-order-route__place {
@@ -501,21 +528,19 @@ page {
 .rider-order-route__lock,
 .rider-order-route__complete {
   flex: 0 0 auto;
-  margin-top: 5rpx;
-  padding: 6rpx 10rpx;
-  border-radius: 9rpx;
-  font-size: 18rpx;
-  font-weight: 600;
+  display: inline-flex;
+  margin-top: 4rpx;
+  font-size: 21rpx;
+  line-height: 1.5;
+  font-weight: 400;
   white-space: nowrap;
 }
 
 .rider-order-route__lock {
-  background: $bg-muted;
   color: $text-tertiary;
 }
 
 .rider-order-route__complete {
-  background: $rider-success-soft;
   color: $rider-success;
 }
 
@@ -556,15 +581,14 @@ page {
 
 .rider-order-card__grab {
   @include ref.touch;
-  min-width: 148rpx;
+  min-width: 176rpx;
   flex: 0 0 auto;
   padding: 0 24rpx;
-  border-radius: 18rpx;
+  border-radius: 14rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   background: $brand-primary;
-  box-shadow: 0 8rpx 20rpx rgba(30, 112, 208, 0.17);
   color: $text-on-color;
   font-size: 24rpx;
   font-weight: 680;
@@ -587,19 +611,19 @@ page {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10rpx;
-  margin-top: 22rpx;
-  padding-top: 20rpx;
+  gap: 8rpx;
+  margin-top: 16rpx;
+  padding-top: 8rpx;
   border-top: 1rpx solid $border-subtle;
 }
 
 .rider-order-card__secondary {
   @include ref.touch;
   @include ref.type(meta);
-  min-width: max(44PX, 100rpx);
-  padding: 0 16rpx;
-  border: 1rpx solid $border-default;
-  border-radius: 17rpx;
+  min-width: max(44PX, 112rpx);
+  padding: 0 12rpx;
+  border: 0;
+  border-radius: 12rpx;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -623,7 +647,7 @@ page {
 }
 
 .rider-order-card__secondary--danger {
-  border-color: color.mix($rider-danger, $border-default, 30%);
+  margin-left: auto;
   color: $rider-danger;
 }
 
@@ -631,9 +655,34 @@ page {
   opacity: 0.45;
 }
 
-.rider-order-card__quick-actions .rider-order-card__grab,
-.rider-order-card__quick-actions .rider-order-card__status {
-  margin-left: auto;
+.rider-order-card__fulfillment {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-top: 8rpx;
+  padding-top: 16rpx;
+  border-top: 1rpx solid $border-subtle;
+}
+
+.rider-order-card__next {
+  min-width: 0;
+  flex: 1;
+}
+
+.rider-order-card__next-label {
+  @include ref.type(meta);
+  display: block;
+  color: $text-tertiary;
+}
+
+.rider-order-card__next-copy {
+  @include ref.type(meta);
+  @include ref.wrap;
+  display: block;
+  margin-top: 4rpx;
+  color: $text-primary;
+  font-weight: 500;
 }
 
 .rider-order-card__status {
@@ -650,9 +699,10 @@ page {
 }
 
 .rider-order-card__feedback-wrap {
-  margin-top: 16rpx;
-  padding-top: 16rpx;
-  border-top: 1rpx solid $border-subtle;
+  margin-top: 12rpx;
+  padding: 12rpx 16rpx;
+  border-radius: 12rpx;
+  background: $bg-subtle;
 }
 
 .rider-order-card__progress,
@@ -904,6 +954,13 @@ page {
 }
 
 @media (max-width: 350px) {
+  .rider-grab-hero { padding-left: 24rpx; padding-right: 24rpx; }
+  .rider-grab-content__inner { padding-left: 16rpx; padding-right: 16rpx; }
+  .rider-order-card { padding: 20rpx; }
+  .rider-order-card__top { align-items: flex-start; gap: 12rpx; }
+  .rider-order-card__fee { flex-direction: column; align-items: flex-end; }
+  .rider-order-card__grab { min-width: 164rpx; padding-left: 16rpx; padding-right: 16rpx; }
+  .rider-order-card__next-copy { max-width: 250rpx; }
   .rider-grab-task-summary__primary {
     flex: 1;
   }

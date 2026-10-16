@@ -45,32 +45,31 @@ page {
 .merchant-publish-card,
 .merchant-publish-fee-card,
 .merchant-publish-import-card {
-  margin: 24rpx 28rpx 0;
-  border-radius: 26rpx;
+  margin: 16rpx 24rpx 0;
+  border-radius: 16rpx;
   border: 1rpx solid $border-subtle;
   background: $bg-surface;
-  box-shadow: 0 8rpx 24rpx rgba(42, 73, 108, .055);
   box-sizing: border-box;
 }
 
 .merchant-publish-import-card {
-  min-height: 150rpx;
-  padding: 22rpx;
+  min-height: 120rpx;
+  padding: 16rpx 20rpx;
   display: grid;
-  grid-template-columns: 64rpx minmax(0, 1fr);
-  column-gap: 18rpx;
-  row-gap: 18rpx;
+  grid-template-columns: 48rpx minmax(0, 1fr);
+  column-gap: 16rpx;
+  row-gap: 8rpx;
   align-items: center;
   border-color: rgba($brand-primary, .18);
-  background: linear-gradient(135deg, $bg-surface 0%, rgba($brand-primary, .055) 100%);
+  background: $bg-surface;
 }
 
 .merchant-publish-import-card__icon {
-  width: 64rpx;
-  height: 64rpx;
-  padding: 16rpx;
+  width: 48rpx;
+  height: 48rpx;
+  padding: 10rpx;
   box-sizing: border-box;
-  border-radius: 20rpx;
+  border-radius: 12rpx;
   background: $publish-blue-soft;
 }
 
@@ -112,7 +111,7 @@ page {
   @include ref.touch;
   @include ref.type(meta);
   padding: 0 16rpx;
-  border-radius: 18rpx;
+  border-radius: 12rpx;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -129,7 +128,6 @@ page {
 .merchant-publish-import-card__primary {
   color: $text-on-color;
   background: $brand-primary;
-  box-shadow: 0 8rpx 18rpx rgba($brand-primary-strong, .14);
 }
 
 .merchant-publish-import-card__secondary:active,
@@ -138,7 +136,7 @@ page {
 }
 
 .merchant-publish-card {
-  padding: 30rpx 28rpx 8rpx;
+  padding: 24rpx 24rpx 8rpx;
 }
 
 .merchant-publish-section-head {
@@ -215,8 +213,9 @@ page {
 
 .merchant-publish-field__label {
   @include ref.type(author);
-  width: 144rpx;
-  flex: 0 0 144rpx;
+  width: 4em;
+  flex: 0 0 4em;
+  white-space: nowrap;
   color: $text-secondary;
 }
 
@@ -227,7 +226,13 @@ page {
   color: $text-primary;
   font-size: 28rpx;
   line-height: 1.3;
-  text-align: right;
+  text-align: left;
+}
+
+.merchant-publish-field__input--address {
+  padding: 24rpx 0;
+  box-sizing: border-box;
+  line-height: 1.5;
 }
 
 .merchant-publish-textarea-wrap {
@@ -243,20 +248,21 @@ page {
 .merchant-publish-textarea {
   @include ref.type(comment);
   width: 100%;
-  min-height: 124rpx;
-  padding: 22rpx 24rpx;
+  min-height: 96rpx;
+  padding: 16rpx;
   box-sizing: border-box;
-  border-radius: 18rpx;
+  border-radius: 12rpx;
   background: $publish-blue-field;
   color: $text-primary;
 }
 
 .merchant-publish-fee-card {
-  min-height: 136rpx;
-  padding: 26rpx 28rpx;
+  min-height: 112rpx;
+  padding: 24rpx;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16rpx;
 }
 
 .merchant-publish-fee-card__main {
@@ -275,8 +281,15 @@ page {
 .merchant-publish-fee-card__hint {
   @include ref.type(meta);
   @include ref.wrap;
-  margin-top: 16rpx;
+  margin-top: 12rpx;
   color: $text-muted;
+}
+
+.merchant-publish-fee-card__summary {
+  @include ref.type(author);
+  flex: 0 0 auto;
+  color: $brand-primary;
+  font-weight: 650;
 }
 
 .merchant-publish-fee-card__amount {
@@ -301,7 +314,7 @@ page {
 .merchant-publish-footer {
   flex: 0 0 auto;
   min-height: calc(44PX + 38rpx + env(safe-area-inset-bottom));
-  padding: 20rpx 28rpx calc(18rpx + env(safe-area-inset-bottom));
+  padding: 16rpx 24rpx calc(16rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
   background: $bg-surface;
   border-top: 1rpx solid $divider-nav;
@@ -312,13 +325,56 @@ page {
   @include ref.touch;
   @include ref.type(label);
   padding: 16rpx 24rpx;
-  border-radius: 24rpx;
+  border-radius: 16rpx;
   background: $brand-primary;
   color: $text-on-color;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 10rpx 24rpx rgba($brand-primary-strong, .16);
+  transition: opacity 140ms ease;
+}
+
+.merchant-publish-footer__button:active { opacity: .82; }
+
+.merchant-publish-feedback {
+  max-height: 32vh;
+  overflow-y: auto;
+  padding: 0 0 16rpx;
+}
+
+.merchant-publish-feedback__title,
+.merchant-publish-feedback__message,
+.merchant-publish-feedback__order,
+.merchant-publish-feedback__error { display: block; }
+
+.merchant-publish-feedback__title {
+  @include ref.type(author);
+  color: $text-strong;
+  font-weight: 650;
+}
+
+.merchant-publish-feedback__message,
+.merchant-publish-feedback__order,
+.merchant-publish-feedback__error {
+  @include ref.type(meta);
+  @include ref.wrap;
+  margin-top: 8rpx;
+  color: $text-secondary;
+  line-height: 1.5;
+}
+
+.merchant-publish-feedback__order { word-break: break-all; color: $text-tertiary; }
+.merchant-publish-feedback--success .merchant-publish-feedback__title { color: $brand-primary; }
+.merchant-publish-feedback--error .merchant-publish-feedback__title,
+.merchant-publish-feedback__error { color: $publish-orange; }
+.merchant-publish-control--disabled { opacity: .5; }
+
+.merchant-publish-feedback__workbench {
+  @include ref.touch;
+  @include ref.type(meta);
+  display: flex;
+  align-items: center;
+  color: $brand-primary;
 }
 
 .merchant-publish-footer__button--disabled {
@@ -411,7 +467,7 @@ page {
   min-height: 106rpx;
   padding: 20rpx 22rpx;
   border: 2rpx solid $divider-nav;
-  border-radius: 22rpx;
+  border-radius: 16rpx;
   background: $bg-surface;
   box-sizing: border-box;
   display: flex;
@@ -484,4 +540,21 @@ page {
   height: 18rpx;
   border-radius: 999rpx;
   background: $brand-primary;
+}
+
+@media (max-width: 340px) {
+  .merchant-publish-card,
+  .merchant-publish-fee-card,
+  .merchant-publish-import-card { margin-left: 16rpx; margin-right: 16rpx; }
+
+  .merchant-publish-card { padding-left: 20rpx; padding-right: 20rpx; }
+  .merchant-publish-fee-card { flex-wrap: wrap; }
+  .merchant-publish-payment { padding: 16rpx; }
+  .merchant-publish-payment__main { margin-left: 16rpx; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .merchant-publish-footer__button { transition: none; }
+  .merchant-publish-import-card__secondary:active,
+  .merchant-publish-import-card__primary:active { transform: none; }
 }

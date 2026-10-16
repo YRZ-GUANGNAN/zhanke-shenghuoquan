@@ -226,7 +226,7 @@ function MerchantOrderDetailContent() {
         className='merchant-detail-nav'
         title='配送单详情'
         left={<AppIconButton name='back' label='返回' className='merchant-detail-nav__back' onClick={() => void Taro.navigateBack()} />}
-        right={<Text className='merchant-detail-nav__refresh' onClick={() => void loadDetail()}>刷新</Text>}
+        right={<View className='merchant-detail-nav__refresh' ariaRole='button' ariaLabel='刷新配送单详情' hoverClass='merchant-detail-control--pressed' onClick={() => void loadDetail()}><Text>刷新</Text></View>}
       />
 
       <ScrollView scrollY className='merchant-detail-scroll' enhanced showScrollbar={false}>
@@ -244,31 +244,54 @@ function MerchantOrderDetailContent() {
 
           {order ? (
             <>
-              <View className='merchant-detail-status-card'>
+              <View className={`merchant-detail-status-card merchant-detail-status-card--${order.status}`}>
                 <View className='merchant-detail-status-card__main'>
-                  <View className='merchant-detail-status-card__state-row'>
-                    <Text className='merchant-detail-status-card__state'>{statusCopy[order.status].label}</Text>
-                    <View className='merchant-detail-status-card__dot' />
-                  </View>
+                  <Text className='merchant-detail-status-card__eyebrow'>当前配送状态</Text>
+                  <Text className='merchant-detail-status-card__state'>{statusCopy[order.status].label}</Text>
                   <Text className='merchant-detail-status-card__sub'>{statusCopy[order.status].sub}</Text>
                 </View>
-                <View className='merchant-detail-status-card__fee'>
-                  <Text className='merchant-detail-status-card__amount'>¥{centsToYuan(order.deliveryFeeCents)}</Text>
-                  <Text className='merchant-detail-status-card__pay'>
-                    {paymentLabel}
-                  </Text>
+                <View className='merchant-detail-status-card__meta'>
+                  <Text>配送单 #{order.deliveryOrderPublicId}</Text>
+                  <Text>创建于 {formatTime(order.createdAt)}</Text>
                 </View>
+              </View>
+
+              <View className='merchant-detail-route-card'>
+                <Text className='merchant-detail-section-title'>取送信息</Text>
+                <View className='merchant-detail-route__row'>
+                  <Text className='merchant-detail-route__marker merchant-detail-route__marker--pickup'>取</Text>
+                  <View className='merchant-detail-route__body'>
+                    <Text className='merchant-detail-route__address'>{order.pickupAddress}</Text>
+                    <Text className='merchant-detail-route__contact'>{[order.pickupContactName, order.pickupContactPhone].filter(Boolean).join(' · ')}</Text>
+                  </View>
+                </View>
+                <View className='merchant-detail-route__row'>
+                  <Text className='merchant-detail-route__marker merchant-detail-route__marker--dropoff'>送</Text>
+                  <View className='merchant-detail-route__body'>
+                    <Text className='merchant-detail-route__address'>{order.deliveryAddress}</Text>
+                    <Text className='merchant-detail-route__contact'>{[order.recipientName, order.recipientPhone].filter(Boolean).join(' · ')}</Text>
+                  </View>
+                </View>
+                {order.remark ? (
+                  <View className='merchant-detail-route__remark'>
+                    <Text className='merchant-detail-route__remark-label'>备注</Text>
+                    <Text>{order.remark}</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              <View className='merchant-detail-fee-card'>
+                <View className='merchant-detail-status-card__fee'>
+                  <Text className='merchant-detail-section-title'>配送费用</Text>
+                  <Text className='merchant-detail-status-card__amount'>¥{centsToYuan(order.deliveryFeeCents)}</Text>
+                </View>
+                <Text className='merchant-detail-status-card__pay'>{paymentLabel}</Text>
                 {!loading && fundsError ? (
                   <View className='merchant-detail-status-card__funds-error' ariaRole='button' ariaLabel='重新加载支付状态' hoverClass='merchant-detail-control--pressed' onClick={() => void loadDetail()}>
                     <Text>{fundsError}{fundsLoaded ? `，上次状态：${deliveryFundsLabel(funds)}` : ''}</Text>
                     <Text className='merchant-detail-notice__retry'>点击重试</Text>
                   </View>
                 ) : null}
-                <View className='merchant-detail-status-card__divider' />
-                <View className='merchant-detail-status-card__meta'>
-                  <Text>#{order.deliveryOrderPublicId} · {formatTime(order.createdAt)}</Text>
-                  <Text>送达点：{order.deliveryAddress}</Text>
-                </View>
               </View>
 
               <View className='merchant-detail-rider-card'>
@@ -291,6 +314,7 @@ function MerchantOrderDetailContent() {
                       onClick={openConversation}
                     >
                       <MerchantHomeIcon name='message' className='merchant-detail-rider-card__message-icon' />
+                      <Text>联系骑手</Text>
                     </View>
                   </View>
                 ) : null}

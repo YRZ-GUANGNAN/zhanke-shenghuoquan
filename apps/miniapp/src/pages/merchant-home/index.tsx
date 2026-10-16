@@ -128,46 +128,31 @@ function OrderCard({ order }: { order: MerchantDeliveryOrder }) {
   return (
     <View className='merchant-order-card'>
       <View className='merchant-order-card__top'>
-        <Text className='merchant-order-card__serial'>
-          #{order.deliveryOrderPublicId} · {formatTime(order.createdAt)}
-        </Text>
         <Text className={`merchant-order-card__status merchant-order-card__status--${tone}`}>
           {statusCopy[order.status]}
         </Text>
+        <Text className='merchant-order-card__time'>{formatTime(order.createdAt)}</Text>
       </View>
-
-      {order.riderUserId ? (
-        <View className='merchant-order-rider'>
-          <View className='merchant-order-rider__avatar'><Text>骑</Text></View>
-          <View className='merchant-order-rider__main'>
-            <Text className='merchant-order-rider__name'>骑手 #{order.riderUserId}</Text>
-            <Text className='merchant-order-rider__phone'>已参与本配送单</Text>
-          </View>
-          <View className='merchant-order-rider__actions'>
-            <View className='merchant-order-rider__circle' onClick={() => openConversation(order)}>
-              <MerchantHomeIcon name='message' className='merchant-order-rider__action-icon' />
-            </View>
-          </View>
-        </View>
-      ) : null}
+      <Text className='merchant-order-card__serial'>配送单 #{order.deliveryOrderPublicId}</Text>
 
       <View className='merchant-order-route'>
-        <View className='merchant-order-route__rail'>
-          <View className='merchant-order-route__dot merchant-order-route__dot--pickup' />
-          <View className='merchant-order-route__line' />
-          <View className='merchant-order-route__dot merchant-order-route__dot--dropoff' />
+        <View className='merchant-order-route__row'>
+          <Text className='merchant-order-route__marker merchant-order-route__marker--pickup'>取</Text>
+          <View className='merchant-order-route__body'>
+            <Text className='merchant-order-route__place'>{order.pickupAddress}</Text>
+            <Text className='merchant-order-route__contact'>
+              {[order.pickupContactName, order.pickupContactPhone].filter(Boolean).join(' · ')}
+            </Text>
+          </View>
         </View>
-        <View className='merchant-order-route__body'>
-          <Text className='merchant-order-route__label'>取货点</Text>
-          <Text className='merchant-order-route__place'>{order.pickupAddress}</Text>
-          <Text className='merchant-order-route__contact'>
-            {order.pickupContactName} · {order.pickupContactPhone}
-          </Text>
-          <Text className='merchant-order-route__label merchant-order-route__label--dropoff'>送达点</Text>
-          <Text className='merchant-order-route__place'>{order.deliveryAddress}</Text>
-          <Text className='merchant-order-route__contact'>
-            {order.recipientName} · {order.recipientPhone}
-          </Text>
+        <View className='merchant-order-route__row'>
+          <Text className='merchant-order-route__marker merchant-order-route__marker--dropoff'>送</Text>
+          <View className='merchant-order-route__body'>
+            <Text className='merchant-order-route__place'>{order.deliveryAddress}</Text>
+            <Text className='merchant-order-route__contact'>
+              {[order.recipientName, order.recipientPhone].filter(Boolean).join(' · ')}
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -178,14 +163,24 @@ function OrderCard({ order }: { order: MerchantDeliveryOrder }) {
         </View>
       ) : null}
 
+      {order.riderUserId ? (
+        <View className='merchant-order-rider'>
+          <Text className='merchant-order-rider__name'>骑手 #{order.riderUserId}</Text>
+          <View className='merchant-order-rider__circle' ariaRole='button' ariaLabel='联系本单骑手' hoverClass='merchant-home-control--pressed' onClick={() => openConversation(order)}>
+            <MerchantHomeIcon name='message' className='merchant-order-rider__action-icon' />
+            <Text>联系骑手</Text>
+          </View>
+        </View>
+      ) : null}
+
       <View className='merchant-order-card__footer'>
         <View className='merchant-order-fee'>
           <Text className='merchant-order-fee__label'>配送费</Text>
           <Text className='merchant-order-fee__amount'>¥{centsToYuan(order.deliveryFeeCents)}</Text>
         </View>
         <View className='merchant-order-card__buttons'>
-          <View className='merchant-order-button merchant-order-button--primary' onClick={() => openOrderDetail(order)}>
-            <Text>详情</Text>
+          <View className='merchant-order-button merchant-order-button--primary' ariaRole='button' ariaLabel='查看配送单详情' hoverClass='merchant-home-control--pressed' onClick={() => openOrderDetail(order)}>
+            <Text>查看详情</Text>
           </View>
         </View>
       </View>
@@ -377,7 +372,7 @@ function MerchantHomeContent() {
               </View>
             </View>
           </View>
-          <View className='merchant-home-switch' onClick={() => {
+          <View className='merchant-home-switch' ariaRole='button' ariaLabel='切换身份' hoverClass='merchant-home-control--pressed' onClick={() => {
             setSwitchIdentityError('')
             setShowStudentSwitch(true)
           }}>
@@ -409,15 +404,14 @@ function MerchantHomeContent() {
 
       <View className='merchant-home-tools'>
         {(!visibility.delivery || !visibility.merchant) && <View className='merchant-home-section-head'><Text>新业务暂未开放，以下仅供处理已有订单与资金。</Text></View>}
-        <View className='merchant-home-section-head'>
-          <Text className='merchant-home-section-head__title'>常用功能</Text>
-          <Text className='merchant-home-section-head__hint'>经营与配送</Text>
-        </View>
-        <View className='merchant-home-shortcuts'>
-          {shortcutCopy.filter(item => item.key !== 'publish' || visibility.delivery && visibility.merchant).map((item) => (
+        <View className={`merchant-home-shortcuts${visibility.delivery && visibility.merchant ? '' : ' merchant-home-shortcuts--existing-only'}`}>
+          {shortcutCopy.filter(item => item.key === 'publish' && visibility.delivery && visibility.merchant).map((item) => (
             <View
               key={item.key}
               className={`merchant-home-shortcut merchant-home-shortcut--${item.key}`}
+              ariaRole='button'
+              ariaLabel={`${item.label}，${item.description}`}
+              hoverClass='merchant-home-control--pressed'
               onClick={() => void Taro.navigateTo({ url: item.url })}
             >
               <View className='merchant-home-shortcut__icon'>
@@ -425,10 +419,24 @@ function MerchantHomeContent() {
               </View>
               <View className='merchant-home-shortcut__copy'>
                 <Text className='merchant-home-shortcut__label'>{item.label}</Text>
-                <Text className='merchant-home-shortcut__description'>{item.description}</Text>
               </View>
             </View>
           ))}
+          <View className='merchant-home-shortcuts__secondary'>
+            {shortcutCopy.filter(item => item.key !== 'publish').map((item) => (
+              <View
+                key={item.key}
+                className={`merchant-home-shortcut merchant-home-shortcut--${item.key}`}
+                ariaRole='button'
+                ariaLabel={`${item.label}，${item.description}`}
+                hoverClass='merchant-home-control--pressed'
+                onClick={() => void Taro.navigateTo({ url: item.url })}
+              >
+                <MerchantHomeIcon name={item.icon} className='merchant-home-shortcut__aux-icon' />
+                <Text className='merchant-home-shortcut__label'>{item.label}</Text>
+              </View>
+            ))}
+          </View>
         </View>
       </View>
 
@@ -437,6 +445,9 @@ function MerchantHomeContent() {
           <View
             key={tab.key}
             className={`merchant-home-tab ${activeTab === tab.key ? 'merchant-home-tab--active' : ''}`}
+            ariaRole='button'
+            ariaLabel={`${tab.label}${activeTab === tab.key ? '，已选中' : ''}`}
+            hoverClass='merchant-home-control--pressed'
             onClick={() => setActiveTab(tab.key)}
           >
             <Text className='merchant-home-tab__label'>{tab.label}</Text>

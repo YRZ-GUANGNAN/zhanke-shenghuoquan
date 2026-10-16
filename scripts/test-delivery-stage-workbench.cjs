@@ -135,6 +135,14 @@ function riderHarness(overrides = {}) {
     markPickedUp: async (value) => ({ ...value, rowVersion: 2, status: 'picked_up' }),
     markDelivered: async (value) => ({ ...value, rowVersion: 2, status: 'delivered' }),
     releaseDeliveryOrder: async (value) => ({ ...value, rowVersion: 2, status: 'ready_for_claim' }),
+    getAssignedDeliveryOrder: async (id) => {
+      for (const group of ['pickup', 'delivery', 'completed']) {
+        const result = await services.listAssignedDeliveryOrders(1, 50, group)
+        const found = result.items.find((item) => item.deliveryOrderPublicId === id)
+        if (found) return found
+      }
+      throw new Error('配送单不存在')
+    },
     ...overrides.services,
   }
   const media = {
@@ -161,7 +169,10 @@ function riderHarness(overrides = {}) {
     '../../components/ui': { AppDialog: 'AppDialog' },
     '../../hooks/use-identity-guard': { useIdentityGuard: () => identityAllowed, identityRoute: () => '' },
     '../../hooks/use-feature-visibility': { useFeatureVisibility: () => ({ delivery: true, rider: true }) },
-    '../../services/api': { isApiError: () => false },
+    '../../services/api': {
+      isApiError: (value) => value instanceof Error && typeof value.status === 'number',
+      isRetryableNetworkError: (value) => value?.status === 0,
+    },
     '../../services/delivery-rider': services,
     '../../services/delivery-merchant': { centsToYuan: (value) => String(value / 100) },
     '../../services/media': media,
@@ -275,6 +286,66 @@ function merchantHarness(kind, overrides = {}) {
 
 async function run() {
   {
+    let writes = 0, failReads = false
+    const app = riderHarness({ services: {
+      startToPickup: async () => { writes++; failReads = true; throw Object.assign(new Error('网络请求超时'), { status: 0 }) },
+      listAssignedDeliveryOrders: async (_, __, group) => {
+        if (failReads) throw new Error('状态读取失败')
+        return page(group === 'pickup' ? [order('ORDER-A')] : [])
+      },
+    } })
+    await app.mount(); await app.tab('待取货')
+    app.primary('ORDER-A').props.onClick(); await app.flush()
+    assert.match(text(app.card('ORDER-A')), /结果待确认/)
+    assert.equal(text(app.primary('ORDER-A')), '刷新状态')
+    app.primary('ORDER-A').props.onClick(); app.primary('ORDER-A').props.onClick(); await app.flush()
+    assert.equal(writes, 1, '未知写结果在读取失败时不能再次提交')
+    failReads = false
+    app.primary('ORDER-A').props.onClick(); await app.flush()
+    assert.equal(writes, 1, '同步成功也不应自动重试写操作')
+    assert.equal(text(app.primary('ORDER-A')), '前往取货')
+    console.log('PASS 写请求结果未知必须先同步，读取失败不能重复提交')
+  }
+  {
+    let writes = 0
+    const app = riderHarness({ services: {
+      releaseDeliveryOrder: async () => { writes++; throw Object.assign(new Error('该订单暂不可释放'), { status: 409 }) },
+    } })
+    await app.mount(); await app.tab('待取货')
+    nodes(app.card('ORDER-A'), (node) => hasClass(node, 'rider-order-card__secondary--danger'))[0].props.onClick()
+    await app.flush()
+    nodes(app.tree, (node) => node.type === 'AppDialog')[0].props.onConfirm(); await app.flush()
+    const dialog = nodes(app.tree, (node) => node.type === 'AppDialog')[0]
+    assert.equal(writes, 1)
+    assert.equal(dialog.props.visible, true, '释放明确失败必须保留确认框')
+    assert.match(dialog.props.error, /暂不可释放/, '失败原因应留在确认操作附近')
+    console.log('PASS 释放业务拒绝保留确认框与真实原因')
+  }
+  {
+    for (const mismatch of ['status', 'version', 'id', 'read-failure']) {
+      const approval = deferred()
+      let writes = 0, preflightCalls = 0
+      const initial = order('ORDER-A', 'to_pickup')
+      const app = riderHarness({ services: {
+        listAssignedDeliveryOrders: async (_, __, group) => page(group === 'pickup' ? [initial] : []),
+        getAssignedDeliveryOrder: async () => {
+          preflightCalls++
+          if (mismatch === 'read-failure') throw new Error('订单校验读取失败')
+          return { ...initial, ...(mismatch === 'status' ? { status: 'picked_up' } : mismatch === 'version' ? { rowVersion: 2 } : { deliveryOrderPublicId: 'ORDER-B' }) }
+        },
+        markPickedUp: async () => { writes++ },
+      }, media: { waitForMediaApproval: () => approval.promise } })
+      await app.mount(); await app.tab('待取货')
+      app.primary('ORDER-A').props.onClick(); await app.flush()
+      assert.equal(preflightCalls, 0, '凭证未审核完成前不应发履约前校验')
+      approval.resolve({ canUse: true, state: 'approved' }); await app.flush()
+      assert.equal(preflightCalls, 1)
+      assert.equal(writes, 0, `${mismatch} 时不得提交旧凭证动作`)
+      assert.match(text(app.card('ORDER-A')), /订单|校验/)
+    }
+    console.log('PASS 凭证审核后的订单阶段、版本、身份及读取失败均停止旧提交')
+  }
+  {
     const a = deferred(), b = deferred(), calls = []
     const app = riderHarness({ services: { startToPickup: (value) => {
       calls.push(value.deliveryOrderPublicId)
@@ -293,6 +364,117 @@ async function run() {
     await app.flush()
     assert.ok(app.meCalls > 1, '动作后应重新同步骑手状态')
     console.log('PASS 同单防重复与不同订单并发')
+  }
+  {
+    let writes = 0, selections = 0, failReads = false
+    const app = riderHarness({ services: {
+      listAssignedDeliveryOrders: async (_, __, group) => {
+        if (failReads) throw new Error('订单同步失败')
+        return page(group === 'pickup' ? [order('ORDER-A', 'to_pickup')] : [])
+      },
+      markPickedUp: async () => { writes++; failReads = true; throw Object.assign(new Error('响应中断'), { status: 502 }) },
+    }, media: { chooseAndUploadImages: async () => { selections++; return [{ assetId: 'TEST-ASSET' }] } } })
+    await app.mount(); await app.tab('待取货')
+    app.primary('ORDER-A').props.onClick(); await app.flush()
+    assert.match(text(app.card('ORDER-A')), /结果待确认/)
+    app.primary('ORDER-A').props.onClick(); await app.flush()
+    assert.equal(writes, 1)
+    assert.equal(selections, 1, '凭证提交结果未知的同步不能再次选择和上传照片')
+    console.log('PASS 凭证提交结果未知时只同步，不重新选图或重复履约')
+  }
+  {
+    for (const mismatch of ['status', 'version', 'id', 'read-failure']) {
+      let writes = 0
+      const app = riderHarness({ services: {
+        getAssignedDeliveryOrder: async () => {
+          if (mismatch === 'read-failure') throw new Error('订单预检失败')
+          return { ...order('ORDER-A'), ...(mismatch === 'status' ? { status: 'picked_up' } : mismatch === 'version' ? { rowVersion: 2 } : { deliveryOrderPublicId: 'ORDER-B' }) }
+        },
+        releaseDeliveryOrder: async () => { writes++ },
+      } })
+      await app.mount(); await app.tab('待取货')
+      nodes(app.card('ORDER-A'), (node) => hasClass(node, 'rider-order-card__secondary--danger'))[0].props.onClick()
+      await app.flush()
+      nodes(app.tree, (node) => node.type === 'AppDialog')[0].props.onConfirm(); await app.flush()
+      const dialog = nodes(app.tree, (node) => node.type === 'AppDialog')[0]
+      assert.equal(writes, 0, `${mismatch} 时不得释放旧订单快照`)
+      assert.equal(dialog.props.visible, true)
+      assert.equal(dialog.props.confirmText, '刷新状态')
+      assert.match(dialog.props.error, /未提交/)
+    }
+    console.log('PASS 释放前校验阶段、版本、订单标识及读取失败均阻止旧确认')
+  }
+  {
+    let current = order('ORDER-A'), released = false
+    const writes = []
+    const app = riderHarness({ services: {
+      listAssignedDeliveryOrders: async (_, __, group) => page(group === 'pickup' && !released ? [current] : []),
+      getAssignedDeliveryOrder: async () => current,
+      releaseDeliveryOrder: async (value) => { writes.push(value.rowVersion); released = true; return { ...value, status: 'ready_for_claim' } },
+    } })
+    await app.mount(); await app.tab('待取货')
+    nodes(app.card('ORDER-A'), (node) => hasClass(node, 'rider-order-card__secondary--danger'))[0].props.onClick()
+    await app.flush()
+    current = { ...current, rowVersion: 2 }
+    const dialog = () => nodes(app.tree, (node) => node.type === 'AppDialog')[0]
+    dialog().props.onConfirm(); await app.flush()
+    assert.equal(dialog().props.confirmText, '刷新状态')
+    dialog().props.onConfirm(); await app.flush()
+    assert.deepEqual(writes, [], '同步新版本不自动释放')
+    assert.equal(dialog().props.visible, true)
+    assert.equal(dialog().props.confirmText, '确认释放')
+    assert.match(dialog().props.error, /再次确认/)
+    dialog().props.onConfirm(); await app.flush()
+    assert.deepEqual(writes, [2], '显式再确认使用同步后的新版本')
+    assert.equal(dialog().props.visible, false, '释放确认成功才自动关闭')
+    console.log('PASS 释放同步新版本后需再次确认，成功才关闭弹窗')
+  }
+  {
+    let writes = 0, released = false
+    const app = riderHarness({ services: {
+      listAssignedDeliveryOrders: async (_, __, group) => page(group === 'pickup' && !released ? [order('ORDER-A')] : []),
+      releaseDeliveryOrder: async () => { writes++; released = true; throw Object.assign(new Error('响应丢失'), { status: 0 }) },
+    } })
+    await app.mount(); await app.tab('待取货')
+    nodes(app.card('ORDER-A'), (node) => hasClass(node, 'rider-order-card__secondary--danger'))[0].props.onClick()
+    await app.flush()
+    const dialog = () => nodes(app.tree, (node) => node.type === 'AppDialog')[0]
+    dialog().props.onConfirm(); await app.flush()
+    assert.equal(dialog().props.visible, true, '只读同步不应被当成释放成功')
+    assert.equal(dialog().props.confirmText, '返回工作台')
+    assert.ok(!app.toasts.some((toast) => toast.icon === 'success'))
+    dialog().props.onConfirm(); await app.flush()
+    assert.equal(writes, 1)
+    assert.equal(dialog().props.visible, false, '用户可以手动退出已失效的旧确认')
+    console.log('PASS 释放响应未知且订单已变更时只返回工作台，不伪造成功或再释放')
+  }
+  {
+    for (const interruption of ['identity', 'unmount']) {
+      for (const action of ['release', 'proof']) {
+        const preflight = deferred()
+        let writes = 0
+        const current = order('ORDER-A', action === 'proof' ? 'to_pickup' : 'claimed')
+        const app = riderHarness({ services: {
+          listAssignedDeliveryOrders: async (_, __, group) => page(group === 'pickup' ? [current] : []),
+          getAssignedDeliveryOrder: () => preflight.promise,
+          releaseDeliveryOrder: async () => { writes++ },
+          markPickedUp: async () => { writes++ },
+        } })
+        await app.mount(); await app.tab('待取货')
+        if (action === 'release') {
+          nodes(app.card('ORDER-A'), (node) => hasClass(node, 'rider-order-card__secondary--danger'))[0].props.onClick()
+          await app.flush()
+          nodes(app.tree, (node) => node.type === 'AppDialog')[0].props.onConfirm()
+        } else app.primary('ORDER-A').props.onClick()
+        await app.flush()
+        if (interruption === 'identity') await app.setIdentityAllowed(false)
+        else await app.unmount()
+        preflight.resolve(current); await app.flush()
+        assert.equal(writes, 0, `${action} 的订单预检等待中 ${interruption} 后不得写入`)
+        assert.equal(app.toasts.length, 0)
+      }
+    }
+    console.log('PASS 订单预检等待中切换身份或卸载不会继续释放或提交凭证')
   }
   {
     let commands = 0, failLists = false
@@ -533,4 +715,7 @@ async function run() {
     console.log('PASS 详情分区刷新失败保留已知资金状态和私密凭证')
   }
 }
-run().catch((error) => { console.error(error); process.exitCode = 1 })
+module.exports = { deferred, page, order, nodes, text, hasClass, hookRenderer, loadPage }
+if (require.main === module) {
+  run().catch((error) => { console.error(error); process.exitCode = 1 })
+}

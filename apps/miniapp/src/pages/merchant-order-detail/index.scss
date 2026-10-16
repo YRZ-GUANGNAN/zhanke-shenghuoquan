@@ -6,19 +6,19 @@ $detail-orange: color.adjust($like-active, $hue: 30deg, $saturation: -7%, $light
 $detail-orange-soft: color.mix($detail-orange, $bg-surface, 13%);
 $detail-blue-soft: color.mix($brand-primary, $bg-surface, 11%);
 $detail-blue-line: color.mix($brand-primary, $bg-surface, 34%);
-$detail-green: color.adjust($brand-primary, $hue: 130deg, $saturation: -8%, $lightness: -2%);
-$detail-green-soft: color.mix($detail-green, $bg-surface, 14%);
+$detail-green: $success;
 $detail-photo-blue: color.mix($brand-tint, $bg-surface, 62%);
 $detail-photo-empty: color.mix($bg-app, $bg-surface, 54%);
 
 page {
-  background: $bg-app;
+  background: $bg-surface;
 }
 
 .merchant-order-detail-page {
   @include ref.page-foundation;
   height: 100vh;
-  background: $bg-app;
+  height: 100dvh;
+  background: $bg-surface;
   color: $text-primary;
   overflow: hidden;
   display: flex;
@@ -55,7 +55,7 @@ page {
 }
 
 .merchant-detail-content {
-  padding: 24rpx 32rpx calc(48rpx + env(safe-area-inset-bottom));
+  padding: 0 32rpx calc(32rpx + env(safe-area-inset-bottom));
 }
 
 .merchant-detail-notice {
@@ -109,123 +109,190 @@ page {
 }
 
 .merchant-detail-status-card,
+.merchant-detail-route-card,
+.merchant-detail-fee-card,
 .merchant-detail-rider-card,
 .merchant-detail-progress-card,
 .merchant-detail-photo-card {
-  border: 1rpx solid $border-subtle;
-  border-radius: 24rpx;
+  border-bottom: 1rpx solid $border-default;
   background: $bg-surface;
-  box-shadow: 0 8rpx 24rpx rgba(42, 73, 108, .055);
   box-sizing: border-box;
+  padding: 28rpx 0;
 }
 
 .merchant-detail-status-card {
-  padding: 28rpx 28rpx 26rpx;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
+  padding: 32rpx 0 28rpx;
 }
 
 .merchant-detail-status-card__main {
   min-width: 0;
-  flex: 1;
-  padding-right: 24rpx;
 }
 
-.merchant-detail-status-card__state-row {
-  display: flex;
-  align-items: center;
+.merchant-detail-status-card__eyebrow {
+  @include ref.type(meta);
+  display: block;
+  color: $text-secondary;
+  margin-bottom: 8rpx;
 }
 
 .merchant-detail-status-card__state {
-  color: $detail-orange;
-  font-size: 34rpx;
-  font-weight: 900;
-  line-height: 1;
+  display: block;
+  color: $brand-primary-strong;
+  font-size: 44rpx;
+  font-size: clamp(22PX, 5.867vw, 26PX);
+  font-weight: 700;
+  line-height: 1.3;
 }
 
-.merchant-detail-status-card__dot {
-  width: 12rpx;
-  height: 12rpx;
-  margin-left: 12rpx;
-  border-radius: 999rpx;
-  background: $detail-orange;
+.merchant-detail-status-card--pending_fee_payment .merchant-detail-status-card__state,
+.merchant-detail-status-card--payment_failed .merchant-detail-status-card__state {
+  color: $detail-orange;
+}
+
+.merchant-detail-status-card--delivered .merchant-detail-status-card__state {
+  color: $detail-green;
+}
+
+.merchant-detail-status-card--cancelled .merchant-detail-status-card__state {
+  color: $text-secondary;
 }
 
 .merchant-detail-status-card__sub {
   @include ref.type(meta);
   @include ref.wrap;
   display: block;
-  margin-top: 16rpx;
-  color: $text-tertiary;
+  margin-top: 12rpx;
+  color: $text-secondary;
 }
 
 .merchant-detail-status-card__fee {
-  flex: 0 0 auto;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16rpx;
 }
 
 .merchant-detail-status-card__amount {
-  color: $detail-orange;
-  font-size: 40rpx;
-  font-weight: 900;
-  line-height: 1;
+  color: $text-strong;
+  font-size: 36rpx;
+  font-size: clamp(18PX, 4.8vw, 21PX);
+  font-weight: 700;
+  line-height: 1.3;
   font-variant-numeric: tabular-nums;
 }
 
 .merchant-detail-status-card__pay {
   @include ref.type(meta);
+  display: block;
   margin-top: 12rpx;
-  color: $text-tertiary;
-}
-
-.merchant-detail-status-card__divider {
-  width: 100%;
-  height: 1rpx;
-  margin: 28rpx 0 22rpx;
-  background: $divider-hairline;
+  color: $text-secondary;
+  text-align: right;
 }
 
 .merchant-detail-status-card__meta {
   @include ref.type(meta);
   @include ref.wrap;
-  width: 100%;
+  margin-top: 24rpx;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12rpx;
+  gap: 8rpx;
+  color: $text-tertiary;
+  font-variant-numeric: tabular-nums;
+}
+
+.merchant-detail-route__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16rpx;
+  margin-top: 24rpx;
+}
+
+.merchant-detail-route__marker {
+  @include ref.type(meta);
+  width: 40rpx;
+  height: 40rpx;
+  min-width: 20PX;
+  min-height: 20PX;
+  flex: 0 0 auto;
+  border-radius: 10rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+}
+
+.merchant-detail-route__marker--pickup {
+  background: $detail-blue-soft;
+  color: $brand-primary;
+}
+
+.merchant-detail-route__marker--dropoff {
+  background: color.mix($detail-green, $bg-surface, 12%);
+  color: $detail-green;
+}
+
+.merchant-detail-route__body {
+  min-width: 0;
+  flex: 1;
+}
+
+.merchant-detail-route__address {
+  @include ref.type(comment);
+  @include ref.wrap;
+  display: block;
+  color: $text-primary;
+  font-weight: 600;
+}
+
+.merchant-detail-route__contact {
+  @include ref.type(meta);
+  @include ref.wrap;
+  display: block;
+  margin-top: 6rpx;
   color: $text-secondary;
 }
 
-.merchant-detail-rider-card {
+.merchant-detail-route__remark {
+  @include ref.type(meta);
+  @include ref.wrap;
+  padding: 16rpx;
   margin-top: 24rpx;
-  padding: 24rpx 28rpx;
+  border-radius: 10rpx;
+  background: $bg-subtle;
+  color: $text-secondary;
+}
+
+.merchant-detail-route__remark-label {
+  margin-right: 12rpx;
+  color: $text-primary;
+  font-weight: 600;
+}
+
+.merchant-detail-rider-card {
   display: flex;
   align-items: center;
 }
 
 .merchant-detail-rider-card__avatar {
-  width: 66rpx;
-  height: 66rpx;
-  flex: 0 0 66rpx;
-  border-radius: 999rpx;
-  background: $brand-primary;
-  color: $text-on-color;
+  width: 56rpx;
+  height: 56rpx;
+  flex: 0 0 56rpx;
+  border-radius: 16rpx;
+  background: $detail-blue-soft;
+  color: $brand-primary;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 30rpx;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .merchant-detail-rider-card__main {
   min-width: 0;
   flex: 1;
-  margin-left: 20rpx;
+  margin-left: 16rpx;
   display: flex;
   flex-direction: column;
 }
@@ -253,17 +320,15 @@ page {
 
 .merchant-detail-rider-card__circle {
   @include ref.touch;
-  width: 44PX;
-  height: 44PX;
-  border: 1rpx solid $divider-nav;
-  border-radius: 999rpx;
+  padding: 0 8rpx;
+  gap: 8rpx;
+  border-radius: $radius-control;
   background: $bg-surface;
   color: $brand-primary;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 25rpx;
-  box-shadow: 0 10rpx 24rpx -20rpx rgba($text-strong, .42);
+  @include ref.type(meta);
   transition: background $duration-fast ease, opacity $duration-fast ease;
 }
 
@@ -274,20 +339,16 @@ page {
 
 .merchant-detail-rider-card__message-icon {
   display: block;
-  width: 24PX;
-  height: 24PX;
-  flex: 0 0 24PX;
-}
-
-.merchant-detail-progress-card {
-  margin-top: 24rpx;
-  padding: 30rpx 28rpx 28rpx;
+  width: 20PX;
+  height: 20PX;
+  flex: 0 0 20PX;
 }
 
 .merchant-detail-section-title {
   @include ref.type(label);
   display: block;
   color: $text-strong;
+  font-weight: 650;
 }
 
 .merchant-detail-timeline {
@@ -326,7 +387,7 @@ page {
 }
 
 .merchant-detail-timeline__marker--current {
-  border: 6rpx solid $detail-orange;
+  border: 5rpx solid $brand-primary;
   background: $bg-surface;
 }
 
@@ -339,7 +400,7 @@ page {
   width: 0;
   flex: 1;
   min-height: 52rpx;
-  border-left: 4rpx solid $detail-blue-line;
+  border-left: 2rpx solid $detail-blue-line;
 }
 
 .merchant-detail-timeline__line--current,
@@ -369,8 +430,8 @@ page {
 }
 
 .merchant-detail-timeline__title--current {
-  color: $detail-orange;
-  font-weight: 750;
+  color: $brand-primary-strong;
+  font-weight: 650;
 }
 
 .merchant-detail-timeline__title--todo {
@@ -392,8 +453,7 @@ page {
 }
 
 .merchant-detail-photo-card {
-  margin-top: 24rpx;
-  padding: 30rpx 26rpx 28rpx;
+  border-bottom: 0;
 }
 
 .merchant-detail-photo-card__header {
@@ -401,23 +461,20 @@ page {
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 20rpx;
+  gap: 8rpx 16rpx;
 }
 
 .merchant-detail-photo-card__privacy {
   @include ref.type(meta);
   flex: 0 0 auto;
-  padding: 8rpx 16rpx;
-  border-radius: 8rpx;
-  background: $detail-orange-soft;
-  color: $detail-orange;
+  color: $text-tertiary;
 }
 
 .merchant-detail-photo-grid {
   margin-top: 24rpx;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 22rpx;
+  gap: 16rpx;
 }
 
 .merchant-detail-photo-item {
@@ -446,25 +503,12 @@ page {
 
 .merchant-detail-photo-item__thumb--ready {
   background-color: $detail-photo-blue;
-  background-image: $placeholder-stripe;
 }
 
 .merchant-detail-photo-item__thumb--pending {
-  border: 2rpx dashed color.mix($text-faint, $bg-surface, 64%);
   background: $detail-photo-empty;
   flex-direction: column;
   gap: 12rpx;
-}
-
-.merchant-detail-photo-item__camera {
-  width: 36rpx;
-  height: 36rpx;
-  border-radius: 10rpx;
-  background: $detail-blue-soft;
-  color: $text-tertiary;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .merchant-detail-photo-item__caption {
@@ -479,4 +523,14 @@ page {
 
 .merchant-detail-photo-item__caption--pending {
   color: $text-faint;
+}
+
+@media (max-width: 350PX) {
+  .merchant-detail-content { padding-right: 24rpx; padding-left: 24rpx; }
+  .merchant-detail-rider-card__actions { margin-left: 8rpx; }
+  .merchant-detail-rider-card__circle { flex-direction: column; gap: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .merchant-detail-rider-card__circle { transition: none; }
 }

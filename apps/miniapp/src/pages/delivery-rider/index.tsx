@@ -7,6 +7,7 @@ import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
 import { isApiError } from '../../services/api'
 import {
   claimDeliveryOrder,
+  getAssignedDeliveryOrder,
   getDeliveryRiderMe,
   listAssignedDeliveryOrders,
   listClaimableDeliveryOrders,
@@ -30,7 +31,8 @@ type RiderTab = 'grab' | 'pickup' | 'delivery'
 
 type BusyAction = 'claim' | 'command' | 'proof' | 'release'
 type BusyByOrder = Record<string, BusyAction | undefined>
-type ProofStage = 'selecting' | 'uploading' | 'reviewing' | 'submitting'
+type ProofStage = 'selecting' | 'uploading' | 'reviewing' | 'checking' | 'submitting'
+type CommandOutcome = 'succeeded' | 'failed' | 'synchronized' | 'aborted'
 type ActionFeedback = {
   tone: 'success' | 'error' | 'warning'
   message: string
@@ -55,6 +57,11 @@ function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback
 }
 
+function isUncertainCommandFailure(error: unknown): boolean {
+  // A lost response or upstream failure cannot prove that the write was rejected.
+  return !isApiError(error) || error.status === 0 || error.status === 408 || error.status >= 500
+}
+
 function settleRequest<T>(request: Promise<T>): Promise<
   { status: 'fulfilled'; value: T } | { status: 'rejected'; reason: unknown }
 > {
@@ -67,7 +74,7 @@ function settleRequest<T>(request: Promise<T>): Promise<
 function retainFailedActionFeedback(current: Record<string, ActionFeedback | undefined>) {
   const next: Record<string, ActionFeedback | undefined> = {}
   Object.keys(current).forEach((orderId) => {
-    if (current[orderId]?.tone === 'error') next[orderId] = current[orderId]
+    if (current[orderId]?.tone === 'error' && !current[orderId]?.needsRefresh) next[orderId] = current[orderId]
   })
   return next
 }
@@ -124,8 +131,11 @@ export default function DeliveryRiderPage() {
   const [error, setError] = useState('')
   const [loadMoreError, setLoadMoreError] = useState('')
   const [releaseCandidate, setReleaseCandidate] = useState<AssignedDeliveryOrder | null>(null)
+  const [releaseReviewOnly, setReleaseReviewOnly] = useState(false)
+  const releaseCandidateRef = useRef<AssignedDeliveryOrder | null>(null)
   const requestVersion = useRef(0)
   const busyByOrderRef = useRef<BusyByOrder>({})
+  const actionFeedbackRef = useRef<Record<string, ActionFeedback | undefined>>({})
   const operationEpochRef = useRef(0)
   const pageMountedRef = useRef(true)
   const pageActiveRef = useRef(identityAllowed)
@@ -158,8 +168,9 @@ export default function DeliveryRiderPage() {
     if (identityAllowed) {
       setBusyByOrder({})
       setProofProgressByOrder({})
+      actionFeedbackRef.current = {}
       setActionFeedbackByOrder({})
-      setReleaseCandidate(null)
+      updateReleaseCandidate(null)
     }
     return invalidatePageOperations
   }, [identityAllowed, invalidatePageOperations])
@@ -178,12 +189,40 @@ export default function DeliveryRiderPage() {
   const isOrderBusy = (orderId: string): boolean => Boolean(busyByOrderRef.current[orderId])
 
   const updateActionFeedback = (orderId: string, feedback?: ActionFeedback) => {
-    setActionFeedbackByOrder((current) => {
-      const next = { ...current }
-      if (feedback) next[orderId] = feedback
-      else delete next[orderId]
-      return next
-    })
+    const next = { ...actionFeedbackRef.current }
+    if (feedback) next[orderId] = feedback
+    else delete next[orderId]
+    actionFeedbackRef.current = next
+    setActionFeedbackByOrder(next)
+  }
+
+  const clearSynchronizedFeedback = () => {
+    const next = retainFailedActionFeedback(actionFeedbackRef.current)
+    actionFeedbackRef.current = next
+    setActionFeedbackByOrder(next)
+  }
+
+  function updateReleaseCandidate(order: AssignedDeliveryOrder | null) {
+    releaseCandidateRef.current = order
+    setReleaseCandidate(order)
+    setReleaseReviewOnly(false)
+  }
+
+  function reconcileReleaseCandidate(orders: AssignedDeliveryOrder[]) {
+    const previous = releaseCandidateRef.current
+    if (!previous) return
+    const latest = orders.find((order) => order.deliveryOrderPublicId === previous.deliveryOrderPublicId)
+    if (!latest || latest.status !== 'claimed' && latest.status !== 'to_pickup') {
+      setReleaseReviewOnly(true)
+      updateActionFeedback(previous.deliveryOrderPublicId, {
+        tone: 'warning', message: '订单列表已更新，请返回工作台查看最新状态。本次不会再次释放订单'
+      })
+    } else if (latest.status !== previous.status || latest.rowVersion !== previous.rowVersion) {
+      updateReleaseCandidate(latest)
+      updateActionFeedback(latest.deliveryOrderPublicId, {
+        tone: 'warning', message: '订单信息已更新。请核对当前订单后，再次确认是否释放'
+      })
+    }
   }
 
   const setProofProgress = (orderId: string, progress?: ProofProgress) => {
@@ -229,7 +268,8 @@ export default function DeliveryRiderPage() {
         setDeliveryTotal(nextDelivery.total)
         setCompletedTotal(nextCompleted.total)
         setHasLoadedOrders(true)
-        setActionFeedbackByOrder(retainFailedActionFeedback)
+        clearSynchronizedFeedback()
+        reconcileReleaseCandidate([...nextPickup.items, ...nextDelivery.items])
       }
       if (ordersResult.status === 'rejected') {
         throw new Error(`列表刷新失败：${errorMessage(ordersResult.reason, '请检查网络后重试')}`)
@@ -301,7 +341,8 @@ export default function DeliveryRiderPage() {
       setDeliveryTotal(deliveryPage.total)
       setCompletedTotal(completedPage.total)
       setHasLoadedOrders(true)
-      setActionFeedbackByOrder(retainFailedActionFeedback)
+      clearSynchronizedFeedback()
+      reconcileReleaseCandidate([...pickupPage.items, ...deliveryPage.items])
     } catch (value) {
       if (!shouldContinue() || requestVersion.current !== version) return
       const message = errorMessage(value, '骑手订单加载失败')
@@ -315,6 +356,17 @@ export default function DeliveryRiderPage() {
   useDidShow(() => {
     void load()
   })
+
+  const synchronizeOrder = async (orderId: string, action: BusyAction) => {
+    const shouldContinue = createOperationGuard()
+    if (!shouldContinue() || isOrderBusy(orderId)) return
+    markBusy(orderId, action)
+    try {
+      await load()
+    } finally {
+      if (shouldContinue()) markBusy(orderId)
+    }
+  }
 
   const loadMoreOrders = async () => {
     const shouldContinue = createOperationGuard()
@@ -371,8 +423,8 @@ export default function DeliveryRiderPage() {
     const shouldContinue = createOperationGuard()
     const orderId = order.deliveryOrderPublicId
     if (!shouldContinue() || isOrderBusy(orderId)) return
-    if (actionFeedbackByOrder[orderId]?.needsRefresh) {
-      await load()
+    if (actionFeedbackRef.current[orderId]?.needsRefresh) {
+      await synchronizeOrder(orderId, 'claim')
       return
     }
     if (!canClaim || me?.rider?.status !== 'active') return
@@ -389,8 +441,7 @@ export default function DeliveryRiderPage() {
       await refreshAfterAction(orderId, true)
     } catch (value) {
       if (!shouldContinue()) return
-      const message = errorMessage(value, '接单失败，请刷新后重试')
-      updateActionFeedback(orderId, { tone: 'error', message })
+      const message = recordCommandFailure(orderId, value, '接单失败，请刷新后重试')
       await Taro.showToast({ title: message, icon: 'none' }).catch(() => {})
       if (!shouldContinue()) return
       await refreshAfterAction(orderId, false)
@@ -404,31 +455,33 @@ export default function DeliveryRiderPage() {
     command: (value: AssignedDeliveryOrder) => Promise<AssignedDeliveryOrder>,
     success: string,
     busyAction: BusyAction = 'command'
-  ) => {
+  ): Promise<CommandOutcome> => {
     const shouldContinue = createOperationGuard()
     const orderId = order.deliveryOrderPublicId
-    if (!shouldContinue() || isOrderBusy(orderId)) return
-    if (actionFeedbackByOrder[orderId]?.needsRefresh) {
-      await load()
-      return
+    if (!shouldContinue() || isOrderBusy(orderId)) return 'aborted'
+    if (actionFeedbackRef.current[orderId]?.needsRefresh) {
+      await synchronizeOrder(orderId, busyAction)
+      return 'synchronized'
     }
     markBusy(orderId, busyAction)
     updateActionFeedback(orderId)
     try {
+      if (busyAction === 'release' && !await checkOrderBeforeWrite(order, shouldContinue)) return 'aborted'
       await command(order)
-      if (!shouldContinue()) return
+      if (!shouldContinue()) return 'aborted'
       requestVersion.current += 1
       updateActionFeedback(orderId, { tone: 'success', message: `${success}，正在同步订单状态`, needsRefresh: true })
       await Taro.showToast({ title: success, icon: 'success' }).catch(() => {})
-      if (!shouldContinue()) return
+      if (!shouldContinue()) return 'aborted'
       await refreshAfterAction(orderId, true)
+      return 'succeeded'
     } catch (value) {
-      if (!shouldContinue()) return
-      const message = errorMessage(value, '操作失败，请刷新后重试')
-      updateActionFeedback(orderId, { tone: 'error', message })
+      if (!shouldContinue()) return 'aborted'
+      const message = recordCommandFailure(orderId, value, '操作失败，请刷新后重试')
       await Taro.showToast({ title: message, icon: 'none' }).catch(() => {})
-      if (!shouldContinue()) return
+      if (!shouldContinue()) return 'aborted'
       await refreshAfterAction(orderId, false)
+      return 'failed'
     } finally {
       if (shouldContinue()) markBusy(orderId)
     }
@@ -442,8 +495,8 @@ export default function DeliveryRiderPage() {
     const shouldContinue = createOperationGuard()
     const orderId = order.deliveryOrderPublicId
     if (!shouldContinue() || isOrderBusy(orderId)) return
-    if (actionFeedbackByOrder[orderId]?.needsRefresh) {
-      await load()
+    if (actionFeedbackRef.current[orderId]?.needsRefresh) {
+      await synchronizeOrder(orderId, 'proof')
       return
     }
     markBusy(orderId, 'proof')
@@ -468,6 +521,9 @@ export default function DeliveryRiderPage() {
         setProofProgress(orderId, { stage: 'reviewing', message: status.message || '凭证审核中，请稍候' })
       }, undefined, shouldContinue)
       if (!shouldContinue()) return
+      stage = 'checking'
+      setProofProgress(orderId, { stage, message: '正在核对最新订单状态…' })
+      if (!await checkOrderBeforeWrite(order, shouldContinue)) return
       stage = 'submitting'
       setProofProgress(orderId, { stage, message: '正在提交履约状态，请稍候' })
       await command(order, uploaded.assetId)
@@ -490,10 +546,13 @@ export default function DeliveryRiderPage() {
         selecting: '照片选择失败',
         uploading: '凭证上传失败',
         reviewing: '凭证审核未完成',
+        checking: '订单状态校验失败',
         submitting: '凭证提交失败'
       }[stage]
-      const message = `${stageLabel}：${errorMessage(value, '请重试')}`
-      updateActionFeedback(orderId, { tone: 'error', message })
+      const message = stage === 'submitting'
+        ? recordCommandFailure(orderId, value, '凭证提交失败')
+        : `${stageLabel}：${errorMessage(value, '请重试')}`
+      if (stage !== 'submitting') updateActionFeedback(orderId, { tone: 'error', message })
       await Taro.showToast({ title: message, icon: 'none' }).catch(() => {})
       if (!shouldContinue()) return
       if (stage === 'submitting') await refreshAfterAction(orderId, false)
@@ -507,8 +566,38 @@ export default function DeliveryRiderPage() {
 
   const release = async (order: AssignedDeliveryOrder) => {
     const shouldContinue = createOperationGuard()
-    await runCommand(order, releaseDeliveryOrder, '订单已释放', 'release')
-    if (shouldContinue()) setReleaseCandidate(null)
+    const outcome = await runCommand(order, releaseDeliveryOrder, '订单已释放', 'release')
+    if (shouldContinue() && outcome === 'succeeded') updateReleaseCandidate(null)
+  }
+
+  function recordCommandFailure(orderId: string, value: unknown, fallback: string): string {
+    // Invalidate reads that began before this write finished, even on failure.
+    requestVersion.current += 1
+    const uncertain = isUncertainCommandFailure(value)
+    const detail = errorMessage(value, fallback)
+    const message = uncertain ? `操作结果待确认：${detail}。请先刷新状态，勿重复提交` : detail
+    updateActionFeedback(orderId, { tone: uncertain ? 'warning' : 'error', message, needsRefresh: uncertain })
+    return message
+  }
+
+  async function checkOrderBeforeWrite(order: AssignedDeliveryOrder, shouldContinue: () => boolean): Promise<boolean> {
+    try {
+      const latest = await getAssignedDeliveryOrder(order.deliveryOrderPublicId)
+      if (!shouldContinue()) return false
+      if (latest.deliveryOrderPublicId !== order.deliveryOrderPublicId
+        || latest.status !== order.status || latest.rowVersion !== order.rowVersion) {
+        updateActionFeedback(order.deliveryOrderPublicId, {
+          tone: 'error', message: '订单状态已变化，本次操作未提交。请刷新状态后重新确认', needsRefresh: true
+        })
+        return false
+      }
+      return true
+    } catch (value) {
+      if (shouldContinue()) updateActionFeedback(order.deliveryOrderPublicId, {
+        tone: 'error', message: `订单状态校验失败，本次操作未提交：${errorMessage(value, '请刷新后重试')}`, needsRefresh: true
+      })
+      return false
+    }
   }
 
   const openConversation = (orderId: string) => {
@@ -607,7 +696,7 @@ export default function DeliveryRiderPage() {
               <Text className='rider-grab-user__name'>{rider.realName || '校园骑手'}</Text>
               <Text className='rider-grab-user__badge'>骑手</Text>
             </View>
-            <Text className='rider-grab-user__meta'>已认证 · {riderStatusLabel(rider.status)}</Text>
+            <Text className={`rider-grab-user__meta rider-grab-user__meta--${rider.status}`}>已认证 · {riderStatusLabel(rider.status)}</Text>
           </View>
           <View className='rider-grab-user__switch' onClick={() => void switchToStudent()}>
             <Text>切换身份</Text>
@@ -647,7 +736,7 @@ export default function DeliveryRiderPage() {
         </View>
       </View>
 
-      <View className='rider-grab-tabs'>
+      <View className={`rider-grab-tabs ${canClaim ? '' : 'rider-grab-tabs--assigned-only'}`}>
         {tabs.filter(item => item.key !== 'grab' || canClaim).map((item) => (
           <View
             key={item.key}
@@ -695,13 +784,17 @@ export default function DeliveryRiderPage() {
       </ScrollView>
       <AppDialog
         visible={releaseCandidate !== null}
-        title='确认释放订单'
-        description='释放后订单会重新进入抢单池，请确认你尚未取到货物。'
-        confirmText='确认释放'
-        tone='danger'
+        title={releaseReviewOnly ? '订单状态已更新' : '确认释放订单'}
+        description={releaseReviewOnly ? '返回工作台后，请根据最新阶段继续操作。' : '释放后订单会重新进入抢单池，请确认你尚未取到货物。'}
+        confirmText={releaseReviewOnly ? '返回工作台' : releaseCandidate && actionFeedbackByOrder[releaseCandidate.deliveryOrderPublicId]?.needsRefresh ? '刷新状态' : '确认释放'}
+        tone={releaseReviewOnly || releaseCandidate && actionFeedbackByOrder[releaseCandidate.deliveryOrderPublicId]?.needsRefresh ? 'default' : 'danger'}
         loading={releaseCandidate ? isOrderBusy(releaseCandidate.deliveryOrderPublicId) : false}
-        onCancel={() => setReleaseCandidate(null)}
-        onConfirm={() => { if (releaseCandidate) void release(releaseCandidate) }}
+        error={releaseCandidate ? actionFeedbackByOrder[releaseCandidate.deliveryOrderPublicId]?.message : undefined}
+        onCancel={() => updateReleaseCandidate(null)}
+        onConfirm={() => {
+          if (releaseReviewOnly) updateReleaseCandidate(null)
+          else if (releaseCandidate) void release(releaseCandidate)
+        }}
       />
     </View>
   )
@@ -721,28 +814,28 @@ export default function DeliveryRiderPage() {
           return (
             <View key={orderId} className={`rider-order-card ${busy ? 'rider-order-card--busy' : ''}`}>
               <View className='rider-order-card__top'>
-                <View className='rider-order-card__serial'>
-                  <Text>{shortOrderId(order.deliveryOrderPublicId)}</Text>
-                  <Text className='rider-order-card__dot'>·</Text>
-                  <Text>{formatTime(order.createdAt)}</Text>
+                <View className='rider-order-card__heading'>
+                  <Text className='rider-order-card__stage'>待接单</Text>
+                  <View className='rider-order-card__serial'><Text>{shortOrderId(order.deliveryOrderPublicId)}</Text></View>
                 </View>
                 <View className='rider-order-card__fee'>
                   <Text>配送费 </Text>
                   <Text className='rider-order-card__fee-price'>¥{centsToYuan(order.deliveryFeeCents)}</Text>
                 </View>
               </View>
+              <Text className='rider-order-card__created-at'>{formatTime(order.createdAt)} 创建</Text>
 
               <View className='rider-order-route'>
                 <View className='rider-order-route__line' />
                 <View className='rider-order-route__row'>
-                  <View className='rider-order-route__marker rider-order-route__marker--pickup' />
+                  <View className='rider-order-route__marker rider-order-route__marker--pickup'><Text>取</Text></View>
                   <View className='rider-order-route__info'>
                     <Text className='rider-order-route__label'>取货点</Text>
                     <Text className='rider-order-route__place'>{route.pickup}</Text>
                   </View>
                 </View>
                 <View className='rider-order-route__row rider-order-route__row--drop'>
-                  <View className='rider-order-route__marker rider-order-route__marker--drop' />
+                  <View className='rider-order-route__marker rider-order-route__marker--drop'><Text>送</Text></View>
                   <View className='rider-order-route__info'>
                     <Text className='rider-order-route__label'>送达点</Text>
                     <View className='rider-order-route__drop-row'>
@@ -796,10 +889,9 @@ export default function DeliveryRiderPage() {
     return (
       <View key={orderId} className={`rider-order-card rider-order-card--assigned ${busy ? 'rider-order-card--busy' : ''}`}>
         <View className='rider-order-card__top'>
-          <View className='rider-order-card__serial'>
-            <Text>{shortOrderId(order.deliveryOrderPublicId)}</Text>
-            <Text className='rider-order-card__dot'>·</Text>
-            <Text>{statusText[order.status]}</Text>
+          <View className='rider-order-card__heading'>
+            <Text className={`rider-order-card__stage ${deliveryStage ? 'rider-order-card__stage--delivery' : ''}`}>{statusText[order.status]}</Text>
+            <View className='rider-order-card__serial'><Text>{shortOrderId(order.deliveryOrderPublicId)}</Text></View>
           </View>
           <View className='rider-order-card__fee'>
             <Text>配送费 </Text>
@@ -811,14 +903,14 @@ export default function DeliveryRiderPage() {
         <View className='rider-order-route rider-order-route--assigned'>
           <View className='rider-order-route__line' />
           <View className='rider-order-route__row'>
-            <View className='rider-order-route__marker rider-order-route__marker--pickup' />
+            <View className='rider-order-route__marker rider-order-route__marker--pickup'><Text>取</Text></View>
             <View className='rider-order-route__info'>
               <Text className='rider-order-route__label'>取货点 · {order.pickupContactName}</Text>
               <Text className='rider-order-route__place'>{order.pickupAddress}</Text>
             </View>
           </View>
           <View className='rider-order-route__row rider-order-route__row--drop'>
-            <View className='rider-order-route__marker rider-order-route__marker--drop' />
+            <View className='rider-order-route__marker rider-order-route__marker--drop'><Text>送</Text></View>
             <View className='rider-order-route__info'>
               <Text className='rider-order-route__label'>送达点 · {order.recipientName}</Text>
               <View className='rider-order-route__drop-row'>
@@ -852,12 +944,18 @@ export default function DeliveryRiderPage() {
             <View
               className={`rider-order-card__secondary rider-order-card__secondary--danger ${busy || needsRefresh ? 'rider-order-card__secondary--disabled' : ''}`}
               onClick={() => {
-                if (!busy && !needsRefresh) setReleaseCandidate(order)
+                if (!busy && !needsRefresh) updateReleaseCandidate(order)
               }}
             >
               <Text>释放</Text>
             </View>
           ) : null}
+        </View>
+        <View className='rider-order-card__fulfillment'>
+          <View className='rider-order-card__next'>
+            <Text className='rider-order-card__next-label'>当前阶段</Text>
+            <Text className='rider-order-card__next-copy'>{needsRefresh ? '先同步订单结果' : order.status === 'claimed' ? '核对地址后前往取货' : order.status === 'to_pickup' ? '取到货后上传凭证' : order.status === 'picked_up' ? '取货完成，准备出发' : '送达后上传凭证'}</Text>
+          </View>
           {primaryAction ? (
             <View
               className={`rider-order-card__grab ${busy ? 'rider-order-card__grab--disabled' : ''}`}
