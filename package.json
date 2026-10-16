@@ -58,6 +58,7 @@
     "check:miniapp-no-fake-pages": "node scripts/check-miniapp-no-fake-pages.cjs",
     "check:miniapp-regression-fixes": "node scripts/check-miniapp-regression-contract.cjs",
     "check:miniapp-back-navigation": "node scripts/check-miniapp-back-navigation.cjs",
+    "check:private-messaging": "node scripts/check-private-messaging.cjs",
     "check:secondhand-comments-contract": "node scripts/check-secondhand-comments-contract.cjs",
     "check:delivery-order-clipboard": "node scripts/check-delivery-order-clipboard.cjs",
     "check:profile-center-ui": "node scripts/check-profile-center-ui.cjs",

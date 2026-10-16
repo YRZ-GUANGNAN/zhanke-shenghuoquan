@@ -125,10 +125,10 @@ type ToolStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'error'
 
 function conversationPeerLabel(context: IMConversationContext, currentUserId: string): string {
   if (String(context.sellerId) === currentUserId) {
-    return `你是卖家 · 对方买家 #${context.buyerId} · 会话 #${context.relationId}`
+    return `你是卖家 · 交易会话 #${context.relationId}`
   }
   if (String(context.buyerId) === currentUserId) {
-    return `你是买家 · 对方卖家 #${context.sellerId} · 会话 #${context.relationId}`
+    return `你是买家 · 交易会话 #${context.relationId}`
   }
   return `交易会话 #${context.relationId}`
 }
@@ -573,6 +573,9 @@ function HomeContent() {
                 <View
                   key={item.context.relationId}
                   className='student-message-row'
+                  hoverClass='student-message-row--pressed'
+                  role='button'
+                  aria-label={`打开${item.product?.title || `二手商品 #${item.context.productId}`}私信`}
                   onClick={() => {
                     if (!channelInteraction.canActivate()) return
                     void Taro.navigateTo({
@@ -586,7 +589,10 @@ function HomeContent() {
                     ) : <Text>聊</Text>}
                   </View>
                   <View className='student-message-row__main'>
-                    <Text className='student-message-row__name'>{item.product?.title || `二手商品 #${item.context.productId}`}</Text>
+                    <View className='student-message-row__top'>
+                      <Text className='student-message-row__name'>{item.product?.title || `二手商品 #${item.context.productId}`}</Text>
+                      <AppIcon name='chevron-right' className='student-message-row__chevron' />
+                    </View>
                     <Text className='student-message-row__preview'>
                       {conversationPeerLabel(item.context, currentUserId)}
                     </Text>

@@ -15,9 +15,16 @@
 }
 
 .secondhand-chat-header__back {
+  @include ref.touch;
   position: relative;
   width: 44PX;
   height: 44PX;
+  border-radius: 50%;
+  transition: background-color $duration-fast $ease-standard;
+}
+
+.secondhand-chat-header__back--pressed {
+  background: rgba($brand-primary, .08);
 }
 
 .secondhand-chat-header__back::before {
@@ -33,11 +40,18 @@
 }
 
 .secondhand-chat-seller {
+  @include ref.touch;
   flex: 1;
   display: flex;
   align-items: center;
   min-width: 0;
   gap: 16rpx;
+  border-radius: 18rpx;
+  transition: background-color $duration-fast $ease-standard;
+}
+
+.secondhand-chat-seller--pressed {
+  background: rgba($brand-primary, .06);
 }
 
 .secondhand-chat-seller__avatar,
@@ -101,6 +115,7 @@
 }
 
 .secondhand-chat-header__home {
+  @include ref.touch;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -113,6 +128,13 @@
   color: $brand-primary;
   font-size: 24rpx;
   font-weight: 700;
+  transition: background-color $duration-fast $ease-standard, transform $duration-fast $ease-standard;
+}
+
+.secondhand-chat-header__home--pressed,
+.secondhand-chat-product__button--pressed {
+  background: rgba($brand-primary, .12);
+  transform: scale(.96);
 }
 
 .secondhand-chat-header__home-icon {
@@ -140,7 +162,8 @@
   grid-template-columns: 72rpx minmax(0, 1fr) minmax(44PX, auto);
   align-items: center;
   gap: 18rpx;
-  padding: 20rpx 36rpx;
+  padding: 16rpx 36rpx;
+  box-shadow: 0 4rpx 18rpx rgba(36, 64, 92, .05);
   background: $bg-surface;
   border-top: 1rpx solid $divider-nav;
 }
@@ -198,6 +221,7 @@
   color: $brand-primary;
   font-size: 23rpx;
   font-weight: 700;
+  transition: background-color $duration-fast $ease-standard, transform $duration-fast $ease-standard;
 }
 
 .secondhand-chat-product__button--disabled {
@@ -237,6 +261,20 @@
   border-radius: 999rpx;
   background: rgba($brand-primary, .07);
   color: $text-muted;
+}
+
+.secondhand-chat-day-divider {
+  display: flex;
+  justify-content: center;
+  margin: 18rpx 0 24rpx;
+}
+
+.secondhand-chat-day-divider text {
+  @include ref.type(meta);
+  padding: 6rpx 16rpx;
+  border-radius: 999rpx;
+  background: rgba($text-strong, .06);
+  color: $text-faint;
 }
 
 .secondhand-chat-state {
@@ -378,16 +416,18 @@
   align-items: center;
   min-width: 0;
   min-height: 44PX;
-  padding: 0 24rpx;
-  border-radius: 999rpx;
+  padding: 8rpx 24rpx;
+  border-radius: 24rpx;
   background: $bg-screen;
 }
 
 .secondhand-chat-input {
   width: 100%;
+  max-height: 144rpx;
+  min-height: 44PX;
   color: $text-strong;
   font-size: 26rpx;
-  min-height: 44PX;
+  line-height: 1.45;
 }
 
 .secondhand-chat-input__placeholder {
@@ -410,4 +450,11 @@
 
 .secondhand-chat-send--active {
   background: $gradient-primary;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .secondhand-chat-header__back,
+  .secondhand-chat-seller,
+  .secondhand-chat-header__home,
+  .secondhand-chat-product__button { transition: none; }
 }

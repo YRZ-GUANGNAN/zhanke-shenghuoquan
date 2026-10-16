@@ -1,6 +1,7 @@
 import { withFeaturePage } from '../../components/feature-page-gate'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Image, Input, ScrollView, Text, View } from '@tarojs/components'
+import { Image, ScrollView, Text, Textarea, View } from '@tarojs/components'
+import { hideKeyboard } from '@tarojs/taro'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import AppIcon from '../../components/app-icon'
 import { isApiError } from '../../services/api'
@@ -75,6 +76,27 @@ function messageText(message: TencentMessage): string {
   return String(message.payload?.text ?? '').trim()
 }
 
+function messageDisplayText(message: TencentMessage): string {
+  const text = messageText(message)
+  return text || '暂不支持的消息类型'
+}
+
+function dayKey(value: number): string {
+  const date = new Date(value * 1000)
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
+}
+
+function formatDayLabel(value: number): string {
+  const date = new Date(value * 1000)
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+  const days = Math.round((today - target) / 86400000)
+  if (days === 0) return '今天'
+  if (days === 1) return '昨天'
+  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`
+}
+
 function formatTime(value: number): string {
   const date = new Date(value * 1000)
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
@@ -97,6 +119,7 @@ function SecondhandChatPage() {
   const [messages, setMessages] = useState<TencentMessage[]>([])
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
+  const [inputFocused, setInputFocused] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const { inset: keyboardHeight, onFocus: onKeyboardFocus, onKeyboardHeightChange, reset: resetKeyboardInset } = useKeyboardInset()
 
@@ -164,7 +187,7 @@ function SecondhandChatPage() {
         setTencentUserId(tencentLoginUser)
         unsubscribe = await subscribeTencentMessages(nextContext, (incoming) => {
           if (!isActive()) return
-          setMessages((current) => mergeMessages(current, incoming.filter((message) => Boolean(messageText(message)))))
+          setMessages((current) => mergeMessages(current, incoming))
         }, expectedTencentUserId)
         if (!isActive()) {
           unsubscribe()
@@ -176,7 +199,7 @@ function SecondhandChatPage() {
         try {
           const history = await loadTencentMessages(nextContext, expectedTencentUserId)
           if (!isActive()) return
-          setMessages((current) => mergeMessages(current, history.filter((message) => Boolean(messageText(message)))))
+          setMessages((current) => mergeMessages(current, history))
         } catch (error) {
           if (isActive()) showToast(`历史消息读取失败：${chatErrorMessage(error)}`)
         }
@@ -201,26 +224,31 @@ function SecondhandChatPage() {
     }
   }, [chatOperationKey, entry?.id, entry?.kind, reloadKey, resetKeyboardInset, sessionUserId])
 
-  const visibleMessages = useMemo(
-    () => messages.filter((message) => Boolean(messageText(message))),
-    [messages]
-  )
+  const visibleMessages = useMemo(() => messages, [messages])
   const scrollAnchorId = `secondhand-chat-bottom-${visibleMessages.length}-${keyboardHeight}`
   const peerName = role === 'seller'
     ? context?.buyerId ? `买家 #${context.buyerId}` : '交易对方'
     : product?.sellerName || (context?.sellerId ? `卖家 #${context.sellerId}` : '校园卖家')
   const peerAvatar = role === 'seller' ? '买' : peerName.trim().charAt(0) || '校'
   const peerAvatarImage = role === 'buyer' ? product?.sellerAvatar : ''
-  const peerState = role === 'seller'
-    ? `你是卖家 · 对方用户 #${context?.buyerId || '-'} · 腾讯云 IM`
-    : `你是买家 · 对方用户 #${context?.sellerId || '-'} · 腾讯云 IM`
+  const peerState = role === 'seller' ? '你是卖家 · 二手交易会话' : '你是买家 · 二手交易会话'
   const canOpenSellerProfile = role === 'buyer' && Boolean(product?.sellerId)
   const resolvedProductId = context
     ? String(context.productId)
     : entry?.kind === 'product' ? entry.id : ''
   const productImage = product?.images[0]
 
-  const goBack = () => {
+  const goBack = async () => {
+    if (inputFocused || keyboardHeight > 0) {
+      try {
+        await hideKeyboard()
+      } catch {
+        // Keyboard state is best-effort on older runtimes.
+      }
+      setInputFocused(false)
+      resetKeyboardInset()
+      return
+    }
     const fallback = entry?.kind === 'product'
       ? `/pages/secondhand-detail/index?id=${encodeURIComponent(entry.id)}`
       : '/pages/home/index'
@@ -270,9 +298,9 @@ function SecondhandChatPage() {
     <View className='secondhand-chat-page' style={capsuleStyle}>
       <CapsulePageHeader
         variant='standard'
-        left={<View className='secondhand-chat-header__back' onClick={goBack} />}
+        left={<View className='secondhand-chat-header__back' hoverClass='secondhand-chat-header__back--pressed' onClick={() => void goBack()} />}
         center={
-          <View className='secondhand-chat-seller' onClick={canOpenSellerProfile ? openSellerProfile : undefined}>
+          <View className='secondhand-chat-seller' hoverClass={canOpenSellerProfile ? 'secondhand-chat-seller--pressed' : ''} onClick={canOpenSellerProfile ? openSellerProfile : undefined}>
             <View className='secondhand-chat-seller__avatar'>
               {peerAvatarImage ? (
                 <Image className='secondhand-chat-seller__avatar-image' src={peerAvatarImage} mode='aspectFill' />
@@ -291,6 +319,7 @@ function SecondhandChatPage() {
         right={
           <View
             className={`secondhand-chat-header__home ${canOpenSellerProfile ? '' : 'secondhand-chat-header__home--text secondhand-chat-header__home--disabled'}`}
+            hoverClass={canOpenSellerProfile ? 'secondhand-chat-header__home--pressed' : ''}
             onClick={canOpenSellerProfile ? openSellerProfile : undefined}
           >
             {canOpenSellerProfile ? (
@@ -318,6 +347,7 @@ function SecondhandChatPage() {
         </View>
         <View
           className={`secondhand-chat-product__button ${resolvedProductId ? '' : 'secondhand-chat-product__button--disabled'}`}
+          hoverClass={resolvedProductId ? 'secondhand-chat-product__button--pressed' : ''}
           onClick={resolvedProductId ? openProduct : undefined}
         >
           <Text>查看</Text>
@@ -354,30 +384,32 @@ function SecondhandChatPage() {
             </Text>
           </View>
         ) : (
-          visibleMessages.map((message) => {
+          visibleMessages.map((message, index) => {
             const mine = tencentUserId
               ? String(message.from || '') === tencentUserId
               : message.flow === 'out'
+            const previous = visibleMessages[index - 1]
+            const showDay = !previous || dayKey(previous.time) !== dayKey(message.time)
             return (
-              <View
-                key={message.ID}
-                className={`secondhand-chat-row ${mine ? 'secondhand-chat-row--me' : 'secondhand-chat-row--seller'}`}
-              >
-                {!mine && (
-                  <View className='secondhand-chat-avatar'>
-                    <Text>{peerAvatar}</Text>
+              <React.Fragment key={message.ID}>
+                {showDay && <View className='secondhand-chat-day-divider'><Text>{formatDayLabel(message.time)}</Text></View>}
+                <View className={`secondhand-chat-row ${mine ? 'secondhand-chat-row--me' : 'secondhand-chat-row--seller'}`}>
+                  {!mine && (
+                    <View className='secondhand-chat-avatar'>
+                      <Text>{peerAvatar}</Text>
+                    </View>
+                  )}
+                  <View className={`secondhand-chat-bubble ${mine ? 'secondhand-chat-bubble--me' : 'secondhand-chat-bubble--seller'}`}>
+                    <Text>{messageDisplayText(message)}</Text>
+                    <Text className='secondhand-chat-bubble__time'>{formatTime(message.time)}</Text>
                   </View>
-                )}
-                <View className={`secondhand-chat-bubble ${mine ? 'secondhand-chat-bubble--me' : 'secondhand-chat-bubble--seller'}`}>
-                  <Text>{messageText(message)}</Text>
-                  <Text className='secondhand-chat-bubble__time'>{formatTime(message.time)}</Text>
+                  {mine && (
+                    <View className='secondhand-chat-avatar secondhand-chat-avatar--me'>
+                      <Text>我</Text>
+                    </View>
+                  )}
                 </View>
-                {mine && (
-                  <View className='secondhand-chat-avatar secondhand-chat-avatar--me'>
-                    <Text>我</Text>
-                  </View>
-                )}
-              </View>
+              </React.Fragment>
             )
           })
         )}
@@ -390,10 +422,11 @@ function SecondhandChatPage() {
         style={keyboardHeight > 0 ? { bottom: `${keyboardHeight}px` } : undefined}
       >
         <View className='secondhand-chat-input-wrap'>
-          <Input
+          <Textarea
             className='secondhand-chat-input'
             value={draft}
             maxlength={500}
+            autoHeight
             disabled={status !== 'ready' || !role || sending}
             placeholder={status === 'ready' ? '发消息...' : '私信连接中...'}
             placeholderClass='secondhand-chat-input__placeholder'
@@ -401,9 +434,9 @@ function SecondhandChatPage() {
             adjustPosition={false}
             cursorSpacing={0}
             onInput={(event) => setDraft(String(event.detail.value ?? ''))}
-            onFocus={onKeyboardFocus}
+            onFocus={() => { setInputFocused(true); onKeyboardFocus() }}
             onKeyboardHeightChange={onKeyboardHeightChange}
-            onBlur={resetKeyboardInset}
+            onBlur={() => { setInputFocused(false); resetKeyboardInset() }}
             onConfirm={() => void sendText()}
           />
         </View>
