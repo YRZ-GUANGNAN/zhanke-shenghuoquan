@@ -39,3 +39,24 @@ func TestAssignedViewProjectsStageTimestampsAndKeepsMissingStagesNull(t *testing
 		}
 	}
 }
+
+func TestSourceMetadataPoolPrivacyAndAssignedVisibility(t *testing.T) {
+	orderID, shopID := "private-source-order", "private-source-shop"
+	value := delivery.Order{SourcePlatform: delivery.SourceMeituan, PickupCode: "0028", SourceOrderID: &orderID, SourceShopID: &shopID, PickupContactPhone: "private-phone", DeliveryAddress: "private-address"}
+	pool, err := json.Marshal(claimableView(value))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []string{orderID, shopID, "sourceOrderId", "sourceShopId", "private-phone", "private-address"} {
+		if strings.Contains(string(pool), forbidden) {
+			t.Fatalf("pool leaked %q", forbidden)
+		}
+	}
+	if !strings.Contains(string(pool), `"sourcePlatform":"meituan"`) || !strings.Contains(string(pool), `"pickupCode":"0028"`) {
+		t.Fatal("pool lost public source label")
+	}
+	assigned := assignedView(value)
+	if assigned.SourceOrderID != &orderID || assigned.SourceShopID != &shopID || assigned.PickupCode != "0028" {
+		t.Fatal("assigned rider lost source identifiers")
+	}
+}

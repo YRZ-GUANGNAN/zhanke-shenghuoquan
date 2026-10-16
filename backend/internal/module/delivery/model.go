@@ -48,33 +48,37 @@ func (s Status) Terminal() bool {
 }
 
 type Order struct {
-	ID                    uint64     `gorm:"column:id;primaryKey"`
-	DeliveryOrderPublicID string     `gorm:"column:delivery_order_public_id;size:26;not null;uniqueIndex:uq_delivery_order_public_id"`
-	MerchantUserID        uint64     `gorm:"column:merchant_user_id;not null;index:idx_delivery_order_merchant_created,priority:1"`
-	MerchantRequestID     *string    `gorm:"column:merchant_request_id;size:26;uniqueIndex:uq_delivery_order_merchant_request,priority:2"`
-	RiderUserID           *uint64    `gorm:"column:rider_user_id;index:idx_delivery_order_rider_status,priority:1"`
-	PickupContactName     string     `gorm:"column:pickup_contact_name;size:64;not null"`
-	PickupContactPhone    string     `gorm:"column:pickup_contact_phone;size:32;not null"`
-	PickupAddress         string     `gorm:"column:pickup_address;size:256;not null"`
-	RecipientName         string     `gorm:"column:recipient_name;size:64;not null"`
-	RecipientPhone        string     `gorm:"column:recipient_phone;size:32;not null"`
-	DeliveryAddress       string     `gorm:"column:delivery_address;size:256;not null"`
-	Remark                string     `gorm:"column:remark;size:512;not null"`
-	DeliveryFeeCents      uint64     `gorm:"column:delivery_fee_cents;not null"`
-	RiderFeeCents         uint64     `gorm:"column:rider_fee_cents;not null"`
-	PlatformCutCents      uint64     `gorm:"column:platform_cut_cents;not null"`
-	Status                Status     `gorm:"column:status;size:24;not null;index:idx_delivery_order_status_created,priority:1;index:idx_delivery_order_rider_status,priority:2"`
-	ReadyForClaimAt       *time.Time `gorm:"column:ready_for_claim_at"`
-	ClaimedAt             *time.Time `gorm:"column:claimed_at"`
-	ToPickupAt            *time.Time `gorm:"column:to_pickup_at"`
-	PickedUpAt            *time.Time `gorm:"column:picked_up_at"`
-	DeliveringAt          *time.Time `gorm:"column:delivering_at"`
-	DeliveredAt           *time.Time `gorm:"column:delivered_at"`
-	PaymentFailedAt       *time.Time `gorm:"column:payment_failed_at"`
-	CancelledAt           *time.Time `gorm:"column:cancelled_at"`
-	RowVersion            uint64     `gorm:"column:row_version;not null"`
-	CreatedAt             time.Time  `gorm:"column:created_at;not null;index:idx_delivery_order_merchant_created,priority:2;index:idx_delivery_order_status_created,priority:2"`
-	UpdatedAt             time.Time  `gorm:"column:updated_at;not null"`
+	ID                    uint64         `gorm:"column:id;primaryKey"`
+	DeliveryOrderPublicID string         `gorm:"column:delivery_order_public_id;size:26;not null;uniqueIndex:uq_delivery_order_public_id"`
+	MerchantUserID        uint64         `gorm:"column:merchant_user_id;not null;index:idx_delivery_order_merchant_created,priority:1"`
+	MerchantRequestID     *string        `gorm:"column:merchant_request_id;size:26;uniqueIndex:uq_delivery_order_merchant_request,priority:2"`
+	SourcePlatform        SourcePlatform `gorm:"column:source_platform;size:12;not null;default:local"`
+	PickupCode            string         `gorm:"column:pickup_code;size:16;not null;default:''"`
+	SourceShopID          *string        `gorm:"column:source_shop_id;size:64"`
+	SourceOrderID         *string        `gorm:"column:source_order_id;size:128"`
+	RiderUserID           *uint64        `gorm:"column:rider_user_id;index:idx_delivery_order_rider_status,priority:1"`
+	PickupContactName     string         `gorm:"column:pickup_contact_name;size:64;not null"`
+	PickupContactPhone    string         `gorm:"column:pickup_contact_phone;size:32;not null"`
+	PickupAddress         string         `gorm:"column:pickup_address;size:256;not null"`
+	RecipientName         string         `gorm:"column:recipient_name;size:64;not null"`
+	RecipientPhone        string         `gorm:"column:recipient_phone;size:32;not null"`
+	DeliveryAddress       string         `gorm:"column:delivery_address;size:256;not null"`
+	Remark                string         `gorm:"column:remark;size:512;not null"`
+	DeliveryFeeCents      uint64         `gorm:"column:delivery_fee_cents;not null"`
+	RiderFeeCents         uint64         `gorm:"column:rider_fee_cents;not null"`
+	PlatformCutCents      uint64         `gorm:"column:platform_cut_cents;not null"`
+	Status                Status         `gorm:"column:status;size:24;not null;index:idx_delivery_order_status_created,priority:1;index:idx_delivery_order_rider_status,priority:2"`
+	ReadyForClaimAt       *time.Time     `gorm:"column:ready_for_claim_at"`
+	ClaimedAt             *time.Time     `gorm:"column:claimed_at"`
+	ToPickupAt            *time.Time     `gorm:"column:to_pickup_at"`
+	PickedUpAt            *time.Time     `gorm:"column:picked_up_at"`
+	DeliveringAt          *time.Time     `gorm:"column:delivering_at"`
+	DeliveredAt           *time.Time     `gorm:"column:delivered_at"`
+	PaymentFailedAt       *time.Time     `gorm:"column:payment_failed_at"`
+	CancelledAt           *time.Time     `gorm:"column:cancelled_at"`
+	RowVersion            uint64         `gorm:"column:row_version;not null"`
+	CreatedAt             time.Time      `gorm:"column:created_at;not null;index:idx_delivery_order_merchant_created,priority:2;index:idx_delivery_order_status_created,priority:2"`
+	UpdatedAt             time.Time      `gorm:"column:updated_at;not null"`
 }
 
 func (Order) TableName() string { return "delivery_orders" }
@@ -85,7 +89,7 @@ func (o Order) ValidateNew() error {
 		(o.MerchantRequestID != nil && !ValidULID(*o.MerchantRequestID)) ||
 		o.Status != StatusPendingFeePayment || o.DeliveryFeeCents == 0 || !ok ||
 		fee != o.DeliveryFeeCents || o.RowVersion != 1 || o.CreatedAt.IsZero() ||
-		o.UpdatedAt.IsZero() || !validContactSnapshot(o) {
+		o.UpdatedAt.IsZero() || !validContactSnapshot(o) || !validOrderSource(o) {
 		return ErrInvalidRecord
 	}
 	return nil

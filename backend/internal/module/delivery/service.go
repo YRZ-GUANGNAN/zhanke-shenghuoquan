@@ -45,6 +45,7 @@ func (s *Service) CreateOrder(ctx context.Context, input CreateOrderInput) (Orde
 	now := s.now().UTC()
 	order := Order{
 		DeliveryOrderPublicID: publicID,
+		SourcePlatform:        SourceLocal,
 		MerchantUserID:        input.MerchantUserID,
 		PickupContactName:     strings.TrimSpace(input.Pickup.Name),
 		PickupContactPhone:    strings.TrimSpace(input.Pickup.Phone),
