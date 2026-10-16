@@ -58,6 +58,8 @@ page {
   padding: 0 32rpx calc(32rpx + env(safe-area-inset-bottom));
 }
 
+.merchant-detail-content--with-actions { padding-bottom: 32rpx; }
+
 .merchant-detail-notice {
   @include ref.type(meta);
   @include ref.wrap;
@@ -111,7 +113,6 @@ page {
 .merchant-detail-status-card,
 .merchant-detail-route-card,
 .merchant-detail-fee-card,
-.merchant-detail-rider-card,
 .merchant-detail-progress-card,
 .merchant-detail-photo-card {
   border-bottom: 1rpx solid $border-default;
@@ -121,12 +122,15 @@ page {
 }
 
 .merchant-detail-status-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  align-items: start;
+  column-gap: 24rpx;
   padding: 32rpx 0 28rpx;
 }
 
 .merchant-detail-order-identity {
   min-width: 0;
-  margin-bottom: 20rpx;
 }
 
 .merchant-detail-order-identity__source {
@@ -155,6 +159,12 @@ page {
   font-size: clamp(22PX, 6.4vw, 28PX);
 }
 
+.merchant-detail-order-identity__code--long {
+  font-size: 40rpx;
+  font-size: clamp(19PX, 5.333vw, 24PX);
+  letter-spacing: 0;
+}
+
 .merchant-detail-order-identity__unit { font-size: .5em; margin-left: 6rpx; font-weight: 600; letter-spacing: 0; }
 
 .merchant-detail-order-identity__caption {
@@ -166,6 +176,94 @@ page {
 
 .merchant-detail-status-card__main {
   min-width: 0;
+  padding-left: 24rpx;
+  border-left: 1rpx solid $border-subtle;
+}
+
+.merchant-detail-status-card__meta { grid-column: 1 / -1; }
+
+.merchant-detail-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.merchant-detail-section-toggle {
+  @include ref.touch;
+  @include ref.type(meta);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+  gap: 12rpx;
+  padding-left: 16rpx;
+  color: $brand-primary-strong;
+}
+
+.merchant-detail-chevron {
+  width: 12rpx;
+  height: 12rpx;
+  border-right: 2rpx solid currentColor;
+  border-bottom: 2rpx solid currentColor;
+  transform: rotate(45deg) translateY(-3rpx);
+  transition: transform $duration-fast ease;
+}
+.merchant-detail-chevron--up { transform: rotate(225deg) translate(-2rpx, -2rpx); }
+
+.merchant-detail-timeline--expanded { animation: merchant-detail-reveal 160ms ease-out; }
+@keyframes merchant-detail-reveal {
+  from { opacity: .65; transform: translateY(-4rpx); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.merchant-detail-action-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 16rpx 32rpx calc(16rpx + env(safe-area-inset-bottom));
+  border-top: 1rpx solid $border-subtle;
+  background: $bg-surface;
+}
+.merchant-detail-action-bar__identity { flex: 1; min-width: 0; }
+.merchant-detail-action-bar__name {
+  @include ref.type(author);
+  @include ref.wrap;
+  display: block;
+  font-weight: 600;
+}
+.merchant-detail-action-bar__hint {
+  @include ref.type(meta);
+  display: block;
+  margin-top: 4rpx;
+  color: $text-secondary;
+}
+.merchant-detail-action-bar__contact {
+  @include ref.touch;
+  @include ref.type(label);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  flex: 0 0 auto;
+  padding: 0 28rpx;
+  border-radius: 14rpx;
+  background: $detail-blue-soft;
+  color: $brand-primary-strong;
+  font-weight: 650;
+}
+.merchant-detail-photo-card__preview-error {
+  @include ref.type(meta);
+  @include ref.wrap;
+  display: block;
+  margin-top: 12rpx;
+  color: $detail-orange;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .merchant-detail-chevron { transition: none; }
+  .merchant-detail-timeline--expanded { animation: none; }
 }
 
 .merchant-detail-status-card__eyebrow {
@@ -310,73 +408,6 @@ page {
   font-weight: 600;
 }
 
-.merchant-detail-rider-card {
-  display: flex;
-  align-items: center;
-}
-
-.merchant-detail-rider-card__avatar {
-  width: 56rpx;
-  height: 56rpx;
-  flex: 0 0 56rpx;
-  border-radius: 16rpx;
-  background: $detail-blue-soft;
-  color: $brand-primary;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 30rpx;
-  font-weight: 600;
-}
-
-.merchant-detail-rider-card__main {
-  min-width: 0;
-  flex: 1;
-  margin-left: 16rpx;
-  display: flex;
-  flex-direction: column;
-}
-
-.merchant-detail-rider-card__name {
-  @include ref.type(author);
-  @include ref.wrap;
-  color: $text-primary;
-}
-
-.merchant-detail-rider-card__phone {
-  @include ref.type(meta);
-  @include ref.wrap;
-  margin-top: 8rpx;
-  color: $text-secondary;
-}
-
-.merchant-detail-rider-card__actions {
-  flex: 0 0 auto;
-  margin-left: 16rpx;
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-}
-
-.merchant-detail-rider-card__circle {
-  @include ref.touch;
-  padding: 0 8rpx;
-  gap: 8rpx;
-  border-radius: $radius-control;
-  background: $bg-surface;
-  color: $brand-primary;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  @include ref.type(meta);
-  transition: background $duration-fast ease, opacity $duration-fast ease;
-}
-
-.merchant-detail-rider-card__circle--pressed {
-  background: $detail-blue-soft;
-  opacity: .72;
-}
-
 .merchant-detail-rider-card__message-icon {
   display: block;
   width: 20PX;
@@ -506,7 +537,8 @@ page {
 
 .merchant-detail-photo-card__privacy {
   @include ref.type(meta);
-  flex: 0 0 auto;
+  display: block;
+  margin-top: 4rpx;
   color: $text-tertiary;
 }
 
@@ -567,10 +599,5 @@ page {
 
 @media (max-width: 350PX) {
   .merchant-detail-content { padding-right: 24rpx; padding-left: 24rpx; }
-  .merchant-detail-rider-card__actions { margin-left: 8rpx; }
-  .merchant-detail-rider-card__circle { flex-direction: column; gap: 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .merchant-detail-rider-card__circle { transition: none; }
+  .merchant-detail-action-bar { padding-right: 24rpx; padding-left: 24rpx; gap: 16rpx; }
 }

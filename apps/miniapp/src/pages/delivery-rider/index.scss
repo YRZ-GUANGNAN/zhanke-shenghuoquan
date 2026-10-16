@@ -507,6 +507,15 @@ page {
   margin-top: 24rpx;
 }
 
+.rider-order-route__row--current .rider-order-route__info {
+  padding: 12rpx 16rpx;
+  margin-top: -12rpx;
+  border-radius: 12rpx;
+  background: $rider-accent-soft;
+}
+
+.rider-order-route__row--current .rider-order-route__label { color: $brand-primary-strong; }
+
 .rider-order-route__marker {
   width: 34rpx;
   height: 34rpx;
@@ -540,6 +549,7 @@ page {
 
 .rider-order-route__label {
   @include ref.type(meta);
+  @include ref.wrap;
   color: $text-tertiary;
 }
 

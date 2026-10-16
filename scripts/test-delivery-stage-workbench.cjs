@@ -131,6 +131,7 @@ function riderHarness(overrides = {}) {
   sessionStore.getState = session
   const renderer = hookRenderer()
   const toasts = []
+  const phoneCalls = [], navigations = []
   let meCalls = 0
   const services = {
     getDeliveryRiderMe: async () => {
@@ -167,7 +168,8 @@ function riderHarness(overrides = {}) {
     showToast: async (value) => { toasts.push(value) },
     showLoading: () => { throw new Error('不得使用全屏 loading 阻塞其他订单') },
     hideLoading: () => {},
-    navigateTo: async () => {}, makePhoneCall: async () => {},
+    navigateTo: async (value) => { navigations.push(value); await overrides.navigateTo?.(value) },
+    makePhoneCall: async (value) => { phoneCalls.push(value); await overrides.makePhoneCall?.(value) },
     reLaunch: async () => { relaunches++ },
   }
   const imports = {
@@ -204,7 +206,7 @@ function riderHarness(overrides = {}) {
     return found
   }
   return {
-    services, toasts, render, flush, card, primary,
+    services, toasts, phoneCalls, navigations, render, flush, card, primary,
     get tree() { return renderer.tree }, get meCalls() { return meCalls },
     get switchCalls() { return switchCalls }, get relaunches() { return relaunches },
     async mount() { render(); show(); await flush() },
@@ -221,7 +223,8 @@ function riderHarness(overrides = {}) {
 }
 
 function merchantHarness(kind, overrides = {}) {
-  let show, orderCalls = 0, identityAllowed = true, accountId = 101
+  let show, hide, orderCalls = 0, identityAllowed = true, accountId = 101
+  let sessionToken = 'TOKEN-101', routeOrderId = 'ORDER-A'
   let identity = { currentIdentity: 'merchant' }, switchCalls = 0, relaunches = 0
   const switchIdentity = async () => {
     switchCalls++
@@ -229,10 +232,11 @@ function merchantHarness(kind, overrides = {}) {
     identity = result
     return result
   }
-  const session = () => ({ profile: { id: accountId }, token: `TOKEN-${accountId}`, status: 'authenticated', identity, switchIdentity })
+  const session = () => ({ profile: { id: accountId }, token: sessionToken, status: 'authenticated', identity, switchIdentity })
   const sessionStore = (select) => select(session())
   sessionStore.getState = session
   const renderer = hookRenderer()
+  const previews = [], proofRequests = [], navigations = [], toasts = []
   const services = {
     listMerchantDeliveryOrders: async () => page([]),
     getMerchantDeliveryOrder: async () => order('ORDER-A'),
@@ -242,7 +246,7 @@ function merchantHarness(kind, overrides = {}) {
   }
   const imports = {
     '@tarojs/components': { View: 'View', Text: 'Text', ScrollView: 'ScrollView', Image: 'Image' },
-    '@tarojs/taro': { useDidShow: (fn) => { show = fn } },
+    '@tarojs/taro': { useDidShow: (fn) => { show = fn }, useDidHide: (fn) => { hide = fn } },
     '../../components/capsule-page-header': {
       __esModule: true,
       default: ({ left, right }) => ({ type: 'Header', props: { children: [left, right] } }),
@@ -266,10 +270,13 @@ function merchantHarness(kind, overrides = {}) {
       getDeliveryWallet: async () => ({ availableBalanceCents: 1000 }),
       getDeliveryOrderFunds: (...args) => services.getDeliveryOrderFunds(...args),
     },
-    '../../services/delivery-proof': { loadPrivateDeliveryProofs: (...args) => services.loadPrivateDeliveryProofs(...args) },
+    '../../services/delivery-proof': { loadPrivateDeliveryProofs: (...args) => { proofRequests.push(args); return services.loadPrivateDeliveryProofs(...args) } },
     '../../services/taro': {
-      getCurrentInstance: () => ({ router: { params: { orderId: 'ORDER-A' } } }),
-      showToast: async () => {}, navigateTo: async () => {}, navigateBack: async () => {}, reLaunch: async () => { relaunches++ },
+      getCurrentInstance: () => ({ router: { params: { orderId: routeOrderId } } }),
+      previewImage: async (value) => { previews.push(value); await overrides.previewImage?.(value) },
+      showToast: async (value) => { toasts.push(value) },
+      navigateTo: async (value) => { navigations.push(value); await overrides.navigateTo?.(value) },
+      navigateBack: async () => {}, reLaunch: async () => { relaunches++ },
     },
     '../../stores/session': { useSessionStore: sessionStore },
     '../../utils/delivery-order-source': { deliverySourceLabel: () => '校内配送', deliveryPickupLabel: (value) => value.pickupCode ? `${value.pickupCode}号` : '配送单' },
@@ -284,12 +291,24 @@ function merchantHarness(kind, overrides = {}) {
     return found
   }
   return {
-    services, one, flush: renderer.flush,
+    services, one, previews, proofRequests, navigations, toasts, flush: renderer.flush,
     get tree() { return renderer.tree }, get orderCalls() { return orderCalls },
     get switchCalls() { return switchCalls }, get relaunches() { return relaunches },
     async mount() { renderer.render(); show?.(); await renderer.flush() },
     async setIdentityAllowed(value) { identityAllowed = value; renderer.render(); await renderer.flush() },
-    async setAccount(value) { accountId = value; renderer.render(); await renderer.flush() },
+    async setAccount(value) { accountId = value; sessionToken = `TOKEN-${value}`; renderer.render(); await renderer.flush() },
+    async setToken(value) { sessionToken = value; renderer.render(); await renderer.flush() },
+    async setOrderId(value) { routeOrderId = value; renderer.render(); await renderer.flush() },
+    async unmount() { renderer.unmount(); await renderer.flush() },
+    async hide() { hide?.(); await renderer.flush() },
+    async show() { show?.(); await renderer.flush() },
+    async toggleProgress() { one('merchant-detail-section-toggle').props.onClick(); await renderer.flush() },
+    async preview(proofId) {
+      const selected = proofId ? nodes(renderer.tree, (node) => hasClass(node, 'merchant-detail-photo-item') && node.props.key === proofId)[0] : renderer.tree
+      const button = proofId ? nodes(selected, (node) => hasClass(node, 'merchant-detail-photo-item__thumb'))[0] : one('merchant-detail-photo-card__view')
+      assert.equal(typeof button?.props.onClick, 'function', '应可查看已激活配送照片')
+      button.props.onClick(); await renderer.flush()
+    },
     async refresh() {
       if (kind === 'merchant-home') show()
       else one('merchant-detail-nav__refresh').props.onClick()
@@ -765,12 +784,16 @@ async function run() {
       claimedAt: '2026-10-16T10:20:00+08:00', cancelledAt,
     }) })
     await app.mount()
+    assert.deepEqual(app.timeline().map((step) => step.key), ['cancelledAt'], '取消单默认摘要显示真实取消节点')
+    await app.toggleProgress()
     assert.deepEqual(app.timeline().map((step) => step.key), ['createdAt', 'readyForClaimAt', 'claimedAt', 'cancelledAt'])
     assert.equal(app.timeline().at(-1).time, '2026-10-16 11:30')
     cancelledAt = undefined
     await app.refresh()
     assert.deepEqual(app.timeline().map((step) => step.key), ['createdAt', 'readyForClaimAt', 'claimedAt'], '取消时间缺失时保留实际节点，不使用更新时间伪造取消节点')
     assert.equal(text(app.one('merchant-detail-status-card__state')), '已取消', '没有取消时间仍准确显示订单已取消')
+    await app.toggleProgress()
+    assert.deepEqual(app.timeline().map((step) => step.key), ['claimedAt'], '取消时间缺失时摘要仅展示最近真实节点')
     assert.equal(app.orderCalls, 2, '稳定 Hook 依赖不会在每轮渲染重新请求详情')
     console.log('PASS 取消时间线保留实际节点且不伪造缺失时间')
   }
@@ -842,6 +865,276 @@ async function run() {
     assert.doesNotMatch(text(app.tree), /暂无支付记录|尚未提交取货或送达凭证/)
     console.log('PASS 详情分区刷新失败保留已知资金状态和私密凭证')
   }
+  let detailAssertions = 0
+  const check = new Proxy(assert, { get(target, property) {
+    return typeof target[property] === 'function' ? (...args) => { detailAssertions++; return target[property](...args) } : target[property]
+  } })
+  const proof = (id, version = 'old', extra = {}) => ({
+    proofPublicId: id, proofType: id === 'PROOF-A' ? 'pickup' : 'delivery', slot: 0,
+    status: 'active', url: `https://fixture.invalid/${id}/${version}.jpg`, expiresAt: Date.now() + 60000, ...extra,
+  })
+  {
+    const app = merchantHarness('merchant-order-detail', { getMerchantDeliveryOrder: async () => ({
+      ...order('ORDER-A', 'to_pickup'), readyForClaimAt: '2026-10-16T10:05:00+08:00',
+      claimedAt: '2026-10-16T10:10:00+08:00', toPickupAt: '2026-10-16T10:15:00+08:00',
+    }) })
+    await app.mount()
+    check.deepEqual(app.timeline().map((step) => step.key), ['toPickupAt'])
+    check.equal(app.timeline()[0].time, '2026-10-16 10:15')
+    check.equal(app.one('merchant-detail-section-toggle').props.ariaLabel, '展开全部配送进度')
+    await app.toggleProgress()
+    check.deepEqual(app.timeline().map((step) => step.key), ['createdAt', 'readyForClaimAt', 'claimedAt', 'toPickupAt', 'pickedUpAt', 'deliveringAt', 'deliveredAt'])
+    check.equal(app.timeline().find((step) => step.key === 'claimedAt').time, '2026-10-16 10:10')
+    check.equal(app.one('merchant-detail-section-toggle').props.ariaLabel, '收起配送进度')
+    await app.toggleProgress()
+    check.deepEqual(app.timeline().map((step) => step.key), ['toPickupAt'])
+    check.equal(app.orderCalls, 1, '折叠展开仅改变呈现，不重取或修改订单')
+    console.log('PASS 进度默认当前节点，展开保留全部记录且收起不触发业务请求')
+  }
+  {
+    for (const [status, key, label] of [['to_pickup', 'toPickupAt', '前往取货'], ['delivered', 'deliveredAt', '已完成']]) {
+      const app = merchantHarness('merchant-order-detail', { getMerchantDeliveryOrder: async () => ({ ...order('ORDER-A', status), updatedAt: '2026-10-16T12:59:00+08:00' }) })
+      await app.mount()
+      check.deepEqual(app.timeline().map((step) => step.key), [key])
+      check.equal(app.timeline()[0].time, '', '缺失阶段时间不能用更新时间伪造')
+      check.equal(text(app.one('merchant-detail-status-card__state')), label)
+      check.doesNotMatch(text(app.one('merchant-detail-progress-card')), /12:59/)
+      await app.toggleProgress()
+      check.equal(app.timeline().find((step) => step.key === key).time, '')
+    }
+    console.log('PASS 当前及完成节点缺少时间仍表达真实状态，不补造履约时间')
+  }
+  {
+    let loads = 0
+    const app = merchantHarness('merchant-order-detail', { loadPrivateDeliveryProofs: async () => ++loads === 1
+      ? [proof('PROOF-A'), proof('PROOF-B')]
+      : [proof('PROOF-B', 'fresh'), proof('PROOF-A', 'fresh')],
+    })
+    await app.mount(); await app.preview('PROOF-B')
+    check.deepEqual(app.proofRequests, [['ORDER-A'], ['ORDER-A']])
+    check.equal(app.previews.length, 1)
+    check.deepEqual(app.previews[0], { urls: [proof('PROOF-B', 'fresh').url, proof('PROOF-A', 'fresh').url], current: proof('PROOF-B', 'fresh').url })
+    check.ok(app.previews[0].urls.every((url) => !url.includes('/old.')))
+    await app.preview()
+    check.equal(app.previews.length, 2)
+    check.equal(app.previews[1].current, proof('PROOF-B', 'fresh').url, '查看全部从最新可用列表开始')
+    check.equal(loads, 3, '每次查看都重新取得私密签名')
+    console.log('PASS 照片预览逐次刷新签名，以凭证ID定位而非旧数组下标')
+  }
+  {
+    for (const changed of ['revoked', 'missing', 'no-url', 'expired']) {
+      let loads = 0
+      const changedProof = changed === 'revoked' ? proof('PROOF-A', 'revoked', { status: 'revoked' })
+        : changed === 'no-url' ? proof('PROOF-A', 'no-url', { url: undefined })
+          : proof('PROOF-A', 'expired', { expiresAt: Date.now() - 1000 })
+      const app = merchantHarness('merchant-order-detail', { loadPrivateDeliveryProofs: async () => ++loads === 1
+        ? [proof('PROOF-A'), proof('PROOF-B')] : [...(changed === 'missing' ? [] : [changedProof]), proof('PROOF-B', 'fresh')],
+      })
+      await app.mount(); await app.preview('PROOF-A')
+      check.equal(app.previews.length, 0, `${changed} 不能误打开另一张或过期缓存照片`)
+      check.match(text(app.one('merchant-detail-photo-card__preview-error')), /暂不可查看/)
+      if (changed === 'revoked') {
+        const target = nodes(app.tree, (node) => hasClass(node, 'merchant-detail-photo-item') && node.props.key === 'PROOF-A')[0]
+        check.equal(nodes(target, (node) => hasClass(node, 'merchant-detail-photo-item__image')).length, 0)
+        check.equal(nodes(target, (node) => hasClass(node, 'merchant-detail-photo-item__thumb'))[0].props.onClick, undefined)
+      }
+    }
+    console.log('PASS 选中凭证撤回缺失无链接或过期均不误开缓存和其他照片')
+  }
+  {
+    const pending = deferred()
+    let loads = 0
+    const app = merchantHarness('merchant-order-detail', { loadPrivateDeliveryProofs: async () => ++loads === 1
+      ? [proof('PROOF-A')] : loads === 2 ? pending.promise : [proof('PROOF-A', 'retry')],
+    })
+    await app.mount()
+    const click = app.one('merchant-detail-photo-item__thumb').props.onClick
+    click(); click(); await app.flush()
+    check.equal(loads, 2, '同帧点击只追加一个签名请求')
+    check.equal(app.previews.length, 0)
+    pending.reject(new Error('签名服务暂不可用')); await app.flush()
+    check.equal(app.one('merchant-detail-photo-item__image').props.src, proof('PROOF-A').url)
+    check.match(text(app.one('merchant-detail-photo-card__preview-error')), /签名服务暂不可用/)
+    check.doesNotMatch(text(app.tree), /骑手尚未提交/)
+    await app.preview('PROOF-A')
+    check.equal(app.previews.length, 1)
+    check.equal(app.previews[0].current, proof('PROOF-A', 'retry').url)
+    check.equal(nodes(app.tree, (node) => hasClass(node, 'merchant-detail-photo-card__preview-error')).length, 0)
+    console.log('PASS 签名读取防重，失败保留已知照片并释放锁允许重试')
+  }
+  {
+    for (const interrupt of ['account', 'token', 'identity', 'order', 'unmount', 'hide']) {
+      const pending = deferred()
+      let loads = 0
+      const app = merchantHarness('merchant-order-detail', {
+        getMerchantDeliveryOrder: async (id) => order(id),
+        loadPrivateDeliveryProofs: async () => ++loads === 1 ? [proof('PROOF-A')] : loads === 2 ? pending.promise : [proof('PROOF-B', 'new-context')],
+      })
+      await app.mount(); await app.preview('PROOF-A')
+      if (interrupt === 'account') await app.setAccount(202)
+      else if (interrupt === 'token') await app.setToken('TOKEN-RENEWED')
+      else if (interrupt === 'identity') await app.setIdentityAllowed(false)
+      else if (interrupt === 'order') await app.setOrderId('ORDER-B')
+      else await app[interrupt]()
+      pending.resolve([proof('PROOF-A', 'late-old-context')]); await app.flush()
+      check.equal(app.previews.length, 0, `${interrupt} 后旧签名不能打开原生预览`)
+      check.ok(nodes(app.tree, (node) => node.type === 'Image').every((node) => !String(node.props.src).includes('late-old-context')))
+      if (['account', 'token', 'order'].includes(interrupt)) {
+        check.equal(app.one('merchant-detail-photo-item__image').props.src, proof('PROOF-B', 'new-context').url)
+      }
+    }
+    console.log('PASS 账号token身份订单变化及隐藏卸载均取消迟到照片预览')
+  }
+  {
+    for (const interrupt of ['account', 'token']) {
+      const pendingOrder = deferred()
+      let orderLoads = 0
+      const app = merchantHarness('merchant-order-detail', {
+        getMerchantDeliveryOrder: async () => ++orderLoads === 1 ? { ...order('OLD-ORDER'), pickupAddress: '旧账号取货地址' } : pendingOrder.promise,
+        loadPrivateDeliveryProofs: async () => [proof('PROOF-A')],
+      })
+      await app.mount()
+      if (interrupt === 'account') await app.setAccount(202)
+      else await app.setToken('TOKEN-RENEWED')
+      check.doesNotMatch(text(app.tree), /旧账号取货地址|OLD-ORDER/)
+      check.equal(nodes(app.tree, (node) => node.type === 'Image').length, 0, `${interrupt} 变更应先清空旧账号照片`)
+      pendingOrder.reject(new Error('新上下文暂无法读单')); await app.flush()
+      check.match(text(app.tree), /新上下文暂无法读单/)
+      check.doesNotMatch(text(app.tree), /旧账号取货地址|OLD-ORDER/)
+    }
+    for (const interrupt of ['account', 'token']) {
+      const oldProof = deferred()
+      let loads = 0
+      const app = merchantHarness('merchant-order-detail', { loadPrivateDeliveryProofs: async () => ++loads === 1 ? oldProof.promise : [proof('PROOF-B', 'new-context')] })
+      await app.mount()
+      if (interrupt === 'account') await app.setAccount(202)
+      else await app.setToken('TOKEN-RENEWED')
+      oldProof.resolve([proof('PROOF-A', 'late-old-context')]); await app.flush()
+      check.equal(app.one('merchant-detail-photo-item__image').props.src, proof('PROOF-B', 'new-context').url)
+      check.equal(nodes(app.tree, (node) => hasClass(node, 'merchant-detail-photo-item')).length, 1)
+    }
+    console.log('PASS 详情账号token变更清旧数据，新上下文失败及旧分区迟到不恢复私密照片')
+  }
+  {
+    const pending = deferred()
+    let loads = 0
+    const app = merchantHarness('merchant-order-detail', { loadPrivateDeliveryProofs: async () => ++loads === 1
+      ? [proof('PROOF-A')] : loads === 2 ? pending.promise : [proof('PROOF-A', 'revoked', { status: 'revoked' })],
+    })
+    await app.mount(); await app.preview('PROOF-A'); await app.refresh()
+    check.equal(app.orderCalls, 1, '签名预览请求中不能并发覆盖整页照片快照')
+    pending.resolve([proof('PROOF-A', 'fresh')]); await app.flush(); await app.refresh()
+    check.equal(app.orderCalls, 2)
+    check.equal(nodes(app.tree, (node) => hasClass(node, 'merchant-detail-photo-item__image')).length, 0)
+    check.match(text(app.tree), /照片已撤回/)
+    const pendingDetail = deferred()
+    let detailLoads = 0
+    const detail = merchantHarness('merchant-order-detail', { loadPrivateDeliveryProofs: async () => ++detailLoads === 1 ? [proof('PROOF-A')] : pendingDetail.promise })
+    await detail.mount(); await detail.refresh(); await detail.preview('PROOF-A')
+    check.equal(detailLoads, 2, '整页刷新中不再追加签名预览')
+    check.equal(detail.previews.length, 0)
+    pendingDetail.resolve([proof('PROOF-A', 'revoked', { status: 'revoked' })]); await detail.flush()
+    check.equal(nodes(detail.tree, (node) => hasClass(node, 'merchant-detail-photo-item__image')).length, 0)
+    console.log('PASS 整页刷新与签名预览互斥，最新撤回状态不会被旧预览覆盖')
+  }
+  {
+    const native = deferred()
+    let opens = 0
+    const app = merchantHarness('merchant-order-detail', {
+      loadPrivateDeliveryProofs: async () => [proof('PROOF-A', 'fresh')],
+      previewImage: async () => ++opens === 1 ? native.promise : undefined,
+    })
+    await app.mount(); await app.preview(); await app.hide()
+    native.reject(new Error('已离开的原生预览错误')); await app.flush(); await app.show(); await app.preview()
+    check.equal(app.previews.length, 2)
+    check.equal(nodes(app.tree, (node) => hasClass(node, 'merchant-detail-photo-card__preview-error')).length, 0)
+    check.doesNotMatch(text(app.tree), /正在打开|已离开的原生预览错误/)
+    let retries = 0
+    const failed = merchantHarness('merchant-order-detail', {
+      loadPrivateDeliveryProofs: async () => [proof('PROOF-A', 'fresh')],
+      previewImage: async () => { if (++retries === 1) throw new Error('原生预览暂不可用') },
+    })
+    await failed.mount(); await failed.preview()
+    check.match(text(failed.one('merchant-detail-photo-card__preview-error')), /原生预览暂不可用/)
+    check.equal(failed.one('merchant-detail-photo-item__image').props.src, proof('PROOF-A', 'fresh').url)
+    await failed.preview()
+    check.equal(failed.previews.length, 2)
+    console.log('PASS 原生照片预览失败或隐藏返回不会锁死，旧错误不覆盖当前页面')
+  }
+  {
+    let riderUserId, navigationCalls = 0
+    const app = merchantHarness('merchant-order-detail', {
+      getMerchantDeliveryOrder: async () => ({ ...order('ORDER /?&中文'), riderUserId }),
+      navigateTo: async () => { if (++navigationCalls === 1) throw new Error('会话暂不可用') },
+    })
+    await app.mount()
+    check.equal(nodes(app.tree, (node) => hasClass(node, 'merchant-detail-action-bar__contact')).length, 0)
+    riderUserId = 202; await app.refresh()
+    check.equal(nodes(app.one('merchant-detail-scroll'), (node) => hasClass(node, 'merchant-detail-action-bar')).length, 0, '联系操作应在滚动区外')
+    check.equal(nodes(app.tree, (node) => hasClass(node, 'merchant-detail-action-bar__contact')).length, 1)
+    check.match(text(app.one('merchant-detail-action-bar')), /骑手 #202/)
+    app.one('merchant-detail-action-bar__contact').props.onClick(); await app.flush()
+    check.equal(app.navigations[0].url, `/pages/delivery-conversation/index?orderId=${encodeURIComponent('ORDER /?&中文')}&role=merchant`)
+    check.ok(app.toasts.some((toast) => toast.title.includes('会话打开失败')))
+    app.one('merchant-detail-action-bar__contact').props.onClick(); await app.flush()
+    check.equal(app.navigations.length, 2, '会话导航失败后可以重试')
+    riderUserId = undefined; await app.refresh()
+    check.equal(nodes(app.tree, (node) => hasClass(node, 'merchant-detail-action-bar')).length, 0)
+    console.log('PASS 底部联系骑手保留角色完整订单路由与权限，且位于滚动区外')
+  }
+  {
+    for (const status of ['claimed', 'to_pickup', 'picked_up', 'delivering']) {
+      const deliveryStage = status === 'picked_up' || status === 'delivering'
+      const assigned = { ...order('ORDER-A', status), pickupContactPhone: '13800000001', recipientPhone: '13900000002' }
+      const app = riderHarness({ services: { listAssignedDeliveryOrders: async (_, __, group) => page(group === (deliveryStage ? 'delivery' : 'pickup') ? [assigned] : []) } })
+      await app.mount(); await app.tab(deliveryStage ? '待送达' : '待取货')
+      const currentRows = nodes(app.card('ORDER-A'), (node) => hasClass(node, 'rider-order-route__row--current'))
+      check.equal(currentRows.length, 1)
+      check.match(text(currentRows[0]), deliveryStage ? /当前前往 · 送达点/ : /当前前往 · 取货点/)
+      check.match(text(currentRows[0]), deliveryStage ? /测试送达地址/ : /测试取货地址/)
+      const label = deliveryStage ? '联系收货人' : '联系取货人'
+      const phone = nodes(app.card('ORDER-A'), (node) => node.props?.ariaLabel === label)[0]
+      check.ok(phone, `${status} 应说明实际拨号对象`)
+      check.equal(text(phone), label)
+      phone.props.onClick(); await app.flush()
+      check.deepEqual(app.phoneCalls, [{ phoneNumber: deliveryStage ? assigned.recipientPhone : assigned.pickupContactPhone }])
+      check.equal(text(app.primary('ORDER-A')), status === 'claimed' ? '前往取货' : status === 'to_pickup' ? '确认取货' : status === 'picked_up' ? '开始配送' : '确认送达')
+    }
+    console.log('PASS 骑手四阶段目的地强调、电话标签与拨号对象一致，履约主操作不变')
+  }
+  {
+    for (const status of ['claimed', 'delivering']) {
+      for (const empty of ['', '   ']) {
+        const deliveryStage = status === 'delivering'
+        const assigned = { ...order('ORDER-A', status), pickupContactPhone: deliveryStage ? '13800000001' : empty, recipientPhone: deliveryStage ? empty : '13900000002' }
+        const app = riderHarness({ services: { listAssignedDeliveryOrders: async (_, __, group) => page(group === (deliveryStage ? 'delivery' : 'pickup') ? [assigned] : []) } })
+        await app.mount(); await app.tab(deliveryStage ? '待送达' : '待取货')
+        const phone = nodes(app.card('ORDER-A'), (node) => hasClass(node, 'rider-order-card__secondary') && String(node.props.ariaLabel).includes('暂无号码'))[0]
+        check.ok(phone)
+        check.equal(text(phone), '暂无号码')
+        phone.props.onClick(); await app.flush()
+        check.equal(app.phoneCalls.length, 0, '当前对象缺少号码时不得拨空号或退回另一方')
+      }
+    }
+    for (const outcome of ['cancel', 'fail']) {
+      let writes = 0
+      const app = riderHarness({
+        services: {
+          listAssignedDeliveryOrders: async (_, __, group) => page(group === 'pickup' ? [{ ...order('ORDER-A'), pickupContactPhone: '13800000001' }] : []),
+          startToPickup: async () => { writes++ },
+        },
+        makePhoneCall: async () => { throw { errMsg: `makePhoneCall:fail ${outcome}` } },
+      })
+      await app.mount(); await app.tab('待取货')
+      nodes(app.card('ORDER-A'), (node) => node.props?.ariaLabel === '联系取货人')[0].props.onClick(); await app.flush()
+      check.equal(app.phoneCalls.length, 1)
+      check.equal(writes, 0)
+      check.equal(text(app.primary('ORDER-A')), '前往取货')
+      check.ok(app.toasts.every((toast) => toast.icon !== 'success'))
+    }
+    console.log('PASS 当前号码为空不拨另一方，拨号取消失败不改变履约结果')
+  }
+  console.log(`PASS 详情紧凑布局与照片联系新增12组，${detailAssertions}项行为断言`)
 }
 module.exports = { deferred, page, order, nodes, text, hasClass, hookRenderer, loadPage }
 if (require.main === module) {

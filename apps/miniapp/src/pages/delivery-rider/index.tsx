@@ -966,20 +966,19 @@ export default function DeliveryRiderPage() {
 
         <View className='rider-order-route rider-order-route--assigned'>
           <View className='rider-order-route__line' />
-          <View className='rider-order-route__row'>
+          <View className={`rider-order-route__row${!deliveryStage ? ' rider-order-route__row--current' : ''}`}>
             <View className='rider-order-route__marker rider-order-route__marker--pickup'><Text>取</Text></View>
             <View className='rider-order-route__info'>
-              <Text className='rider-order-route__label'>取货点 · {order.pickupContactName}</Text>
+              <Text className='rider-order-route__label'>{!deliveryStage ? '当前前往 · ' : ''}取货点 · {order.pickupContactName}</Text>
               <Text className='rider-order-route__place'>{order.pickupAddress}</Text>
             </View>
           </View>
-          <View className='rider-order-route__row rider-order-route__row--drop'>
+          <View className={`rider-order-route__row rider-order-route__row--drop${deliveryStage ? ' rider-order-route__row--current' : ''}`}>
             <View className='rider-order-route__marker rider-order-route__marker--drop'><Text>送</Text></View>
             <View className='rider-order-route__info'>
-              <Text className='rider-order-route__label'>送达点 · {order.recipientName}</Text>
+              <Text className='rider-order-route__label'>{deliveryStage ? '当前前往 · ' : ''}送达点 · {order.recipientName}</Text>
               <View className='rider-order-route__drop-row'>
                 <Text className='rider-order-route__place'>{order.deliveryAddress}</Text>
-                <Text className='rider-order-route__complete'>完整地址</Text>
               </View>
             </View>
           </View>
@@ -993,16 +992,22 @@ export default function DeliveryRiderPage() {
         ) : null}
 
         <View className='rider-order-card__quick-actions'>
-          <View className='rider-order-card__secondary' onClick={() => openConversation(order.deliveryOrderPublicId)}>
+          <View className='rider-order-card__secondary' ariaRole='button' ariaLabel='联系商家' onClick={() => openConversation(order.deliveryOrderPublicId)}>
             <RiderWorkbenchIcon name='message' className='rider-order-card__secondary-icon' />
-            <Text>消息</Text>
+            <Text>商家消息</Text>
           </View>
           <View
-            className='rider-order-card__secondary'
-            onClick={() => void Taro.makePhoneCall({ phoneNumber: contactPhone })}
+            className={`rider-order-card__secondary${!contactPhone?.trim() ? ' rider-order-card__secondary--disabled' : ''}`}
+            ariaRole='button' ariaLabel={`${deliveryStage ? '联系收货人' : '联系取货人'}${contactPhone?.trim() ? '' : '，暂无号码'}`}
+            onClick={() => {
+              if (!contactPhone?.trim()) return
+              void Taro.makePhoneCall({ phoneNumber: contactPhone }).catch(() => {
+                void Taro.showToast({ title: '拨号未完成，可重试或联系商家', icon: 'none' }).catch(() => undefined)
+              })
+            }}
           >
             <RiderWorkbenchIcon name='phone' className='rider-order-card__secondary-icon' />
-            <Text>电话</Text>
+            <Text>{!contactPhone?.trim() ? '暂无号码' : deliveryStage ? '联系收货人' : '联系取货人'}</Text>
           </View>
           {releasable ? (
             <View

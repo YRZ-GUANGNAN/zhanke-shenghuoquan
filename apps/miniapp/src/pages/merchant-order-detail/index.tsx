@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
+import { useDidHide, useDidShow } from '@tarojs/taro'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import { AppIconButton } from '../../components/ui'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
@@ -15,6 +16,7 @@ import {
 import { getDeliveryOrderFunds, type DeliveryOrderFunds } from '../../services/delivery-payment'
 import { loadPrivateDeliveryProofs, type DeliveryProofImage } from '../../services/delivery-proof'
 import Taro from '../../services/taro'
+import { useSessionStore } from '../../stores/session'
 import { deliveryPickupLabel, deliverySourceLabel } from '../../utils/delivery-order-source'
 import MerchantHomeIcon from '../merchant-home/merchant-home-icon'
 import './index.scss'
@@ -134,6 +136,8 @@ function proofStatusLabel(proof: DeliveryProofImage): string {
 
 function MerchantOrderDetailContent() {
   const identityAllowed = useIdentityGuard('merchant')
+  const accountId = useSessionStore((state) => state.profile.id)
+  const token = useSessionStore((state) => state.token)
   const orderId = String(Taro.getCurrentInstance().router?.params?.orderId || '')
   const [order, setOrder] = useState<MerchantDeliveryOrder | null>(null)
   const [funds, setFunds] = useState<DeliveryOrderFunds | null>(null)
@@ -144,18 +148,40 @@ function MerchantOrderDetailContent() {
   const [proofsLoaded, setProofsLoaded] = useState(false)
   const [fundsError, setFundsError] = useState('')
   const [proofsError, setProofsError] = useState('')
+  const [progressExpanded, setProgressExpanded] = useState(false)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewError, setPreviewError] = useState('')
   const requestVersion = useRef(0)
   const loadingOrderId = useRef('')
+  const previewVersion = useRef(0)
+  const previewLock = useRef(false)
+  const pageActive = useRef(true)
+  const context = `${accountId}:${token}:${identityAllowed}:${orderId}`
+  const contextRef = useRef(context)
+  contextRef.current = context
+  const isSessionCurrent = () => {
+    const session = useSessionStore.getState()
+    return session.profile.id === accountId && session.token === token
+  }
+
+  useDidShow(() => { pageActive.current = true })
+  useDidHide(() => {
+    pageActive.current = false
+    previewVersion.current += 1
+    previewLock.current = false
+    setPreviewLoading(false)
+  })
 
   const loadDetail = useCallback(async () => {
-    if (!identityAllowed || !orderId || loadingOrderId.current === orderId) return
+    if (!identityAllowed || !orderId || contextRef.current !== context || !isSessionCurrent() || loadingOrderId.current === orderId || previewLock.current) return
     loadingOrderId.current = orderId
     const version = ++requestVersion.current
+    const isCurrent = () => requestVersion.current === version && contextRef.current === context && isSessionCurrent()
     setLoading(true)
     setLoadError('')
     try {
       const orderValue = await getMerchantDeliveryOrder(orderId)
-      if (requestVersion.current !== version) return
+      if (!isCurrent()) return
       setOrder(orderValue)
       setFundsError('')
       setProofsError('')
@@ -163,7 +189,7 @@ function MerchantOrderDetailContent() {
         deliveryPaymentEnabled ? settle(getDeliveryOrderFunds(orderId)) : null,
         settle(loadPrivateDeliveryProofs(orderId)),
       ])
-      if (requestVersion.current !== version) return
+      if (!isCurrent()) return
       if (fundsResult?.ok) {
         setFunds(fundsResult.value)
         setFundsLoaded(true)
@@ -177,16 +203,16 @@ function MerchantOrderDetailContent() {
         setProofsError(errorMessage(proofsResult.error, '配送照片加载失败'))
       }
     } catch (error) {
-      if (requestVersion.current === version) {
+      if (isCurrent()) {
         setLoadError(errorMessage(error, '配送单详情加载失败'))
       }
     } finally {
-      if (requestVersion.current === version) {
+      if (isCurrent()) {
         loadingOrderId.current = ''
         setLoading(false)
       }
     }
-  }, [identityAllowed, orderId])
+  }, [identityAllowed, orderId, context])
 
   useEffect(() => {
     setOrder(null)
@@ -194,15 +220,59 @@ function MerchantOrderDetailContent() {
     setProofs([])
     setFundsLoaded(false)
     setProofsLoaded(false)
+    setLoadError('')
+    setFundsError('')
+    setProofsError('')
+    setPreviewError('')
+    setPreviewLoading(false)
+    setProgressExpanded(false)
+    previewLock.current = false
     setLoading(false)
     if (identityAllowed) void loadDetail()
     return () => {
       requestVersion.current += 1
+      previewVersion.current += 1
+      previewLock.current = false
       loadingOrderId.current = ''
     }
   }, [identityAllowed, orderId, loadDetail])
 
   const progressSteps = useMemo(() => order ? buildProgressSteps(order) : [], [order])
+  const currentStep = progressSteps.find((step) => step.state === 'current') || progressSteps[progressSteps.length - 1]
+  const visibleSteps = progressExpanded ? progressSteps : currentStep ? [currentStep] : []
+  const availableProofs = proofs.filter((proof) => proof.status === 'active' && proof.url)
+
+  const previewProofs = async (proofId?: string) => {
+    if (!identityAllowed || !order || contextRef.current !== context || !isSessionCurrent() || !pageActive.current || previewLock.current || loadingOrderId.current) return
+    const version = ++previewVersion.current
+    const activeContext = contextRef.current
+    const isCurrent = () => pageActive.current && previewVersion.current === version && contextRef.current === activeContext && isSessionCurrent()
+    previewLock.current = true
+    setPreviewLoading(true)
+    setPreviewError('')
+    try {
+      // Resolve privately on every view; cached signed links may have expired or been revoked.
+      const latest = await loadPrivateDeliveryProofs(order.deliveryOrderPublicId)
+      if (!isCurrent()) return
+      setProofs(latest)
+      setProofsLoaded(true)
+      setProofsError('')
+      const available = latest.filter((proof) => proof.status === 'active' && proof.url && (!proof.expiresAt || proof.expiresAt > Date.now()))
+      const selected = proofId ? available.find((proof) => proof.proofPublicId === proofId) : available[0]
+      if (!selected?.url) {
+        setPreviewError('这张凭证暂不可查看，照片状态已更新')
+        return
+      }
+      await Taro.previewImage({ urls: available.map((proof) => proof.url!), current: selected.url })
+    } catch (error) {
+      if (isCurrent()) setPreviewError(errorMessage(error, '照片打开失败，请重试'))
+    } finally {
+      if (isCurrent()) {
+        previewLock.current = false
+        setPreviewLoading(false)
+      }
+    }
+  }
   const paymentLabel = !deliveryPaymentEnabled
     ? '支付功能未开放'
     : fundsError
@@ -210,13 +280,14 @@ function MerchantOrderDetailContent() {
       : !fundsLoaded ? '正在加载支付状态…' : deliveryFundsLabel(funds)
 
   const openConversation = () => {
+    if (!identityAllowed || !pageActive.current || contextRef.current !== context || !isSessionCurrent()) return
     if (!order?.riderUserId) {
       void Taro.showToast({ title: '骑手接单后才能进入私聊', icon: 'none' })
       return
     }
     void Taro.navigateTo({
       url: `/pages/delivery-conversation/index?orderId=${encodeURIComponent(order.deliveryOrderPublicId)}&role=merchant`,
-    })
+    }).catch(() => { void Taro.showToast({ title: '会话打开失败，请重试', icon: 'none' }).catch(() => undefined) })
   }
 
   if (!identityAllowed) return <View className='merchant-order-detail-page' />
@@ -231,7 +302,7 @@ function MerchantOrderDetailContent() {
       />
 
       <ScrollView scrollY className='merchant-detail-scroll' enhanced showScrollbar={false}>
-        <View className='merchant-detail-content'>
+        <View className={`merchant-detail-content${order?.riderUserId ? ' merchant-detail-content--with-actions' : ''}`}>
           {loading ? <View className='merchant-detail-notice'><Text>{order ? '正在更新配送单…' : '正在加载配送单…'}</Text></View> : null}
           {!loading && loadError ? (
             <View className='merchant-detail-notice merchant-detail-notice--error' ariaRole='button' ariaLabel='重新加载配送单' hoverClass='merchant-detail-control--pressed' onClick={() => void loadDetail()}>
@@ -248,7 +319,7 @@ function MerchantOrderDetailContent() {
               <View className={`merchant-detail-status-card merchant-detail-status-card--${order.status}`}>
                 <View className='merchant-detail-order-identity'>
                   <Text className='merchant-detail-order-identity__source'>{deliverySourceLabel(order.sourcePlatform)}</Text>
-                  <Text className={`merchant-detail-order-identity__code${order.pickupCode ? '' : ' merchant-detail-order-identity__code--fallback'}`}>
+                  <Text className={`merchant-detail-order-identity__code${order.pickupCode ? '' : ' merchant-detail-order-identity__code--fallback'}${(order.pickupCode?.length || 0) > 7 ? ' merchant-detail-order-identity__code--long' : ''}`}>
                     {order.pickupCode?.trim() ? <>{deliveryPickupLabel(order).slice(0, -1)}<Text className='merchant-detail-order-identity__unit'>号</Text></> : deliveryPickupLabel(order)}
                   </Text>
                   {order.pickupCode ? <Text className='merchant-detail-order-identity__caption'>取货时核对平台与取餐号</Text> : null}
@@ -302,42 +373,23 @@ function MerchantOrderDetailContent() {
                 ) : null}
               </View>
 
-              <View className='merchant-detail-rider-card'>
-                <View className='merchant-detail-rider-card__avatar'><Text>骑</Text></View>
-                <View className='merchant-detail-rider-card__main'>
-                  <Text className='merchant-detail-rider-card__name'>
-                    {order.riderUserId ? `骑手 #${order.riderUserId}` : '等待骑手接单'}
-                  </Text>
-                  <Text className='merchant-detail-rider-card__phone'>
-                    {order.riderUserId ? '可通过本单加密私聊联系' : '接单后开放本单私聊'}
-                  </Text>
-                </View>
-                {order.riderUserId ? (
-                  <View className='merchant-detail-rider-card__actions'>
-                    <View
-                      className='merchant-detail-rider-card__circle'
-                      hoverClass='merchant-detail-rider-card__circle--pressed'
-                      ariaRole='button'
-                      ariaLabel='联系骑手'
-                      onClick={openConversation}
-                    >
-                      <MerchantHomeIcon name='message' className='merchant-detail-rider-card__message-icon' />
-                      <Text>联系骑手</Text>
-                    </View>
-                  </View>
-                ) : null}
-              </View>
-
               <View className='merchant-detail-progress-card'>
-                <Text className='merchant-detail-section-title'>配送进度</Text>
-                <View className='merchant-detail-timeline'>
-                  {progressSteps.map((step, index) => (
+                <View className='merchant-detail-section-head'>
+                  <Text className='merchant-detail-section-title'>配送进度</Text>
+                  {progressSteps.length > 1 ? <View className='merchant-detail-section-toggle' ariaRole='button'
+                    ariaLabel={progressExpanded ? '收起配送进度' : '展开全部配送进度'} hoverClass='merchant-detail-control--pressed'
+                    onClick={() => setProgressExpanded((expanded) => !expanded)}>
+                    <Text>{progressExpanded ? '收起' : '全部记录'}</Text><View className={`merchant-detail-chevron${progressExpanded ? ' merchant-detail-chevron--up' : ''}`} />
+                  </View> : null}
+                </View>
+                <View className={`merchant-detail-timeline${progressExpanded ? ' merchant-detail-timeline--expanded' : ''}`}>
+                  {visibleSteps.map((step, index) => (
                     <View key={step.key} className='merchant-detail-timeline__row'>
                       <View className='merchant-detail-timeline__rail'>
                         <View className={`merchant-detail-timeline__marker merchant-detail-timeline__marker--${step.state}`}>
                           {step.state === 'done' ? <Text>✓</Text> : null}
                         </View>
-                        {index < progressSteps.length - 1 ? (
+                        {index < visibleSteps.length - 1 ? (
                           <View className={`merchant-detail-timeline__line merchant-detail-timeline__line--${step.state}`} />
                         ) : null}
                       </View>
@@ -356,8 +408,13 @@ function MerchantOrderDetailContent() {
               <View className='merchant-detail-photo-card'>
                 <View className='merchant-detail-photo-card__header'>
                   <Text className='merchant-detail-section-title'>配送照片</Text>
-                  <View className='merchant-detail-photo-card__privacy'><Text>仅本单商家与骑手可见</Text></View>
+                  {availableProofs.length ? <View className='merchant-detail-photo-card__view merchant-detail-section-toggle' ariaRole='button'
+                    ariaLabel='查看配送照片' hoverClass='merchant-detail-control--pressed' onClick={() => void previewProofs()}>
+                    <Text>{previewLoading ? '正在打开…' : `查看 ${availableProofs.length} 张`}</Text>
+                  </View> : null}
                 </View>
+                <Text className='merchant-detail-photo-card__privacy'>仅本单商家与骑手可见</Text>
+                {previewError ? <Text className='merchant-detail-photo-card__preview-error'>{previewError}</Text> : null}
                 {loading ? <Text className='merchant-detail-timeline__note'>正在更新配送照片…</Text> : null}
                 {!loading && proofsError ? (
                   <View className='merchant-detail-photo-card__error' ariaRole='button' ariaLabel='重新加载配送照片' hoverClass='merchant-detail-control--pressed' onClick={() => void loadDetail()}>
@@ -369,14 +426,18 @@ function MerchantOrderDetailContent() {
                 <View className='merchant-detail-photo-grid'>
                   {proofs.map((proof) => (
                     <View key={proof.proofPublicId} className='merchant-detail-photo-item'>
-                      <View className={`merchant-detail-photo-item__thumb ${proof.url ? 'merchant-detail-photo-item__thumb--ready' : 'merchant-detail-photo-item__thumb--pending'}`}>
-                        {proof.url ? (
+                      <View className={`merchant-detail-photo-item__thumb ${proof.status === 'active' && proof.url ? 'merchant-detail-photo-item__thumb--ready' : 'merchant-detail-photo-item__thumb--pending'}`}
+                        ariaRole={proof.status === 'active' && proof.url ? 'button' : undefined}
+                        ariaLabel={proof.status === 'active' && proof.url ? `查看${proof.proofType === 'pickup' ? '取货' : '送达'}凭证` : undefined}
+                        hoverClass={proof.status === 'active' && proof.url ? 'merchant-detail-control--pressed' : 'none'}
+                        onClick={proof.status === 'active' && proof.url ? () => void previewProofs(proof.proofPublicId) : undefined}>
+                        {proof.status === 'active' && proof.url ? (
                           <Image className='merchant-detail-photo-item__image' src={proof.url} mode='aspectFill' />
                         ) : (
                           <Text>{proofStatusLabel(proof)}</Text>
                         )}
                       </View>
-                      <Text className={`merchant-detail-photo-item__caption ${proof.url ? 'merchant-detail-photo-item__caption--ready' : 'merchant-detail-photo-item__caption--pending'}`}>
+                      <Text className={`merchant-detail-photo-item__caption ${proof.status === 'active' && proof.url ? 'merchant-detail-photo-item__caption--ready' : 'merchant-detail-photo-item__caption--pending'}`}>
                         {proof.proofType === 'pickup' ? '取货凭证' : '送达凭证'}
                       </Text>
                     </View>
@@ -387,6 +448,16 @@ function MerchantOrderDetailContent() {
           ) : null}
         </View>
       </ScrollView>
+      {order?.riderUserId ? <View className='merchant-detail-action-bar'>
+        <View className='merchant-detail-action-bar__identity'>
+          <Text className='merchant-detail-action-bar__name'>骑手 #{order.riderUserId}</Text>
+          <Text className='merchant-detail-action-bar__hint'>本单配送联系</Text>
+        </View>
+        <View className='merchant-detail-action-bar__contact' hoverClass='merchant-detail-control--pressed'
+          ariaRole='button' ariaLabel='联系骑手' onClick={openConversation}>
+          <MerchantHomeIcon name='message' className='merchant-detail-rider-card__message-icon' /><Text>联系骑手</Text>
+        </View>
+      </View> : null}
     </View>
   )
 }
