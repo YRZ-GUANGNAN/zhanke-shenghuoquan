@@ -214,11 +214,14 @@ page {
   color: $text-tertiary;
 }
 
-.rider-grab-task-summary__divider {
-  align-self: center;
+.rider-grab-task-summary__stat + .rider-grab-task-summary__stat::before {
+  position: absolute;
+  top: 26rpx;
+  bottom: 26rpx;
+  left: 0;
   width: 1rpx;
-  height: 64rpx;
   background: $border-subtle;
+  content: '';
 }
 
 .rider-grab-refresh {
@@ -352,6 +355,15 @@ page {
   border-color: color.mix($brand-primary, $border-subtle, 22%);
 }
 
+.rider-order-card--busy {
+  border-color: color.mix($brand-primary, $border-subtle, 45%);
+}
+
+.rider-order-card--busy .rider-order-card__grab:active,
+.rider-order-card__secondary--disabled:active {
+  transform: none;
+}
+
 .rider-order-card__top,
 .rider-order-card__bottom {
   display: flex;
@@ -380,6 +392,14 @@ page {
 .rider-order-card__dot {
   flex: 0 0 auto;
   color: $text-tertiary;
+}
+
+.rider-order-card__created-at {
+  @include ref.type(meta);
+  display: block;
+  margin-top: 8rpx;
+  color: $text-tertiary;
+  font-variant-numeric: tabular-nums;
 }
 
 .rider-order-card__fee {
@@ -629,10 +649,74 @@ page {
   font-weight: 650;
 }
 
+.rider-order-card__feedback-wrap {
+  margin-top: 16rpx;
+  padding-top: 16rpx;
+  border-top: 1rpx solid $border-subtle;
+}
+
+.rider-order-card__progress,
+.rider-order-card__feedback {
+  @include ref.type(meta);
+  @include ref.wrap;
+  min-width: 0;
+  line-height: 1.6;
+}
+
+.rider-order-card__progress {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+  color: $text-secondary;
+}
+
+.rider-order-card__progress-dot {
+  flex: 0 0 auto;
+  width: 10rpx;
+  height: 10rpx;
+  margin-top: 13rpx;
+  border-radius: 50%;
+  background: $brand-primary;
+  animation: rider-progress-pulse 1.2s ease-in-out infinite;
+}
+
+.rider-order-card__progress--reviewing .rider-order-card__progress-dot {
+  background: $rider-warning;
+}
+
+.rider-order-card__feedback {
+  color: $text-secondary;
+}
+
+.rider-order-card__progress + .rider-order-card__feedback {
+  margin-top: 8rpx;
+}
+
+.rider-order-card__feedback--success {
+  color: $rider-success;
+}
+
+.rider-order-card__feedback--error {
+  color: $rider-danger;
+}
+
+.rider-order-card__feedback--warning {
+  color: $rider-warning;
+}
+
+@keyframes rider-progress-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
 .rider-grab-error {
   @include ref.type(meta);
   @include ref.wrap;
   margin-bottom: 18rpx;
+  min-height: 72rpx;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
   padding: 18rpx 20rpx;
   border: 1rpx solid color.mix($rider-warning, $border-subtle, 24%);
   border-radius: 16rpx;
@@ -846,7 +930,8 @@ page {
     transition: none;
   }
 
-  .rider-grab-refresh__icon--spin {
+  .rider-grab-refresh__icon--spin,
+  .rider-order-card__progress-dot {
     animation: none;
   }
 }
