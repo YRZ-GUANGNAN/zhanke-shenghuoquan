@@ -1,0 +1,16 @@
+@use '../styles/design-tokens.scss' as *;
+.delivery-workspace-nav {
+  flex: 0 0 auto; display: flex; align-items: stretch; width: 100%; box-sizing: border-box;
+  padding: 6PX 8PX calc(6PX + env(safe-area-inset-bottom)); background: $bg-surface;
+  border-top: 1PX solid $border-subtle;
+}
+.delivery-workspace-nav__item {
+  flex: 1; min-width: 0; min-height: 48PX; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 4PX; color: $text-secondary;
+  font-size: 12PX; line-height: 16PX; transition: opacity 120ms, transform 120ms;
+}
+.delivery-workspace-nav__icon { width: 24PX; height: 24PX; }
+.delivery-workspace-nav__item:not(.delivery-workspace-nav__item--active) .delivery-workspace-nav__icon { filter: grayscale(1); opacity: .72; }
+.delivery-workspace-nav__item--active { color: $brand-primary-strong; font-weight: 600; }
+.delivery-workspace-nav__item--pressed { opacity: .7; transform: scale(.97); }
+@media (prefers-reduced-motion: reduce) { .delivery-workspace-nav__item { transition: none; transform: none; } }

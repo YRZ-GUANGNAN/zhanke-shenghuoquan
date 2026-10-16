@@ -27,6 +27,7 @@ func NewHandler(
 }
 
 func (h *Handler) Register(group *gin.RouterGroup) {
+	group.GET("/order-intake", h.orderIntake)
 	group.POST("/orders", h.create)
 	group.GET("/orders", h.list)
 	group.GET("/orders/:id", h.detail)
@@ -36,16 +37,34 @@ func (h *Handler) Register(group *gin.RouterGroup) {
 	}
 }
 
+func (h *Handler) orderIntake(c *gin.Context) {
+	// This release supports manual delivery orders only. Selecting provenance
+	// on a form does not authorize or connect a third-party merchant account.
+	response.OK(c, OrderIntakeView{
+		ManualAvailable:   true,
+		ExternalAvailable: false,
+		Platforms: []OrderIntakePlatformView{
+			{Platform: delivery.SourceTaobao, Label: "淘宝闪购", Connected: false},
+			{Platform: delivery.SourceJD, Label: "京东", Connected: false},
+			{Platform: delivery.SourceMeituan, Label: "美团", Connected: false},
+		},
+	})
+}
+
 func (h *Handler) create(c *gin.Context) {
 	var req struct {
-		ClientRequestID string `json:"clientRequestId"`
-		PickupName      string `json:"pickupName"`
-		PickupPhone     string `json:"pickupPhone"`
-		PickupAddress   string `json:"pickupAddress"`
-		RecipientName   string `json:"recipientName"`
-		RecipientPhone  string `json:"recipientPhone"`
-		DeliveryAddress string `json:"deliveryAddress"`
-		Remark          string `json:"remark"`
+		ClientRequestID string                  `json:"clientRequestId"`
+		SourcePlatform  delivery.SourcePlatform `json:"sourcePlatform"`
+		PickupCode      string                  `json:"pickupCode"`
+		SourceOrderID   string                  `json:"sourceOrderId"`
+		SourceShopID    string                  `json:"sourceShopId"`
+		PickupName      string                  `json:"pickupName"`
+		PickupPhone     string                  `json:"pickupPhone"`
+		PickupAddress   string                  `json:"pickupAddress"`
+		RecipientName   string                  `json:"recipientName"`
+		RecipientPhone  string                  `json:"recipientPhone"`
+		DeliveryAddress string                  `json:"deliveryAddress"`
+		Remark          string                  `json:"remark"`
 	}
 	if c.ShouldBindJSON(&req) != nil {
 		response.Fail(c, http.StatusBadRequest, "invalid request")
@@ -57,6 +76,8 @@ func (h *Handler) create(c *gin.Context) {
 	}
 	value, err := h.service.CreateOrder(c.Request.Context(), delivery.CreateDispatchInput{
 		MerchantUserID: h.currentUserID(c), MerchantRequestID: requestID,
+		SourcePlatform: req.SourcePlatform, PickupCode: req.PickupCode,
+		SourceOrderID: req.SourceOrderID, SourceShopID: req.SourceShopID,
 		Pickup:    delivery.Contact{Name: req.PickupName, Phone: req.PickupPhone, Address: req.PickupAddress},
 		Recipient: delivery.Contact{Name: req.RecipientName, Phone: req.RecipientPhone, Address: req.DeliveryAddress},
 		Remark:    req.Remark,
@@ -156,7 +177,7 @@ func (h *Handler) write(c *gin.Context, value any, err error) {
 	case errors.Is(err, delivery.ErrForbiddenOrder), errors.Is(err, delivery.ErrNotFound):
 		response.Fail(c, http.StatusNotFound, "delivery order not found")
 	case errors.Is(err, delivery.ErrConcurrentUpdate), errors.Is(err, delivery.ErrInvalidTransition),
-		errors.Is(err, delivery.ErrIdempotencyConflict):
+		errors.Is(err, delivery.ErrIdempotencyConflict), errors.Is(err, delivery.ErrSourceOrderExists):
 		response.Fail(c, http.StatusConflict, err.Error())
 	case errors.Is(err, delivery.ErrInvalidRecord), errors.Is(err, delivery.ErrInvalidULID),
 		errors.Is(err, delivery.ErrAmountOverflow):

@@ -50,32 +50,36 @@ type MerchantFeeOverrideView struct {
 }
 
 type OrderView struct {
-	DeliveryOrderPublicID string          `json:"deliveryOrderPublicId"`
-	MerchantRequestID     *string         `json:"merchantRequestId,omitempty"`
-	MerchantUserID        uint64          `json:"merchantUserId"`
-	RiderUserID           *uint64         `json:"riderUserId,omitempty"`
-	PickupContactName     string          `json:"pickupContactName"`
-	PickupContactPhone    string          `json:"pickupContactPhone"`
-	PickupAddress         string          `json:"pickupAddress"`
-	RecipientName         string          `json:"recipientName"`
-	RecipientPhone        string          `json:"recipientPhone"`
-	DeliveryAddress       string          `json:"deliveryAddress"`
-	Remark                string          `json:"remark"`
-	DeliveryFeeCents      uint64          `json:"deliveryFeeCents"`
-	RiderFeeCents         uint64          `json:"riderFeeCents"`
-	PlatformCutCents      uint64          `json:"platformCutCents"`
-	Status                delivery.Status `json:"status"`
-	RowVersion            uint64          `json:"rowVersion"`
-	ReadyForClaimAt       *time.Time      `json:"readyForClaimAt"`
-	ClaimedAt             *time.Time      `json:"claimedAt"`
-	ToPickupAt            *time.Time      `json:"toPickupAt"`
-	PickedUpAt            *time.Time      `json:"pickedUpAt"`
-	DeliveringAt          *time.Time      `json:"deliveringAt"`
-	DeliveredAt           *time.Time      `json:"deliveredAt"`
-	PaymentFailedAt       *time.Time      `json:"paymentFailedAt"`
-	CancelledAt           *time.Time      `json:"cancelledAt"`
-	CreatedAt             time.Time       `json:"createdAt"`
-	UpdatedAt             time.Time       `json:"updatedAt"`
+	DeliveryOrderPublicID string                  `json:"deliveryOrderPublicId"`
+	MerchantRequestID     *string                 `json:"merchantRequestId,omitempty"`
+	SourcePlatform        delivery.SourcePlatform `json:"sourcePlatform"`
+	PickupCode            string                  `json:"pickupCode"`
+	SourceOrderID         *string                 `json:"sourceOrderId,omitempty"`
+	SourceShopID          *string                 `json:"sourceShopId,omitempty"`
+	MerchantUserID        uint64                  `json:"merchantUserId"`
+	RiderUserID           *uint64                 `json:"riderUserId,omitempty"`
+	PickupContactName     string                  `json:"pickupContactName"`
+	PickupContactPhone    string                  `json:"pickupContactPhone"`
+	PickupAddress         string                  `json:"pickupAddress"`
+	RecipientName         string                  `json:"recipientName"`
+	RecipientPhone        string                  `json:"recipientPhone"`
+	DeliveryAddress       string                  `json:"deliveryAddress"`
+	Remark                string                  `json:"remark"`
+	DeliveryFeeCents      uint64                  `json:"deliveryFeeCents"`
+	RiderFeeCents         uint64                  `json:"riderFeeCents"`
+	PlatformCutCents      uint64                  `json:"platformCutCents"`
+	Status                delivery.Status         `json:"status"`
+	RowVersion            uint64                  `json:"rowVersion"`
+	ReadyForClaimAt       *time.Time              `json:"readyForClaimAt"`
+	ClaimedAt             *time.Time              `json:"claimedAt"`
+	ToPickupAt            *time.Time              `json:"toPickupAt"`
+	PickedUpAt            *time.Time              `json:"pickedUpAt"`
+	DeliveringAt          *time.Time              `json:"deliveringAt"`
+	DeliveredAt           *time.Time              `json:"deliveredAt"`
+	PaymentFailedAt       *time.Time              `json:"paymentFailedAt"`
+	CancelledAt           *time.Time              `json:"cancelledAt"`
+	CreatedAt             time.Time               `json:"createdAt"`
+	UpdatedAt             time.Time               `json:"updatedAt"`
 }
 
 type MerchantWalletView struct {
@@ -231,6 +235,8 @@ func merchantFeeOverrideView(value delivery.MerchantFeeOverride) MerchantFeeOver
 func orderView(value delivery.Order) OrderView {
 	return OrderView{
 		DeliveryOrderPublicID: value.DeliveryOrderPublicID, MerchantRequestID: value.MerchantRequestID,
+		SourcePlatform: value.SourcePlatform.Effective(), PickupCode: value.PickupCode,
+		SourceOrderID: value.SourceOrderID, SourceShopID: value.SourceShopID,
 		MerchantUserID: value.MerchantUserID, RiderUserID: value.RiderUserID,
 		PickupContactName: value.PickupContactName, PickupContactPhone: value.PickupContactPhone,
 		PickupAddress: value.PickupAddress, RecipientName: value.RecipientName,

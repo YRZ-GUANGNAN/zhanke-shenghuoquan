@@ -19,6 +19,7 @@ page {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   background: $bg-app;
   color: $text-primary;
@@ -340,7 +341,7 @@ page {
   width: 100%;
   max-width: 880PX;
   margin: 0 auto;
-  padding: 16rpx 24rpx calc(40rpx + env(safe-area-inset-bottom));
+  padding: 16rpx 24rpx 24rpx;
   box-sizing: border-box;
 }
 
@@ -384,7 +385,42 @@ page {
 .rider-order-card__heading {
   min-width: 0;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4rpx;
+}
+
+.rider-order-card__source {
+  @include ref.type(author);
+  color: $text-secondary;
+  font-weight: 650;
+}
+
+.rider-order-card__pickup-code {
+  display: block;
+  max-width: 100%;
+  color: $text-primary;
+  font-size: 52rpx;
+  font-size: clamp(24PX, 6.933vw, 32PX);
+  font-weight: 780;
+  line-height: 1.2;
+  letter-spacing: -1rpx;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.rider-order-card__pickup-code--fallback {
+  font-size: 40rpx;
+  font-size: clamp(19PX, 5.333vw, 24PX);
+}
+
+.rider-order-card__pickup-unit { font-size: .5em; margin-left: 4rpx; font-weight: 600; letter-spacing: 0; }
+
+.rider-order-card__meta {
+  margin-top: 16rpx;
+  display: flex;
+  align-items: baseline;
   flex-wrap: wrap;
   gap: 8rpx 16rpx;
 }

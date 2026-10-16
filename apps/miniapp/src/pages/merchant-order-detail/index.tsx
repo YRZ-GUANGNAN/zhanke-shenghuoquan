@@ -15,6 +15,7 @@ import {
 import { getDeliveryOrderFunds, type DeliveryOrderFunds } from '../../services/delivery-payment'
 import { loadPrivateDeliveryProofs, type DeliveryProofImage } from '../../services/delivery-proof'
 import Taro from '../../services/taro'
+import { deliveryPickupLabel, deliverySourceLabel } from '../../utils/delivery-order-source'
 import MerchantHomeIcon from '../merchant-home/merchant-home-icon'
 import './index.scss'
 
@@ -245,6 +246,13 @@ function MerchantOrderDetailContent() {
           {order ? (
             <>
               <View className={`merchant-detail-status-card merchant-detail-status-card--${order.status}`}>
+                <View className='merchant-detail-order-identity'>
+                  <Text className='merchant-detail-order-identity__source'>{deliverySourceLabel(order.sourcePlatform)}</Text>
+                  <Text className={`merchant-detail-order-identity__code${order.pickupCode ? '' : ' merchant-detail-order-identity__code--fallback'}`}>
+                    {order.pickupCode?.trim() ? <>{deliveryPickupLabel(order).slice(0, -1)}<Text className='merchant-detail-order-identity__unit'>号</Text></> : deliveryPickupLabel(order)}
+                  </Text>
+                  {order.pickupCode ? <Text className='merchant-detail-order-identity__caption'>取货时核对平台与取餐号</Text> : null}
+                </View>
                 <View className='merchant-detail-status-card__main'>
                   <Text className='merchant-detail-status-card__eyebrow'>当前配送状态</Text>
                   <Text className='merchant-detail-status-card__state'>{statusCopy[order.status].label}</Text>

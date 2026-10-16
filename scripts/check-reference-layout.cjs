@@ -11,9 +11,15 @@ const read = (name) => fs.readFileSync(path.join(src, name), 'utf8')
 const routes = [...read('app.config.ts').matchAll(/'pages\/([^']+)\/index'/g)].map(match => match[1])
 const excluded = ['campus-guide']
 const compiled = new Map()
-assert.equal(routes.length, 28, '路由变化需要显式复审覆盖表，不得顺带开启历史页面')
+assert.equal(routes.length, 30, '路由变化需要显式复审覆盖表，不得顺带开启历史页面')
 for (const route of routes) {
-  const source = read(`pages/${route}/index.scss`)
+  let styleRoute = route
+  if (route === 'rider-messages') {
+    assert.match(read(`pages/${route}/index.tsx`), /DeliveryMessagesContent role='rider' identityAllowed=\{allowed\}/, '骑手消息必须复用有身份守卫的配送消息组件')
+    assert.match(read(`pages/${route}/index.tsx`), /from '\.\.\/merchant-messages\/content'/, '不能从Taro页面模块导入共享组件')
+    styleRoute = 'merchant-messages'
+  }
+  const source = read(`pages/${styleRoute}/index.scss`)
   if (excluded.includes(route)) {
     assert.doesNotMatch(source, /reference-layout|ref\./, '咨询页面保持不变')
     continue
@@ -21,7 +27,7 @@ for (const route of routes) {
   assert.match(source, /@use ['"]\.\.\/\.\.\/styles\/reference-layout\.scss['"] as ref/, `${route} 必须显式接入规范`)
   assert.match(source, /@include ref\.page-foundation/, `${route} 缺少作用域内控件适配`)
   assert.match(source, /@include ref\.(type|wrap|touch)/, `${route} 不能只接入基础而没有语义适配`)
-  const css = sass.compile(path.join(src, `pages/${route}/index.scss`), { silenceDeprecations: ['legacy-js-api', 'global-builtin', 'color-functions', 'import'] }).css
+  const css = sass.compile(path.join(src, `pages/${styleRoute}/index.scss`), { silenceDeprecations: ['legacy-js-api', 'global-builtin', 'color-functions', 'import'] }).css
   compiled.set(route, css)
   assert.match(css, /min-height: 44PX/, `${route} 控件保留物理触控尺寸`)
   assert.match(css, /overflow-wrap: anywhere/, `${route} 长文本不能横向溢出`)

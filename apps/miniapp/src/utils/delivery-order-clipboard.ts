@@ -1,4 +1,6 @@
 export type DeliveryClipboardField =
+  | 'sourcePlatform'
+  | 'pickupCode'
   | 'pickupContact'
   | 'pickupPhone'
   | 'pickupAddress'
@@ -18,6 +20,11 @@ export interface DeliveryClipboardParseResult {
 type DeliverySection = 'pickup' | 'receiver' | null
 
 const explicitLabels: Record<string, DeliveryClipboardField> = {
+  来源平台: 'sourcePlatform',
+  订单来源: 'sourcePlatform',
+  外卖平台: 'sourcePlatform',
+  取餐号: 'pickupCode',
+  取餐编号: 'pickupCode',
   取货联系人: 'pickupContact',
   取件人: 'pickupContact',
   商家联系人: 'pickupContact',
@@ -59,6 +66,9 @@ const genericLabels: Record<Exclude<DeliverySection, null>, Record<string, Deliv
 const continuationFields = new Set<DeliveryClipboardField>(['pickupAddress', 'receiverAddress', 'remark'])
 
 export const deliveryClipboardTemplate = [
+  '来源平台：',
+  '取餐号：',
+  '',
   '取货信息',
   '联系人：',
   '电话：',
@@ -70,6 +80,18 @@ export const deliveryClipboardTemplate = [
   '送货地址：',
   '备注：',
 ].join('\n')
+
+const sourcePlatforms: Record<string, string> = {
+  本店: 'local', 本店自发: 'local', 校内配送: 'local', 自行发单: 'local', local: 'local',
+  淘宝: 'taobao', 淘宝闪购: 'taobao', taobao: 'taobao',
+  京东: 'jd', 京东外卖: 'jd', jd: 'jd',
+  美团: 'meituan', 美团外卖: 'meituan', meituan: 'meituan',
+}
+
+function normalizedPickupCode(value: string): string | undefined {
+  const candidate = value.trim().replace(/^#/, '').replace(/号$/, '').trim()
+  return /^[a-zA-Z0-9][a-zA-Z0-9-]{0,15}$/.test(candidate) ? candidate : undefined
+}
 
 function cleanLine(value: string) {
   return value
@@ -142,8 +164,29 @@ export function parseDeliveryOrderClipboard(source: string): DeliveryClipboardPa
 
       const labeled = splitLabeledLine(line, section)
       if (labeled) {
-        if (labeled.value) values[labeled.field] = labeled.value
+        const value = labeled.field === 'sourcePlatform'
+          ? sourcePlatforms[labeled.value.toLowerCase()]
+          : labeled.field === 'pickupCode' ? normalizedPickupCode(labeled.value) : labeled.value
+        if (value) values[labeled.field] = value
+        else if (labeled.value) ignoredLines.push(line)
         continuationField = continuationFields.has(labeled.field) ? labeled.field : null
+        return
+      }
+
+      // A full platform order ID is not a pickup number. Keep it out of both
+      // pickup labels and multiline addresses; only the external adapter owns it.
+      if (/^(?:(?:淘宝闪购|淘宝|京东外卖|京东|美团外卖|美团)\s*)?(?:平台订单号|外部订单号|订单号|配送单号|订单ID|deliveryOrderPublicId|sourceOrderId)\s*[:：]/i.test(line)) {
+        ignoredLines.push(line)
+        continuationField = null
+        return
+      }
+
+      // Recognize standalone counter labels only. Do not mine ordinary remarks
+      // or address continuation lines for numbers that happen to name a platform.
+      const counter = !continuationField && line.match(/^(淘宝闪购|淘宝|京东外卖|京东|美团外卖|美团)\s*#?\s*([a-zA-Z0-9][a-zA-Z0-9-]{0,15})\s*号$/)
+      if (counter) {
+        values.sourcePlatform = sourcePlatforms[counter[1]]
+        values.pickupCode = counter[2]
         return
       }
 

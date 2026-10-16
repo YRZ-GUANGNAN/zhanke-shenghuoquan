@@ -124,6 +124,46 @@ page {
   padding: 32rpx 0 28rpx;
 }
 
+.merchant-detail-order-identity {
+  min-width: 0;
+  margin-bottom: 20rpx;
+}
+
+.merchant-detail-order-identity__source {
+  @include ref.type(author);
+  display: block;
+  color: $text-secondary;
+  font-weight: 650;
+}
+
+.merchant-detail-order-identity__code {
+  display: block;
+  margin-top: 6rpx;
+  color: $text-primary;
+  font-size: 68rpx;
+  font-size: clamp(28PX, 9.067vw, 40PX);
+  line-height: 1.2;
+  font-weight: 780;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -1rpx;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.merchant-detail-order-identity__code--fallback {
+  font-size: 48rpx;
+  font-size: clamp(22PX, 6.4vw, 28PX);
+}
+
+.merchant-detail-order-identity__unit { font-size: .5em; margin-left: 6rpx; font-weight: 600; letter-spacing: 0; }
+
+.merchant-detail-order-identity__caption {
+  @include ref.type(meta);
+  display: block;
+  margin-top: 10rpx;
+  color: $text-tertiary;
+}
+
 .merchant-detail-status-card__main {
   min-width: 0;
 }

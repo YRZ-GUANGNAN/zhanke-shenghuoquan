@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
-import { useDidShow } from '@tarojs/taro'
+import { getCurrentInstance, useDidShow } from '@tarojs/taro'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import { AppDialog } from '../../components/ui'
+import DeliveryWorkspaceNav from '../../components/delivery-workspace-nav'
 import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
 import { isApiError } from '../../services/api'
 import {
@@ -23,6 +24,8 @@ import {
 import { centsToYuan, type DeliveryStatus } from '../../services/delivery-merchant'
 import { chooseAndUploadImages, waitForMediaApproval } from '../../services/media'
 import Taro from '../../services/taro'
+import { useSessionStore } from '../../stores/session'
+import { deliveryPickupLabel, deliverySourceLabel } from '../../utils/delivery-order-source'
 import RiderWorkbenchIcon from './rider-workbench-icon'
 import './index.scss'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
@@ -110,7 +113,8 @@ export default function DeliveryRiderPage() {
   const visibility = useFeatureVisibility()
   const canClaim = visibility.delivery && visibility.rider
   const identityAllowed = useIdentityGuard('rider')
-  const [activeTab, setActiveTab] = useState<RiderTab>('grab')
+  const accountId = useSessionStore((state) => state.profile.id)
+  const [activeTab, setActiveTab] = useState<RiderTab>(() => getCurrentInstance().router?.params.tab === 'tasks' ? 'pickup' : 'grab')
   const [me, setMe] = useState<DeliveryRiderMe | null>(null)
   const [claimable, setClaimable] = useState<ClaimableDeliveryOrder[]>([])
   const [pickupOrders, setPickupOrders] = useState<AssignedDeliveryOrder[]>([])
@@ -140,19 +144,27 @@ export default function DeliveryRiderPage() {
   const pageMountedRef = useRef(true)
   const pageActiveRef = useRef(identityAllowed)
   const identityAllowedRef = useRef(identityAllowed)
+  const accountRef = useRef(accountId)
+  const dataAccountRef = useRef(accountId)
+  const activeLoad = useRef<number | null>(null)
+  const switchLockRef = useRef(false)
   identityAllowedRef.current = identityAllowed
+  accountRef.current = accountId
 
   const invalidatePageOperations = useCallback(() => {
     pageActiveRef.current = false
     operationEpochRef.current += 1
     requestVersion.current += 1
+    activeLoad.current = null
     busyByOrderRef.current = {}
   }, [])
 
   const createOperationGuard = useCallback(() => {
     const epoch = operationEpochRef.current
+    const account = accountRef.current
     return () => pageActiveRef.current
       && identityAllowedRef.current
+      && accountRef.current === account
       && operationEpochRef.current === epoch
   }, [])
 
@@ -165,6 +177,26 @@ export default function DeliveryRiderPage() {
   // losing the rider identity invalidates its unfinished operations.
   useEffect(() => {
     pageActiveRef.current = identityAllowed
+    switchLockRef.current = false
+    setLoading(false)
+    setLoadingMore(false)
+    if (accountId && accountId !== dataAccountRef.current) {
+      dataAccountRef.current = accountId
+      setMe(null)
+      setClaimable([])
+      setPickupOrders([])
+      setDeliveryOrders([])
+      setClaimablePage(1)
+      setPickupPage(1)
+      setDeliveryPage(1)
+      setClaimableTotal(0)
+      setPickupTotal(0)
+      setDeliveryTotal(0)
+      setCompletedTotal(0)
+      setHasLoadedOrders(false)
+      setError('')
+      setLoadMoreError('')
+    }
     if (identityAllowed) {
       setBusyByOrder({})
       setProofProgressByOrder({})
@@ -173,7 +205,7 @@ export default function DeliveryRiderPage() {
       updateReleaseCandidate(null)
     }
     return invalidatePageOperations
-  }, [identityAllowed, invalidatePageOperations])
+  }, [identityAllowed, accountId, invalidatePageOperations])
 
   const activeTaskCount = pickupTotal + deliveryTotal
   useEffect(() => { if (!canClaim && activeTab === 'grab') setActiveTab('pickup') }, [canClaim, activeTab])
@@ -302,9 +334,10 @@ export default function DeliveryRiderPage() {
 
   const load = useCallback(async () => {
     const shouldContinue = createOperationGuard()
-    if (!shouldContinue()) return
+    if (!shouldContinue() || activeLoad.current === requestVersion.current) return
     const version = requestVersion.current + 1
     requestVersion.current = version
+    activeLoad.current = version
     setLoading(true)
     setLoadingMore(false)
     setError('')
@@ -349,9 +382,14 @@ export default function DeliveryRiderPage() {
       setError(message)
       await Taro.showToast({ title: message, icon: 'none' }).catch(() => {})
     } finally {
+      if (activeLoad.current === version) activeLoad.current = null
       if (shouldContinue() && requestVersion.current === version) setLoading(false)
     }
   }, [createOperationGuard, canClaim])
+
+  useEffect(() => {
+    if (identityAllowed) void load()
+  }, [identityAllowed, accountId, load])
 
   useDidShow(() => {
     void load()
@@ -608,26 +646,36 @@ export default function DeliveryRiderPage() {
 
   const switchToStudent = async () => {
     const shouldContinue = createOperationGuard()
-    if (!shouldContinue()) return
+    if (!shouldContinue() || switchLockRef.current) return
+    const previous = useSessionStore.getState()
+    const account = previous.profile.id
+    const token = previous.token
+    const current = () => {
+      const session = useSessionStore.getState()
+      return pageMountedRef.current && session.status === 'authenticated'
+        && session.profile.id === account && session.token === token
+    }
+    switchLockRef.current = true
     let identitySwitched = false
     try {
-      const store = await import('../../stores/session')
       if (!shouldContinue()) return
-      await store.useSessionStore.getState().switchIdentity('student')
+      const identity = await previous.switchIdentity('student')
+      if (!current() || useSessionStore.getState().identity !== identity || identity.currentIdentity !== 'student') return
       identitySwitched = true
       invalidatePageOperations()
-      if (!pageMountedRef.current) return
       await Taro.reLaunch({ url: identityRoute('student') })
     } catch (value) {
-      if (identitySwitched && pageMountedRef.current) {
+      if (identitySwitched && current()) {
         await Taro.showToast({ title: '身份已切换，页面跳转失败，请重新进入小程序', icon: 'none' }).catch(() => {})
-      } else if (shouldContinue()) {
+      } else if (current() && shouldContinue()) {
         await Taro.showToast({ title: errorMessage(value, '身份切换失败'), icon: 'none' }).catch(() => {})
       }
+    } finally {
+      if (current()) switchLockRef.current = false
     }
   }
 
-  if (!identityAllowed) return <View className='rider-grab-page' />
+  if (!identityAllowed || accountId && accountId !== dataAccountRef.current) return <View className='rider-grab-page' />
 
   if (!me || loading && !hasLoadedOrders) {
     return (
@@ -782,6 +830,14 @@ export default function DeliveryRiderPage() {
           )}
         </View>
       </ScrollView>
+      <DeliveryWorkspaceNav
+        role='rider'
+        active={activeTab === 'grab' ? 'grab' : 'tasks'}
+        onSelect={(key) => {
+          if (key === 'grab') setActiveTab(canClaim ? 'grab' : 'pickup')
+          if (key === 'tasks') setActiveTab('pickup')
+        }}
+      />
       <AppDialog
         visible={releaseCandidate !== null}
         title={releaseReviewOnly ? '订单状态已更新' : '确认释放订单'}
@@ -815,13 +871,17 @@ export default function DeliveryRiderPage() {
             <View key={orderId} className={`rider-order-card ${busy ? 'rider-order-card--busy' : ''}`}>
               <View className='rider-order-card__top'>
                 <View className='rider-order-card__heading'>
-                  <Text className='rider-order-card__stage'>待接单</Text>
-                  <View className='rider-order-card__serial'><Text>{shortOrderId(order.deliveryOrderPublicId)}</Text></View>
+                  <Text className='rider-order-card__source'>{deliverySourceLabel(order.sourcePlatform)}</Text>
+                  <Text className={`rider-order-card__pickup-code${order.pickupCode ? '' : ' rider-order-card__pickup-code--fallback'}`}>{order.pickupCode?.trim() ? <>{deliveryPickupLabel(order).slice(0, -1)}<Text className='rider-order-card__pickup-unit'>号</Text></> : deliveryPickupLabel(order)}</Text>
                 </View>
                 <View className='rider-order-card__fee'>
                   <Text>配送费 </Text>
                   <Text className='rider-order-card__fee-price'>¥{centsToYuan(order.deliveryFeeCents)}</Text>
                 </View>
+              </View>
+              <View className='rider-order-card__meta'>
+                <Text className='rider-order-card__stage'>待接单</Text>
+                <View className='rider-order-card__serial'><Text>配送单 {shortOrderId(order.deliveryOrderPublicId)}</Text></View>
               </View>
               <Text className='rider-order-card__created-at'>{formatTime(order.createdAt)} 创建</Text>
 
@@ -890,13 +950,17 @@ export default function DeliveryRiderPage() {
       <View key={orderId} className={`rider-order-card rider-order-card--assigned ${busy ? 'rider-order-card--busy' : ''}`}>
         <View className='rider-order-card__top'>
           <View className='rider-order-card__heading'>
-            <Text className={`rider-order-card__stage ${deliveryStage ? 'rider-order-card__stage--delivery' : ''}`}>{statusText[order.status]}</Text>
-            <View className='rider-order-card__serial'><Text>{shortOrderId(order.deliveryOrderPublicId)}</Text></View>
+            <Text className='rider-order-card__source'>{deliverySourceLabel(order.sourcePlatform)}</Text>
+            <Text className={`rider-order-card__pickup-code${order.pickupCode ? '' : ' rider-order-card__pickup-code--fallback'}`}>{order.pickupCode?.trim() ? <>{deliveryPickupLabel(order).slice(0, -1)}<Text className='rider-order-card__pickup-unit'>号</Text></> : deliveryPickupLabel(order)}</Text>
           </View>
           <View className='rider-order-card__fee'>
             <Text>配送费 </Text>
             <Text className='rider-order-card__fee-price'>¥{centsToYuan(order.deliveryFeeCents)}</Text>
           </View>
+        </View>
+        <View className='rider-order-card__meta'>
+          <Text className={`rider-order-card__stage ${deliveryStage ? 'rider-order-card__stage--delivery' : ''}`}>{statusText[order.status]}</Text>
+          <View className='rider-order-card__serial'><Text>配送单 {shortOrderId(order.deliveryOrderPublicId)}</Text></View>
         </View>
         <Text className='rider-order-card__created-at'>{formatTime(order.createdAt)} 创建</Text>
 

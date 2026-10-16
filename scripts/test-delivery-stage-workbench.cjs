@@ -118,7 +118,17 @@ function loadPage(relativePath, imports, renderer) {
 }
 
 function riderHarness(overrides = {}) {
-  let show, hide, identityAllowed = true
+  let show, hide, identityAllowed = true, accountId = 101
+  let identity = { currentIdentity: 'rider' }, switchCalls = 0, relaunches = 0
+  const switchIdentity = async () => {
+    switchCalls++
+    const result = overrides.switchIdentity ? await overrides.switchIdentity() : { currentIdentity: 'student' }
+    identity = result
+    return result
+  }
+  const session = () => ({ profile: { id: accountId }, token: `TOKEN-${accountId}`, status: 'authenticated', identity, switchIdentity })
+  const sessionStore = (select) => select(session())
+  sessionStore.getState = session
   const renderer = hookRenderer()
   const toasts = []
   let meCalls = 0
@@ -158,14 +168,17 @@ function riderHarness(overrides = {}) {
     showLoading: () => { throw new Error('不得使用全屏 loading 阻塞其他订单') },
     hideLoading: () => {},
     navigateTo: async () => {}, makePhoneCall: async () => {},
+    reLaunch: async () => { relaunches++ },
   }
   const imports = {
     '@tarojs/components': { View: 'View', Text: 'Text', ScrollView: 'ScrollView' },
     '@tarojs/taro': {
+      getCurrentInstance: () => ({ router: { params: {} } }),
       useDidShow: (fn) => { show = fn },
       useDidHide: (fn) => { hide = fn },
     },
     '../../components/capsule-page-header': { CapsuleSystemRow: 'CapsuleSystemRow' },
+    '../../components/delivery-workspace-nav': 'DeliveryWorkspaceNav',
     '../../components/ui': { AppDialog: 'AppDialog' },
     '../../hooks/use-identity-guard': { useIdentityGuard: () => identityAllowed, identityRoute: () => '' },
     '../../hooks/use-feature-visibility': { useFeatureVisibility: () => ({ delivery: true, rider: true }) },
@@ -177,6 +190,8 @@ function riderHarness(overrides = {}) {
     '../../services/delivery-merchant': { centsToYuan: (value) => String(value / 100) },
     '../../services/media': media,
     '../../services/taro': taro,
+    '../../stores/session': { useSessionStore: sessionStore },
+    '../../utils/delivery-order-source': { deliverySourceLabel: () => '校内配送', deliveryPickupLabel: (value) => value.pickupCode ? `${value.pickupCode}号` : '配送单' },
     './rider-workbench-icon': 'Icon',
     './index.scss': {},
   }
@@ -191,8 +206,10 @@ function riderHarness(overrides = {}) {
   return {
     services, toasts, render, flush, card, primary,
     get tree() { return renderer.tree }, get meCalls() { return meCalls },
+    get switchCalls() { return switchCalls }, get relaunches() { return relaunches },
     async mount() { render(); show(); await flush() },
     async setIdentityAllowed(value) { identityAllowed = value; render(); await flush() },
+    async setAccount(value) { accountId = value; render(); await flush() },
     async unmount() { renderer.unmount(); await flush() },
     async hide() { hide?.(); await flush() },
     async tab(label) {
@@ -204,7 +221,17 @@ function riderHarness(overrides = {}) {
 }
 
 function merchantHarness(kind, overrides = {}) {
-  let show, orderCalls = 0
+  let show, orderCalls = 0, identityAllowed = true, accountId = 101
+  let identity = { currentIdentity: 'merchant' }, switchCalls = 0, relaunches = 0
+  const switchIdentity = async () => {
+    switchCalls++
+    const result = overrides.switchIdentity ? await overrides.switchIdentity() : { currentIdentity: 'student' }
+    identity = result
+    return result
+  }
+  const session = () => ({ profile: { id: accountId }, token: `TOKEN-${accountId}`, status: 'authenticated', identity, switchIdentity })
+  const sessionStore = (select) => select(session())
+  sessionStore.getState = session
   const renderer = hookRenderer()
   const services = {
     listMerchantDeliveryOrders: async () => page([]),
@@ -223,9 +250,10 @@ function merchantHarness(kind, overrides = {}) {
     },
     '../../components/ui': { AppIconButton: 'AppIconButton' },
     '../../components/IdentitySwitchModal': 'IdentitySwitchModal',
+    '../../components/delivery-workspace-nav': 'DeliveryWorkspaceNav',
     '../../components/runtime-session-gate': 'RuntimeSessionGate',
     '../../feature-flags': { deliveryPaymentEnabled: true },
-    '../../hooks/use-identity-guard': { useIdentityGuard: () => true, identityRoute: () => '' },
+    '../../hooks/use-identity-guard': { useIdentityGuard: () => identityAllowed, identityRoute: () => '' },
     '../../hooks/use-feature-visibility': { useFeatureVisibility: () => ({ delivery: true, merchant: true }) },
     '../../hooks/use-viewport-refresh': { useViewportRefresh: () => ({}) },
     '../../services/a-user': { getIdentityApplication: async () => ({ status: 'approved', merchantName: '测试商家', merchantAddress: '测试取货点' }) },
@@ -241,9 +269,10 @@ function merchantHarness(kind, overrides = {}) {
     '../../services/delivery-proof': { loadPrivateDeliveryProofs: (...args) => services.loadPrivateDeliveryProofs(...args) },
     '../../services/taro': {
       getCurrentInstance: () => ({ router: { params: { orderId: 'ORDER-A' } } }),
-      showToast: async () => {}, navigateTo: async () => {}, navigateBack: async () => {}, reLaunch: async () => {},
+      showToast: async () => {}, navigateTo: async () => {}, navigateBack: async () => {}, reLaunch: async () => { relaunches++ },
     },
-    '../../stores/session': { useSessionStore: (select) => select({ profile: {}, switchIdentity: async () => {} }) },
+    '../../stores/session': { useSessionStore: sessionStore },
+    '../../utils/delivery-order-source': { deliverySourceLabel: () => '校内配送', deliveryPickupLabel: (value) => value.pickupCode ? `${value.pickupCode}号` : '配送单' },
     './merchant-home-icon': 'Icon',
     '../merchant-home/merchant-home-icon': 'Icon',
     './index.scss': {},
@@ -257,7 +286,10 @@ function merchantHarness(kind, overrides = {}) {
   return {
     services, one, flush: renderer.flush,
     get tree() { return renderer.tree }, get orderCalls() { return orderCalls },
+    get switchCalls() { return switchCalls }, get relaunches() { return relaunches },
     async mount() { renderer.render(); show?.(); await renderer.flush() },
+    async setIdentityAllowed(value) { identityAllowed = value; renderer.render(); await renderer.flush() },
+    async setAccount(value) { accountId = value; renderer.render(); await renderer.flush() },
     async refresh() {
       if (kind === 'merchant-home') show()
       else one('merchant-detail-nav__refresh').props.onClick()
@@ -273,7 +305,7 @@ function merchantHarness(kind, overrides = {}) {
       const found = nodes(renderer.tree, (node) => hasClass(node, 'merchant-home-tab') && node.props.key === key)[0]
       return text(nodes(found, (node) => hasClass(node, 'merchant-home-tab__count')))
     },
-    serials() { return nodes(renderer.tree, (node) => hasClass(node, 'merchant-order-card__serial')).map(text) },
+    serials() { return nodes(renderer.tree, (node) => hasClass(node, 'merchant-order-card')).map((node) => node.props.key) },
     timeline() {
       return nodes(renderer.tree, (node) => hasClass(node, 'merchant-detail-timeline__row')).map((row) => ({
         key: row.props.key,
@@ -586,6 +618,102 @@ async function run() {
     assert.equal(submitted, 1, '打开系统相册产生的 onHide 不应取消正常凭证提交')
     assert.equal(app.toasts.filter((toast) => toast.icon === 'success').length, 1)
     console.log('PASS 系统相册暂时隐藏页面仍可完成正常凭证提交')
+  }
+  {
+    for (const role of ['merchant', 'rider']) {
+      for (const accountChanged of [false, true]) {
+        const pending = deferred()
+        const options = { switchIdentity: () => pending.promise }
+        const app = role === 'merchant' ? merchantHarness('merchant-home', options) : riderHarness(options)
+        await app.mount()
+        const action = role === 'merchant'
+          ? nodes(app.tree, node => node.type === 'IdentitySwitchModal')[0].props.onConfirm
+          : nodes(app.tree, node => hasClass(node, 'rider-grab-user__switch'))[0].props.onClick
+        action(); action(); await app.flush()
+        assert.equal(app.switchCalls, 1, `${role} 身份切换同帧防重`)
+        if (accountChanged) await app.setAccount(202)
+        pending.resolve({ currentIdentity: 'student' }); await app.flush()
+        assert.equal(app.relaunches, accountChanged ? 0 : 1, `${role} 仅当前账号成功切换后跳页`)
+      }
+    }
+    console.log('PASS 两端工作台身份切换防重复，旧账号迟到响应不会导航')
+  }
+  {
+    const late = deferred()
+    let account = 'A', listCalls = 0
+    const app = merchantHarness('merchant-home', { listMerchantDeliveryOrders: async (_, __, group) => {
+      listCalls++
+      if (account === 'A') return late.promise
+      return page(group === 'pending' ? [{ ...order('ACCOUNT-B'), pickupAddress: '账户B取货地址' }] : [])
+    } })
+    await app.mount()
+    assert.equal(listCalls, 3, '挂载与 didShow 同时触发不能重复发起三组读取')
+    await app.setIdentityAllowed(false)
+    account = 'B'
+    await app.setAccount(202)
+    await app.setIdentityAllowed(true)
+    assert.match(text(app.tree), /账户B取货地址/, '身份恢复不依赖额外 didShow 就应读取当前账号')
+    late.resolve(page([{ ...order('ACCOUNT-A-LATE'), pickupAddress: '账户A迟到地址' }]))
+    await app.flush()
+    assert.match(text(app.tree), /账户B取货地址/, '旧账号迟到响应不能覆盖当前账号')
+    assert.doesNotMatch(text(app.tree), /账户A迟到地址/)
+    console.log('PASS 商家账号切换作废迟到响应并主动重新加载')
+  }
+  {
+    let rejectReads = false
+    const app = merchantHarness('merchant-home', { listMerchantDeliveryOrders: async (_, __, group) => {
+      if (rejectReads) throw new Error('账号恢复读取失败')
+      return page(group === 'pending' ? [{ ...order('KNOWN-ACCOUNT-A'), pickupAddress: '账户A已知地址' }] : [])
+    } })
+    await app.mount()
+    rejectReads = true
+    await app.setIdentityAllowed(false)
+    await app.setIdentityAllowed(true)
+    assert.match(text(app.tree), /账户A已知地址/, '同账号临时核验失败保留原有数据')
+    await app.setAccount(202)
+    assert.deepEqual(app.serials(), [], '不同账号读取失败时不能继承旧账号数据')
+    assert.equal(app.count('pending'), '—')
+    console.log('PASS 商家同账号恢复保留已知订单，新账号失败不继承旧数据')
+  }
+  {
+    const late = deferred()
+    let account = 'A'
+    const app = riderHarness({ services: {
+      getDeliveryRiderMe: async () => ({ registered: true, rider: { status: 'active', realName: `骑手${account}` } }),
+      listAssignedDeliveryOrders: async (_, __, group) => {
+        if (account === 'A') return late.promise
+        return page(group === 'pickup' ? [order('RIDER-B')] : [])
+      },
+    } })
+    await app.mount()
+    await app.setIdentityAllowed(false)
+    account = 'B'
+    await app.setAccount(202)
+    await app.setIdentityAllowed(true)
+    await app.tab('待取货')
+    assert.ok(app.card('RIDER-B'), '骑手身份恢复应主动读取当前账号任务')
+    late.resolve(page([order('RIDER-A-LATE')]))
+    await app.flush()
+    assert.ok(app.card('RIDER-B'))
+    assert.equal(app.card('RIDER-A-LATE'), undefined)
+    console.log('PASS 骑手账号切换隔离迟到任务并主动恢复加载')
+  }
+  {
+    let rejectReads = false
+    const app = riderHarness({ services: {
+      listAssignedDeliveryOrders: async (_, __, group) => {
+        if (rejectReads) throw new Error('骑手读取失败')
+        return page(group === 'pickup' ? [order('RIDER-KNOWN')] : [])
+      },
+    } })
+    await app.mount(); await app.tab('待取货')
+    rejectReads = true
+    await app.setIdentityAllowed(false); await app.setIdentityAllowed(true)
+    assert.ok(app.card('RIDER-KNOWN'), '同账号身份重试失败保留任务')
+    await app.setAccount(202)
+    assert.equal(app.card('RIDER-KNOWN'), undefined, '新账号不得显示原骑手任务')
+    assert.match(text(app.tree), /订单加载失败/)
+    console.log('PASS 骑手同账号失败保留任务，新账号清除旧任务')
   }
   {
     const response = deferred()

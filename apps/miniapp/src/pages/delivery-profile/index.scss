@@ -1,0 +1,19 @@
+@use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
+.delivery-profile { @include ref.page-foundation; height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; background: $bg-surface; color: $text-primary; }
+.delivery-profile__scroll { flex: 1; min-height: 0; }
+.delivery-profile__identity { padding: 32rpx; display: flex; align-items: center; gap: 24rpx; }
+.delivery-profile__avatar { width: 104rpx; height: 104rpx; flex-shrink: 0; border-radius: 26rpx; background: $brand-tint; color: $brand-primary-strong; font-size: 40rpx; display: flex; align-items: center; justify-content: center; }
+.delivery-profile__name { display: flex; flex-direction: column; gap: 8rpx; font-size: 40rpx; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.delivery-profile__caption { @include ref.type(meta); @include ref.wrap; display: block; color: $text-secondary; }
+.delivery-profile__section { margin: 0 32rpx; padding: 32rpx 0; border-top: 1PX solid $border-subtle; }
+.delivery-profile__heading { display: block; font-size: 30rpx; font-weight: 600; margin-bottom: 20rpx; }
+.delivery-profile__fact { display: flex; justify-content: space-between; gap: 32rpx; padding: 12rpx 0; font-size: 28rpx; line-height: 1.5; }
+.delivery-profile__fact > text:first-child, .delivery-profile__fact > span:first-child { flex: 0 0 4em; color: $text-secondary; }
+.delivery-profile__fact > text:last-child, .delivery-profile__fact > span:last-child { min-width: 0; text-align: right; overflow-wrap: anywhere; }
+.delivery-profile__link { min-height: 56PX; display: flex; align-items: center; gap: 20rpx; }
+.delivery-profile__link-copy { flex: 1; min-width: 0; font-size: 30rpx; }
+.delivery-profile__link .app-icon { width: 24PX; height: 24PX; flex-shrink: 0; }
+.delivery-profile__retry { display: flex; min-height: 44PX; align-items: center; color: $danger; font-size: 28rpx; }
+.delivery-profile__section .app-button { margin-top: 24rpx; min-height: 44PX; }
+.delivery-profile__link:active { opacity: .7; }

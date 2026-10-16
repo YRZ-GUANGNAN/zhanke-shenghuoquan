@@ -30,6 +30,7 @@ function publishHarness(options = {}) {
     '../../services/a-user': { getIdentityApplication: options.application || (async () => ({})) },
     '../../services/api': { isApiError: (error) => error instanceof ApiError },
     '../../services/delivery-merchant': {
+      getMerchantOrderIntake: options.intake || (async () => ({ manualAvailable: true, externalAvailable: false, platforms: ['taobao', 'jd', 'meituan'].map((platform) => ({ platform, connected: false })) })),
       createDeliveryClientRequestId: () => `REQUEST-${++requestSequence}`,
       createMerchantDeliveryOrder: invoke('create', async () => deliveryOrder),
       confirmMockDeliveryFee: invoke('mock', async () => ({ ...deliveryOrder, status: 'ready_for_claim' })),
@@ -45,10 +46,11 @@ function publishHarness(options = {}) {
       requestPayment: options.requestPayment || (async () => {}),
       redirectTo: invoke('navigate', async () => {}),
       navigateBack: async () => {},
-      setClipboardData: async () => {}, getClipboardData: async () => ({ data: '' }),
+      setClipboardData: async () => {}, getClipboardData: options.getClipboard || (async () => ({ data: options.clipboard || '' })),
     },
     '../../stores/session': { useSessionStore: (select) => select({ profile }) },
-    '../../utils/delivery-order-clipboard': { deliveryClipboardTemplate: '', parseDeliveryOrderClipboard: () => ({ values: {}, recognizedFields: [] }) },
+    '../../utils/delivery-order-clipboard': { deliveryClipboardTemplate: '', parseDeliveryOrderClipboard: options.parseClipboard || (() => ({ values: {}, recognizedFields: [] })) },
+    '../../utils/delivery-order-source': { deliverySourceLabel: (platform) => ({ local: '校内配送', taobao: '淘宝闪购', jd: '京东外卖', meituan: '美团外卖' }[platform] || '校内配送') },
     './index.scss': {},
   }
   loadPage('merchant-publish', imports, renderer)
@@ -66,6 +68,17 @@ function publishHarness(options = {}) {
       const option = nodes(renderer.tree, (node) => hasClass(node, 'merchant-publish-payment') && text(node).includes(value === 'wechat' ? '微信支付' : '钱包余额'))[0]
       option.props.onClick(); await renderer.flush()
     },
+    async source(label) {
+      nodes(renderer.tree, (node) => hasClass(node, 'merchant-publish-source__option') && text(node) === label)[0].props.onClick()
+      await renderer.flush()
+    },
+    async pickupCode(value) {
+      one('merchant-publish-source__code').props.onInput({ detail: { value } }); await renderer.flush()
+    },
+    async mode(label) {
+      nodes(renderer.tree, (node) => hasClass(node, 'merchant-publish-intake-tab') && text(node) === label)[0].props.onClick()
+      await renderer.flush()
+    },
     async submit() { confirm().props.onClick(); await renderer.flush() },
     async primary() { one('merchant-publish-footer__button').props.onClick(); await renderer.flush() },
     async identity(value) { identityAllowed = value; renderer.render(); await renderer.flush() },
@@ -75,6 +88,117 @@ function publishHarness(options = {}) {
 }
 
 async function run() {
+  {
+    const app = publishHarness()
+    await app.mount(); await app.submit()
+    assert.equal(app.calls.create[0][0].sourcePlatform, 'local')
+    assert.equal(app.calls.create[0][0].pickupCode, '')
+    assert.equal('sourceOrderId' in app.calls.create[0][0], false, '手工发单不能伪造外部全局订单 ID')
+    console.log('PASS 旧发单默认校内来源，完整外部编号不由手工页面生成')
+  }
+  {
+    const app = publishHarness()
+    await app.mount(); await app.source('淘宝闪购'); await app.submit()
+    assert.equal(app.calls.create.length, 0)
+    assert.match(app.calls.toasts.map((item) => item.title).join(''), /取餐号/)
+    await app.pickupCode(' A0022 '); await app.submit()
+    assert.equal(app.calls.create[0][0].sourcePlatform, 'taobao')
+    assert.equal(app.calls.create[0][0].pickupCode, 'A0022')
+    console.log('PASS 平台手工订单要求取餐号，保留前导零与字母')
+  }
+  {
+    const app = publishHarness()
+    await app.mount(); await app.source('京东外卖'); await app.pickupCode('12345678901234567'); await app.submit()
+    assert.equal(app.calls.create.length, 0)
+    assert.match(app.calls.toasts.map((item) => item.title).join(''), /16/)
+    console.log('PASS 超长取餐号不会发出创建请求')
+  }
+  {
+    let attempts = 0
+    const app = publishHarness({ create: async () => { if (++attempts === 1) throw new ApiError('超时', 0); return deliveryOrder } })
+    await app.mount(); await app.source('美团外卖'); await app.pickupCode('0028'); await app.submit()
+    await app.source('京东外卖'); await app.pickupCode('15'); await app.mode('平台接入')
+    assert.match(text(app.tree), /订单来源/)
+    assert.equal(app.one('merchant-publish-source__code').props.value, '0028')
+    await app.primary()
+    assert.deepEqual(app.calls.create[0], app.calls.create[1])
+    assert.equal(app.calls.create[1][0].sourcePlatform, 'meituan')
+    assert.equal(app.calls.wallet.length, 1)
+    console.log('PASS 未知创建锁住来源、取餐号与接入方式，重试沿用原快照')
+  }
+  {
+    const app = publishHarness()
+    await app.mount(); await app.source('淘宝闪购'); await app.pickupCode('0022'); await app.account('MERCHANT-B')
+    assert.equal(app.one('merchant-publish-source__code').props.value, '')
+    assert.equal(text(nodes(app.tree, (node) => hasClass(node, 'merchant-publish-source__option--active'))[0]), '校内配送')
+    console.log('PASS 换账号清空来源取餐号，不串用上个商家信息')
+  }
+  {
+    const app = publishHarness()
+    await app.mount(); await app.mode('平台接入'); await app.submit()
+    assert.equal(app.calls.create.length, 0)
+    assert.equal(app.calls.wallet.length, 0)
+    assert.equal(nodes(app.tree, (node) => hasClass(node, 'merchant-publish-intake__status') && text(node) === '未接入').length, 3)
+    assert.match(text(app.tree), /当前尚未开放自动接单/)
+    assert.doesNotMatch(text(app.tree), /已接入|接入成功/)
+    await app.primary()
+    assert.ok(app.one('merchant-publish-source__code'))
+    console.log('PASS 平台未接入只显示能力状态，可返回自行发单，不创建或支付')
+  }
+  {
+    let attempts = 0
+    const app = publishHarness({ intake: async () => { if (++attempts === 1) throw new Error('断网'); return { manualAvailable: true, externalAvailable: false, platforms: [{ platform: 'jd', connected: false }] } } })
+    await app.mount(); await app.mode('平台接入')
+    assert.match(text(app.tree), /暂时无法确认平台接入状态/)
+    assert.equal(nodes(app.tree, (node) => hasClass(node, 'merchant-publish-intake__status') && text(node) === '状态未确认').length, 3)
+    const retry = nodes(app.tree, (node) => node.type === 'AppButton' && text(node) === '重新确认接入状态')[0]
+    retry.props.onClick(); await app.flush()
+    assert.doesNotMatch(text(app.tree), /暂时无法确认平台接入状态/)
+    assert.equal(nodes(app.tree, (node) => hasClass(node, 'merchant-publish-intake__status') && text(node) === '未接入').length, 1)
+    assert.equal(app.calls.create.length, 0)
+    console.log('PASS 能力读取失败保持未确认，重试读取真实状态')
+  }
+  {
+    const pending = deferred()
+    let calls = 0
+    const app = publishHarness({ intake: async () => ++calls === 1 ? pending.promise : { manualAvailable: true, externalAvailable: false, platforms: [{ platform: 'taobao', connected: false }] } })
+    await app.mount(); await app.account('MERCHANT-B'); await app.mode('平台接入')
+    pending.resolve({ manualAvailable: true, externalAvailable: true, platforms: [{ platform: 'taobao', connected: true }] }); await app.flush()
+    assert.doesNotMatch(text(app.tree), /已接入|已开放外部订单接入/)
+    console.log('PASS 旧账号接入能力迟到响应不会覆盖当前账号')
+  }
+  {
+    const app = publishHarness({ intake: async () => ({ manualAvailable: false, externalAvailable: false, platforms: [] }) })
+    await app.mount(); await app.submit()
+    assert.equal(app.calls.create.length, 0)
+    assert.match(app.calls.toasts.map((item) => item.title).join(''), /自行发单暂未开放/)
+    console.log('PASS 服务端关闭自行发单后不创建配送单')
+  }
+  {
+    const parsed = { values: { sourcePlatform: 'taobao', pickupCode: '0022' }, recognizedFields: ['sourcePlatform', 'pickupCode'] }
+    const app = publishHarness({ clipboard: '淘宝0022号', parseClipboard: () => parsed })
+    await app.mount()
+    app.one('merchant-publish-import-card__primary').props.onClick(); await app.flush()
+    assert.equal(app.one('merchant-publish-source__code').props.value, '', '读取不等于确认导入')
+    assert.match(text(app.tree), /淘宝闪购/)
+    nodes(app.tree, (node) => node.type === 'AppButton' && text(node) === '确认导入')[0].props.onClick(); await app.flush()
+    assert.equal(app.one('merchant-publish-source__code').props.value, '0022')
+    await app.submit()
+    assert.equal(app.calls.create[0][0].sourcePlatform, 'taobao')
+    assert.equal(app.calls.create[0][0].pickupCode, '0022')
+    console.log('PASS 剪贴板来源与取餐号需手工确认才写入发单快照')
+  }
+  {
+    const pending = deferred()
+    const app = publishHarness({ getClipboard: () => pending.promise, parseClipboard: () => ({ values: { pickupCode: '0022' }, recognizedFields: ['pickupCode'] }) })
+    await app.mount()
+    app.one('merchant-publish-import-card__primary').props.onClick(); await app.flush()
+    await app.mode('平台接入')
+    pending.resolve({ data: '取餐号：0022' }); await app.flush()
+    assert.ok(nodes(app.tree, (node) => node.type === 'AppActionSheet').every((node) => !node.props.visible))
+    assert.equal(app.calls.create.length, 0)
+    console.log('PASS 切换平台接入后迟到的剪贴板响应不会重新弹出导入框')
+  }
   {
     const pending = deferred()
     const app = publishHarness({ create: () => pending.promise })

@@ -1,9 +1,10 @@
-import React, { useCallback, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
 import { useDidShow } from '@tarojs/taro'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import IdentitySwitchModal from '../../components/IdentitySwitchModal'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
+import DeliveryWorkspaceNav from '../../components/delivery-workspace-nav'
 import { deliveryPaymentEnabled } from '../../feature-flags'
 import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
 import { getIdentityApplication } from '../../services/a-user'
@@ -16,6 +17,7 @@ import {
 import { getDeliveryWallet } from '../../services/delivery-payment'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
+import { deliveryPickupLabel, deliverySourceLabel } from '../../utils/delivery-order-source'
 import MerchantHomeIcon, { type MerchantHomeIconName } from './merchant-home-icon'
 import './index.scss'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
@@ -127,59 +129,52 @@ function OrderCard({ order }: { order: MerchantDeliveryOrder }) {
   const tone = orderTone(order.status)
   return (
     <View className='merchant-order-card'>
+      <View className='merchant-order-card__identity'>
+        <Text className='merchant-order-card__source'>{deliverySourceLabel(order.sourcePlatform)}</Text>
+        <Text className={`merchant-order-card__pickup-code${order.pickupCode ? '' : ' merchant-order-card__pickup-code--fallback'}${(order.pickupCode?.length ?? 0) > 8 ? ' merchant-order-card__pickup-code--long' : ''}`}>
+          {order.pickupCode?.trim() ? <>{deliveryPickupLabel(order).slice(0, -1)}<Text className='merchant-order-card__pickup-unit'>号</Text></> : deliveryPickupLabel(order)}
+        </Text>
+      </View>
       <View className='merchant-order-card__top'>
         <Text className={`merchant-order-card__status merchant-order-card__status--${tone}`}>
           {statusCopy[order.status]}
         </Text>
         <Text className='merchant-order-card__time'>{formatTime(order.createdAt)}</Text>
       </View>
-      <Text className='merchant-order-card__serial'>配送单 #{order.deliveryOrderPublicId}</Text>
 
       <View className='merchant-order-route'>
         <View className='merchant-order-route__row'>
           <Text className='merchant-order-route__marker merchant-order-route__marker--pickup'>取</Text>
           <View className='merchant-order-route__body'>
             <Text className='merchant-order-route__place'>{order.pickupAddress}</Text>
-            <Text className='merchant-order-route__contact'>
-              {[order.pickupContactName, order.pickupContactPhone].filter(Boolean).join(' · ')}
-            </Text>
           </View>
         </View>
         <View className='merchant-order-route__row'>
           <Text className='merchant-order-route__marker merchant-order-route__marker--dropoff'>送</Text>
           <View className='merchant-order-route__body'>
             <Text className='merchant-order-route__place'>{order.deliveryAddress}</Text>
-            <Text className='merchant-order-route__contact'>
-              {[order.recipientName, order.recipientPhone].filter(Boolean).join(' · ')}
-            </Text>
           </View>
         </View>
       </View>
 
-      {order.remark ? (
-        <View className='merchant-order-remark'>
-          <Text className='merchant-order-remark__label'>备注</Text>
-          <Text>{order.remark}</Text>
-        </View>
-      ) : null}
-
-      {order.riderUserId ? (
-        <View className='merchant-order-rider'>
-          <Text className='merchant-order-rider__name'>骑手 #{order.riderUserId}</Text>
-          <View className='merchant-order-rider__circle' ariaRole='button' ariaLabel='联系本单骑手' hoverClass='merchant-home-control--pressed' onClick={() => openConversation(order)}>
-            <MerchantHomeIcon name='message' className='merchant-order-rider__action-icon' />
-            <Text>联系骑手</Text>
-          </View>
-        </View>
-      ) : null}
+      {order.remark ? <View className='merchant-order-remark'>
+        <Text className='merchant-order-remark__label'>备注</Text>
+        <Text className='merchant-order-remark__text'>{order.remark}</Text>
+      </View> : null}
 
       <View className='merchant-order-card__footer'>
         <View className='merchant-order-fee'>
           <Text className='merchant-order-fee__label'>配送费</Text>
           <Text className='merchant-order-fee__amount'>¥{centsToYuan(order.deliveryFeeCents)}</Text>
         </View>
+        {order.riderUserId ? (
+          <View className='merchant-order-rider' ariaRole='button' ariaLabel='联系本单骑手' hoverClass='merchant-home-control--pressed' onClick={() => openConversation(order)}>
+            <MerchantHomeIcon name='message' className='merchant-order-rider__action-icon' />
+            <Text>联系骑手</Text>
+          </View>
+        ) : null}
         <View className='merchant-order-card__buttons'>
-          <View className='merchant-order-button merchant-order-button--primary' ariaRole='button' ariaLabel='查看配送单详情' hoverClass='merchant-home-control--pressed' onClick={() => openOrderDetail(order)}>
+          <View className='merchant-order-button merchant-order-button--primary' ariaRole='button' ariaLabel={`查看${deliverySourceLabel(order.sourcePlatform)}${deliveryPickupLabel(order)}详情`} hoverClass='merchant-home-control--pressed' onClick={() => openOrderDetail(order)}>
             <Text>查看详情</Text>
           </View>
         </View>
@@ -211,22 +206,39 @@ function MerchantHomeContent() {
   const switchIdentity = useSessionStore((state) => state.switchIdentity)
   const identityAllowed = useIdentityGuard('merchant')
   const requestVersion = useRef(0)
+  const activeLoad = useRef<number | null>(null)
+  const identityRef = useRef(identityAllowed)
+  const accountRef = useRef(profile.id)
+  const dataAccountRef = useRef(profile.id)
+  const mountedRef = useRef(true)
+  const switchLockRef = useRef(false)
+  identityRef.current = identityAllowed
+  accountRef.current = profile.id
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   const loadWorkbench = useCallback(async () => {
-    if (!identityAllowed) return
+    if (!identityAllowed || !identityRef.current || activeLoad.current !== null) return
+    const account = accountRef.current
     const version = requestVersion.current + 1
     requestVersion.current = version
+    activeLoad.current = version
+    const current = () => identityRef.current && accountRef.current === account && requestVersion.current === version
     setLoading(true)
     setLoadingMore(false)
     setLoadErrorsByTab(emptyErrorsByTab())
     setApprovalState('checking')
     setApprovalMessage('正在核验商家审核状态…')
     const applicationResult = await settle(getIdentityApplication('merchant'))
-    if (requestVersion.current !== version) return
+    if (!current()) return
     if (!applicationResult.ok) {
       setApprovalState('blocked')
       setApprovalMessage('暂时无法确认商家审核状态，请返回“我的”重新进入')
       setLoading(false)
+      activeLoad.current = null
       return
     }
     if (applicationResult.value.status !== 'approved') {
@@ -237,6 +249,7 @@ function MerchantHomeContent() {
           : '商家申请未通过，请修改资料后重新提交'
       )
       setLoading(false)
+      activeLoad.current = null
       return
     }
     setMerchantName(applicationResult.value.merchantName)
@@ -248,7 +261,7 @@ function MerchantHomeContent() {
       settle(listMerchantDeliveryOrders(1, 50, 'completed')),
       deliveryPaymentEnabled ? settle(getDeliveryWallet()) : null,
     ])
-    if (requestVersion.current !== version) return
+    if (!current()) return
     setLoadedByTab((current) => ({
       pending: pendingResult.ok || current.pending,
       delivering: deliveringResult.ok || current.delivering,
@@ -276,7 +289,39 @@ function MerchantHomeContent() {
     })
     setBalanceCents(walletResult?.ok ? walletResult.value.availableBalanceCents : null)
     setLoading(false)
+    activeLoad.current = null
   }, [identityAllowed])
+
+  useEffect(() => {
+    requestVersion.current += 1
+    activeLoad.current = null
+    setLoading(false)
+    setLoadingMore(false)
+    setShowStudentSwitch(false)
+    switchLockRef.current = false
+    setSwitchingIdentity(false)
+    setSwitchIdentityError('')
+    // A transient authentication retry keeps this account's known data. A new
+    // account must never inherit the previous merchant's orders or balance.
+    if (profile.id && profile.id !== dataAccountRef.current) {
+      dataAccountRef.current = profile.id
+      setOrdersByTab(emptyOrdersByTab())
+      setOrdersPageByTab(initialPagesByTab())
+      setOrdersTotalByTab(emptyTotalsByTab())
+      setLoadedByTab(unloadedTabs())
+      setLoadErrorsByTab(emptyErrorsByTab())
+      setBalanceCents(null)
+      setMerchantName('')
+      setMerchantAddress('')
+      setApprovalState('checking')
+      setActiveTab('pending')
+    }
+    if (identityAllowed) void loadWorkbench()
+    return () => {
+      requestVersion.current += 1
+      activeLoad.current = null
+    }
+  }, [identityAllowed, profile.id, loadWorkbench])
 
   useDidShow(() => {
     if (identityAllowed) void loadWorkbench()
@@ -287,13 +332,15 @@ function MerchantHomeContent() {
     const currentOrders = ordersByTab[requestedTab]
     const currentTotal = ordersTotalByTab[requestedTab]
     if (!identityAllowed || loading || loadingMore || currentOrders.length >= currentTotal) return
+    const account = accountRef.current
     const version = requestVersion.current
+    const current = () => identityRef.current && accountRef.current === account && requestVersion.current === version
     const nextPage = ordersPageByTab[requestedTab] + 1
     setLoadingMore(true)
     setLoadErrorsByTab((current) => ({ ...current, [requestedTab]: '' }))
     try {
       const result = await listMerchantDeliveryOrders(nextPage, 50, requestedTab)
-      if (requestVersion.current !== version) return
+      if (!current()) return
       setOrdersByTab((current) => {
         const byId = new Map(current[requestedTab].map((order) => [order.deliveryOrderPublicId, order]))
         result.items.forEach((order) => byId.set(order.deliveryOrderPublicId, order))
@@ -302,14 +349,14 @@ function MerchantHomeContent() {
       setOrdersPageByTab((current) => ({ ...current, [requestedTab]: result.page || nextPage }))
       setOrdersTotalByTab((current) => ({ ...current, [requestedTab]: result.total }))
     } catch (error) {
-      if (requestVersion.current === version) {
+      if (current()) {
         setLoadErrorsByTab((current) => ({
           ...current,
           [requestedTab]: error instanceof Error ? error.message : '更多配送单加载失败',
         }))
       }
     } finally {
-      if (requestVersion.current === version) setLoadingMore(false)
+      if (current()) setLoadingMore(false)
     }
   }, [activeTab, identityAllowed, loading, loadingMore, ordersByTab, ordersPageByTab, ordersTotalByTab])
 
@@ -320,21 +367,34 @@ function MerchantHomeContent() {
   const shopAddress = merchantAddress || profile.campus || profile.school || '商家资料已通过审核'
 
   const confirmStudentSwitch = async () => {
-    if (switchingIdentity) return
+    if (switchLockRef.current || !identityRef.current) return
+    const previous = useSessionStore.getState()
+    const account = previous.profile.id
+    const token = previous.token
+    const current = () => {
+      const session = useSessionStore.getState()
+      return mountedRef.current && session.status === 'authenticated'
+        && session.profile.id === account && session.token === token
+    }
+    switchLockRef.current = true
     setSwitchingIdentity(true)
     setSwitchIdentityError('')
     try {
-      await switchIdentity('student')
+      const identity = await switchIdentity('student')
+      if (!current() || useSessionStore.getState().identity !== identity || identity.currentIdentity !== 'student') return
       await Taro.reLaunch({ url: identityRoute('student') })
-      setShowStudentSwitch(false)
+      if (current()) setShowStudentSwitch(false)
     } catch (error) {
-      setSwitchIdentityError(error instanceof Error ? error.message : '身份切换失败，请重试')
+      if (current()) setSwitchIdentityError(error instanceof Error ? error.message : '身份切换失败，请重试')
     } finally {
-      setSwitchingIdentity(false)
+      if (current()) {
+        switchLockRef.current = false
+        setSwitchingIdentity(false)
+      }
     }
   }
 
-  if (!identityAllowed) return <View className='merchant-home-page' />
+  if (!identityAllowed || profile.id && profile.id !== dataAccountRef.current) return <View className='merchant-home-page' />
   if (approvalState !== 'approved') {
     return (
       <View className='merchant-home-page merchant-home-page--review' style={capsuleStyle}>
@@ -488,13 +548,17 @@ function MerchantHomeContent() {
               </Text>
             </View>
           ) : null}
-          {ordersByTab[activeTab].map((order) => <OrderCard key={order.deliveryOrderPublicId} order={order} />)}
+          <View className='merchant-home-order-grid'>
+            {ordersByTab[activeTab].map((order) => <OrderCard key={order.deliveryOrderPublicId} order={order} />)}
+          </View>
           {loadingMore ? <Text className='merchant-home-orders__end'>正在加载更多配送单…</Text> : null}
           {!loading && !loadingMore && !loadError && ordersByTab[activeTab].length > 0 && ordersByTab[activeTab].length >= ordersTotalByTab[activeTab] ? (
             <Text className='merchant-home-orders__end'>— 已显示全部配送单 —</Text>
           ) : null}
         </View>
       </ScrollView>
+
+      <DeliveryWorkspaceNav role='merchant' active='orders' />
 
       <IdentitySwitchModal
         visible={showStudentSwitch}

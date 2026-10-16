@@ -1,4 +1,5 @@
 import { request } from './api'
+import type { SourcePlatform } from '../utils/delivery-order-source'
 
 export type DeliveryStatus =
   | 'pending_fee_payment'
@@ -26,6 +27,10 @@ export interface StageTimestamps {
 
 export interface MerchantDeliveryOrder extends StageTimestamps {
   deliveryOrderPublicId: string
+  sourcePlatform?: SourcePlatform
+  pickupCode?: string
+  sourceOrderId?: string
+  sourceShopId?: string
   merchantRequestId?: string
   merchantUserId: number
   riderUserId?: number
@@ -54,6 +59,10 @@ export interface Page<T> {
 
 export interface CreateMerchantDeliveryInput {
   clientRequestId: string
+  sourcePlatform?: SourcePlatform
+  pickupCode?: string
+  sourceOrderId?: string
+  sourceShopId?: string
   pickupName: string
   pickupPhone: string
   pickupAddress: string
@@ -63,8 +72,18 @@ export interface CreateMerchantDeliveryInput {
   remark: string
 }
 
+export interface MerchantOrderIntake {
+  manualAvailable: boolean
+  externalAvailable: boolean
+  platforms: Array<{ platform: Exclude<SourcePlatform, 'local'>; label: string; connected: boolean }>
+}
+
 const BASE = '/delivery/merchant'
 const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
+
+export function getMerchantOrderIntake(): Promise<MerchantOrderIntake> {
+  return request<MerchantOrderIntake>(`${BASE}/order-intake`, { url: '', timeout: 10000 })
+}
 
 export function createDeliveryClientRequestId(now = Date.now()): string {
   let value = Math.max(0, Math.floor(now))

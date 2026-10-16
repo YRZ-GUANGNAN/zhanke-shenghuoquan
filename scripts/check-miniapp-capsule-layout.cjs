@@ -138,7 +138,8 @@ for (const pageName of heroPages) {
 const merchantPages = ['merchant-messages', 'merchant-order-detail', 'merchant-publish']
 
 for (const pageName of merchantPages) {
-  const source = fs.readFileSync(path.join(miniappPagesRoot, pageName, 'index.tsx'), 'utf8')
+  let source = fs.readFileSync(path.join(miniappPagesRoot, pageName, 'index.tsx'), 'utf8')
+  if (pageName === 'merchant-messages') source += fs.readFileSync(path.join(miniappPagesRoot, pageName, 'content.tsx'), 'utf8')
   assert.match(source, /CapsulePageHeader/, `${pageName} must use CapsulePageHeader`)
 }
 
@@ -150,18 +151,22 @@ const customNavigationPages = fs.readdirSync(miniappPagesRoot, { withFileTypes: 
     return fs.existsSync(configPath) && /navigationStyle:\s*'custom'/.test(fs.readFileSync(configPath, 'utf8'))
   })
 
-assert.equal(customNavigationPages.length, 28, 'custom navigation page inventory changed')
+assert.equal(customNavigationPages.length, 30, 'custom navigation page inventory changed')
 
 for (const pageName of customNavigationPages) {
   const sourcePath = path.join(miniappPagesRoot, pageName, 'index.tsx')
   assert.ok(fs.existsSync(sourcePath), `${pageName} custom navigation page source is missing`)
   let source = fs.readFileSync(sourcePath, 'utf8')
   if (pageName === 'student-secondhand') source += fs.readFileSync(path.join(miniappPagesRoot, pageName, 'content.tsx'), 'utf8')
+  if (pageName === 'rider-messages' || pageName === 'merchant-messages') {
+    assert.match(source, /DeliveryMessagesContent role='(?:rider|merchant)' identityAllowed=\{allowed\}/, '配送消息复用带身份守卫的内容组件')
+    source += fs.readFileSync(path.join(miniappPagesRoot, 'merchant-messages', 'content.tsx'), 'utf8')
+  }
   assert.match(source, /CapsulePageHeader|CapsuleSystemRow/, `${pageName} custom navigation is not capsule-safe`)
 }
 
 const allCustomNavigationSource = customNavigationPages
-  .flatMap((pageName) => (pageName === 'student-secondhand' ? ['index.tsx', 'content.tsx', 'index.scss'] : ['index.tsx', 'index.scss']).map((fileName) => path.join(miniappPagesRoot, pageName, fileName)))
+  .flatMap((pageName) => (['student-secondhand', 'merchant-messages'].includes(pageName) ? ['index.tsx', 'content.tsx', 'index.scss'] : ['index.tsx', 'index.scss']).map((fileName) => path.join(miniappPagesRoot, pageName, fileName)))
   .filter(fs.existsSync)
   .map((fileName) => fs.readFileSync(fileName, 'utf8'))
   .join('\n')

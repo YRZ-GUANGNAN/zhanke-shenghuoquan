@@ -11,7 +11,10 @@ const forbiddenCopy = /静态(?:预览|占位|示意)|后续接入|下一阶段�
 const violations = []
 for (const route of routes) {
   const file = path.join(src, `${route}.tsx`)
-  const source = fs.readFileSync(file, 'utf8')
+  let source = fs.readFileSync(file, 'utf8')
+  if (route === 'pages/merchant-messages/index' || route === 'pages/rider-messages/index') {
+    source += fs.readFileSync(path.join(src, 'pages/merchant-messages/content.tsx'), 'utf8')
+  }
   if (forbiddenCopy.test(source)) violations.push(`${route}: contains placeholder or fake-value copy`)
 }
 
@@ -26,7 +29,7 @@ const mustContain = [
   ['pages/merchant-home/index.tsx', 'getDeliveryWallet'],
   ['pages/merchant-publish/index.tsx', 'createMerchantDeliveryOrder'],
   ['pages/merchant-wallet/index.tsx', 'listDeliveryWalletLedger'],
-  ['pages/merchant-messages/index.tsx', 'listDeliveryConversations'],
+  ['pages/merchant-messages/content.tsx', 'listDeliveryConversations'],
   ['pages/merchant-order-detail/index.tsx', 'getMerchantDeliveryOrder']
 ]
 for (const [relative, token] of mustContain) {

@@ -450,7 +450,17 @@ page {
 }
 
 .merchant-home-orders__inner {
-  padding: 16rpx 24rpx calc(32rpx + env(safe-area-inset-bottom));
+  max-width: 880PX;
+  margin: 0 auto;
+  padding: 16rpx 24rpx 24rpx;
+  box-sizing: border-box;
+}
+
+.merchant-home-order-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 16rpx;
 }
 
 .merchant-home-orders__end {
@@ -544,38 +554,77 @@ page {
 }
 
 .merchant-order-card {
-  margin-bottom: 18rpx;
-  padding: 24rpx;
-  border-radius: 20rpx;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 20rpx;
+  border: 1rpx solid $border-subtle;
+  border-radius: 16rpx;
   background: $bg-surface;
 }
 
-.merchant-order-card__top {
+.merchant-order-card__identity {
+  min-height: 100rpx;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18rpx;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4rpx;
 }
 
-.merchant-order-card__serial {
-  @include ref.type(meta);
-  min-width: 0;
-  @include ref.wrap;
+.merchant-order-card__source {
   display: block;
-  margin-top: 8rpx;
-  color: $text-tertiary;
+  color: $text-secondary;
+  font-size: 24rpx;
+  font-size: clamp(12PX, 3.2vw, 14PX);
+  line-height: 1.4;
+  font-weight: 650;
+}
+
+.merchant-order-card__pickup-code {
+  min-width: 0;
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  color: $text-primary;
+  font-size: 54rpx;
+  font-size: clamp(24PX, 7.2vw, 32PX);
+  font-weight: 780;
+  line-height: 1.2;
+  letter-spacing: -1rpx;
   font-variant-numeric: tabular-nums;
 }
 
+.merchant-order-card__pickup-code--fallback {
+  font-size: 40rpx;
+  font-size: clamp(19PX, 5.333vw, 24PX);
+}
+
+.merchant-order-card__pickup-unit { font-size: .5em; margin-left: 4rpx; font-weight: 600; letter-spacing: 0; }
+.merchant-order-card__pickup-code--long { font-size: clamp(18PX, 4.8vw, 22PX); letter-spacing: 0; }
+
+.merchant-order-card__top {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4rpx;
+  margin-top: 12rpx;
+  padding-bottom: 16rpx;
+  border-bottom: 1rpx solid $border-subtle;
+}
+
 .merchant-order-card__status {
-  @include ref.type(label);
   @include ref.wrap;
+  font-size: 24rpx;
+  font-size: clamp(12PX, 3.2vw, 14PX);
+  line-height: 1.4;
   font-weight: 650;
 }
 
 .merchant-order-card__time {
-  @include ref.type(meta);
-  flex: 0 0 auto;
+  font-size: 22rpx;
+  font-size: clamp(11PX, 2.933vw, 13PX);
+  line-height: 1.4;
   color: $text-tertiary;
   font-variant-numeric: tabular-nums;
 }
@@ -594,40 +643,20 @@ page {
 }
 
 .merchant-order-rider {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16rpx;
-  margin-top: 12rpx;
-  border-top: 1rpx solid $border-subtle;
-}
-
-.merchant-order-rider__name {
-  display: block;
-}
-
-.merchant-order-rider__name {
-  @include ref.type(author);
-  @include ref.wrap;
-  color: $text-primary;
-  font-weight: 650;
-}
-
-.merchant-order-rider__circle {
   @include ref.touch;
-  flex: 0 0 auto;
-  gap: 8rpx;
-  padding: 0 8rpx;
-  border-radius: $radius-control;
+  width: 100%;
+  min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
-  background: $bg-surface;
+  justify-content: flex-start;
+  gap: 8rpx;
+  border-radius: $radius-control;
   color: $brand-primary;
-  @include ref.type(meta);
+  font-size: 24rpx;
+  font-size: clamp(12PX, 3.2vw, 14PX);
 }
 
-.merchant-order-rider__circle:active {
+.merchant-order-rider:active {
   background: $merchant-accent-soft;
   transform: scale(0.97);
 }
@@ -640,24 +669,24 @@ page {
 .merchant-order-route {
   display: flex;
   flex-direction: column;
-  gap: 16rpx;
-  margin-top: 20rpx;
+  gap: 12rpx;
+  margin-top: 16rpx;
 }
 
 .merchant-order-route__row {
   display: flex;
   align-items: flex-start;
-  gap: 16rpx;
+  gap: 10rpx;
 }
 
 .merchant-order-route__marker {
   @include ref.type(meta);
-  width: 40rpx;
-  height: 40rpx;
-  min-width: 20PX;
-  min-height: 20PX;
+  width: 32rpx;
+  height: 32rpx;
+  min-width: 16PX;
+  min-height: 16PX;
   flex: 0 0 auto;
-  border-radius: 10rpx;
+  border-radius: 6rpx;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -680,56 +709,63 @@ page {
   flex: 1;
 }
 
-.merchant-order-route__place,
-.merchant-order-route__contact {
-  display: block;
-}
-
 .merchant-order-route__place {
-  @include ref.type(comment);
   @include ref.wrap;
+  display: -webkit-box;
+  height: 2.9em;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   margin-top: 0;
   color: $text-primary;
-  font-weight: 650;
-}
-
-.merchant-order-route__contact {
-  @include ref.type(meta);
-  @include ref.wrap;
-  margin-top: 5rpx;
-  color: $text-secondary;
+  font-size: 24rpx;
+  font-size: clamp(12PX, 3.2vw, 14PX);
+  line-height: 1.45;
+  font-weight: 550;
 }
 
 .merchant-order-remark {
-  @include ref.type(meta);
-  @include ref.wrap;
-  margin-top: 16rpx;
-  padding: 12rpx 16rpx;
-  border-radius: 10rpx;
-  background: $bg-subtle;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8rpx;
+  margin-top: 12rpx;
+  padding-bottom: 16rpx;
   color: $text-secondary;
+  font-size: 22rpx;
+  font-size: clamp(11PX, 2.933vw, 13PX);
+  line-height: 1.5;
+}
+
+.merchant-order-remark--empty {
+  color: $text-tertiary;
 }
 
 .merchant-order-remark__label {
-  margin-right: 12rpx;
-  color: $text-primary;
-  font-weight: 650;
+  flex: 0 0 auto;
+  font-weight: 600;
+}
+
+.merchant-order-remark__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .merchant-order-card__footer {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 18rpx;
-  margin-top: 8rpx;
-  padding-top: 12rpx;
+  flex-direction: column;
+  align-items: stretch;
+  margin-top: auto;
+  padding-top: 16rpx;
   border-top: 1rpx solid $border-subtle;
 }
 
 .merchant-order-fee {
   display: flex;
   align-items: baseline;
+  justify-content: space-between;
   flex-wrap: wrap;
   gap: 8rpx;
 }
@@ -740,7 +776,8 @@ page {
 }
 
 .merchant-order-fee__label {
-  @include ref.type(meta);
+  font-size: 22rpx;
+  font-size: clamp(11PX, 2.933vw, 13PX);
   color: $text-tertiary;
 }
 
@@ -754,19 +791,18 @@ page {
 
 .merchant-order-card__buttons {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  margin-left: auto;
-  gap: 12rpx;
+  width: 100%;
+  margin-top: 12rpx;
 }
 
 .merchant-order-button {
   @include ref.touch;
   @include ref.type(meta);
-  min-width: 128rpx;
-  padding: 0 24rpx;
+  width: 100%;
+  min-width: 0;
+  padding: 0 12rpx;
   border: 1rpx solid $border-default;
-  border-radius: 18rpx;
+  border-radius: 10rpx;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -777,8 +813,8 @@ page {
 }
 
 .merchant-order-button--primary {
-  border-color: $border-default;
-  background: $bg-surface;
+  border-color: transparent;
+  background: $bg-muted;
   color: $text-primary;
 }
 
@@ -805,7 +841,7 @@ page {
   .merchant-home-review__action,
   .merchant-home-switch,
   .merchant-home-shortcut,
-  .merchant-order-rider__circle,
+  .merchant-order-rider,
   .merchant-order-button {
     transition: none;
   }

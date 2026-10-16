@@ -42,6 +42,88 @@ page {
   box-sizing: border-box;
 }
 
+.merchant-publish-intake-tabs {
+  margin: 16rpx 24rpx 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-bottom: 1rpx solid $divider-hairline;
+}
+
+.merchant-publish-intake-tab {
+  @include ref.type(label);
+  min-height: 44PX;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: $text-tertiary;
+  border-bottom: 4rpx solid transparent;
+  box-sizing: border-box;
+}
+
+.merchant-publish-intake-tab--active {
+  color: $brand-primary;
+  border-bottom-color: $brand-primary;
+}
+
+.merchant-publish-source__options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12rpx;
+  margin-bottom: 12rpx;
+}
+
+.merchant-publish-source__option {
+  @include ref.type(comment);
+  min-height: 44PX;
+  padding: 8rpx 12rpx;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: 1rpx solid $divider-hairline;
+  border-radius: 10rpx;
+  box-sizing: border-box;
+  color: $text-secondary;
+}
+
+.merchant-publish-source__option--active {
+  border-color: $brand-primary;
+  background: $publish-blue-soft;
+  color: $brand-primary;
+  font-weight: 650;
+}
+
+.merchant-publish-source__option:active,
+.merchant-publish-intake-tab:active { opacity: .72; }
+
+.merchant-publish-source__hint,
+.merchant-publish-intake__description,
+.merchant-publish-intake__notice {
+  @include ref.type(meta);
+  @include ref.wrap;
+  display: block;
+  color: $text-tertiary;
+  line-height: 1.6;
+  margin: 8rpx 0 16rpx;
+}
+
+.merchant-publish-intake { padding-bottom: 24rpx; }
+.merchant-publish-intake__title {
+  @include ref.type(label);
+  display: block;
+  color: $text-strong;
+}
+.merchant-publish-intake__platform {
+  @include ref.type(comment);
+  min-height: 96rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  border-bottom: 1rpx solid $divider-hairline;
+}
+.merchant-publish-intake__status { color: $text-tertiary; flex-shrink: 0; }
+.merchant-publish-intake__notice { margin-top: 24rpx; }
+
 .merchant-publish-card,
 .merchant-publish-fee-card,
 .merchant-publish-import-card {
@@ -219,7 +301,8 @@ page {
   color: $text-secondary;
 }
 
-.merchant-publish-field__input {
+.merchant-publish-field__input,
+.merchant-publish-source__code {
   min-height: 44PX;
   min-width: 0;
   flex: 1;
@@ -545,7 +628,8 @@ page {
 @media (max-width: 340px) {
   .merchant-publish-card,
   .merchant-publish-fee-card,
-  .merchant-publish-import-card { margin-left: 16rpx; margin-right: 16rpx; }
+  .merchant-publish-import-card,
+  .merchant-publish-intake-tabs { margin-left: 16rpx; margin-right: 16rpx; }
 
   .merchant-publish-card { padding-left: 20rpx; padding-right: 20rpx; }
   .merchant-publish-fee-card { flex-wrap: wrap; }

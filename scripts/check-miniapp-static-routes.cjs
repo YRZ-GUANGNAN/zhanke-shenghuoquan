@@ -32,6 +32,8 @@ const expectedRoutes = [
   'pages/merchant-messages/index',
   'pages/merchant-order-detail/index',
   'pages/delivery-rider/index',
+  'pages/rider-messages/index',
+  'pages/delivery-profile/index',
   'pages/delivery-conversation/index',
   'pages/post-detail/index'
 ]
@@ -76,6 +78,7 @@ for (const route of registeredRoutes) {
 
 const sourceFiles = registeredRoutes.map((route) => path.join(src, `${route}.tsx`))
 sourceFiles.push(path.join(src, 'components', 'student-bottom-nav.tsx'))
+sourceFiles.push(path.join(src, 'components', 'delivery-workspace-nav.tsx'))
 
 const routePattern = /\/pages\/[a-z0-9-]+\/index/g
 const brokenTargets = []

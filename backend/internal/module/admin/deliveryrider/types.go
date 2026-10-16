@@ -29,38 +29,44 @@ type MeView struct {
 }
 
 type ClaimableOrderView struct {
-	DeliveryOrderPublicID string          `json:"deliveryOrderPublicId"`
-	RouteSummary          string          `json:"routeSummary"`
-	DeliveryFeeCents      uint64          `json:"deliveryFeeCents"`
-	Status                delivery.Status `json:"status"`
-	RowVersion            uint64          `json:"rowVersion"`
-	CreatedAt             time.Time       `json:"createdAt"`
+	DeliveryOrderPublicID string                  `json:"deliveryOrderPublicId"`
+	SourcePlatform        delivery.SourcePlatform `json:"sourcePlatform"`
+	PickupCode            string                  `json:"pickupCode"`
+	RouteSummary          string                  `json:"routeSummary"`
+	DeliveryFeeCents      uint64                  `json:"deliveryFeeCents"`
+	Status                delivery.Status         `json:"status"`
+	RowVersion            uint64                  `json:"rowVersion"`
+	CreatedAt             time.Time               `json:"createdAt"`
 }
 
 type AssignedOrderView struct {
-	DeliveryOrderPublicID string          `json:"deliveryOrderPublicId"`
-	MerchantUserID        uint64          `json:"merchantUserId"`
-	RiderUserID           uint64          `json:"riderUserId"`
-	PickupContactName     string          `json:"pickupContactName"`
-	PickupContactPhone    string          `json:"pickupContactPhone"`
-	PickupAddress         string          `json:"pickupAddress"`
-	RecipientName         string          `json:"recipientName"`
-	RecipientPhone        string          `json:"recipientPhone"`
-	DeliveryAddress       string          `json:"deliveryAddress"`
-	Remark                string          `json:"remark"`
-	DeliveryFeeCents      uint64          `json:"deliveryFeeCents"`
-	Status                delivery.Status `json:"status"`
-	RowVersion            uint64          `json:"rowVersion"`
-	ReadyForClaimAt       *time.Time      `json:"readyForClaimAt"`
-	ClaimedAt             *time.Time      `json:"claimedAt"`
-	ToPickupAt            *time.Time      `json:"toPickupAt"`
-	PickedUpAt            *time.Time      `json:"pickedUpAt"`
-	DeliveringAt          *time.Time      `json:"deliveringAt"`
-	DeliveredAt           *time.Time      `json:"deliveredAt"`
-	PaymentFailedAt       *time.Time      `json:"paymentFailedAt"`
-	CancelledAt           *time.Time      `json:"cancelledAt"`
-	CreatedAt             time.Time       `json:"createdAt"`
-	UpdatedAt             time.Time       `json:"updatedAt"`
+	DeliveryOrderPublicID string                  `json:"deliveryOrderPublicId"`
+	SourcePlatform        delivery.SourcePlatform `json:"sourcePlatform"`
+	PickupCode            string                  `json:"pickupCode"`
+	SourceOrderID         *string                 `json:"sourceOrderId,omitempty"`
+	SourceShopID          *string                 `json:"sourceShopId,omitempty"`
+	MerchantUserID        uint64                  `json:"merchantUserId"`
+	RiderUserID           uint64                  `json:"riderUserId"`
+	PickupContactName     string                  `json:"pickupContactName"`
+	PickupContactPhone    string                  `json:"pickupContactPhone"`
+	PickupAddress         string                  `json:"pickupAddress"`
+	RecipientName         string                  `json:"recipientName"`
+	RecipientPhone        string                  `json:"recipientPhone"`
+	DeliveryAddress       string                  `json:"deliveryAddress"`
+	Remark                string                  `json:"remark"`
+	DeliveryFeeCents      uint64                  `json:"deliveryFeeCents"`
+	Status                delivery.Status         `json:"status"`
+	RowVersion            uint64                  `json:"rowVersion"`
+	ReadyForClaimAt       *time.Time              `json:"readyForClaimAt"`
+	ClaimedAt             *time.Time              `json:"claimedAt"`
+	ToPickupAt            *time.Time              `json:"toPickupAt"`
+	PickedUpAt            *time.Time              `json:"pickedUpAt"`
+	DeliveringAt          *time.Time              `json:"deliveringAt"`
+	DeliveredAt           *time.Time              `json:"deliveredAt"`
+	PaymentFailedAt       *time.Time              `json:"paymentFailedAt"`
+	CancelledAt           *time.Time              `json:"cancelledAt"`
+	CreatedAt             time.Time               `json:"createdAt"`
+	UpdatedAt             time.Time               `json:"updatedAt"`
 }
 
 func riderView(value takeout.Rider) RiderView {
@@ -73,7 +79,8 @@ func riderView(value takeout.Rider) RiderView {
 func claimableView(value delivery.Order) ClaimableOrderView {
 	return ClaimableOrderView{
 		DeliveryOrderPublicID: value.DeliveryOrderPublicID,
-		RouteSummary:          "校园配送单", DeliveryFeeCents: value.DeliveryFeeCents,
+		SourcePlatform:        value.SourcePlatform.Effective(), PickupCode: value.PickupCode,
+		RouteSummary: "校园配送单", DeliveryFeeCents: value.DeliveryFeeCents,
 		Status: value.Status, RowVersion: value.RowVersion, CreatedAt: value.CreatedAt,
 	}
 }
@@ -85,7 +92,9 @@ func assignedView(value delivery.Order) AssignedOrderView {
 	}
 	return AssignedOrderView{
 		DeliveryOrderPublicID: value.DeliveryOrderPublicID,
-		MerchantUserID:        value.MerchantUserID, RiderUserID: riderID,
+		SourcePlatform:        value.SourcePlatform.Effective(), PickupCode: value.PickupCode,
+		SourceOrderID: value.SourceOrderID, SourceShopID: value.SourceShopID,
+		MerchantUserID: value.MerchantUserID, RiderUserID: riderID,
 		PickupContactName: value.PickupContactName, PickupContactPhone: value.PickupContactPhone,
 		PickupAddress: value.PickupAddress, RecipientName: value.RecipientName,
 		RecipientPhone: value.RecipientPhone, DeliveryAddress: value.DeliveryAddress,

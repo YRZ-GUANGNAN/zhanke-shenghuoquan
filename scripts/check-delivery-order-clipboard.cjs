@@ -99,4 +99,17 @@ const empty = parseDeliveryOrderClipboard('  \r\n\t')
 assert.deepEqual(empty.values, {})
 assert.equal(empty.recognizedFields.length, 0)
 
+for (const [label, platform, code] of [['淘宝0022号', 'taobao', '0022'], ['京东 A15号', 'jd', 'A15'], ['美团#28号', 'meituan', '28']]) {
+  const result = parseDeliveryOrderClipboard(label)
+  assert.deepEqual(result.values, { sourcePlatform: platform, pickupCode: code })
+}
+assert.deepEqual(parseDeliveryOrderClipboard('来源平台：淘宝闪购\n取餐号：#A0022号').values, { sourcePlatform: 'taobao', pickupCode: 'A0022' })
+assert.deepEqual(parseDeliveryOrderClipboard('来源平台：校内配送').values, { sourcePlatform: 'local' })
+assert.deepEqual(parseDeliveryOrderClipboard('外卖平台：JD\n取餐编号：0001').values, { sourcePlatform: 'jd', pickupCode: '0001' })
+assert.deepEqual(parseDeliveryOrderClipboard('淘宝订单号：123456789\n订单号：22\n配送单号：28\nsourceOrderId: 123\n今天美团22号送过去').values, {})
+assert.deepEqual(parseDeliveryOrderClipboard('来源平台：陌生平台\n取餐号：12345678901234567').values, {})
+assert.deepEqual(parseDeliveryOrderClipboard('备注：今天一起送\n淘宝22号').values, { remark: '今天一起送\n淘宝22号' })
+assert.deepEqual(parseDeliveryOrderClipboard('收货地址：一号楼\n平台订单号：123456789').values, { receiverAddress: '一号楼' })
+assert.deepEqual(parseDeliveryOrderClipboard('收货地址：一号楼\n淘宝订单号：123456789').values, { receiverAddress: '一号楼' })
+
 console.log('PASS delivery order clipboard parser')

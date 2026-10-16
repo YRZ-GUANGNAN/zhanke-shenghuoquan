@@ -1,5 +1,6 @@
 import { request } from './api'
 import type { DeliveryStatus, Page, StageTimestamps } from './delivery-merchant'
+import type { SourcePlatform } from '../utils/delivery-order-source'
 
 export type RiderStatus = 'active' | 'resting' | 'suspended'
 export type RiderAssignedStatusGroup = 'pickup' | 'delivery' | 'completed'
@@ -20,6 +21,8 @@ export interface DeliveryRiderMe {
 
 export interface ClaimableDeliveryOrder {
   deliveryOrderPublicId: string
+  sourcePlatform?: SourcePlatform
+  pickupCode?: string
   routeSummary: string
   deliveryFeeCents: number
   status: DeliveryStatus
@@ -29,6 +32,10 @@ export interface ClaimableDeliveryOrder {
 
 export interface AssignedDeliveryOrder extends StageTimestamps {
   deliveryOrderPublicId: string
+  sourcePlatform?: SourcePlatform
+  pickupCode?: string
+  sourceOrderId?: string
+  sourceShopId?: string
   merchantUserId: number
   riderUserId: number
   pickupContactName: string

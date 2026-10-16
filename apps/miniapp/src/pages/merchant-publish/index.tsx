@@ -14,8 +14,10 @@ import {
   createDeliveryClientRequestId,
   createMerchantDeliveryOrder,
   confirmMockDeliveryFee,
+  getMerchantOrderIntake,
   type CreateMerchantDeliveryInput,
   type MerchantDeliveryOrder,
+  type MerchantOrderIntake,
 } from '../../services/delivery-merchant'
 import {
   getDeliveryWallet,
@@ -31,6 +33,7 @@ import {
   type DeliveryClipboardField,
   type DeliveryClipboardParseResult,
 } from '../../utils/delivery-order-clipboard'
+import { deliverySourceLabel, type SourcePlatform } from '../../utils/delivery-order-source'
 import './index.scss'
 
 type PaymentMethod = 'wallet' | 'wechat'
@@ -56,6 +59,8 @@ function paymentFeedback(status: string): PublishFeedback {
 }
 
 const clipboardFieldCopy: Record<DeliveryClipboardField, string> = {
+  sourcePlatform: '来源平台',
+  pickupCode: '取餐号',
   pickupContact: '取货联系人',
   pickupPhone: '取货电话',
   pickupAddress: '取货地址',
@@ -65,6 +70,8 @@ const clipboardFieldCopy: Record<DeliveryClipboardField, string> = {
   remark: '备注',
 }
 
+const sourceOptions: SourcePlatform[] = ['local', 'taobao', 'jd', 'meituan']
+
 function inputValue(event: { detail: { value?: string } }) {
   return String(event.detail.value ?? '')
 }
@@ -73,6 +80,15 @@ function MerchantPublishContent() {
   const testPublishEnabled = deliveryMockFeeEnabled && !deliveryPaymentEnabled
   const profile = useSessionStore((state) => state.profile)
   const identityAllowed = useIdentityGuard('merchant')
+  const [intakeMode, setIntakeMode] = useState<'manual' | 'external'>('manual')
+  const [sourcePlatform, setSourcePlatform] = useState<SourcePlatform>('local')
+  const [pickupCode, setPickupCode] = useState('')
+  const [intake, setIntake] = useState<MerchantOrderIntake | null>(null)
+  const [intakeLoading, setIntakeLoading] = useState(false)
+  const [intakeError, setIntakeError] = useState('')
+  const intakeRequestRef = useRef(0)
+  const intakeModeRef = useRef(intakeMode)
+  intakeModeRef.current = intakeMode
   const [pickupContact, setPickupContact] = useState(profile.nickname)
   const [pickupPhone, setPickupPhone] = useState('')
   const [pickupAddress, setPickupAddress] = useState(profile.campus || profile.school)
@@ -132,6 +148,9 @@ function MerchantPublishContent() {
       setReceiverPhone('')
       setReceiverAddress('')
       setRemark('')
+      setSourcePlatform('local')
+      setPickupCode('')
+      setIntakeMode('manual')
       setBalanceCents(null)
       setPaymentMethod('wallet')
       setClipboardPreview(null)
@@ -166,6 +185,29 @@ function MerchantPublishContent() {
     }
   }
 
+  const loadIntake = async () => {
+    if (!activeRef.current || !identityRef.current) return
+    const current = operationGuard()
+    const requestId = ++intakeRequestRef.current
+    setIntakeLoading(true)
+    setIntakeError('')
+    setIntake(null)
+    try {
+      const result = await getMerchantOrderIntake()
+      if (current() && requestId === intakeRequestRef.current) setIntake(result)
+    } catch {
+      if (current() && requestId === intakeRequestRef.current) setIntakeError('暂时无法确认平台接入状态，请重试。')
+    } finally {
+      if (current() && requestId === intakeRequestRef.current) setIntakeLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    setIntake(null)
+    setIntakeError('')
+    if (identityAllowed) void loadIntake()
+  }, [identityAllowed, profile.id])
+
   useEffect(() => {
     if (!identityAllowed) return
     const current = operationGuard()
@@ -187,6 +229,8 @@ function MerchantPublishContent() {
   }, [identityAllowed, profile.id])
 
   const currentFormValues: Record<DeliveryClipboardField, string> = {
+    sourcePlatform,
+    pickupCode,
     pickupContact,
     pickupPhone,
     pickupAddress,
@@ -206,12 +250,12 @@ function MerchantPublishContent() {
   }
 
   const readClipboard = async () => {
-    if (clipboardReading || submittingRef.current || attemptRef.current) return
+    if (intakeMode !== 'manual' || clipboardReading || submittingRef.current || attemptRef.current) return
     const current = operationGuard()
     setClipboardReading(true)
     try {
       const result = await Taro.getClipboardData()
-      if (!current() || submittingRef.current || attemptRef.current) return
+      if (!current() || intakeModeRef.current !== 'manual' || submittingRef.current || attemptRef.current) return
       const source = String(result.data ?? '')
       if (!source.trim()) {
         void Taro.showToast({ title: '剪贴板没有可导入的文字', icon: 'none' })
@@ -232,8 +276,10 @@ function MerchantPublishContent() {
   }
 
   const applyClipboardPreview = () => {
-    if (!clipboardPreview || submittingRef.current || attemptRef.current) return
+    if (intakeMode !== 'manual' || !clipboardPreview || submittingRef.current || attemptRef.current) return
     const setters: Record<DeliveryClipboardField, (value: string) => void> = {
+      sourcePlatform: (value) => { if (sourceOptions.includes(value as SourcePlatform)) setSourcePlatform(value as SourcePlatform) },
+      pickupCode: setPickupCode,
       pickupContact: setPickupContact,
       pickupPhone: setPickupPhone,
       pickupAddress: setPickupAddress,
@@ -251,6 +297,19 @@ function MerchantPublishContent() {
   }
 
   const validate = () => {
+    if (intakeMode !== 'manual') return false
+    if (intake?.manualAvailable === false) {
+      showToast('自行发单暂未开放')
+      return false
+    }
+    if (sourcePlatform !== 'local' && !pickupCode.trim()) {
+      showToast('请填写该平台的取餐号')
+      return false
+    }
+    if (pickupCode.trim().length > 16 || /[\r\n]/.test(pickupCode)) {
+      showToast('取餐号请控制在 16 个字符以内')
+      return false
+    }
     if (!pickupContact.trim() || !pickupPhone.trim() || !pickupAddress.trim()) {
       void Taro.showToast({ title: '请完整填写取货信息', icon: 'none' })
       return false
@@ -337,7 +396,7 @@ function MerchantPublishContent() {
   }
 
   const submitAttempt = async (method: PublishMethod) => {
-    if (submittingRef.current || !activeRef.current || !identityRef.current) return
+    if (intakeMode !== 'manual' || submittingRef.current || !activeRef.current || !identityRef.current) return
     if (attemptRef.current?.order) {
       await viewCreatedOrder()
       return
@@ -355,6 +414,8 @@ function MerchantPublishContent() {
         method,
         input: {
           clientRequestId: createDeliveryClientRequestId(),
+          sourcePlatform,
+          pickupCode: pickupCode.trim(),
           pickupName: pickupContact.trim(),
           pickupPhone: pickupPhone.trim(),
           pickupAddress: pickupAddress.trim(),
@@ -447,7 +508,7 @@ function MerchantPublishContent() {
   }
 
   const openPaymentSheet = () => {
-    if (submittingRef.current || !activeRef.current || !identityRef.current) return
+    if (intakeMode !== 'manual' || submittingRef.current || !activeRef.current || !identityRef.current) return
     if (attemptRef.current?.order) {
       void viewCreatedOrder()
       return
@@ -497,6 +558,53 @@ function MerchantPublishContent() {
       />
 
       <ScrollView scrollY className='merchant-publish-scroll' enhanced showScrollbar={false}>
+        <View className='merchant-publish-intake-tabs'>
+          {([{ key: 'manual', title: '自行发单' }, { key: 'external', title: '平台接入' }] as const).map((item) => (
+            <View key={item.key} className={`merchant-publish-intake-tab ${intakeMode === item.key ? 'merchant-publish-intake-tab--active' : ''} ${formLocked ? 'merchant-publish-control--disabled' : ''}`} ariaRole='button' ariaLabel={item.title}
+              onClick={() => { if (!submittingRef.current && !attemptRef.current) { setIntakeMode(item.key); setClipboardSheetVisible(false); setSheetVisible(false) } }}>
+              <Text>{item.title}</Text>
+            </View>
+          ))}
+        </View>
+
+        {intakeMode === 'external' ? (
+          <View className='merchant-publish-card merchant-publish-intake'>
+            <Text className='merchant-publish-intake__title'>外卖订单接入</Text>
+            <Text className='merchant-publish-intake__description'>连接已授权店铺后，外卖订单可由接口导入。选择订单来源不代表已经连接平台。</Text>
+            {sourceOptions.filter((platform) => platform !== 'local').map((platform) => {
+              const platformState = intake?.platforms.find((item) => item.platform === platform)
+              return (
+                <View key={platform} className='merchant-publish-intake__platform'>
+                  <Text>{deliverySourceLabel(platform)}</Text>
+                  <Text className='merchant-publish-intake__status'>{intakeLoading ? '正在确认' : !platformState ? '状态未确认' : platformState.connected ? '已接入' : '未接入'}</Text>
+                </View>
+              )
+            })}
+            <Text className='merchant-publish-intake__notice'>{intakeError || (intakeLoading ? '正在读取店铺接入能力…' : intake?.externalAvailable ? '已开放外部订单接入，可返回订单页查看平台订单。' : '当前尚未开放自动接单。可先选择自行发单，填写平台与取餐号安排配送。')}</Text>
+            {intakeError ? <AppButton variant='secondary' block onClick={() => void loadIntake()}>重新确认接入状态</AppButton> : null}
+          </View>
+        ) : <>
+        <View className='merchant-publish-card merchant-publish-source'>
+          <View className='merchant-publish-section-head'>
+            <Text className='merchant-publish-section-head__title'>订单来源</Text>
+            <Text className='merchant-publish-section-head__hint'>仅标记来源，不会自动接单</Text>
+          </View>
+          <View className='merchant-publish-source__options'>
+            {sourceOptions.map((platform) => (
+              <View key={platform} className={`merchant-publish-source__option ${sourcePlatform === platform ? 'merchant-publish-source__option--active' : ''} ${formLocked ? 'merchant-publish-control--disabled' : ''}`} ariaRole='button' ariaLabel={`订单来源${deliverySourceLabel(platform)}`}
+                onClick={() => { if (!submittingRef.current && !attemptRef.current) setSourcePlatform(platform) }}>
+                <Text>{deliverySourceLabel(platform)}</Text>
+              </View>
+            ))}
+          </View>
+          <View className='merchant-publish-field merchant-publish-field--last'>
+            <Text className='merchant-publish-field__label'>取餐号</Text>
+            <Input className='merchant-publish-source__code' value={pickupCode} maxlength={16} disabled={formLocked}
+              placeholder={sourcePlatform === 'local' ? '选填，如 0022 或 A15' : '必填，使用平台取餐号'}
+              onInput={(event) => { if (!submittingRef.current && !attemptRef.current) setPickupCode(inputValue(event)) }} />
+          </View>
+          <Text className='merchant-publish-source__hint'>取餐号用于门店核对，不是平台完整订单编号。</Text>
+        </View>
         <View className='merchant-publish-import-card'>
           <View className='merchant-publish-import-card__icon'>
             <AppIcon name='order' />
@@ -601,10 +709,12 @@ function MerchantPublishContent() {
           </View>
           <Text className='merchant-publish-fee-card__summary'>{createdOrder ? `¥${(createdOrder.deliveryFeeCents / 100).toFixed(2)}` : '创建后确认'}</Text>
         </View>
+        </>}
         <View className='merchant-publish-scroll__spacer' />
       </ScrollView>
 
       <View className='merchant-publish-footer'>
+        {intakeMode === 'external' ? <View className='merchant-publish-footer__button' ariaRole='button' ariaLabel='返回自行发单' onClick={() => setIntakeMode('manual')}><Text>返回自行发单</Text></View> : <>
         {feedback ? (
           <View className={`merchant-publish-feedback merchant-publish-feedback--${feedback.tone}`}>
             <Text className='merchant-publish-feedback__title'>{feedback.title}</Text>
@@ -634,6 +744,7 @@ function MerchantPublishContent() {
                       : '发布并支付'}
           </Text>
         </View>
+        </>}
       </View>
 
       <AppActionSheet
@@ -653,7 +764,7 @@ function MerchantPublishContent() {
                 <View key={field} className='merchant-publish-import-preview__row'>
                   <View className='merchant-publish-import-preview__copy'>
                     <Text className='merchant-publish-import-preview__label'>{clipboardFieldCopy[field]}</Text>
-                    <Text className='merchant-publish-import-preview__value'>{nextValue}</Text>
+                    <Text className='merchant-publish-import-preview__value'>{field === 'sourcePlatform' ? deliverySourceLabel(nextValue as SourcePlatform) : nextValue}</Text>
                   </View>
                   <Text className={`merchant-publish-import-preview__state merchant-publish-import-preview__state--${stateTone}`}>{state}</Text>
                 </View>
