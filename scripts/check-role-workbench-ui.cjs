@@ -32,6 +32,17 @@ for (const fragment of [
   assert.ok(merchant.includes(fragment), `merchant workbench missing: ${fragment}`)
 }
 
+assert.match(
+  merchant,
+  /loadedByTab\[tab\.key\]\s*\?\s*ordersTotalByTab\[tab\.key\]\s*:\s*['"]—['"]/,
+  'merchant tabs must show real totals only after that group has loaded',
+)
+assert.match(
+  merchant,
+  /setLoadedByTab\(\(current\)\s*=>\s*\(\{\s*pending:\s*pendingResult\.ok\s*\|\|\s*current\.pending,\s*delivering:\s*deliveringResult\.ok\s*\|\|\s*current\.delivering,\s*completed:\s*completedResult\.ok\s*\|\|\s*current\.completed/,
+  'merchant loading state must follow each group result and preserve previously loaded data',
+)
+
 for (const fragment of [
   'CapsuleSystemRow',
   'useDidShow',
