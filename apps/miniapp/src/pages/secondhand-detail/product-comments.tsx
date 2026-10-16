@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Image, Input, Text, View } from '@tarojs/components'
+import { Image, Input, ScrollView, Text, View } from '@tarojs/components'
 import { nextTick } from '@tarojs/taro'
 import { isApiError } from '../../services/api'
 import { createProductComment, listProductComments, replyProductComment } from '../../services/c-trade'
@@ -9,6 +9,10 @@ import type { Product, ProductComment } from '../../types'
 import { ExpandableText, ReplyReveal } from '../../components/content-motion'
 import AppIcon from '../../components/app-icon'
 import { formatPostDate } from '../../utils/post-presentation'
+import { AppIconButton } from '../../components/ui'
+import { useLayerPresence } from '../../hooks/use-layer-presence'
+import { useSheetDismiss } from '../../hooks/use-sheet-dismiss'
+import { useKeyboardInset } from '../../hooks/use-keyboard-inset'
 import './product-comments.scss'
 
 type CommentLoadState = 'loading' | 'ready' | 'empty' | 'error'
@@ -20,6 +24,8 @@ interface ProductCommentsProps {
   layoutReady?: boolean
   onTargetReady?: (elementId: string) => void
   onLoadMoreReady?: (handler: (() => void) | null) => void
+  sheetVisible?: boolean
+  onClose?: () => void
 }
 interface PendingSubmission { key: string; clientRequestId: string }
 
@@ -49,7 +55,11 @@ function mergeComments(current: ProductComment[], incoming: ProductComment[]): P
   return Array.from(byId.values())
 }
 
-export default function ProductComments({ productId, productStatus, targetCommentId = '', layoutReady = true, onTargetReady, onLoadMoreReady }: ProductCommentsProps) {
+export default function ProductComments({ productId, productStatus, targetCommentId = '', layoutReady = true, onTargetReady, onLoadMoreReady, sheetVisible, onClose }: ProductCommentsProps) {
+  const isSheet = sheetVisible !== undefined
+  const presence = useLayerPresence(Boolean(sheetVisible))
+  const keyboard = useKeyboardInset()
+  const [sheetTarget, setSheetTarget] = useState('')
   const [items, setItems] = useState<ProductComment[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
@@ -70,6 +80,14 @@ export default function ProductComments({ productId, productStatus, targetCommen
   const readingRef = useRef<number | null>(null)
   const submittingRef = useRef(false)
   const locatedTarget = useRef('')
+  const closeSheet = () => {
+    if (!sheetVisible) return
+    keyboard.reset()
+    void Taro.hideKeyboard().catch(() => {})
+    onClose?.()
+  }
+  const drag = useSheetDismiss(Boolean(sheetVisible) && presence.phase === 'open', closeSheet)
+  useEffect(() => { if (isSheet && !sheetVisible) keyboard.reset() }, [isSheet, sheetVisible, keyboard.reset])
 
   const load = useCallback(async () => {
     if (readingRef.current !== null || submittingRef.current) return
@@ -184,15 +202,16 @@ export default function ProductComments({ productId, productStatus, targetCommen
       }
       if (item.id === root.id) break
     }
-    if (!layoutReady || precedingBodies.some(id => !bodyLayouts[id])) return
+    if (!layoutReady || (isSheet && (!sheetVisible || presence.phase !== 'open')) || precedingBodies.some(id => !bodyLayouts[id])) return
     let alive = true
     nextTick(() => {
       if (!alive) return
       locatedTarget.current = targetKey
-      onTargetReady?.('product-comment-' + focusedCommentId)
+      if (isSheet) setSheetTarget('product-comment-' + focusedCommentId)
+      else onTargetReady?.('product-comment-' + focusedCommentId)
     })
     return () => { alive = false }
-  }, [bodyLayouts, expandedThreads, focusedCommentId, items, layoutReady, onTargetReady, productId, state])
+  }, [bodyLayouts, expandedThreads, focusedCommentId, items, layoutReady, onTargetReady, productId, state, isSheet, sheetVisible, presence.phase])
 
   const bodyLayoutChanged = useCallback((id: string, ready: boolean) => {
     setBodyLayouts(current => current[id] === ready ? current : { ...current, [id]: ready })
@@ -201,11 +220,13 @@ export default function ProductComments({ productId, productStatus, targetCommen
   const beginReply = (comment: ProductComment) => {
     if (productStatus === 'sold' || submittingRef.current || comment.reviewStatus !== 'approved') return
     setReplyTarget({ commentId: comment.id, parentCommentId: comment.parentCommentId || comment.id, authorName: comment.author.nickname })
+    if (isSheet) setSheetTarget('')
     pendingSubmission.current = null
     setSubmitError('')
   }
 
   const submit = async () => {
+    if (isSheet && !sheetVisible) return
     const content = draft.trim()
     if (!content || submittingRef.current || readingRef.current !== null || (state !== 'ready' && state !== 'empty') || productStatus === 'sold') return
     submittingRef.current = true
@@ -255,9 +276,14 @@ export default function ProductComments({ productId, productStatus, targetCommen
     </View>
   }
   const sendDisabled = submitting || loadingMore || state === 'loading' || state === 'error' || !draft.trim()
-  return (
-    <View className='product-comments'>
-      <View className='product-comments__head'><Text className='product-comments__title'>留言</Text><Text className='product-comments__count'>{page > 0 ? total + ' 条' : ''}</Text></View>
+  const content = (
+    <View className={'product-comments' + (isSheet ? ' product-comments--sheet' : '')}>
+      <View className='product-comments__head'>
+        <Text className='product-comments__title'>留言</Text><Text className='product-comments__count'>{page > 0 ? total + ' 条' : ''}</Text>
+        {isSheet && <AppIconButton name='close' label='关闭留言' className='product-comments__close' onClick={closeSheet} />}
+      </View>
+      <ScrollView className='product-comments__list' scrollY={isSheet} enhanced showScrollbar={false} scrollIntoView={isSheet ? sheetTarget : undefined}
+        lowerThreshold={120} onScrollToLower={isSheet ? () => void loadMore() : undefined}>
       {state === 'loading' && <Text className='product-comments__state'>正在加载留言…</Text>}
       {state === 'error' && <Text className='product-comments__state product-comments__state--retry' onClick={() => void load()}>留言加载失败，点击重试</Text>}
       {state === 'empty' && <Text className='product-comments__state'>{productStatus === 'sold' ? '暂无留言' : '还没有留言，来问问卖家吧'}</Text>}
@@ -271,7 +297,7 @@ export default function ProductComments({ productId, productStatus, targetCommen
                 {item.isSeller && <Text className='product-comment__seller'>卖家</Text>}
                 {reviewLabel(item.reviewStatus) && <Text className={'product-comment__review product-comment__review--' + item.reviewStatus}>{reviewLabel(item.reviewStatus)}</Text>}
               </View>
-              <ExpandableText text={item.content} className='product-comment__content'
+              <ExpandableText text={item.content} className='product-comment__content' layoutKey={isSheet ? String(sheetVisible) + presence.phase : ''}
                 expanded={expandedBodies[item.id] ?? false}
                 onLayoutReady={ready => bodyLayoutChanged(item.id, ready)}
                 onExpandedChange={value => setExpandedBodies(current => ({ ...current, [item.id]: value }))} />
@@ -291,7 +317,7 @@ export default function ProductComments({ productId, productStatus, targetCommen
                   {reply.replyTo && <Text className='product-comment__reply-to'>回复 {reply.replyTo.nickname}</Text>}
                   {reviewLabel(reply.reviewStatus) && <Text className={'product-comment__review product-comment__review--' + reply.reviewStatus}>{reviewLabel(reply.reviewStatus)}</Text>}
                 </View>
-                <ExpandableText text={reply.content} className='product-comment__content' disabled={!interactive}
+                <ExpandableText text={reply.content} className='product-comment__content' disabled={!interactive} layoutKey={isSheet ? String(sheetVisible) + presence.phase : ''}
                   expanded={expandedBodies[reply.id] ?? false}
                   onLayoutReady={ready => bodyLayoutChanged(reply.id, ready)}
                   onExpandedChange={value => setExpandedBodies(current => ({ ...current, [reply.id]: value }))} />
@@ -321,6 +347,7 @@ export default function ProductComments({ productId, productStatus, targetCommen
       {loadMoreError ? <Text className='product-comments__state product-comments__state--retry' onClick={() => void loadMore()}>{loadMoreError}</Text>
         : loadingMore ? <Text className='product-comments__state'>正在加载更多留言…</Text>
           : items.length > 0 && items.length >= total ? <Text className='product-comments__state'>已显示全部留言</Text> : null}
+      </ScrollView>
       <View className='product-comments__composer'>
         {replyTarget && productStatus !== 'sold' && <View className='product-comments__replying'>
           <Text className='product-comments__reply-name'>回复 {replyTarget.authorName}</Text>
@@ -328,7 +355,8 @@ export default function ProductComments({ productId, productStatus, targetCommen
         </View>}
         {productStatus === 'sold' ? <Text className='product-comments__closed'>商品已售出，不能继续留言</Text> : (
           <View className='product-comments__input-row'>
-            <Input className='product-comments__input' value={draft} maxlength={500} adjustPosition disabled={submitting}
+            <Input className='product-comments__input' value={draft} maxlength={500} adjustPosition={!isSheet} disabled={submitting || (isSheet && !sheetVisible)}
+              onFocus={keyboard.onFocus} onBlur={keyboard.reset} onKeyboardHeightChange={keyboard.onKeyboardHeightChange}
               placeholder={replyTarget ? '回复 ' + replyTarget.authorName : '问问卖家，或留下你的看法'} confirmType='send'
               onInput={(event) => { if (submittingRef.current) return; setDraft(String(event.detail.value ?? '')); pendingSubmission.current = null; setSubmitError('') }}
               onConfirm={() => void submit()} />
@@ -341,4 +369,16 @@ export default function ProductComments({ productId, productStatus, targetCommen
       </View>
     </View>
   )
+  if (!isSheet) return content
+  // Retain one comments instance and its draft/page/expanded replies on close.
+  // Only the overlay is hidden after its exit animation; the product never remounts.
+  return <View className={`product-comments-layer product-comments-layer--${presence.phase}`} style={!presence.mounted ? { display: 'none' } : undefined}>
+    <View className='product-comments-layer__mask' onClick={closeSheet} catchMove />
+    <View className={'product-comments-sheet' + (drag.dragging ? ' product-comments-sheet--dragging' : '')}
+      role='dialog' aria-modal aria-label='商品留言'
+      style={{ bottom: `${keyboard.inset}px`, maxHeight: `calc(100% - ${keyboard.inset}px - 24px)`, ...(drag.dragging ? { transform: `translateY(${drag.offset}px)` } : {}) }}>
+      <View className='product-comments-sheet__handle' {...drag.handlers} catchMove ariaLabel='下滑关闭留言'><View /></View>
+      {content}
+    </View>
+  </View>
 }

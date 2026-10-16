@@ -84,8 +84,8 @@
 }
 .student-secondhand-categories__inner {
   display: inline-flex;
-  gap: 32rpx;
-  padding: 0 24rpx;
+  gap: 36rpx;
+  padding: 0 32rpx;
 }
 .student-secondhand-category {
   @include ref.touch;
@@ -133,7 +133,7 @@
   align-items: center;
   gap: 12rpx;
   margin: 0 24rpx;
-  padding: 24rpx 0;
+  padding: 20rpx 0;
   color: $text-secondary;
 }
 .student-secondhand-notice__icon {
@@ -144,7 +144,7 @@
 .student-secondhand-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 32rpx 16rpx;
+  gap: 36rpx 20rpx;
   padding: 0 24rpx;
 }
 .secondhand-card {
@@ -164,7 +164,7 @@
   height: 0;
   padding-top: 100%;
   overflow: hidden;
-  border-radius: 16rpx;
+  border-radius: 12rpx;
   background: $bg-screen;
   transition: transform $duration-fast $ease-standard, opacity $duration-fast $ease-standard;
 }
@@ -216,17 +216,18 @@
   font-size: 22rpx;
 }
 .secondhand-card__body {
-  padding: 16rpx 8rpx 0;
+  padding: 12rpx 4rpx 0;
   transition: opacity $duration-fast $ease-standard;
 }
 .secondhand-card__title {
   @include ref.type(label);
   @include ref.wrap;
   display: -webkit-box;
-  height: 80rpx;
+  // Two full lines even when compact screens hit the minimum fluid font size.
+  height: 2.86em;
   overflow: hidden;
   color: $text-primary;
-  font-weight: 600;
+  font-weight: 500;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
@@ -234,7 +235,7 @@
   @include ref.type(meta);
   display: block;
   height: 36rpx;
-  margin-top: 8rpx;
+  margin-top: 4rpx;
   overflow: hidden;
   color: $text-secondary;
   white-space: nowrap;
@@ -245,7 +246,7 @@
   margin-top: 8rpx;
   overflow: hidden;
   color: $like-active;
-  font-size: 36rpx;
+  font-size: 40rpx;
   font-weight: 700;
   line-height: 48rpx;
   font-variant-numeric: tabular-nums;
@@ -308,6 +309,24 @@
   display: block;
   padding: 24rpx 0;
   color: $brand-primary;
+}
+
+// Based on available space, not hardware pixel density. Search owns its own grid.
+@media (min-width: 600PX) {
+  .student-secondhand-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24PX 16PX; padding: 0 24PX; max-width: 960PX; margin: 0 auto; }
+  .student-secondhand-notice { max-width: 960PX; margin: 0 auto; padding: 16PX 24PX; font-size: 12PX; line-height: 18PX; }
+  .student-secondhand-categories__inner { gap: 24PX; padding: 0 24PX; }
+  .student-secondhand-category { height: 48PX; font-size: 15PX; line-height: 22PX; }
+  .secondhand-card__media { border-radius: 8PX; }
+  .secondhand-card__body { padding: 8PX 2PX 0; }
+  .secondhand-card__title { height: 44PX; font-size: 15PX; line-height: 22PX; }
+  .secondhand-card__meta, .secondhand-card__seller-name { height: 18PX; font-size: 12PX; line-height: 18PX; }
+  .secondhand-card__price { font-size: 22PX; line-height: 30PX; margin-top: 4PX; }
+  .secondhand-card__currency { font-size: 13PX; margin-right: 2PX; }
+  .secondhand-card__seller { margin-top: 8PX; gap: 6PX; }
+  .secondhand-card__avatar { width: 18PX; height: 18PX; font-size: 11PX; line-height: 18PX; }
+  .secondhand-card__no-image { font-size: 12PX; line-height: 18PX; }
+  .secondhand-card__no-image .app-icon { width: 24PX; height: 24PX; }
 }
 
 // A category replacement fades once; pagination never replays the whole grid.

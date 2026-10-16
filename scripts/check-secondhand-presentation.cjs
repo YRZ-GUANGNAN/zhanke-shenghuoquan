@@ -40,7 +40,7 @@ async function main() {
     const cache = new Map()
     const taro = {
       getCurrentInstance: () => ({ router: { params: options.params ?? { id: '1' } } }),
-      showToast: async () => {}, navigateTo: async () => {}, navigateBack: async () => {}, redirectTo: async () => {}, previewImage: async () => {},
+      showToast: async () => {}, navigateTo: async () => {}, navigateBack: async () => {}, redirectTo: async () => {}, previewImage: async () => {}, hideKeyboard: async () => {},
       getImageInfo: async () => ({ width: 600, height: 800 }), ...options.taro,
     }
     function load(relative) {
@@ -74,6 +74,8 @@ async function main() {
         if (id === './content') return load('pages/student-secondhand/content.tsx')
         if (id.endsWith('/content-motion')) return load('components/content-motion.tsx')
         if (id.endsWith('/use-layer-presence')) return load('hooks/use-layer-presence.ts')
+        if (id.endsWith('/use-sheet-dismiss')) return load('hooks/use-sheet-dismiss.ts')
+        if (id.endsWith('/sheet-drag')) return load('utils/sheet-drag.ts')
         if (id.endsWith('/use-confirmed-feedback')) return load('hooks/use-confirmed-feedback.ts')
         throw new Error('Unexpected test dependency: ' + id)
       }
@@ -139,6 +141,29 @@ async function main() {
     assert.equal(requests.length, 7, '关闭二手使旧响应失效并停止返回刷新')
     assert.equal(list.container.querySelector('.secondhand-card'), null)
 
+    const categoryRequests = []
+    const restored = await mount('pages/student-secondhand/content.tsx', { trade: {
+      getProductsPage: query => { const task = deferred(); categoryRequests.push({ query, ...task }); return task.promise },
+    } })
+    await restored.event(() => categoryRequests[0].resolve(pageResult([product('cached')], 1, 21)))
+    await restored.event(() => restored.props('.student-secondhand-scroll').onScroll({ detail: { scrollTop: 735 } }))
+    await restored.event(() => restored.all('.student-secondhand-category')[1].onClick())
+    await restored.event(() => categoryRequests[1].resolve(pageResult([product('digital')], 1, 21)))
+    await restored.event(() => restored.props('.student-secondhand-scroll').onScroll({ detail: { scrollTop: 180 } }))
+    await restored.event(() => restored.all('.student-secondhand-category')[0].onClick())
+    assert.equal(restored.props('.student-secondhand-scroll').scrollTop, 735, '返回分类恢复独立滚动位置')
+    assert.ok(restored.container.textContent.includes('测试商品 cached'), '分类缓存即时恢复，后台更新期间不闪空')
+    await restored.event(() => categoryRequests[2].reject(new Error('offline category refresh')))
+    assert.ok(restored.container.textContent.includes('测试商品 cached'), '后台更新失败保留该分类')
+    await restored.event(() => restored.all('.student-secondhand-category')[1].onClick())
+    assert.equal(restored.props('.student-secondhand-scroll').scrollTop, 180)
+    restored.options.token = 'other-account-token'
+    await restored.render()
+    await restored.event(() => categoryRequests[3].resolve(pageResult([product('old-account')])) )
+    assert.ok(!restored.container.textContent.includes('old-account'), '账号变化丢弃旧缓存和迟到响应')
+    assert.equal(restored.props('.student-secondhand-scroll').scrollTop, 0)
+    await restored.event(() => categoryRequests[4].resolve(pageResult([product('new-account')])))
+
     const embeddedRequests = [], destinations = []
     let canActivate = true
     const embedded = await mount('pages/student-secondhand/content.tsx', { lazyMounted: true, trade: {
@@ -200,7 +225,7 @@ async function main() {
     await detail.event(() => { detail.props('.secondhand-contact-option').onClick(); detail.props('.secondhand-contact-option').onClick() })
     assert.equal(contacts, 1, '联系卖家同帧防重')
     await detail.event(() => contact.resolve({ relationId: 8 }))
-    detail.options.visibility = { ...detail.options.visibility, favorites: false, secondhand_chat: false }
+    detail.options.visibility = { ...detail.options.visibility, favorites: false, secondhand_chat: false, secondhand_comments: false }
     await detail.render()
     assert.equal(detail.container.querySelector('.secondhand-detail-actionbar'), null, '没有可用操作时不保留空底栏')
 
@@ -265,6 +290,25 @@ async function main() {
     assert.deepEqual(submissions[1].args, submissions[0].args, '留言失败重试使用相同内容、对象及幂等号')
     await comments.event(() => submissions[1].resolve(comment('11', { parentCommentId: '10', reviewStatus: 'submitted' })))
     assert.ok(comments.container.textContent.includes('审核中'), '使用实际审核状态而非假装立即公开')
+
+    let sheetReads = 0, closeRequests = 0
+    const sheetProps = { productId: '1', productStatus: 'selling', sheetVisible: true, onClose: () => { closeRequests++ } }
+    const sheet = await mount('pages/secondhand-detail/product-comments.tsx', { trade: {
+      listProductComments: async () => { sheetReads++; return pageResult([comment('sheet-root', { replies: [comment('sheet-reply')] })]) },
+    } }, sheetProps)
+    await sheet.event(() => sheet.props('.product-comments__input').onInput({ detail: { value: '关闭后继续编辑的草稿' } }))
+    await sheet.event(() => sheet.props('.product-comments__disclosure').onClick())
+    const sheetList = sheet.container.querySelector('.product-comments__list')
+    await sheet.event(() => sheet.props('.product-comments__close').onClick())
+    assert.equal(closeRequests, 1)
+    await sheet.render({ ...sheetProps, sheetVisible: false })
+    await React.act(async () => new Promise(resolve => setTimeout(resolve, 260)))
+    assert.deepEqual(sheet.props('.product-comments-layer').style, { display: 'none' }, '留言退出完成后隐藏，不卸载草稿和列表')
+    await sheet.render(sheetProps)
+    assert.equal(sheetReads, 1, '重新打开不重复请求或清空留言')
+    assert.equal(sheet.container.querySelector('.product-comments__list'), sheetList)
+    assert.equal(sheet.props('.product-comments__input').value, '关闭后继续编辑的草稿')
+    assert.equal(sheet.props('.product-comments__disclosure')['aria-expanded'], true, '留言折叠状态保留')
 
     const locatedRequests = [], targets = []
     const located = await mount('pages/secondhand-detail/product-comments.tsx', { trade: {

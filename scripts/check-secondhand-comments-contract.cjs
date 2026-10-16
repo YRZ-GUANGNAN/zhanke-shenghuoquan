@@ -105,8 +105,8 @@ for (const fragment of [
   }
 }
 
-if (!detail.includes('onScrollToLower={() => commentsLoadMoreRef.current?.()}')) {
-  throw new Error('second-hand detail must trigger comment pagination at the scroll boundary')
+if (!detail.includes('sheetVisible={commentsVisible}') || !comments.includes('onScrollToLower={isSheet ? () => void loadMore() : undefined}')) {
+  throw new Error('second-hand comments sheet must trigger pagination at its own scroll boundary')
 }
 if (!comments.includes("onLoadMoreReady?.(() => { void loadMore() })")) {
   throw new Error('product comments must register a load-more callback with the detail page')

@@ -61,8 +61,7 @@ function SecondhandDetailPage() {
   const [contactPending, setContactPending] = useState(false)
   const [statusPending, setStatusPending] = useState(false)
   const [statusCandidate, setStatusCandidate] = useState<Product['status'] | null>(null)
-  const [scrollTarget, setScrollTarget] = useState('')
-  const commentsLoadMoreRef = useRef<(() => void) | null>(null)
+  const [commentsVisible, setCommentsVisible] = useState(Boolean(targetCommentId))
   const retryProduct = useCallback(() => setReloadKey((value) => value + 1), [])
   usePageShare({ kind: 'product', enabled: visibility.secondhand && status === 'ready', id: requestedId, content: product })
 
@@ -76,7 +75,6 @@ function SecondhandDetailPage() {
     let active = true
     setStatus('loading')
     setDescriptionLayoutReady(false)
-    setScrollTarget('')
     setGallery({ items: [], index: 0 })
     setMediaPending(false)
     setAvatarFailed(false)
@@ -88,6 +86,7 @@ function SecondhandDetailPage() {
     setContactPending(false)
     setStatusPending(false)
     setContactVisible(false)
+    setCommentsVisible(Boolean(targetCommentId))
     setStatusCandidate(null)
 
     void getTradeViewerState(requestedId).catch(() => null).then((viewerState) => {
@@ -116,7 +115,14 @@ function SecondhandDetailPage() {
     }
   }, [reloadKey, requestedId, validId, ownerKey])
 
+  useEffect(() => { if (!visibility.secondhand_comments) setCommentsVisible(false) }, [visibility.secondhand_comments])
+
   const goBack = () => {
+    if (commentsVisible) {
+      setCommentsVisible(false)
+      void Taro.hideKeyboard().catch(() => {})
+      return
+    }
     void Taro.navigateBack().catch(() => Taro.redirectTo({ url: '/pages/student-secondhand/index' }))
   }
 
@@ -140,7 +146,7 @@ function SecondhandDetailPage() {
   const sellerMeta = product?.campus || '校内'
   const sellerAvatar = product?.sellerName.trim().charAt(0) || '校'
   const isSeller = Boolean(product && currentUserId === product.sellerId)
-  const hasActions = isSeller || visibility.favorites || visibility.secondhand_chat
+  const hasActions = isSeller || visibility.favorites || visibility.secondhand_chat || visibility.secondhand_comments
   const galleryView = useGalleryPresentation(requestedId, gallery.items.length, undefined, 'product', hasActions)
 
   const handleFavorite = async () => {
@@ -257,15 +263,35 @@ function SecondhandDetailPage() {
 
       <ScrollView
         className='secondhand-detail-scroll'
-        scrollY
+        scrollY={!commentsVisible}
         enhanced
         showScrollbar={false}
-        scrollIntoView={scrollTarget}
-        lowerThreshold={120}
-        onScrollToLower={() => commentsLoadMoreRef.current?.()}
       >
         {status !== 'ready' || !product ? renderState() : (
           <>
+            <View className='secondhand-detail-seller'>
+              <View className='secondhand-detail-seller__avatar'>
+                {product.sellerAvatar && !avatarFailed ? <Image src={product.sellerAvatar} mode='aspectFill' onError={() => setAvatarFailed(true)} /> : <Text>{sellerAvatar}</Text>}
+              </View>
+              <View className='secondhand-detail-seller__main'>
+                <Text className='secondhand-detail-seller__name'>{product.sellerName}</Text>
+                <Text className='secondhand-detail-seller__meta'>{sellerMeta}{product.createdAt ? ` · ${formatPostDate(product.createdAt)} 发布` : ''}</Text>
+              </View>
+              {visibility.forum && <View className='secondhand-detail-seller__button' onClick={openSellerProfile} hoverClass='secondhand-detail-control--pressed'>
+                <Text>主页</Text><AppIcon name='chevron-right' />
+              </View>}
+            </View>
+            <View className='secondhand-detail-info'>
+              <View className='secondhand-detail-info__price-row'>
+                <Text className='secondhand-detail-info__price'><Text className='secondhand-detail-info__currency'>¥</Text>{product.price}</Text>
+                <View className={`secondhand-detail-info__status secondhand-detail-info__status--${product.status}`}><Text>{statusLabel}</Text></View>
+              </View>
+              <Text className='secondhand-detail-info__title'>{product.title}</Text>
+              {tags.length > 0 && <View className='secondhand-detail-tags'>
+                {tags.map(tag => <View className='secondhand-detail-tag' key={tag}><Text>{tag}</Text></View>)}
+              </View>}
+              <ExpandableText key={product.id} text={product.description} lines={8} className='secondhand-detail-info__desc' onLayoutReady={setDescriptionLayoutReady} />
+            </View>
             <View className={'secondhand-detail-hero' + (product.images.length === 0 ? ' secondhand-detail-hero--empty' : '')}
               style={product.images.length ? { height: `${galleryView.height}px` } : undefined}
               onTouchStart={galleryView.onTouchStart} onTouchEnd={galleryView.onTouchEnd} onTouchCancel={galleryView.onTouchEnd}>
@@ -286,60 +312,16 @@ function SecondhandDetailPage() {
               </> : <Text>{product.images.length ? '图片暂不可用，商品信息仍可查看' : '卖家未上传图片'}</Text>}
             </View>
 
-            <View className='secondhand-detail-info'>
-              <View className='secondhand-detail-info__price-row'>
-                <Text className='secondhand-detail-info__price'>
-                  <Text className='secondhand-detail-info__currency'>¥</Text>{product.price}
-                </Text>
-                <View className='secondhand-detail-info__status'>
-                  <Text>{statusLabel}</Text>
-                </View>
-              </View>
-
-              <Text className='secondhand-detail-info__title'>{product.title}</Text>
-              <ExpandableText key={product.id} text={product.description} lines={8} className='secondhand-detail-info__desc' onLayoutReady={setDescriptionLayoutReady} />
-
-              <View className='secondhand-detail-tags'>
-                {tags.map((tag) => (
-                  <View className='secondhand-detail-tag' key={tag}>
-                    <Text>{tag}</Text>
-                  </View>
-                ))}
-              </View>
-
-              <Text className='secondhand-detail-info__meta'>
-                {product.createdAt ? `${formatPostDate(product.createdAt)} 发布` : '发布时间未知'}
-              </Text>
-            </View>
-
             <View className='secondhand-detail-section'>
-              <View className='secondhand-detail-seller'>
-                <View className='secondhand-detail-seller__avatar'>
-                  {product.sellerAvatar && !avatarFailed ? <Image src={product.sellerAvatar} mode='aspectFill' onError={() => setAvatarFailed(true)} /> : <Text>{sellerAvatar}</Text>}
-                </View>
-                <View className='secondhand-detail-seller__main'>
-                  <Text className='secondhand-detail-seller__name'>{product.sellerName}</Text>
-                  <Text className='secondhand-detail-seller__meta'>{sellerMeta}</Text>
-                </View>
-                {visibility.forum && <View className='secondhand-detail-seller__button' onClick={openSellerProfile} hoverClass='secondhand-detail-control--pressed'>
-                  <Text>主页</Text>
-                </View>}
-              </View>
-
               <View className='secondhand-detail-warning'>
                 <AppIcon name='info' className='secondhand-detail-warning__icon' />
                 <Text>平台仅展示信息、不参与交易。请与卖家私下当面交易，验货后再付款，谨防转账诈骗。</Text>
               </View>
 
-              {visibility.secondhand_comments && <ProductComments
-                key={ownerKey}
-                productId={product.id}
-                productStatus={product.status}
-                targetCommentId={targetCommentId}
-                layoutReady={descriptionLayoutReady && !mediaPending}
-                onTargetReady={setScrollTarget}
-                onLoadMoreReady={(handler) => { commentsLoadMoreRef.current = handler }}
-              />}
+              {visibility.secondhand_comments && <View className='secondhand-detail-comments-entry' onClick={() => setCommentsVisible(true)} ariaRole='button' ariaLabel='查看商品留言'>
+                <View><Text className='secondhand-detail-comments-entry__title'>商品留言</Text><Text className='secondhand-detail-comments-entry__hint'>{product.status === 'sold' ? '查看这件宝贝的留言' : '成色、规格和交付细节，在这里问卖家'}</Text></View>
+                <AppIcon name='chevron-right' />
+              </View>}
             </View>
           </>
         )}
@@ -347,6 +329,9 @@ function SecondhandDetailPage() {
 
       {status === 'ready' && product && hasActions && (
         <View className={`secondhand-detail-actionbar ${isSeller ? 'secondhand-detail-actionbar--seller' : ''}`}>
+          {visibility.secondhand_comments && <View className='secondhand-detail-comment-action' onClick={() => setCommentsVisible(true)} ariaRole='button' ariaLabel='打开商品留言'>
+            <AppIcon name='comment' /><Text>留言</Text>
+          </View>}
           {isSeller ? (
             <View className='secondhand-detail-seller-actions'>
               {product.status === 'selling' && (
@@ -400,6 +385,11 @@ function SecondhandDetailPage() {
           )}
         </View>
       )}
+
+      {status === 'ready' && product && visibility.secondhand_comments && <ProductComments
+        key={ownerKey} productId={product.id} productStatus={product.status} targetCommentId={targetCommentId}
+        layoutReady={descriptionLayoutReady && !mediaPending} sheetVisible={commentsVisible} onClose={() => setCommentsVisible(false)}
+      />}
 
       <AppActionSheet visible={contactVisible && visibility.secondhand_chat && Boolean(product)} title='联系卖家' description='请选择一种安全的沟通方式' loading={contactPending} onClose={() => setContactVisible(false)}>
         {product ? <View className='secondhand-contact-sheet__content'>

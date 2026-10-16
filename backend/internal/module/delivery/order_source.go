@@ -131,7 +131,7 @@ type ExternalOrderEvent struct {
 func NormalizeExternalOrderEvent(adapterPlatform SourcePlatform, binding ExternalShopBinding, event ExternalOrderEvent) (ExternalOrderEvent, error) {
 	adapterPlatform = adapterPlatform.Effective()
 	binding.Platform = binding.Platform.Effective()
-	if adapterPlatform != binding.Platform || event.Source.SourcePlatform.Effective() != adapterPlatform ||
+	if adapterPlatform == SourceLocal || adapterPlatform != binding.Platform || event.Source.SourcePlatform.Effective() != adapterPlatform ||
 		binding.MerchantUserID == 0 || strings.TrimSpace(binding.SourceShopID) == "" ||
 		strings.TrimSpace(event.EventID) == "" || !validSourceText(event.EventID, 128) || event.OccurredAt.IsZero() {
 		return ExternalOrderEvent{}, ErrInvalidRecord

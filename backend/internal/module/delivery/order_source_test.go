@@ -129,4 +129,27 @@ func TestExternalAdapterNormalizationRequiresBoundShopAndNeverCreatesOrder(t *te
 	if _, err := NormalizeExternalOrderEvent(SourceTaobao, ExternalShopBinding{MerchantUserID: 99, Platform: SourceTaobao, SourceShopID: shopID}, event); !errors.Is(err, ErrInvalidRecord) {
 		t.Fatal("event platform mismatch accepted")
 	}
+	event.Source.SourcePlatform = SourceLocal
+	if _, err := NormalizeExternalOrderEvent(SourceLocal, ExternalShopBinding{MerchantUserID: 99, Platform: SourceLocal, SourceShopID: shopID}, event); !errors.Is(err, ErrInvalidRecord) {
+		t.Fatal("manual local source accepted as a verified external adapter")
+	}
+}
+
+func TestExternalContentRequiresCompleteCreateAndBoundsOptionalUpdates(t *testing.T) {
+	e := ExternalOrderEvent{EventType: ExternalOrderCreated, Pickup: Contact{Name: "商家", Phone: "13000000001", Address: "校门"}, Recipient: Contact{Name: "同学", Phone: "13000000002", Address: "宿舍"}}
+	if !validExternalContent(e) {
+		t.Fatal("valid snapshot rejected")
+	}
+	e.Recipient.Address = ""
+	if validExternalContent(e) {
+		t.Fatal("missing destination accepted")
+	}
+	e.EventType = ExternalOrderCancelled
+	if !validExternalContent(e) {
+		t.Fatal("cancellation must not require unchanged addresses")
+	}
+	e.Remark = string([]byte{0xff})
+	if validExternalContent(e) {
+		t.Fatal("invalid UTF-8 accepted")
+	}
 }

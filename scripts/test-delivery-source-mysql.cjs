@@ -9,6 +9,7 @@ const mysqlDirectory = 'C:\\Program Files\\MySQL\\MySQL Server 8.4\\bin'
 const mysql = path.join(mysqlDirectory, 'mysql.exe')
 const mysqld = path.join(mysqlDirectory, 'mysqld.exe')
 const port = 33308
+const externalIntake = process.argv.includes('--external-intake')
 const connection = ['--no-defaults', '--protocol=tcp', '--host=127.0.0.1', `--port=${port}`, '--user=root', '--default-character-set=utf8mb4']
 const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds))
 
@@ -43,14 +44,18 @@ async function run() {
     const created = sql(`CREATE DATABASE ${database} CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci`)
     if (created.status !== 0) throw new Error(created.stderr)
     const migrationDirectory = path.join(root, 'backend', 'migrations')
-    const baseline = fs.readdirSync(migrationDirectory).filter(name => /^\d{3}_.+\.sql$/.test(name) && Number(name.slice(0, 3)) < 45).sort()
+    const baseline = fs.readdirSync(migrationDirectory).filter(name => /^\d{3}_.+\.sql$/.test(name) && Number(name.slice(0, 3)) < (externalIntake ? 47 : 45)).sort()
     for (const name of baseline) {
       const applied = spawnSync(mysql, [...connection, database], { input: fs.readFileSync(path.join(migrationDirectory, name), 'utf8'), encoding: 'utf8', windowsHide: true, env: environment })
       if (applied.status !== 0) throw new Error(`Baseline migration ${name}: ${applied.stderr}`)
     }
     console.log(`Applied ${baseline.length} baseline migrations to an isolated temporary database.`)
-    const result = spawnSync('go.exe', ['test', './internal/module/admin/deliverymerchant', '-run', 'TestOrderSourceTemporaryMySQL', '-count=1', '-v'], {
-      cwd: path.join(root, 'backend'), env: { ...environment, DELIVERY_SOURCE_TEST_MYSQL_DSN: `root@tcp(127.0.0.1:${port})/${database}?charset=utf8mb4&parseTime=True&loc=UTC` }, stdio: 'inherit', windowsHide: true,
+    if (externalIntake) {
+      const repeated = spawnSync(mysql, [...connection, database], { input: fs.readFileSync(path.join(migrationDirectory, '046_delivery_external_inbox.sql'), 'utf8'), encoding: 'utf8', windowsHide: true, env: environment })
+      if (repeated.status !== 0) throw new Error(`Repeated migration 046: ${repeated.stderr}`)
+    }
+    const result = spawnSync('go.exe', ['test', externalIntake ? './internal/module/delivery' : './internal/module/admin/deliverymerchant', '-run', externalIntake ? 'TestExternalIntakeTemporaryMySQL' : 'TestOrderSourceTemporaryMySQL', '-count=1', '-v'], {
+      cwd: path.join(root, 'backend'), env: { ...environment, [externalIntake ? 'DELIVERY_INTAKE_TEST_MYSQL_DSN' : 'DELIVERY_SOURCE_TEST_MYSQL_DSN']: `root@tcp(127.0.0.1:${port})/${database}?charset=utf8mb4&parseTime=True&loc=UTC` }, stdio: 'inherit', windowsHide: true,
     })
     if (result.status !== 0) throw new Error('Delivery-source MySQL integration test failed.')
   } finally {

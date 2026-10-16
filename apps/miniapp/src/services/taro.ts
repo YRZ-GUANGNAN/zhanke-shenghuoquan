@@ -78,6 +78,7 @@ interface TaroFacade {
   showToast(options: ToastOptions): Promise<unknown>
 	showLoading(options: { title: string; mask?: boolean }): Promise<unknown>
 	hideLoading(): Promise<unknown>
+  hideKeyboard(): Promise<unknown>
 	showModal(options: ModalOptions): Promise<{ confirm: boolean; cancel: boolean }>
 	makePhoneCall(options: { phoneNumber: string }): Promise<unknown>
 	setClipboardData(options: { data: string }): Promise<unknown>

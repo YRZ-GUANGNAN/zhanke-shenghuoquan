@@ -11,10 +11,12 @@ import Taro from '../../services/taro'
 import type { Product } from '../../types'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
+import { useSessionStore } from '../../stores/session'
 import './index.scss'
 
 type CategoryKey = '全部' | '数码' | '书籍资料' | '生活用品' | '代步'
 const categories: CategoryKey[] = ['全部', '数码', '书籍资料', '生活用品', '代步']
+interface CategorySnapshot { items: Product[]; page: number; total: number; scrollTop: number }
 
 function mergeProductsById(current: Product[], incoming: Product[]) {
   const values = new Map(current.map((item) => [item.id, item]))
@@ -30,6 +32,7 @@ interface StudentSecondhandContentProps {
 
 export default function StudentSecondhandContent({ embedded = false, active = true, interaction }: StudentSecondhandContentProps) {
   const capsuleStyle = useViewportRefresh()
+  const ownerKey = useSessionStore(state => `${state.profile.id}:${state.token}`)
   const [activeCategory, setActiveCategory] = useState<CategoryKey>('全部')
   const [items, setItems] = useState<Product[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'empty' | 'error'>('loading')
@@ -49,6 +52,14 @@ export default function StudentSecondhandContent({ embedded = false, active = tr
   const navigatingRef = useRef(false)
   const didShowOnce = useRef(false)
   const refreshOnActivate = useRef(false)
+  const snapshots = useRef<Partial<Record<CategoryKey, CategorySnapshot>>>({})
+  const snapshotOwner = useRef(ownerKey)
+  const scrollPosition = useRef(0)
+  const [restoreScrollTop, setRestoreScrollTop] = useState(0)
+  const refreshCurrent = useRef<() => void>(() => {})
+  if (snapshotOwner.current === ownerKey && page > 0) {
+    snapshots.current[categoryRef.current] = { items, page, total, scrollTop: scrollPosition.current }
+  }
 
   const fetchProductsPage = useCallback(async (category: CategoryKey, targetPage: number, version: number, reset: boolean) => {
     const key = version + ':' + targetPage
@@ -93,15 +104,37 @@ export default function StudentSecondhandContent({ embedded = false, active = tr
   }, [fetchProductsPage, visibility.secondhand])
 
   useEffect(() => {
+    if (snapshotOwner.current !== ownerKey || !visibility.secondhand) {
+      snapshots.current = {}
+      snapshotOwner.current = ownerKey
+    }
     categoryRef.current = activeCategory
-    if (visibility.secondhand) retryCurrentCategory()
+    const saved = snapshots.current[activeCategory]
+    scrollPosition.current = saved?.scrollTop ?? 0
+    setRestoreScrollTop(scrollPosition.current)
+    refreshingRef.current = false
+    setRefreshing(false)
+    setLoadingMore(false)
+    setPagingError(false)
+    setRefreshError(false)
+    if (visibility.secondhand && saved) {
+      queryVersion.current += 1
+      setItems(saved.items)
+      setPage(saved.page)
+      loadedPageRef.current = saved.page
+      setTotal(saved.total)
+      setStatus(saved.items.length ? 'ready' : 'empty')
+      refreshCurrent.current()
+    } else if (visibility.secondhand) retryCurrentCategory()
     else {
       queryVersion.current += 1
       setItems([])
+      setPage(0)
+      loadedPageRef.current = 0
       setStatus('empty')
     }
     return () => { queryVersion.current += 1 }
-  }, [activeCategory, retryCurrentCategory, visibility.secondhand])
+  }, [activeCategory, retryCurrentCategory, visibility.secondhand, ownerKey])
 
   // Keep the mounted list and its scroll position while reconciling real server changes.
   const refreshProducts = useCallback(async () => {
@@ -147,6 +180,7 @@ export default function StudentSecondhandContent({ embedded = false, active = tr
       }
     }
   }, [retryCurrentCategory, status, visibility.secondhand])
+  refreshCurrent.current = () => { void refreshProducts() }
 
   useDidShow(() => {
     navigatingRef.current = false
@@ -206,8 +240,8 @@ export default function StudentSecondhandContent({ embedded = false, active = tr
         </View>
         <View className='secondhand-card__body'>
           <Text className='secondhand-card__title'>{item.title}</Text>
-          <Text className='secondhand-card__meta'>{[item.category, item.condition].filter(Boolean).join(' · ')}</Text>
           <Text className='secondhand-card__price'><Text className='secondhand-card__currency'>¥</Text>{item.price}</Text>
+          <Text className='secondhand-card__meta'>{[item.condition, item.category].filter(Boolean).join(' · ')}</Text>
           <View className='secondhand-card__seller'>
             {item.sellerAvatar && !failedImages.has(avatarKey)
               ? <Image className='secondhand-card__avatar' src={item.sellerAvatar} mode='aspectFill' onError={() => markImageFailed(avatarKey)} />
@@ -246,7 +280,9 @@ export default function StudentSecondhandContent({ embedded = false, active = tr
           </View>
         </ScrollView>
       </View>
-      <ScrollView key={activeCategory} className='student-secondhand-scroll' scrollY enhanced showScrollbar={false} lowerThreshold={120} onScrollToLower={loadMoreProducts}>
+      <ScrollView key={`${ownerKey}:${activeCategory}`} className='student-secondhand-scroll' scrollY enhanced showScrollbar={false}
+        scrollTop={restoreScrollTop} onScroll={event => { scrollPosition.current = Math.max(0, event.detail.scrollTop) }}
+        lowerThreshold={120} onScrollToLower={loadMoreProducts}>
         {!visibility.secondhand ? <AppState kind='empty' title='二手市场暂未开放' /> : <>
           <View className='student-secondhand-notice'>
             <AppIcon name='info' className='student-secondhand-notice__icon' />

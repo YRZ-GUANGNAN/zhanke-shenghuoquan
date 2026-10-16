@@ -32,6 +32,9 @@
   align-items: center;
   justify-content: center;
   height: 750rpx;
+  margin: 0 32rpx;
+  overflow: hidden;
+  border-radius: 12rpx;
   background: $bg-screen;
   color: $text-secondary;
   font-size: 26rpx;
@@ -62,7 +65,7 @@
   opacity: 1;
 }
 .secondhand-detail-info {
-  padding: 32rpx;
+  padding: 8rpx 32rpx 28rpx;
   background: $bg-surface;
 }
 .secondhand-detail-info__price-row {
@@ -75,7 +78,7 @@
   min-width: 0;
   overflow: hidden;
   color: $badge-unread;
-  font-size: 56rpx;
+  font-size: 60rpx;
   font-weight: 700;
   line-height: 64rpx;
   font-variant-numeric: tabular-nums;
@@ -97,11 +100,12 @@
   line-height: 32rpx;
   font-weight: 500;
 }
+.secondhand-detail-info__status--sold { background: $bg-screen; color: $text-secondary; }
 .secondhand-detail-info__title {
   @include ref.type(title);
   @include ref.wrap;
   display: block;
-  margin-top: 24rpx;
+  margin-top: 16rpx;
   color: $text-strong;
 }
 .secondhand-detail-info__desc {
@@ -115,19 +119,18 @@
 .secondhand-detail-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 12rpx;
-  margin-top: 24rpx;
+  gap: 16rpx;
+  margin-top: 16rpx;
 }
 .secondhand-detail-tag {
   @include ref.type(meta);
   @include ref.wrap;
   box-sizing: border-box;
   max-width: 100%;
-  padding: 6rpx 16rpx;
-  border-radius: 8rpx;
-  background: $bg-screen;
+  padding: 0;
   color: $text-secondary;
 }
+.secondhand-detail-tag + .secondhand-detail-tag { padding-left: 16rpx; border-left: 1rpx solid $divider-nav; }
 .secondhand-detail-info__meta {
   @include ref.type(meta);
   @include ref.wrap;
@@ -142,9 +145,7 @@
   display: flex;
   align-items: center;
   gap: 16rpx;
-  padding: 24rpx 0;
-  border-top: 1rpx solid $divider-nav;
-  border-bottom: 1rpx solid $divider-nav;
+  padding: 24rpx 32rpx;
 }
 .secondhand-detail-seller__avatar {
   flex: 0 0 auto;
@@ -169,7 +170,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 8rpx;
+  gap: 4rpx;
 }
 .secondhand-detail-seller__name {
   @include ref.type(label);
@@ -194,8 +195,9 @@
   align-items: center;
   justify-content: center;
   min-width: max(44PX, 96rpx);
-  color: $brand-primary;
+  color: $text-secondary;
 }
+.secondhand-detail-seller__button .app-icon { width: 28rpx; height: 28rpx; }
 .secondhand-detail-warning {
   @include ref.type(meta);
   @include ref.wrap;
@@ -203,7 +205,7 @@
   align-items: flex-start;
   gap: 12rpx;
   padding: 24rpx 0;
-  color: $badge-unread;
+  color: $text-secondary;
 }
 .secondhand-detail-warning__icon {
   flex: 0 0 auto;
@@ -211,22 +213,32 @@
   height: 28rpx;
   margin-top: 4rpx;
 }
+.secondhand-detail-comments-entry {
+  @include ref.touch;
+  display: flex; align-items: center; justify-content: space-between; gap: 16rpx;
+  padding: 24rpx 0; border-top: 1rpx solid $divider-nav;
+  > view { min-width: 0; }
+  > .app-icon { flex: 0 0 auto; width: 32rpx; height: 32rpx; }
+  &:active { opacity: .6; }
+}
+.secondhand-detail-comments-entry__title { display: block; font-size: 30rpx; font-weight: 600; line-height: 44rpx; }
+.secondhand-detail-comments-entry__hint { display: block; margin-top: 8rpx; font-size: 24rpx; line-height: 36rpx; color: $text-secondary; }
 
 // The bar is a flex sibling of the scroll viewport, so it cannot cover the last comment.
 .secondhand-detail-actionbar {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 16rpx;
+  gap: 12rpx;
   min-height: calc(120rpx + env(safe-area-inset-bottom));
-  padding: 16rpx 32rpx calc(16rpx + env(safe-area-inset-bottom));
+  padding: 16rpx 24rpx calc(16rpx + env(safe-area-inset-bottom));
   border-top: 1rpx solid $divider-nav;
   background: $bg-surface;
   box-sizing: border-box;
 }
-.secondhand-detail-favorite {
+.secondhand-detail-favorite, .secondhand-detail-comment-action {
   @include ref.touch;
-  flex: 0 0 104rpx;
+  flex: 0 0 max(44PX, 96rpx);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -236,6 +248,8 @@
   font-size: 22rpx;
   line-height: 32rpx;
 }
+.secondhand-detail-comment-action > .app-icon { width: 36rpx; height: 36rpx; }
+.secondhand-detail-comment-action:active { opacity: .6; }
 .secondhand-detail-favorite:only-child {
   flex: 1;
   flex-direction: row;
@@ -376,4 +390,26 @@
   .secondhand-detail-gallery__count, .secondhand-detail-favorite,
   .secondhand-detail-contact, .secondhand-detail-seller-action,
   .secondhand-contact-option { transition: none; }
+}
+
+@media (min-width: 600PX) {
+  .secondhand-detail-seller, .secondhand-detail-info, .secondhand-detail-section { max-width: 720PX; width: 100%; margin-right: auto; margin-left: auto; padding-right: 24PX; padding-left: 24PX; }
+  .secondhand-detail-seller { padding-top: 20PX; padding-bottom: 20PX; gap: 12PX; }
+  .secondhand-detail-seller__avatar { width: 40PX; height: 40PX; font-size: 18PX; }
+  .secondhand-detail-info { padding-top: 4PX; padding-bottom: 20PX; }
+  .secondhand-detail-info__price { font-size: 36PX; line-height: 44PX; }
+  .secondhand-detail-info__currency { font-size: 18PX; }
+  .secondhand-detail-info__status { font-size: 13PX; line-height: 20PX; padding: 4PX 8PX; }
+  .secondhand-detail-info__title, .secondhand-detail-tags, .secondhand-detail-info__desc { margin-top: 12PX; }
+  .secondhand-detail-hero { max-width: 672PX; max-height: 560PX; margin-right: auto; margin-left: auto; border-radius: 8PX; }
+  .secondhand-detail-hero--empty { height: 88PX; font-size: 14PX; }
+  .secondhand-detail-comments-entry__title { font-size: 17PX; line-height: 24PX; }
+  .secondhand-detail-comments-entry__hint { font-size: 13PX; line-height: 20PX; margin-top: 6PX; }
+  .secondhand-detail-actionbar { min-height: 80PX; gap: 12PX; padding: 12PX max(24PX, calc((100vw - 672PX) / 2)) calc(12PX + env(safe-area-inset-bottom)); }
+  .secondhand-detail-comment-action, .secondhand-detail-favorite { flex-basis: 56PX; font-size: 12PX; line-height: 18PX; }
+  .secondhand-detail-comment-action > .app-icon, .secondhand-detail-favorite__star, .secondhand-detail-contact__icon { width: 20PX; height: 20PX; }
+  .secondhand-detail-contact, .secondhand-detail-seller-action { min-height: 44PX; padding: 8PX 12PX; border-radius: 8PX; }
+  .secondhand-detail-page .product-comments-sheet { max-width: 640PX; margin: 0 auto; }
+  .secondhand-detail-page .product-comments__input { height: 48PX; font-size: 15PX; }
+  .secondhand-detail-page .product-comments__send { height: 48PX; font-size: 15PX; }
 }
