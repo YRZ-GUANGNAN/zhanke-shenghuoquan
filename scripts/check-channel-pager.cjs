@@ -161,6 +161,8 @@ async function run() {
       '../../components/campus-info-home': { default: View },
       '../../components/capsule-page-header': { default: (props) => React.createElement(View, {}, props.center, props.right) },
       '../../components/app-icon': { default: View },
+      '../../components/chat-avatar': { default: View },
+      '../../utils/conversation-presentation': load(path.join(root, 'apps/miniapp/src/utils/conversation-presentation.ts')),
       '../../components/ui': { AppState: component('AppState') },
       '../../hooks/use-identity-guard': { useIdentityGuard: () => true },
       '../../hooks/use-feature-visibility': { useFeatureVisibility: () => visibility },
@@ -234,7 +236,7 @@ async function run() {
     await messagePage.event(() => requests.messages[1].resolve([]))
     await messagePage.event(() => { for (const ref of shown) ref.current() })
     assert.equal(requests.messages.length, 3, '从聊天页返回后刷新当前账号会话')
-    await messagePage.event(() => requests.messages[2].resolve([{ relationId: 7, productId: 8, sellerId: 'test-user-c', buyerId: 'test-peer' }]))
+    await messagePage.event(() => requests.messages[2].resolve([{ relationId: 7, productId: 8, sellerId: 'test-user-c', buyerId: 'test-peer', peerUserId: 'campus_test-peer', conversationId: 'C2Ccampus_test-peer' }]))
     assert.ok(messagePage.container.querySelector('.student-message-row'))
     const messageSwiper = () => messagePage.props('[data-component="Swiper"]')
     const navigationCount = navigate.length
