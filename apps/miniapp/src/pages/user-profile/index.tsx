@@ -24,6 +24,7 @@ import ChannelPager, { useChannelInteraction } from '../../components/channel-pa
 import { navigateBackOrHome } from '../../utils/navigation'
 import AppIcon from '../../components/app-icon'
 import { postBodyWithoutTitle } from '../../utils/post-presentation'
+import { useEdgeBack } from '../../hooks/use-edge-back'
 import './index.scss'
 
 type ProfileTab = 'posts' | 'secondhand'
@@ -70,6 +71,7 @@ function UserProfilePage() {
   const didShowOnce = useRef(false)
   const scrollPositions = useRef<Record<ProfileTab, number>>({ posts: 0, secondhand: 0 })
   const interaction = useChannelInteraction()
+  const edgeBack = useEdgeBack(!menuVisible && !blockConfirmVisible)
   const visibleTabs: ProfileTab[] = visibility.secondhand ? ['posts', 'secondhand'] : ['posts']
   const shareReady = usePageShare({ kind: 'profile', enabled: visibility.forum && status === 'ready', id: userId, loadedId: String(profile?.profile.id || ''), nickname: profile?.profile.nickname || '' })
   useEffect(() => { if (!visibility.secondhand && activeTab === 'secondhand') setActiveTab('posts') }, [visibility.secondhand, activeTab])
@@ -291,14 +293,21 @@ function UserProfilePage() {
   const navigation = (
     <View className={`public-profile-navigation${status !== 'ready' || scrolledTabs[activeTab] ? ' public-profile-navigation--scrolled' : ''}${status === 'ready' && hasCover && !scrolledTabs[activeTab] ? ' public-profile-navigation--on-cover' : ''}`}>
       <View className='public-profile-nav'>
-        <View className='public-profile-nav__back' ariaRole='button' ariaLabel='返回' hoverClass='public-profile-control--pressed' onClick={() => void navigateBackOrHome()} />
+        <View className={`public-profile-nav__back${edgeBack.tracking ? ' public-profile-nav__back--tracking' : ''}`}
+          style={{ '--profile-back-offset': `${edgeBack.offset}px` } as React.CSSProperties}
+          {...(edgeBack.available ? edgeBack.handlers : {})}
+          ariaRole='button' ariaLabel='返回' hoverClass='public-profile-control--pressed'
+          onClick={() => { if (edgeBack.canActivate()) void navigateBackOrHome() }} />
       </View>
     </View>
   )
 
+  const edgeBackLayer = edgeBack.available ? <View className='public-profile-edge-back' {...edgeBack.handlers} catchMove aria-hidden='true' /> : null
+
   if (status !== 'ready' || !profile) {
     return (
       <View className='public-profile-page' style={capsuleStyle}>
+        {edgeBackLayer}
         {navigation}
         <View className='public-profile-state public-profile-empty'>
           <Text className='public-profile-empty__title'>{status === 'loading' ? '正在加载主页…' : error || '用户主页加载失败'}</Text>
@@ -350,6 +359,7 @@ function UserProfilePage() {
   )
   return (
     <View className='public-profile-page' style={capsuleStyle}>
+      {edgeBackLayer}
       {navigation}
       <View className='public-profile-content'>
         <ChannelPager

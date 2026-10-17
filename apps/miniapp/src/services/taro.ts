@@ -106,6 +106,9 @@ interface TaroFacade {
 	getAccountInfoSync(): { miniProgram: { appId: string; envVersion: string; version: string } }
   getMenuButtonBoundingClientRect(): MenuButtonRect
   getWindowInfo(): WindowInfo
+  getDeviceInfo(): { platform: string }
+  getSystemInfoSync(): { platform: string }
+  getCurrentPages(): unknown[]
 }
 
 export default TaroRuntime as unknown as TaroFacade

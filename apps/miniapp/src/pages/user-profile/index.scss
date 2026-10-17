@@ -81,14 +81,27 @@
   border-bottom: 2PX solid currentColor;
   border-left: 2PX solid currentColor;
   content: '';
-  transform: translateY(-50%) rotate(45deg);
+  transform: translate(var(--profile-back-offset, 0px), -50%) rotate(45deg);
+  transition: transform $duration-fast $ease-standard;
 }
+.public-profile-nav__back--tracking::before { transition: none; }
 
 .public-profile-navigation--on-cover .public-profile-nav__back {
   color: $text-on-color;
 }
 .public-profile-navigation--on-cover .public-profile-nav__back::before {
   filter: drop-shadow(0 1PX 2PX rgba($text-strong, .5));
+}
+.public-profile-edge-back {
+  position: fixed;
+  z-index: 4;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 24PX;
+  background: transparent;
+  pointer-events: auto;
+  touch-action: none;
 }
 .public-profile-control--pressed,
 .public-profile-nav__back:active,
@@ -567,4 +580,5 @@
 
 @media (prefers-reduced-motion: reduce) {
   .public-profile-navigation, .public-profile-nav__back, .public-profile-user__options, .public-profile-card { transition: none; }
+  .public-profile-nav__back::before { transition: none; transform: translateY(-50%) rotate(45deg); }
 }

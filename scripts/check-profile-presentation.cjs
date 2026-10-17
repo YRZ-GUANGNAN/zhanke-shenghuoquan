@@ -43,17 +43,21 @@ async function run() {
     options.visibility ||= { ...visibility }
     options.session ||= session()
     const shows = new Set()
-    const taro = { getCurrentInstance: () => ({ router: { params: options.params || {} } }), navigateTo: async () => {}, navigateBack: async () => {}, reLaunch: async () => {}, showToast: async () => {}, ...options.taro }
+    const taro = { getCurrentInstance: () => ({ router: { params: options.params || {} } }), navigateTo: async () => {}, navigateBack: async () => {}, reLaunch: async () => {}, showToast: async () => {}, getWindowInfo: () => ({ windowWidth: 390 }), ...options.taro }
     const loadSource = (sourcePath) => {
       const loaded = new Module(sourcePath, module)
       loaded.require = (id) => {
         if (id === 'react' || id === 'react/jsx-runtime') return require(id)
         if (id === '@tarojs/components') return Object.fromEntries(['Image', 'ScrollView', 'Swiper', 'SwiperItem', 'Text', 'View', 'Button'].map((name) => [name, component(name)]))
-        if (id === '@tarojs/taro') return { useDidShow: (callback) => {
-          const ref = React.useRef(callback)
-          ref.current = callback
-          React.useEffect(() => { shows.add(ref); return () => shows.delete(ref) }, [])
-        } }
+        if (id === '@tarojs/taro') return {
+          useDidShow: (callback) => {
+            const ref = React.useRef(callback)
+            ref.current = callback
+            React.useEffect(() => { shows.add(ref); return () => shows.delete(ref) }, [])
+          },
+          useDidHide: () => {},
+          useResize: () => {},
+        }
         if (id.endsWith('.scss')) return {}
         if (id.endsWith('/use-feature-visibility')) return { useFeatureVisibility: () => options.visibility }
         if (id.endsWith('/stores/session')) return { useSessionStore: (selector) => selector(options.session) }
@@ -76,6 +80,8 @@ async function run() {
         if (id.endsWith('/product-presentation')) return loadSource(path.resolve(__dirname, '../apps/miniapp/src/utils/product-presentation.ts'))
         if (id.endsWith('/channel-pager')) return loadSource(path.resolve(__dirname, '../apps/miniapp/src/components/channel-pager.tsx'))
         if (id.endsWith('/utils/navigation')) return loadSource(path.resolve(__dirname, '../apps/miniapp/src/utils/navigation.ts'))
+        if (id.endsWith('/hooks/use-edge-back')) return loadSource(path.resolve(__dirname, '../apps/miniapp/src/hooks/use-edge-back.ts'))
+        if (id.endsWith('/utils/edge-back')) return loadSource(path.resolve(__dirname, '../apps/miniapp/src/utils/edge-back.ts'))
         if (id === './use-content-tabs') return loadSource(path.resolve(path.dirname(sourcePath), 'use-content-tabs.ts'))
         throw new Error(`Unexpected profile test dependency: ${id}`)
       }
@@ -253,10 +259,20 @@ async function run() {
       trade: { getPublicUserProducts: async (...args) => { productReads.push(args); return { items: [], total: 0, page: 1 } } },
       taro: { navigateBack: async () => { returned++ }, navigateTo: async ({ url }) => profileRoutes.push(url) },
     })
+    assert.ok(publicPage.props('.public-profile-edge-back').onTouchStart, '加载中仍提供边缘返回')
     await publicPage.event(() => publicPage.props('.public-profile-nav__back').onClick())
     assert.equal(returned, 1, '加载时也可以返回')
     await publicPage.event(() => publicCalls[0].resolve(publicValue))
     assert.equal(publicPage.props('[data-component="Swiper"]').current, 1, '卖家入口默认打开二手')
+    assert.equal(publicPage.container.querySelector('.public-profile-edge-back').closest('[data-component="Swiper"]'), null, '返回手势在分页器外，不与栏目横滑共用触摸层')
+    assert.equal(publicPage.props('.public-profile-edge-back').catchMove, true, '边缘手势不会透传到原生分页器')
+    await publicPage.event(() => publicPage.props('.public-profile-user__options').onClick())
+    assert.equal(publicPage.container.querySelector('.public-profile-edge-back'), null, '资料菜单打开后移除边缘返回层')
+    await publicPage.event(() => {
+      const sheet = publicPage.container.querySelector('.public-profile-sheet__content').parentElement
+      sheet.taroProps.onClose()
+    })
+    assert.ok(publicPage.props('.public-profile-edge-back').onTouchStart, '菜单关闭后恢复边缘返回')
     assert.equal(publicPage.props('.public-profile-cover__image').src, 'test-cover', '公开主页展示服务端真实封面')
     assert.ok(!publicPage.container.textContent.includes('不展示的学校'))
     await publicPage.event(() => { publicPage.props('.public-profile-action--primary').onClick(); publicPage.props('.public-profile-action--primary').onClick() })
@@ -301,6 +317,7 @@ async function run() {
     assert.ok(invalid.container.textContent.includes('用户主页入口无效'))
     assert.ok(invalid.props('.public-profile-nav__back').onClick)
     assert.ok(invalid.props('.public-profile-retry').onClick)
+    assert.ok(invalid.props('.public-profile-edge-back').onTouchStart, '错误页仍可手势返回')
     console.log('profile presentation: isolated page behavior ok')
   } finally {
     await act(async () => { for (const root of roots) root.unmount() })

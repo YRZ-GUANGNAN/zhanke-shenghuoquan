@@ -7,7 +7,7 @@
     "apps/*"
   ],
   "scripts": {
-    "preverify": "npm run check:reference-layout && npm run check:viewport-refresh && npm run check:tactile-navigation && npm run check:channel-pager && npm run check:keyboard-inset && npm run check:layer-presence && npm run check:post-presentation && npm run check:comment-interactions && npm run check:content-motion && npm run check:secondhand-presentation && npm run check:gallery-presentation && npm run check:profile-presentation && npm run check:profile-cover && npm run check:search-filters && npm run check:media-review-policy",
+    "preverify": "npm run check:reference-layout && npm run check:viewport-refresh && npm run check:tactile-navigation && npm run check:channel-pager && npm run check:keyboard-inset && npm run check:layer-presence && npm run check:post-presentation && npm run check:comment-interactions && npm run check:content-motion && npm run check:secondhand-presentation && npm run check:gallery-presentation && npm run check:profile-presentation && npm run check:profile-edge-back && npm run check:profile-cover && npm run check:search-filters && npm run check:media-review-policy",
     "check:reference-layout": "node scripts/check-reference-layout.cjs",
     "check:viewport-refresh": "node scripts/check-viewport-refresh.cjs",
     "check:tactile-navigation": "node scripts/check-tactile-navigation.cjs",
@@ -17,6 +17,7 @@
     "check:media-review-policy": "node scripts/check-media-review-policy.cjs",
     "test:profile-cover:mysql": "node scripts/test-feature-policy-mysql.cjs --profile-cover",
     "check:profile-presentation": "node scripts/check-profile-presentation.cjs",
+    "check:profile-edge-back": "node scripts/check-profile-edge-back.cjs",
     "check:search-filters": "node scripts/check-search-filters.cjs",
     "check:post-presentation": "node scripts/check-post-presentation.cjs",
     "check:comment-interactions": "node scripts/check-comment-interactions.cjs",
