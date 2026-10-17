@@ -8,4 +8,10 @@
 
 版本：`2026.10.17.1`。目标：`/opt/campus-circle/releases/20261017-public-profile`。回执：`/var/backups/campus-circle/20261017-public-profile-result.json`。
 
-验证：用户封面与公开主页定向 Go 测试通过；Linux amd64 构建和线上健康核验在发布阶段执行。微信登录后的真实封面显示仍需设备验收，匿名权限检查不能替代此验收。
+验证：用户封面与公开主页定向 Go 测试、隔离生产数据库凭据后的全部 Go 测试、Linux amd64 构建均通过。
+
+2026-10-17 14:49:42（Asia/Shanghai）部署成功。源码提交 `092ddc3521259f2fc238d73a07c99ca94a120c0e`，二进制 SHA256 `641c456b6ad49cdeb26306098b96ce8b4a0d9a23f2a8cab52514c27328d8b530`。公网 `/healthz` 和 `/version` 返回 200，主机 `/readyz` 为 ready，服务 active/running、NRestarts=0、ExecMainStatus=0。
+
+发布前后功能策略、分享设置、运行环境摘要一致。公开主页匿名响应保持 403，商家/骑手订单和管理分享接口保持 401。旧二进制 SHA256 复核一致；未执行数据库迁移、未写测试数据、未触发回滚。
+
+微信登录后的真实封面显示仍需设备验收，匿名权限检查不能替代此验收。小程序开发版本上传和正式发布分开记录。
