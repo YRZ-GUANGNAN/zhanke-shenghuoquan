@@ -1,0 +1,13 @@
+@use '../../styles/design-tokens.scss' as *;
+.status-glyph { position: relative; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 96rpx; height: 96rpx; border-radius: 28rpx; background: $brand-tint; animation: status-arrive 180ms $ease-standard both; }
+.status-glyph__image { display: block; width: 48rpx; height: 48rpx; }
+.status-glyph__ring { box-sizing: border-box; width: 44rpx; height: 44rpx; border: 4rpx solid rgba($brand-primary, .18); border-top-color: $brand-primary; border-right-color: $brand-primary; border-radius: 50%; animation: status-turn 850ms linear infinite; }
+.status-glyph--login { width: 112rpx; height: 112rpx; background: transparent; }
+.status-glyph--login .status-glyph__ring { position: absolute; width: 100%; height: 100%; border-width: 3rpx; }
+.status-glyph--error, .status-glyph--offline, .status-glyph--forbidden { background: #F3F5F8; }
+.status-glyph--small { width: 36rpx; height: 36rpx; border-radius: 0; background: transparent; }
+.status-glyph--small .status-glyph__image { width: 32rpx; height: 32rpx; }
+.status-glyph--small .status-glyph__ring { width: 28rpx; height: 28rpx; border-width: 3rpx; }
+@keyframes status-turn { to { transform: rotate(360deg); } }
+@keyframes status-arrive { from { opacity: .3; transform: translateY(4rpx); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .status-glyph, .status-glyph__ring { animation: none; } }

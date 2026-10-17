@@ -22,7 +22,7 @@ for (const required of [
   'navigateToMiniProgram',
   "merchant.operatingStatus === 'resting'",
   '/pages/search/index?scope=takeout',
-  '商家加载失败，点击重试',
+  '商家加载失败',
 ]) assertIncludes(takeoutPage, required)
 
 for (const forbidden of [

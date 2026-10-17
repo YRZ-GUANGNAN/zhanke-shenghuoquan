@@ -94,8 +94,9 @@ export function ShareSettingsConsole() {
         <fieldset disabled={loading || saving}>
           <legend>分享封面</legend>
           <AdminField label='通用封面地址' type='url' value={draft.defaultImageUrl} maxLength={2048} error={imageError || undefined}
-            description='使用本站或已配置下载域名的腾讯云 COS 公开 JPG/PNG，建议 5:4。留空时，公开页面使用微信默认截图。'
+            description='使用本站或已配置下载域名的腾讯云 COS 公开 JPG/PNG，建议 5:4。留空使用小程序内置默认封面，无配图内容也能正常展示。'
             onChange={e => update('defaultImageUrl', e.target.value)} />
+          <div className='share-settings-cover-actions'><AdminButton tone='ghost' disabled={!draft.defaultImageUrl} onClick={() => update('defaultImageUrl', '')}>恢复内置封面</AdminButton><span>{draft.defaultImageUrl ? '自定义封面 · 保存后生效' : '正在使用内置默认封面'}</span></div>
           <label className='share-settings-check'><input type='checkbox' checked={draft.preferContentImage} onChange={e => update('preferContentImage', e.target.checked)} />
             <span><strong>详情优先使用真实内容图片</strong><small>帖子、商品使用自身图片；无可用图片则使用通用封面。公开主页使用通用封面。</small></span></label>
         </fieldset>
@@ -107,7 +108,8 @@ export function ShareSettingsConsole() {
           <div className='share-card-preview__brand'>湛科生活圈</div>
           <h4>{draft[scene.key] || '请填写分享标题'}</h4>
           {draft.defaultImageUrl && !imageError && !imageFailed ? <img src={draft.defaultImageUrl.trim()} alt='当前分享封面' referrerPolicy='no-referrer' onError={() => setImageFailed(true)} />
-            : <div className='share-card-preview__empty'>{imageFailed ? '封面加载失败，请检查公开访问权限' : '微信根据公开页面生成截图'}</div>}
+            : <img src='/images/default-share.png' alt='湛科生活圈内置默认分享封面' />}
+          {(imageFailed || imageError) && <p className='share-card-preview__warning'>{imageFailed ? '自定义封面加载失败。当前仅预览内置图，请修正地址或恢复内置封面后保存。' : '封面地址不可用，请修正或恢复内置封面。'}</p>}
           <footer>小程序</footer>
         </article>
         <p className='share-settings-caption'>预览仅展示标题与封面关系，最终样式以微信为准。</p>

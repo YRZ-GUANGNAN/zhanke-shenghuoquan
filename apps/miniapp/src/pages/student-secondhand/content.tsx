@@ -5,6 +5,7 @@ import { Image, ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import AppIcon from '../../components/app-icon'
 import { AppState } from '../../components/ui'
+import RefreshScrollView from '../../components/refresh-scroll-view'
 import StudentBottomNav from '../../components/student-bottom-nav'
 import type { ChannelInteraction } from '../../components/channel-pager'
 import { getProductsPage } from '../../services/c-trade'
@@ -65,7 +66,7 @@ export default function StudentSecondhandContent({ embedded = false, active = tr
 
   const fetchProductsPage = useCallback(async (category: CategoryKey, targetPage: number, version: number, reset: boolean) => {
     const key = version + ':' + targetPage
-    if (loadingKeys.current.has(key)) return
+    if (loadingKeys.current.has(key)) return false
     loadingKeys.current.add(key)
     if (reset) setStatus('loading')
     else setLoadingMore(true)
@@ -75,24 +76,26 @@ export default function StudentSecondhandContent({ embedded = false, active = tr
         page: targetPage, pageSize: 20,
         category: category === '全部' ? undefined : category, status: 'selling'
       })
-      if (queryVersion.current !== version || categoryRef.current !== category) return
+      if (queryVersion.current !== version || categoryRef.current !== category) return false
       setItems((current) => mergeProductsById(reset ? [] : current, result.items))
       loadedPageRef.current = result.page
       setPage(result.page)
       setTotal(result.total)
       setStatus(result.total === 0 ? 'empty' : 'ready')
+      return true
     } catch {
-      if (queryVersion.current !== version || categoryRef.current !== category) return
+      if (queryVersion.current !== version || categoryRef.current !== category) return false
       if (reset) setStatus('error')
       else setPagingError(true)
+      return false
     } finally {
       loadingKeys.current.delete(key)
       if (queryVersion.current === version) setLoadingMore(false)
     }
   }, [])
 
-  const retryCurrentCategory = useCallback(() => {
-    if (!visibility.secondhand) return
+  const retryCurrentCategory = useCallback(async () => {
+    if (!visibility.secondhand) return false
     const version = ++queryVersion.current
     loadedPageRef.current = 0
     refreshingRef.current = false
@@ -102,7 +105,7 @@ export default function StudentSecondhandContent({ embedded = false, active = tr
     setRefreshing(false)
     setLoadingMore(false)
     setRefreshError(false)
-    void fetchProductsPage(categoryRef.current, 1, version, true)
+    return fetchProductsPage(categoryRef.current, 1, version, true)
   }, [fetchProductsPage, visibility.secondhand])
 
   useEffect(() => {
@@ -140,10 +143,10 @@ export default function StudentSecondhandContent({ embedded = false, active = tr
 
   // Keep the mounted list and its scroll position while reconciling real server changes.
   const refreshProducts = useCallback(async () => {
-    if (!visibility.secondhand || refreshingRef.current) return
+    if (!visibility.secondhand || refreshingRef.current) return false
     if (loadedPageRef.current === 0) {
-      if (status === 'error') retryCurrentCategory()
-      return
+      if (status === 'error') return retryCurrentCategory()
+      return false
     }
     refreshingRef.current = true
     const lastPage = loadedPageRef.current
@@ -162,7 +165,7 @@ export default function StudentSecondhandContent({ embedded = false, active = tr
           page: targetPage, pageSize: 20,
           category: category === '全部' ? undefined : category, status: 'selling'
         })
-        if (queryVersion.current !== version || categoryRef.current !== category) return
+        if (queryVersion.current !== version || categoryRef.current !== category) return false
         refreshed = mergeProductsById(refreshed, result.items)
         refreshedTotal = result.total
         refreshedPage = result.page
@@ -173,8 +176,11 @@ export default function StudentSecondhandContent({ embedded = false, active = tr
       setPage(refreshedPage)
       loadedPageRef.current = refreshedPage
       setStatus(refreshed.length ? 'ready' : 'empty')
+      setFailedImages(new Set())
+      return true
     } catch {
       if (queryVersion.current === version) setRefreshError(true)
+      return false
     } finally {
       if (queryVersion.current === version) {
         refreshingRef.current = false
@@ -285,7 +291,9 @@ export default function StudentSecondhandContent({ embedded = false, active = tr
           </View>
         </ScrollView>
       </View>
-      <ScrollView key={`${ownerKey}:${activeCategory}`} className='student-secondhand-scroll' scrollY enhanced showScrollbar={false}
+      <RefreshScrollView key={`${ownerKey}:${activeCategory}`} className='student-secondhand-scroll' scrollY enhanced showScrollbar={false}
+        enabled={active && visibility.secondhand} busy={status === 'loading' || loadingMore || refreshing}
+        refreshKey={`${ownerKey}:${activeCategory}`} onRefresh={refreshProducts}
         scrollTop={restoreScrollTop} onScroll={event => { scrollPosition.current = Math.max(0, event.detail.scrollTop) }}
         lowerThreshold={120} onScrollToLower={loadMoreProducts}>
         {!visibility.secondhand ? <AppState kind='empty' title='二手市场暂未开放' /> : <>
@@ -311,7 +319,7 @@ export default function StudentSecondhandContent({ embedded = false, active = tr
                     : status === 'ready' && items.length >= total ? <Text>已显示全部在售宝贝</Text> : null}
           </View>
         </>}
-      </ScrollView>
+      </RefreshScrollView>
       {!embedded && <StudentBottomNav active='market' className='student-bottom-nav--secondhand' />}
     </View>
   )

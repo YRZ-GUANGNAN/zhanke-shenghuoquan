@@ -52,6 +52,7 @@ async function main() {
         if (id === '@tarojs/components') return Object.fromEntries(['Image', 'Input', 'ScrollView', 'Swiper', 'SwiperItem', 'Text', 'Textarea', 'View'].map((name) => [name, component(name)]))
         if (id === '@tarojs/taro') return { nextTick: callback => queueMicrotask(callback), createSelectorQuery: () => ({ selectors: [], select(selector) { this.selectors.push(selector); return this }, boundingClientRect() { return this }, exec(callback) { if (options.measurements) options.measurements.push({ selectors: this.selectors, callback }); else callback([{ height: 22 }, { height: 22 }]) } }), useDidShow: (handler) => { showCallback = handler; React.useEffect(() => { if (!options.lazyMounted) handler() }, []) }, useDidHide: (handler) => { options.hide = handler }, useResize: (handler) => { options.resize = handler } }
         if (id.endsWith('.scss')) return {}
+        if (id.endsWith('/refresh-scroll-view')) return { default: component('ScrollView') }
         if (id.endsWith('/feature-page-gate')) return { withFeaturePage: (Page) => Page }
         if (id.endsWith('/use-feature-visibility')) return { useFeatureVisibility: () => options.visibility }
         if (id.endsWith('/use-page-share')) return { usePageShare: () => {} }

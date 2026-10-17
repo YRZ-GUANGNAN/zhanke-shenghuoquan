@@ -8,7 +8,7 @@ const sourcePath = path.join(root, 'apps/miniapp/src/services/share-model.ts')
 const compiled = ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } })
 const loaded = new Module(sourcePath, module)
 loaded._compile(compiled.outputText, sourcePath)
-const { buildShareCard, DEFAULT_SHARE_SETTINGS: defaults, publicShareId, shareImage, parseShareSettings } = loaded.exports
+const { buildShareCard, DEFAULT_SHARE_SETTINGS: defaults, DEFAULT_SHARE_IMAGE, publicShareId, shareImage, parseShareSettings } = loaded.exports
 for (const value of ['', '0', '01', '-1', '%', '%31', '1&token=secret', '1e3', 12]) assert.equal(publicShareId(value), '')
 assert.equal(publicShareId('18446744073709551615'), '18446744073709551615')
 for (const value of ['http://site.example/p.png', 'javascript:alert(1)', 'https://site.example/a.svg', 'https://user:secret@site.example/a.jpg', 'https://site.example/a.jpg#x']) assert.equal(shareImage(value), '')
@@ -27,9 +27,20 @@ for (const kind of ['post', 'product']) {
   assert.equal(buildShareCard({ kind, id: '12', enabled: false, content }, settings), null)
   assert.equal(buildShareCard({ kind, id: '12', enabled: true, content }, { ...settings, preferContentImage: false }).imageUrl, cover)
   assert.equal(buildShareCard({ kind, id: '12', enabled: true, content: { ...content, images: [] } }, settings).imageUrl, cover)
+  assert.equal(buildShareCard({ kind, id: '12', enabled: true, content: { ...content, images: [] } }, defaults).imageUrl, DEFAULT_SHARE_IMAGE)
+  assert.equal(buildShareCard({ kind, id: '12', enabled: true, content: null }, defaults), null)
+  assert.equal(buildShareCard({ kind, id: '12', enabled: true, content }, { ...defaults, preferContentImage: false }).imageUrl, DEFAULT_SHARE_IMAGE)
 }
 assert.equal(buildShareCard({ kind: 'profile', enabled: true, id: '12', loadedId: '13', nickname: '同学' }, defaults), null)
-assert.deepEqual(buildShareCard({ kind: 'home', enabled: true, token: 'secret', commentId: '5' }, defaults), { title: '湛科生活圈', path: '/pages/home/index' })
+assert.deepEqual(buildShareCard({ kind: 'home', enabled: true, token: 'secret', commentId: '5' }, defaults), { title: '湛科生活圈', path: '/pages/home/index', imageUrl: DEFAULT_SHARE_IMAGE })
+for (const kind of ['home', 'secondhand', 'services']) {
+  assert.equal(buildShareCard({ kind, enabled: true }, defaults).imageUrl, DEFAULT_SHARE_IMAGE)
+  assert.equal(buildShareCard({ kind, enabled: true }, { ...defaults, defaultImageUrl: 'javascript:invalid' }).imageUrl, DEFAULT_SHARE_IMAGE)
+}
+const miniCover = fs.readFileSync(path.join(root, 'apps/miniapp/src' + DEFAULT_SHARE_IMAGE))
+assert.ok(miniCover.subarray(1, 4).equals(Buffer.from('PNG')))
+assert.equal(miniCover.readUInt32BE(16) / miniCover.readUInt32BE(20), 5 / 4)
+assert.ok(miniCover.equals(fs.readFileSync(path.join(root, 'apps/admin/public/images/default-share.png'))), 'admin and miniapp show the same owned fallback')
 assert.equal(buildShareCard({ kind: 'home', enabled: false }, defaults), null)
 assert.equal(parseShareSettings({ homeTitle: 'x' }), null)
 assert.deepEqual(parseShareSettings(defaults), defaults)

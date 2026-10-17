@@ -152,6 +152,8 @@ export interface Product {
 }
 
 export interface ToolLink {
+  categoryId?: string
+  categoryName?: string
   id: string
   title: string
   subtitle: string

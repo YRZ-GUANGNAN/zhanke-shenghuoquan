@@ -28,11 +28,12 @@ export default function RuntimeSessionGate({
   }
 
   if (status === 'idle' || status === 'booting') {
-    return <AppState kind='loading' title='正在登录…' description='正在安全校验当前微信会话' />
+    return <AppState kind='loading' scene='login' title='正在登录…' description='正在连接你的微信账号' />
   }
 
   if (status !== 'authenticated') {
-    return <AppState kind='error' title='微信登录暂时不可用' description={error || '请使用当前微信重新登录，账号会自动恢复'} actionText='重新登录' onAction={() => void retry()} />
+    const offline = /网络|超时|network|timeout/i.test(error || '')
+    return <AppState kind={offline ? 'offline' : 'error'} title={offline ? '暂时无法连接' : '微信登录暂时不可用'} description={error || '请使用当前微信重新登录，账号会自动恢复'} actionText='重新登录' onAction={() => void retry()} />
   }
 
   return <>{children}</>

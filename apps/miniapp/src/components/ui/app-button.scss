@@ -46,5 +46,5 @@
 
 @media (prefers-reduced-motion: reduce) {
   .app-button { transition: none; }
-  .app-button__loading-dot { animation-duration: 1.4s; }
+  .app-button__loading-dot { animation: none; }
 }

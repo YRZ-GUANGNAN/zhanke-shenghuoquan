@@ -13,6 +13,7 @@ export default defineConfig(async (merge) => {
     },
     sourceRoot: 'src',
     outputRoot: 'dist',
+    copy: { patterns: [{ from: 'src/assets/share/default-share.png', to: 'dist/assets/share/default-share.png' }] },
     framework: 'react',
     compiler: {
       type: 'webpack5' as const,

@@ -325,12 +325,21 @@ function homeToolsDataFlowViolations(home) {
     unwrapExpression(node.expression)?.type === 'LogicalExpression' && unwrapExpression(node.expression).operator === '&&' &&
     isChannelEquality(unwrapExpression(node.expression).left, 'tools'))
   let readyMapCall = null
+  let sharedToolsReference = null
   if (toolsContainers.length !== 1) {
     violations.push("HomeContent must have exactly one tools channel render branch")
   } else {
     const toolsExpression = unwrapExpression(toolsContainers[0].expression)
     const readyConditional = unwrapExpression(toolsExpression.right)
-    if (readyConditional?.type !== 'ConditionalExpression' || !isStrictStringEquality(readyConditional.test, 'toolStatus', 'ready')) {
+    if (readyConditional?.type === 'JSXElement' && jsxName(readyConditional.openingElement.name) === 'ToolDirectory') {
+      const imports = ast.program.body.filter(node => node.type === 'ImportDeclaration' && node.source.value === '../../components/tool-directory')
+      if (imports.length !== 1 || !imports[0].specifiers.some(specifier => specifier.type === 'ImportDefaultSpecifier' && isIdentifier(specifier.local, 'ToolDirectory'))) violations.push('ToolDirectory must come from the shared component')
+      const attributes = jsxAttributes(readyConditional)
+      sharedToolsReference = expressionAttribute(attributes, 'tools')
+      if (!isIdentifier(sharedToolsReference, 'tools') || !isIdentifier(expressionAttribute(attributes, 'status'), 'toolStatus')) violations.push('shared directory must receive the unchanged service state and status')
+      if (!containsCall(expressionAttribute(attributes, 'onRetry'), 'loadTools') || !containsCall(expressionAttribute(attributes, 'onOpen'), 'openTool')) violations.push('directory actions must use actual load and jump handlers')
+      if (meaningfulJSXChildren(readyConditional).length) violations.push('directory must not receive invented child entries')
+    } else if (readyConditional?.type !== 'ConditionalExpression' || !isStrictStringEquality(readyConditional.test, 'toolStatus', 'ready')) {
       violations.push("tools branch must start with toolStatus === 'ready'")
     } else {
       readyMapCall = validateReadyBranch(readyConditional.consequent, violations)
@@ -356,8 +365,8 @@ function homeToolsDataFlowViolations(home) {
     violations.push('HomeContent main JSX return must not render another tool-like collection outside canonical tools.map')
   }
 
-  if (toolStates.length === 1 && readyMapCall) {
-    const allowedTools = new Set([toolStates[0].id.elements[0], readyMapCall.callee.object])
+  if (toolStates.length === 1 && (readyMapCall || sharedToolsReference)) {
+    const allowedTools = new Set([toolStates[0].id.elements[0], sharedToolsReference || readyMapCall.callee.object])
     if (homeIndex.nodes.some((node) => isIdentifier(node, 'tools') && !allowedTools.has(node))) {
       violations.push('tools may only be referenced by the canonical tools.map render')
     }
@@ -394,7 +403,8 @@ function assertSyntheticStaticToolsRejected(home) {
   const marker = 'function HomeContent() {'
   if (!home.includes(marker)) throw new Error('HomeContent marker is missing')
   const toolsState = '  const [tools, setTools] = useState<ToolLink[]>([])'
-  const toolsMap = '{tools.map((tool) => ('
+  const shared = home.includes('<ToolDirectory tools={tools}')
+  const toolsMap = shared ? '<ToolDirectory tools={tools}' : '{tools.map((tool) => ('
   const messagesRender = "        {channel === 'messages' && ("
   if (!home.includes(toolsState) || !home.includes(toolsMap) || !home.includes(messagesRender)) {
     throw new Error('Home tools state or render marker is missing')
@@ -407,7 +417,7 @@ function assertSyntheticStaticToolsRejected(home) {
     ['tools.concat([fake])', home.replace(toolsState, `${toolsState}\n  const decoratedCards = tools.concat([${fakeTool}])`)],
     ['decoratedCards.map', home
       .replace(toolsState, `${toolsState}\n  const decoratedCards = tools`)
-      .replace(toolsMap, '{decoratedCards.map((tool) => (')],
+      .replace(toolsMap, shared ? '<ToolDirectory tools={decoratedCards}' : '{decoratedCards.map((tool) => (')],
     ['extra fake card', home.replace(toolsMap, `<View className='alternate-fake-card'><Text>fake</Text></View>\n              ${toolsMap}`)],
     ['module arbitraryFakeCards', home.replace(marker, `const arbitraryFakeCards: ToolLink[] = [${fakeTool}]\n\n${marker}`)],
     ['module static fake object', home.replace(marker, `const arbitraryFakeCard: ToolLink = ${fakeTool}\n\n${marker}`)],

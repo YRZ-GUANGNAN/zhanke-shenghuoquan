@@ -42,7 +42,7 @@ export function usePageShare(target: ShareTarget) {
     const value = current.current
     const config = shareSettingsSnapshot()
     return buildShareCard({ ...value, enabled: value.enabled && allowed(value) }, config) ||
-      { title: config.homeTitle, path: '/pages/home/index', ...(config.defaultImageUrl ? { imageUrl: config.defaultImageUrl } : {}) }
+      buildShareCard({ kind: 'home', enabled: true }, config)!
   })
   return Boolean(card) && allowed(target)
 }

@@ -9,6 +9,8 @@ export interface ShareSettings {
   detailTitleSuffix: string
   preferContentImage: boolean
 }
+// A package asset (never a data URL), also used by the admin's default-cover preview.
+export const DEFAULT_SHARE_IMAGE = '/assets/share/default-share.png'
 export const DEFAULT_SHARE_SETTINGS: ShareSettings = {
   homeTitle: '湛科生活圈', secondhandTitle: '校园二手 · 湛科生活圈', servicesTitle: '校园服务 · 湛科生活圈',
   defaultImageUrl: '', detailTitleSuffix: '湛科生活圈', preferContentImage: true
@@ -46,7 +48,7 @@ export function parseShareSettings(value: unknown): ShareSettings | null {
 
 export function buildShareCard(target: ShareTarget, settings: ShareSettings): ShareCard | null {
   if (!target.enabled) return null
-  const fallbackImage = shareImage(settings.defaultImageUrl)
+  const fallbackImage = shareImage(settings.defaultImageUrl) || DEFAULT_SHARE_IMAGE
   const card = (text: string, path: string, media = ''): ShareCard => {
     const imageUrl = (settings.preferContentImage && shareImage(media)) || fallbackImage
     return { title: title(text), path, ...(imageUrl ? { imageUrl } : {}) }

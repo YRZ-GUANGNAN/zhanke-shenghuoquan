@@ -2,12 +2,15 @@ import ProductPrice from '../../components/product-price'
 import { FeaturePageGate } from '../../components/feature-page-gate'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDidShow } from '@tarojs/taro'
-import { Image, ScrollView, Text, View } from '@tarojs/components'
+import { Image, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import AppIcon from '../../components/app-icon'
 import ChatAvatar from '../../components/chat-avatar'
 import ChannelPager, { useChannelInteraction } from '../../components/channel-pager'
-import { AppState } from '../../components/ui'
+import { AppSkeleton, AppState } from '../../components/ui'
+import RefreshScrollView from '../../components/refresh-scroll-view'
+import ToolDirectory from '../../components/tool-directory'
+import { isMiniProgramJumpCancelled } from '../../utils/mini-program-jump'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import StudentBottomNav from '../../components/student-bottom-nav'
 import StudentSecondhandContent from '../student-secondhand/content'
@@ -156,6 +159,13 @@ function HomeContent() {
   const [conversationItems, setConversationItems] = useState<ConversationItem[]>([])
   const [conversationStatus, setConversationStatus] = useState<ConversationStatus>('idle')
   const [tools, setTools] = useState<ToolLink[]>([])
+  const [toolRefreshError, setToolRefreshError] = useState(false)
+  const [conversationRefreshError, setConversationRefreshError] = useState(false)
+  const [toolBusy, setToolBusy] = useState(false)
+  const [conversationBusy, setConversationBusy] = useState(false)
+  const [jumpingTool, setJumpingTool] = useState<string | null>(null)
+  const toolJumpLock = useRef(false)
+  const failedRefresh = useRef({ community: false, trade: false })
   const visibility = useFeatureVisibility()
   usePageShare({ kind: activeTab === 'secondhand' ? 'secondhand' : 'home', enabled: visibility.available && !isMessagesPage })
   const [toolStatus, setToolStatus] = useState<ToolStatus>('idle')
@@ -167,6 +177,7 @@ function HomeContent() {
   const conversationRequestVersion = useRef(0)
   const conversationOwnerRef = useRef('')
   const toolLoadingRef = useRef(false)
+  const toolRequestVersion = useRef(0)
   const tabScrollPositions = useRef<Record<HomeTab, number>>({ discover: 0, secondhand: 0, messages: 0, 'tools': 0 })
   const cards = useMemo(
     () => interleaveCards(visibility.forum ? postCards : [], visibility.secondhand ? productCards : []),
@@ -196,29 +207,26 @@ function HomeContent() {
     reset = false,
     sources = { community: visibility.forum, trade: visibility.secondhand }
   ) => {
-    if (!mountedRef.current || loadingRef.current) return
+    if (!mountedRef.current || loadingRef.current) return false
     loadingRef.current = true
     const version = discoverRequestVersion.current + 1
     discoverRequestVersion.current = version
-    reset ? setInitialStatus('loading') : setLoadingMore(true)
+    if (reset && sourceRef.current.communityPage === 0 && sourceRef.current.tradePage === 0) setInitialStatus('loading')
+    else setLoadingMore(true)
     try {
       const state = sourceRef.current
-      if (reset) {
-        state.communityPage = 0
-        state.tradePage = 0
-        state.communityTotal = 0
-        state.tradeTotal = 0
-      }
-      const communityPage = reset ? 1 : state.communityPage + 1
-      const tradePage = reset ? 1 : state.tradePage + 1
+      const resetCommunity = reset || failedRefresh.current.community
+      const resetTrade = reset || failedRefresh.current.trade
+      const communityPage = resetCommunity ? 1 : state.communityPage + 1
+      const tradePage = resetTrade ? 1 : state.tradePage + 1
       const requestCommunity = sources.community && (
-        reset || state.communityPage === 0 || state.communityPage * 10 < state.communityTotal
+        resetCommunity || state.communityPage === 0 || state.communityPage * 10 < state.communityTotal
       )
       const requestTrade = sources.trade && (
-        reset || state.tradePage === 0 || state.tradePage * 10 < state.tradeTotal
+        resetTrade || state.tradePage === 0 || state.tradePage * 10 < state.tradeTotal
       )
 
-      if (!requestCommunity && !requestTrade) return
+      if (!requestCommunity && !requestTrade) return true
 
       const communityRequest: Promise<PageResult<CommunityPost> | null> = requestCommunity
         ? getCommunityPostsPage({ page: communityPage, sort: 'recent', pageSize: 10 })
@@ -230,7 +238,7 @@ function HomeContent() {
         settle(communityRequest),
         settle(tradeRequest)
       ])
-      if (!mountedRef.current || discoverRequestVersion.current !== version) return
+      if (!mountedRef.current || discoverRequestVersion.current !== version) return false
 
       const community = results[0].status === 'fulfilled' ? results[0].value : null
       const trade = results[1].status === 'fulfilled' ? results[1].value : null
@@ -242,19 +250,25 @@ function HomeContent() {
       if (community) {
         state.communityPage = community.page
         state.communityTotal = community.total
-        setPostCards((current) => mergeUnique(reset ? [] : current, nextPosts))
-      } else if (reset) {
-        setPostCards([])
+        setPostCards((current) => mergeUnique(resetCommunity ? [] : current, nextPosts))
+        failedRefresh.current.community = false
+      } else if (communityFailed && resetCommunity) {
+        failedRefresh.current.community = true
       }
       if (trade) {
         state.tradePage = trade.page
         state.tradeTotal = trade.total
-        setProductCards((current) => mergeUnique(reset ? [] : current, nextProducts))
-      } else if (reset) {
-        setProductCards([])
+        setProductCards((current) => mergeUnique(resetTrade ? [] : current, nextProducts))
+        failedRefresh.current.trade = false
+      } else if (tradeFailed && resetTrade) {
+        failedRefresh.current.trade = true
       }
 
-      setSourceError({ community: communityFailed, trade: tradeFailed })
+      setSourceError(current => ({
+        community: requestCommunity ? communityFailed : current.community,
+        trade: requestTrade ? tradeFailed : current.trade
+      }))
+      if (reset && !communityFailed && !tradeFailed) setFailedImageKeys(new Set())
       const hasLoadedSource = state.communityPage > 0 || state.tradePage > 0
       const allRequestedSourcesFailed = (
         (!requestCommunity || communityFailed) &&
@@ -272,6 +286,7 @@ function HomeContent() {
       } else {
         setInitialStatus('ready')
       }
+      return !communityFailed && !tradeFailed
     } finally {
       if (discoverRequestVersion.current === version) {
         loadingRef.current = false
@@ -285,10 +300,12 @@ function HomeContent() {
       !mountedRef.current ||
       conversationLoadingRef.current ||
       conversationOwnerRef.current !== ownerKey
-    ) return
+    ) return false
     conversationLoadingRef.current = true
+    setConversationBusy(true)
     const version = conversationRequestVersion.current + 1
     conversationRequestVersion.current = version
+    setConversationRefreshError(false)
     setConversationStatus((current) => current === 'ready' || current === 'empty' ? current : 'loading')
     try {
       const contexts = await requestWithSingleSessionRecovery(() => listIMConversations(1, 20))
@@ -304,43 +321,56 @@ function HomeContent() {
         !mountedRef.current ||
         conversationRequestVersion.current !== version ||
         conversationOwnerRef.current !== ownerKey
-      ) return
+      ) return false
       setConversationItems(items)
       setConversationStatus(items.length ? 'ready' : 'empty')
+      return true
     } catch (error) {
       if (
         !mountedRef.current ||
         conversationRequestVersion.current !== version ||
         conversationOwnerRef.current !== ownerKey
-      ) return
-      setConversationItems([])
-      setConversationStatus('error')
+      ) return false
+      setConversationRefreshError(true)
+      setConversationStatus(current => current === 'ready' || current === 'empty' ? current : 'error')
       if (isApiError(error) && error.status === 401) {
         void Taro.showToast({ title: '登录恢复失败，请点击重试', icon: 'none' })
       }
+      return false
     } finally {
       if (
         conversationRequestVersion.current === version &&
         conversationOwnerRef.current === ownerKey
-      ) conversationLoadingRef.current = false
+      ) {
+        conversationLoadingRef.current = false
+        if (mountedRef.current) setConversationBusy(false)
+      }
     }
   }, [])
 
   const loadTools = useCallback(async () => {
-    if (!mountedRef.current || toolLoadingRef.current) return
+    if (!mountedRef.current || toolLoadingRef.current) return false
     toolLoadingRef.current = true
-    setToolStatus('loading')
+    setToolBusy(true)
+    const version = ++toolRequestVersion.current
+    setToolRefreshError(false)
+    setToolStatus(current => current === 'ready' || current === 'empty' ? current : 'loading')
     try {
       const values = await listNavigationItems()
-      if (!mountedRef.current) return
+      if (!mountedRef.current || toolRequestVersion.current !== version) return false
       setTools(values)
       setToolStatus(values.length > 0 ? 'ready' : 'empty')
+      return true
     } catch {
-      if (!mountedRef.current) return
-      setTools([])
-      setToolStatus('error')
+      if (!mountedRef.current || toolRequestVersion.current !== version) return false
+      setToolRefreshError(true)
+      setToolStatus(current => current === 'ready' || current === 'empty' ? current : 'error')
+      return false
     } finally {
-      toolLoadingRef.current = false
+      if (toolRequestVersion.current === version) {
+        toolLoadingRef.current = false
+        if (mountedRef.current) setToolBusy(false)
+      }
     }
   }, [])
 
@@ -352,6 +382,7 @@ function HomeContent() {
       loadingRef.current = false
       conversationRequestVersion.current += 1
       conversationLoadingRef.current = false
+      toolRequestVersion.current += 1
       toolLoadingRef.current = false
     }
   }, [])
@@ -367,6 +398,7 @@ function HomeContent() {
     setInitialStatus('loading')
     setLoadingMore(false)
     setSourceError({ community: false, trade: false })
+    failedRefresh.current = { community: false, trade: false }
   }, [currentSessionKey, visibility.forum, visibility.secondhand])
 
   useEffect(() => {
@@ -387,7 +419,18 @@ function HomeContent() {
     tabScrollPositions.current.messages = 0
     setConversationItems([])
     setConversationStatus('idle')
+    setConversationRefreshError(false)
+    setConversationBusy(false)
   }, [currentSessionKey, visibility.messages, visibility.secondhand_chat])
+
+  useEffect(() => {
+    toolRequestVersion.current += 1
+    toolLoadingRef.current = false
+    setTools([])
+    setToolStatus('idle')
+    setToolRefreshError(false)
+    setToolBusy(false)
+  }, [currentSessionKey, visibility.campus_tools])
 
   useEffect(() => {
     if (activeTab === 'messages' && conversationStatus === 'idle' && visibility.messages) {
@@ -421,15 +464,21 @@ function HomeContent() {
   }
 
   const openTool = async (tool: ToolLink) => {
-    if (!channelInteraction.canActivate() || !tool.appId || !tool.path) return
+    if (!channelInteraction.canActivate() || !tool.appId || !tool.path || toolJumpLock.current) return
+    toolJumpLock.current = true
+    setJumpingTool(tool.id)
     try {
       await Taro.navigateToMiniProgram({ appId: tool.appId, path: tool.path })
     } catch (error) {
+      if (isMiniProgramJumpCancelled(error)) return
       try {
-        await Taro.showToast({ title: error instanceof Error ? error.message : '工具打开失败', icon: 'none' })
+        await Taro.showToast({ title: '工具暂时无法打开，请稍后再试', icon: 'none' })
       } catch {
         // Toast failures must not escape from the fire-and-forget click handler.
       }
+    } finally {
+      toolJumpLock.current = false
+      if (mountedRef.current) setJumpingTool(null)
     }
   }
 
@@ -490,6 +539,7 @@ function HomeContent() {
   const renderDiscoverState = () => {
     const retrying = initialStatus === 'error' && loadingMore
     const pending = initialStatus === 'loading' || retrying
+    if (pending) return <AppSkeleton variant='feed' rows={4} />
     return (
       <AppState
         kind={pending ? 'loading' : initialStatus === 'empty' ? 'empty' : 'error'}
@@ -547,8 +597,12 @@ function HomeContent() {
             interaction={channelInteraction}
           /> : <AppState kind='loading' title='正在准备二手集市' />
         ) : (
-      <ScrollView
+      <RefreshScrollView
         key={channel}
+        enabled={channel === activeTab}
+        busy={channel === 'discover' ? loadingMore || initialStatus === 'loading' : channel === 'messages' ? conversationBusy : toolBusy}
+        refreshKey={`${currentSessionKey}:${channel}:${visibility.forum}:${visibility.secondhand}`}
+        onRefresh={() => channel === 'discover' ? loadDiscover(true) : channel === 'messages' ? loadConversations(currentSessionKey) : loadTools()}
         className='student-home-content'
         scrollY
         scrollTop={tabScrollPositions.current[channel]}
@@ -572,19 +626,11 @@ function HomeContent() {
           visibility.messages && (
           <View className='student-message-panel'>
             {conversationStatus === 'loading' || conversationStatus === 'idle' ? (
-              <View className='student-message-state'><Text>正在读取私信…</Text></View>
+              <AppSkeleton rows={4} />
             ) : conversationStatus === 'error' ? (
-              <View
-                className='student-message-state student-message-state--retry'
-                onClick={() => { if (channelInteraction.canActivate()) void loadConversations(currentSessionKey) }}
-              >
-                <Text>私信加载失败，点击重试</Text>
-              </View>
+              <AppState kind='error' title='私信加载失败' actionText='重新加载' onAction={() => { if (channelInteraction.canActivate()) void loadConversations(currentSessionKey) }} />
             ) : conversationStatus === 'empty' ? (
-              <View className='student-message-state'>
-                <Text className='student-message-state__title'>还没有私信会话</Text>
-                <Text className='student-message-state__description'>从用户主页发私信，或从商品详情联系卖家后，可在这里继续交流。</Text>
-              </View>
+              <AppState kind='empty' title='还没有私信会话' description='从用户主页发私信，或从商品详情联系卖家后，可在这里继续交流。' />
             ) : (
               conversationItems.map((item) => {
                 const peer = conversationPeer(item.context, item.product, currentUserId)
@@ -623,6 +669,7 @@ function HomeContent() {
               })
             )}
             {conversationStatus === 'ready' && <Text className='student-home-footnote'>仅展示最近 20 个会话</Text>}
+            {conversationRefreshError && conversationStatus !== 'error' && <View className='student-discover-feedback student-discover-feedback--retry' onClick={() => void loadConversations(currentSessionKey)}><Text>更新失败，已保留当前会话 · 重试</Text></View>}
           </View>
           )
         )}
@@ -655,28 +702,11 @@ function HomeContent() {
         )}
 
         {visibility.campus_tools && <>{channel === 'tools' && (
-          toolStatus === 'ready' ? (
-            <View className='student-tools-grid'>
-              {tools.map((tool) => (
-                <View key={tool.id} className='student-tool-card' onClick={() => void openTool(tool)}>
-                  <View className='student-tool-card__icon' style={{ color: tool.color }}><Text>{tool.iconText}</Text></View>
-                  <Text className='student-tool-card__label'>{tool.title}</Text>
-                  <Text className='student-tool-card__sub'>{tool.subtitle}</Text>
-                </View>
-              ))}
-            </View>
-          ) : toolStatus === 'error' ? (
-            <View className='student-tool-state student-tool-state--retry' onClick={() => { if (channelInteraction.canActivate()) void loadTools() }}>
-              <Text>工具加载失败，点击重试</Text>
-            </View>
-          ) : toolStatus === 'empty' ? (
-            <View className='student-tool-state'><Text>暂无可用工具</Text></View>
-          ) : (
-            <View className='student-tool-state'><Text>正在加载真实工具...</Text></View>
-          )
+          <ToolDirectory tools={tools} status={toolStatus} jumpingId={jumpingTool} refreshError={toolRefreshError}
+            onOpen={tool => void openTool(tool)} onRetry={() => { if (channelInteraction.canActivate()) void loadTools() }} />
         )}</>}
 
-      </ScrollView>
+      </RefreshScrollView>
         )}
       /> : <View className='student-tool-state'><Text>{visibility.available ? '当前暂无开放的模块，可前往“我的”管理账号。' : '功能状态读取失败，请检查网络后重新进入。'}</Text></View>}
 

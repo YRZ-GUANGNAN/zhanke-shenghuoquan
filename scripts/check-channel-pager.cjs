@@ -39,6 +39,9 @@ async function run() {
       if (id.endsWith('.scss')) return {}
       if (id.endsWith('/product-price')) return load(path.join(root, 'apps/miniapp/src/components/product-price.tsx'))
       if (id.endsWith('/product-presentation')) return load(path.join(root, 'apps/miniapp/src/utils/product-presentation.ts'))
+      if (id.endsWith('/refresh-scroll-view')) return { default: component('ScrollView') }
+      if (id.endsWith('/tool-directory')) return { default: component('ToolDirectory') }
+      if (id.endsWith('/mini-program-jump')) return load(path.join(root, 'apps/miniapp/src/utils/mini-program-jump.ts'))
       if (Object.prototype.hasOwnProperty.call(dependencies, id)) return dependencies[id]
       if (id.endsWith('/utils/navigation')) return load(path.join(root, 'apps/miniapp/src/utils/navigation.ts'), { '../services/taro': dependencies['../../services/taro'] })
       throw new Error(`Unexpected channel test dependency: ${id}`)
@@ -163,7 +166,7 @@ async function run() {
       '../../components/app-icon': { default: View },
       '../../components/chat-avatar': { default: View },
       '../../utils/conversation-presentation': load(path.join(root, 'apps/miniapp/src/utils/conversation-presentation.ts')),
-      '../../components/ui': { AppState: component('AppState') },
+      '../../components/ui': { AppState: component('AppState'), AppSkeleton: component('AppSkeleton') },
       '../../hooks/use-identity-guard': { useIdentityGuard: () => true },
       '../../hooks/use-feature-visibility': { useFeatureVisibility: () => visibility },
       '../../hooks/use-page-share': { usePageShare: (options) => shareOptions.push(options) },
@@ -197,6 +200,24 @@ async function run() {
       requests.products[0].resolve({ items: [], page: 1, total: 0 })
     })
     const homeDiscoverNode = home.container.querySelector('[data-item-id="discover"] .student-home-content')
+    let refreshResult
+    await home.event(() => {
+      refreshResult = channel('discover').onRefresh()
+      channel('discover').onRefresh()
+    })
+    assert.equal(requests.posts.length, 2, 'same-frame refresh is deduplicated')
+    await home.event(() => {
+      requests.posts[1].reject(new Error('offline'))
+      requests.products[1].resolve({ items: [], page: 1, total: 0 })
+    })
+    assert.equal(await refreshResult, false, 'partial failure is not shown as refresh success')
+    assert.ok(home.container.textContent.includes('稳定内容'), 'failed source retains loaded cards')
+    await home.event(() => home.props('.student-discover-feedback--retry').onClick())
+    assert.equal(requests.posts[2].query.page, 1, 'retry after refresh retries first page, not next page')
+    await home.event(() => requests.posts[2].resolve({ items: [{ id: 'post-2', title: '更新内容', content: '', author: '测试', images: [], likedCount: 0 }], page: 1, total: 11 }))
+    assert.ok(!home.container.textContent.includes('稳定内容'))
+    assert.ok(home.container.textContent.includes('更新内容'))
+    const postRequestsAfterRefresh = requests.posts.length
     await home.event(() => channel('discover').onScroll({ detail: { scrollTop: 640 } }))
     await clickTab(1)
     assert.equal(shareOptions.at(-1).kind, 'secondhand', '二手频道保留商品市场分享卡片和旧直达路由')
@@ -208,11 +229,11 @@ async function run() {
     assert.equal(home.container.querySelector('[data-item-id="discover"] .student-home-content'), homeDiscoverNode)
     await clickTab(1)
     await home.event(() => channel('discover').onScrollToLower())
-    assert.equal(requests.posts.length, 1, 'hidden channel cannot paginate')
+    assert.equal(requests.posts.length, postRequestsAfterRefresh, 'hidden channel cannot paginate')
     session = { token: 'test-token-b', profile: { id: 'test-user-b' } }
     await home.render()
     assert.equal(home.container.querySelector('.student-message-row'), null, '普通首页不挂载私信页面')
-    assert.equal(requests.posts.length, 1, 'account invalidation does not preload an inactive discover page')
+    assert.equal(requests.posts.length, postRequestsAfterRefresh, 'account invalidation does not preload an inactive discover page')
     await home.event(() => {
       homeSwiper().onTouchStart()
       homeSwiper().onTransition({ detail: { dx: 30, dy: 0 } })

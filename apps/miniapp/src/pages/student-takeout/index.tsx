@@ -4,6 +4,9 @@ import { useDidShow } from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import AppIcon from '../../components/app-icon'
+import ToolDirectory from '../../components/tool-directory'
+import { AppSkeleton, AppState } from '../../components/ui'
+import { isMiniProgramJumpCancelled } from '../../utils/mini-program-jump'
 import StudentBottomNav from '../../components/student-bottom-nav'
 import {
   listExternalTakeoutMerchants,
@@ -30,6 +33,7 @@ function StudentTakeoutPage() {
   const capsuleStyle = useViewportRefresh()
   const [tools, setTools] = useState<ToolLink[]>([])
   const [toolStatus, setToolStatus] = useState<DirectoryStatus>('loading')
+  const [toolRefreshError, setToolRefreshError] = useState(false)
   const [merchants, setMerchants] = useState<ExternalTakeoutMerchantLink[]>([])
   const [status, setStatus] = useState<DirectoryStatus>('loading')
   const [filter, setFilter] = useState<MerchantFilter>('all')
@@ -53,7 +57,8 @@ function StudentTakeoutPage() {
   const loadTools = useCallback(async () => {
     const version = toolRequestVersion.current + 1
     toolRequestVersion.current = version
-    setToolStatus('loading')
+    setToolRefreshError(false)
+    setToolStatus(current => current === 'ready' || current === 'empty' ? current : 'loading')
     try {
       const values = await listNavigationItems()
       if (version !== toolRequestVersion.current) return
@@ -62,8 +67,8 @@ function StudentTakeoutPage() {
     } catch (error) {
       console.error('load campus service tools failed', error)
       if (version !== toolRequestVersion.current) return
-      setTools([])
-      setToolStatus('error')
+      setToolRefreshError(true)
+      setToolStatus(current => current === 'ready' || current === 'empty' ? current : 'error')
     }
   }, [])
 
@@ -91,7 +96,9 @@ function StudentTakeoutPage() {
 
   useEffect(() => {
     if (visibility.campus_tools) void loadTools()
+    else { toolRequestVersion.current += 1; setTools([]) }
     if (visibility.takeout) void load()
+    else { merchantRequestVersion.current += 1; setMerchants([]) }
   }, [visibility.campus_tools, visibility.takeout, loadTools, load])
 
   useEffect(() => () => {
@@ -124,6 +131,7 @@ function StudentTakeoutPage() {
     try {
       await Taro.navigateToMiniProgram({ appId, path })
     } catch (error) {
+      if (isMiniProgramJumpCancelled(error)) return
       console.error('open campus service mini program failed', error)
       await Taro.showToast({ title: errorTitle, icon: 'none' })
     } finally {
@@ -158,43 +166,9 @@ function StudentTakeoutPage() {
       </View>
 
       <View className='student-takeout-scroll'>
-        {visibility?.campus_tools && toolStatus === 'ready' && (
-          <View className='student-takeout-services'>
-            <View className='student-takeout-section-heading'>
-              <View>
-                <Text className='student-takeout-section-heading__title'>常用服务</Text>
-                <Text className='student-takeout-section-heading__desc'>直接进入对应服务小程序</Text>
-              </View>
-            </View>
-            <View className='student-takeout-services__grid'>
-              {tools.map((tool) => {
-                const target = `tool:${tool.id}`
-                return (
-                  <View
-                    key={tool.id}
-                    className='student-takeout-service'
-                    hoverClass='student-takeout-service--pressed'
-                    onClick={() => void openTool(tool)}
-                  >
-                    <View className='student-takeout-service__icon' style={{ color: tool.color }}>
-                      <Text>{tool.iconText}</Text>
-                    </View>
-                    <Text className='student-takeout-service__name'>
-                      {jumpingTarget === target ? '打开中' : tool.title}
-                    </Text>
-                  </View>
-                )
-              })}
-            </View>
-          </View>
-        )}
-
-        {visibility?.campus_tools && toolStatus === 'error' && (
-          <View className='student-takeout-tools-error' onClick={() => void loadTools()}>
-            <Text>常用服务暂时无法加载</Text>
-            <Text className='student-takeout-tools-error__action'>重新加载</Text>
-          </View>
-        )}
+        {visibility.campus_tools && <ToolDirectory compact tools={tools} status={toolStatus}
+          refreshError={toolRefreshError} jumpingId={jumpingTarget?.startsWith('tool:') ? jumpingTarget.slice(5) : null}
+          onOpen={tool => void openTool(tool)} onRetry={() => void loadTools()} />}
 
         {visibility?.takeout && <View className='student-takeout-directory'>
           <View className='student-takeout-directory__copy'>
@@ -228,40 +202,16 @@ function StudentTakeoutPage() {
         </View>}
 
         {visibility?.takeout && status === 'loading' && (
-          <View className='student-takeout-state'>
-            <View className='student-takeout-state__visual student-takeout-state__visual--loading'>
-              <View /><View /><View />
-            </View>
-            <Text className='student-takeout-state__title'>正在读取合作商家</Text>
-            <Text className='student-takeout-state__desc'>正在同步最新营业状态</Text>
-          </View>
+          <AppSkeleton rows={3} />
         )}
         {visibility?.takeout && status === 'empty' && (
-          <View className='student-takeout-state'>
-            <View className='student-takeout-state__visual'>
-              <View /><View /><View />
-            </View>
-            <Text className='student-takeout-state__title'>暂无可用合作商家</Text>
-            <Text className='student-takeout-state__desc'>接入并启用后会显示在这里</Text>
-          </View>
+          <AppState kind='empty' title='暂无可用合作商家' description='新的合作商家加入后，会显示在这里。' />
         )}
         {visibility?.takeout && status === 'error' && (
-          <View className='student-takeout-state student-takeout-state--retry' onClick={() => void load()}>
-            <View className='student-takeout-state__visual student-takeout-state__visual--error'>
-              <View /><View /><View />
-            </View>
-            <Text className='student-takeout-state__title'>商家加载失败，点击重试</Text>
-            <Text className='student-takeout-state__desc'>请检查网络连接后重试</Text>
-          </View>
+          <AppState kind='error' title='商家加载失败' description='请检查网络连接后重试。' actionText='重新加载' onAction={() => void load()} />
         )}
         {visibility?.takeout && status === 'ready' && filteredMerchants.length === 0 && (
-          <View className='student-takeout-state'>
-            <View className='student-takeout-state__visual'>
-              <View /><View /><View />
-            </View>
-            <Text className='student-takeout-state__title'>当前分类暂无商家</Text>
-            <Text className='student-takeout-state__desc'>可以切换其他营业状态查看</Text>
-          </View>
+          <AppState kind='empty' title='当前分类暂无商家' description='可以切换其他营业状态查看。' />
         )}
         {visibility?.takeout && status === 'ready' && filteredMerchants.length > 0 && (
           <View className='student-takeout-list'>

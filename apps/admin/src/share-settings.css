@@ -7,6 +7,8 @@
 .share-settings-check { display:flex; align-items:flex-start; gap:10px; font-size:14px; cursor:pointer; }
 .share-settings-check input { width:18px; height:18px; margin:2px 0 0; flex-shrink:0; }
 .share-settings-check small { display:block; color:#687387; line-height:1.6; margin-top:6px; }
+.share-settings-cover-actions { display:flex; flex-wrap:wrap; align-items:center; gap:12px; font-size:12px; color:#687387; }
+.share-card-preview__warning { margin:12px 16px; font-size:12px; line-height:1.6; color:#975126; }
 .share-settings-preview { border-left:1px solid #e7eaf0; padding-left:32px; }
 .share-settings-preview h3 { font-size:15px; margin:0 0 16px; }
 .share-settings-tabs { display:flex; gap:4px; margin-bottom:20px; }
