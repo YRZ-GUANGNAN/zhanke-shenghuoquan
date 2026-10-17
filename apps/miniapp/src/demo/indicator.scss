@@ -1,0 +1,10 @@
+.visual-demo-badge{position:absolute;left:24px;top:calc(var(--capsule-system-row-height) - 36PX);z-index:180;display:flex;align-items:center;min-height:24PX;padding:0 16px;background:rgba(32,45,58,.84);border-radius:8px;color:#fff;font-size:20px;line-height:24PX;white-space:nowrap;pointer-events:auto}
+.visual-demo-scrim{position:fixed;inset:0;z-index:3000;background:rgba(15,24,35,.48);display:flex;align-items:flex-end;pointer-events:auto}
+.visual-demo-sheet{width:100%;background:#fff;color:#243548;border-radius:24px 24px 0 0;padding:28px 28px calc(env(safe-area-inset-bottom) + 24px);box-sizing:border-box}
+.visual-demo-sheet__header{display:flex;align-items:center;justify-content:space-between;font-weight:600;font-size:30px;margin-bottom:24px}
+.visual-demo-sheet__header>view{font-size:26px;padding:16px}
+.visual-demo-sheet__body{height:65vh}
+.visual-demo-sheet__intro{display:block;font-size:26px;line-height:1.7;margin-bottom:24px}
+.visual-demo-credit{padding:24px 0;border-top:1PX solid #e9edf1;font-size:24px;line-height:1.6}
+.visual-demo-credit>text{display:block;overflow-wrap:anywhere}
+.visual-demo-credit>view{color:#315f89;margin-top:8px;padding:8px 0}

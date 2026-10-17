@@ -1,7 +1,11 @@
 import { defineConfig } from '@tarojs/cli'
+import path from 'node:path'
+import { NormalModuleReplacementPlugin } from 'webpack'
 
 export default defineConfig(async (merge) => {
   const appMode = process.env.TARO_APP_MODE || process.env.NODE_ENV
+  const visualDemo = process.env.TARO_APP_VISUAL_DEMO === 'true'
+  const demoRoot = path.resolve(__dirname, '../src/demo')
   const baseConfig = {
     projectName: 'campus-circle',
     date: '2026-06-17',
@@ -14,6 +18,8 @@ export default defineConfig(async (merge) => {
     sourceRoot: 'src',
     outputRoot: 'dist',
     framework: 'react',
+    defineConstants: { TARO_APP_VISUAL_DEMO: JSON.stringify(visualDemo) },
+    ...(visualDemo ? { copy: { patterns: [{ from: path.join(demoRoot, 'photos'), to: 'dist/demo-media' }], options: {} } } : {}),
     compiler: {
       type: 'webpack5' as const,
       prebundle: {
@@ -21,6 +27,15 @@ export default defineConfig(async (merge) => {
       }
     },
     mini: {
+      ...(visualDemo ? { webpackChain(chain) {
+        const replacements = [
+          [/[/\\]services[/\\]taro$|^\.\/taro$/, 'taro.ts'],
+          [/[/\\]services[/\\]e-im$|^\.\/e-im$/, 'im.ts'],
+          [/[/\\]use-page-share$/, 'share.ts'],
+          [/[/\\]resource-url$/, 'resource-url.ts'],
+        ] as const
+        replacements.forEach(([pattern, file], i) => chain.plugin(`visual-demo-${i}`).use(NormalModuleReplacementPlugin, [pattern, path.join(demoRoot, file)]))
+      } } : {}),
       postcss: {
         pxtransform: {
           enable: true,

@@ -1,5 +1,11 @@
+declare const process: { env: Record<string, string | undefined> }
+
 export default defineAppConfig({
-  pages: [
+  pages: process.env.TARO_APP_VISUAL_DEMO === 'true' ? [
+    'pages/home/index', 'pages/search/index', 'pages/student-secondhand/index',
+    'pages/secondhand-detail/index', 'pages/secondhand-chat/index', 'pages/profile/index',
+    'pages/user-profile/index', 'pages/my-content/index', 'pages/post-detail/index'
+  ] : [
     'pages/home/index',
     'pages/campus-guide/index',
     'pages/search/index',
