@@ -1,6 +1,7 @@
 package im
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -12,12 +13,17 @@ import (
 )
 
 type Handler struct {
-	service *Service
-	users   *user.Service
+	service  *Service
+	users    *user.Service
+	profiles func(context.Context, []uint) (map[uint]user.Profile, error)
 }
 
 func NewHandler(service *Service, users *user.Service) *Handler {
-	return &Handler{service: service, users: users}
+	handler := &Handler{service: service, users: users}
+	if users != nil {
+		handler.profiles = users.Profiles
+	}
+	return handler
 }
 func (h *Handler) Register(rg *gin.RouterGroup) {
 	auth := rg.Group("", h.users.AuthRequired())
@@ -49,7 +55,10 @@ func (h *Handler) conversations(c *gin.Context) {
 		response.Fail(c, 500, "list conversations failed")
 		return
 	}
-	response.OK(c, value)
+	response.OK(c, conversationPageView{
+		Items: h.conversationViews(c, value.Items, user.CurrentUserID(c)),
+		Page:  value.Page, PageSize: value.PageSize, Total: value.Total,
+	})
 }
 
 func (h *Handler) conversation(c *gin.Context) {
@@ -71,5 +80,5 @@ func (h *Handler) conversation(c *gin.Context) {
 		response.Fail(c, http.StatusInternalServerError, "get conversation failed")
 		return
 	}
-	response.OK(c, value)
+	response.OK(c, h.conversationViews(c, []ConversationContext{value}, user.CurrentUserID(c))[0])
 }

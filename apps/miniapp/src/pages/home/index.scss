@@ -339,25 +339,9 @@
 }
 
 .student-message-row__avatar {
-  position: relative;
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 88rpx;
-  height: 88rpx;
-  border-radius: 28rpx;
-  overflow: hidden;
-  background: linear-gradient(135deg, #E6F1FB, #FDF2E8);
-  color: $brand-primary;
-  font-size: 32rpx;
-  font-weight: 600;
-}
-
-.student-message-row__avatar-image {
-  width: 100%;
-  height: 100%;
-  border-radius: inherit;
+  width: 48PX;
+  height: 48PX;
+  border-radius: 16PX;
 }
 
 .student-message-state {
@@ -420,7 +404,8 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: $text-strong;
-  font-weight: 700;
+  font-size: 16PX;
+  font-weight: 600;
 }
 
 .student-message-row__product {
@@ -453,7 +438,7 @@
   display: block;
   overflow: hidden;
   margin-top: 4rpx;
-  color: $text-muted;
+  color: $text-secondary;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -476,6 +461,12 @@
   display: block;
   width: 100%;
   height: 100%;
+}
+
+.student-message-row__product-placeholder {
+  width: 24PX;
+  height: 24PX;
+  opacity: .5;
 }
 
 .student-message-row__preview--unread {

@@ -5,6 +5,7 @@ import { useDidShow } from '@tarojs/taro'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import AppIcon from '../../components/app-icon'
+import ChatAvatar from '../../components/chat-avatar'
 import ChannelPager, { useChannelInteraction } from '../../components/channel-pager'
 import { AppState } from '../../components/ui'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
@@ -25,6 +26,7 @@ import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
 import { postBodyWithoutTitle } from '../../utils/post-presentation'
 import { navigateToPublicProfile } from '../../utils/navigation'
+import { conversationPeer } from '../../utils/conversation-presentation'
 import './index.scss'
 
 type HomeTab = 'discover' | 'secondhand' | 'tools' | 'messages'
@@ -136,16 +138,6 @@ function conversationPeerLabel(context: IMConversationContext, currentUserId: st
     return '你是买家 · 二手交易'
   }
   return '二手交易'
-}
-
-function conversationPeerName(item: ConversationItem, currentUserId: string): string {
-  if (String(item.context.buyerId) === currentUserId) return item.product?.sellerName || '校园卖家'
-  if (String(item.context.sellerId) === currentUserId) return '买家'
-  return '交易对方'
-}
-
-function conversationPeerAvatar(item: ConversationItem, currentUserId: string): string {
-  return conversationPeerName(item, currentUserId).trim().charAt(0) || '聊'
 }
 
 function HomeContent() {
@@ -578,7 +570,7 @@ function HomeContent() {
           visibility.messages && visibility.secondhand_chat && (
           <View className='student-message-panel'>
             {conversationStatus === 'loading' || conversationStatus === 'idle' ? (
-              <View className='student-message-state'><Text>正在读取真实私信...</Text></View>
+              <View className='student-message-state'><Text>正在读取私信…</Text></View>
             ) : conversationStatus === 'error' ? (
               <View
                 className='student-message-state student-message-state--retry'
@@ -592,13 +584,15 @@ function HomeContent() {
                 <Text className='student-message-state__description'>从二手商品详情联系卖家后，会在这里继续交流。</Text>
               </View>
             ) : (
-              conversationItems.map((item) => (
+              conversationItems.map((item) => {
+                const peer = conversationPeer(item.context, item.product, currentUserId)
+                return (
                 <View
                   key={item.context.relationId}
                   className='student-message-row'
                   hoverClass='student-message-row--pressed'
                   role='button'
-                  aria-label={`打开${item.product?.title || '相关二手商品'}私信`}
+                  aria-label={`与${peer.name}的私信，${item.product?.title || '相关二手商品'}`}
                   onClick={() => {
                     if (!channelInteraction.canActivate()) return
                     void Taro.navigateTo({
@@ -606,14 +600,10 @@ function HomeContent() {
                     })
                   }}
                 >
-                  <View className='student-message-row__avatar'>
-                    {String(item.context.buyerId) === currentUserId && item.product?.sellerAvatar ? (
-                      <Image className='student-message-row__avatar-image' src={item.product.sellerAvatar} mode='aspectFill' />
-                    ) : <Text>聊</Text>}
-                  </View>
+                  <ChatAvatar className='student-message-row__avatar' src={peer.avatar} name={peer.name} />
                   <View className='student-message-row__main'>
                     <View className='student-message-row__top'>
-                      <Text className='student-message-row__name'>{conversationPeerName(item, currentUserId)}</Text>
+                      <Text className='student-message-row__name'>{peer.name}</Text>
                       <AppIcon name='chevron-right' className='student-message-row__chevron' />
                     </View>
                     <Text className='student-message-row__product'>
@@ -624,10 +614,11 @@ function HomeContent() {
                     </Text>
                   </View>
                   <View className='student-message-row__product-thumb'>
-                    {item.product?.images[0] ? <Image src={item.product.images[0]} mode='aspectFill' /> : <Text>{conversationPeerAvatar(item, currentUserId)}</Text>}
+                    {item.product?.images[0] ? <Image src={item.product.images[0]} mode='aspectFill' /> : <AppIcon name='market' className='student-message-row__product-placeholder' />}
                   </View>
                 </View>
-              ))
+                )
+              })
             )}
             {conversationStatus === 'ready' && <Text className='student-home-footnote'>仅展示最近 20 个会话</Text>}
           </View>

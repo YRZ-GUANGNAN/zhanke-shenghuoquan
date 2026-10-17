@@ -24,7 +24,7 @@ requireMatch(home, /key=\{channel\}/, '每个首页频道保留独立 ScrollView
 requireMatch(home, /scrollTop=\{tabScrollPositions\.current\[channel\]\}/, '首页标签切换时必须独立保存滚动位置')
 
 const chatPage = read('apps/miniapp/src/pages/secondhand-chat/index.tsx')
-requireMatch(chatPage, /<AppIcon\s+name='home'/, '聊天页主页入口必须使用标准 home 图标')
+requireMatch(chatPage, /onClick=\{openPeerProfile\}[\s\S]{0,100}<Text>主页<\/Text>/, '聊天页必须保留明确的对方主页入口')
 requireMatch(chatPage, /`campus_\$\{currentUserId\}`/, '聊天页必须绑定当前后端用户对应的 Tencent IM 账号')
 requireMatch(chatPage, /activeChatKeyRef\.current\s*!==\s*operationKey/, '聊天发送完成后必须拒绝旧账号结果写回')
 
@@ -35,9 +35,12 @@ forbidMatch(
 )
 requireMatch(
   chatPage,
-  /className=\{`secondhand-chat-inputbar[\s\S]{0,240}bottom:\s*`\$\{keyboardHeight\}px`/,
-  '聊天输入栏必须跟随键盘高度移动'
+  /className='secondhand-chat-page'[\s\S]{0,100}paddingBottom:\s*`\$\{keyboardHeight\}px`/,
+  '聊天页面应由 flex 布局统一避让键盘，输入栏与消息滚动区共享剩余空间'
 )
+const chatStyle = read('apps/miniapp/src/pages/secondhand-chat/index.scss')
+requireMatch(chatStyle, /\.secondhand-chat-scroll\s*\{[^}]*flex:\s*1 1 0;[^}]*height:\s*0;/, '聊天滚动区必须收缩以让出输入区与键盘空间')
+forbidMatch(chatStyle, /\.secondhand-chat-inputbar\s*\{[^}]*(position:\s*fixed|bottom:)/, '聊天输入区必须参与布局，不能重复固定定位')
 requireMatch(chatPage, /adjustPosition=\{false\}/, '聊天输入框必须关闭系统自动顶起，避免与手动键盘适配冲突')
 
 const sessionStore = read('apps/miniapp/src/stores/session.ts')

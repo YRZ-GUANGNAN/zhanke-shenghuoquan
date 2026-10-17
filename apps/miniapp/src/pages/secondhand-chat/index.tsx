@@ -5,6 +5,7 @@ import { Image, ScrollView, Text, Textarea, View } from '@tarojs/components'
 import { hideKeyboard } from '@tarojs/taro'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import AppIcon from '../../components/app-icon'
+import ChatAvatar from '../../components/chat-avatar'
 import { isApiError } from '../../services/api'
 import { contactSeller, getProduct, type IMConversationContext } from '../../services/c-trade'
 import {
@@ -21,6 +22,7 @@ import { useSessionStore } from '../../stores/session'
 import type { Product } from '../../types'
 import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
 import { useKeyboardInset } from '../../hooks/use-keyboard-inset'
+import { conversationPeer } from '../../utils/conversation-presentation'
 import './index.scss'
 
 type PageStatus = 'loading' | 'ready' | 'error'
@@ -107,7 +109,8 @@ function SecondhandChatPage() {
   const capsuleStyle = useViewportRefresh()
   const params = Taro.getCurrentInstance().router?.params ?? {}
   const entry = parseChatEntry(params)
-  const sessionUserId = useSessionStore((state) => state.profile.id)
+  const selfProfile = useSessionStore((state) => state.profile)
+  const sessionUserId = selfProfile.id
   const [status, setStatus] = useState<PageStatus>('loading')
   const [reloadKey, setReloadKey] = useState(0)
   const chatOperationKey = `${sessionUserId}:${entry?.kind || ''}:${entry?.id || ''}:${reloadKey}`
@@ -120,6 +123,9 @@ function SecondhandChatPage() {
   const [messages, setMessages] = useState<TencentMessage[]>([])
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
+  const sendLockRef = useRef<object | null>(null)
+  const [historyLoading, setHistoryLoading] = useState(true)
+  const [productImageFailed, setProductImageFailed] = useState(false)
   const [inputFocused, setInputFocused] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const { inset: keyboardHeight, onFocus: onKeyboardFocus, onKeyboardHeightChange, reset: resetKeyboardInset } = useKeyboardInset()
@@ -128,6 +134,7 @@ function SecondhandChatPage() {
     let active = true
     let unsubscribe: (() => void) | undefined
     const operationKey = chatOperationKey
+    activeChatKeyRef.current = operationKey
     const isActive = () => active && activeChatKeyRef.current === operationKey
 
     setStatus('loading')
@@ -138,6 +145,10 @@ function SecondhandChatPage() {
     setMessages([])
     setDraft('')
     setSending(false)
+    sendLockRef.current = null
+    setHistoryLoading(true)
+    setProductImageFailed(false)
+    setInputFocused(false)
     setErrorMessage('')
     resetKeyboardInset()
 
@@ -152,7 +163,8 @@ function SecondhandChatPage() {
     void (async () => {
       try {
         await requireAuthenticatedUserId()
-        const nextContext = await requestWithSingleSessionRecovery(() => (
+        if (!isActive()) return
+        let nextContext = await requestWithSingleSessionRecovery(() => (
           entry.kind === 'product'
             ? contactSeller(entry.id)
             : getIMConversation(Number(entry.id))
@@ -170,6 +182,20 @@ function SecondhandChatPage() {
         if (!nextRole || !validRelation || !validProduct || !validTencentPeer) {
           throw new Error('会话参与者校验失败')
         }
+        if (!isActive()) return
+        // Contact establishes the relation. Fetch its authorized presentation
+        // data separately, without changing the relation or blocking old APIs.
+        if (entry.kind === 'product' && !nextContext.peer) {
+          try {
+            const detail = await getIMConversation(nextContext.relationId)
+            if (detail.relationId === nextContext.relationId && detail.buyerId === nextContext.buyerId && detail.sellerId === nextContext.sellerId) {
+              nextContext = { ...nextContext, peer: detail.peer }
+            }
+          } catch {
+            // Public profile data is optional; authorized text chat still works.
+          }
+        }
+        if (!isActive()) return
         const tencentLoginUser = await getTencentIMLoginUser(expectedTencentUserId)
         if (tencentLoginUser !== expectedTencentUserId) {
           throw new Error('腾讯云 IM 账号与当前登录用户不一致，请返回“我的”重新登录')
@@ -203,6 +229,8 @@ function SecondhandChatPage() {
           setMessages((current) => mergeMessages(current, history))
         } catch (error) {
           if (isActive()) showToast(`历史消息读取失败：${chatErrorMessage(error)}`)
+        } finally {
+          if (isActive()) setHistoryLoading(false)
         }
       } catch (error) {
         unsubscribe?.()
@@ -221,19 +249,16 @@ function SecondhandChatPage() {
 
     return () => {
       active = false
+      if (activeChatKeyRef.current === operationKey) activeChatKeyRef.current = ''
       unsubscribe?.()
     }
   }, [chatOperationKey, entry?.id, entry?.kind, reloadKey, resetKeyboardInset, sessionUserId])
 
   const visibleMessages = useMemo(() => messages, [messages])
-  const scrollAnchorId = `secondhand-chat-bottom-${visibleMessages.length}-${keyboardHeight}`
-  const peerName = role === 'seller'
-    ? context?.buyerId ? `买家 #${context.buyerId}` : '交易对方'
-    : product?.sellerName || (context?.sellerId ? `卖家 #${context.sellerId}` : '校园卖家')
-  const peerAvatar = role === 'seller' ? '买' : peerName.trim().charAt(0) || '校'
-  const peerAvatarImage = role === 'buyer' ? product?.sellerAvatar : ''
-  const peerState = role === 'seller' ? '你是卖家 · 二手交易会话' : '你是买家 · 二手交易会话'
-  const canOpenSellerProfile = role === 'buyer' && Boolean(product?.sellerId)
+  const scrollAnchorId = `secondhand-chat-bottom-${visibleMessages.length}-${keyboardHeight}-${inputFocused ? 1 : 0}`
+  const peer = conversationPeer(context, product, sessionUserId)
+  const peerState = role === 'seller' ? '咨询买家 · 二手交流' : '宝贝卖家 · 二手交流'
+  const canOpenPeerProfile = Boolean(peer.id) && status === 'ready'
   const resolvedProductId = context
     ? String(context.productId)
     : entry?.kind === 'product' ? entry.id : ''
@@ -256,10 +281,10 @@ function SecondhandChatPage() {
     void Taro.navigateBack().catch(() => Taro.redirectTo({ url: fallback }))
   }
 
-  const openSellerProfile = () => {
-    if (!canOpenSellerProfile || !product?.sellerId) return
+  const openPeerProfile = () => {
+    if (!canOpenPeerProfile) return
     void Taro.navigateTo({
-      url: `/pages/user-profile/index?userId=${encodeURIComponent(product.sellerId)}&tab=secondhand`
+      url: `/pages/user-profile/index?userId=${encodeURIComponent(peer.id)}&tab=secondhand`
     })
   }
 
@@ -274,10 +299,13 @@ function SecondhandChatPage() {
       showToast('先输入消息')
       return
     }
-    if (!context || !role || !tencentUserId || status !== 'ready' || sending) return
+    if (!context || !role || !tencentUserId || status !== 'ready' || sendLockRef.current) return
 
     const operationKey = activeChatKeyRef.current
     const sendingUserId = sessionUserId
+    if (!operationKey || useSessionStore.getState().profile.id !== sendingUserId) return
+    const sendLock = {}
+    sendLockRef.current = sendLock
     setSending(true)
     try {
       const message = await sendTencentText(context, value, tencentUserId)
@@ -286,72 +314,71 @@ function SecondhandChatPage() {
         useSessionStore.getState().profile.id !== sendingUserId
       ) return
       setMessages((current) => mergeMessages(current, [message]))
-      setDraft('')
+      setDraft((current) => current.trim() === value ? '' : current)
     } catch (error) {
       if (activeChatKeyRef.current !== operationKey) return
       showToast(chatErrorMessage(error))
     } finally {
-      if (activeChatKeyRef.current === operationKey) setSending(false)
+      if (sendLockRef.current === sendLock) {
+        sendLockRef.current = null
+        if (activeChatKeyRef.current === operationKey) setSending(false)
+      }
     }
   }
 
   return (
-    <View className='secondhand-chat-page' style={capsuleStyle}>
+    <View className='secondhand-chat-page' style={{ ...capsuleStyle, paddingBottom: `${keyboardHeight}px` }}>
       <CapsulePageHeader
+        className='secondhand-chat-header'
         variant='standard'
-        left={<View className='secondhand-chat-header__back' hoverClass='secondhand-chat-header__back--pressed' onClick={() => void goBack()} />}
+        left={<View className='secondhand-chat-header__back' role='button' aria-label='返回' hoverClass='secondhand-chat-header__back--pressed' onClick={() => void goBack()}><AppIcon name='back' /></View>}
         center={
-          <View className='secondhand-chat-seller' hoverClass={canOpenSellerProfile ? 'secondhand-chat-seller--pressed' : ''} onClick={canOpenSellerProfile ? openSellerProfile : undefined}>
-            <View className='secondhand-chat-seller__avatar'>
-              {peerAvatarImage ? (
-                <Image className='secondhand-chat-seller__avatar-image' src={peerAvatarImage} mode='aspectFill' />
-              ) : (
-                <Text>{peerAvatar}</Text>
-              )}
-            </View>
+          <View className='secondhand-chat-seller' role={canOpenPeerProfile ? 'button' : undefined} aria-label={canOpenPeerProfile ? `查看${peer.name}的主页` : undefined} hoverClass={canOpenPeerProfile ? 'secondhand-chat-seller--pressed' : ''} onClick={canOpenPeerProfile ? openPeerProfile : undefined}>
+            <ChatAvatar className='secondhand-chat-seller__avatar' src={peer.avatar} name={peer.name} />
             <View className='secondhand-chat-seller__meta'>
-              <Text className='secondhand-chat-seller__name'>{status === 'loading' ? '正在连接私信' : peerName}</Text>
+              <Text className='secondhand-chat-seller__name'>{status === 'loading' ? '正在连接…' : peer.name}</Text>
               <Text className='secondhand-chat-seller__state'>
-                {status === 'ready' ? peerState : status === 'error' ? '连接失败' : '安全初始化中'}
+                {status === 'ready' ? peerState : status === 'error' ? '连接失败' : '稍等片刻'}
               </Text>
             </View>
           </View>
         }
         right={
-          <View
-            className={`secondhand-chat-header__home ${canOpenSellerProfile ? '' : 'secondhand-chat-header__home--text secondhand-chat-header__home--disabled'}`}
-            hoverClass={canOpenSellerProfile ? 'secondhand-chat-header__home--pressed' : ''}
-            onClick={canOpenSellerProfile ? openSellerProfile : undefined}
+          canOpenPeerProfile ? <View
+            className='secondhand-chat-header__home'
+            role='button'
+            aria-label={`查看${peer.name}的主页`}
+            hoverClass='secondhand-chat-header__home--pressed'
+            onClick={openPeerProfile}
           >
-            {canOpenSellerProfile ? (
-              <AppIcon name='home' active className='secondhand-chat-header__home-icon' />
-            ) : (
-              <Text>交易中</Text>
-            )}
-          </View>
+            <Text>主页</Text>
+            <AppIcon name='chevron-right' className='secondhand-chat-header__home-icon' />
+          </View> : null
         }
       />
 
       <View className='secondhand-chat-product'>
         <View className='secondhand-chat-product__image'>
-          {productImage ? (
-            <Image className='secondhand-chat-product__image-content' src={productImage} mode='aspectFill' />
+          {productImage && !productImageFailed ? (
+            <Image className='secondhand-chat-product__image-content' src={productImage} mode='aspectFill' onError={() => setProductImageFailed(true)} />
           ) : (
-            <Text>图 · 宝贝</Text>
+            <AppIcon name='market' className='secondhand-chat-product__placeholder' />
           )}
         </View>
         <View className='secondhand-chat-product__main'>
           <Text className='secondhand-chat-product__title'>
-            {product?.title || (resolvedProductId ? `二手商品 #${resolvedProductId}` : '正在读取宝贝信息')}
+            {product?.title || (status === 'loading' ? '正在读取宝贝信息…' : '商品信息暂不可用')}
           </Text>
           {product ? <ProductPrice className='secondhand-chat-product__price' value={product.price} size='compact' /> : null}
         </View>
         <View
           className={`secondhand-chat-product__button ${resolvedProductId ? '' : 'secondhand-chat-product__button--disabled'}`}
           hoverClass={resolvedProductId ? 'secondhand-chat-product__button--pressed' : ''}
+          role='button'
+          aria-label='查看商品详情'
           onClick={resolvedProductId ? openProduct : undefined}
         >
-          <Text>查看</Text>
+          <Text>查看宝贝</Text>
         </View>
       </View>
 
@@ -369,14 +396,16 @@ function SecondhandChatPage() {
 
         {status === 'loading' ? (
           <View className='secondhand-chat-state'>
-            <Text className='secondhand-chat-state__title'>正在连接真实私信</Text>
-            <Text className='secondhand-chat-state__desc'>正在校验商品与会话权限，请稍候。</Text>
+            <Text className='secondhand-chat-state__title'>正在连接私信…</Text>
+            <Text className='secondhand-chat-state__desc'>连接后即可继续交流。</Text>
           </View>
         ) : status === 'error' ? (
           <View className='secondhand-chat-state secondhand-chat-state--retry' onClick={() => setReloadKey((value) => value + 1)}>
             <Text className='secondhand-chat-state__title'>私信连接失败，点击重试</Text>
             <Text className='secondhand-chat-state__desc'>{errorMessage || '请检查网络或登录状态后再试。'}</Text>
           </View>
+        ) : historyLoading && visibleMessages.length === 0 ? (
+          <View className='secondhand-chat-state'><Text className='secondhand-chat-state__desc'>正在读取消息…</Text></View>
         ) : visibleMessages.length === 0 ? (
           <View className='secondhand-chat-state'>
             <Text className='secondhand-chat-state__title'>会话已建立</Text>
@@ -396,18 +425,16 @@ function SecondhandChatPage() {
                 {showDay && <View className='secondhand-chat-day-divider'><Text>{formatDayLabel(message.time)}</Text></View>}
                 <View className={`secondhand-chat-row ${mine ? 'secondhand-chat-row--me' : 'secondhand-chat-row--seller'}`}>
                   {!mine && (
-                    <View className='secondhand-chat-avatar'>
-                      <Text>{peerAvatar}</Text>
+                    <View className='secondhand-chat-avatar-touch' role='button' aria-label={`查看${peer.name}的主页`} onClick={openPeerProfile}>
+                      <ChatAvatar className='secondhand-chat-avatar' src={peer.avatar} name={peer.name} />
                     </View>
                   )}
                   <View className={`secondhand-chat-bubble ${mine ? 'secondhand-chat-bubble--me' : 'secondhand-chat-bubble--seller'}`}>
-                    <Text>{messageDisplayText(message)}</Text>
+                    <Text className='secondhand-chat-bubble__text' selectable>{messageDisplayText(message)}</Text>
                     <Text className='secondhand-chat-bubble__time'>{formatTime(message.time)}</Text>
                   </View>
                   {mine && (
-                    <View className='secondhand-chat-avatar secondhand-chat-avatar--me'>
-                      <Text>我</Text>
-                    </View>
+                    <ChatAvatar className='secondhand-chat-avatar secondhand-chat-avatar--me' src={selfProfile.avatar} name={selfProfile.nickname || '我'} />
                   )}
                 </View>
               </React.Fragment>
@@ -419,8 +446,7 @@ function SecondhandChatPage() {
       </ScrollView>
 
       <View
-        className={`secondhand-chat-inputbar ${keyboardHeight > 0 ? 'secondhand-chat-inputbar--keyboard' : ''}`}
-        style={keyboardHeight > 0 ? { bottom: `${keyboardHeight}px` } : undefined}
+        className={`secondhand-chat-inputbar ${inputFocused || keyboardHeight > 0 ? 'secondhand-chat-inputbar--keyboard' : ''}`}
       >
         <View className='secondhand-chat-input-wrap'>
           <Textarea
@@ -428,12 +454,14 @@ function SecondhandChatPage() {
             value={draft}
             maxlength={500}
             autoHeight
-            disabled={status !== 'ready' || !role || sending}
-            placeholder={status === 'ready' ? '发消息...' : '私信连接中...'}
+            disabled={status !== 'ready' || !role}
+            placeholder={status === 'ready' ? '发送消息…' : status === 'error' ? '重新连接后即可发送' : '私信连接中…'}
             placeholderClass='secondhand-chat-input__placeholder'
             confirmType='send'
             adjustPosition={false}
             cursorSpacing={0}
+            showConfirmBar={false}
+            holdKeyboard
             onInput={(event) => setDraft(String(event.detail.value ?? ''))}
             onFocus={() => { setInputFocused(true); onKeyboardFocus() }}
             onKeyboardHeightChange={onKeyboardHeightChange}
@@ -443,6 +471,10 @@ function SecondhandChatPage() {
         </View>
         <View
           className={`secondhand-chat-send ${draft.trim() && status === 'ready' && role && !sending ? 'secondhand-chat-send--active' : ''}`}
+          role='button'
+          aria-label={sending ? '消息发送中' : '发送消息'}
+          aria-disabled={!draft.trim() || status !== 'ready' || !role || sending}
+          hoverClass={draft.trim() && status === 'ready' && role && !sending ? 'secondhand-chat-send--pressed' : ''}
           onClick={() => void sendText()}
         >
           <Text>{sending ? '发送中' : '发送'}</Text>
