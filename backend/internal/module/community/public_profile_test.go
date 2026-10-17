@@ -27,10 +27,10 @@ func TestPublicProfileAndPostsUseRealDirectoryAndRepository(t *testing.T) {
 		stats: PublicProfileView{FollowingCount: 2, FollowerCount: 3, LikedCount: 9, IsFollowing: true},
 		posts: []Post{{ID: 11, UserID: 7, Title: "真实帖子", ReviewStatus: review.StatusApproved}},
 	}
-	service := NewService(repo, profileDirectory{7: {ID: 7, Nickname: "真实用户", School: "湛江科技学院"}}, nil)
+	service := NewService(repo, profileDirectory{7: {ID: 7, Nickname: "真实用户", School: "湛江科技学院", Cover: "/api/v1/media/assets/test-cover/content"}}, nil)
 
 	profile, err := service.PublicProfile(context.Background(), 5, 7)
-	if err != nil || profile.Profile.Nickname != "真实用户" || profile.FollowerCount != 3 || !profile.IsFollowing {
+	if err != nil || profile.Profile.Nickname != "真实用户" || profile.Profile.Cover != "/api/v1/media/assets/test-cover/content" || profile.FollowerCount != 3 || !profile.IsFollowing {
 		t.Fatalf("profile=%+v err=%v", profile, err)
 	}
 	posts, err := service.PublicUserPosts(context.Background(), 7, 1, 20)

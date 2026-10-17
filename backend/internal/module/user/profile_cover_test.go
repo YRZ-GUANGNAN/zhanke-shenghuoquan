@@ -14,6 +14,17 @@ import (
 
 const coverTestID = "01J00000000000000000000001"
 
+func TestProfileProjectionExposesCoverAndRedactsClosedAccount(t *testing.T) {
+	value := User{ID: 7, Nickname: "封面用户", Avatar: "avatar-url", Cover: "cover-url", Status: StatusActive}
+	if profile := value.Profile(); profile.Cover != value.Cover || profile.Avatar != value.Avatar {
+		t.Fatalf("public profile lost saved media: %+v", profile)
+	}
+	value.Status = StatusClosed
+	if profile := value.Profile(); profile.Cover != "" || profile.Avatar != "" || profile.Nickname != "账号已注销" {
+		t.Fatalf("closed account exposed personal media: %+v", profile)
+	}
+}
+
 type coverRepositoryStub struct {
 	value User
 	calls int
