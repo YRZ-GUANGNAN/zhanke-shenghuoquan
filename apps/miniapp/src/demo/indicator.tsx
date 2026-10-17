@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ScrollView, Text, View } from '@tarojs/components'
+import { RootPortal, ScrollView, Text, View } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import type Facade from '../services/taro'
 import { useDidShow } from '@tarojs/taro'
@@ -12,7 +12,7 @@ export default function DemoIndicator() {
   useDidShow(()=>{void Taro.hideShareMenu({menus:['shareAppMessage','shareTimeline']}).catch(()=>undefined)})
   return <>
     <View className='visual-demo-badge' onClick={()=>setOpen(true)}><Text>模拟体验 · 说明</Text></View>
-    {open && <View className='visual-demo-scrim' onClick={()=>setOpen(false)}>
+    {open && <RootPortal><View className='visual-demo-scrim' onClick={()=>setOpen(false)}>
       <View className='visual-demo-sheet' onClick={event=>event.stopPropagation()}>
         <View className='visual-demo-sheet__header'><Text>模拟数据与照片来源</Text><View onClick={()=>setOpen(false)}>关闭</View></View>
         <ScrollView scrollY className='visual-demo-sheet__body'>
@@ -24,6 +24,6 @@ export default function DemoIndicator() {
           </View>)}
         </ScrollView>
       </View>
-    </View>}
+    </View></RootPortal>}
   </>
 }
