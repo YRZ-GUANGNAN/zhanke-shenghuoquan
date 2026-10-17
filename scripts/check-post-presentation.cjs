@@ -66,6 +66,22 @@ async function pageBehavior() {
       if (id.endsWith('/use-viewport-refresh')) return { useViewportRefresh: () => ({}) }
       if (id.endsWith('/use-keyboard-inset')) return { useKeyboardInset: () => ({ inset: 0, onFocus: () => {}, onKeyboardHeightChange: () => {}, reset: () => {} }) }
       if (id.endsWith('/runtime-session-gate') || id.endsWith('/app-icon')) return { default: View }
+      if (id.endsWith('/chat-avatar')) return { default: View }
+      if (id.endsWith('/refresh-scroll-view')) return { default: View }
+      if (id.endsWith('/tool-directory')) return { default: View }
+      const sourceHelpers = {
+        '../../components/product-price': 'components/product-price.tsx',
+        '../utils/product-presentation': 'utils/product-presentation.ts',
+        '../../utils/mini-program-jump': 'utils/mini-program-jump.ts',
+        '../../utils/conversation-presentation': 'utils/conversation-presentation.ts',
+      }
+      if (sourceHelpers[id]) {
+        const helperPath = path.resolve(__dirname, '../apps/miniapp/src', sourceHelpers[id])
+        const helper = new Module(helperPath, module)
+        helper.require = modulePage.require
+        helper._compile(ts.transpileModule(fs.readFileSync(helperPath, 'utf8'), { fileName: helperPath, compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText, helperPath)
+        return helper.exports
+      }
       if (id.endsWith('/student-bottom-nav')) return { default: View }
       if (id === '../student-secondhand/content') return { default: View }
       if (id.endsWith('/content-motion') || id.endsWith('/use-layer-presence') || id.endsWith('/use-confirmed-feedback')) {
@@ -87,7 +103,7 @@ async function pageBehavior() {
         }).outputText, helperPath)
         return helper.exports
       }
-      if (id.endsWith('/components/ui')) return { AppIconButton: View, AppState: View }
+      if (id.endsWith('/components/ui')) return { AppIconButton: View, AppState: View, AppSkeleton: View }
       if (id.endsWith('/services/taro')) return { default: taro }
       if (id.endsWith('/capsule-safe')) return { getCapsuleSafeStyle: () => ({}) }
       if (id.endsWith('/utils/navigation')) {

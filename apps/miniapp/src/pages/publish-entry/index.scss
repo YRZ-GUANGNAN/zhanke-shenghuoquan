@@ -173,3 +173,8 @@
     color: $brand-primary;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .publish-entry-card { transition: none; }
+  .publish-entry-card--pressed { transform: none; }
+}

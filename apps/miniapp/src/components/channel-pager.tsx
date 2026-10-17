@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { Swiper, SwiperItem, View } from '@tarojs/components'
+import { useDidHide, useDidShow } from '@tarojs/taro'
 
 const CHANNEL_DURATION_MS = 200
 const RELEASE_GUARD_MS = 120
@@ -13,34 +14,51 @@ export type ChannelInteraction = {
   onAnimationFinish: () => void
 }
 
+type ChannelController = ChannelInteraction & {
+  isActive: () => boolean
+  setActive: (active: boolean) => void
+}
+
 // This only guards the click emitted after a native swipe. Direction, distance,
 // velocity and edge resistance remain owned by the native Swiper.
-export function createChannelInteraction(now: () => number = Date.now): ChannelInteraction {
+export function createChannelInteraction(now: () => number = Date.now): ChannelController {
+  let active = true
   let touching = false
   let moved = false
   let blockedUntil = 0
   const release = () => {
+    if (!active) return
     touching = false
     if (moved) blockedUntil = Math.max(blockedUntil, now() + RELEASE_GUARD_MS)
     moved = false
   }
   return {
-    canActivate: () => !(touching && moved) && now() >= blockedUntil,
-    onTouchStart: () => { touching = true; moved = false },
+    isActive: () => active,
+    setActive: (value) => { active = value; touching = false; moved = false; blockedUntil = 0 },
+    canActivate: () => active && !(touching && moved) && now() >= blockedUntil,
+    onTouchStart: () => { if (active) { touching = true; moved = false } },
     onTouchEnd: release,
     onTouchCancel: release,
     onTransition: () => {
+      if (!active) return
       if (touching) moved = true
       // Some clients omit animationfinish after cancel; this deadline also
       // guarantees that the page never remains permanently unclickable.
       blockedUntil = now() + CHANNEL_DURATION_MS + RELEASE_GUARD_MS
     },
-    onAnimationFinish: () => { blockedUntil = now() + RELEASE_GUARD_MS }
+    onAnimationFinish: () => { if (active && blockedUntil > 0) blockedUntil = now() + RELEASE_GUARD_MS }
   }
 }
 
-export function useChannelInteraction(): ChannelInteraction {
-  return useMemo(() => createChannelInteraction(), [])
+export function useChannelInteraction(): ChannelController {
+  const interaction = useMemo(() => createChannelInteraction(), [])
+  useEffect(() => {
+    interaction.setActive(true)
+    return () => interaction.setActive(false)
+  }, [interaction])
+  useDidHide(() => interaction.setActive(false))
+  useDidShow(() => interaction.setActive(true))
+  return interaction
 }
 
 export type ChannelPagerProps<T extends string> = {
@@ -73,6 +91,8 @@ export default function ChannelPager<T extends string>({
     // Ignore a late swipe event whose old index now identifies another page.
     keysAtTouch.current = null
   }
+  useDidHide(() => { keysAtTouch.current = null })
+  useDidShow(() => { keysAtTouch.current = null })
 
   useEffect(() => {
     if (selectedIndex < 0 && visibleKeys.length > 0) onChange(visibleKeys[0])
@@ -90,16 +110,18 @@ export default function ChannelPager<T extends string>({
       autoplay={false}
       indicatorDots={false}
       onTouchStart={() => {
+        if (!ownInteraction.isActive()) return
         keysAtTouch.current = keySignature
         controls.onTouchStart()
       }}
       onTouchEnd={controls.onTouchEnd}
       onTouchCancel={controls.onTouchCancel}
       onTransition={(event) => {
-        if (event.detail.dx !== 0 || event.detail.dy !== 0) controls.onTransition()
+        if (ownInteraction.isActive() && keysAtTouch.current === keySignature && (event.detail.dx !== 0 || event.detail.dy !== 0)) controls.onTransition()
       }}
       onAnimationFinish={controls.onAnimationFinish}
       onChange={(event) => {
+        if (!ownInteraction.isActive()) return
         const { current: nextIndex, source, currentItemId } = event.detail
         if (!Number.isInteger(nextIndex) || nextIndex < 0 || nextIndex >= visibleKeys.length) return
         const nextKey = visibleKeys[nextIndex]

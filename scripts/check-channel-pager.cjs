@@ -31,11 +31,19 @@ async function run() {
   }, props.children, props.title, props.description)
   const components = Object.fromEntries(['Image', 'ScrollView', 'Text', 'View', 'Swiper', 'SwiperItem'].map((name) => [name, component(name)]))
   const View = components.View
+  const shown = new Set(), hidden = new Set()
+  const register = callbacks => callback => {
+    const ref = React.useRef(callback)
+    ref.current = callback
+    React.useEffect(() => { callbacks.add(ref); return () => callbacks.delete(ref) }, [])
+  }
+  const lifecycle = { useDidShow: register(shown), useDidHide: register(hidden) }
   const load = (filename, dependencies = {}) => {
     const loaded = new Module(filename, module)
     loaded.require = (id) => {
       if (id === 'react' || id === 'react/jsx-runtime') return require(id)
       if (id === '@tarojs/components') return components
+      if (id === '@tarojs/taro') return lifecycle
       if (id.endsWith('.scss')) return {}
       if (id.endsWith('/product-price')) return load(path.join(root, 'apps/miniapp/src/components/product-price.tsx'))
       if (id.endsWith('/product-presentation')) return load(path.join(root, 'apps/miniapp/src/utils/product-presentation.ts'))
@@ -93,6 +101,23 @@ async function run() {
     interaction.onTouchCancel()
     clock += 321
     assert.equal(interaction.canActivate(), true, 'missing animationfinish after cancel cannot lock content')
+
+    let hookInteraction, probeMounted = true
+    const LifecycleProbe = () => { hookInteraction = pagerModule.useChannelInteraction(); return null }
+    const probe = await mount(() => probeMounted ? React.createElement(LifecycleProbe) : null)
+    await probe.event(() => {
+      hookInteraction.onTouchStart(); hookInteraction.onTransition()
+      for (const ref of hidden) ref.current()
+      hookInteraction.onTouchStart(); hookInteraction.onTransition(); hookInteraction.onAnimationFinish()
+    })
+    assert.equal(hookInteraction.canActivate(), false, 'hidden callbacks cannot activate content')
+    await probe.event(() => { for (const ref of shown) ref.current() })
+    hookInteraction.onAnimationFinish()
+    assert.equal(hookInteraction.canActivate(), true, 'late animationfinish cannot restore an old guard after showing')
+    probeMounted = false
+    await probe.render()
+    hookInteraction.onTouchStart(); hookInteraction.onTransition(); hookInteraction.onTouchEnd()
+    assert.equal(hookInteraction.canActivate(), false, 'unmounted hook rejects stale handlers')
 
     let selected = 'discover'
     let keys = ['messages', 'discover', 'tools']
@@ -152,7 +177,6 @@ async function run() {
     const shareOptions = []
     const requests = { posts: [], products: [], messages: [], tools: [] }
     const navigate = []
-    const shown = new Set()
     const queued = (kind, query) => { const task = deferred(); requests[kind].push({ ...task, query }); return task.promise }
     const homePath = path.join(root, 'apps/miniapp/src/pages/home/index.tsx')
     const Home = load(homePath, {
@@ -179,11 +203,6 @@ async function run() {
       '../../services/session-recovery': { requestWithSingleSessionRecovery: (callback) => callback() },
       '../../services/taro': { default: { getCurrentInstance: () => ({ router: { params: routeParams } }), navigateTo: async (value) => navigate.push(value.url), showToast: async () => {} } },
       '../../utils/post-presentation': { postBodyWithoutTitle: (_, body) => body },
-      '@tarojs/taro': { useDidShow: (callback) => {
-        const ref = React.useRef(callback)
-        ref.current = callback
-        React.useEffect(() => { shown.add(ref); return () => shown.delete(ref) }, [])
-      } },
     }).default
     const home = await mount(() => React.createElement(Home))
     const homeSwiper = () => home.props('[data-component="Swiper"]')
@@ -199,6 +218,30 @@ async function run() {
       requests.posts[0].resolve({ items: [{ id: 'post-1', title: '稳定内容', content: '', author: '测试', images: [], likedCount: 0 }], page: 1, total: 11 })
       requests.products[0].resolve({ items: [], page: 1, total: 0 })
     })
+    await home.event(() => {
+      homeSwiper().onTouchStart()
+      homeSwiper().onTransition({ detail: { dx: 30, dy: 0 } })
+      for (const ref of hidden) ref.current()
+    })
+    await home.event(() => homeSwiper().onChange({ detail: { current: 2, source: 'touch', currentItemId: 'tools' } }))
+    assert.equal(homeSwiper().current, 0, 'hidden-page swipe callbacks cannot change tabs')
+    await home.event(() => { for (const ref of shown) ref.current() })
+    await home.event(() => {
+      homeSwiper().onTransition({ detail: { dx: 30, dy: 0 } })
+      homeSwiper().onAnimationFinish()
+      homeSwiper().onChange({ detail: { current: 2, source: 'touch', currentItemId: 'tools' } })
+    })
+    assert.equal(homeSwiper().current, 0, 'returning discards a stale change until a fresh touch starts')
+    await clickTab(2)
+    assert.equal(homeSwiper().current, 2, 'returning without touchend restores tab clicks')
+    await clickTab(0)
+    await home.event(() => {
+      homeSwiper().onTouchStart()
+      homeSwiper().onChange({ detail: { current: 2, source: 'touch', currentItemId: 'tools' } })
+    })
+    assert.equal(homeSwiper().current, 2, 'a fresh swipe still changes the selected tab')
+    await home.event(() => { for (const ref of hidden) ref.current(); for (const ref of shown) ref.current() })
+    await clickTab(0)
     const homeDiscoverNode = home.container.querySelector('[data-item-id="discover"] .student-home-content')
     let refreshResult
     await home.event(() => {
@@ -275,7 +318,7 @@ async function run() {
     await messagePage.event(() => requests.messages[3].resolve([{ relationId: 9, productId: 9, sellerId: 'test-user-c', buyerId: 'test-peer' }]))
     assert.equal(messagePage.container.querySelector('[data-component="Swiper"]'), null, '私信开关关闭后不展示残留会话')
     assert.equal(requests.posts.length, discoverRequestsBefore)
-    console.log('channel pager and home behavior: ok')
+    console.log('channel pager and home behavior: PASS (swipe guard, hide/show/unmount, stale events, preserved channels, owner and source changes)')
   } finally {
     for (const node of roots) await act(async () => node.unmount())
     dom.window.close()

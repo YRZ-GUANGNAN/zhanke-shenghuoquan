@@ -335,7 +335,7 @@ h1 {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+  *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
 }
 
 .metric-grid {
@@ -2110,7 +2110,9 @@ table code { color: #405167; font-family: "Cascadia Code", Consolas, monospace; 
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
+  .admin-button:hover:not(:disabled), .admin-button:active:not(:disabled),
+  .main button:not(:disabled):active, .admin-navigation button:active { transform: none; }
 }
 }
 

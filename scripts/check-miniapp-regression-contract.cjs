@@ -16,8 +16,11 @@ function forbidMatch(source, pattern, message) {
 }
 
 const home = read('apps/miniapp/src/pages/home/index.tsx')
-requireMatch(home, /import\s*\{[^}]*ScrollView[^}]*\}\s*from\s*'@tarojs\/components'/s, '首页必须使用原生 ScrollView')
-requireMatch(home, /<ScrollView[\s\S]*scrollY[\s\S]*onScrollToLower=/, '首页必须通过 onScrollToLower 触发翻页')
+const refreshScroll = read('apps/miniapp/src/components/refresh-scroll-view.tsx')
+requireMatch(home, /import RefreshScrollView from '..\/..\/components\/refresh-scroll-view'/, '首页必须使用共享原生刷新滚动组件')
+requireMatch(refreshScroll, /import\s*\{[^}]*ScrollView[^}]*\}\s*from\s*'@tarojs\/components'/s, '共享刷新组件必须使用原生 ScrollView')
+requireMatch(refreshScroll, /<ScrollView\s+\{\.\.\.props\}/, '共享刷新组件必须透传原生滚动和分页事件')
+requireMatch(home, /<RefreshScrollView[\s\S]*scrollY[\s\S]*onScrollToLower=/, '首页必须通过 onScrollToLower 触发翻页')
 forbidMatch(home, /createIntersectionObserver|home-discover-sentinel/, '首页不得继续使用不稳定的 IntersectionObserver sentinel')
 requireMatch(home, /conversationOwnerRef\.current\s*!==\s*ownerKey/, '私信列表必须拒绝旧账号请求写回')
 requireMatch(home, /key=\{channel\}/, '每个首页频道保留独立 ScrollView')
