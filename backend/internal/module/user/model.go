@@ -71,6 +71,7 @@ type UserSettings struct {
 }
 
 type SettingsView struct {
+	WechatBound    bool   `json:"wechatBound"`
 	OrderNotice    bool   `json:"orderNotice"`
 	SocialNotice   bool   `json:"socialNotice"`
 	QuietHours     bool   `json:"quietHours"`

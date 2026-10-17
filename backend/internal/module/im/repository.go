@@ -15,7 +15,7 @@ type Repository interface {
 	FindConversation(context.Context, uint, uint, string, uint) (Conversation, bool, error)
 	FindConversationForParticipant(context.Context, uint, uint) (Conversation, bool, error)
 	EnsureConversationStable(context.Context, *Conversation) error
-	ListConversations(context.Context, uint, int, int) ([]Conversation, int64, error)
+	ListConversations(context.Context, uint, int, int, ...bool) ([]Conversation, int64, error)
 }
 type GormRepository struct{ db *gorm.DB }
 
@@ -59,7 +59,7 @@ func (r *GormRepository) FindConversation(ctx context.Context, buyerID, sellerID
 func (r *GormRepository) FindConversationForParticipant(ctx context.Context, relationID, userID uint) (Conversation, bool, error) {
 	var value Conversation
 	err := r.db.WithContext(ctx).
-		Where("id = ? AND reference_type = ? AND (buyer_id = ? OR seller_id = ?)", relationID, "product", userID, userID).
+		Where("id = ? AND reference_type IN ? AND (buyer_id = ? OR seller_id = ?)", relationID, []string{"product", "user"}, userID, userID).
 		First(&value).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return Conversation{}, false, nil
@@ -89,14 +89,18 @@ func (r *GormRepository) EnsureConversationStable(ctx context.Context, value *Co
 	*value = canonical
 	return nil
 }
-func (r *GormRepository) ListConversations(ctx context.Context, userID uint, page, size int) ([]Conversation, int64, error) {
+func (r *GormRepository) ListConversations(ctx context.Context, userID uint, page, size int, includeProducts ...bool) ([]Conversation, int64, error) {
 	var values []Conversation
 	var total int64
+	types := []string{"user"}
+	if len(includeProducts) == 0 || includeProducts[0] {
+		types = append(types, "product")
+	}
 	query := r.db.WithContext(ctx).Model(&Conversation{}).
-		Where("reference_type = ? AND (buyer_id = ? OR seller_id = ?)", "product", userID, userID)
+		Where("reference_type IN ? AND (buyer_id = ? OR seller_id = ?)", types, userID, userID)
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
-	err := query.Order("updated_at DESC").Offset((page - 1) * size).Limit(size).Find(&values).Error
+	err := query.Order("updated_at DESC, id DESC").Offset((page - 1) * size).Limit(size).Find(&values).Error
 	return values, total, err
 }

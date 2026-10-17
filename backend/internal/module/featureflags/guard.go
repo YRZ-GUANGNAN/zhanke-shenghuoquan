@@ -55,7 +55,8 @@ func RequestKeys(method, path string) []string {
 		}
 		return keys
 	case strings.HasPrefix(path, "/im/"):
-		return []string{KeyMessages, KeySecondhandChat}
+		// Product relations are checked after participant authorization by IM.
+		return []string{KeyMessages}
 	case strings.HasPrefix(path, "/navigation/external-takeout"):
 		keys := []string{KeyTakeout}
 		if strings.Contains(path, "/search") {
