@@ -1,3 +1,4 @@
+import ProductPrice from '../../components/product-price'
 import { withFeaturePage } from '../../components/feature-page-gate'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import React, { useRef, useState } from 'react'
@@ -165,7 +166,7 @@ function MyContentContent() {
           <ContentThumb src={item.images[0]} />
           <View className='my-content-row__main'>
             <Text className='my-content-row__title'>{item.title}</Text>
-            <Text className='my-content-row__price'>¥{item.price}</Text>
+            <ProductPrice className='my-content-row__price' value={item.price} size='compact' />
           </View>
           <View className='my-content-row__tail'>
             <Text className={`my-content-row__status${item.status === 'sold' ? ' my-content-row__status--muted' : ''}`}>

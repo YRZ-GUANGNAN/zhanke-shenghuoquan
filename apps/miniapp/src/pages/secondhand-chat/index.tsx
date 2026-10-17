@@ -1,3 +1,4 @@
+import ProductPrice from '../../components/product-price'
 import { withFeaturePage } from '../../components/feature-page-gate'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Image, ScrollView, Text, Textarea, View } from '@tarojs/components'
@@ -343,7 +344,7 @@ function SecondhandChatPage() {
           <Text className='secondhand-chat-product__title'>
             {product?.title || (resolvedProductId ? `二手商品 #${resolvedProductId}` : '正在读取宝贝信息')}
           </Text>
-          {product ? <Text className='secondhand-chat-product__price'>¥{product.price}</Text> : null}
+          {product ? <ProductPrice className='secondhand-chat-product__price' value={product.price} size='compact' /> : null}
         </View>
         <View
           className={`secondhand-chat-product__button ${resolvedProductId ? '' : 'secondhand-chat-product__button--disabled'}`}

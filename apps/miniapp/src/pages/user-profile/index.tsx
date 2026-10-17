@@ -1,7 +1,8 @@
+import ProductPrice from '../../components/product-price'
 import { withFeaturePage } from '../../components/feature-page-gate'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import { usePageShare } from '../../hooks/use-page-share'
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useDidShow } from '@tarojs/taro'
 import { Button, Image, ScrollView, Text, View } from '@tarojs/components'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
@@ -21,6 +22,8 @@ import type { CommunityPost, Product } from '../../types'
 import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
 import ChannelPager, { useChannelInteraction } from '../../components/channel-pager'
 import { navigateBackOrHome } from '../../utils/navigation'
+import AppIcon from '../../components/app-icon'
+import { postBodyWithoutTitle } from '../../utils/post-presentation'
 import './index.scss'
 
 type ProfileTab = 'posts' | 'secondhand'
@@ -28,13 +31,6 @@ type PageStatus = 'loading' | 'ready' | 'error'
 
 function showToast(title: string) {
   void Taro.showToast({ title, icon: 'none', duration: 1600 })
-}
-
-function splitColumns<T>(items: T[]) {
-  return {
-    left: items.filter((_, index) => index % 2 === 0),
-    right: items.filter((_, index) => index % 2 === 1)
-  }
 }
 
 function UserProfilePage() {
@@ -66,6 +62,7 @@ function UserProfilePage() {
   const [error, setError] = useState('')
   const [failedCover, setFailedCover] = useState('')
   const [failedAvatar, setFailedAvatar] = useState('')
+  const [failedMedia, setFailedMedia] = useState<Set<string>>(() => new Set())
   const [scrolledTabs, setScrolledTabs] = useState<Record<ProfileTab, boolean>>({ posts: false, secondhand: false })
   const requestVersion = useRef(0)
   const loadingMoreRef = useRef(false)
@@ -185,8 +182,6 @@ function UserProfilePage() {
     }
   }
 
-  const postColumns = useMemo(() => splitColumns(posts), [posts])
-  const productColumns = useMemo(() => splitColumns(products), [products])
   const isSelf = currentUserId === userId
   const hasCover = Boolean(profile?.profile.cover && profile.profile.cover !== failedCover)
   const hasAvatar = Boolean(profile?.profile.avatar && profile.profile.avatar !== failedAvatar)
@@ -206,15 +201,6 @@ function UserProfilePage() {
       followPending.current = false
       setBusy(false)
     }
-  }
-
-  const secondaryAction = () => {
-    const selling = products.find((item) => item.status === 'selling')
-    if (!selling) {
-      showToast('该用户当前没有可联系的在售商品')
-      return
-    }
-    void Taro.navigateTo({ url: `/pages/secondhand-detail/index?id=${encodeURIComponent(selling.id)}` })
   }
 
   const copyProfilePath = async () => {
@@ -255,33 +241,52 @@ function UserProfilePage() {
     void Taro.navigateTo({ url })
   }
 
-  const renderPost = (item: CommunityPost) => (
-    <View className='public-profile-card' key={item.id} onClick={() => openContent(`/pages/post-detail/index?id=${encodeURIComponent(item.id)}`)}>
-      <View className='public-profile-card__media public-profile-card__media--sky public-profile-card__media--medium'>
-        {item.images[0] ? <Image className='public-profile-card__media-image' src={item.images[0]} mode='aspectFill' /> : <Text>帖 · {item.topic || '校园'}</Text>}
-      </View>
+  const markMediaFailed = (src: string) => setFailedMedia((current) => new Set(current).add(src))
+
+  const renderPost = (item: CommunityPost) => {
+    const image = item.images.find((src) => src.trim())
+    const summary = postBodyWithoutTitle(item.title, item.content)
+    return (
+    <View className={`public-profile-card public-profile-card--post${image ? '' : ' public-profile-card--text'}`} key={item.id}
+      ariaRole='button' ariaLabel={item.title || item.content} hoverClass='public-profile-card--pressed'
+      onClick={() => openContent(`/pages/post-detail/index?id=${encodeURIComponent(item.id)}`)}>
+      {image ? <View className='public-profile-card__media public-profile-card__media--post'>
+        {!failedMedia.has(image) ? <Image className='public-profile-card__media-image' src={image} mode='aspectFill' lazyLoad onError={() => markMediaFailed(image)} />
+          : <View className='public-profile-card__no-media'><AppIcon name='image' /><Text>图片暂不可用</Text></View>}
+      </View> : <View className='public-profile-card__text'>
+        <Text className='public-profile-card__topic'>{item.topic || '校园帖子'}</Text>
+        <Text className='public-profile-card__text-title'>{item.title || item.content}</Text>
+        {summary && summary !== item.title && <Text className='public-profile-card__excerpt'>{summary}</Text>}
+      </View>}
       <View className='public-profile-card__body'>
-        <Text className='public-profile-card__title'>{item.title || item.content}</Text>
-        <View className='public-profile-card__metric'><Text className='public-profile-card__heart'>♥</Text><Text>{item.likedCount}</Text></View>
+        {image && <Text className='public-profile-card__title'>{item.title || item.content}</Text>}
+        {visibility.likes && <View className='public-profile-card__metric'><AppIcon name='heart' className='public-profile-card__heart' /><Text>{item.likedCount}</Text></View>}
       </View>
     </View>
-  )
+    )
+  }
 
-  const renderProduct = (item: Product) => (
-    <View className='public-profile-card' key={item.id} onClick={() => openContent(`/pages/secondhand-detail/index?id=${encodeURIComponent(item.id)}`)}>
-      <View className='public-profile-card__media public-profile-card__media--lemon public-profile-card__media--medium'>
-        {item.images[0] ? <Image className='public-profile-card__media-image' src={item.images[0]} mode='aspectFill' /> : <Text>物 · {item.category || '二手'}</Text>}
-        {item.status === 'sold' ? <Text className='public-profile-card__sold'>已售</Text> : null}
+  const renderProduct = (item: Product) => {
+    const image = item.images.find((src) => src.trim())
+    const status = item.status === 'selling' ? '出售中' : item.status === 'reserved' ? '已预留' : '已售出'
+    return (
+    <View className='public-profile-card public-profile-card--product' key={item.id}
+      ariaRole='button' ariaLabel={`${item.title}，${item.price}元`} hoverClass='public-profile-card--pressed'
+      onClick={() => openContent(`/pages/secondhand-detail/index?id=${encodeURIComponent(item.id)}`)}>
+      <View className='public-profile-card__media public-profile-card__media--product'>
+        {image && !failedMedia.has(image) ? <Image className='public-profile-card__media-image' src={image} mode='aspectFill' lazyLoad onError={() => markMediaFailed(image)} />
+          : <View className='public-profile-card__no-media'><AppIcon name='image' /><Text>{image ? '图片暂不可用' : '卖家未上传图片'}</Text></View>}
       </View>
       <View className='public-profile-card__body'>
         <Text className='public-profile-card__title'>{item.title}</Text>
         <View className='public-profile-card__product-meta'>
-          <Text className='public-profile-card__price'>¥{item.price}</Text>
-          <Text>{item.status === 'selling' ? '出售中' : item.status === 'reserved' ? '已预留' : '已售出'}</Text>
+          <ProductPrice className='public-profile-card__price' value={item.price} />
         </View>
+        <Text className='public-profile-card__product-facts'>{[status, item.condition || item.category].filter(Boolean).join(' · ')}</Text>
       </View>
     </View>
-  )
+    )
+  }
 
   const navigation = (
     <View className={`public-profile-navigation${status !== 'ready' || scrolledTabs[activeTab] ? ' public-profile-navigation--scrolled' : ''}`}>
@@ -318,17 +323,16 @@ function UserProfilePage() {
             <View className='public-profile-user__avatar'>
               {hasAvatar ? <Image className='public-profile-user__avatar-image' src={value.avatar} mode='aspectFill' onError={() => setFailedAvatar(value.avatar)} /> : <Text>{value.nickname.slice(0, 1) || '校'}</Text>}
             </View>
+            <View className='public-profile-actions'>
+              {(isSelf || visibility.following) && <View className={`public-profile-action public-profile-action--primary ${following && !isSelf ? 'public-profile-action--active' : ''}`} ariaRole='button' onClick={isSelf ? () => openContent('/pages/edit-profile/index') : () => { if (interaction.canActivate()) void toggleFollow() }}>
+                <Text>{isSelf ? '编辑资料' : busy ? '处理中…' : following ? '已关注' : '+ 关注'}</Text>
+              </View>}
+              {isSelf && <Button className='public-profile-action public-profile-action--secondary' openType='share' disabled={!shareReady}>分享主页</Button>}
+            </View>
           </View>
           <View className='public-profile-user__main'>
             <Text className='public-profile-user__name'>{value.nickname}</Text>
             <Text className='public-profile-user__meta'>用户号 {value.id}</Text>
-          </View>
-          <View className='public-profile-actions'>
-            {(isSelf || visibility.following) && <View className={`public-profile-action public-profile-action--primary ${following && !isSelf ? 'public-profile-action--active' : ''}`} ariaRole='button' onClick={isSelf ? () => openContent('/pages/edit-profile/index') : () => { if (interaction.canActivate()) void toggleFollow() }}>
-              <Text>{isSelf ? '编辑资料' : busy ? '处理中…' : following ? '已关注' : '+ 关注'}</Text>
-            </View>}
-            {isSelf ? <Button className='public-profile-action public-profile-action--secondary' openType='share' disabled={!shareReady}>分享主页</Button>
-              : visibility.secondhand && <View className='public-profile-action public-profile-action--secondary' ariaRole='button' onClick={() => { if (interaction.canActivate()) secondaryAction() }}><Text>查看在售商品</Text></View>}
           </View>
         </View>
         <View className='public-profile-stats'>
@@ -377,9 +381,9 @@ function UserProfilePage() {
           {(tab === 'posts' ? posts.length === 0 : products.length === 0) ? (
             <View className='public-profile-empty'><Text className='public-profile-empty__title'>{tab === 'posts' ? '暂无公开帖子' : '暂无公开二手商品'}</Text></View>
           ) : tab === 'posts' ? (
-            <View className='public-profile-waterfall'><View className='public-profile-waterfall__column'>{postColumns.left.map(renderPost)}</View><View className='public-profile-waterfall__column'>{postColumns.right.map(renderPost)}</View></View>
+            <View className='public-profile-grid public-profile-grid--posts'>{posts.map(renderPost)}</View>
           ) : (
-            <View className='public-profile-waterfall'><View className='public-profile-waterfall__column'>{productColumns.left.map(renderProduct)}</View><View className='public-profile-waterfall__column'>{productColumns.right.map(renderProduct)}</View></View>
+            <View className='public-profile-grid public-profile-grid--products'>{products.map(renderProduct)}</View>
           )}
           {loadMoreErrors[tab] ? <Text className='public-profile-load-more public-profile-load-more--retry' onClick={() => { if (interaction.canActivate()) void loadMore(tab) }}>{loadMoreErrors[tab]}</Text> : null}
           {loadingMore && loadingTab === tab ? <Text className='public-profile-load-more'>正在加载更多内容…</Text> : null}

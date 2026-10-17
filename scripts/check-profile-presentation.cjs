@@ -71,7 +71,9 @@ async function run() {
         if (id.endsWith('/services/taro')) return { default: taro }
         if (id.endsWith('/services/b-community')) return options.community || {}
         if (id.endsWith('/services/c-trade')) return options.trade || {}
-        if (id.endsWith('/post-presentation')) return { formatPostDate: (value) => value || '' }
+        if (id.endsWith('/post-presentation')) return loadSource(path.resolve(__dirname, '../apps/miniapp/src/utils/post-presentation.ts'))
+        if (id.endsWith('/product-price')) return loadSource(path.resolve(__dirname, '../apps/miniapp/src/components/product-price.tsx'))
+        if (id.endsWith('/product-presentation')) return loadSource(path.resolve(__dirname, '../apps/miniapp/src/utils/product-presentation.ts'))
         if (id.endsWith('/channel-pager')) return loadSource(path.resolve(__dirname, '../apps/miniapp/src/components/channel-pager.tsx'))
         if (id.endsWith('/utils/navigation')) return loadSource(path.resolve(__dirname, '../apps/miniapp/src/utils/navigation.ts'))
         if (id === './use-content-tabs') return loadSource(path.resolve(path.dirname(sourcePath), 'use-content-tabs.ts'))

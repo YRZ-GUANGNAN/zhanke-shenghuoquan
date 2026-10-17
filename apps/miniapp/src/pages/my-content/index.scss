@@ -187,14 +187,7 @@
 }
 
 .my-content-row__price {
-  @include ref.wrap;
-  display: block;
   margin-top: 8rpx;
-  color: $like-active;
-  font-size: 30rpx;
-  font-weight: 800;
-  line-height: 38rpx;
-  font-variant-numeric: tabular-nums;
 }
 
 .my-content-row__tail {

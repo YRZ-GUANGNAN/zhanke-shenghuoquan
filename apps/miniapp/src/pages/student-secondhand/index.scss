@@ -242,21 +242,7 @@
   text-overflow: ellipsis;
 }
 .secondhand-card__price {
-  display: block;
   margin-top: 8rpx;
-  overflow: hidden;
-  color: $like-active;
-  font-size: 40rpx;
-  font-weight: 700;
-  line-height: 48rpx;
-  font-variant-numeric: tabular-nums;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.secondhand-card__currency {
-  margin-right: 4rpx;
-  font-size: 24rpx;
-  font-weight: 600;
 }
 .secondhand-card__seller {
   min-height: 44PX;
@@ -323,8 +309,7 @@
   .secondhand-card__body { padding: 8PX 2PX 0; }
   .secondhand-card__title { height: 44PX; font-size: 15PX; line-height: 22PX; }
   .secondhand-card__meta, .secondhand-card__seller-name { height: 18PX; font-size: 12PX; line-height: 18PX; }
-  .secondhand-card__price { font-size: 22PX; line-height: 30PX; margin-top: 4PX; }
-  .secondhand-card__currency { font-size: 13PX; margin-right: 2PX; }
+  .secondhand-card__price { margin-top: 4PX; }
   .secondhand-card__seller { margin-top: 8PX; gap: 6PX; }
   .secondhand-card__avatar { width: 18PX; height: 18PX; font-size: 11PX; line-height: 18PX; }
   .secondhand-card__no-image { font-size: 12PX; line-height: 18PX; }

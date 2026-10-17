@@ -1,3 +1,4 @@
+import ProductPrice from '../../components/product-price'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDidShow } from '@tarojs/taro'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
@@ -241,7 +242,7 @@ export default function StudentSecondhandContent({ embedded = false, active = tr
         </View>
         <View className='secondhand-card__body'>
           <Text className='secondhand-card__title'>{item.title}</Text>
-          <Text className='secondhand-card__price'><Text className='secondhand-card__currency'>¥</Text>{item.price}</Text>
+          <ProductPrice className='secondhand-card__price' value={item.price} />
           <Text className='secondhand-card__meta'>{[item.condition, item.category].filter(Boolean).join(' · ')}</Text>
           <View className='secondhand-card__seller' ariaRole={visibility.forum ? 'button' : undefined} ariaLabel={`查看${item.sellerName}的主页`} onClick={(event) => {
             event.stopPropagation()

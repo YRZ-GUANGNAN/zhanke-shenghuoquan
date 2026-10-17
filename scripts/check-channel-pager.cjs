@@ -37,6 +37,8 @@ async function run() {
       if (id === 'react' || id === 'react/jsx-runtime') return require(id)
       if (id === '@tarojs/components') return components
       if (id.endsWith('.scss')) return {}
+      if (id.endsWith('/product-price')) return load(path.join(root, 'apps/miniapp/src/components/product-price.tsx'))
+      if (id.endsWith('/product-presentation')) return load(path.join(root, 'apps/miniapp/src/utils/product-presentation.ts'))
       if (Object.prototype.hasOwnProperty.call(dependencies, id)) return dependencies[id]
       if (id.endsWith('/utils/navigation')) return load(path.join(root, 'apps/miniapp/src/utils/navigation.ts'), { '../services/taro': dependencies['../../services/taro'] })
       throw new Error(`Unexpected channel test dependency: ${id}`)

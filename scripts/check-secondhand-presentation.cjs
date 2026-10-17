@@ -68,6 +68,8 @@ async function main() {
         if (id.endsWith('/client-request-id')) return { createClientRequestId: () => 'test-request-' + (++sequence) }
         if (id.endsWith('/stores/session')) return { useSessionStore: (selector) => selector({ token: options.token || 'test-token', profile: { id: options.userId || 'viewer' } }) }
         if (id.endsWith('/post-presentation')) return load('utils/post-presentation.ts')
+        if (id.endsWith('/product-price')) return load('components/product-price.tsx')
+        if (id.endsWith('/product-presentation')) return load('utils/product-presentation.ts')
         if (id.endsWith('/utils/navigation')) return load('utils/navigation.ts')
         if (id.endsWith('/gallery-presentation')) return load('utils/gallery-presentation.ts')
         if (id.endsWith('/use-gallery-presentation')) return load('hooks/use-gallery-presentation.ts')
@@ -104,6 +106,12 @@ async function main() {
   }
 
   try {
+    const price = await mount('components/product-price.tsx', {}, { value: 99.9 })
+    for (const [value, expected] of [[99.9, '¥99.90'], [35, '¥35'], [0, '¥0'], [0.01, '¥0.01'], [' 12.30 ', '¥12.30'], [9999999.99, '¥9999999.99'], [null, '—'], [undefined, '—'], ['', '—'], ['bad', '—'], [-1, '—'], [Infinity, '—']]) {
+      await price.render({ value })
+      assert.equal(price.container.textContent, expected, '价格保留精度，缺失值不能显示为零元')
+    }
+    assert.equal(price.props('.product-price').ariaLabel, '价格待确认')
     const requests = []
     const sellerRoutes = []
     const list = await mount('pages/student-secondhand/index.tsx', { taro: { navigateTo: async ({ url }) => sellerRoutes.push(url) }, trade: {

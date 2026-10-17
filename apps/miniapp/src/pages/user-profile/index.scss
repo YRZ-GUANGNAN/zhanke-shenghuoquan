@@ -215,10 +215,9 @@
 
 .public-profile-actions {
   display: flex;
-  width: 100%;
-  max-width: none;
-  justify-content: flex-start;
-  flex-wrap: wrap;
+  flex: 1;
+  justify-content: flex-end;
+  align-items: center;
   gap: 12rpx;
   min-width: 0;
 }
@@ -245,7 +244,7 @@
 }
 
 .public-profile-action--primary {
-  min-width: 144rpx;
+  min-width: 184rpx;
   border-color: $brand-primary;
   background: $brand-primary;
   color: $text-on-color;
@@ -258,7 +257,7 @@
 }
 
 .public-profile-action--secondary {
-  flex: 1 1 100%;
+  flex: 0 1 auto;
   background: $bg-surface;
   color: $text-primary;
 }
@@ -322,26 +321,21 @@
   height: 100%;
 }
 
-.public-profile-waterfall {
+.public-profile-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 16rpx;
+  align-items: start;
+  gap: 28rpx 16rpx;
   padding: 24rpx 24rpx calc(48rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
 }
 
-.public-profile-waterfall__column {
-  display: flex;
-  flex-direction: column;
-  gap: 32rpx;
-  min-width: 0;
-}
-
 .public-profile-card {
-  overflow: hidden;
   min-width: 0;
   background: $bg-surface;
+  transition: opacity $duration-fast $ease-standard;
 }
+.public-profile-card--pressed { opacity: .72; }
 
 .public-profile-card__media {
   @include ref.type(meta);
@@ -352,71 +346,64 @@
   height: 0;
   padding: 100% 0 0;
   overflow: hidden;
-  border-radius: 16rpx;
+  border-radius: 12rpx;
+  background: $bg-screen;
   color: $placeholder-label;
   text-align: center;
   box-sizing: border-box;
 }
 
-.public-profile-card__media > text {
-  @include ref.wrap;
+.public-profile-card__media--post {
+  padding-top: 125%;
+}
+
+.public-profile-card__media--product {
+  padding-top: 100%;
+}
+
+.public-profile-card__no-media {
+  @include ref.type(meta);
   position: absolute;
   inset: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 24rpx;
+  gap: 8rpx;
+  padding: 20rpx;
+  background: $bg-screen;
+  color: $text-secondary;
   box-sizing: border-box;
 }
-
-.public-profile-card__media--peach {
-  background-color: #FFF0EA;
+.public-profile-card__no-media .app-icon { width: 40rpx; height: 40rpx; opacity: .5; }
+.public-profile-card__text {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+  padding: 12rpx 2rpx 0;
+  min-height: 200rpx;
 }
-
-.public-profile-card__media--sky {
-  padding-top: 125%;
-  background-color: #EAF5FC;
-}
-
-.public-profile-card__media--mint {
-  background-color: #EAF7F1;
-}
-
-.public-profile-card__media--lemon {
-  background-color: #FFF8E6;
-}
-
-.public-profile-card__media--lilac {
-  background-color: #F3EEFA;
-}
-
-.public-profile-card__sold {
-  position: absolute;
-  top: 14rpx;
-  right: 14rpx;
-  padding: 6rpx 12rpx;
-  border-radius: 6rpx;
-  background: rgba(26, 43, 60, .72);
-  color: $text-on-color;
-  font-size: 21rpx;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-.public-profile-card__media > .public-profile-card__sold {
-  inset: auto 14rpx 14rpx auto;
-  padding: 6rpx 12rpx;
+.public-profile-card__topic { @include ref.type(meta); color: $text-secondary; }
+.public-profile-card__text-title { @include ref.type(label); @include ref.wrap; font-weight: 600; }
+.public-profile-card__excerpt {
+  @include ref.type(comment);
+  @include ref.wrap;
+  display: -webkit-box;
+  overflow: hidden;
+  color: $text-secondary;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
 }
 
 .public-profile-card__body {
-  padding: 16rpx 8rpx 0;
+  padding: 12rpx 2rpx 0;
 }
 
 .public-profile-card__title {
   @include ref.type(label);
   @include ref.wrap;
   display: -webkit-box;
-  min-height: 80rpx;
+  height: 2.86em;
   overflow: hidden;
   color: $text-strong;
   -webkit-box-orient: vertical;
@@ -429,37 +416,36 @@
   align-items: center;
   gap: 8rpx;
   min-height: 36rpx;
-  margin-top: 12rpx;
+  margin-top: 8rpx;
   color: $like-idle-count;
   font-variant-numeric: tabular-nums;
 }
 
 .public-profile-card__heart {
-  color: $like-active;
+  width: 28rpx;
+  height: 28rpx;
 }
 
 .public-profile-card__product-meta {
-  @include ref.type(meta);
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12rpx;
-  min-height: 36rpx;
-  margin-top: 12rpx;
-  color: $text-tertiary;
+  align-items: baseline;
+  min-height: 42rpx;
+  margin-top: 6rpx;
   white-space: nowrap;
 }
 
 .public-profile-card__price {
-  flex: 0 1 auto;
-  min-width: 0;
+  margin-top: 2rpx;
+}
+.public-profile-card__product-facts {
+  @include ref.type(meta);
+  display: block;
+  min-height: 32rpx;
+  margin-top: 2rpx;
   overflow: hidden;
-  color: #E64E55;
-  font-size: 28rpx;
-  font-weight: 800;
-  line-height: 40rpx;
-  font-variant-numeric: tabular-nums;
+  color: $text-secondary;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .public-profile-empty {
@@ -576,16 +562,12 @@
     font-size: 24rpx;
   }
 
-  .public-profile-waterfall {
+  .public-profile-grid {
     padding-right: 24rpx;
     padding-left: 24rpx;
-  }
-
-  .public-profile-waterfall__column {
-    gap: 32rpx;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .public-profile-navigation { transition: none; }
+  .public-profile-navigation, .public-profile-card { transition: none; }
 }

@@ -74,22 +74,6 @@
   justify-content: space-between;
   gap: 24rpx;
 }
-.secondhand-detail-info__price {
-  min-width: 0;
-  overflow: hidden;
-  color: $badge-unread;
-  font-size: 60rpx;
-  font-weight: 700;
-  line-height: 64rpx;
-  font-variant-numeric: tabular-nums;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.secondhand-detail-info__currency {
-  margin-right: 8rpx;
-  font-size: 28rpx;
-  font-weight: 600;
-}
 .secondhand-detail-info__status {
   flex: 0 0 auto;
   padding: 8rpx 16rpx;

@@ -1,3 +1,4 @@
+import ProductPrice from '../../components/product-price'
 import { FeaturePageGate } from '../../components/feature-page-gate'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDidShow } from '@tarojs/taro'
@@ -461,7 +462,7 @@ function HomeContent() {
           <Text className='student-post-card__category'>{card.category}</Text>
           <Text className='student-post-card__title'>{card.title}</Text>
           {!card.imageUrl && card.summary && card.summary !== card.title && <Text className='student-post-card__summary'>{card.summary}</Text>}
-          {card.target === 'secondhand' && <Text className='student-post-card__price'>¥{card.price}</Text>}
+          {card.target === 'secondhand' && <ProductPrice className='student-post-card__price' value={card.price} />}
           <View className='student-post-card__meta'>
             <View className='student-post-card__profile' ariaRole={visibility.forum ? 'button' : undefined} ariaLabel={`查看${card.author}的主页`} onClick={(event) => {
               event.stopPropagation()

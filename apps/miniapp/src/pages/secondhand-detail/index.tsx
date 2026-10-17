@@ -1,3 +1,4 @@
+import ProductPrice from '../../components/product-price'
 import { withFeaturePage } from '../../components/feature-page-gate'
 import { usePageShare } from '../../hooks/use-page-share'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
@@ -282,7 +283,7 @@ function SecondhandDetailPage() {
             </View>
             <View className='secondhand-detail-info'>
               <View className='secondhand-detail-info__price-row'>
-                <Text className='secondhand-detail-info__price'><Text className='secondhand-detail-info__currency'>¥</Text>{product.price}</Text>
+                <ProductPrice className='secondhand-detail-info__price' value={product.price} size='detail' />
                 <View className={`secondhand-detail-info__status secondhand-detail-info__status--${product.status}`}><Text>{statusLabel}</Text></View>
               </View>
               <Text className='secondhand-detail-info__title'>{product.title}</Text>

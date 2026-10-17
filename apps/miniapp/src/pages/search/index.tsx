@@ -1,3 +1,4 @@
+import ProductPrice from '../../components/product-price'
 import { withFeaturePage } from '../../components/feature-page-gate'
 import { useEffect, useRef, useState } from 'react'
 import { hideKeyboard, nextTick } from '@tarojs/taro'
@@ -354,7 +355,7 @@ function SearchContent() {
           <View className='student-search-result__main'>
             <View className='student-search-result__row'>
               <Text className='student-search-result__title'>{product.title}</Text>
-              <Text className='student-search-result__price'>¥{product.price.toFixed(2)}</Text>
+              <ProductPrice className='student-search-result__price' value={product.price} size='compact' />
             </View>
             <Text className='student-search-result__summary'>{product.description || '暂无商品描述'}</Text>
             <Text className='student-search-result__meta'>{[product.category || '其他', product.campus || '校内交易', product.sellerName, formatPostDate(product.createdAt)].filter(Boolean).join(' · ')}</Text>

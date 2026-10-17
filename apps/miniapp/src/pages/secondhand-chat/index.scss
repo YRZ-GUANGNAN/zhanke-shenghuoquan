@@ -204,12 +204,6 @@
   white-space: nowrap;
 }
 
-.secondhand-chat-product__price {
-  color: #FF7548;
-  font-size: 25rpx;
-  font-weight: 900;
-}
-
 .secondhand-chat-product__button {
   @include ref.touch;
   display: flex;
