@@ -21,6 +21,7 @@ type ToggleKey = 'orderNotice' | 'socialNotice' | 'quietHours' | 'personalized'
 type CloseStage = 'idle' | 'first' | 'final' | 'blocked'
 
 const defaults: UserSettingsView = {
+	wechatBound: true,
   orderNotice: true,
   socialNotice: true,
   quietHours: false,
@@ -154,6 +155,16 @@ export default function SettingsPage() {
         <View className='student-settings-section'>
           <Text className='student-settings-section__label'>账号与绑定</Text>
           <View className='student-settings-card'>
+            <View className='student-settings-row student-settings-account-row'>
+              <View className='student-settings-row__main'>
+                <Text className='student-settings-row__title'>微信登录</Text>
+                <Text className='student-settings-row__subtitle'>当前账号已与微信稳定绑定，退出后可重新登录</Text>
+              </View>
+              <View className='student-settings-bind'>
+                <View className='student-settings-bind__dot' />
+                <Text>{settings.wechatBound ? '已绑定' : '待确认'}</Text>
+              </View>
+            </View>
             {(!isCampusInfo || settings.phoneBound || hasHistoricalWork) && <View className='student-settings-row'>
               <Text className='student-settings-row__title'>手机号</Text>
               <Button className='student-settings-phone' openType='getPhoneNumber' onGetPhoneNumber={bindPhone}>
@@ -164,6 +175,13 @@ export default function SettingsPage() {
               <Text className='student-settings-row__title'>当前身份</Text>
               <Text className='student-settings-row__value'>{identityName}</Text>
             </View>
+            {!settings.phoneBound && <View className='student-settings-row student-settings-account-row'>
+              <View className='student-settings-row__main'>
+                <Text className='student-settings-row__title'>手机号登录</Text>
+                <Text className='student-settings-row__subtitle'>功能预留中，暂不影响微信登录</Text>
+              </View>
+              <Text className='student-settings-row__value'>暂未启用</Text>
+            </View>}
           </View>
         </View>
 
@@ -183,7 +201,6 @@ export default function SettingsPage() {
             ))}
           </View>
         </View>}
-
         {(visiblePrivacyRows.length > 0 || settings.blacklistCount > 0) && <View className='student-settings-section'>
           <Text className='student-settings-section__label'>隐私</Text>
           <View className='student-settings-card'>

@@ -30,6 +30,7 @@ export interface LoginSession {
 }
 
 export interface UserSettingsView {
+	wechatBound: boolean
 	orderNotice: boolean
 	socialNotice: boolean
 	quietHours: boolean
@@ -133,15 +134,22 @@ export async function submitIdentityApplication(
 }
 
 export async function getUserSettings(): Promise<UserSettingsView> {
-	return request('/auth/settings')
+	return normalizeUserSettings(await request('/auth/settings') as UserSettingsView)
 }
 
 export async function updateUserSettings(value: Pick<UserSettingsView, 'orderNotice' | 'socialNotice' | 'quietHours' | 'personalized'>): Promise<UserSettingsView> {
-	return request('/auth/settings', { url: '', method: 'PATCH', data: value })
+	return normalizeUserSettings(await request<UserSettingsView>('/auth/settings', { url: '', method: 'PATCH', data: value }))
 }
 
 export async function bindWechatPhone(code: string): Promise<UserSettingsView> {
-	return request('/auth/me/phone', { url: '', method: 'POST', data: { code } })
+	return normalizeUserSettings(await request<UserSettingsView>('/auth/me/phone', { url: '', method: 'POST', data: { code } }))
+}
+
+function normalizeUserSettings(value: UserSettingsView): UserSettingsView {
+	// Older servers do not return the derived binding flag. A valid authenticated
+	// session is still a WeChat-backed account, so keep the UI truthful while the
+	// server rolls forward.
+	return { ...value, wechatBound: value.wechatBound !== false }
 }
 
 export async function listBlockedUsers(): Promise<BlockedUserView[]> {

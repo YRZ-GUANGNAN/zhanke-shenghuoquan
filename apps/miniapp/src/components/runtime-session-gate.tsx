@@ -32,7 +32,7 @@ export default function RuntimeSessionGate({
   }
 
   if (status !== 'authenticated') {
-    return <AppState kind='error' title='暂时无法登录' description={error || '请重新尝试微信登录'} actionText='重试' onAction={() => void retry()} />
+    return <AppState kind='error' title='微信登录暂时不可用' description={error || '请使用当前微信重新登录，账号会自动恢复'} actionText='重新登录' onAction={() => void retry()} />
   }
 
   return <>{children}</>

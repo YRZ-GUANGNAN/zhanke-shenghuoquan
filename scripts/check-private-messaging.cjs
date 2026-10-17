@@ -17,7 +17,7 @@ const checks = [
   ['未知消息安全降级为可见占位', chat.includes('messageDisplayText') && chat.includes('暂不支持的消息类型')],
   ['消息按稳定 ID 渲染', chat.includes('key={message.ID}')],
   ['消息按日期分组', chat.includes('secondhand-chat-day-divider') && chat.includes('dayKey(')],
-  ['会话列表不暴露 IM 用户标识', home.includes('交易会话 #') && !home.includes('对方买家 #') && !home.includes('对方卖家 #')]
+  ['会话列表不暴露内部标识', home.includes('二手交易') && !home.includes('交易会话 #') && !home.includes('对方买家 #') && !home.includes('对方卖家 #')]
 ]
 
 const failed = checks.filter(([, passed]) => !passed)

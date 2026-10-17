@@ -130,12 +130,22 @@ type ToolStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'error'
 
 function conversationPeerLabel(context: IMConversationContext, currentUserId: string): string {
   if (String(context.sellerId) === currentUserId) {
-    return `你是卖家 · 交易会话 #${context.relationId}`
+    return '你是卖家 · 二手交易'
   }
   if (String(context.buyerId) === currentUserId) {
-    return `你是买家 · 交易会话 #${context.relationId}`
+    return '你是买家 · 二手交易'
   }
-  return `交易会话 #${context.relationId}`
+  return '二手交易'
+}
+
+function conversationPeerName(item: ConversationItem, currentUserId: string): string {
+  if (String(item.context.buyerId) === currentUserId) return item.product?.sellerName || '校园卖家'
+  if (String(item.context.sellerId) === currentUserId) return '买家'
+  return '交易对方'
+}
+
+function conversationPeerAvatar(item: ConversationItem, currentUserId: string): string {
+  return conversationPeerName(item, currentUserId).trim().charAt(0) || '聊'
 }
 
 function HomeContent() {
@@ -577,7 +587,10 @@ function HomeContent() {
                 <Text>私信加载失败，点击重试</Text>
               </View>
             ) : conversationStatus === 'empty' ? (
-              <View className='student-message-state'><Text>还没有二手交易私信</Text></View>
+              <View className='student-message-state'>
+                <Text className='student-message-state__title'>还没有私信会话</Text>
+                <Text className='student-message-state__description'>从二手商品详情联系卖家后，会在这里继续交流。</Text>
+              </View>
             ) : (
               conversationItems.map((item) => (
                 <View
@@ -585,7 +598,7 @@ function HomeContent() {
                   className='student-message-row'
                   hoverClass='student-message-row--pressed'
                   role='button'
-                  aria-label={`打开${item.product?.title || `二手商品 #${item.context.productId}`}私信`}
+                  aria-label={`打开${item.product?.title || '相关二手商品'}私信`}
                   onClick={() => {
                     if (!channelInteraction.canActivate()) return
                     void Taro.navigateTo({
@@ -594,18 +607,24 @@ function HomeContent() {
                   }}
                 >
                   <View className='student-message-row__avatar'>
-                    {item.product?.images[0] ? (
-                      <Image className='student-message-row__avatar-image' src={item.product.images[0]} mode='aspectFill' />
+                    {String(item.context.buyerId) === currentUserId && item.product?.sellerAvatar ? (
+                      <Image className='student-message-row__avatar-image' src={item.product.sellerAvatar} mode='aspectFill' />
                     ) : <Text>聊</Text>}
                   </View>
                   <View className='student-message-row__main'>
                     <View className='student-message-row__top'>
-                      <Text className='student-message-row__name'>{item.product?.title || `二手商品 #${item.context.productId}`}</Text>
+                      <Text className='student-message-row__name'>{conversationPeerName(item, currentUserId)}</Text>
                       <AppIcon name='chevron-right' className='student-message-row__chevron' />
                     </View>
+                    <Text className='student-message-row__product'>
+                      {item.product?.title || '相关二手商品'}
+                    </Text>
                     <Text className='student-message-row__preview'>
                       {conversationPeerLabel(item.context, currentUserId)}
                     </Text>
+                  </View>
+                  <View className='student-message-row__product-thumb'>
+                    {item.product?.images[0] ? <Image src={item.product.images[0]} mode='aspectFill' /> : <Text>{conversationPeerAvatar(item, currentUserId)}</Text>}
                   </View>
                 </View>
               ))

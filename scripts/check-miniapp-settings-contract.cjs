@@ -35,6 +35,10 @@ for (const [source, fragment] of requirements) {
   if (!source.includes(fragment)) throw new Error(`settings contract missing: ${fragment}`)
 }
 
+for (const fragment of ['wechatBound', '微信登录', '手机号登录', '暂未启用']) {
+  if (!settings.includes(fragment) && !userClient.includes(fragment)) throw new Error(`account binding presentation missing: ${fragment}`)
+}
+
 for (const fragment of ["visible={closeStage === 'first'}", "visible={closeStage === 'final'}", "visible={closeStage === 'blocked'}"]) {
   if (!settings.includes(fragment)) throw new Error('account closure must keep two confirmations plus a blocked-state dialog')
 }

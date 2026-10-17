@@ -69,7 +69,7 @@ func (s *Service) Settings(ctx context.Context, userID uint) (SettingsView, erro
 			return SettingsView{}, err
 		}
 	}
-	return settingsView(settings, user.Phone, count), nil
+	return settingsView(settings, user.OpenID != "", user.Phone, count), nil
 }
 
 func (s *Service) UpdateSettings(ctx context.Context, userID uint, input UserSettings) (SettingsView, error) {
@@ -89,11 +89,13 @@ func (s *Service) UpdateSettings(ctx context.Context, userID uint, input UserSet
 	if blocks, ok := s.repo.(blocksRepository); ok {
 		count, err = blocks.CountBlocks(ctx, userID)
 	}
-	return settingsView(settings, user.Phone, count), err
+	return settingsView(settings, user.OpenID != "", user.Phone, count), err
 }
 
-func settingsView(value UserSettings, phone *string, count int64) SettingsView {
+func settingsView(value UserSettings, wechatBound bool, phone *string, count int64) SettingsView {
 	view := SettingsView{
+		// Expose only the binding state, never the OpenID itself.
+		WechatBound: wechatBound,
 		OrderNotice: value.OrderNotice, SocialNotice: value.SocialNotice,
 		QuietHours: value.QuietHours, Personalized: value.Personalized, BlacklistCount: count,
 	}

@@ -314,7 +314,7 @@
 }
 
 .student-message-panel {
-  margin: 0 32rpx 24rpx;
+  margin: 12rpx 32rpx 24rpx;
   background: $bg-surface;
 }
 
@@ -322,9 +322,9 @@
   @include ref.touch;
   display: flex;
   align-items: center;
-  gap: 24rpx;
-  min-height: 112rpx;
-  padding: 20rpx 0;
+  gap: 20rpx;
+  min-height: 128rpx;
+  padding: 22rpx 0;
   border-bottom: 1rpx solid $divider-hairline;
   transition: background-color $duration-fast $ease-standard, transform $duration-fast $ease-standard;
 }
@@ -344,9 +344,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 84rpx;
-  height: 84rpx;
-  border-radius: 50%;
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 28rpx;
   overflow: hidden;
   background: linear-gradient(135deg, #E6F1FB, #FDF2E8);
   color: $brand-primary;
@@ -366,10 +366,23 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 300rpx;
+  flex-direction: column;
+  gap: 12rpx;
+  min-height: 360rpx;
   padding: 0 32rpx;
   color: $text-muted;
   text-align: center;
+}
+
+.student-message-state__title {
+  color: $text-strong;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.student-message-state__description {
+  @include ref.type(meta);
+  color: $text-muted;
 }
 
 .student-message-state--retry {
@@ -407,7 +420,17 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: $text-strong;
-  font-weight: 600;
+  font-weight: 700;
+}
+
+.student-message-row__product {
+  @include ref.type(author);
+  display: block;
+  margin-top: 6rpx;
+  overflow: hidden;
+  color: $text-primary;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .student-message-row__chevron {
@@ -429,10 +452,30 @@
   @include ref.type(author);
   display: block;
   overflow: hidden;
-  margin-top: 12rpx;
+  margin-top: 4rpx;
   color: $text-muted;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+.student-message-row__product-thumb {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 88rpx;
+  height: 88rpx;
+  overflow: hidden;
+  border-radius: 18rpx;
+  background: $bg-surface-subtle;
+  color: $text-muted;
+  font-size: 25rpx;
+}
+
+.student-message-row__product-thumb image {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .student-message-row__preview--unread {
