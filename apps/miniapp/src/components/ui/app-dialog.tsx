@@ -47,7 +47,7 @@ export function AppDialog({
     loadingRef.current = loading
   }, [error, loading, visible])
   if (!mounted) return null
-  const interactive = phase !== 'exit'
+  const interactive = visible && phase !== 'exit'
   const handleCancel = () => {
     if (interactive && !loading) onCancel()
   }

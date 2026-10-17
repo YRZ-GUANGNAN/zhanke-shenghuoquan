@@ -25,34 +25,56 @@ const CLOSED: LayerState = { mounted: false, phase: 'closed' }
 export function useLayerPresence(visible: boolean, exitMs = LAYER_EXIT_MS): LayerState {
   const [state, setState] = useState<LayerState>(() => visible ? { mounted: true, phase: 'enter' } : CLOSED)
   const mountedRef = useRef(state.mounted)
+  const phaseRef = useRef(state.phase)
+  const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const commit = (next: LayerState) => {
+    phaseRef.current = next.phase
+    mountedRef.current = next.mounted
+    setState(next)
+  }
   useEffect(() => {
     if (visible) {
+      if (mountedRef.current && phaseRef.current === 'exit') {
+        // A quick reopen reverses the existing exit in place. Restarting at
+        // enter would flash the panel from off-screen and lose the gesture's
+        // visual continuity.
+        if (exitTimerRef.current) clearTimeout(exitTimerRef.current)
+        exitTimerRef.current = null
+        commit({ mounted: true, phase: 'open' })
+        return
+      }
       mountedRef.current = true
-      setState({ mounted: true, phase: 'enter' })
+      commit({ mounted: true, phase: 'enter' })
       // 双帧推进，避免 enter 起始样式和 open 在同帧被合并。
       let cancelSecond: (() => void) | null = null
       const cancelFirst = scheduleLayerFrame(() => {
         cancelSecond = scheduleLayerFrame(() => {
-          if (mountedRef.current) setState({ mounted: true, phase: 'open' })
+          if (mountedRef.current) commit({ mounted: true, phase: 'open' })
         })
       })
       return () => { cancelFirst(); cancelSecond?.() }
     }
 
     if (!mountedRef.current) {
-      setState(CLOSED)
+      commit(CLOSED)
       return
     }
 
-    setState({ mounted: true, phase: 'exit' })
+    commit({ mounted: true, phase: 'exit' })
     const timer = setTimeout(() => {
-      mountedRef.current = false
-      setState(CLOSED)
+      exitTimerRef.current = null
+      commit(CLOSED)
     }, Math.max(0, exitMs))
-    return () => clearTimeout(timer)
+    exitTimerRef.current = timer
+    return () => {
+      clearTimeout(timer)
+      if (exitTimerRef.current === timer) exitTimerRef.current = null
+    }
   }, [exitMs, visible])
 
   useEffect(() => () => {
+    if (exitTimerRef.current) clearTimeout(exitTimerRef.current)
+    exitTimerRef.current = null
     mountedRef.current = false
   }, [])
 

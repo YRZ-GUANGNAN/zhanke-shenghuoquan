@@ -10,7 +10,6 @@
   transition: background $duration-fast $ease-standard,
     opacity $duration-fast $ease-standard,
     transform $duration-fast $ease-standard;
-  will-change: transform;
 }
 
 .app-icon-button--regular {
@@ -39,6 +38,10 @@
 
 .app-icon-button--disabled {
   opacity: .42;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-icon-button { transition: none; }
 }
 
 .app-icon-button__icon {

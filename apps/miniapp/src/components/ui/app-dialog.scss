@@ -4,7 +4,7 @@
 .app-dialog-layer--exit { pointer-events: auto; }
 .app-dialog-layer__mask { position: absolute; inset: 0; background: rgba(15, 30, 48, .5); backdrop-filter: blur(4rpx); opacity: 1; transition: opacity 180ms $ease-standard; }
 .app-dialog-layer--enter .app-dialog-layer__mask, .app-dialog-layer--exit .app-dialog-layer__mask { opacity: 0; }
-.app-dialog { position: relative; z-index: 1; width: 100%; max-width: 600rpx; padding: $space-6 $space-5 $space-5; border: 1rpx solid rgba(255, 255, 255, .72); border-radius: $radius-dialog; background: $bg-surface; box-shadow: $shadow-dialog; opacity: 1; transform: translateY(0) scale(1); transition: opacity 180ms $ease-standard, transform 220ms $ease-standard; will-change: opacity, transform; }
+.app-dialog { position: relative; z-index: 1; width: 100%; max-width: 600rpx; padding: $space-6 $space-5 $space-5; border: 1rpx solid rgba(255, 255, 255, .72); border-radius: $radius-dialog; background: $bg-surface; box-shadow: $shadow-dialog; opacity: 1; transform: translateY(0) scale(1); transition: opacity 180ms $ease-standard, transform 220ms $ease-standard; }
 .app-dialog-layer--enter .app-dialog { opacity: 0; transform: translateY(20rpx) scale(.98); }
 .app-dialog-layer--exit .app-dialog { opacity: 0; transform: translateY(12rpx) scale(.985); }
 .app-dialog-layer--exit .app-dialog { pointer-events: none; }

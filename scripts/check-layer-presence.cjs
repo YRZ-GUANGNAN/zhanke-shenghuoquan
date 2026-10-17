@@ -111,6 +111,7 @@ async function run() {
     await frame(); await frame()
     await probe.render(React.createElement(Probe, { visible: false }))
     await probe.render(React.createElement(Probe, { visible: true }))
+    check('退场途中反转', () => assert.equal(states.at(-1).phase, 'open', '尚未卸载时重开应反向过渡，不能跳回enter起点'))
     await frame(); await frame()
     await React.act(async () => wait(LAYER_EXIT_MS + 20))
     check('快速重开', () => assert.deepEqual(states.at(-1), { visible: true, mounted: true, phase: 'open' }))

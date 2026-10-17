@@ -303,7 +303,7 @@ h1 {
 
 .admin-state { min-height: 220px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 36px; border: 1px dashed var(--color-border); border-radius: var(--radius-card); background: #fbfcfe; text-align: center; }
 .admin-state__mark { width: 34px; height: 34px; border: 3px solid #c9d5e3; border-radius: 50%; }
-.admin-state--loading .admin-state__mark { border-right-color: var(--color-primary); animation: admin-spin .8s linear infinite; }
+.admin-state--loading .admin-state__mark { border-right-color: var(--color-primary); }
 .admin-state--error .admin-state__mark { position: relative; border-color: #efb9c1; }
 .admin-state--error .admin-state__mark::before, .admin-state--error .admin-state__mark::after { content: ''; position: absolute; top: 14px; left: 6px; width: 16px; height: 2px; background: var(--color-danger); transform: rotate(45deg); }
 .admin-state--error .admin-state__mark::after { transform: rotate(-45deg); }

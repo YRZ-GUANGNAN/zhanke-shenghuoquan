@@ -160,6 +160,10 @@
   transform: translateX(36rpx);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .student-settings-switch, .student-settings-switch__knob { transition: none; }
+}
+
 .student-settings-logout {
   @include ref.touch;
   display: flex;

@@ -16,16 +16,20 @@ async function run() {
   const dom = new JSDOM('<main></main>')
   const saved = ['window', 'document', 'IS_REACT_ACT_ENVIRONMENT'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)])
   Object.assign(globalThis, { window: dom.window, document: dom.window.document, IS_REACT_ACT_ENVIRONMENT: true })
-  const settings = { homeTitle: '湛科生活圈', secondhandTitle: '校园二手', servicesTitle: '校园服务', defaultImageUrl: 'https://zhanduiwang.top/existing.png', detailTitleSuffix: '湛科生活圈', preferContentImage: true, rowVersion: 7, updatedAt: '2026-10-17T00:00:00Z' }
+  let settings = { homeTitle: '湛科生活圈', secondhandTitle: '校园二手', servicesTitle: '校园服务', defaultImageUrl: 'https://zhanduiwang.top/existing.png', detailTitleSuffix: '湛科生活圈', preferContentImage: true, rowVersion: 7, updatedAt: '2026-10-17T00:00:00Z' }
   const writes = []
   const service = compile('apps/admin/src/services/share-settings.ts', { './http': { adminRequest: async () => {} } })
   service.shareSettingsAPI.read = async () => ({ ...settings })
-  service.shareSettingsAPI.save = async (value, expected) => { writes.push({ value, expected }); return { ...value, rowVersion: 8, updatedAt: settings.updatedAt } }
+  service.shareSettingsAPI.save = async (value, expected) => {
+    writes.push({ value, expected })
+    settings = { ...value, rowVersion: settings.rowVersion + 1, updatedAt: settings.updatedAt }
+    return { ...settings }
+  }
   const box = p => React.createElement('div', null, p.children, p.actions)
   const components = {
     AdminPanel: box, AdminNotice: box, AdminState: p => React.createElement('div', null, p.title),
     AdminButton: p => React.createElement('button', { onClick: p.onClick, disabled: p.disabled || p.loading }, p.children),
-    AdminField: p => React.createElement('input', { value: p.value, 'aria-label': p.label, onChange: p.onChange }),
+    AdminField: p => React.createElement('input', { value: p.value, disabled: p.disabled, 'aria-label': p.label, onChange: p.onChange, onInput: p.onChange }),
     useAdminDialog: () => ({ confirm: async () => true })
   }
   const { ShareSettingsConsole } = compile('apps/admin/src/ShareSettingsConsole.tsx', {
@@ -38,24 +42,53 @@ async function run() {
     await React.act(async () => app.render(React.createElement(ShareSettingsConsole)))
     assert.equal(document.querySelector('.share-card-preview img').getAttribute('src'), settings.defaultImageUrl)
     const button = label => [...document.querySelectorAll('button')].find(element => element.textContent === label)
-    await React.act(async () => button('恢复内置封面').click())
-    assert.equal(document.querySelector('[aria-label=通用封面地址]').value, '')
+    const select = mode => React.act(async () => document.querySelector(`input[name=share-cover-source][value=${mode}]`).click())
+    const coverInput = () => document.querySelector('[aria-label=通用封面地址]')
+    const input = value => React.act(async () => {
+      Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set.call(coverInput(), value)
+      coverInput().dispatchEvent(new dom.window.Event('input', { bubbles: true }))
+    })
+    const replacement = 'https://zhanduiwang.top/new-cover.jpg'
+    await input(replacement)
+    assert.equal(document.querySelector('.share-card-preview img').getAttribute('src'), replacement)
+    await select('builtin')
+    assert.ok(coverInput().disabled)
     assert.equal(document.querySelector('.share-card-preview img').getAttribute('src'), '/images/default-share.png')
-    const save = [...document.querySelectorAll('button')].find(element => /保存/.test(element.textContent))
+    await select('custom')
+    assert.equal(coverInput().value, replacement, 'switching sources preserves the custom draft')
+    assert.equal(document.querySelector('.share-card-preview img').getAttribute('src'), replacement)
+    const save = button('保存设置')
     assert.ok(save && !save.disabled)
     await React.act(async () => save.click())
     assert.equal(writes.length, 1)
-    assert.equal(writes[0].expected, 7, 'restore keeps optimistic concurrency version')
-    assert.equal(writes[0].value.defaultImageUrl, '', 'restore uses existing backend empty-field contract')
+    assert.equal(writes[0].expected, 7, 'replacement keeps optimistic concurrency version')
+    assert.equal(writes[0].value.defaultImageUrl, replacement, 'replacement reaches the actual save API')
     assert.equal(writes[0].value.preferContentImage, true)
     assert.equal(writes[0].value.homeTitle, settings.homeTitle)
+    await input('')
+    assert.ok(save.disabled, 'empty custom selection must not silently save as builtin')
+    await React.act(async () => save.click())
+    assert.equal(writes.length, 1)
+    await input('https://example.com/invalid.jpg')
+    assert.ok(save.disabled, 'switcher preserves the existing download-domain validation')
+    await select('builtin')
+    assert.equal(document.querySelector('.share-card-preview img').getAttribute('src'), '/images/default-share.png')
+    await React.act(async () => save.click())
+    assert.equal(writes.length, 2)
+    assert.equal(writes[1].value.defaultImageUrl, '', 'builtin uses existing backend empty-field contract')
+    assert.equal(writes[1].expected, 8, 'subsequent save uses returned version')
+    await select('custom')
+    await input(replacement)
+    await React.act(async () => button('重新读取').click())
+    assert.equal(document.querySelector('input[name=share-cover-source]:checked').value, 'builtin', 'reload restores the persisted cover source')
+    assert.equal(document.querySelector('.share-card-preview img').getAttribute('src'), '/images/default-share.png')
     const { navigationItemError } = compile('apps/admin/src/services/navigation-validation.ts')
     const tool = { categoryId: 1, title: '测试入口', subtitle: '', iconText: '', appId: 'wx1234567890ABCDEF', path: 'pages/home/index', color: '', sort: 0, enabled: true }
     assert.equal(navigationItemError(tool), '')
     for (const path of ['https://example.com', '/pages/index', '../pages/index', 'pages/%zz', 'pages/%2E%2E/index']) assert.ok(navigationItemError({ ...tool, path }))
     assert.ok(navigationItemError({ ...tool, appId: 'wx0000000000000000' }))
     assert.ok(navigationItemError({ ...tool, sort: NaN }))
-    console.log('admin share default: PASS (restore, preview, actual save payload and CAS; tool target validation)')
+    console.log('admin share default: PASS (custom edit, source switching, draft preservation, validation, preview, save payload, CAS, reload; tool target validation)')
   } finally {
     await React.act(async () => app.unmount())
     dom.window.close()

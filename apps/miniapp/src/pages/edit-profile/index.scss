@@ -90,6 +90,10 @@
   transform: none;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .edit-profile-avatar { transition: none; }
+}
+
 .edit-profile-avatar__text {
   color: $text-on-color;
   font-size: 66rpx;
