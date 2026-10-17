@@ -44,6 +44,10 @@ page {
   display: block;
 }
 
+.merchant-home-review__status {
+  margin-bottom: 24rpx;
+}
+
 .merchant-home-review__title {
   color: $text-primary;
   font-size: 36rpx;
@@ -75,6 +79,12 @@ page {
 
 .merchant-home-review__action:active {
   transform: scale(0.98);
+}
+
+.merchant-home-review__action--secondary {
+  margin-top: 8rpx;
+  background: transparent;
+  color: $text-secondary;
 }
 
 .merchant-home-hero {
@@ -838,6 +848,10 @@ page {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .merchant-home-review__action:active {
+    transform: none;
+  }
+
   .merchant-home-review__action,
   .merchant-home-switch,
   .merchant-home-shortcut,

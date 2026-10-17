@@ -22,6 +22,7 @@ export default function RefreshScrollView({ enabled = true, busy = false, refres
   const [triggered, setTriggered] = useState(false)
   const generation = useRef(0)
   const locked = useRef(false)
+  const mounted = useRef(true)
   const visible = useRef(true)
   const timer = useRef<ReturnType<typeof setTimeout>>()
   const current = useRef({ enabled, busy, refreshKey, onRefresh })
@@ -32,16 +33,22 @@ export default function RefreshScrollView({ enabled = true, busy = false, refres
     clearTimeout(timer.current)
   }
   const reset = () => { invalidate(); setTriggered(false); setPhase('idle') }
+  const isCurrentOwner = () => mounted.current && visible.current && current.current.refreshKey === refreshKey
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false; invalidate() }
+  }, [])
   useEffect(() => {
     reset()
     return invalidate
   }, [enabled, refreshKey])
-  useDidHide(() => { visible.current = false; reset() })
-  useDidShow(() => { visible.current = true })
+  useDidHide(() => { if (mounted.current) { visible.current = false; reset() } })
+  useDidShow(() => { if (mounted.current) visible.current = true })
 
   const refresh = async () => {
-    if (locked.current) return
-    if (!current.current.enabled || current.current.busy || !visible.current) {
+    // Native events may arrive after the page or account that owned the pull.
+    if (!isCurrentOwner() || !enabled || locked.current) return
+    if (!current.current.enabled || current.current.busy) {
       setTriggered(false)
       setPhase('idle')
       return
@@ -53,7 +60,7 @@ export default function RefreshScrollView({ enabled = true, busy = false, refres
     setPhase('refreshing')
     let ok = false
     try { ok = await current.current.onRefresh() } catch { /* The page owns its actionable error. */ }
-    if (generation.current !== version || !visible.current || !current.current.enabled || current.current.refreshKey !== key) return
+    if (generation.current !== version || !isCurrentOwner() || !current.current.enabled || current.current.refreshKey !== key) return
     setPhase(ok ? 'success' : 'error')
     timer.current = setTimeout(() => {
       if (generation.current !== version) return
@@ -64,12 +71,12 @@ export default function RefreshScrollView({ enabled = true, busy = false, refres
   }
   const resting = () => {
     // A native abort is not cancellation of a request already in flight.
-    if (!locked.current) { setTriggered(false); setPhase('idle') }
+    if (isCurrentOwner() && !locked.current) { setTriggered(false); setPhase('idle') }
   }
   return <ScrollView {...props} refresherEnabled={enabled && (!busy || locked.current)} refresherThreshold={60}
     refresherDefaultStyle='none' refresherBackground='#FFFFFF' refresherTriggered={triggered}
     onRefresherPulling={event => {
-      if (!locked.current && current.current.enabled && !current.current.busy) {
+      if (isCurrentOwner() && enabled && !locked.current && current.current.enabled && !current.current.busy) {
         const dy = Number((event.detail as { dy?: number }).dy || 0)
         setPhase(dy >= 60 ? 'ready' : 'pulling')
       }

@@ -238,6 +238,8 @@ function merchantHarness(kind, overrides = {}) {
   const renderer = hookRenderer()
   const previews = [], proofRequests = [], navigations = [], toasts = []
   const services = {
+    getIdentityApplication: async () => ({ status: 'approved', merchantName: '测试商家', merchantAddress: '测试取货点' }),
+    getDeliveryWallet: async () => ({ availableBalanceCents: 1000 }),
     listMerchantDeliveryOrders: async () => page([]),
     getMerchantDeliveryOrder: async () => order('ORDER-A'),
     getDeliveryOrderFunds: async () => ({ deliveryOrderPublicId: 'ORDER-A', payment: null, settlement: null, refund: null }),
@@ -253,6 +255,7 @@ function merchantHarness(kind, overrides = {}) {
       CapsuleSystemRow: 'CapsuleSystemRow',
     },
     '../../components/ui': { AppIconButton: 'AppIconButton' },
+    '../../components/ui/status-glyph': { StatusGlyph: 'StatusGlyph' },
     '../../components/IdentitySwitchModal': 'IdentitySwitchModal',
     '../../components/delivery-workspace-nav': 'DeliveryWorkspaceNav',
     '../../components/runtime-session-gate': 'RuntimeSessionGate',
@@ -260,14 +263,14 @@ function merchantHarness(kind, overrides = {}) {
     '../../hooks/use-identity-guard': { useIdentityGuard: () => identityAllowed, identityRoute: () => '' },
     '../../hooks/use-feature-visibility': { useFeatureVisibility: () => ({ delivery: true, merchant: true }) },
     '../../hooks/use-viewport-refresh': { useViewportRefresh: () => ({}) },
-    '../../services/a-user': { getIdentityApplication: async () => ({ status: 'approved', merchantName: '测试商家', merchantAddress: '测试取货点' }) },
+    '../../services/a-user': { getIdentityApplication: (...args) => services.getIdentityApplication(...args) },
     '../../services/delivery-merchant': {
       centsToYuan: (value) => String(value / 100),
       listMerchantDeliveryOrders: (...args) => services.listMerchantDeliveryOrders(...args),
       getMerchantDeliveryOrder: (...args) => { orderCalls++; return services.getMerchantDeliveryOrder(...args) },
     },
     '../../services/delivery-payment': {
-      getDeliveryWallet: async () => ({ availableBalanceCents: 1000 }),
+      getDeliveryWallet: (...args) => services.getDeliveryWallet(...args),
       getDeliveryOrderFunds: (...args) => services.getDeliveryOrderFunds(...args),
     },
     '../../services/delivery-proof': { loadPrivateDeliveryProofs: (...args) => { proofRequests.push(args); return services.loadPrivateDeliveryProofs(...args) } },
@@ -776,6 +779,124 @@ async function run() {
     assert.equal(requested.at(-1).page, 3, '分页失败重试当前页，不跳页')
     assert.equal(app.serials().length, 3)
     console.log('PASS 商家分组刷新与翻页失败保留数据和游标')
+  }
+  {
+    let identityReads = 0, orderReads = 0, walletReads = 0
+    const approval = deferred()
+    const app = merchantHarness('merchant-home', {
+      getIdentityApplication: async () => {
+        if (++identityReads === 1) throw new Error('测试核验网络失败')
+        return approval.promise
+      },
+      listMerchantDeliveryOrders: async () => { orderReads++; return page([]) },
+      getDeliveryWallet: async () => { walletReads++; return { availableBalanceCents: 1000 } },
+    })
+    await app.mount()
+    assert.match(text(app.tree), /核验失败/)
+    const retry = app.one('merchant-home-review__retry')
+    assert.equal(orderReads + walletReads, 0, '核验失败不能读取订单或钱包')
+    retry.props.onClick(); retry.props.onClick(); await app.flush()
+    assert.equal(identityReads, 2, '同帧连点只重新核验一次')
+    assert.match(text(app.tree), /正在核验商家资格/)
+    assert.equal(orderReads + walletReads, 0, '核验中仍保持资格守卫')
+    approval.resolve({ status: 'approved', merchantName: '测试商家', merchantAddress: '测试取货点' })
+    await app.flush()
+    assert.equal(orderReads, 3)
+    assert.equal(walletReads, 1)
+    assert.match(text(app.tree), /暂无待接单配送单/)
+    await app.unmount()
+    retry.props.onClick(); await app.flush()
+    assert.equal(identityReads, 2, '卸载后旧重试事件不能发起资格核验')
+    console.log('PASS 商家核验网络错误可原地重试，防连点且严格保留资格守卫')
+  }
+  {
+    for (const status of ['pending', 'rejected']) {
+      let orderReads = 0, walletReads = 0
+      const app = merchantHarness('merchant-home', {
+        getIdentityApplication: async () => ({ status }),
+        listMerchantDeliveryOrders: async () => { orderReads++; return page([]) },
+        getDeliveryWallet: async () => { walletReads++; return { availableBalanceCents: 1000 } },
+      })
+      await app.mount()
+      assert.match(text(app.tree), status === 'pending' ? /申请正在审核中/ : /申请未通过/)
+      assert.equal(nodes(app.tree, (node) => hasClass(node, 'merchant-home-review__retry')).length, 0)
+      assert.equal(orderReads + walletReads, 0, '真实未通过资格时不允许重试绕开守卫')
+      assert.match(text(app.one('merchant-home-review__action')), /返回我的/)
+    }
+    console.log('PASS 商家审核中与未通过不误报网络错误，不显示错误重试或读取业务数据')
+  }
+  {
+    const response = deferred()
+    const requested = []
+    const app = merchantHarness('merchant-home', {
+      listMerchantDeliveryOrders: async (pageNumber, _, group) => {
+        requested.push({ page: pageNumber, group })
+        if (pageNumber === 2) return response.promise
+        return { items: group === 'pending' ? [order('PAGE-1')] : [], total: group === 'pending' ? 10 : 0, page: pageNumber }
+      },
+    })
+    await app.mount()
+    const more = app.one('merchant-home-orders').props.onScrollToLower
+    more(); more(); more(); await app.flush()
+    assert.equal(requested.filter(item => item.page === 2).length, 1, '同帧连续触底仅请求一次下一页')
+    response.reject(new Error('测试下一页暂时失败')); await app.flush()
+    more(); await app.flush()
+    assert.equal(requested.filter(item => item.page === 2).length, 2, '分页失败释放同步锁且重试相同页码')
+    await app.unmount()
+    more(); await app.flush()
+    assert.equal(requested.filter(item => item.page === 2).length, 2, '卸载后旧触底事件不能发起业务读取')
+    console.log('PASS 商家同帧触底防重，失败可重试，卸载作废旧事件')
+  }
+  {
+    for (const interruption of ['refresh', 'account']) {
+      const oldPage = deferred(), newPage = deferred()
+      let pageReads = 0
+      const app = merchantHarness('merchant-home', {
+        listMerchantDeliveryOrders: async (pageNumber, _, group) => {
+          if (pageNumber > 1) return (++pageReads === 1 ? oldPage : newPage).promise
+          return { items: group === 'pending' ? [{ ...order('KNOWN-ORDER'), pickupAddress: '当前首屏订单' }] : [], total: group === 'pending' ? 10 : 0, page: pageNumber }
+        },
+      })
+      await app.mount()
+      const oldMore = app.one('merchant-home-orders').props.onScrollToLower
+      oldMore(); await app.flush()
+      if (interruption === 'account') await app.setAccount(202)
+      else await app.refresh()
+      await app.more()
+      assert.equal(pageReads, 2, `${interruption} 后可以发起当前分页`)
+      oldPage.resolve({ items: [{ ...order('OLD-PAGE'), pickupAddress: '过期分页订单' }], total: 10, page: 2 }); await app.flush()
+      assert.equal(app.serials().length, 1, `${interruption} 前的迟到分页不能拼入新列表`)
+      assert.match(text(app.tree), /当前首屏订单/)
+      assert.doesNotMatch(text(app.tree), /过期分页订单/)
+      await app.more()
+      assert.equal(pageReads, 2, '旧分页完成不能释放正在进行的新分页锁')
+      newPage.resolve({ items: [{ ...order('NEW-PAGE'), pickupAddress: '当前分页订单' }], total: 2, page: 2 }); await app.flush()
+      assert.equal(app.serials().length, 2)
+      assert.match(text(app.tree), /当前分页订单/)
+      assert.equal(nodes(app.tree, node => hasClass(node, 'merchant-home-orders__end') && text(node).includes('正在加载')).length, 0)
+      if (interruption === 'account') {
+        oldMore(); await app.flush()
+        assert.equal(pageReads, 2, '旧账号持有的触底事件不能读取新账号')
+      }
+    }
+    console.log('PASS 商家刷新与账号变化隔离旧分页，旧完成事件不会解锁新的读取')
+  }
+  {
+    let approved = true, reads = 0
+    const app = merchantHarness('merchant-home', {
+      getIdentityApplication: async () => ({ status: approved ? 'approved' : 'pending' }),
+      listMerchantDeliveryOrders: async (_, __, group) => { reads++; return { ...page(group === 'pending' ? [order('PRIOR-ORDER')] : []), total: group === 'pending' ? 10 : 0 } },
+    })
+    await app.mount()
+    assert.equal(app.serials().length, 1)
+    const oldMore = app.one('merchant-home-orders').props.onScrollToLower
+    approved = false
+    await app.refresh()
+    oldMore(); await app.flush()
+    assert.equal(reads, 3, '最新核验未通过后不得重新读取订单')
+    assert.deepEqual(app.serials(), [], '资格未通过不展示可操作的旧订单')
+    assert.match(text(app.tree), /申请正在审核中/)
+    console.log('PASS 商家后续核验未通过仍阻断旧工作台与业务读取')
   }
   {
     let cancelledAt = '2026-10-16T11:30:00+08:00'

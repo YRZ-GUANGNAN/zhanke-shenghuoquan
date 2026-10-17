@@ -5,6 +5,7 @@ import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import IdentitySwitchModal from '../../components/IdentitySwitchModal'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import DeliveryWorkspaceNav from '../../components/delivery-workspace-nav'
+import { StatusGlyph } from '../../components/ui/status-glyph'
 import { deliveryPaymentEnabled } from '../../feature-flags'
 import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
 import { getIdentityApplication } from '../../services/a-user'
@@ -29,7 +30,7 @@ type MerchantNumbersByTab = Record<MerchantTabKey, number>
 type MerchantLoadedByTab = Record<MerchantTabKey, boolean>
 type MerchantErrorsByTab = Record<MerchantTabKey, string>
 type Settled<T> = { ok: true; value: T } | { ok: false; error: unknown }
-type ApprovalState = 'checking' | 'approved' | 'blocked'
+type ApprovalState = 'checking' | 'approved' | 'blocked' | 'error'
 
 function emptyOrdersByTab(): MerchantOrdersByTab {
   return { pending: [], delivering: [], completed: [] }
@@ -207,12 +208,15 @@ function MerchantHomeContent() {
   const identityAllowed = useIdentityGuard('merchant')
   const requestVersion = useRef(0)
   const activeLoad = useRef<number | null>(null)
+  const activePageLoad = useRef<{ version: number; tab: MerchantTabKey } | null>(null)
   const identityRef = useRef(identityAllowed)
+  const approvalRef = useRef(approvalState)
   const accountRef = useRef(profile.id)
   const dataAccountRef = useRef(profile.id)
   const mountedRef = useRef(true)
   const switchLockRef = useRef(false)
   identityRef.current = identityAllowed
+  approvalRef.current = approvalState
   accountRef.current = profile.id
 
   useEffect(() => {
@@ -221,12 +225,13 @@ function MerchantHomeContent() {
   }, [])
 
   const loadWorkbench = useCallback(async () => {
-    if (!identityAllowed || !identityRef.current || activeLoad.current !== null) return
+    if (!mountedRef.current || !identityAllowed || !identityRef.current || profile.id !== accountRef.current || activeLoad.current !== null) return
     const account = accountRef.current
     const version = requestVersion.current + 1
     requestVersion.current = version
     activeLoad.current = version
-    const current = () => identityRef.current && accountRef.current === account && requestVersion.current === version
+    activePageLoad.current = null
+    const current = () => mountedRef.current && identityRef.current && accountRef.current === account && requestVersion.current === version
     setLoading(true)
     setLoadingMore(false)
     setLoadErrorsByTab(emptyErrorsByTab())
@@ -235,8 +240,8 @@ function MerchantHomeContent() {
     const applicationResult = await settle(getIdentityApplication('merchant'))
     if (!current()) return
     if (!applicationResult.ok) {
-      setApprovalState('blocked')
-      setApprovalMessage('暂时无法确认商家审核状态，请返回“我的”重新进入')
+      setApprovalState('error')
+      setApprovalMessage('暂时无法确认商家审核状态，请稍后重试')
       setLoading(false)
       activeLoad.current = null
       return
@@ -290,11 +295,12 @@ function MerchantHomeContent() {
     setBalanceCents(walletResult?.ok ? walletResult.value.availableBalanceCents : null)
     setLoading(false)
     activeLoad.current = null
-  }, [identityAllowed])
+  }, [identityAllowed, profile.id])
 
   useEffect(() => {
     requestVersion.current += 1
     activeLoad.current = null
+    activePageLoad.current = null
     setLoading(false)
     setLoadingMore(false)
     setShowStudentSwitch(false)
@@ -320,6 +326,7 @@ function MerchantHomeContent() {
     return () => {
       requestVersion.current += 1
       activeLoad.current = null
+      activePageLoad.current = null
     }
   }, [identityAllowed, profile.id, loadWorkbench])
 
@@ -331,10 +338,15 @@ function MerchantHomeContent() {
     const requestedTab = activeTab
     const currentOrders = ordersByTab[requestedTab]
     const currentTotal = ordersTotalByTab[requestedTab]
-    if (!identityAllowed || loading || loadingMore || currentOrders.length >= currentTotal) return
+    if (!mountedRef.current || !identityAllowed || !identityRef.current || profile.id !== accountRef.current
+      || approvalRef.current !== 'approved' || activeLoad.current !== null || activePageLoad.current !== null
+      || loading || loadingMore || currentOrders.length >= currentTotal) return
     const account = accountRef.current
     const version = requestVersion.current
-    const current = () => identityRef.current && accountRef.current === account && requestVersion.current === version
+    const pageRequest = { version, tab: requestedTab }
+    activePageLoad.current = pageRequest
+    const current = () => mountedRef.current && identityRef.current && accountRef.current === account
+      && requestVersion.current === version && activePageLoad.current === pageRequest
     const nextPage = ordersPageByTab[requestedTab] + 1
     setLoadingMore(true)
     setLoadErrorsByTab((current) => ({ ...current, [requestedTab]: '' }))
@@ -356,9 +368,12 @@ function MerchantHomeContent() {
         }))
       }
     } finally {
-      if (current()) setLoadingMore(false)
+      if (current()) {
+        activePageLoad.current = null
+        setLoadingMore(false)
+      }
     }
-  }, [activeTab, identityAllowed, loading, loadingMore, ordersByTab, ordersPageByTab, ordersTotalByTab])
+  }, [activeTab, identityAllowed, profile.id, loading, loadingMore, ordersByTab, ordersPageByTab, ordersTotalByTab])
 
   const totalOrderCount = ordersTotalByTab.pending + ordersTotalByTab.delivering + ordersTotalByTab.completed
   const loadError = loadErrorsByTab[activeTab]
@@ -400,12 +415,20 @@ function MerchantHomeContent() {
       <View className='merchant-home-page merchant-home-page--review' style={capsuleStyle}>
         <CapsuleSystemRow />
         <View className='merchant-home-review'>
+          <View className='merchant-home-review__status'>
+            <StatusGlyph kind={approvalState === 'checking' ? 'loading' : approvalState === 'error' ? 'error' : 'forbidden'} />
+          </View>
           <Text className='merchant-home-review__title'>
-            {approvalState === 'checking' ? '正在核验商家资格' : '暂时无法进入商家端'}
+            {approvalState === 'checking' ? '正在核验商家资格' : approvalState === 'error' ? '商家资格核验失败' : '暂时无法进入商家端'}
           </Text>
           <Text className='merchant-home-review__message'>{approvalMessage}</Text>
-          {approvalState === 'blocked' ? (
-            <View className='merchant-home-review__action' onClick={() => void Taro.reLaunch({ url: '/pages/profile/index' })}>
+          {approvalState === 'error' ? (
+            <View className='merchant-home-review__action merchant-home-review__retry' ariaRole='button' ariaLabel='重新核验商家资格' hoverClass='merchant-home-control--pressed' onClick={() => void loadWorkbench()}>
+              <Text>重新尝试</Text>
+            </View>
+          ) : null}
+          {approvalState === 'blocked' || approvalState === 'error' ? (
+            <View className={`merchant-home-review__action${approvalState === 'error' ? ' merchant-home-review__action--secondary' : ''}`} ariaRole='button' ariaLabel='返回我的' hoverClass='merchant-home-control--pressed' onClick={() => void Taro.reLaunch({ url: '/pages/profile/index' })}>
               <Text>返回我的</Text>
             </View>
           ) : null}
