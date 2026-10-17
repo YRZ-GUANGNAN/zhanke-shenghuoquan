@@ -13,7 +13,11 @@ $avatar-overlap: 64rpx;
   overflow: hidden;
 }
 
-@mixin surface {
+@mixin surface($unclipped: false) {
+  // The image clips itself. Let the opaque fade cover its fractional bottom
+  // pixel instead of clipping both layers separately at the same boundary.
+  @if $unclipped { overflow: visible; }
+
   &::after {
     position: absolute;
     z-index: 1;
@@ -23,12 +27,14 @@ $avatar-overlap: 64rpx;
     content: '';
   }
   &::after {
-    bottom: 0;
-    height: 22%;
+    bottom: -1PX;
+    height: calc(22% + 2PX);
     background: linear-gradient(to bottom,
       rgba($bg-surface, 0) 0,
       rgba($bg-surface, .3) 38%,
       rgba($bg-surface, .84) 78%,
+      // A fully opaque final band prevents a dark fractional-pixel image seam.
+      $bg-surface 94%,
       $bg-surface 100%);
   }
 }

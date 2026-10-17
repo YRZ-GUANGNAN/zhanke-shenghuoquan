@@ -25,7 +25,7 @@
 
 .public-profile-cover {
   @include cover.frame;
-  @include cover.surface;
+  @include cover.surface($unclipped: true);
   position: absolute;
   top: 0;
   right: 0;
@@ -34,7 +34,7 @@
   background: $brand-tint;
 }
 
-.public-profile-cover__image { position: absolute; inset: 0; width: 100%; height: 100%; }
+.public-profile-cover__image { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
 .public-profile-hero__toolbar { height: var(--profile-toolbar-height); }
 .public-profile-hero > .capsule-system-row,
 .public-profile-user,
@@ -323,14 +323,17 @@
 .public-profile-content {
   display: flex;
   flex-direction: column;
+  height: calc(100vh - var(--capsule-system-row-height, 72px) - var(--profile-toolbar-height) - 44PX);
+  min-height: calc(100vh - var(--capsule-system-row-height, 72px) - var(--profile-toolbar-height) - 44PX);
+}
+
+.public-profile-scroll {
   flex: 1 1 auto;
   height: 0;
   min-height: 0;
 }
 
-.public-profile-scroll {
-  height: 100%;
-}
+.public-profile-panel { width: 100%; overflow: hidden; }
 
 .public-profile-grid {
   display: grid;

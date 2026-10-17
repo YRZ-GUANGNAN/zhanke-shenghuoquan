@@ -25,6 +25,7 @@ import { navigateBackOrHome } from '../../utils/navigation'
 import AppIcon from '../../components/app-icon'
 import { postBodyWithoutTitle } from '../../utils/post-presentation'
 import { useEdgeBack } from '../../hooks/use-edge-back'
+import { useProfilePagerLayout } from './use-profile-pager-layout'
 import './index.scss'
 
 type ProfileTab = 'posts' | 'secondhand'
@@ -66,14 +67,19 @@ function UserProfilePage() {
   const [failedCover, setFailedCover] = useState('')
   const [failedAvatar, setFailedAvatar] = useState('')
   const [failedMedia, setFailedMedia] = useState<Set<string>>(() => new Set())
-  const [scrolledTabs, setScrolledTabs] = useState<Record<ProfileTab, boolean>>({ posts: false, secondhand: false })
+  const [headerScrolled, setHeaderScrolled] = useState(false)
   const requestVersion = useRef(0)
   const loadingMoreRef = useRef(false)
   const followPending = useRef(false)
   const didShowOnce = useRef(false)
-  const scrollPositions = useRef<Record<ProfileTab, number>>({ posts: 0, secondhand: 0 })
   const interaction = useChannelInteraction()
   const edgeBack = useEdgeBack(!menuVisible && !blockConfirmVisible)
+  const pagerLayout = useProfilePagerLayout(status === 'ready', `${userId}:${posts.length}:${products.length}:${visibility.secondhand}:${visibility.likes}:${visibility.following}:${loadingMore}:${loadMoreErrors.posts}:${loadMoreErrors.secondhand}`)
+  const switchTab = (tab: ProfileTab) => {
+    if (tab === activeTab) return
+    setHeaderScrolled(pagerLayout.switchScroll(tab) > 48)
+    setActiveTab(tab)
+  }
   const visibleTabs: ProfileTab[] = visibility.secondhand ? ['posts', 'secondhand'] : ['posts']
   const shareReady = usePageShare({ kind: 'profile', enabled: visibility.forum && status === 'ready', id: userId, loadedId: String(profile?.profile.id || ''), nickname: profile?.profile.nickname || '' })
   useEffect(() => { if (!visibility.secondhand && activeTab === 'secondhand') setActiveTab('posts') }, [visibility.secondhand, activeTab])
@@ -118,10 +124,6 @@ function UserProfilePage() {
     })
     return () => { active = false; requestVersion.current += 1 }
   }, [reloadKey, userId, visibility.secondhand])
-
-  useEffect(() => {
-    scrollPositions.current = { posts: 0, secondhand: 0 }
-  }, [userId])
 
   // Reconcile a changed cover/follow state after returning without replacing
   // either content list or its saved scroll position.
@@ -307,7 +309,7 @@ function UserProfilePage() {
   }
 
   const navigation = (
-    <View className={`public-profile-navigation${status !== 'ready' || scrolledTabs[activeTab] ? ' public-profile-navigation--scrolled' : ''}${status === 'ready' && hasCover && !scrolledTabs[activeTab] ? ' public-profile-navigation--on-cover' : ''}`}>
+    <View className={`public-profile-navigation${status !== 'ready' || headerScrolled ? ' public-profile-navigation--scrolled' : ''}${status === 'ready' && hasCover && !headerScrolled ? ' public-profile-navigation--on-cover' : ''}`}>
       <View className='public-profile-nav'>
         <View className={`public-profile-nav__back${edgeBack.tracking ? ' public-profile-nav__back--tracking' : ''}`}
           style={{ '--profile-back-offset': `${edgeBack.offset}px` } as React.CSSProperties}
@@ -370,53 +372,49 @@ function UserProfilePage() {
 
   const tabs = (
       <View className='public-profile-tabs'>
-        <View className={`public-profile-tab ${activeTab === 'posts' ? 'public-profile-tab--active' : ''}`} onClick={() => { if (interaction.canActivate()) setActiveTab('posts') }}><Text>帖子 {postTotal}</Text></View>
-        {visibility.secondhand && <View className={`public-profile-tab ${activeTab === 'secondhand' ? 'public-profile-tab--active' : ''}`} onClick={() => { if (interaction.canActivate()) setActiveTab('secondhand') }}><Text>二手 {productTotal}</Text></View>}
+        <View className={`public-profile-tab ${activeTab === 'posts' ? 'public-profile-tab--active' : ''}`} onClick={() => { if (interaction.canActivate()) switchTab('posts') }}><Text>帖子 {postTotal}</Text></View>
+        {visibility.secondhand && <View className={`public-profile-tab ${activeTab === 'secondhand' ? 'public-profile-tab--active' : ''}`} onClick={() => { if (interaction.canActivate()) switchTab('secondhand') }}><Text>二手 {productTotal}</Text></View>}
       </View>
   )
   return (
     <View className='public-profile-page' style={capsuleStyle}>
       {edgeBackLayer}
       {navigation}
-      <View className='public-profile-content'>
-        <ChannelPager
-          keys={visibleTabs}
-          activeKey={activeTab}
-          onChange={setActiveTab}
-          interaction={interaction}
-          renderPage={(tab) => (
-        <ScrollView
-          className='public-profile-scroll'
-          scrollY
-          enhanced
-          showScrollbar={false}
-          lowerThreshold={120}
-          scrollTop={scrollPositions.current[tab]}
-          onScroll={(event) => {
-            const top = event.detail.scrollTop
-            if (Number.isFinite(top)) {
-              scrollPositions.current[tab] = Math.max(0, top)
-              const scrolled = top > 48
-              setScrolledTabs((current) => current[tab] === scrolled ? current : { ...current, [tab]: scrolled })
-            }
-          }}
-          onScrollToLower={() => void loadMore(tab)}
-        >
-          {hero}
-          {tabs}
-          {(tab === 'posts' ? posts.length === 0 : products.length === 0) ? (
-            <View className='public-profile-empty'><Text className='public-profile-empty__title'>{tab === 'posts' ? '暂无公开帖子' : '暂无公开二手商品'}</Text></View>
-          ) : tab === 'posts' ? (
-            <View className='public-profile-grid public-profile-grid--posts'>{posts.map(renderPost)}</View>
-          ) : (
-            <View className='public-profile-grid public-profile-grid--products'>{products.map(renderProduct)}</View>
-          )}
-          {loadMoreErrors[tab] ? <Text className='public-profile-load-more public-profile-load-more--retry' onClick={() => { if (interaction.canActivate()) void loadMore(tab) }}>{loadMoreErrors[tab]}</Text> : null}
-          {loadingMore && loadingTab === tab ? <Text className='public-profile-load-more'>正在加载更多内容…</Text> : null}
-        </ScrollView>
-          )}
-        />
-      </View>
+      <ScrollView
+        className='public-profile-scroll'
+        scrollY enhanced showScrollbar={false} lowerThreshold={120}
+        scrollTop={pagerLayout.scrollTarget}
+        onScroll={(event) => {
+          const top = event.detail.scrollTop
+          pagerLayout.rememberScroll(activeTab, top)
+          if (Number.isFinite(top)) setHeaderScrolled(top > 48)
+        }}
+        onScrollToLower={() => void loadMore(activeTab)}
+      >
+        {hero}
+        {tabs}
+        <View className='public-profile-content' style={pagerLayout.layout.heights[activeTab] > 0 ? { height: `${Math.max(pagerLayout.layout.heights[activeTab], pagerLayout.layout.minimumBody)}px` } : undefined}>
+          <ChannelPager
+            keys={visibleTabs}
+            activeKey={activeTab}
+            onChange={switchTab}
+            interaction={interaction}
+            renderPage={(tab) => (
+              <View className='public-profile-panel' id={`public-profile-panel-${tab}`}>
+                {(tab === 'posts' ? posts.length === 0 : products.length === 0) ? (
+                  <View className='public-profile-empty'><Text className='public-profile-empty__title'>{tab === 'posts' ? '暂无公开帖子' : '暂无公开二手商品'}</Text></View>
+                ) : tab === 'posts' ? (
+                  <View className='public-profile-grid public-profile-grid--posts'>{posts.map(renderPost)}</View>
+                ) : (
+                  <View className='public-profile-grid public-profile-grid--products'>{products.map(renderProduct)}</View>
+                )}
+                {loadMoreErrors[tab] ? <Text className='public-profile-load-more public-profile-load-more--retry' onClick={() => { if (interaction.canActivate()) void loadMore(tab) }}>{loadMoreErrors[tab]}</Text> : null}
+                {loadingMore && loadingTab === tab ? <Text className='public-profile-load-more'>正在加载更多内容…</Text> : null}
+              </View>
+            )}
+          />
+        </View>
+      </ScrollView>
       <AppActionSheet visible={menuVisible} title='更多操作' onClose={() => setMenuVisible(false)}>
         <View className='public-profile-sheet__content'>
             <View className='public-profile-sheet__group'>

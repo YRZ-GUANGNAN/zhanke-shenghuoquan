@@ -73,7 +73,7 @@ page {
 
 .student-profile-cover {
   @include cover.frame;
-  @include cover.surface;
+  @include cover.surface($unclipped: true);
   position: absolute;
   top: 0;
   right: 0;

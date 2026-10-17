@@ -41,7 +41,9 @@ async function run() {
     loaded.require = id => {
       if (id === 'react' || id === 'react/jsx-runtime') return require(id)
       if (id === '@tarojs/components') return components
-      if (id === '@tarojs/taro') return { useDidShow: () => {} }
+      if (id === '@tarojs/taro') return { useDidShow: () => {}, useResize: () => {}, nextTick: fn => fn(),
+        createSelectorQuery: () => ({ select() { return this }, boundingClientRect() { return this },
+          exec: fn => fn([{height:360}, {height:44}, {height:100}, {height:800}, {height:1800}, {height:900}]) }) }
       if (id.endsWith('/components/product-price') || id.endsWith('/components/app-icon')) return { default: components.View }
       if (id.endsWith('/use-edge-back')) return { useEdgeBack: () => ({available:false,canActivate:()=>true}) }
       if (id.endsWith('/post-presentation')) return { postBodyWithoutTitle: (_, body) => body }
@@ -55,6 +57,7 @@ async function run() {
       if (id.endsWith('/stores/session')) return { useSessionStore: select => select({ profile: { id: viewerId } }) }
       if (id.endsWith('/components/ui')) return { AppActionSheet: () => null, AppDialog: () => null }
       if (id.endsWith('/channel-pager')) return load('components/channel-pager.tsx')
+      if (id === './use-profile-pager-layout') return load('pages/user-profile/use-profile-pager-layout.ts')
       if (id.endsWith('/navigation')) return { navigateBackOrHome: async () => navigation.push('back') }
       if (id.endsWith('/services/a-user')) return { blockUser: async () => {} }
       if (id.endsWith('/services/b-community')) return {
@@ -85,7 +88,7 @@ async function run() {
   const node = selector => { const value = container.querySelector(selector); assert.ok(value, selector); return value }
   const props = selector => node(selector).taroProps
   const pane = tab => `[data-item="${tab}"]`
-  const scroll = tab => `${pane(tab)} .public-profile-scroll`
+  const scroll = () => '.public-profile-scroll'
   const swipe = (index, key) => event(() => props('.channel-pager').onChange({ detail: { current: index, currentItemId: key, source: 'touch' } }))
   const post = { id: 'p1', title: '测试帖子', content: '', images: [], likedCount: 2 }
   const product = { id: 's1', title: '测试商品', images: [], price: 10, status: 'selling' }
@@ -97,20 +100,28 @@ async function run() {
       requests.posts[0].resolve({ items: [post], total: 3, page: 1 })
       requests.secondhand[0].resolve({ items: [product], total: 3, page: 1 })
     })
-    const postScroll = node(scroll('posts')), productScroll = node(scroll('secondhand'))
+    const sharedScroll = node(scroll()), heroNode = node('.public-profile-hero'), tabsNode = node('.public-profile-tabs')
+    assert.equal(container.querySelectorAll('.public-profile-hero').length, 1, '封面资料只渲染一次')
+    assert.equal(container.querySelectorAll('.public-profile-tabs').length, 1, '标签只渲染一次')
+    assert.equal(heroNode.closest('.channel-pager'), null, '封面资料不能被横向分页移动')
+    assert.equal(tabsNode.closest('.channel-pager'), null, '标签不能被横向分页移动')
+    await event(() => props(scroll()).onScroll({detail:{scrollTop:40}}))
+    await swipe(1,'secondhand')
+    assert.equal(props(scroll()).scrollTop,40,'封面可见时切换保持同一纵向位置')
+    await swipe(0,'posts')
     await event(() => props(scroll('posts')).onScroll({ detail: { scrollTop: 640 } }))
     await swipe(1, 'secondhand')
     assert.equal(props('.channel-pager').current, 1)
     assert.ok(node('.public-profile-tab--active').textContent.includes('二手'))
-    await event(() => props(scroll('secondhand')).onScroll({ detail: { scrollTop: 96 } }))
+    assert.equal(props(scroll()).scrollTop,260,'封面已收起时切新栏保持收起')
+    await event(() => props(scroll('secondhand')).onScroll({ detail: { scrollTop: 400 } }))
     await swipe(0, 'posts')
-    assert.equal(node(scroll('posts')), postScroll, '来回切换保留帖子滚动容器')
-    assert.equal(node(scroll('secondhand')), productScroll, '来回切换保留商品滚动容器')
-    assert.equal(props(scroll('posts')).scrollTop, 640)
-    assert.equal(props(scroll('secondhand')).scrollTop, 96)
+    assert.equal(node(scroll()),sharedScroll,'来回切换保留同一个纵向容器')
+    assert.equal(node('.public-profile-hero'),heroNode,'封面资料节点没有替换或复制')
+    assert.equal(node('.public-profile-tabs'),tabsNode,'标签节点没有替换或复制')
+    assert.equal(props(scroll()).scrollTop,640,'封面收起后恢复帖子阅读位置')
     assert.equal(requests.posts.length, 1, '切换不重复初始加载')
-    await event(() => props(scroll('secondhand')).onScrollToLower())
-    assert.equal(requests.secondhand.length, 1, '隐藏页触底不能发起分页')
+    assert.equal(container.querySelectorAll('[data-component="ScrollView"]').length,1,'没有隐藏页纵向滚动容器')
     await event(() => { props(scroll('posts')).onScrollToLower(); props(scroll('posts')).onScrollToLower() })
     assert.equal(requests.posts.length, 2, '同帧触底去重')
     await swipe(1, 'secondhand')
@@ -151,7 +162,7 @@ async function run() {
     visibility.messages = true; viewerId = '1'; await render()
     assert.equal(messageButton(), undefined, '自身主页不显示私信')
     console.log('主页私信入口检查通过：正确用户路由、连点互斥、跳转失败重试、自身与关闭状态隐藏。')
-    console.log('公开主页横滑检查通过：独立位置、稳定容器、分页归属/防重、滑后防误触、关闭栏目与旧请求隔离。')
+    console.log('公开主页横滑检查通过：唯一共享头部、局部横滑、稳定纵向容器、列表位置恢复、分页归属/防重与手势防误触。')
   } finally {
     await React.act(async () => root.unmount())
     Date.now = originalNow

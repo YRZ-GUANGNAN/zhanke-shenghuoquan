@@ -57,6 +57,9 @@ async function run() {
           },
           useDidHide: () => {},
           useResize: () => {},
+          nextTick: callback => callback(),
+          createSelectorQuery: () => ({ select() { return this }, boundingClientRect() { return this },
+            exec: callback => callback([{height:360},{height:44},{height:100},{height:800},{height:1800},{height:1800}]) }),
         }
         if (id.endsWith('.scss')) return {}
         if (id.endsWith('/use-feature-visibility')) return { useFeatureVisibility: () => options.visibility }
@@ -83,6 +86,7 @@ async function run() {
         if (id.endsWith('/hooks/use-edge-back')) return loadSource(path.resolve(__dirname, '../apps/miniapp/src/hooks/use-edge-back.ts'))
         if (id.endsWith('/utils/edge-back')) return loadSource(path.resolve(__dirname, '../apps/miniapp/src/utils/edge-back.ts'))
         if (id === './use-content-tabs') return loadSource(path.resolve(path.dirname(sourcePath), 'use-content-tabs.ts'))
+        if (id === './use-profile-pager-layout') return loadSource(path.resolve(path.dirname(sourcePath), 'use-profile-pager-layout.ts'))
         throw new Error(`Unexpected profile test dependency: ${id}`)
       }
       loaded._compile(ts.transpileModule(fs.readFileSync(sourcePath, 'utf8'), {
@@ -279,10 +283,14 @@ async function run() {
     assert.equal(follows.length, 1, '同帧连点关注只写一次')
     await publicPage.event(() => follows[0].resolve())
     assert.ok(publicPage.container.textContent.includes('已关注'))
-    await publicPage.event(() => publicPage.props('[data-item-id="secondhand"] .public-profile-scroll').onScroll({ detail: { scrollTop: 655 } }))
-    await publicPage.event(() => publicPage.props('[data-item-id="secondhand"] .public-profile-tab').onClick())
+    assert.equal(publicPage.all('.public-profile-hero').length,1)
+    assert.equal(publicPage.container.querySelector('.public-profile-hero').closest('[data-component="Swiper"]'),null)
+    await publicPage.event(() => publicPage.props('.public-profile-scroll').onScroll({ detail: { scrollTop: 655 } }))
+    await publicPage.event(() => publicPage.props('.public-profile-tab').onClick())
     assert.equal(publicPage.props('[data-component="Swiper"]').current, 0)
-    assert.equal(publicPage.props('[data-item-id="secondhand"] .public-profile-scroll').scrollTop, 655, '不同内容标签分别保留滚动位置')
+    assert.equal(publicPage.props('.public-profile-scroll').scrollTop, 260, '切换栏目时头部保持收起')
+    await publicPage.event(() => publicPage.all('.public-profile-tab')[1].onClick())
+    assert.equal(publicPage.props('.public-profile-scroll').scrollTop,655,'返回二手恢复列表阅读位置')
     await publicPage.event(() => publicPage.props('.public-profile-cover__image').onError())
     await publicPage.event(() => publicPage.props('.public-profile-user__avatar-image').onError())
     assert.equal(publicPage.all('.public-profile-cover__image').length, 0, '封面失效回退浅色底，保留头像资料')
@@ -291,7 +299,7 @@ async function run() {
     await publicPage.show()
     await publicPage.event(() => publicCalls[1].resolve({ ...publicValue, profile: { ...publicValue.profile, cover: 'returned-cover', avatar: 'returned-avatar' } }))
     assert.equal(publicPage.props('.public-profile-cover__image').src, 'returned-cover', '从编辑页返回后同步封面，不重置内容滚动')
-    assert.equal(publicPage.props('[data-item-id="secondhand"] .public-profile-scroll').scrollTop, 655)
+    assert.equal(publicPage.props('.public-profile-scroll').scrollTop, 655)
     publicPage.options.params = { userId: '999', tab: 'posts' }
     publicPage.options.visibility.secondhand = false
     await publicPage.render()
