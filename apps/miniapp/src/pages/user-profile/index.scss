@@ -55,8 +55,7 @@
 .public-profile-nav {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16rpx;
+  justify-content: flex-start;
   height: var(--profile-toolbar-height);
   margin: 0 24rpx;
 }
@@ -67,52 +66,33 @@
   flex: 0 0 44PX;
   width: 44PX;
   height: 44PX;
-  border-radius: 50%;
-  background: rgba($bg-surface, .92);
+  background: transparent;
+  color: $text-strong;
   pointer-events: auto;
+  transition: opacity $duration-fast ease;
 }
 
 .public-profile-nav__back::before {
   position: absolute;
   top: 50%;
-  left: 12PX;
-  width: 20rpx;
-  height: 20rpx;
-  border-bottom: 4rpx solid $text-strong;
-  border-left: 4rpx solid $text-strong;
+  left: 16PX;
+  width: 12PX;
+  height: 12PX;
+  border-bottom: 2PX solid currentColor;
+  border-left: 2PX solid currentColor;
   content: '';
   transform: translateY(-50%) rotate(45deg);
 }
 
-.public-profile-nav__more {
-  @include ref.touch;
-  display: flex;
-  flex: 0 0 44PX;
-  align-items: center;
-  justify-content: center;
-  width: 44PX;
-  height: 44PX;
-  border-radius: 50%;
-  background: rgba($bg-surface, .92);
-  color: $text-strong;
-  font-size: 30rpx;
-  line-height: 1;
-  margin-right: 0;
-  pointer-events: auto;
+.public-profile-navigation--on-cover .public-profile-nav__back {
+  color: $text-on-color;
 }
-
-.public-profile-nav__title {
-  @include ref.type(label);
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 600;
+.public-profile-navigation--on-cover .public-profile-nav__back::before {
+  filter: drop-shadow(0 1PX 2PX rgba($text-strong, .5));
 }
+.public-profile-control--pressed,
 .public-profile-nav__back:active,
-.public-profile-nav__more:active,
+.public-profile-user__options:active,
 .public-profile-action:active { opacity: .72; }
 
 .public-profile-user {
@@ -158,12 +138,29 @@
 }
 
 .public-profile-user__main {
+  position: relative;
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
   min-width: 0;
   margin-top: 16rpx;
+  padding-right: 44PX;
 }
+
+.public-profile-user__options {
+  @include ref.touch;
+  position: absolute;
+  top: -6PX;
+  right: -6PX;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44PX;
+  height: 44PX;
+  background: transparent;
+  transition: opacity $duration-fast ease;
+}
+.public-profile-user__options .app-icon { width: 24PX; height: 24PX; }
 
 .public-profile-user__name {
   overflow: hidden;
@@ -569,5 +566,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .public-profile-navigation, .public-profile-card { transition: none; }
+  .public-profile-navigation, .public-profile-nav__back, .public-profile-user__options, .public-profile-card { transition: none; }
 }

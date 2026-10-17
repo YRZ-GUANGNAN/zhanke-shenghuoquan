@@ -289,11 +289,9 @@ function UserProfilePage() {
   }
 
   const navigation = (
-    <View className={`public-profile-navigation${status !== 'ready' || scrolledTabs[activeTab] ? ' public-profile-navigation--scrolled' : ''}`}>
+    <View className={`public-profile-navigation${status !== 'ready' || scrolledTabs[activeTab] ? ' public-profile-navigation--scrolled' : ''}${status === 'ready' && hasCover && !scrolledTabs[activeTab] ? ' public-profile-navigation--on-cover' : ''}`}>
       <View className='public-profile-nav'>
-        <View className='public-profile-nav__back' ariaRole='button' ariaLabel='返回' onClick={() => void navigateBackOrHome()} />
-        {scrolledTabs[activeTab] && profile && <Text className='public-profile-nav__title'>{profile.profile.nickname}</Text>}
-        {status === 'ready' && <View className='public-profile-nav__more' ariaRole='button' ariaLabel='更多操作' onClick={() => setMenuVisible(true)}><Text>•••</Text></View>}
+        <View className='public-profile-nav__back' ariaRole='button' ariaLabel='返回' hoverClass='public-profile-control--pressed' onClick={() => void navigateBackOrHome()} />
       </View>
     </View>
   )
@@ -333,6 +331,7 @@ function UserProfilePage() {
           <View className='public-profile-user__main'>
             <Text className='public-profile-user__name'>{value.nickname}</Text>
             <Text className='public-profile-user__meta'>用户号 {value.id}</Text>
+            <View className='public-profile-user__options' ariaRole='button' ariaLabel='主页资料操作' hoverClass='public-profile-control--pressed' onClick={() => { if (interaction.canActivate()) setMenuVisible(true) }}><AppIcon name='more' /></View>
           </View>
         </View>
         <View className='public-profile-stats'>
