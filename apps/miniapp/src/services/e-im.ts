@@ -109,6 +109,10 @@ export function getIMConversation(relationId: number): Promise<IMConversationCon
   return request(`/im/conversations/${relationId}`)
 }
 
+export function contactUser(userId: string): Promise<IMConversationContext> {
+  return request(`/im/users/${encodeURIComponent(userId)}/conversation`, { url: '', method: 'PUT', timeout: 10000 })
+}
+
 function createTencentReadyWaiter(chat: ChatSDK): { promise: Promise<void>; cancel: () => void } {
   if (chat.isReady()) return { promise: Promise.resolve(), cancel: () => undefined }
   let cleanup = () => undefined
@@ -327,7 +331,15 @@ export async function sendTencentText(
   expectedUserId = ''
 ): Promise<Message> {
   const visibility = await getFeatureVisibility(true)
-  if (!visibility.secondhand_chat || !visibility.messages) throw new Error('私信功能暂未开放')
+  if (!visibility.messages || (context.referenceType !== 'user' && !visibility.secondhand_chat)) throw new Error('私信功能暂未开放')
+  if (context.referenceType === 'user') {
+    const authorized = await getIMConversation(context.relationId)
+    if (authorized.relationId !== context.relationId || authorized.referenceType !== 'user' || authorized.productId !== 0 ||
+        authorized.buyerId !== context.buyerId || authorized.sellerId !== context.sellerId ||
+        authorized.peerUserId !== context.peerUserId || authorized.conversationId !== context.conversationId) {
+      throw new Error('会话已变化，请返回后重新进入')
+    }
+  }
   const chat = await ensureTencentIMReady(expectedUserId)
   const message = chat.createTextMessage({
     to: context.peerUserId,

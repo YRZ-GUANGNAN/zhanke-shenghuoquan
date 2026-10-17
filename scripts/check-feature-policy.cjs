@@ -39,6 +39,11 @@ for (const key of FEATURE_KEYS) {
 }
 for (const [route, key] of [['post-detail', 'forum'], ['secondhand-detail', 'secondhand'], ['publish-post', 'post'], ['publish-secondhand', 'secondhand_publish'], ['secondhand-chat', 'secondhand_chat'], ['notifications', 'notifications'], ['merchant-publish', 'merchant']]) assert.ok(featurePageKeys(`pages/${route}/index`).includes(key))
 assert.deepEqual(featurePageKeys('pages/my-content/index', { tab: 'favorites' }), [], 'initial closed tab must not block a different available content channel')
+assert.deepEqual(featurePageKeys('pages/secondhand-chat/index', { userId: '8' }), ['messages'])
+assert.deepEqual(featurePageKeys('pages/secondhand-chat/index', { relationId: '8' }), ['messages'])
+assert.deepEqual(featurePageKeys('pages/secondhand-chat/index', { productId: '8' }), ['secondhand_chat'])
+assert.deepEqual(featureRequestKeys('PUT', '/im/users/8/conversation'), ['messages'])
+assert.equal(parse({ ...flags, secondhand: false }).messages, true)
 for (const [method, url, key] of [['GET','/community/posts/8/comments','comment'], ['PUT','/auth/identity-applications/rider','identity_application'], ['POST','/delivery/merchant/orders','delivery'], ['POST','/delivery/rider/orders/8/claim','rider'], ['PUT','/trade/products/8/contact','secondhand_chat'], ['GET','/trade/search/hot','search']]) assert.ok(featureRequestKeys(method,url).includes(key))
 for (const [method, url] of [['GET','/auth/me'], ['GET','/delivery/im-credentials'], ['GET','/delivery/merchant/orders'], ['PATCH','/delivery/rider/orders/8/delivered'], ['POST','/delivery/merchant/orders/8/refunds'], ['GET','/delivery/merchant/wallet']]) assert.deepEqual(featureRequestKeys(method,url), [], `${url} must preserve necessary existing-order work`)
 const backend = fs.readFileSync(path.join(root, 'backend/internal/module/featureflags/service.go'), 'utf8')

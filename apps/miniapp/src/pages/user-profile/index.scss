@@ -273,6 +273,7 @@
 }
 .public-profile-action::after { border: 0; }
 .public-profile-action[disabled] { opacity: .5; }
+.public-profile-action--message { min-width: max(44PX, 120rpx); }
 
 .public-profile-tabs {
   position: sticky;

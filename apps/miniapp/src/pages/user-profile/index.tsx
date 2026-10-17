@@ -58,6 +58,8 @@ function UserProfilePage() {
   const [followerCount, setFollowerCount] = useState(0)
   const [menuVisible, setMenuVisible] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [contacting, setContacting] = useState(false)
+  const contactPending = useRef(false)
   const [blockConfirmVisible, setBlockConfirmVisible] = useState(false)
   const [blockPending, setBlockPending] = useState(false)
   const [error, setError] = useState('')
@@ -205,6 +207,20 @@ function UserProfilePage() {
     }
   }
 
+  const openDirectMessage = async () => {
+    if (isSelf || contactPending.current || !visibility.messages || !interaction.canActivate()) return
+    contactPending.current = true
+    setContacting(true)
+    try {
+      await Taro.navigateTo({ url: `/pages/secondhand-chat/index?userId=${encodeURIComponent(userId)}` })
+    } catch {
+      showToast('私信页面打开失败，请稍后重试')
+    } finally {
+      contactPending.current = false
+      setContacting(false)
+    }
+  }
+
   const copyProfilePath = async () => {
     setMenuVisible(false)
     await Taro.setClipboardData({ data: `pages/user-profile/index?userId=${userId}` })
@@ -335,6 +351,7 @@ function UserProfilePage() {
                 <Text>{isSelf ? '编辑资料' : busy ? '处理中…' : following ? '已关注' : '+ 关注'}</Text>
               </View>}
               {isSelf && <Button className='public-profile-action public-profile-action--secondary' openType='share' disabled={!shareReady}>分享主页</Button>}
+              {!isSelf && visibility.messages && <Button className='public-profile-action public-profile-action--secondary public-profile-action--message' ariaLabel='发私信' disabled={contacting} onClick={() => void openDirectMessage()}>{contacting ? '打开中…' : '私信'}</Button>}
             </View>
           </View>
           <View className='public-profile-user__main'>

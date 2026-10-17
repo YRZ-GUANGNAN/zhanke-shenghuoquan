@@ -32,7 +32,7 @@ export default function StudentBottomNav({ active, className = '' }: StudentBott
 
   const visibleItems = navItems.filter((item) => {
     if (item.key === 'takeout') return visibility.takeout || visibility.campus_tools
-    if (item.key === 'messages') return visibility.messages && visibility.secondhand_chat
+    if (item.key === 'messages') return visibility.messages
     return true
   })
   const canPublish = visibility.publish && (visibility.post || visibility.secondhand_publish)

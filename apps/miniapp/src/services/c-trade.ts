@@ -13,7 +13,7 @@ export interface ProductListQuery{page?:number;pageSize?:number;keyword?:string;
 export interface ProductPageResult{items:Product[];page:number;pageSize:number;total:number}
 export interface ProductCommentPage{items:ProductComment[];page:number;pageSize:number;total:number}
 export interface TradeHotSearchKeyword{keyword:string;count:number;score:number}
-export interface IMConversationContext{relationId:number;conversationId:string;peerUserId:string;productId:number;buyerId:number;sellerId:number;peer?:{id:number|string;nickname:string;avatar:string}}
+export interface IMConversationContext{relationId:number;conversationId:string;peerUserId:string;productId:number;buyerId:number;sellerId:number;referenceType?:'product'|'user';peer?:{id:number|string;nickname:string;avatar:string}}
 export interface CreateProductInput{title:string;description:string;price:number;category?:string;imageAssetIds?:string[];clientRequestId?:string}
 export interface TradeViewerState{favorited:boolean;contactedSeller:boolean}
 

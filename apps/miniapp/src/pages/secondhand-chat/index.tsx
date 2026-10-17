@@ -11,6 +11,7 @@ import { contactSeller, getProduct, type IMConversationContext } from '../../ser
 import {
   getTencentIMLoginUser,
   getIMConversation,
+  contactUser,
   loadTencentMessages,
   sendTencentText,
   subscribeTencentMessages,
@@ -26,16 +27,17 @@ import { conversationPeer } from '../../utils/conversation-presentation'
 import './index.scss'
 
 type PageStatus = 'loading' | 'ready' | 'error'
-type ChatEntry = { kind: 'product' | 'relation'; id: string }
+type ChatEntry = { kind: 'product' | 'relation' | 'user'; id: string }
 type ViewerRole = 'buyer' | 'seller'
 
 function parseChatEntry(params: Record<string, string | undefined>): ChatEntry | null {
   const productId = params.productId?.trim() || ''
   const relationId = params.relationId?.trim() || ''
-  if (Boolean(productId) === Boolean(relationId)) return null
-  const id = productId || relationId
+  const userId = params.userId?.trim() || ''
+  if ([productId, relationId, userId].filter(Boolean).length !== 1) return null
+  const id = productId || relationId || userId
   if (!/^[1-9]\d*$/.test(id)) return null
-  return { kind: productId ? 'product' : 'relation', id }
+  return { kind: productId ? 'product' : userId ? 'user' : 'relation', id }
 }
 
 function viewerRole(context: IMConversationContext, currentUserId: string): ViewerRole | null {
@@ -61,8 +63,9 @@ function showToast(title: string) {
 function chatErrorMessage(error: unknown): string {
   if (!isApiError(error)) return error instanceof Error ? error.message : '私信服务暂不可用，请稍后重试'
   if (error.status === 0) return '网络连接失败，请检查网络后重试'
-  if (error.status === 400) return '私信入口无效，请从商品详情或首页重新进入'
-  if (error.status === 401 || error.status === 403) return '登录状态已失效，请重新登录'
+  if (error.status === 400) return '私信入口无效，请从用户主页或商品详情重新进入'
+  if (error.status === 401) return '登录状态已失效，请重新登录'
+  if (error.status === 403) return error.message || '当前无法与该用户私信'
   if (error.status === 404) return '会话不存在或无权访问'
   if (error.status === 409 || error.status === 422) return '当前宝贝无法发起私信'
   return error.message || '私信服务暂不可用，请稍后重试'
@@ -107,7 +110,7 @@ function formatTime(value: number): string {
 
 function SecondhandChatPage() {
   const capsuleStyle = useViewportRefresh()
-  const params = Taro.getCurrentInstance().router?.params ?? {}
+  const [params] = useState(() => Taro.getCurrentInstance().router?.params ?? {})
   const entry = parseChatEntry(params)
   const selfProfile = useSessionStore((state) => state.profile)
   const sessionUserId = selfProfile.id
@@ -154,7 +157,7 @@ function SecondhandChatPage() {
 
     if (!entry) {
       setStatus('error')
-      setErrorMessage('私信入口无效，请从商品详情或首页重新进入。')
+      setErrorMessage('私信入口无效，请从用户主页或商品详情重新进入。')
       return () => {
         active = false
       }
@@ -167,7 +170,7 @@ function SecondhandChatPage() {
         let nextContext = await requestWithSingleSessionRecovery(() => (
           entry.kind === 'product'
             ? contactSeller(entry.id)
-            : getIMConversation(Number(entry.id))
+            : entry.kind === 'user' ? contactUser(entry.id) : getIMConversation(Number(entry.id))
         ))
         const recoveredSession = useSessionStore.getState()
         if (recoveredSession.status !== 'authenticated' || !recoveredSession.profile.id) {
@@ -177,9 +180,16 @@ function SecondhandChatPage() {
         const expectedTencentUserId = `campus_${currentUserId}`
         const nextRole = viewerRole(nextContext, currentUserId)
         const validRelation = Number.isInteger(nextContext.relationId) && nextContext.relationId > 0
-        const validProduct = Number.isInteger(nextContext.productId) && nextContext.productId > 0
-        const validTencentPeer = Boolean(nextContext.peerUserId) && nextContext.conversationId === `C2C${nextContext.peerUserId}`
-        if (!nextRole || !validRelation || !validProduct || !validTencentPeer) {
+        const isUserConversation = nextContext.referenceType === 'user'
+        const validReference = isUserConversation
+          ? nextContext.productId === 0
+          : (!nextContext.referenceType || nextContext.referenceType === 'product') && Number.isInteger(nextContext.productId) && nextContext.productId > 0
+        const peerID = nextRole === 'buyer' ? nextContext.sellerId : nextContext.buyerId
+        const validTencentPeer = Number.isSafeInteger(peerID) && peerID > 0 && String(peerID) !== currentUserId && nextContext.peerUserId === `campus_${peerID}` && nextContext.conversationId === `C2C${nextContext.peerUserId}`
+        const validEntry = entry.kind === 'user' ? isUserConversation && String(peerID) === entry.id
+          : entry.kind === 'product' ? !isUserConversation && String(nextContext.productId) === entry.id
+          : String(nextContext.relationId) === entry.id
+        if (!nextRole || !validRelation || !validReference || !validTencentPeer || !validEntry) {
           throw new Error('会话参与者校验失败')
         }
         if (!isActive()) return
@@ -201,10 +211,12 @@ function SecondhandChatPage() {
           throw new Error('腾讯云 IM 账号与当前登录用户不一致，请返回“我的”重新登录')
         }
         let nextProduct: Product | null = null
-        try {
-          nextProduct = await getProduct(String(nextContext.productId))
-        } catch {
-          nextProduct = null
+        if (!isUserConversation) {
+          try {
+            nextProduct = await getProduct(String(nextContext.productId))
+          } catch {
+            nextProduct = null
+          }
         }
         if (!isActive()) return
 
@@ -257,9 +269,10 @@ function SecondhandChatPage() {
   const visibleMessages = useMemo(() => messages, [messages])
   const scrollAnchorId = `secondhand-chat-bottom-${visibleMessages.length}-${keyboardHeight}-${inputFocused ? 1 : 0}`
   const peer = conversationPeer(context, product, sessionUserId)
-  const peerState = role === 'seller' ? '咨询买家 · 二手交流' : '宝贝卖家 · 二手交流'
+  const isDirect = context?.referenceType === 'user' || (!context && entry?.kind === 'user')
+  const peerState = isDirect ? '私信' : role === 'seller' ? '咨询买家 · 二手交流' : '宝贝卖家 · 二手交流'
   const canOpenPeerProfile = Boolean(peer.id) && status === 'ready'
-  const resolvedProductId = context
+  const resolvedProductId = isDirect ? '' : context
     ? String(context.productId)
     : entry?.kind === 'product' ? entry.id : ''
   const productImage = product?.images[0]
@@ -277,14 +290,14 @@ function SecondhandChatPage() {
     }
     const fallback = entry?.kind === 'product'
       ? `/pages/secondhand-detail/index?id=${encodeURIComponent(entry.id)}`
-      : '/pages/home/index'
+      : entry?.kind === 'user' ? `/pages/user-profile/index?userId=${encodeURIComponent(entry.id)}` : '/pages/home/index?tab=messages'
     void Taro.navigateBack().catch(() => Taro.redirectTo({ url: fallback }))
   }
 
   const openPeerProfile = () => {
     if (!canOpenPeerProfile) return
     void Taro.navigateTo({
-      url: `/pages/user-profile/index?userId=${encodeURIComponent(peer.id)}&tab=secondhand`
+      url: `/pages/user-profile/index?userId=${encodeURIComponent(peer.id)}${isDirect ? '' : '&tab=secondhand'}`
     })
   }
 
@@ -357,7 +370,7 @@ function SecondhandChatPage() {
         }
       />
 
-      <View className='secondhand-chat-product'>
+      {!isDirect && (context || entry?.kind === 'product') && <View className='secondhand-chat-product'>
         <View className='secondhand-chat-product__image'>
           {productImage && !productImageFailed ? (
             <Image className='secondhand-chat-product__image-content' src={productImage} mode='aspectFill' onError={() => setProductImageFailed(true)} />
@@ -380,7 +393,7 @@ function SecondhandChatPage() {
         >
           <Text>查看宝贝</Text>
         </View>
-      </View>
+      </View>}
 
       <ScrollView
         className='secondhand-chat-scroll'
@@ -391,7 +404,7 @@ function SecondhandChatPage() {
       >
         <View className='secondhand-chat-scroll__inner'>
         <View className='secondhand-chat-safe-tip'>
-          <Text>平台不担保交易，请当面验货后再付款</Text>
+          <Text>{isDirect ? '友善交流，注意保护个人隐私' : '平台不担保交易，请当面验货后再付款'}</Text>
         </View>
 
         {status === 'loading' ? (
@@ -410,7 +423,7 @@ function SecondhandChatPage() {
           <View className='secondhand-chat-state'>
             <Text className='secondhand-chat-state__title'>会话已建立</Text>
             <Text className='secondhand-chat-state__desc'>
-              {role === 'seller' ? '回复买家确认交易。' : '发送第一条文字消息，与卖家确认宝贝情况。'}
+              {isDirect ? '发一句问候，开始交流吧。' : role === 'seller' ? '回复买家确认交易。' : '发送第一条文字消息，与卖家确认宝贝情况。'}
             </Text>
           </View>
         ) : (

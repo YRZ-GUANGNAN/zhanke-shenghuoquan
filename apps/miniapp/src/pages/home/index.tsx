@@ -26,7 +26,7 @@ import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
 import { postBodyWithoutTitle } from '../../utils/post-presentation'
 import { navigateToPublicProfile } from '../../utils/navigation'
-import { conversationPeer } from '../../utils/conversation-presentation'
+import { conversationPeer, uniquePeerConversations } from '../../utils/conversation-presentation'
 import './index.scss'
 
 type HomeTab = 'discover' | 'secondhand' | 'tools' | 'messages'
@@ -131,6 +131,7 @@ type ConversationStatus = 'idle' | 'loading' | 'empty' | 'ready' | 'error'
 type ToolStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'error'
 
 function conversationPeerLabel(context: IMConversationContext, currentUserId: string): string {
+  if (context.referenceType === 'user') return '点击继续交流'
   if (String(context.sellerId) === currentUserId) {
     return '你是卖家 · 二手交易'
   }
@@ -177,7 +178,7 @@ function HomeContent() {
   const currentSessionKey = useSessionStore((state) => `${state.token}:${state.profile.id}`)
   const visibleTabs = useMemo(() => {
     if (!visibility) return []
-    if (isMessagesPage) return visibility.messages && visibility.secondhand_chat
+    if (isMessagesPage) return visibility.messages
       ? [{ key: 'messages' as const, label: '私信' }] : []
     return tabs.filter((tab) => (
       tab.key === 'secondhand' ? visibility.secondhand :
@@ -291,7 +292,8 @@ function HomeContent() {
     setConversationStatus((current) => current === 'ready' || current === 'empty' ? current : 'loading')
     try {
       const contexts = await requestWithSingleSessionRecovery(() => listIMConversations(1, 20))
-      const items = await Promise.all(contexts.map(async (context): Promise<ConversationItem> => {
+      const items = await Promise.all(uniquePeerConversations(contexts).map(async (context): Promise<ConversationItem> => {
+        if (context.referenceType === 'user') return { context, product: null }
         try {
           return { context, product: await getProduct(String(context.productId)) }
         } catch {
@@ -381,14 +383,14 @@ function HomeContent() {
   useEffect(() => {
     conversationRequestVersion.current += 1
     conversationLoadingRef.current = false
-    conversationOwnerRef.current = visibility.messages && visibility.secondhand_chat ? currentSessionKey : ''
+    conversationOwnerRef.current = visibility.messages ? currentSessionKey : ''
     tabScrollPositions.current.messages = 0
     setConversationItems([])
     setConversationStatus('idle')
   }, [currentSessionKey, visibility.messages, visibility.secondhand_chat])
 
   useEffect(() => {
-    if (activeTab === 'messages' && conversationStatus === 'idle' && visibility.messages && visibility.secondhand_chat) {
+    if (activeTab === 'messages' && conversationStatus === 'idle' && visibility.messages) {
       void loadConversations(currentSessionKey)
     }
   }, [activeTab, conversationStatus, currentSessionKey, loadConversations, visibility.messages, visibility.secondhand_chat])
@@ -398,7 +400,7 @@ function HomeContent() {
   }, [activeTab, loadTools, toolStatus, visibility?.campus_tools])
 
   useDidShow(() => {
-    if (activeTab === 'messages' && visibility.messages && visibility.secondhand_chat) void loadConversations(currentSessionKey)
+    if (activeTab === 'messages' && visibility.messages) void loadConversations(currentSessionKey)
   })
 
   const openSearch = () => {
@@ -567,7 +569,7 @@ function HomeContent() {
         }}
       >
         {channel === 'messages' && (
-          visibility.messages && visibility.secondhand_chat && (
+          visibility.messages && (
           <View className='student-message-panel'>
             {conversationStatus === 'loading' || conversationStatus === 'idle' ? (
               <View className='student-message-state'><Text>正在读取私信…</Text></View>
@@ -581,7 +583,7 @@ function HomeContent() {
             ) : conversationStatus === 'empty' ? (
               <View className='student-message-state'>
                 <Text className='student-message-state__title'>还没有私信会话</Text>
-                <Text className='student-message-state__description'>从二手商品详情联系卖家后，会在这里继续交流。</Text>
+                <Text className='student-message-state__description'>从用户主页发私信，或从商品详情联系卖家后，可在这里继续交流。</Text>
               </View>
             ) : (
               conversationItems.map((item) => {
@@ -592,7 +594,7 @@ function HomeContent() {
                   className='student-message-row'
                   hoverClass='student-message-row--pressed'
                   role='button'
-                  aria-label={`与${peer.name}的私信，${item.product?.title || '相关二手商品'}`}
+                  aria-label={`与${peer.name}的私信${item.product ? `，${item.product.title}` : ''}`}
                   onClick={() => {
                     if (!channelInteraction.canActivate()) return
                     void Taro.navigateTo({
@@ -607,15 +609,15 @@ function HomeContent() {
                       <AppIcon name='chevron-right' className='student-message-row__chevron' />
                     </View>
                     <Text className='student-message-row__product'>
-                      {item.product?.title || '相关二手商品'}
+                      {item.context.referenceType === 'user' ? '用户私信' : item.product?.title || '相关二手商品'}
                     </Text>
                     <Text className='student-message-row__preview'>
                       {conversationPeerLabel(item.context, currentUserId)}
                     </Text>
                   </View>
-                  <View className='student-message-row__product-thumb'>
+                  {item.context.referenceType !== 'user' && <View className='student-message-row__product-thumb'>
                     {item.product?.images[0] ? <Image src={item.product.images[0]} mode='aspectFill' /> : <AppIcon name='market' className='student-message-row__product-placeholder' />}
-                  </View>
+                  </View>}
                 </View>
                 )
               })

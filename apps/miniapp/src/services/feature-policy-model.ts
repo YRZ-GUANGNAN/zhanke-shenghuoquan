@@ -41,7 +41,9 @@ export function featurePageKeys(path: string, params: Record<string, string | un
   if (page === 'post-detail' || page === 'user-profile') return ['forum']
   if (['student-secondhand', 'market', 'secondhand-detail', 'product-detail'].includes(page)) return ['secondhand']
   if (page === 'publish-secondhand') return ['secondhand_publish']
-  if (page === 'secondhand-chat' || page === 'chat' || page === 'conversations') return ['secondhand_chat']
+  if (page === 'conversations') return ['messages']
+  if (page === 'secondhand-chat') return params.userId || params.relationId ? ['messages'] : ['secondhand_chat']
+  if (page === 'chat') return ['secondhand_chat']
   if (page === 'notifications') return ['notifications']
   if (page === 'search') return ['search', params.scope === 'takeout' ? 'takeout' : params.scope === 'secondhand' ? 'secondhand' : 'forum']
   if (page === 'identity-application') return ['identity_application', params.role === 'rider' ? 'rider' : 'merchant']
@@ -75,7 +77,7 @@ export function featureRequestKeys(method: string, url: string): FeaturePolicyKe
     if (method === 'POST' && path === '/trade/products' || method === 'PUT' && path.startsWith('/trade/products/') && !path.endsWith('/favorite') && !path.endsWith('/contact')) keys.push('secondhand_publish')
     return keys
   }
-  if (path.startsWith('/im/')) return ['messages', 'secondhand_chat']
+  if (path.startsWith('/im/')) return ['messages']
   if (path.startsWith('/navigation/external-takeout')) return path.includes('/search') ? ['takeout', 'search'] : ['takeout']
   if (path.startsWith('/navigation')) return ['campus_tools']
   if (path.startsWith('/auth/identity-applications') && (method === 'POST' || method === 'PUT')) return ['identity_application', path.endsWith('/rider') ? 'rider' : 'merchant']
