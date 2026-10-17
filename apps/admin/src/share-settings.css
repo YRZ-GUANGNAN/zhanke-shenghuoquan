@@ -16,7 +16,10 @@
 .share-cover-source__option strong { color:#263142; font-size:13px; }
 .share-cover-source__option small { color:#687387; font-size:11px; line-height:1.5; }
 .share-settings-cover-actions { display:flex; flex-wrap:wrap; align-items:center; gap:12px; font-size:12px; color:#687387; }
-.share-card-preview__warning { margin:12px 16px; font-size:12px; line-height:1.6; color:#975126; }
+.share-card-preview__feedback { margin:12px 16px; color:#687387; font-size:12px; line-height:1.6; }
+.share-card-preview__feedback:empty { display:none; }
+.share-card-preview__feedback p { margin:0 0 8px; }
+.share-card-preview__feedback .share-card-preview__warning { color:#975126; }
 .share-settings-preview { border-left:1px solid #e7eaf0; padding-left:32px; }
 .share-settings-preview h3 { font-size:15px; margin:0 0 16px; }
 .share-settings-tabs { display:flex; gap:4px; margin-bottom:20px; }

@@ -26,7 +26,7 @@
 
 ## 验证
 
-通过：
+本轮已通过：
 
 - `npm.cmd run check:admin-share-default`
 - `npm.cmd run check:layer-presence`
@@ -35,17 +35,20 @@
 - `npm.cmd run check:tactile-navigation`
 - `npm.cmd run check:profile-edge-back`
 - `npm.cmd run check:secondhand-presentation`
+- `npm.cmd run check:gallery-presentation`
+- `npm.cmd run check:channel-pager`
 - `npm.cmd run check:share-cards`
 - `npm.cmd run check:feature-gate-feedback`
 - `npm.cmd run check:admin-ui-system`
 - `npm.cmd run check:miniapp-ui-system`
-- `npm.cmd run check:media-review-policy`
-- `npm.cmd run check:profile-presentation`
+- `npm.cmd run check:home-real-tools-contract`
 - `npm.cmd run typecheck`
 - `npm.cmd run build:admin`
 - `npm.cmd run build:miniapp`
 - `git diff --check`
 
-小程序构建成功，仍有基线已有的 CSS 顺序和 `vendors.js` 体积建议警告；不影响构建产物。系统级减少动效、真机触感和微信最终分享卡片仍需真机验收，开发者工具检查不能替代这些结论。
+构建产物检查确认正式小程序仍为 30 个业务页面，未包含 `feedback-review` 检查页。构建仍报告基线已有的 CSS 顺序和 `vendors.js` 体积建议警告，不影响生成产物。
+
+本轮尝试用隔离检查工程连接微信开发者工具自动化通道，重载后通道在页面查询阶段超时，未形成新的原生交互通过证据；因此没有把它写成已通过。减少动效、真机触感、微信最终分享卡片和原生面板拖动仍需在开发者工具/真机中人工复核。
 
 本轮没有部署、上传微信体验版、推送 GitHub 或修改线上封面。

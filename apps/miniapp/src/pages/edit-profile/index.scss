@@ -92,6 +92,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .edit-profile-avatar { transition: none; }
+  .edit-profile-avatar:active { transform: none; }
 }
 
 .edit-profile-avatar__text {

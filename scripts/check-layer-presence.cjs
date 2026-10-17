@@ -27,8 +27,18 @@ async function run() {
   const check = (name, test) => {
     try { test() } catch (error) { errors.push(`${name}: ${error.message}`) }
   }
-  const component = (tag) => ({ children, mode, ...props }) => React.createElement(tag, props, children)
+  const component = (tag) => ({ children, mode, catchMove, ariaLabel, ...props }) => React.createElement(tag, { ...props, ...(ariaLabel ? { 'aria-label': ariaLabel } : {}) }, children)
   const primitives = { View: component('div'), Text: component('span'), Button: component('button'), Image: component('img') }
+  const hides = new Set(), shows = new Set()
+  const lifecycle = callbacks => handler => {
+    const latest = React.useRef(handler)
+    latest.current = handler
+    React.useEffect(() => {
+      const callback = () => latest.current()
+      callbacks.add(callback)
+      return () => callbacks.delete(callback)
+    }, [])
+  }
   const modules = new Map()
   const loadSource = (sourcePath) => {
     if (modules.has(sourcePath)) return modules.get(sourcePath).exports
@@ -37,6 +47,7 @@ async function run() {
     loaded.require = (id) => {
       if (id === 'react' || id === 'react/jsx-runtime') return require(id)
       if (id === '@tarojs/components') return primitives
+      if (id === '@tarojs/taro') return { useDidHide: lifecycle(hides), useDidShow: lifecycle(shows) }
       if (id.endsWith('.scss')) return {}
       if (id.endsWith('.svg')) return id
       if (id.startsWith('.')) {
@@ -55,6 +66,7 @@ async function run() {
   const { useLayerPresence, LAYER_EXIT_MS } = loadSource(path.join(sourceRoot, 'hooks/use-layer-presence.ts'))
   const { AppDialog } = loadSource(path.join(sourceRoot, 'components/ui/app-dialog.tsx'))
   const { AppActionSheet } = loadSource(path.join(sourceRoot, 'components/ui/app-action-sheet.tsx'))
+  const { useSheetDismiss } = loadSource(path.join(sourceRoot, 'hooks/use-sheet-dismiss.ts'))
   assert.equal(typeof useLayerPresence, 'function', 'useLayerPresence 必须导出 hook')
   assert.equal(Number.isInteger(LAYER_EXIT_MS), true, '退出时长应为明确的整数毫秒')
   assert.ok(LAYER_EXIT_MS >= 220 && LAYER_EXIT_MS <= 320, '退出时长必须覆盖现有面板动效且保持短时范围')
@@ -175,6 +187,29 @@ async function run() {
     check('面板重开可关闭', () => assert.equal(closes, 1))
     await sheet.unmount()
 
+    let gesture, dismissed = 0
+    function DragProbe() { gesture = useSheetDismiss(true, () => { dismissed++ }); return null }
+    const dragProbe = fixture()
+    const event = (y, ended = false) => ({ stopPropagation() {}, touches: ended ? [] : [{ identifier: 1, clientX: 100, clientY: y }], changedTouches: [{ identifier: 1, clientX: 100, clientY: y }] })
+    await dragProbe.render(React.createElement(DragProbe))
+    await React.act(async () => gesture.handlers.onTouchStart(event(0)))
+    await React.act(async () => gesture.handlers.onTouchMove(event(100)))
+    check('面板拖动跟手', () => assert.ok(gesture.dragging && gesture.offset > 0))
+    await React.act(async () => hides.forEach(hide => hide()))
+    check('隐藏时取消拖动', () => assert.equal(gesture.offset, 0, '页面隐藏后不能保留拖动位移'))
+    await React.act(async () => shows.forEach(show => show()))
+    await React.act(async () => gesture.handlers.onTouchEnd(event(100, true)))
+    check('返回后忽略旧抬手', () => assert.equal(dismissed, 0, '回前台的旧手势不能关闭面板'))
+    await React.act(async () => gesture.handlers.onTouchStart(event(0)))
+    await React.act(async () => gesture.handlers.onTouchMove(event(100)))
+    await React.act(async () => gesture.handlers.onTouchEnd(event(100, true)))
+    check('返回后新手势可用', () => assert.equal(dismissed, 1))
+    await React.act(async () => gesture.handlers.onTouchStart(event(0)))
+    await React.act(async () => gesture.handlers.onTouchMove(event(100)))
+    await dragProbe.unmount()
+    await React.act(async () => gesture.handlers.onTouchEnd(event(100, true)))
+    check('卸载后忽略旧抬手', () => assert.equal(dismissed, 1))
+
     // Sass解析后的实际规则：jsdom没有命中测试，背景点穿由浏览器另行验证。
     for (const name of ['app-dialog', 'app-action-sheet']) {
       const css = sass.compile(path.join(sourceRoot, `components/ui/${name}.scss`), {
@@ -219,5 +254,5 @@ async function run() {
   }
 }
 
-run().then(() => console.log('layer presence: PASS (real dialog/sheet, paint frames, exit interception, loading/retry, fast reopen, fallback and cleanup)'))
+run().then(() => console.log('layer presence: PASS (real dialog/sheet, paint frames, exit interception, fast reopen, hidden/unmounted drag cancellation, fallback and cleanup)'))
   .catch((error) => { console.error(error); process.exitCode = 1 })
