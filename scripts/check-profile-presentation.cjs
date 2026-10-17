@@ -26,6 +26,7 @@ async function run() {
   const component = (name) => (props) => React.createElement('div', {
     className: props.className,
     'data-component': name,
+    'data-item-id': props.itemId,
     ref: (node) => { if (node) node.taroProps = props },
   }, props.children)
   const View = component('View')
@@ -64,7 +65,9 @@ async function run() {
         if (id.endsWith('/capsule-page-header')) return { CapsuleSystemRow: View, default: (props) => React.createElement(View, { className: 'test-header' }, props.left, props.right) }
         if (id.endsWith('/use-viewport-refresh')) return { useViewportRefresh: () => ({}) }
         if (id.endsWith('/capsule-safe')) return { getCapsuleSafeStyle: () => ({}) }
-        if (id.endsWith('/components/ui')) return { AppIconButton: View }
+        if (id.endsWith('/components/ui')) return { AppIconButton: View, AppActionSheet: (props) => props.visible ? React.createElement(View, props) : null, AppDialog: (props) => props.visible ? React.createElement(View, { ...props, className: 'test-dialog' }) : null }
+        if (id.endsWith('/use-page-share')) return { usePageShare: () => true }
+        if (id.endsWith('/services/a-user')) return options.user || {}
         if (id.endsWith('/services/taro')) return { default: taro }
         if (id.endsWith('/services/b-community')) return options.community || {}
         if (id.endsWith('/services/c-trade')) return options.trade || {}
@@ -234,6 +237,68 @@ async function run() {
     content.options.session = { ...session(), token: 'isolated-other-session', profile: { ...session().profile, id: 'fixture-account-c' } }
     await content.render()
     assert.equal(content.all('.my-content-row').length, 0, '更换账号后不显示上个账号的内容')
+    const publicValue = { profile: { id: 7, nickname: '封面用户', avatar: 'test-avatar', cover: 'test-cover', school: '不展示的学校', campus: '' }, followingCount: 12, followerCount: 8, likedCount: 26, isFollowing: false }
+    const publicCalls = [], productReads = [], profileRoutes = [], follows = []
+    let returned = 0
+    const publicCommunity = {
+      getPublicCommunityProfile: () => { const task = deferred(); publicCalls.push(task); return task.promise },
+      getPublicUserPosts: async () => ({ items: [post('11')], total: 1, page: 1 }),
+      setUserFollowing: (id, value) => { const task = deferred(); follows.push({ ...task, id, value }); return task.promise },
+    }
+    const publicPage = await mount('user-profile', {
+      params: { userId: '7', tab: 'secondhand' }, visibility: { ...visibility, likes: true, following: true },
+      community: publicCommunity,
+      trade: { getPublicUserProducts: async (...args) => { productReads.push(args); return { items: [], total: 0, page: 1 } } },
+      taro: { navigateBack: async () => { returned++ }, navigateTo: async ({ url }) => profileRoutes.push(url) },
+    })
+    await publicPage.event(() => publicPage.props('.public-profile-nav__back').onClick())
+    assert.equal(returned, 1, '加载时也可以返回')
+    await publicPage.event(() => publicCalls[0].resolve(publicValue))
+    assert.equal(publicPage.props('[data-component="Swiper"]').current, 1, '卖家入口默认打开二手')
+    assert.equal(publicPage.props('.public-profile-cover__image').src, 'test-cover', '公开主页展示服务端真实封面')
+    assert.ok(!publicPage.container.textContent.includes('不展示的学校'))
+    await publicPage.event(() => { publicPage.props('.public-profile-action--primary').onClick(); publicPage.props('.public-profile-action--primary').onClick() })
+    assert.equal(follows.length, 1, '同帧连点关注只写一次')
+    await publicPage.event(() => follows[0].resolve())
+    assert.ok(publicPage.container.textContent.includes('已关注'))
+    await publicPage.event(() => publicPage.props('[data-item-id="secondhand"] .public-profile-scroll').onScroll({ detail: { scrollTop: 655 } }))
+    await publicPage.event(() => publicPage.props('[data-item-id="secondhand"] .public-profile-tab').onClick())
+    assert.equal(publicPage.props('[data-component="Swiper"]').current, 0)
+    assert.equal(publicPage.props('[data-item-id="secondhand"] .public-profile-scroll').scrollTop, 655, '不同内容标签分别保留滚动位置')
+    await publicPage.event(() => publicPage.props('.public-profile-cover__image').onError())
+    await publicPage.event(() => publicPage.props('.public-profile-user__avatar-image').onError())
+    assert.equal(publicPage.all('.public-profile-cover__image').length, 0, '封面失效回退浅色底，保留头像资料')
+    assert.equal(publicPage.all('.public-profile-user__avatar-image').length, 0, '头像失效回退首字')
+    await publicPage.show()
+    await publicPage.show()
+    await publicPage.event(() => publicCalls[1].resolve({ ...publicValue, profile: { ...publicValue.profile, cover: 'returned-cover', avatar: 'returned-avatar' } }))
+    assert.equal(publicPage.props('.public-profile-cover__image').src, 'returned-cover', '从编辑页返回后同步封面，不重置内容滚动')
+    assert.equal(publicPage.props('[data-item-id="secondhand"] .public-profile-scroll').scrollTop, 655)
+    publicPage.options.params = { userId: '999', tab: 'posts' }
+    publicPage.options.visibility.secondhand = false
+    await publicPage.render()
+    await publicPage.event(() => publicCalls[2].resolve({ ...publicValue, profile: { ...publicValue.profile, cover: 'test-cover-new', avatar: 'test-avatar-new' } }))
+    assert.equal(publicPage.props('.public-profile-cover__image').src, 'test-cover-new', '新封面不继承旧图失败状态')
+    assert.equal(publicPage.props('.public-profile-user__avatar-image').src, 'test-avatar-new')
+    assert.equal(publicPage.all('[data-component="SwiperItem"]').length, 1)
+    assert.equal(productReads.length, 1, '关闭二手不请求或显示商品')
+    assert.ok(publicPage.container.textContent.includes('用户号 7'), '子页成为当前 router 不改变原主页用户')
+
+    const plainProfile = await mount('user-profile', {
+      params: { userId: '7' }, session: { ...session(), profile: { ...session().profile, id: '7' } },
+      community: { ...publicCommunity, getPublicCommunityProfile: async () => ({ ...publicValue, profile: { id: 7, nickname: '本人', avatar: '', school: '', campus: '' } }) },
+      trade: { getPublicUserProducts: async () => ({ items: [], total: 0, page: 1 }) },
+      taro: { navigateTo: async ({ url }) => profileRoutes.push(url) },
+    })
+    assert.equal(plainProfile.props('[data-component="Swiper"]').current, 0, '帖子入口默认打开帖子')
+    assert.equal(plainProfile.all('.public-profile-cover__image').length, 0, '旧接口无 cover 可正常查看')
+    await plainProfile.event(() => plainProfile.props('.public-profile-action--primary').onClick())
+    assert.equal(profileRoutes.at(-1), '/pages/edit-profile/index', '自己的公开主页仍可编辑资料')
+    assert.equal(plainProfile.props('.public-profile-action--secondary').openType, 'share')
+    const invalid = await mount('user-profile', { params: { userId: '../7' }, community: { getPublicCommunityProfile: () => assert.fail('无效 ID 不请求') } })
+    assert.ok(invalid.container.textContent.includes('用户主页入口无效'))
+    assert.ok(invalid.props('.public-profile-nav__back').onClick)
+    assert.ok(invalid.props('.public-profile-retry').onClick)
     console.log('profile presentation: isolated page behavior ok')
   } finally {
     await act(async () => { for (const root of roots) root.unmount() })

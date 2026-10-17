@@ -259,12 +259,14 @@
   font-weight: 600;
 }
 .secondhand-card__seller {
+  min-height: 44PX;
   display: flex;
   align-items: center;
   gap: 8rpx;
   margin-top: 12rpx;
   min-width: 0;
 }
+.secondhand-card__seller:active { opacity: .72; }
 .secondhand-card__avatar {
   flex: 0 0 auto;
   width: 32rpx;

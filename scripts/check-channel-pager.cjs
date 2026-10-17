@@ -38,6 +38,7 @@ async function run() {
       if (id === '@tarojs/components') return components
       if (id.endsWith('.scss')) return {}
       if (Object.prototype.hasOwnProperty.call(dependencies, id)) return dependencies[id]
+      if (id.endsWith('/utils/navigation')) return load(path.join(root, 'apps/miniapp/src/utils/navigation.ts'), { '../services/taro': dependencies['../../services/taro'] })
       throw new Error(`Unexpected channel test dependency: ${id}`)
     }
     loaded._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), {

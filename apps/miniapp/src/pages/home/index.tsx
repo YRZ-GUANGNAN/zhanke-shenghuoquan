@@ -23,6 +23,7 @@ import { usePageShare } from '../../hooks/use-page-share'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
 import { postBodyWithoutTitle } from '../../utils/post-presentation'
+import { navigateToPublicProfile } from '../../utils/navigation'
 import './index.scss'
 
 type HomeTab = 'discover' | 'secondhand' | 'tools' | 'messages'
@@ -34,6 +35,7 @@ type DiscoverCard = {
   title: string
   summary: string
   author: string
+  authorId: string
   avatar: string
   avatarUrl: string
   likes: number
@@ -75,6 +77,7 @@ function toPostCard(post: CommunityPost): DiscoverCard {
     title: post.title || post.content,
     summary: postBodyWithoutTitle(post.title, post.content),
     author: post.author,
+    authorId: post.authorId,
     avatar: post.author.slice(0, 1) || '校',
     avatarUrl: post.avatar,
     likes: post.likedCount
@@ -91,6 +94,7 @@ function toProductCard(product: Product): DiscoverCard {
     title: product.title,
     summary: product.description,
     author: product.sellerName,
+    authorId: product.sellerId,
     avatar: product.sellerName.slice(0, 1) || '校',
     avatarUrl: product.sellerAvatar,
     price: product.price,
@@ -459,10 +463,15 @@ function HomeContent() {
           {!card.imageUrl && card.summary && card.summary !== card.title && <Text className='student-post-card__summary'>{card.summary}</Text>}
           {card.target === 'secondhand' && <Text className='student-post-card__price'>¥{card.price}</Text>}
           <View className='student-post-card__meta'>
-            <View className='student-post-card__avatar'>
-              {card.avatarUrl ? <Image src={card.avatarUrl} mode='aspectFill' lazyLoad /> : <Text>{card.avatar}</Text>}
+            <View className='student-post-card__profile' ariaRole={visibility.forum ? 'button' : undefined} ariaLabel={`查看${card.author}的主页`} onClick={(event) => {
+              event.stopPropagation()
+              if (visibility.forum && channelInteraction.canActivate()) void navigateToPublicProfile(card.authorId, card.target === 'post' ? 'posts' : 'secondhand')
+            }}>
+              <View className='student-post-card__avatar'>
+                {card.avatarUrl ? <Image src={card.avatarUrl} mode='aspectFill' lazyLoad /> : <Text>{card.avatar}</Text>}
+              </View>
+              <Text className='student-post-card__author'>{card.author}</Text>
             </View>
-            <Text className='student-post-card__author'>{card.author}</Text>
             {(card.target === 'secondhand' ? visibility.favorites : visibility.likes) && <View className='student-post-card__like'>
               <AppIcon name={card.target === 'secondhand' ? 'star' : 'heart'} className='student-post-card__heart' />
               <Text>{card.likes}</Text>

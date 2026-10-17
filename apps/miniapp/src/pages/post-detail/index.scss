@@ -49,11 +49,14 @@
 }
 
 .post-detail-author {
+  @include ref.touch;
   min-width: 0;
   flex: 1;
   display: flex;
   align-items: center;
 }
+
+.post-detail-author:active { opacity: .72; }
 
 .post-detail-author__avatar {
   width: 56rpx;

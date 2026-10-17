@@ -65,6 +65,7 @@ export interface PublicCommunityProfile {
 		id: number
 		nickname: string
 		avatar: string
+		cover?: string
 		school: string
 		campus: string
 	}

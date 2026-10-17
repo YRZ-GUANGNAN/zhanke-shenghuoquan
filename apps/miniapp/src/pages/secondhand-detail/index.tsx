@@ -16,6 +16,7 @@ import type { Product } from '../../types'
 import { formatPostDate, preparePostMedia, removeFailedPostMedia, type PostGalleryState } from '../../utils/post-presentation'
 import { useGalleryPresentation } from '../../hooks/use-gallery-presentation'
 import ProductComments from './product-comments'
+import { navigateToPublicProfile } from '../../utils/navigation'
 import './index.scss'
 
 function showToast(title: string) {
@@ -132,9 +133,7 @@ function SecondhandDetailPage() {
       showToast('卖家资料暂不可用')
       return
     }
-    void Taro.navigateTo({
-      url: `/pages/user-profile/index?userId=${encodeURIComponent(product.sellerId)}&tab=secondhand`
-    })
+    void navigateToPublicProfile(product.sellerId, 'secondhand')
   }
 
   const statusLabel = product?.status === 'selling'
@@ -270,10 +269,10 @@ function SecondhandDetailPage() {
         {status !== 'ready' || !product ? renderState() : (
           <>
             <View className='secondhand-detail-seller'>
-              <View className='secondhand-detail-seller__avatar'>
+              <View className='secondhand-detail-seller__avatar' ariaRole={visibility.forum ? 'button' : undefined} ariaLabel='查看卖家主页' onClick={openSellerProfile}>
                 {product.sellerAvatar && !avatarFailed ? <Image src={product.sellerAvatar} mode='aspectFill' onError={() => setAvatarFailed(true)} /> : <Text>{sellerAvatar}</Text>}
               </View>
-              <View className='secondhand-detail-seller__main'>
+              <View className='secondhand-detail-seller__main' ariaRole={visibility.forum ? 'button' : undefined} ariaLabel='查看卖家主页' onClick={openSellerProfile}>
                 <Text className='secondhand-detail-seller__name'>{product.sellerName}</Text>
                 <Text className='secondhand-detail-seller__meta'>{sellerMeta}{product.createdAt ? ` · ${formatPostDate(product.createdAt)} 发布` : ''}</Text>
               </View>

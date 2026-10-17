@@ -1,31 +1,64 @@
 @use '../../styles/design-tokens.scss' as *;
 @use '../../styles/reference-layout.scss' as ref;
+@use '../../styles/profile-cover-surface.scss' as cover;
 
 .public-profile-page {
   @include ref.page-foundation;
+  --profile-toolbar-height: max(44PX, 88rpx);
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
-  background: $bg-app;
+  overflow-x: hidden;
+  background: $bg-surface;
   color: $text-strong;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
 }
 
 .public-profile-hero {
-  flex: 0 0 auto;
-  padding: 0 30rpx 34rpx;
-  background: $brand-primary;
-  color: $text-on-color;
+  position: relative;
+  padding: 0 0 28rpx;
+  background: $bg-surface;
   box-sizing: border-box;
 }
+
+.public-profile-cover {
+  @include cover.frame;
+  @include cover.surface;
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  pointer-events: none;
+  background: $brand-tint;
+}
+
+.public-profile-cover__image { position: absolute; inset: 0; width: 100%; height: 100%; }
+.public-profile-hero__toolbar { height: var(--profile-toolbar-height); }
+.public-profile-hero > .capsule-system-row,
+.public-profile-user,
+.public-profile-stats { position: relative; z-index: 1; }
+
+.public-profile-navigation {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  right: 0;
+  left: 0;
+  padding-top: var(--capsule-system-row-height, 72px);
+  pointer-events: none;
+  transition: background-color $duration-fast ease;
+}
+.public-profile-navigation--scrolled { background: $bg-surface; }
 
 .public-profile-nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 48px;
-  height: auto;
+  gap: 16rpx;
+  height: var(--profile-toolbar-height);
+  margin: 0 24rpx;
 }
 
 .public-profile-nav__back {
@@ -34,6 +67,9 @@
   flex: 0 0 44PX;
   width: 44PX;
   height: 44PX;
+  border-radius: 50%;
+  background: rgba($bg-surface, .92);
+  pointer-events: auto;
 }
 
 .public-profile-nav__back::before {
@@ -42,8 +78,8 @@
   left: 12PX;
   width: 20rpx;
   height: 20rpx;
-  border-bottom: 4rpx solid $text-on-color;
-  border-left: 4rpx solid $text-on-color;
+  border-bottom: 4rpx solid $text-strong;
+  border-left: 4rpx solid $text-strong;
   content: '';
   transform: translateY(-50%) rotate(45deg);
 }
@@ -56,17 +92,39 @@
   justify-content: center;
   width: 44PX;
   height: 44PX;
-  color: $text-on-color;
+  border-radius: 50%;
+  background: rgba($bg-surface, .92);
+  color: $text-strong;
   font-size: 30rpx;
   line-height: 1;
   margin-right: 0;
+  pointer-events: auto;
 }
 
+.public-profile-nav__title {
+  @include ref.type(label);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.public-profile-nav__back:active,
+.public-profile-nav__more:active,
+.public-profile-action:active { opacity: .72; }
+
 .public-profile-user {
+  margin: max(24rpx, calc(#{cover.$height} - var(--capsule-system-row-height, 72px) - var(--profile-toolbar-height) - #{cover.$avatar-overlap})) 32rpx 0;
+}
+
+.public-profile-user__top {
   display: flex;
-  align-items: center;
-  gap: 24rpx;
-  margin-top: 24rpx;
+  align-items: flex-end;
+  flex-wrap: nowrap;
+  gap: 16rpx;
+  min-width: 0;
 }
 
 .public-profile-user__avatar {
@@ -74,15 +132,17 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 94rpx;
-  height: 94rpx;
-  border: 5rpx solid rgba(255, 255, 255, .72);
+  width: 144rpx;
+  height: 144rpx;
+  overflow: hidden;
+  border: 4rpx solid $bg-surface;
   border-radius: 50%;
-  background: #F5A888;
-  color: $text-on-color;
-  font-size: 46rpx;
+  background: $brand-tint;
+  color: $brand-primary-strong;
+  font-size: 38rpx;
   font-weight: 700;
   line-height: 1;
+  box-sizing: border-box;
 }
 
 .public-profile-user__avatar-image,
@@ -102,13 +162,15 @@
   flex: 1 1 auto;
   flex-direction: column;
   min-width: 0;
+  margin-top: 16rpx;
 }
 
 .public-profile-user__name {
-  @include ref.type(title);
   overflow: hidden;
-  color: $text-on-color;
-  font-weight: 800;
+  color: $text-strong;
+  font-size: 42rpx;
+  line-height: 56rpx;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -117,18 +179,12 @@
   @include ref.type(meta);
   display: block;
   overflow: hidden;
-  margin-top: 4rpx;
-  color: rgba(255, 255, 255, .86);
+  margin-top: 6rpx;
+  color: $text-secondary;
+  font-size: 23rpx;
+  line-height: 34rpx;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.public-profile-bio {
-  @include ref.type(author);
-  @include ref.wrap;
-  display: block;
-  margin-top: 24rpx;
-  color: rgba(255, 255, 255, .95);
 }
 
 .public-profile-stats {
@@ -137,8 +193,8 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 16rpx 40rpx;
-  margin-top: 24rpx;
-  color: rgba(255, 255, 255, .84);
+  margin: 24rpx 32rpx 0;
+  color: $text-secondary;
 }
 
 .public-profile-stats > view {
@@ -150,55 +206,69 @@
 }
 
 .public-profile-stats__value {
-  color: $text-on-color;
+  color: $text-strong;
   font-size: 34rpx;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 
 .public-profile-actions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 16rpx;
-  margin-top: 28rpx;
+  display: flex;
+  width: 100%;
+  max-width: none;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  min-width: 0;
 }
 
 .public-profile-action {
   @include ref.touch;
-  @include ref.type(label);
-  width: 100%;
+  font-size: 24rpx;
+  line-height: 32rpx;
+  margin: 0;
   box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
   height: auto;
-  padding: 12rpx 18rpx;
-  border: 2rpx solid rgba(255, 255, 255, .48);
-  border-radius: 8rpx;
+  padding: 8rpx 20rpx;
+  border: 1rpx solid $border-subtle;
+  border-radius: 14rpx;
   font-weight: 600;
   white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   box-sizing: border-box;
 }
 
 .public-profile-action--primary {
-  border-color: $text-on-color;
-  background: $text-on-color;
-  color: $brand-primary-strong;
+  min-width: 144rpx;
+  border-color: $brand-primary;
+  background: $brand-primary;
+  color: $text-on-color;
 }
 
 .public-profile-action--primary.public-profile-action--active {
-  border-color: rgba(255, 255, 255, .62);
-  background: rgba(255, 255, 255, .16);
-  color: $text-on-color;
+  border-color: $border-subtle;
+  background: $bg-surface;
+  color: $text-secondary;
 }
 
 .public-profile-action--secondary {
-  background: rgba(255, 255, 255, .12);
-  color: $text-on-color;
+  flex: 1 1 100%;
+  background: $bg-surface;
+  color: $text-primary;
 }
+.public-profile-action::after { border: 0; }
+.public-profile-action[disabled] { opacity: .5; }
 
 .public-profile-tabs {
+  position: sticky;
+  z-index: 3;
+  top: calc(var(--capsule-system-row-height, 72px) + var(--profile-toolbar-height));
   display: flex;
   flex: 0 0 auto;
   min-height: 44PX;
@@ -256,7 +326,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 16rpx;
-  padding: 24rpx 24rpx 48rpx;
+  padding: 24rpx 24rpx calc(48rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
 }
 
@@ -404,6 +474,22 @@
   box-sizing: border-box;
 }
 
+.public-profile-state {
+  flex: 1;
+  padding-top: calc(var(--capsule-system-row-height, 72px) + var(--profile-toolbar-height));
+}
+.public-profile-retry {
+  @include ref.touch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 32rpx;
+  margin-top: 24rpx;
+  border-radius: 14rpx;
+  background: $brand-primary;
+  color: $text-on-color;
+}
+
 .public-profile-empty__icon {
   display: flex;
   flex: 0 0 78rpx;
@@ -480,15 +566,6 @@
 }
 
 @media (max-width: 340px) {
-  .public-profile-hero {
-    padding-right: 24rpx;
-    padding-left: 24rpx;
-  }
-
-  .public-profile-user {
-    gap: 18rpx;
-  }
-
   .public-profile-stats {
     justify-content: space-between;
     gap: 18rpx;
@@ -496,7 +573,7 @@
 
   .public-profile-action {
     padding: 0 12rpx;
-    font-size: 25rpx;
+    font-size: 24rpx;
   }
 
   .public-profile-waterfall {
@@ -507,4 +584,8 @@
   .public-profile-waterfall__column {
     gap: 32rpx;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .public-profile-navigation { transition: none; }
 }

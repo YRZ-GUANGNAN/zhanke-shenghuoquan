@@ -12,6 +12,7 @@ import type { Product } from '../../types'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
 import { useSessionStore } from '../../stores/session'
+import { navigateToPublicProfile } from '../../utils/navigation'
 import './index.scss'
 
 type CategoryKey = '全部' | '数码' | '书籍资料' | '生活用品' | '代步'
@@ -242,7 +243,10 @@ export default function StudentSecondhandContent({ embedded = false, active = tr
           <Text className='secondhand-card__title'>{item.title}</Text>
           <Text className='secondhand-card__price'><Text className='secondhand-card__currency'>¥</Text>{item.price}</Text>
           <Text className='secondhand-card__meta'>{[item.condition, item.category].filter(Boolean).join(' · ')}</Text>
-          <View className='secondhand-card__seller'>
+          <View className='secondhand-card__seller' ariaRole={visibility.forum ? 'button' : undefined} ariaLabel={`查看${item.sellerName}的主页`} onClick={(event) => {
+            event.stopPropagation()
+            if (active && visibility.forum && !navigatingRef.current && (!interaction || interaction.canActivate())) void navigateToPublicProfile(item.sellerId, 'secondhand')
+          }}>
             {item.sellerAvatar && !failedImages.has(avatarKey)
               ? <Image className='secondhand-card__avatar' src={item.sellerAvatar} mode='aspectFill' onError={() => markImageFailed(avatarKey)} />
               : <Text className='secondhand-card__avatar secondhand-card__avatar--text'>{item.sellerName.trim().charAt(0) || '校'}</Text>}

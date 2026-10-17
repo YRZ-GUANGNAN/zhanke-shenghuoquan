@@ -2,6 +2,7 @@ import { withFeaturePage } from '../../components/feature-page-gate'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import { usePageShare } from '../../hooks/use-page-share'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useDidShow } from '@tarojs/taro'
 import { Button, Image, ScrollView, Text, View } from '@tarojs/components'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
@@ -39,7 +40,7 @@ function splitColumns<T>(items: T[]) {
 function UserProfilePage() {
   const capsuleStyle = useViewportRefresh()
   const visibility = useFeatureVisibility()
-  const params = Taro.getCurrentInstance().router?.params || {}
+  const [params] = useState(() => Taro.getCurrentInstance().router?.params || {})
   const userId = String(params.userId || '').trim()
   const currentUserId = useSessionStore((state) => state.profile.id)
   const initialTab: ProfileTab = params.tab === 'secondhand' ? 'secondhand' : 'posts'
@@ -63,8 +64,13 @@ function UserProfilePage() {
   const [blockConfirmVisible, setBlockConfirmVisible] = useState(false)
   const [blockPending, setBlockPending] = useState(false)
   const [error, setError] = useState('')
+  const [failedCover, setFailedCover] = useState('')
+  const [failedAvatar, setFailedAvatar] = useState('')
+  const [scrolledTabs, setScrolledTabs] = useState<Record<ProfileTab, boolean>>({ posts: false, secondhand: false })
   const requestVersion = useRef(0)
   const loadingMoreRef = useRef(false)
+  const followPending = useRef(false)
+  const didShowOnce = useRef(false)
   const scrollPositions = useRef<Record<ProfileTab, number>>({ posts: 0, secondhand: 0 })
   const interaction = useChannelInteraction()
   const visibleTabs: ProfileTab[] = visibility.secondhand ? ['posts', 'secondhand'] : ['posts']
@@ -115,6 +121,20 @@ function UserProfilePage() {
   useEffect(() => {
     scrollPositions.current = { posts: 0, secondhand: 0 }
   }, [userId])
+
+  // Reconcile a changed cover/follow state after returning without replacing
+  // either content list or its saved scroll position.
+  useDidShow(() => {
+    if (!didShowOnce.current) { didShowOnce.current = true; return }
+    if (status !== 'ready' || followPending.current) return
+    const version = requestVersion.current
+    void getPublicCommunityProfile(userId).then((value) => {
+      if (requestVersion.current !== version || followPending.current) return
+      setProfile(value)
+      setFollowing(value.isFollowing)
+      setFollowerCount(value.followerCount)
+    }).catch(() => showToast('资料刷新失败，已保留当前主页'))
+  })
 
   const loadMore = async (tab: ProfileTab = activeTab) => {
     if (loadingMoreRef.current || tab !== activeTab || (tab === 'secondhand' && !visibility.secondhand)) return
@@ -168,9 +188,12 @@ function UserProfilePage() {
   const postColumns = useMemo(() => splitColumns(posts), [posts])
   const productColumns = useMemo(() => splitColumns(products), [products])
   const isSelf = currentUserId === userId
+  const hasCover = Boolean(profile?.profile.cover && profile.profile.cover !== failedCover)
+  const hasAvatar = Boolean(profile?.profile.avatar && profile.profile.avatar !== failedAvatar)
 
   const toggleFollow = async () => {
-    if (busy || isSelf) return
+    if (followPending.current || isSelf || !visibility.following) return
+    followPending.current = true
     const next = !following
     setBusy(true)
     try {
@@ -180,6 +203,7 @@ function UserProfilePage() {
     } catch (value) {
       showToast(value instanceof Error ? value.message : '关注操作失败')
     } finally {
+      followPending.current = false
       setBusy(false)
     }
   }
@@ -259,55 +283,71 @@ function UserProfilePage() {
     </View>
   )
 
-  if (status === 'loading') return <View className='public-profile-page'><View className='public-profile-empty'><Text>正在加载真实主页…</Text></View></View>
-  if (status === 'error' || !profile) {
+  const navigation = (
+    <View className={`public-profile-navigation${status !== 'ready' || scrolledTabs[activeTab] ? ' public-profile-navigation--scrolled' : ''}`}>
+      <View className='public-profile-nav'>
+        <View className='public-profile-nav__back' ariaRole='button' ariaLabel='返回' onClick={() => void navigateBackOrHome()} />
+        {scrolledTabs[activeTab] && profile && <Text className='public-profile-nav__title'>{profile.profile.nickname}</Text>}
+        {status === 'ready' && <View className='public-profile-nav__more' ariaRole='button' ariaLabel='更多操作' onClick={() => setMenuVisible(true)}><Text>•••</Text></View>}
+      </View>
+    </View>
+  )
+
+  if (status !== 'ready' || !profile) {
     return (
-      <View className='public-profile-page'>
-        <View className='public-profile-empty' onClick={() => setReloadKey((value) => value + 1)}>
-          <Text className='public-profile-empty__title'>{error || '用户主页加载失败'}</Text>
-          <Text className='public-profile-empty__desc'>点击重试</Text>
+      <View className='public-profile-page' style={capsuleStyle}>
+        {navigation}
+        <View className='public-profile-state public-profile-empty'>
+          <Text className='public-profile-empty__title'>{status === 'loading' ? '正在加载主页…' : error || '用户主页加载失败'}</Text>
+          {status !== 'loading' && <View className='public-profile-retry' ariaRole='button' ariaLabel='重新加载主页' onClick={() => setReloadKey((value) => value + 1)}><Text>重新加载</Text></View>}
         </View>
       </View>
     )
   }
 
   const value = profile.profile
-  return (
-    <View className='public-profile-page' style={capsuleStyle}>
-      <View className='public-profile-hero'>
-        <CapsuleSystemRow />
-        <View className='public-profile-nav'>
-          <View className='public-profile-nav__back' ariaRole='button' ariaLabel='返回' onClick={() => void navigateBackOrHome()} />
-          <View className='public-profile-nav__more' onClick={() => setMenuVisible(true)}><Text>•••</Text></View>
+  const hero = (
+      <View className={`public-profile-hero${hasCover ? ' public-profile-hero--with-cover' : ''}`}>
+        <View className='public-profile-cover'>
+          {hasCover && <Image className='public-profile-cover__image' src={value.cover || ''} mode='aspectFill' ariaLabel='个人封面' onError={() => setFailedCover(value.cover || '')} />}
         </View>
+        <CapsuleSystemRow />
+        <View className='public-profile-hero__toolbar' aria-hidden />
         <View className='public-profile-user'>
-          <View className='public-profile-user__avatar'>
-            {value.avatar ? <Image className='public-profile-user__avatar-image' src={value.avatar} mode='aspectFill' /> : <Text>{value.nickname.slice(0, 1) || '校'}</Text>}
+          <View className='public-profile-user__top'>
+            <View className='public-profile-user__avatar'>
+              {hasAvatar ? <Image className='public-profile-user__avatar-image' src={value.avatar} mode='aspectFill' onError={() => setFailedAvatar(value.avatar)} /> : <Text>{value.nickname.slice(0, 1) || '校'}</Text>}
+            </View>
           </View>
           <View className='public-profile-user__main'>
             <Text className='public-profile-user__name'>{value.nickname}</Text>
-            <Text className='public-profile-user__meta'>用户编号：{value.id}</Text>
-            <Text className='public-profile-user__meta'>{value.school || '未填写学校'}{value.campus ? ` · ${value.campus}` : ''}</Text>
+            <Text className='public-profile-user__meta'>用户号 {value.id}</Text>
+          </View>
+          <View className='public-profile-actions'>
+            {(isSelf || visibility.following) && <View className={`public-profile-action public-profile-action--primary ${following && !isSelf ? 'public-profile-action--active' : ''}`} ariaRole='button' onClick={isSelf ? () => openContent('/pages/edit-profile/index') : () => { if (interaction.canActivate()) void toggleFollow() }}>
+              <Text>{isSelf ? '编辑资料' : busy ? '处理中…' : following ? '已关注' : '+ 关注'}</Text>
+            </View>}
+            {isSelf ? <Button className='public-profile-action public-profile-action--secondary' openType='share' disabled={!shareReady}>分享主页</Button>
+              : visibility.secondhand && <View className='public-profile-action public-profile-action--secondary' ariaRole='button' onClick={() => { if (interaction.canActivate()) secondaryAction() }}><Text>查看在售商品</Text></View>}
           </View>
         </View>
-        <Text className='public-profile-bio'>这里展示该用户审核通过的公开内容。</Text>
         <View className='public-profile-stats'>
           {visibility.following && <View><Text className='public-profile-stats__value'>{profile.followingCount}</Text><Text>关注</Text></View>}
           {visibility.following && <View><Text className='public-profile-stats__value'>{followerCount}</Text><Text>粉丝</Text></View>}
           {visibility.likes && <View><Text className='public-profile-stats__value'>{profile.likedCount}</Text><Text>获赞</Text></View>}
         </View>
-        <View className='public-profile-actions'>
-          {(isSelf || visibility.following) && <View className={`public-profile-action public-profile-action--primary ${following ? 'public-profile-action--active' : ''}`} onClick={isSelf ? () => void Taro.navigateTo({ url: '/pages/edit-profile/index' }) : () => void toggleFollow()}>
-            <Text>{isSelf ? '编辑资料' : busy ? '处理中…' : following ? '已关注' : '+ 关注'}</Text>
-          </View>}
-          {isSelf ? <Button className='public-profile-action public-profile-action--secondary' openType='share' disabled={!shareReady}>分享主页</Button>
-            : visibility.secondhand && <View className='public-profile-action public-profile-action--secondary' onClick={secondaryAction}><Text>查看在售商品</Text></View>}
-        </View>
       </View>
+  )
+
+  const tabs = (
       <View className='public-profile-tabs'>
         <View className={`public-profile-tab ${activeTab === 'posts' ? 'public-profile-tab--active' : ''}`} onClick={() => { if (interaction.canActivate()) setActiveTab('posts') }}><Text>帖子 {postTotal}</Text></View>
         {visibility.secondhand && <View className={`public-profile-tab ${activeTab === 'secondhand' ? 'public-profile-tab--active' : ''}`} onClick={() => { if (interaction.canActivate()) setActiveTab('secondhand') }}><Text>二手 {productTotal}</Text></View>}
       </View>
+  )
+  return (
+    <View className='public-profile-page' style={capsuleStyle}>
+      {navigation}
       <View className='public-profile-content'>
         <ChannelPager
           keys={visibleTabs}
@@ -324,10 +364,16 @@ function UserProfilePage() {
           scrollTop={scrollPositions.current[tab]}
           onScroll={(event) => {
             const top = event.detail.scrollTop
-            if (Number.isFinite(top)) scrollPositions.current[tab] = Math.max(0, top)
+            if (Number.isFinite(top)) {
+              scrollPositions.current[tab] = Math.max(0, top)
+              const scrolled = top > 48
+              setScrolledTabs((current) => current[tab] === scrolled ? current : { ...current, [tab]: scrolled })
+            }
           }}
           onScrollToLower={() => void loadMore(tab)}
         >
+          {hero}
+          {tabs}
           {(tab === 'posts' ? posts.length === 0 : products.length === 0) ? (
             <View className='public-profile-empty'><Text className='public-profile-empty__title'>{tab === 'posts' ? '暂无公开帖子' : '暂无公开二手商品'}</Text></View>
           ) : tab === 'posts' ? (

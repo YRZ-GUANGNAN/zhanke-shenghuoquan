@@ -19,13 +19,19 @@ function deferred() {
 function scenario(pages, failures = {}, gates = {}) {
   const stack = [...pages]
   const notices = []
-  const calls = { back: 0, home: 0 }
+  const calls = { back: 0, home: 0, profile: 0 }
   let now = 1000
   const loaded = new Module(sourcePath, module)
   loaded.require = (id) => {
     if (id === '../test-clock') return () => now
     assert.equal(id, '../services/taro')
     return { default: {
+      async navigateTo({ url }) {
+        calls.profile++
+        if (gates.profile) await gates.profile.promise
+        if (failures.profile) throw new Error('navigateTo:fail')
+        stack.push({ path: url })
+      },
       async navigateBack({ delta }) {
         calls.back++
         assert.equal(delta, 1)
@@ -46,10 +52,34 @@ function scenario(pages, failures = {}, gates = {}) {
     } }
   }
   loaded._compile("const Date = { now: require('../test-clock') };\n" + compiled.outputText, sourcePath)
-  return { back: loaded.exports.navigateBackOrHome, guardMs: loaded.exports.RETURN_TRANSITION_GUARD_MS, stack, notices, failures, calls, advance: ms => { now += ms } }
+  return { back: loaded.exports.navigateBackOrHome, openProfile: loaded.exports.navigateToPublicProfile, profilePath: loaded.exports.publicProfilePath, guardMs: loaded.exports.RETURN_TRANSITION_GUARD_MS, stack, notices, failures, calls, advance: ms => { now += ms } }
 }
 
 async function run() {
+  const profileGate = deferred()
+  const author = scenario([], {}, { profile: profileGate })
+  const entering = author.openProfile('7', 'posts')
+  assert.equal(author.openProfile('7', 'posts'), entering, '头像与姓名连点复用同一次导航')
+  profileGate.resolve()
+  await entering
+  assert.equal(author.stack.at(-1).path, '/pages/user-profile/index?userId=7&tab=posts')
+  await author.openProfile('7', 'posts')
+  assert.equal(author.calls.profile, 1, '原生成功到过渡结束期间不能重复进主页')
+  author.advance(author.guardMs)
+  await author.openProfile('7', 'secondhand')
+  assert.equal(author.stack.at(-1).path, '/pages/user-profile/index?userId=7&tab=secondhand', '两个来源使用同一路由、分别打开内容频道')
+  assert.equal(author.profilePath('0'), null)
+  assert.equal(author.profilePath('../7'), null)
+  const absent = scenario([])
+  await absent.openProfile(undefined)
+  assert.equal(absent.calls.profile, 0)
+  assert.equal(absent.notices.length, 1)
+  const profileRetry = scenario([], { profile: true })
+  await profileRetry.openProfile('7')
+  assert.equal(profileRetry.notices.length, 1)
+  profileRetry.failures.profile = false
+  await profileRetry.openProfile('7')
+  assert.equal(profileRetry.calls.profile, 2, '导航失败立即允许重试')
   const sharedPost = { path: '/pages/post-detail/index?id=1' }
   const direct = scenario([sharedPost])
   await direct.back()

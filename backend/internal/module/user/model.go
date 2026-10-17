@@ -46,6 +46,7 @@ type Profile struct {
 	ID            uint    `json:"id"`
 	Nickname      string  `json:"nickname"`
 	Avatar        string  `json:"avatar"`
+	Cover         string  `json:"cover"`
 	AvatarAssetID *uint64 `json:"-"`
 	School        string  `json:"school"`
 	Campus        string  `json:"campus"`
@@ -55,7 +56,7 @@ func (u User) Profile() Profile {
 	if u.Status == StatusClosed {
 		return Profile{ID: u.ID, Nickname: "账号已注销"}
 	}
-	return Profile{ID: u.ID, Nickname: u.Nickname, Avatar: u.Avatar, AvatarAssetID: u.AvatarAssetID, School: u.School, Campus: u.Campus}
+	return Profile{ID: u.ID, Nickname: u.Nickname, Avatar: u.Avatar, Cover: u.Cover, AvatarAssetID: u.AvatarAssetID, School: u.School, Campus: u.Campus}
 }
 
 type UserSettings struct {

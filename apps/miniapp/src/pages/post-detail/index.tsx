@@ -22,7 +22,7 @@ import {
   setUserFollowing,
 } from '../../services/b-community'
 import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
-import { navigateBackOrHome } from '../../utils/navigation'
+import { navigateBackOrHome, navigateToPublicProfile } from '../../utils/navigation'
 import { formatPostDate, postBodyWithoutTitle, preparePostMedia, removeFailedPostMedia, type PostGalleryState, type PostMedia } from '../../utils/post-presentation'
 import { useGalleryPresentation } from '../../hooks/use-gallery-presentation'
 import { useKeyboardInset } from '../../hooks/use-keyboard-inset'
@@ -309,7 +309,9 @@ function PostDetailPage() {
   }
 
   const headerCenter = post ? (
-    <View className='post-detail-author'>
+    <View className='post-detail-author' ariaRole='button' ariaLabel={`查看${post.author || '作者'}的主页`} onClick={() => {
+      if (visibility.forum) void navigateToPublicProfile(post.authorId, 'posts')
+    }}>
       <View className='post-detail-author__avatar'>
         {post.avatar ? <Image src={post.avatar} mode='aspectFill' /> : (post.author || '校').slice(0, 1)}
       </View>

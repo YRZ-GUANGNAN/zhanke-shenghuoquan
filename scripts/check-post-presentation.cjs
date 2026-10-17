@@ -90,7 +90,13 @@ async function pageBehavior() {
       if (id.endsWith('/components/ui')) return { AppIconButton: View, AppState: View }
       if (id.endsWith('/services/taro')) return { default: taro }
       if (id.endsWith('/capsule-safe')) return { getCapsuleSafeStyle: () => ({}) }
-      if (id.endsWith('/navigation')) return { navigateBackOrHome: async () => {} }
+      if (id.endsWith('/utils/navigation')) {
+        const helperPath = path.resolve(__dirname, '../apps/miniapp/src/utils/navigation.ts')
+        const helper = new Module(helperPath, module)
+        helper.require = modulePage.require
+        helper._compile(ts.transpileModule(fs.readFileSync(helperPath, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText, helperPath)
+        return helper.exports
+      }
       if (id === './post-comments' || id.endsWith('/comment-session')) {
         const helperPath = path.resolve(__dirname, '../apps/miniapp/src', id === './post-comments' ? 'pages/post-detail/post-comments.tsx' : 'services/comment-session.ts')
         const helper = new Module(helperPath, module)
@@ -143,8 +149,9 @@ async function pageBehavior() {
   }
 
   try {
-    const homePostRequests = [], homeProductRequests = []
+    const homePostRequests = [], homeProductRequests = [], authorRoutes = []
     const home = await mount('home', {
+      taro: { navigateTo: async ({ url }) => authorRoutes.push(url) },
       visibility: { ...visibility, available: true, presentationMode: 'original', secondhand: true, messages: true, secondhand_chat: true, campus_tools: true, search: true },
       community: { getCommunityPostsPage: (query) => { const task = deferred(); homePostRequests.push({ query, ...task }); return task.promise } },
       trade: { getProductsPage: (query) => { const task = deferred(); homeProductRequests.push({ query, ...task }); return task.promise } },
@@ -152,9 +159,13 @@ async function pageBehavior() {
     assert.equal(homePostRequests.length, 1)
     assert.equal(homeProductRequests.length, 1)
     await home.event(() => {
-      homePostRequests[0].resolve({ items: [fakePost], page: 1, total: 11 })
+      homePostRequests[0].resolve({ items: [{ ...fakePost, authorId: '7' }], page: 1, total: 11 })
       homeProductRequests[0].resolve({ items: [], page: 1, total: 0 })
     })
+    let stoppedAuthorClick = false
+    await home.event(() => home.props('.student-post-card__profile').onClick({ stopPropagation: () => { stoppedAuthorClick = true } }))
+    assert.ok(stoppedAuthorClick, '作者入口阻止冒泡到帖子卡片')
+    assert.deepEqual(authorRoutes, ['/pages/user-profile/index?userId=7&tab=posts'], '信息流使用作者 ID 打开个人主页')
     const discoverContent = () => home.props('[data-item-id="discover"] .student-home-content')
     await home.event(() => discoverContent().onScroll({ detail: { scrollTop: 640 } }))
     await home.event(() => home.all('.student-home-header__tab')[2].onClick())
@@ -253,9 +264,10 @@ async function pageBehavior() {
     const commentRequests = [], viewerRequests = [], postLikes = [], submits = [], replyRequests = []
     const comment = (id, extra = {}) => ({ id, content: `评论 ${id}`, author: '作者', avatar: '', authorId: '2', parentCommentId: '0', replyToCommentId: '0', replyToUserId: '0', replyToAuthor: '', liked: false, likedCount: 0, replyCount: 1, createdAt: '', reviewStatus: 'approved', ...extra })
     const detail = await mount('post-detail', {
+      taro: { navigateTo: async ({ url }) => authorRoutes.push(url) },
       params: { id: fakePost.id, anchor: 'comments' },
       community: {
-        getCommunityPost: async () => { postLoads += 1; return fakePost },
+        getCommunityPost: async () => { postLoads += 1; return { ...fakePost, authorId: '8' } },
         getCommunityViewerState: () => { const task = deferred(); viewerRequests.push(task); return task.promise },
         setPostLiked: (id, liked) => { const task = deferred(); postLikes.push({ id, liked, ...task }); return task.promise },
         getCommentThreads: (id, page) => { const task = deferred(); commentRequests.push({ id, page, ...task }); return task.promise },
@@ -264,6 +276,8 @@ async function pageBehavior() {
         submitThreadComment: (...args) => { const task = deferred(); submits.push({ args, ...task }); return task.promise },
       },
     })
+    await detail.event(() => detail.props('.post-detail-author').onClick())
+    assert.equal(authorRoutes.at(-1), '/pages/user-profile/index?userId=8&tab=posts', '详情头像昵称可进入作者主页')
     assert.ok(detail.container.textContent.includes('保留的正文'), '评论请求未完成时正文仍可阅读')
     assert.equal(detail.props('.post-detail-scroll').scrollIntoView, '', '评论未完成布局时不提前定位到底部')
     await detail.event(() => { commentRequests[0].reject(new Error('comments offline')); viewerRequests[0].reject(new Error('viewer offline')) })

@@ -166,12 +166,16 @@
   height: 100%;
 }
 .secondhand-detail-seller__main {
+  min-height: 44PX;
+  justify-content: center;
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 4rpx;
 }
+.secondhand-detail-seller__avatar:active,
+.secondhand-detail-seller__main:active { opacity: .72; }
 .secondhand-detail-seller__name {
   @include ref.type(label);
   overflow: hidden;

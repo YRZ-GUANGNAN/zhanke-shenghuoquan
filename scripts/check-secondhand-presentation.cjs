@@ -68,6 +68,7 @@ async function main() {
         if (id.endsWith('/client-request-id')) return { createClientRequestId: () => 'test-request-' + (++sequence) }
         if (id.endsWith('/stores/session')) return { useSessionStore: (selector) => selector({ token: options.token || 'test-token', profile: { id: options.userId || 'viewer' } }) }
         if (id.endsWith('/post-presentation')) return load('utils/post-presentation.ts')
+        if (id.endsWith('/utils/navigation')) return load('utils/navigation.ts')
         if (id.endsWith('/gallery-presentation')) return load('utils/gallery-presentation.ts')
         if (id.endsWith('/use-gallery-presentation')) return load('hooks/use-gallery-presentation.ts')
         if (id === './product-comments') return load('pages/secondhand-detail/product-comments.tsx')
@@ -104,14 +105,19 @@ async function main() {
 
   try {
     const requests = []
-    const list = await mount('pages/student-secondhand/index.tsx', { trade: {
+    const sellerRoutes = []
+    const list = await mount('pages/student-secondhand/index.tsx', { taro: { navigateTo: async ({ url }) => sellerRoutes.push(url) }, trade: {
       getProductsPage: (query) => { const task = deferred(); requests.push({ query, ...task }); return task.promise },
     } })
     assert.equal(requests.length, 1)
     await list.event(() => list.all('.student-secondhand-category')[1].onClick())
     assert.equal(requests[1].query.category, '数码')
-    const firstTwenty = Array.from({ length: 20 }, (_, index) => product(String(index + 1)))
+    const firstTwenty = Array.from({ length: 20 }, (_, index) => product(String(index + 1), { sellerId: '7' }))
     await list.event(() => requests[1].resolve(pageResult(firstTwenty, 1, 21)))
+    let stoppedSellerClick = false
+    await list.event(() => list.props('.secondhand-card__seller').onClick({ stopPropagation: () => { stoppedSellerClick = true } }))
+    assert.ok(stoppedSellerClick, '点击卖家不冒泡打开商品')
+    assert.deepEqual(sellerRoutes, ['/pages/user-profile/index?userId=7&tab=secondhand'])
     await list.event(() => requests[0].resolve(pageResult([product('99', { title: '过期分类结果' })])))
     assert.ok(!list.container.textContent.includes('过期分类结果'), '分类旧响应不能覆盖当前分类')
     const listNode = list.container.querySelector('.student-secondhand-scroll')
@@ -195,12 +201,26 @@ async function main() {
     let favorites = 0, contacts = 0, previews = []
     const detail = await mount('pages/secondhand-detail/index.tsx', {
       trade: {
-        getProduct: async () => product('1', { images: ['test-a', 'test-b', 'test-c'] }),
+        getProduct: async () => product('1', { sellerId: '8', images: ['test-a', 'test-b', 'test-c'] }),
         getTradeViewerState: () => viewer.promise,
         setProductFavorited: () => { favorites += 1; return favorite.promise },
         contactSeller: () => { contacts += 1; return contact.promise },
-      }, taro: { previewImage: async (value) => { previews.push(value) } },
+      }, taro: { previewImage: async (value) => { previews.push(value) }, navigateTo: async ({ url }) => sellerRoutes.push(url) },
     })
+    await detail.event(() => {
+      detail.props('.secondhand-detail-seller__avatar').onClick()
+      detail.props('.secondhand-detail-seller__main').onClick()
+      detail.props('.secondhand-detail-seller__button').onClick()
+    })
+    assert.equal(sellerRoutes.at(-1), '/pages/user-profile/index?userId=8&tab=secondhand')
+    assert.equal(sellerRoutes.length, 2, '头像、昵称、主页按钮同帧只打开一次同一主页')
+    detail.options.visibility.forum = false
+    await detail.render()
+    await detail.event(() => detail.props('.secondhand-detail-seller__main').onClick())
+    assert.equal(detail.container.querySelector('.secondhand-detail-seller__button'), null, '关闭社区仍隐藏公开主页入口')
+    assert.equal(sellerRoutes.length, 2)
+    detail.options.visibility.forum = true
+    await detail.render()
     assert.ok(detail.container.textContent.includes('测试商品说明'), '个人收藏读取慢时仍能查看商品')
     await detail.event(() => detail.props('.secondhand-detail-favorite').onClick())
     assert.equal(favorites, 0, '收藏初始状态未读取时禁止误切换')
