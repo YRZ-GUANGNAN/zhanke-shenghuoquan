@@ -22,9 +22,6 @@ for (const fragment of [
   'useDidShow',
   "useIdentityGuard('merchant')",
   "getIdentityApplication('merchant')",
-  'getMerchantOrderIntake',
-  'merchant-home-intake',
-  '外部订单回推',
   'merchant-home-metrics',
   'merchant-home-tabs',
   'merchant-order-card',
@@ -97,8 +94,9 @@ assert.doesNotMatch(workspaceNav, /return <View className='delivery-workspace-na
 for (const [name, source] of [['merchant', merchant], ['rider', rider], ['profile', profile], ['messages', messages]]) {
   assert.match(source, /gestureGuard=\{workspace\.swipe\.canActivate\}/, `${name} navigation must share the page gesture guard`)
 }
-assert.match(merchant, /merchant-home-hero__cover-image/, 'merchant workbench must render the existing profile cover media')
-assert.match(rider, /rider-grab-hero__cover-image/, 'rider workbench must render the existing profile cover media')
+assert.doesNotMatch(merchant, /profile\.cover|profile\.avatar|merchant-home-hero__cover-image|ChatAvatar/, 'merchant order page must keep personal media on the profile page')
+assert.doesNotMatch(rider, /profile\.cover|profile\.avatar|rider-grab-hero__cover-image|ChatAvatar/, 'rider order page must keep personal media on the profile page')
+assert.match(merchant, /merchant-home-metric__label.*全部订单|全部订单/, 'merchant order page must show an order-only total')
 assert.match(profile, /delivery-profile__hero-image/, 'role profile must keep the real cover image')
 assert.match(profileStyle, /background: linear-gradient\(to bottom, rgba\(\$bg-surface, 0\), rgba\(\$bg-surface, \.54\) 45%, \$bg-surface 100%\)/, 'profile cover edge must finish on an opaque surface')
 assert.match(riderWallet, /骑手结算功能尚未开放/, 'rider wallet must expose an honest unavailable state until a real API exists')

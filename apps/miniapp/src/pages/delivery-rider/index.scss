@@ -13,37 +13,22 @@
   color: $text-primary;
 }
 .rider-grab-hero { position: relative; flex: 0 0 auto; padding: 0 28rpx 20rpx; overflow: hidden; background: $bg-surface; }
-.rider-grab-hero--cover { padding-top: 0; }
-.rider-grab-hero__media { position: absolute; z-index: 0; top: 0; right: 0; left: 0; height: 240rpx; overflow: hidden; background: $bg-app; }
-.rider-grab-hero__media::after { position: absolute; inset: 0; content: ''; pointer-events: none; background: linear-gradient(to bottom, rgba($text-strong, .16) 0%, rgba($text-strong, .04) 42%, $bg-surface 100%); }
-.rider-grab-hero__cover-image { display: block; width: 100%; height: 100%; }
-.rider-grab-hero--cover .rider-grab-user { padding-top: 156rpx; color: $text-on-color; }
-.rider-grab-hero--cover .rider-grab-user__name { text-shadow: 0 1PX 6PX rgba($text-strong, .36); }
-.rider-grab-hero--cover .rider-grab-user__badge { background: rgba($bg-surface, .86); }
-.rider-grab-hero--cover .rider-grab-task-summary,
-.rider-grab-hero--cover .rider-grab-context { position: relative; z-index: 1; }
 .rider-grab-page .channel-pager__item > .rider-grab-content { height: 100%; }
-.rider-grab-user { display: flex; align-items: center; gap: 20rpx; min-height: 48PX; }
-.rider-grab-user__avatar { flex: 0 0 44PX; width: 44PX; height: 44PX; }
-.rider-grab-user__main { min-width: 0; flex: 1; }
-.rider-grab-user__name-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8rpx 16rpx; }
-.rider-grab-user__name { @include ref.wrap; font-size: 15PX; font-weight: 650; }
-.rider-grab-user__badge { padding: 4rpx 12rpx; background: $bg-app; color: $text-secondary; border-radius: 8rpx; font-size: 11PX; line-height: 18PX; }
-.rider-grab-user__badge--active { color: $success; background: $success-tint; }
-.rider-grab-user__badge--suspended { color: $danger; background: $danger-tint; }
-.rider-grab-user__switch { @include ref.touch; display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0; font-size: 12PX; color: $text-secondary; }
-.rider-grab-task-summary { display: flex; align-items: center; justify-content: space-between; gap: 24rpx; padding: 20rpx 0 16rpx; }
-.rider-grab-task-summary__primary { min-width: 0; }
-.rider-grab-task-summary__label { display: block; font-size: 27PX; font-weight: 750; line-height: 1.3; color: $text-strong; }
-.rider-grab-task-summary__value-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10rpx; margin-top: 12rpx; }
-.rider-grab-task-summary__value { @include ref.wrap; font-size: 26PX; font-weight: 750; line-height: 1.15; font-variant-numeric: tabular-nums; color: $brand-primary-strong; }
+.rider-grab-status { padding: 4rpx 12rpx; background: $bg-app; color: $text-secondary; border-radius: 8rpx; font-size: 11PX; line-height: 18PX; }
+.rider-grab-status--active { color: $success; background: $success-tint; }
+.rider-grab-status--suspended { color: $danger; background: $danger-tint; }
+.rider-grab-task-summary { display: flex; align-items: center; justify-content: space-between; gap: 24rpx; padding: 8rpx 0 16rpx; }
+.rider-grab-task-summary__primary { min-width: 0; flex: 1; }
+.rider-grab-task-summary__label { display: block; font-size: 24PX; font-weight: 750; line-height: 1.3; color: $text-strong; }
+.rider-grab-task-summary__value-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10rpx; margin-top: 8rpx; }
+.rider-grab-task-summary__value { @include ref.wrap; font-size: 20PX; font-weight: 750; line-height: 1.3; font-variant-numeric: tabular-nums; color: $brand-primary-strong; }
 .rider-grab-task-summary__unit { @include ref.type(meta); color: $text-secondary; }
-.rider-grab-refresh { @include ref.touch; display: flex; align-items: center; justify-content: center; gap: 8PX; flex: 0 0 92PX; width: 92PX; box-sizing: border-box; padding: 0 10PX; border: 1PX solid $border-default; border-radius: 12rpx; color: $brand-primary-strong; font-size: 12PX; }
+.rider-grab-refresh { @include ref.touch; display: flex; align-items: center; justify-content: center; gap: 8PX; flex: 0 0 92PX; width: 92PX; min-height: 44PX; box-sizing: border-box; padding: 0 10PX; border: 1PX solid $border-default; border-radius: 12rpx; color: $brand-primary-strong; font-size: 12PX; }
 .rider-grab-refresh__symbol { display: flex; align-items: center; justify-content: center; flex: 0 0 18PX; width: 18PX; height: 18PX; }
 .rider-grab-refresh__icon { display: block; width: 18PX; height: 18PX; flex: 0 0 18PX; }
 .rider-grab-refresh__label { display: block; width: 36PX; flex: 0 0 36PX; text-align: center; line-height: 20PX; }
 .rider-grab-refresh--disabled { opacity: .55; }
-.rider-grab-context { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8rpx 20rpx; font-size: 11PX; line-height: 18PX; color: $text-secondary; }
+.rider-grab-context { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8rpx 20rpx; font-size: 11PX; line-height: 18PX; color: $text-secondary; }
 .rider-grab-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0 28rpx; background: $bg-surface; border-bottom: 1PX solid $border-default; flex: 0 0 auto; }
 .rider-grab-tabs__item { @include ref.touch; min-height: 50PX; position: relative; display: flex; align-items: center; justify-content: center; gap: 12rpx; padding: 8rpx; color: $text-secondary; font-size: 16PX; }
 .rider-grab-tabs__item--active { color: $brand-primary-strong; font-weight: 700; }

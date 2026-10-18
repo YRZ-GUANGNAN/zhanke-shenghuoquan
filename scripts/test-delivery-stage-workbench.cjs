@@ -266,6 +266,7 @@ function merchantHarness(kind, overrides = {}) {
   const services = {
     getIdentityApplication: async () => ({ status: 'approved', merchantName: '测试商家', merchantAddress: '测试取货点' }),
     getDeliveryWallet: async () => ({ availableBalanceCents: 1000 }),
+    listDeliveryWalletLedger: async () => page([]),
     getMerchantOrderIntake: async () => ({ manualAvailable: true, externalAvailable: false, platforms: ['taobao', 'jd', 'meituan'].map((platform) => ({ platform, label: platform, connected: false })) }),
     listMerchantDeliveryOrders: async () => page([]),
     getMerchantDeliveryOrder: async () => order('ORDER-A'),
@@ -287,7 +288,7 @@ function merchantHarness(kind, overrides = {}) {
     '../../components/delivery-workspace-nav': { __esModule: true, default: 'DeliveryWorkspaceNav', useDeliveryWorkspaceNavigation: () => ({ swipe: { handlers: {}, canActivate: () => true } }) },
     '../../components/chat-avatar': 'ChatAvatar',
     '../../components/channel-pager': { __esModule: true, default: ({ activeKey, renderPage }) => renderPage(activeKey), useChannelInteraction: () => ({ canActivate: () => true }) },
-    '../../hooks/use-delivery-payment': { useDeliveryPayment: () => ({ enabled: true }) },
+    '../../hooks/use-delivery-payment': { useDeliveryPayment: () => ({ enabled: overrides.deliveryPaymentEnabled ?? true }) },
     '../../components/refresh-scroll-view': 'ScrollView',
     '../../components/delivery-order-feedback': feedbackComponents(renderer),
     '../../components/runtime-session-gate': 'RuntimeSessionGate',
@@ -304,6 +305,7 @@ function merchantHarness(kind, overrides = {}) {
     },
     '../../services/delivery-payment': {
       getDeliveryWallet: (...args) => services.getDeliveryWallet(...args),
+      listDeliveryWalletLedger: (...args) => services.listDeliveryWalletLedger(...args),
       getDeliveryOrderFunds: (...args) => services.getDeliveryOrderFunds(...args),
     },
     '../../services/delivery-proof': { loadPrivateDeliveryProofs: (...args) => { proofRequests.push(args); return services.loadPrivateDeliveryProofs(...args) } },
@@ -1018,8 +1020,8 @@ async function run() {
     assert.match(text(app.tree), /正在加载订单/)
     response.resolve(); await app.flush()
     assert.deepEqual(['pending', 'delivering', 'completed'].map((key) => app.count(key)), ['62', '8', '120'], '数量使用服务端 total，不用当前页条数')
-    const total = nodes(app.tree, (node) => hasClass(node, 'merchant-home-metric') && text(node).startsWith('累计单量'))[0]
-    assert.equal(text(total), '累计单量190')
+    const total = nodes(app.tree, (node) => hasClass(node, 'merchant-home-metric') && text(node).startsWith('全部订单'))[0]
+    assert.equal(text(total), '全部订单190')
     console.log('PASS 商家加载数量占位与真实服务端总量')
   }
   {
@@ -1072,12 +1074,27 @@ async function run() {
     approval.resolve({ status: 'approved', merchantName: '测试商家', merchantAddress: '测试取货点' })
     await app.flush()
     assert.equal(orderReads, 3)
-    assert.equal(walletReads, 1)
+    assert.equal(walletReads, 0, '商家订单页不读取钱包，钱包契约归商家钱包页')
     assert.match(text(app.tree), /暂无待处理配送单/)
     await app.unmount()
     retry.props.onClick(); await app.flush()
     assert.equal(identityReads, 2, '卸载后旧重试事件不能发起资格核验')
     console.log('PASS 商家核验网络错误可原地重试，防连点且严格保留资格守卫')
+  }
+  {
+    for (const deliveryPaymentEnabled of [false, true]) {
+      let walletReads = 0, ledgerReads = 0
+      const app = merchantHarness('merchant-wallet', {
+        deliveryPaymentEnabled,
+        getDeliveryWallet: async () => { walletReads++; return { availableBalanceCents: 12345 } },
+        listDeliveryWalletLedger: async () => { ledgerReads++; return page([]) },
+      })
+      await app.mount()
+      assert.equal(walletReads, deliveryPaymentEnabled ? 1 : 0, '钱包读取仅在钱包页且支付开通时执行')
+      assert.equal(ledgerReads, deliveryPaymentEnabled ? 1 : 0, '支付关闭时不得请求资金流水')
+      assert.match(text(app.tree), deliveryPaymentEnabled ? /123\.45/ : /商家钱包暂未开通/)
+    }
+    console.log('PASS 商家钱包页独立读取真实余额与流水，支付关闭时保持未开通且零请求')
   }
   {
     for (const status of ['pending', 'rejected']) {
@@ -1527,7 +1544,10 @@ async function run() {
   }
   console.log(`PASS 详情紧凑布局与照片联系新增12组，${detailAssertions}项行为断言`)
 }
-module.exports = { deferred, page, order, nodes, text, hasClass, hookRenderer, loadPage, loadSource }
+module.exports = {
+  deferred, page, order, nodes, text, hasClass, hookRenderer, loadPage, loadSource,
+  merchantHarness, riderHarness,
+}
 if (require.main === module) {
   run().catch((error) => { console.error(error); process.exitCode = 1 })
 }

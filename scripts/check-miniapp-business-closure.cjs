@@ -26,7 +26,7 @@ const mustContain = [
   ['pages/delivery-rider/index.tsx', 'listClaimableDeliveryOrders'],
   ['pages/delivery-conversation/index.tsx', 'loadDeliveryTencentMessages'],
   ['pages/merchant-home/index.tsx', 'listMerchantDeliveryOrders'],
-  ['pages/merchant-home/index.tsx', 'getDeliveryWallet'],
+  ['pages/merchant-wallet/index.tsx', 'getDeliveryWallet'],
   ['pages/merchant-publish/index.tsx', 'createMerchantDeliveryOrder'],
   ['pages/merchant-wallet/index.tsx', 'listDeliveryWalletLedger'],
   ['pages/merchant-messages/content.tsx', 'listDeliveryConversations'],
@@ -73,6 +73,9 @@ if (!identityGuard.includes("merchant: '/pages/merchant-home/index'")) {
   violations.push('merchant identity must route to the new real-data merchant workbench')
 }
 const merchantHome = fs.readFileSync(path.join(src, 'pages/merchant-home/index.tsx'), 'utf8')
+if (/getDeliveryWallet|listDeliveryWalletLedger|startDeliveryWalletRecharge/.test(merchantHome)) {
+  violations.push('pages/merchant-home/index.tsx: wallet reads and payments belong to the dedicated merchant-wallet page')
+}
 for (const token of [
   "getIdentityApplication('merchant')",
   "applicationResult.value.status !== 'approved'",
@@ -103,11 +106,6 @@ for (const pageName of merchantPages) {
 }
 
 const merchantPaymentGateContracts = [
-  [
-    'merchant-home',
-    /deliveryPaymentEnabled\s*\?\s*settle\(getDeliveryWallet\(\)\)\s*:\s*null/,
-    'merchant home must not request the gated wallet endpoint when delivery payment is disabled'
-  ],
   [
     'merchant-wallet',
     /if\s*\(\s*!deliveryPaymentEnabled\s*\)/,

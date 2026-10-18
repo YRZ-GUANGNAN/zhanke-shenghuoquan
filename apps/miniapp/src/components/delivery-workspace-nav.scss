@@ -25,7 +25,7 @@
   line-height: 16PX;
   transition: background 120ms, opacity 120ms;
 }
-.delivery-workspace-nav__icon { width: 24PX; height: 24PX; }
+.delivery-workspace-nav .delivery-workspace-nav__icon { width: 24PX; height: 24PX; }
 .delivery-workspace-nav__item:not(.delivery-workspace-nav__item--active) .delivery-workspace-nav__icon { filter: grayscale(1); opacity: .72; }
 .delivery-workspace-nav__item--active { color: $brand-primary-strong; background: $brand-tint; font-weight: 650; }
 .delivery-workspace-nav__item--pressed { opacity: .7; }

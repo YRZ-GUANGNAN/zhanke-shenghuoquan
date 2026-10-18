@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Image, Text, View } from '@tarojs/components'
+import { Text, View } from '@tarojs/components'
 import { getCurrentInstance, useDidShow } from '@tarojs/taro'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import { AppDialog } from '../../components/ui'
@@ -32,7 +32,6 @@ import { deliveryPickupLabel, deliverySourceLabel } from '../../utils/delivery-o
 import RiderWorkbenchIcon from './rider-workbench-icon'
 import './index.scss'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
-import ChatAvatar from '../../components/chat-avatar'
 
 type RiderTab = 'grab' | 'pickup' | 'delivery'
 
@@ -118,7 +117,6 @@ export default function DeliveryRiderPage() {
   const canClaim = visibility.delivery && visibility.rider
   const identityAllowed = useIdentityGuard('rider')
   const accountId = useSessionStore((state) => state.profile.id)
-  const profile = useSessionStore((state) => state.profile)
   const [activeTab, setActiveTab] = useState<RiderTab>(() => getCurrentInstance().router?.params.tab === 'tasks' ? 'pickup' : 'grab')
   const channelInteraction = useChannelInteraction()
   const workspace = useDeliveryWorkspaceNavigation({ role: 'rider', active: activeTab === 'grab' ? 'grab' : 'tasks', onSelect: key => setActiveTab(key === 'grab' ? 'grab' : 'pickup') })
@@ -141,7 +139,6 @@ export default function DeliveryRiderPage() {
   const [actionFeedbackByOrder, setActionFeedbackByOrder] = useState<Record<string, ActionFeedback | undefined>>({})
   const [error, setError] = useState('')
   const [loadMoreError, setLoadMoreError] = useState<{ tab: RiderTab; message: string } | null>(null)
-  const [failedCover, setFailedCover] = useState('')
   const [releaseCandidate, setReleaseCandidate] = useState<AssignedDeliveryOrder | null>(null)
   const [releaseReviewOnly, setReleaseReviewOnly] = useState(false)
   const releaseCandidateRef = useRef<AssignedDeliveryOrder | null>(null)
@@ -750,7 +747,6 @@ export default function DeliveryRiderPage() {
   }
 
   const rider = me.rider
-  const hasCover = Boolean(profile.cover && failedCover !== profile.cover)
   const tabs: Array<{ key: RiderTab; label: string; count: number }> = [
     { key: 'pickup', label: '待取货', count: pickupTotal },
     { key: 'delivery', label: '待送达', count: deliveryTotal }
@@ -759,22 +755,8 @@ export default function DeliveryRiderPage() {
 
   return (
     <View className='rider-grab-page' {...workspace.swipe.handlers}>
-      <View className={`rider-grab-hero${hasCover ? ' rider-grab-hero--cover' : ''}`}>
-        {hasCover ? <View className='rider-grab-hero__media' ariaLabel='骑手个人封面'>
-          <Image src={profile.cover || ''} mode='aspectFill' className='rider-grab-hero__cover-image'
-            onError={() => setFailedCover(profile.cover || '')} />
-        </View> : null}
+      <View className='rider-grab-hero'>
         <CapsuleSystemRow className='rider-grab-system-row' />
-
-        <View className='rider-grab-user'>
-          <ChatAvatar className='rider-grab-user__avatar' src={profile.avatar} name={rider.realName || profile.nickname || '骑手'} />
-          <View className='rider-grab-user__main'>
-            <View className='rider-grab-user__name-row'>
-              <Text className='rider-grab-user__name'>{rider.realName || '校园骑手'}</Text>
-              <Text className={`rider-grab-user__badge rider-grab-user__badge--${rider.status}`}>{riderStatusLabel(rider.status)}</Text>
-            </View>
-          </View>
-        </View>
 
         <View className='rider-grab-task-summary'>
           <View className='rider-grab-task-summary__primary'>
@@ -797,7 +779,7 @@ export default function DeliveryRiderPage() {
           </View>
         </View>
         <View className='rider-grab-context'>
-          <Text>{activeTab === 'grab' ? '核对取送路线，再选择接单' : '先取货，再送达，按阶段处理'}</Text>
+          <Text className={`rider-grab-status rider-grab-status--${rider.status}`}>{riderStatusLabel(rider.status)}</Text>
           <Text>已结束 {hasLoadedOrders ? completedTotal : '—'} 单</Text>
         </View>
       </View>

@@ -14,7 +14,7 @@ const check = new Proxy(assert, { get(target, property) {
 } })
 const passed = (label) => { scenarios++; console.log(`PASS ${label}`) }
 const root = path.resolve(__dirname, '..')
-const header = { __esModule: true, default: ({ left, right }) => ({ type: 'Header', props: { children: [left, right] } }) }
+const header = { __esModule: true, CapsuleSystemRow: 'CapsuleSystemRow', default: ({ left, right }) => ({ type: 'Header', props: { children: [left, right] } }) }
 
 function loadModule(relative, imports, renderer) {
   const filename = path.join(root, 'apps/miniapp/src', relative)
@@ -81,7 +81,7 @@ function profileHarness(options = {}) {
     return identity
   } })
   const imports = {
-    '@tarojs/components': { View: 'View', Text: 'Text', ScrollView: 'ScrollView' },
+    '@tarojs/components': { View: 'View', Text: 'Text', ScrollView: 'ScrollView', Image: 'Image' },
     '@tarojs/taro': { useDidShow: (fn) => { show = fn }, useDidHide: (fn) => { hide = fn } },
     '../../components/capsule-page-header': header,
     '../../components/delivery-workspace-nav': { __esModule: true, default: 'DeliveryWorkspaceNav', useDeliveryWorkspaceNavigation: () => ({ swipe: { handlers: {}, canActivate: () => true } }) },
