@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { ScrollView, Text, View } from '@tarojs/components'
+import { Text, View } from '@tarojs/components'
 import { getCurrentInstance, useDidShow } from '@tarojs/taro'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import { AppDialog } from '../../components/ui'
 import DeliveryWorkspaceNav from '../../components/delivery-workspace-nav'
+import RefreshScrollView from '../../components/refresh-scroll-view'
+import { DeliveryLoadDots, DeliveryOrderLoading, DeliveryOrderState } from '../../components/delivery-order-feedback'
 import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
 import { isApiError } from '../../services/api'
 import {
@@ -133,7 +135,7 @@ export default function DeliveryRiderPage() {
   const [proofProgressByOrder, setProofProgressByOrder] = useState<Record<string, ProofProgress | undefined>>({})
   const [actionFeedbackByOrder, setActionFeedbackByOrder] = useState<Record<string, ActionFeedback | undefined>>({})
   const [error, setError] = useState('')
-  const [loadMoreError, setLoadMoreError] = useState('')
+  const [loadMoreError, setLoadMoreError] = useState<{ tab: RiderTab; message: string } | null>(null)
   const [releaseCandidate, setReleaseCandidate] = useState<AssignedDeliveryOrder | null>(null)
   const [releaseReviewOnly, setReleaseReviewOnly] = useState(false)
   const releaseCandidateRef = useRef<AssignedDeliveryOrder | null>(null)
@@ -147,6 +149,8 @@ export default function DeliveryRiderPage() {
   const accountRef = useRef(accountId)
   const dataAccountRef = useRef(accountId)
   const activeLoad = useRef<number | null>(null)
+  const activePageLoad = useRef<object | null>(null)
+  const userRefreshLock = useRef<object | null>(null)
   const switchLockRef = useRef(false)
   identityAllowedRef.current = identityAllowed
   accountRef.current = accountId
@@ -156,6 +160,8 @@ export default function DeliveryRiderPage() {
     operationEpochRef.current += 1
     requestVersion.current += 1
     activeLoad.current = null
+    activePageLoad.current = null
+    userRefreshLock.current = null
     busyByOrderRef.current = {}
   }, [])
 
@@ -195,7 +201,7 @@ export default function DeliveryRiderPage() {
       setCompletedTotal(0)
       setHasLoadedOrders(false)
       setError('')
-      setLoadMoreError('')
+      setLoadMoreError(null)
     }
     if (identityAllowed) {
       setBusyByOrder({})
@@ -218,7 +224,7 @@ export default function DeliveryRiderPage() {
     setBusyByOrder(next)
   }
 
-  const isOrderBusy = (orderId: string): boolean => Boolean(busyByOrderRef.current[orderId])
+  const isOrderBusy = (orderId: string): boolean => Boolean(busyByOrderRef.current[orderId] || userRefreshLock.current)
 
   const updateActionFeedback = (orderId: string, feedback?: ActionFeedback) => {
     const next = { ...actionFeedbackRef.current }
@@ -271,10 +277,12 @@ export default function DeliveryRiderPage() {
     if (!shouldContinue()) return false
     const version = requestVersion.current + 1
     requestVersion.current = version
+    activeLoad.current = version
+    activePageLoad.current = null
     setLoading(true)
     setLoadingMore(false)
     setError('')
-    setLoadMoreError('')
+    setLoadMoreError(null)
     try {
       const [ordersResult, riderResult] = await Promise.all([
         settleRequest(Promise.all([
@@ -311,6 +319,7 @@ export default function DeliveryRiderPage() {
       }
       return true
     } finally {
+      if (activeLoad.current === version) activeLoad.current = null
       if (shouldContinue() && requestVersion.current === version) setLoading(false)
     }
   }
@@ -332,19 +341,23 @@ export default function DeliveryRiderPage() {
     }
   }
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (synchronizing = false): Promise<boolean> => {
     const shouldContinue = createOperationGuard()
-    if (!shouldContinue() || activeLoad.current === requestVersion.current) return
+    if (!shouldContinue() || !pageMountedRef.current || !identityAllowed || accountId !== accountRef.current
+      || activeLoad.current === requestVersion.current) return false
+    // A photo picker can emit didShow while proof upload/approval is still active.
+    if (!synchronizing && (Object.values(busyByOrderRef.current).some(Boolean) || releaseCandidateRef.current)) return false
     const version = requestVersion.current + 1
     requestVersion.current = version
     activeLoad.current = version
+    activePageLoad.current = null
     setLoading(true)
     setLoadingMore(false)
     setError('')
-    setLoadMoreError('')
+    setLoadMoreError(null)
     try {
       const rider = await getDeliveryRiderMe()
-      if (!shouldContinue() || requestVersion.current !== version) return
+      if (!shouldContinue() || requestVersion.current !== version) return false
       setMe(rider)
       if (!rider.registered || !rider.rider) {
         setClaimable([])
@@ -354,7 +367,7 @@ export default function DeliveryRiderPage() {
         setPickupTotal(0)
         setDeliveryTotal(0)
         setCompletedTotal(0)
-        return
+        return false
       }
       const [claimablePage, pickupPage, deliveryPage, completedPage] = await Promise.all([
         canClaim ? listClaimableDeliveryOrders(1, 50) : Promise.resolve({ items: [] as ClaimableDeliveryOrder[], total: 0, page: 1 }),
@@ -362,7 +375,7 @@ export default function DeliveryRiderPage() {
         listAssignedDeliveryOrders(1, 50, 'delivery'),
         listAssignedDeliveryOrders(1, 1, 'completed')
       ])
-      if (!shouldContinue() || requestVersion.current !== version) return
+      if (!shouldContinue() || requestVersion.current !== version) return false
       setClaimable(claimablePage.items)
       setClaimablePage(claimablePage.page || 1)
       setClaimableTotal(claimablePage.total)
@@ -376,16 +389,28 @@ export default function DeliveryRiderPage() {
       setHasLoadedOrders(true)
       clearSynchronizedFeedback()
       reconcileReleaseCandidate([...pickupPage.items, ...deliveryPage.items])
+      return true
     } catch (value) {
-      if (!shouldContinue() || requestVersion.current !== version) return
+      if (!shouldContinue() || requestVersion.current !== version) return false
       const message = errorMessage(value, '骑手订单加载失败')
       setError(message)
-      await Taro.showToast({ title: message, icon: 'none' }).catch(() => {})
+      return false
     } finally {
       if (activeLoad.current === version) activeLoad.current = null
       if (shouldContinue() && requestVersion.current === version) setLoading(false)
     }
-  }, [createOperationGuard, canClaim])
+  }, [createOperationGuard, canClaim, identityAllowed, accountId])
+
+  const requestRefresh = async (): Promise<boolean> => {
+    if (!identityAllowed || accountId !== accountRef.current || !pageActiveRef.current
+      || activeLoad.current !== null || activePageLoad.current !== null || userRefreshLock.current
+      || releaseCandidateRef.current || Object.values(busyByOrderRef.current).some(Boolean)) return false
+    const lock = {}
+    userRefreshLock.current = lock
+    try { return await load() } finally {
+      if (userRefreshLock.current === lock) userRefreshLock.current = null
+    }
+  }
 
   useEffect(() => {
     if (identityAllowed) void load()
@@ -400,7 +425,7 @@ export default function DeliveryRiderPage() {
     if (!shouldContinue() || isOrderBusy(orderId)) return
     markBusy(orderId, action)
     try {
-      await load()
+      await load(true)
     } finally {
       if (shouldContinue()) markBusy(orderId)
     }
@@ -408,7 +433,9 @@ export default function DeliveryRiderPage() {
 
   const loadMoreOrders = async () => {
     const shouldContinue = createOperationGuard()
-    if (!shouldContinue() || loading || loadingMore) return
+    if (!shouldContinue() || !identityAllowed || accountId !== accountRef.current
+      || activeLoad.current !== null || activePageLoad.current !== null || userRefreshLock.current
+      || Object.values(busyByOrderRef.current).some(Boolean) || loading || loadingMore) return
     const isClaimable = activeTab === 'grab'
     const items = isClaimable ? claimable : activeTab === 'pickup' ? pickupOrders : deliveryOrders
     const total = isClaimable ? claimableTotal : activeTab === 'pickup' ? pickupTotal : deliveryTotal
@@ -416,12 +443,15 @@ export default function DeliveryRiderPage() {
     const nextPage = (isClaimable ? claimablePage : activeTab === 'pickup' ? pickupPage : deliveryPage) + 1
     const requestedTab = activeTab
     const version = requestVersion.current
+    const pageRequest = {}
+    activePageLoad.current = pageRequest
+    const current = () => shouldContinue() && requestVersion.current === version && activePageLoad.current === pageRequest
     setLoadingMore(true)
-    setLoadMoreError('')
+    setLoadMoreError(null)
     try {
       if (isClaimable) {
         const result = await listClaimableDeliveryOrders(nextPage, 50)
-        if (!shouldContinue() || requestVersion.current !== version) return
+        if (!current()) return
         setClaimable((current) => {
           const byId = new Map(current.map((order) => [order.deliveryOrderPublicId, order]))
           result.items.forEach((order) => byId.set(order.deliveryOrderPublicId, order))
@@ -432,7 +462,7 @@ export default function DeliveryRiderPage() {
       } else {
         const statusGroup = requestedTab === 'pickup' ? 'pickup' : 'delivery'
         const result = await listAssignedDeliveryOrders(nextPage, 50, statusGroup)
-        if (!shouldContinue() || requestVersion.current !== version) return
+        if (!current()) return
         const mergeOrders = (current: AssignedDeliveryOrder[]) => {
           const byId = new Map(current.map((order) => [order.deliveryOrderPublicId, order]))
           result.items.forEach((order) => byId.set(order.deliveryOrderPublicId, order))
@@ -449,11 +479,14 @@ export default function DeliveryRiderPage() {
         }
       }
     } catch (value) {
-      if (shouldContinue() && requestVersion.current === version) {
-        setLoadMoreError(errorMessage(value, '更多订单加载失败，点击重试'))
+      if (current()) {
+        setLoadMoreError({ tab: requestedTab, message: errorMessage(value, '更多订单加载失败，请重试') })
       }
     } finally {
-      if (shouldContinue() && requestVersion.current === version) setLoadingMore(false)
+      if (current()) {
+        activePageLoad.current = null
+        setLoadingMore(false)
+      }
     }
   }
 
@@ -684,15 +717,9 @@ export default function DeliveryRiderPage() {
           <CapsuleSystemRow />
           <Text className='rider-access-hero__title'>骑手工作台</Text>
         </View>
-        <View className={`rider-grab-placeholder ${error ? '' : 'rider-grab-placeholder--loading'}`}>
-          <RiderWorkbenchIcon name='empty' className='rider-grab-placeholder__icon' />
-          <Text className='rider-grab-placeholder__title'>{error ? '骑手工作台加载失败' : '正在加载骑手工作台'}</Text>
-          <Text className='rider-grab-placeholder__desc'>{error || '正在同步身份与配送订单，请稍候。'}</Text>
-          {error ? (
-            <View className='rider-grab-placeholder__action' onClick={() => void load()}>
-              <Text>重新加载</Text>
-            </View>
-          ) : null}
+        <View className='rider-grab-placeholder'>
+          {error ? <DeliveryOrderState kind='error' title='骑手工作台加载失败' description={error}
+            onAction={() => void requestRefresh()} /> : <DeliveryOrderLoading label='正在加载骑手工作台' />}
         </View>
       </View>
     )
@@ -706,14 +733,9 @@ export default function DeliveryRiderPage() {
           <Text className='rider-access-hero__title'>骑手工作台</Text>
         </View>
         <View className='rider-grab-placeholder'>
-          <RiderWorkbenchIcon name='empty' className='rider-grab-placeholder__icon' />
-          <Text className='rider-grab-placeholder__title'>骑手权限尚未开通</Text>
-          <Text className='rider-grab-placeholder__desc'>
-            {me.message || '请先提交骑手身份申请，并等待平台审核。'}
-          </Text>
-          <View className='rider-grab-placeholder__action' onClick={() => void switchToStudent()}>
-            <Text>返回学生端</Text>
-          </View>
+          <DeliveryOrderState kind='access' title='骑手权限尚未开通'
+            description={me.message || '请先提交骑手身份申请，并等待平台审核。'}
+            actionLabel='返回学生端' onAction={() => void switchToStudent()} />
         </View>
       </View>
     )
@@ -729,6 +751,7 @@ export default function DeliveryRiderPage() {
     : activeTab === 'pickup'
       ? pickupOrders.length
       : deliveryOrders.length
+  const refreshBusy = loading || loadingMore || Object.values(busyByOrder).some(Boolean) || releaseCandidate !== null
 
   return (
     <View className='rider-grab-page'>
@@ -756,17 +779,15 @@ export default function DeliveryRiderPage() {
             </View>
           </View>
           <View
-            className={`rider-grab-refresh ${loading ? 'rider-grab-refresh--loading' : ''}`}
-            ariaRole='button' ariaLabel='刷新配送订单'
-            onClick={() => {
-              if (!loading) void load()
-            }}
+            className={`rider-grab-refresh ${refreshBusy ? 'rider-grab-refresh--disabled' : ''}`}
+            ariaRole='button' ariaLabel={loading ? '正在刷新配送订单' : '刷新配送订单'}
+            hoverClass='delivery-order-control--pressed'
+            onClick={() => { void requestRefresh() }}
           >
-            <RiderWorkbenchIcon
-              name='refresh'
-              className={`rider-grab-refresh__icon ${loading ? 'rider-grab-refresh__icon--spin' : ''}`}
-            />
-            <Text>{loading ? '刷新中' : '刷新'}</Text>
+            <View className='rider-grab-refresh__symbol'>
+              {loading ? <DeliveryLoadDots /> : <RiderWorkbenchIcon name='refresh' className='rider-grab-refresh__icon' />}
+            </View>
+            <Text className='rider-grab-refresh__label'>{loading ? '刷新中' : '刷新'}</Text>
           </View>
         </View>
         <View className='rider-grab-context'>
@@ -787,41 +808,34 @@ export default function DeliveryRiderPage() {
             <Text className={`rider-grab-tabs__count rider-grab-tabs__count--${item.key}`}>{hasLoadedOrders ? item.count : '—'}</Text>
           </View>
         ))}
-      </View> : <View className='rider-grab-pool-heading'><Text>可接订单</Text><Text>接单后查看完整地址与联系方式</Text></View>}
+      </View> : <View className='rider-grab-pool-heading'><Text>可接订单</Text><Text>下拉刷新 · 接单后查看完整信息</Text></View>}
 
-      <ScrollView
+      <RefreshScrollView
         scrollY
         enhanced
         showScrollbar={false}
-        className='rider-grab-content'
+        className='rider-grab-content delivery-orders-scroll'
+        refreshKey={`rider:${accountId}:${activeTab}:${canClaim}`}
+        enabled={identityAllowed && releaseCandidate === null}
+        busy={refreshBusy}
+        onRefresh={requestRefresh}
         lowerThreshold={120}
         onScrollToLower={() => void loadMoreOrders()}
       >
         <View className='rider-grab-content__inner'>
-          {error && activeOrderCount === 0 ? (
-            <View className='rider-load-error' onClick={() => void load()}>
-              <Text className='rider-load-error__title'>订单加载失败</Text>
-              <Text className='rider-load-error__desc'>{error}</Text>
-              <Text className='rider-load-error__action'>点击重试</Text>
-            </View>
-          ) : (
-            <>
-              {error ? (
-                <View className='rider-grab-error' onClick={() => void load()}>
-                  <Text>{error}。点击重新同步工作台</Text>
-                </View>
-              ) : null}
+          {error ? <DeliveryOrderState kind='error' compact={activeOrderCount > 0}
+            title={hasLoadedOrders ? '订单刷新失败' : '订单加载失败'} description={error}
+            onAction={() => void requestRefresh()} /> : null}
+          {(!error || activeOrderCount > 0) && <>
               {activeTab === 'grab' ? renderClaimableOrders() : null}
               {activeTab === 'pickup' ? renderAssignedOrders(pickupOrders, 'pickup') : null}
               {activeTab === 'delivery' ? renderAssignedOrders(deliveryOrders, 'delivery') : null}
-              {loadMoreError ? (
-                <Text className='rider-grab-content__loading-more rider-grab-content__loading-more--retry' onClick={() => void loadMoreOrders()}>{loadMoreError}</Text>
-              ) : null}
-              {loadingMore ? <Text className='rider-grab-content__loading-more'>正在加载更多订单…</Text> : null}
-            </>
-          )}
+          </>}
+          {loadMoreError?.tab === activeTab ? <DeliveryOrderState kind='error' compact title='更多订单暂未加载'
+            description={loadMoreError.message} actionLabel='重试加载' onAction={() => void loadMoreOrders()} /> : null}
+          {loadingMore ? <DeliveryOrderLoading compact label='正在加载更多订单' /> : null}
         </View>
-      </ScrollView>
+      </RefreshScrollView>
       <DeliveryWorkspaceNav
         role='rider'
         active={activeTab === 'grab' ? 'grab' : 'tasks'}
@@ -857,7 +871,9 @@ export default function DeliveryRiderPage() {
         {claimable.map((order) => {
           const route = parseRouteSummary(order.routeSummary)
           const orderId = order.deliveryOrderPublicId
-          const busy = isOrderBusy(orderId)
+          const busy = Boolean(busyByOrder[orderId])
+          const refreshing = userRefreshLock.current !== null
+          const disabled = busy || refreshing
           const needsRefresh = actionFeedbackByOrder[orderId]?.needsRefresh
           return (
             <View key={orderId} className={`rider-order-card ${busy ? 'rider-order-card--busy' : ''}`}>
@@ -901,12 +917,12 @@ export default function DeliveryRiderPage() {
               <View className='rider-order-card__bottom'>
                 <Text className='rider-order-card__privacy'>隐私保护 · 接单后可联系</Text>
                 <View
-                  className={`rider-order-card__grab ${busy || !needsRefresh && rider.status !== 'active' ? 'rider-order-card__grab--disabled' : ''}`}
+                  className={`rider-order-card__grab ${disabled || !needsRefresh && rider.status !== 'active' ? 'rider-order-card__grab--disabled' : ''}`}
                   onClick={() => {
-                    if (!busy && (needsRefresh || rider.status === 'active')) void claim(order)
+                    if (!disabled && (needsRefresh || rider.status === 'active')) void claim(order)
                   }}
                 >
-                  <Text>{busy ? '接单中…' : needsRefresh ? '刷新状态' : rider.status === 'active' ? '抢单' : '当前不可接单'}</Text>
+                  <Text>{busy ? '接单中…' : refreshing ? '同步中…' : needsRefresh ? '刷新状态' : rider.status === 'active' ? '抢单' : '当前不可接单'}</Text>
                 </View>
               </View>
               {renderOrderFeedback(orderId)}
@@ -931,7 +947,9 @@ export default function DeliveryRiderPage() {
 
   function renderAssignedOrder(order: AssignedDeliveryOrder) {
     const orderId = order.deliveryOrderPublicId
-    const busy = isOrderBusy(orderId)
+    const busy = Boolean(busyByOrder[orderId])
+    const refreshing = userRefreshLock.current !== null
+    const disabled = busy || refreshing
     const needsRefresh = actionFeedbackByOrder[orderId]?.needsRefresh
     const releasable = order.status === 'claimed' || order.status === 'to_pickup'
     const deliveryStage = order.status === 'picked_up' || order.status === 'delivering'
@@ -1003,9 +1021,9 @@ export default function DeliveryRiderPage() {
           </View>
           {releasable ? (
             <View
-              className={`rider-order-card__secondary rider-order-card__secondary--danger ${busy || needsRefresh ? 'rider-order-card__secondary--disabled' : ''}`}
+              className={`rider-order-card__secondary rider-order-card__secondary--danger ${disabled || needsRefresh ? 'rider-order-card__secondary--disabled' : ''}`}
               onClick={() => {
-                if (!busy && !needsRefresh) updateReleaseCandidate(order)
+                if (!disabled && !needsRefresh && !isOrderBusy(orderId)) updateReleaseCandidate(order)
               }}
             >
               <Text>释放</Text>
@@ -1019,12 +1037,12 @@ export default function DeliveryRiderPage() {
           </View>
           {primaryAction ? (
             <View
-              className={`rider-order-card__grab ${busy ? 'rider-order-card__grab--disabled' : ''}`}
+              className={`rider-order-card__grab ${disabled ? 'rider-order-card__grab--disabled' : ''}`}
               onClick={() => {
-                if (!busy) primaryAction.run()
+                if (!disabled) primaryAction.run()
               }}
             >
-              <Text>{busy ? '处理中…' : needsRefresh ? '刷新状态' : primaryAction.label}</Text>
+              <Text>{busy ? '处理中…' : refreshing ? '同步中…' : needsRefresh ? '刷新状态' : primaryAction.label}</Text>
             </View>
           ) : (
             <View className='rider-order-card__status'><Text>{statusText[order.status]}</Text></View>
@@ -1060,7 +1078,7 @@ export default function DeliveryRiderPage() {
         {feedback ? (
           <View
             className={`rider-order-card__feedback rider-order-card__feedback--${feedback.tone}`}
-            onClick={() => { if (!busyAction && feedback.needsRefresh) void load() }}
+            onClick={() => { if (!busyAction && feedback.needsRefresh) void requestRefresh() }}
           >
             <Text>{feedback.message}</Text>
           </View>
@@ -1087,13 +1105,5 @@ export default function DeliveryRiderPage() {
 }
 
 function EmptyState({ title, description }: { title: string; description: string }) {
-  return (
-    <View className='rider-empty-state'>
-      <RiderWorkbenchIcon name='empty' className='rider-empty-state__icon' />
-      <View className='rider-empty-state__copy'>
-        <Text className='rider-empty-state__title'>{title}</Text>
-        <Text className='rider-empty-state__desc'>{description}</Text>
-      </View>
-    </View>
-  )
+  return <DeliveryOrderState kind='empty' title={title} description={`${description}可下拉刷新。`} />
 }

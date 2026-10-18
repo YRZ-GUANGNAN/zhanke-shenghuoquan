@@ -43,7 +43,7 @@ for (const token of [
   "className='rider-grab-hero'",
   'RiderWorkbenchIcon',
   "className='rider-grab-task-summary'",
-  "className='rider-empty-state'",
+  "<DeliveryOrderState kind='empty'",
   "'接单大厅'",
   "label: '待取货'",
   "label: '待送达'",

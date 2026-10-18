@@ -12,7 +12,6 @@ const icons = [
   ['action-wallet', 'walletIcon'],
   ['action-bill', 'billIcon'],
   ['action-message', 'messageIcon'],
-  ['empty-orders', 'emptyIcon'],
 ]
 
 assert.ok(fs.existsSync(iconComponentPath), 'merchant home icon component is required')
@@ -31,7 +30,9 @@ assert.match(source, /name='message'/)
 assert.match(source, /visibility\.delivery && visibility\.merchant/)
 assert.match(source, /key: 'pending', label: '待处理'/)
 assert.match(source, /key: 'completed', label: '已结束'/)
-assert.match(source, /name='empty'/)
+assert.doesNotMatch(source, /name='empty'/, '订单空态使用最新配送反馈组件')
+assert.match(source, /RefreshScrollView/)
+assert.match(source, /DeliveryOrderState/)
 assert.doesNotMatch(source, /icon:\s*['"](?:\+|¥|楼|账|聊)['"]/)
 assert.match(
   style,

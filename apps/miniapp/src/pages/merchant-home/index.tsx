@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { ScrollView, Text, View } from '@tarojs/components'
+import { Text, View } from '@tarojs/components'
 import { useDidShow } from '@tarojs/taro'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import IdentitySwitchModal from '../../components/IdentitySwitchModal'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import DeliveryWorkspaceNav from '../../components/delivery-workspace-nav'
-import { StatusGlyph } from '../../components/ui/status-glyph'
+import RefreshScrollView from '../../components/refresh-scroll-view'
+import { DeliveryLoadDots, DeliveryOrderLoading, DeliveryOrderState } from '../../components/delivery-order-feedback'
 import { deliveryPaymentEnabled } from '../../feature-flags'
 import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
 import { getIdentityApplication } from '../../services/a-user'
@@ -180,6 +181,7 @@ function MerchantHomeContent() {
   const [ordersTotalByTab, setOrdersTotalByTab] = useState<MerchantNumbersByTab>(emptyTotalsByTab)
   const [loadedByTab, setLoadedByTab] = useState<MerchantLoadedByTab>(unloadedTabs)
   const [loadErrorsByTab, setLoadErrorsByTab] = useState<MerchantErrorsByTab>(emptyErrorsByTab)
+  const [pageErrorsByTab, setPageErrorsByTab] = useState<MerchantErrorsByTab>(emptyErrorsByTab)
   const [loadingMore, setLoadingMore] = useState(false)
   const [balanceCents, setBalanceCents] = useState<number | null>(null)
   const [merchantName, setMerchantName] = useState('')
@@ -211,8 +213,8 @@ function MerchantHomeContent() {
     return () => { mountedRef.current = false }
   }, [])
 
-  const loadWorkbench = useCallback(async () => {
-    if (!mountedRef.current || !identityAllowed || !identityRef.current || profile.id !== accountRef.current || activeLoad.current !== null) return
+  const loadWorkbench = useCallback(async (): Promise<boolean> => {
+    if (!mountedRef.current || !identityAllowed || !identityRef.current || profile.id !== accountRef.current || activeLoad.current !== null) return false
     const account = accountRef.current
     const version = requestVersion.current + 1
     requestVersion.current = version
@@ -222,18 +224,23 @@ function MerchantHomeContent() {
     setLoading(true)
     setLoadingMore(false)
     setLoadErrorsByTab(emptyErrorsByTab())
-    setApprovalState('checking')
+    setPageErrorsByTab(emptyErrorsByTab())
+    // A background check must not unmount the list and native refresh slot.
+    // A failed check or revoked approval still leaves the guarded workbench.
+    if (approvalRef.current !== 'approved') setApprovalState('checking')
     setApprovalMessage('正在核验商家审核状态…')
     const applicationResult = await settle(getIdentityApplication('merchant'))
-    if (!current()) return
+    if (!current()) return false
     if (!applicationResult.ok) {
+      approvalRef.current = 'error'
       setApprovalState('error')
       setApprovalMessage('暂时无法确认商家审核状态，请稍后重试')
       setLoading(false)
       activeLoad.current = null
-      return
+      return false
     }
     if (applicationResult.value.status !== 'approved') {
+      approvalRef.current = 'blocked'
       setApprovalState('blocked')
       setApprovalMessage(
         applicationResult.value.status === 'pending'
@@ -242,10 +249,11 @@ function MerchantHomeContent() {
       )
       setLoading(false)
       activeLoad.current = null
-      return
+      return false
     }
     setMerchantName(applicationResult.value.merchantName)
     setMerchantAddress(applicationResult.value.merchantAddress)
+    approvalRef.current = 'approved'
     setApprovalState('approved')
     const [pendingResult, deliveringResult, completedResult, walletResult] = await Promise.all([
       settle(listMerchantDeliveryOrders(1, 50, 'pending')),
@@ -253,7 +261,7 @@ function MerchantHomeContent() {
       settle(listMerchantDeliveryOrders(1, 50, 'completed')),
       deliveryPaymentEnabled ? settle(getDeliveryWallet()) : null,
     ])
-    if (!current()) return
+    if (!current()) return false
     setLoadedByTab((current) => ({
       pending: pendingResult.ok || current.pending,
       delivering: deliveringResult.ok || current.delivering,
@@ -282,6 +290,7 @@ function MerchantHomeContent() {
     setBalanceCents(walletResult?.ok ? walletResult.value.availableBalanceCents : null)
     setLoading(false)
     activeLoad.current = null
+    return pendingResult.ok && deliveringResult.ok && completedResult.ok
   }, [identityAllowed, profile.id])
 
   useEffect(() => {
@@ -303,6 +312,7 @@ function MerchantHomeContent() {
       setOrdersTotalByTab(emptyTotalsByTab())
       setLoadedByTab(unloadedTabs())
       setLoadErrorsByTab(emptyErrorsByTab())
+      setPageErrorsByTab(emptyErrorsByTab())
       setBalanceCents(null)
       setMerchantName('')
       setMerchantAddress('')
@@ -336,7 +346,7 @@ function MerchantHomeContent() {
       && requestVersion.current === version && activePageLoad.current === pageRequest
     const nextPage = ordersPageByTab[requestedTab] + 1
     setLoadingMore(true)
-    setLoadErrorsByTab((current) => ({ ...current, [requestedTab]: '' }))
+    setPageErrorsByTab((current) => ({ ...current, [requestedTab]: '' }))
     try {
       const result = await listMerchantDeliveryOrders(nextPage, 50, requestedTab)
       if (!current()) return
@@ -349,7 +359,7 @@ function MerchantHomeContent() {
       setOrdersTotalByTab((current) => ({ ...current, [requestedTab]: result.total }))
     } catch (error) {
       if (current()) {
-        setLoadErrorsByTab((current) => ({
+        setPageErrorsByTab((current) => ({
           ...current,
           [requestedTab]: error instanceof Error ? error.message : '更多配送单加载失败',
         }))
@@ -361,6 +371,11 @@ function MerchantHomeContent() {
       }
     }
   }, [activeTab, identityAllowed, profile.id, loading, loadingMore, ordersByTab, ordersPageByTab, ordersTotalByTab])
+
+  const requestRefresh = async (): Promise<boolean> => {
+    if (activePageLoad.current !== null || showStudentSwitch || switchLockRef.current) return false
+    return loadWorkbench()
+  }
 
   const totalOrderCount = ordersTotalByTab.pending + ordersTotalByTab.delivering + ordersTotalByTab.completed
   const loadError = loadErrorsByTab[activeTab]
@@ -402,13 +417,9 @@ function MerchantHomeContent() {
       <View className='merchant-home-page merchant-home-page--review' style={capsuleStyle}>
         <CapsuleSystemRow />
         <View className='merchant-home-review'>
-          <View className='merchant-home-review__status'>
-            <StatusGlyph kind={approvalState === 'checking' ? 'loading' : approvalState === 'error' ? 'error' : 'forbidden'} />
-          </View>
-          <Text className='merchant-home-review__title'>
-            {approvalState === 'checking' ? '正在核验商家资格' : approvalState === 'error' ? '商家资格核验失败' : '暂时无法进入商家端'}
-          </Text>
-          <Text className='merchant-home-review__message'>{approvalMessage}</Text>
+          {approvalState === 'checking' ? <DeliveryOrderLoading compact label='正在核验商家资格' /> :
+            <DeliveryOrderState kind={approvalState === 'error' ? 'error' : 'access'}
+              title={approvalState === 'error' ? '商家资格核验失败' : '暂时无法进入商家端'} description={approvalMessage} />}
           {approvalState === 'error' ? (
             <View className='merchant-home-review__action merchant-home-review__retry' ariaRole='button' ariaLabel='重新核验商家资格' hoverClass='merchant-home-control--pressed' onClick={() => void loadWorkbench()}>
               <Text>重新尝试</Text>
@@ -496,45 +507,48 @@ function MerchantHomeContent() {
         ))}
       </View>
 
-      <ScrollView
+      <RefreshScrollView
         scrollY
-        className='merchant-home-orders'
+        className='merchant-home-orders delivery-orders-scroll'
+        refreshKey={`merchant:${profile.id}:${activeTab}`}
+        enabled={identityAllowed && !showStudentSwitch}
+        busy={loading || loadingMore || switchingIdentity}
+        onRefresh={requestRefresh}
         enhanced
         showScrollbar={false}
         lowerThreshold={120}
         onScrollToLower={() => void loadMoreOrders()}
       >
         <View className='merchant-home-orders__inner'>
-          {loading ? <Text className='merchant-home-orders__notice merchant-home-orders__notice--loading'>正在加载真实配送单…</Text> : null}
+          {loadedByTab[activeTab] || !loading ? <View className='delivery-order-toolbar'>
+            <Text>{loading ? '正在更新订单' : '下拉刷新订单'}</Text>
+            <View className={`delivery-order-toolbar__refresh${loading || loadingMore ? ' delivery-order-toolbar__refresh--disabled' : ''}`}
+              ariaRole='button' ariaLabel={loading ? '正在刷新配送订单' : '刷新配送订单'} hoverClass='delivery-order-control--pressed'
+              onClick={() => { void requestRefresh() }}>
+              {loading ? <DeliveryLoadDots /> : null}<Text>{loading ? '刷新中' : '刷新'}</Text>
+            </View>
+          </View> : null}
+          {loading && !loadedByTab[activeTab] ? <DeliveryOrderLoading columns={2} /> : null}
           {!loading && loadError ? (
-            <View className='merchant-home-orders__notice merchant-home-orders__notice--error' hoverClass='merchant-home-orders__notice--pressed' ariaRole='button' ariaLabel='重试配送单加载' onClick={() => void loadWorkbench()}>
-              <Text>配送单{loadedByTab[activeTab] ? '刷新' : '加载'}失败</Text>
-              <Text>{loadError}</Text>
-              <Text className='merchant-home-orders__retry'>点击重试</Text>
-            </View>
+            <DeliveryOrderState kind='error' compact={ordersByTab[activeTab].length > 0}
+              title={`配送单${loadedByTab[activeTab] ? '刷新' : '加载'}失败`} description={loadError}
+              actionLabel='重新加载' onAction={() => void requestRefresh()} />
           ) : null}
-          {!loading && !loadError && ordersByTab[activeTab].length === 0 ? (
-            <View className='merchant-home-empty'>
-              <View className='merchant-home-empty__icon'>
-                <MerchantHomeIcon name='empty' />
-              </View>
-              <Text className='merchant-home-empty__title'>
-                暂无{tabCopy.find((item) => item.key === activeTab)?.label}配送单
-              </Text>
-              <Text className='merchant-home-empty__description'>
-                新配送单和状态更新会显示在这里
-              </Text>
-            </View>
+          {loadedByTab[activeTab] && !loadError && ordersByTab[activeTab].length === 0 ? (
+            <DeliveryOrderState kind='empty' title={`暂无${tabCopy.find((item) => item.key === activeTab)?.label}配送单`}
+              description='新配送单和状态更新会显示在这里，可下拉刷新。' />
           ) : null}
           <View className='merchant-home-order-grid'>
             {ordersByTab[activeTab].map((order) => <OrderCard key={order.deliveryOrderPublicId} order={order} />)}
           </View>
-          {loadingMore ? <Text className='merchant-home-orders__end'>正在加载更多配送单…</Text> : null}
+          {pageErrorsByTab[activeTab] ? <DeliveryOrderState kind='error' compact title='更多订单暂未加载'
+            description={pageErrorsByTab[activeTab]} actionLabel='重试加载' onAction={() => void loadMoreOrders()} /> : null}
+          {loadingMore ? <DeliveryOrderLoading compact label='正在加载更多订单' /> : null}
           {!loading && !loadingMore && !loadError && ordersByTab[activeTab].length > 0 && ordersByTab[activeTab].length >= ordersTotalByTab[activeTab] ? (
             <Text className='merchant-home-orders__end'>— 已显示全部配送单 —</Text>
           ) : null}
         </View>
-      </ScrollView>
+      </RefreshScrollView>
 
       <DeliveryWorkspaceNav role='merchant' active='orders' />
 
