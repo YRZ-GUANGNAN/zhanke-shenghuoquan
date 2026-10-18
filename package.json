@@ -22,6 +22,8 @@
     "check:post-presentation": "node scripts/check-post-presentation.cjs",
     "check:comment-interactions": "node scripts/check-comment-interactions.cjs",
     "check:content-motion": "node scripts/check-content-motion.cjs",
+    "test:post-motion": "node scripts/test-post-motion.cjs",
+    "test:post-motion:mysql": "node scripts/test-feature-policy-mysql.cjs --post-motion",
     "check:channel-pager": "node scripts/check-channel-pager.cjs",
     "check:refresh-feedback": "node scripts/check-refresh-feedback.cjs",
     "check:admin-share-default": "node scripts/check-admin-share-default.cjs",

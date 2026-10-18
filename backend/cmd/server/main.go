@@ -219,11 +219,25 @@ func main() {
 	if err != nil {
 		log.Fatalf("configure delivery conversation media adapter: %v", err)
 	}
+	mediaOptions := []miniappflow.ServiceOption{
+		miniappflow.WithLocalMockAutoApproval(localMockWechatMode(cfg)),
+		miniappflow.WithWechatReviewSubmitter(wechatReviewSubmitter),
+	}
+	if cfg.EnablePostVideo {
+		provider, videoErr := coremedia.NewTencentVideoReview(completionStore, cfg.VideoReviewBizType)
+		if videoErr != nil {
+			log.Fatalf("configure video review: %v", videoErr)
+		}
+		videoReview, videoErr := coremedia.NewVideoReviewService(mediaRepository, provider)
+		if videoErr != nil {
+			log.Fatalf("configure video review service: %v", videoErr)
+		}
+		mediaOptions = append(mediaOptions, miniappflow.WithVideoReviewer(videoReview))
+	}
 	miniappMedia, err := miniappflow.NewService(
 		uploadTickets, mediaRepository, completionService, coreMediaService,
 		projectionService, mediaRepository, mediaConsumer, miniappflow.NewStatusRepository(db), nil,
-		miniappflow.WithLocalMockAutoApproval(localMockWechatMode(cfg)),
-		miniappflow.WithWechatReviewSubmitter(wechatReviewSubmitter),
+		mediaOptions...,
 	)
 	if err != nil {
 		log.Fatalf("configure Module 10 miniapp flow: %v", err)

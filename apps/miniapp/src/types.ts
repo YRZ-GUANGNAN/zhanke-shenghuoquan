@@ -57,6 +57,15 @@ export interface UserProfile {
   role?: 'user' | 'admin' | 'superadmin'
 }
 
+export interface PostMotion {
+  kind: 'video' | 'live_photo'
+  url: string
+  posterUrl: string
+  width: number
+  height: number
+  durationMs: number
+}
+
 export interface CommunityPost {
   id: string
   authorId: string
@@ -68,6 +77,7 @@ export interface CommunityPost {
   title: string
   content: string
   images: string[]
+  motion?: PostMotion
   likedCount: number
   commentCount: number
   favoriteCount: number

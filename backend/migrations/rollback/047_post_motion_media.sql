@@ -1,0 +1,2 @@
+-- Rollback is intentionally manual: removing motion metadata would make
+-- newer posts unreadable. Keep the additive columns during application rollback.

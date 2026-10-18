@@ -9,7 +9,7 @@ import {
   createCommunityPost,
   listHotCommunityTags,
 } from '../../services/b-community'
-import { chooseAndUploadImages, waitForMediaApprovals, type UploadedMedia } from '../../services/media'
+import { chooseAndUploadImages, waitForMediaApprovals, chooseAndUploadPostMotion, confirmPostMotion, postMotionAvailable, type UploadedPostMotion, type UploadedMedia } from '../../services/media'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
 import './index.scss'
@@ -42,6 +42,14 @@ function PublishPostPage() {
   const [hotTags, setHotTags] = useState<string[]>([])
   const [customTag, setCustomTag] = useState('')
   const [images, setImages] = useState<UploadedMedia[]>([])
+  const [motion, setMotion] = useState<UploadedPostMotion | null>(null)
+  const [motionEnabled, setMotionEnabled] = useState(false)
+  const alive = useRef(true)
+  useEffect(() => {
+    alive.current = true
+    void postMotionAvailable().then(value => { if (alive.current) setMotionEnabled(value) })
+    return () => { alive.current = false }
+  }, [])
   const [uploading, setUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [publishedId, setPublishedId] = useState('')
@@ -111,7 +119,7 @@ function PublishPostPage() {
   }
 
   const handlePickImages = async () => {
-    if (uploadLock.current || submitLock.current || publishedIdRef.current) return
+    if (uploadLock.current || submitLock.current || publishedIdRef.current || motion) return
     const remaining = MAX_IMAGES - images.length
     if (remaining <= 0) {
       toast(`最多上传 ${MAX_IMAGES} 张图`)
@@ -138,6 +146,23 @@ function PublishPostPage() {
     } finally {
       uploadLock.current = false
       setUploading(false)
+    }
+  }
+
+  const handlePickMotion = async (kind: UploadedPostMotion['kind']) => {
+    if (!motionEnabled || images.length || motion || uploadLock.current || submitLock.current || publishedIdRef.current) return
+    uploadLock.current = true
+    setUploading(true); setEditorError('')
+    try {
+      const value = await chooseAndUploadPostMotion(kind, message => { if (alive.current) setUploadHint(message) }, () => alive.current)
+      if (!alive.current) return
+      resetClientRequestId(); setMotion(value); setUploadHint('已上传，发布时确认审核')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String((error as { errMsg?: string })?.errMsg ?? '媒体上传失败')
+      if (alive.current && !/cancel/i.test(message)) setEditorError(message)
+    } finally {
+      uploadLock.current = false
+      if (alive.current) setUploading(false)
     }
   }
 
@@ -169,6 +194,8 @@ function PublishPostPage() {
     const deadline = Date.now() + SUBMIT_TIMEOUT_MS
     try {
       setUploadHint('审核中')
+      if (motion) await confirmPostMotion(motion, APPROVAL_TIMEOUT_MS,
+        message => { if (alive.current) setUploadHint(message) }, () => alive.current)
       await waitForMediaApprovals(
         images.map((image) => image.assetId),
         () => setUploadHint('审核中'),
@@ -178,6 +205,7 @@ function PublishPostPage() {
       if (deadline - Date.now() < 12000) {
         throw new Error('本次提交等待超时，草稿和图片已保留，请稍后重试')
       }
+      if (!alive.current) return
       setSubmitStage('publishing')
       setUploadHint('发布中')
       const normalizedContent = content.trim()
@@ -188,6 +216,7 @@ function PublishPostPage() {
         topic: selectedTags[0] ?? '湛科日常',
         tags: selectedTags,
         imageAssetIds: images.map((image) => image.assetId),
+        ...(motion ? { motion: { kind: motion.kind, assetId: motion.video.assetId, posterAssetId: motion.poster.assetId } } : {}),
         clientRequestId,
       })
       publishedIdRef.current = post.id
@@ -227,7 +256,7 @@ function PublishPostPage() {
       <CapsulePageHeader
         title='发布帖子'
         left={<Text className={`publish-post-nav__side${submitting ? ' publish-post-control--pending' : ''}`} onClick={() => {
-          if (submitLock.current) { toast('内容正在提交，请稍候'); return }
+          if (submitLock.current || uploadLock.current) { toast('内容正在处理，请稍候'); return }
           void Taro.navigateBack()
         }}>取消</Text>}
         right={
@@ -242,14 +271,25 @@ function PublishPostPage() {
 
       <View className='publish-post-body'>
         <View className='publish-post-media'>
+          {motion && <View className='publish-post-motion'>
+            <Image src={motion.poster.previewPath} mode='aspectFill' />
+            <View><Text>{motion.kind === 'live_photo' ? '实况照片' : '视频'} · {Math.ceil(motion.durationMs / 1000)} 秒</Text><Text className='publish-post-motion__hint'>首页静音短预览，详情可完整播放</Text></View>
+            <View role='button' aria-label='移除动态媒体' onClick={() => { if (!uploadLock.current && !submitLock.current && !publishedIdRef.current) { setMotion(null); resetClientRequestId() } }}><Text>移除</Text></View>
+          </View>}
           {images.map((image) => <View className='publish-post-media__item' key={image.assetId}>
             <Image className='publish-post-media__image' src={image.previewPath} mode='aspectFill' />
           </View>)}
-          <View className={`publish-post-upload${uploading || submitting || images.length === MAX_IMAGES ? ' publish-post-control--pending' : ''}`} role='button' aria-label='添加帖子图片' aria-disabled={uploading || submitting || images.length === MAX_IMAGES} onClick={() => void handlePickImages()}>
+          {!motion && <View className={`publish-post-upload${uploading || submitting || images.length === MAX_IMAGES ? ' publish-post-control--pending' : ''}`} role='button' aria-label='添加帖子图片' aria-disabled={uploading || submitting || images.length === MAX_IMAGES} onClick={() => void handlePickImages()}>
             <Text className='publish-post-upload__icon'>{images.length === MAX_IMAGES ? '✓' : '＋'}</Text>
             <Text className='publish-post-upload__count'>{uploading ? uploadHint : `${images.length}/${MAX_IMAGES}`}</Text>
-          </View>
+          </View>}
         </View>
+        {motionEnabled && !images.length && !motion && <View className='publish-post-motion-actions'>
+          <View role='button' aria-disabled={uploading || submitting} className={uploading || submitting ? 'publish-post-control--pending' : ''} onClick={() => void handlePickMotion('video')}><Text>添加视频</Text></View>
+          <View role='button' aria-disabled={uploading || submitting} className={uploading || submitting ? 'publish-post-control--pending' : ''} onClick={() => void handlePickMotion('live_photo')}><Text>添加实况照片</Text></View>
+        </View>}
+        {motionEnabled && !images.length && !motion && <Text className='publish-post-motion-tip'>视频最长 60 秒；实况照片由封面照片和对应的 5 秒内片段组成</Text>}
+        {uploading && <View className='publish-post-motion-tip' role='status'><Text>{uploadHint}</Text></View>}
 
         <Textarea
           className='publish-post-textarea'

@@ -195,6 +195,7 @@ func (r *GormRepository) MarkCompletionPromoting(ctx context.Context, work Compl
 				"technical_status": TechnicalPromoting, "staging_version_id": validation.StagingVersionID,
 				"trusted_sha256": validation.TrustedSHA256, "verified_mime": validation.VerifiedMIME,
 				"byte_size": validation.VerifiedSize, "width": validation.Width, "height": validation.Height,
+				"duration_ms": validation.DurationMS,
 				"row_version": gorm.Expr("row_version + 1"), "updated_at": now,
 			})); err != nil {
 			return err
@@ -207,7 +208,8 @@ func (r *GormRepository) MarkCompletionPromoting(ctx context.Context, work Compl
 				"trusted_sha256": validation.TrustedSHA256, "verified_mime": validation.VerifiedMIME,
 				"verified_size": validation.VerifiedSize, "verified_width": validation.Width,
 				"verified_height": validation.Height, "final_key": validation.FinalKey,
-				"row_version": gorm.Expr("row_version + 1"), "updated_at": now,
+				"verified_duration_ms": validation.DurationMS,
+				"row_version":          gorm.Expr("row_version + 1"), "updated_at": now,
 			})); err != nil {
 			return err
 		}
@@ -215,6 +217,7 @@ func (r *GormRepository) MarkCompletionPromoting(ctx context.Context, work Compl
 		asset.StagingVersionID = stringPointer(validation.StagingVersionID)
 		asset.TrustedSHA256 = stringPointer(validation.TrustedSHA256)
 		asset.VerifiedMIME, asset.ByteSize, asset.Width, asset.Height = validation.VerifiedMIME, validation.VerifiedSize, validation.Width, validation.Height
+		asset.DurationMS = validation.DurationMS
 		asset.RowVersion++
 		completion.Phase = CompletionPromoting
 		completion.StagingVersionID = stringPointer(validation.StagingVersionID)
@@ -225,6 +228,7 @@ func (r *GormRepository) MarkCompletionPromoting(ctx context.Context, work Compl
 		completion.VerifiedSize = uint64Pointer(validation.VerifiedSize)
 		completion.VerifiedWidth = uint32Pointer(validation.Width)
 		completion.VerifiedHeight = uint32Pointer(validation.Height)
+		completion.VerifiedDurationMS = uint32Pointer(validation.DurationMS)
 		completion.FinalKey = stringPointer(validation.FinalKey)
 		completion.RowVersion++
 		result = CompletionWork{Bundle: work.Bundle, Completion: completion, LeaseToken: work.LeaseToken, ShouldProcess: true}

@@ -87,7 +87,7 @@ declare module '@tarojs/taro' {
     getCurrentInstance(): CurrentInstance
     showShareMenu(options?: { menus?: Array<'shareAppMessage' | 'shareTimeline'> }): Promise<unknown>
     hideShareMenu(options?: { menus?: Array<'shareAppMessage' | 'shareTimeline'> }): Promise<unknown>
-    chooseMedia(options: { count: number; mediaType: ['image']; sourceType: Array<'album' | 'camera'>; sizeType?: Array<'original' | 'compressed'> }): Promise<{ tempFiles: Array<{ tempFilePath: string; size: number; fileType?: string }> }>
+    chooseMedia(options: { count: number; mediaType: Array<'image' | 'video'>; sourceType: Array<'album' | 'camera'>; sizeType?: Array<'original' | 'compressed'>; maxDuration?: number }): Promise<{ tempFiles: Array<{ tempFilePath: string; size: number; fileType?: string; duration?: number; width?: number; height?: number; thumbTempFilePath?: string }> }>
     previewImage(options: { urls: string[]; current?: string }): Promise<unknown>
     getImageInfo(options: { src: string }): Promise<{ width: number; height: number; type: string; path: string }>
     compressImage(options: { src: string; quality: number; compressedWidth?: number; compressedHeight?: number; format?: 'webp' }): Promise<{ tempFilePath: string }>

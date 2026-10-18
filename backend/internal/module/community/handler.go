@@ -153,12 +153,13 @@ func (h *Handler) create(c *gin.Context) {
 		return
 	}
 	var req struct {
-		Title           string   `json:"title"`
-		Content         string   `json:"content"`
-		Topic           string   `json:"topic"`
-		Tags            []string `json:"tags"`
-		ImageAssetIDs   []string `json:"imageAssetIds"`
-		ClientRequestID string   `json:"clientRequestId"`
+		Title           string                 `json:"title"`
+		Content         string                 `json:"content"`
+		Topic           string                 `json:"topic"`
+		Tags            []string               `json:"tags"`
+		ImageAssetIDs   []string               `json:"imageAssetIds"`
+		Motion          *CreatePostMotionInput `json:"motion"`
+		ClientRequestID string                 `json:"clientRequestId"`
 	}
 	if c.ShouldBindJSON(&req) != nil {
 		response.Fail(c, 400, "invalid post")
@@ -171,7 +172,7 @@ func (h *Handler) create(c *gin.Context) {
 	}
 	currentUser := cu
 	risk := h.safety.CheckText(c.Request.Context(), currentUser.OpenID, req.Title+"\n"+req.Content)
-	input := CreatePostInput{UserID: currentUser.ID, Title: req.Title, Content: req.Content, Topic: req.Topic, Tags: req.Tags, ImageAssetIDs: req.ImageAssetIDs}
+	input := CreatePostInput{UserID: currentUser.ID, Title: req.Title, Content: req.Content, Topic: req.Topic, Tags: req.Tags, ImageAssetIDs: req.ImageAssetIDs, Motion: req.Motion}
 	if keyed {
 		result, err := h.service.CreatePostKeyed(c, input, clientRequestID, risk)
 		writeKeyedCreate(c, result.Value, result.Replayed, err)

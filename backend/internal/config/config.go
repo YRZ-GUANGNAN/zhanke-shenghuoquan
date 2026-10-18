@@ -38,6 +38,8 @@ type Config struct {
 	MediaPublicBaseURL  string
 	WechatCallbackToken string
 	WechatAPIBase       string
+	EnablePostVideo     bool
+	VideoReviewBizType  string
 
 	WechatAppID     string
 	WechatAppSecret string
@@ -112,6 +114,10 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	enablePostVideo, err := envBool("ENABLE_POST_VIDEO", false)
+	if err != nil {
+		return Config{}, err
+	}
 
 	cfg := Config{
 		AppEnv:             appEnv,
@@ -137,6 +143,8 @@ func Load() (Config, error) {
 		MediaPublicBaseURL:  env("MEDIA_PUBLIC_BASE_URL", ""),
 		WechatCallbackToken: env("WECHAT_CALLBACK_TOKEN", ""),
 		WechatAPIBase:       env("WECHAT_API_BASE", "https://api.weixin.qq.com"),
+		EnablePostVideo:     enablePostVideo,
+		VideoReviewBizType:  env("VIDEO_REVIEW_BIZ_TYPE", ""),
 
 		WechatAppID:     env("WECHAT_APP_ID", ""),
 		WechatAppSecret: env("WECHAT_APP_SECRET", ""),
@@ -208,6 +216,9 @@ func (c Config) Validate() error {
 	}
 	if c.AllowMockDeliveryPayment && c.DeliveryWechatPayAnyCredentialSet() {
 		return errors.New("mock delivery payment cannot be enabled with real WeChat Pay credentials")
+	}
+	if c.EnablePostVideo && strings.TrimSpace(c.VideoReviewBizType) == "" {
+		return errors.New("enabled post video requires VIDEO_REVIEW_BIZ_TYPE")
 	}
 	if c.EnableDeliveryPayment && c.AllowMockDeliveryPayment && c.AllowMockDeliveryFeeConfirmation {
 		return errors.New("delivery payment mock and legacy fee confirmation mock cannot be enabled together")

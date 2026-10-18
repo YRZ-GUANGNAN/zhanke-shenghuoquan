@@ -144,6 +144,21 @@ func (s *CompletionService) validateStaging(ctx context.Context, work Completion
 		return CompletionValidation{}, pinned, err
 	}
 	validation, err := validateCompletionBytes(work.Bundle.Asset, work.Bundle.Ticket, head, raw, s.config.Environment)
+	if err == nil && validation.VerifiedMIME == "video/mp4" {
+		inspector, ok := s.storage.(VideoInspector)
+		if !ok {
+			return CompletionValidation{}, pinned, ErrVideoUnavailable
+		}
+		info, inspectErr := inspector.InspectVideo(ctx, key, head.VersionID)
+		if inspectErr != nil {
+			return CompletionValidation{}, pinned, inspectErr
+		}
+		if info.DurationMS < 500 || info.DurationMS > 60000 || info.Width == 0 || info.Height == 0 ||
+			info.Width > 4096 || info.Height > 4096 || info.Codec != "h264" || info.Size != validation.VerifiedSize {
+			return CompletionValidation{}, pinned, fmt.Errorf("%w: unsupported video metadata", ErrCompletionValidation)
+		}
+		validation.Width, validation.Height, validation.DurationMS = info.Width, info.Height, info.DurationMS
+	}
 	return validation, pinned, err
 }
 
@@ -168,23 +183,39 @@ func validateCompletionBytes(asset Asset, ticket UploadTicket, head CompletionOb
 	if err != nil || hex.EncodeToString(digest[:]) != expected {
 		return CompletionValidation{}, fmt.Errorf("%w: downloaded md5 mismatch", ErrCompletionValidation)
 	}
-	config, format, err := image.DecodeConfig(bytes.NewReader(raw))
-	if err != nil {
-		return CompletionValidation{}, fmt.Errorf("%w: decode config", ErrCompletionValidation)
-	}
-	verifiedMIME, extension, err := strictImageContainer(raw, format)
-	if err != nil || verifiedMIME != ticket.ExpectedContentType {
-		return CompletionValidation{}, fmt.Errorf("%w: real format mismatch", ErrCompletionValidation)
-	}
-	maxEdge, maxPixels := uint64(8192), uint64(40_000_000)
-	if asset.Purpose == PurposeAvatar {
-		maxEdge, maxPixels = 4096, 16_000_000
-	}
-	if config.Width <= 0 || config.Height <= 0 || uint64(config.Width) > maxEdge || uint64(config.Height) > maxEdge || uint64(config.Width)*uint64(config.Height) > maxPixels {
-		return CompletionValidation{}, fmt.Errorf("%w: image dimensions", ErrCompletionValidation)
-	}
-	if _, decodedFormat, err := image.Decode(bytes.NewReader(raw)); err != nil || decodedFormat != format {
-		return CompletionValidation{}, fmt.Errorf("%w: full decode", ErrCompletionValidation)
+	var verifiedMIME, extension string
+	var width, height, durationMS uint32
+	if ticket.ExpectedContentType == "video/mp4" {
+		if asset.Purpose != PurposePost {
+			return CompletionValidation{}, fmt.Errorf("%w: video purpose is not allowed", ErrCompletionValidation)
+		}
+		inspection, inspectErr := inspectMP4(raw)
+		if inspectErr != nil {
+			return CompletionValidation{}, inspectErr
+		}
+		verifiedMIME, extension = "video/mp4", "mp4"
+		width, height, durationMS = inspection.Width, inspection.Height, inspection.DurationMS
+	} else {
+		config, format, decodeErr := image.DecodeConfig(bytes.NewReader(raw))
+		if decodeErr != nil {
+			return CompletionValidation{}, fmt.Errorf("%w: decode config", ErrCompletionValidation)
+		}
+		var strictErr error
+		verifiedMIME, extension, strictErr = strictImageContainer(raw, format)
+		if strictErr != nil || verifiedMIME != ticket.ExpectedContentType {
+			return CompletionValidation{}, fmt.Errorf("%w: real format mismatch", ErrCompletionValidation)
+		}
+		maxEdge, maxPixels := uint64(8192), uint64(40_000_000)
+		if asset.Purpose == PurposeAvatar {
+			maxEdge, maxPixels = 4096, 16_000_000
+		}
+		if config.Width <= 0 || config.Height <= 0 || uint64(config.Width) > maxEdge || uint64(config.Height) > maxEdge || uint64(config.Width)*uint64(config.Height) > maxPixels {
+			return CompletionValidation{}, fmt.Errorf("%w: image dimensions", ErrCompletionValidation)
+		}
+		if _, decodedFormat, decodeErr := image.Decode(bytes.NewReader(raw)); decodeErr != nil || decodedFormat != format {
+			return CompletionValidation{}, fmt.Errorf("%w: full decode", ErrCompletionValidation)
+		}
+		width, height = uint32(config.Width), uint32(config.Height)
 	}
 	trusted := sha256.Sum256(raw)
 	trustedHex := hex.EncodeToString(trusted[:])
@@ -196,7 +227,7 @@ func validateCompletionBytes(asset Asset, ticket UploadTicket, head CompletionOb
 	return CompletionValidation{
 		StagingVersionID: head.VersionID, StagingETag: normalizeETag(head.ETag), StagingLastModified: head.LastModified,
 		TrustedSHA256: trustedHex, VerifiedMIME: verifiedMIME, VerifiedSize: uint64(len(raw)),
-		Width: uint32(config.Width), Height: uint32(config.Height), FinalKey: finalKey,
+		Width: width, Height: height, DurationMS: durationMS, FinalKey: finalKey,
 	}, nil
 }
 
@@ -281,6 +312,7 @@ func (s *CompletionService) ensurePromoted(ctx context.Context, work CompletionW
 		SourceKey: *work.Bundle.Asset.StagingKey, SourceVersionID: *c.StagingVersionID, SourceETag: *c.StagingETag,
 		DestinationKey: *c.FinalKey, AssetPublicID: work.Bundle.Asset.AssetPublicID, TicketID: c.TicketID,
 		TrustedSHA256: *c.TrustedSHA256, VerifiedMIME: *c.VerifiedMIME, VerifiedSize: *c.VerifiedSize,
+		VerifiedDurationMS: valueOrUint32(c.VerifiedDurationMS),
 	})
 	if errors.Is(err, ErrObjectAlreadyExists) {
 		final, err = s.storage.HeadObject(ctx, *c.FinalKey, "")
@@ -296,14 +328,26 @@ func (s *CompletionService) ensurePromoted(ctx context.Context, work CompletionW
 
 func verifyFinalObject(object CompletionObject, work CompletionWork) error {
 	c := work.Completion
+	durationMetadataOK := true
+	if c.VerifiedMIME != nil && *c.VerifiedMIME == "video/mp4" {
+		durationMetadataOK = object.Metadata["media-duration-ms"] == fmt.Sprintf("%d", valueOrUint32(c.VerifiedDurationMS))
+	}
 	if c.FinalKey == nil || c.VerifiedSize == nil || c.VerifiedMIME == nil || c.TrustedSHA256 == nil || c.StagingVersionID == nil || c.StagingETag == nil ||
 		object.Key != *c.FinalKey || object.VersionID == "" || object.Size != *c.VerifiedSize || object.ContentType != *c.VerifiedMIME ||
 		normalizeETag(object.ETag) != normalizeETag(*c.StagingETag) ||
 		object.Metadata["media-asset-id"] != work.Bundle.Asset.AssetPublicID || object.Metadata["media-ticket-id"] != c.TicketID ||
-		object.Metadata["media-sha256"] != *c.TrustedSHA256 || object.Metadata["media-source-version"] != *c.StagingVersionID {
+		object.Metadata["media-sha256"] != *c.TrustedSHA256 || object.Metadata["media-source-version"] != *c.StagingVersionID ||
+		!durationMetadataOK {
 		return fmt.Errorf("%w: final object identity mismatch", ErrCompletionInvariant)
 	}
 	return nil
+}
+
+func valueOrUint32(value *uint32) uint32 {
+	if value == nil {
+		return 0
+	}
+	return *value
 }
 
 func expectedMD5Hex(value string) (string, error) {

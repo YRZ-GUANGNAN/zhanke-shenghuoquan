@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	coremedia "campus-circle/backend/internal/module/media"
@@ -57,6 +58,7 @@ type Service struct {
 	now                  func() time.Time
 	localMockAutoApprove bool
 	wechatReview         WechatReviewSubmitter
+	videoReview          videoReviewer
 }
 
 type ServiceOption func(*Service)
@@ -103,6 +105,9 @@ func NewService(
 func (s *Service) CreateUpload(ctx context.Context, input CreateUploadInput) (UploadSession, error) {
 	if input.OwnerID == 0 {
 		return UploadSession{}, ErrInvalidRequest
+	}
+	if input.ContentType == "video/mp4" && s.videoReview == nil {
+		return UploadSession{}, coremedia.ErrVideoUnavailable
 	}
 	bundle, _, err := s.tickets.CreateTicket(ctx, coremedia.CreateUploadTicketInput{
 		OwnerID: input.OwnerID, Purpose: input.Purpose, ExpectedSize: input.SizeBytes,
@@ -185,6 +190,10 @@ func (s *Service) CompleteUploadWithOpenID(ctx context.Context, ownerID uint64, 
 	}
 	if asset.TechnicalStatus != coremedia.TechnicalFinalReady || asset.StorageStage != coremedia.StorageStageFinal {
 		return AssetStatus{}, coremedia.ErrCompletionInvariant
+	}
+	if asset.VerifiedMIME == "video/mp4" {
+		// Status advances the durable COS job; videos never enter image review or mock approval.
+		return s.Status(ctx, ownerID, asset.AssetPublicID)
 	}
 	projection, _, err := s.projections.EnsureProjection(ctx, asset.AssetPublicID)
 	if err != nil {
@@ -310,6 +319,20 @@ func (s *Service) Status(ctx context.Context, ownerID uint64, assetPublicID stri
 	fact, err := s.status.FindStatus(ctx, ownerID, assetPublicID)
 	if err != nil {
 		return AssetStatus{}, err
+	}
+	if fact.MIMEType == "video/mp4" && fact.TechnicalStatus == coremedia.TechnicalFinalReady && !fact.DeleteRequested &&
+		(fact.Projection == nil || !fact.Projection.Terminal()) {
+		bundle, bundleErr := s.bundles.FindUploadBundle(ctx, fact.TicketID, ownerID)
+		if bundleErr != nil {
+			return AssetStatus{}, bundleErr
+		}
+		if reviewErr := s.advanceVideoReview(ctx, bundle.Asset); reviewErr != nil {
+			return AssetStatus{}, errors.Join(ErrSubmissionPending, reviewErr)
+		}
+		fact, err = s.status.FindStatus(ctx, ownerID, assetPublicID)
+		if err != nil {
+			return AssetStatus{}, err
+		}
 	}
 	return projectStatus(fact), nil
 }
@@ -532,6 +555,9 @@ func projectStatus(fact StatusFact) AssetStatus {
 	projection := "pending"
 	if fact.Projection != nil {
 		projection = string(*fact.Projection)
+	}
+	if fact.MIMEType == "video/mp4" {
+		message = strings.ReplaceAll(message, "图片", "视频")
 	}
 	return AssetStatus{
 		AssetID: fact.AssetPublicID, TicketID: fact.TicketID, Purpose: fact.Purpose, State: state,

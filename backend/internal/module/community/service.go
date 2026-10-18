@@ -57,6 +57,13 @@ type CreatePostInput struct {
 	Title, Content, Topic string
 	Tags                  []string
 	ImageAssetIDs         []string
+	Motion                *CreatePostMotionInput
+}
+
+type CreatePostMotionInput struct {
+	Kind          string `json:"kind"`
+	AssetID       string `json:"assetId"`
+	PosterAssetID string `json:"posterAssetId"`
 }
 
 type KeyedCreateResult[T any] struct {
@@ -107,20 +114,26 @@ func (s *Service) CreatePost(ctx context.Context, input CreatePostInput, risk st
 	if err != nil {
 		return Post{}, err
 	}
+	assetIDs, err := postAssetIDs(input)
+	if err != nil {
+		return Post{}, err
+	}
 	reservation := media.Reservation{}
-	if len(input.ImageAssetIDs) > 0 {
+	if len(assetIDs) > 0 {
 		if s.media == nil {
 			return Post{}, errors.New("media pipeline is unavailable")
 		}
-		reservation, err = s.media.Reserve(ctx, input.UserID, media.PurposePostImage, input.ImageAssetIDs)
+		reservation, err = s.media.Reserve(ctx, input.UserID, media.PurposePostImage, assetIDs)
 		if err != nil {
 			return Post{}, err
 		}
 	}
 	value := Post{UserID: input.UserID, Title: input.Title, Content: input.Content, Topic: fallback(input.Topic, "校园生活"), Tags: tags, ReviewStatus: review.StatusSubmitted}
-	for i, ref := range reservation.References {
-		assetID := ref.InternalID
-		value.Images = append(value.Images, PostImage{AssetID: &assetID, URL: ref.URL, Sort: i})
+	if err := applyPostMedia(&value, input, reservation.References); err != nil {
+		if s.media != nil && reservation.Token != "" {
+			_ = s.media.Cancel(ctx, input.UserID, reservation)
+		}
+		return Post{}, err
 	}
 	if err := s.repo.CreatePost(ctx, &value); err != nil {
 		if s.media != nil && reservation.Token != "" {
@@ -156,6 +169,10 @@ func (s *Service) CreatePostKeyed(ctx context.Context, input CreatePostInput, cl
 		return KeyedCreateResult[Post]{}, err
 	}
 	input.Tags = tags
+	assetIDs, err := postAssetIDs(input)
+	if err != nil {
+		return KeyedCreateResult[Post]{}, err
+	}
 
 	input.Topic = fallback(input.Topic, "校园生活")
 	requestHash, err := postCreateRequestHash(input)
@@ -172,11 +189,11 @@ func (s *Service) CreatePostKeyed(ctx context.Context, input CreatePostInput, cl
 	}
 
 	reservation := media.Reservation{}
-	if len(input.ImageAssetIDs) > 0 {
+	if len(assetIDs) > 0 {
 		if s.media == nil {
 			return KeyedCreateResult[Post]{}, errors.New("media pipeline is unavailable")
 		}
-		reservation, err = s.media.Reserve(ctx, input.UserID, media.PurposePostImage, input.ImageAssetIDs)
+		reservation, err = s.media.Reserve(ctx, input.UserID, media.PurposePostImage, assetIDs)
 		if err != nil {
 			if errors.Is(err, media.ErrAlreadyBound) || errors.Is(err, media.ErrInvalidAsset) {
 				if replay, replayErr, found := s.awaitPostReplay(ctx, input.UserID, clientRequestID, requestHash); found {
@@ -190,13 +207,15 @@ func (s *Service) CreatePostKeyed(ctx context.Context, input CreatePostInput, cl
 		UserID: input.UserID, ClientRequestID: &clientRequestID, CreateRequestHash: append([]byte(nil), requestHash...),
 		Title: input.Title, Content: input.Content, Topic: input.Topic, Tags: input.Tags, ReviewStatus: review.StatusSubmitted,
 	}
-	for index, ref := range reservation.References {
-		assetID := ref.InternalID
-		value.Images = append(value.Images, PostImage{AssetID: &assetID, URL: ref.URL, Sort: index})
+	if err := applyPostMedia(&value, input, reservation.References); err != nil {
+		if s.media != nil && reservation.Token != "" {
+			_ = s.media.Cancel(ctx, input.UserID, reservation)
+		}
+		return KeyedCreateResult[Post]{}, err
 	}
 	payload, err := json.Marshal(communityCreationPayload{
 		Version: "community-post-created:v1", ReferenceType: "post", ReferenceIDSource: "aggregateId",
-		OrderedAssetPublicIDs: normalizedAssetIDs(input.ImageAssetIDs), ReviewTargetType: "post", ReviewRisk: risk,
+		OrderedAssetPublicIDs: normalizedAssetIDs(assetIDs), ReviewTargetType: "post", ReviewRisk: risk,
 	})
 	if err != nil {
 		return KeyedCreateResult[Post]{}, err
@@ -346,6 +365,16 @@ func normalizeTags(values []string) ([]string, error) {
 
 func postCreateRequestHash(input CreatePostInput) ([]byte, error) {
 	assets := normalizedAssetIDs(input.ImageAssetIDs)
+	if input.Motion != nil {
+		return canonicalCommunityHash(struct {
+			Version string                 `json:"version"`
+			Title   string                 `json:"title"`
+			Content string                 `json:"content"`
+			Topic   string                 `json:"topic"`
+			Tags    []string               `json:"tags"`
+			Motion  *CreatePostMotionInput `json:"motion"`
+		}{"community-post-create:v3", input.Title, input.Content, input.Topic, input.Tags, input.Motion})
+	}
 	if len(input.Tags) == 0 {
 		return canonicalCommunityHash(struct {
 			Version       string   `json:"version"`

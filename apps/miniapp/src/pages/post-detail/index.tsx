@@ -7,6 +7,7 @@ import { nextTick } from '@tarojs/taro'
 import { Image, Input, ScrollView, Swiper, SwiperItem, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
+import PostMotionMedia from '../../components/post-motion-media'
 import AppIcon from '../../components/app-icon'
 import { ConfirmedIcon, ExpandableText } from '../../components/content-motion'
 import { AppIconButton, AppState } from '../../components/ui'
@@ -99,7 +100,7 @@ function PostDetailPage() {
   const detailVersion = useRef(0)
 
   const { items: media, index: mediaIndex } = gallery
-  const mediaKey = JSON.stringify([post?.id, post?.images])
+  const mediaKey = JSON.stringify([post?.id, post?.images, post?.motion])
   const showHero = media.length > 0
   const body = post ? postBodyWithoutTitle(post.title, post.content) : ''
   const tags = useMemo(() => {
@@ -116,7 +117,7 @@ function PostDetailPage() {
   const commentsLoading = commentState.roots.loading
   const pageStyle = { ...capsuleStyle, '--comment-keyboard-height': `${keyboardHeight}px` }
   const hasActions = isApproved && (visibility.canComment || visibility.comment || visibility.likes || visibility.favorites)
-  const galleryView = useGalleryPresentation(mediaKey, media.length, mediaSize, 'post', hasActions)
+  const galleryView = useGalleryPresentation(mediaKey, post?.motion ? 1 : media.length, post?.motion ?? mediaSize, 'post', hasActions)
   const interactionPending = actioning || viewerLoading || Boolean(viewerError)
   const reviewState = post?.reviewStatus ? reviewCopy[post.reviewStatus] : null
   usePageShare({ kind: 'post', enabled: visibility.forum && !loading && !error, id: postId, content: post })
@@ -128,7 +129,7 @@ function PostDetailPage() {
 
   useEffect(() => {
     let alive = true
-    const images = post?.images ?? []
+    const images = post?.motion ? [] : post?.images ?? []
     setGallery({ items: [], index: 0 })
     setMediaSize(undefined)
     setMediaPending(images.length > 0)
@@ -367,7 +368,9 @@ function PostDetailPage() {
               </View>
             ) : null}
 
-            {mediaPending ? (
+            {post.motion ? <View className='post-detail-hero' style={{ height: `${galleryView.height}px` }}>
+              <PostMotionMedia key={post.id} id={post.id} motion={post.motion} mode='detail' enabled={isApproved} />
+            </View> : mediaPending ? (
               <View className='post-detail-hero post-detail-hero--loading' style={{ height: `${galleryView.height}px` }}><Text>正在读取图片…</Text></View>
             ) : showHero ? (
               <View className='post-detail-hero' style={{ height: `${galleryView.height}px` }} onTouchStart={galleryView.onTouchStart} onTouchEnd={galleryView.onTouchEnd} onTouchCancel={galleryView.onTouchEnd}>

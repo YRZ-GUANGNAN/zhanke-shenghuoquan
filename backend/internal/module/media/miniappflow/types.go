@@ -85,6 +85,7 @@ type ResolvedDisplayURL struct {
 }
 
 type StatusFact struct {
+	MIMEType        string
 	AssetID         uint64
 	AssetPublicID   string
 	OwnerID         uint64

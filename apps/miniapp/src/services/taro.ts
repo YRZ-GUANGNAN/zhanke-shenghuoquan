@@ -90,7 +90,15 @@ interface TaroFacade {
 	removeStorageSync(key: string): void
 	navigateToMiniProgram(options: { appId: string; path: string }): Promise<unknown>
   getCurrentInstance(): { router?: { path?: string; params: Record<string, string | undefined> } }
-  chooseMedia(options: { count: number; mediaType: ['image']; sourceType: Array<'album' | 'camera'>; sizeType?: Array<'original' | 'compressed'> }): Promise<{ tempFiles: Array<{ tempFilePath: string; size: number; fileType?: string }> }>
+  chooseMedia(options: { count: number; mediaType: Array<'image' | 'video'>; sourceType: Array<'album' | 'camera'>; sizeType?: Array<'original' | 'compressed'>; maxDuration?: number }): Promise<{ tempFiles: Array<{ tempFilePath: string; size: number; fileType?: string; duration?: number; width?: number; height?: number; thumbTempFilePath?: string }> }>
+  createVideoContext(id: string): { play(): void; pause(): void; stop(): void; seek(seconds: number): void }
+  createIntersectionObserver(component?: unknown, options?: { thresholds?: number[] }): {
+    relativeToViewport(margins?: { top?: number; bottom?: number }): { observe(selector: string, callback: (result: { intersectionRatio: number }) => void): void }
+    disconnect(): void
+  }
+  getNetworkType(): Promise<{ networkType: string }>
+  onNetworkStatusChange(callback: (state: { networkType: string; isConnected: boolean }) => void): void
+  offNetworkStatusChange(callback: (state: { networkType: string; isConnected: boolean }) => void): void
   previewImage(options: { urls: string[]; current?: string }): Promise<unknown>
   getImageInfo(options: { src: string }): Promise<{ width: number; height: number; type: string; path: string }>
   compressImage(options: { src: string; quality: number; compressedWidth?: number; compressedHeight?: number; format?: 'webp' }): Promise<{ tempFilePath: string }>

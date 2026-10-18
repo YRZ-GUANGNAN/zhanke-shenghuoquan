@@ -85,9 +85,10 @@ func (g *HybridMediaGateway) Reserve(ctx context.Context, ownerID uint, purpose 
 			return legacymedia.Reservation{}, legacymedia.ErrInvalidAsset
 		}
 		result.References = append(result.References, legacymedia.Reference{
-			InternalID: reference.InternalID,
-			PublicID:   reference.AssetPublicID,
-			URL:        g.publicBase + "/api/v1/media/assets/" + reference.AssetPublicID + "/content",
+			InternalID:   reference.InternalID,
+			PublicID:     reference.AssetPublicID,
+			URL:          g.publicBase + "/api/v1/media/assets/" + reference.AssetPublicID + "/content",
+			VerifiedMIME: reference.VerifiedMIME, Width: reference.Width, Height: reference.Height, DurationMS: reference.DurationMS,
 		})
 	}
 	return result, nil

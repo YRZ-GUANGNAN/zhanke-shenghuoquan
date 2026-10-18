@@ -140,6 +140,7 @@ func metadataView(value GatewaySnapshot) MediaMetadataView {
 	return MediaMetadataView{
 		MediaID: value.AssetPublicID, Purpose: value.Purpose, MIMEType: value.VerifiedMIME,
 		ByteSize: value.ByteSize, Width: value.Width, Height: value.Height,
+		DurationMS:   value.DurationMS,
 		ReviewStatus: value.ProjectionStatus,
 	}
 }

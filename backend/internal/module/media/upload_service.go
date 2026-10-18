@@ -162,6 +162,9 @@ func validateUploadDeclaration(input CreateUploadTicketInput) error {
 	if input.Purpose == PurposeAvatar {
 		maxSize = 5 << 20
 	}
+	if input.Purpose == PurposePost && input.ExpectedContentType == "video/mp4" {
+		maxSize = 30 << 20
+	}
 	if input.ExpectedSize > maxSize {
 		return ErrInvalidUploadDeclaration
 	}
@@ -172,13 +175,18 @@ func validateUploadDeclaration(input CreateUploadTicketInput) error {
 	switch input.ExpectedContentType {
 	case "image/jpeg", "image/png", "image/webp":
 		return nil
+	case "video/mp4":
+		if input.Purpose != PurposePost {
+			return ErrInvalidUploadDeclaration
+		}
+		return nil
 	default:
 		return ErrInvalidUploadDeclaration
 	}
 }
 
 func newStagingKey(environment string, ownerID uint64, assetPublicID, contentType string) (string, error) {
-	extension := map[string]string{"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}[contentType]
+	extension := map[string]string{"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "video/mp4": "mp4"}[contentType]
 	if extension == "" || !ValidULID(assetPublicID) || ownerID == 0 {
 		return "", ErrInvalidUploadDeclaration
 	}

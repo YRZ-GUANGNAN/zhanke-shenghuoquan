@@ -70,6 +70,18 @@ func TestProductionConfigurationAcceptsExplicitCredentials(t *testing.T) {
 	}
 }
 
+func TestPostVideoRequiresReviewBusinessType(t *testing.T) {
+	cfg := validConfig()
+	cfg.EnablePostVideo = true
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "VIDEO_REVIEW_BIZ_TYPE") {
+		t.Fatalf("expected missing video review business type error, got %v", err)
+	}
+	cfg.VideoReviewBizType = "post-video"
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("configured post video rejected: %v", err)
+	}
+}
+
 func TestRealWechatConfigurationDisablesMockFallback(t *testing.T) {
 	t.Setenv("APP_ENV", "dev")
 	t.Setenv("JWT_SECRET", strings.Repeat("s", 32))

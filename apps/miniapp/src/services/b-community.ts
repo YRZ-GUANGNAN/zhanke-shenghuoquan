@@ -18,6 +18,7 @@ export interface CreateCommunityPostInput {
   topic?: string
   tags?: string[]
   imageAssetIds?: string[]
+  motion?: { kind: 'video' | 'live_photo'; assetId: string; posterAssetId: string }
   clientRequestId?: string
 }
 
@@ -152,6 +153,7 @@ const normalizePost = (raw: unknown): CommunityPost => {
     title: asString(first(record, ['title', 'headline'])),
     content: asString(first(record, ['content', 'body', 'text']), ''),
     images: normalizeImages(first(record, ['images', 'imageUrls', 'image_urls', 'media'])),
+    motion: normalizePostMotion(record.motion),
     likedCount: asNumber(first(record, ['likedCount', 'liked_count', 'likeCount', 'like_count']), 0),
     commentCount: asNumber(first(record, ['commentCount', 'comment_count']), 0),
     favoriteCount: asNumber(first(record, ['favoriteCount', 'favorite_count']), 0),
@@ -159,6 +161,14 @@ const normalizePost = (raw: unknown): CommunityPost => {
     createdAt: dateLabel(first(record, ['createdAt', 'created_at'])),
     pinned: asBoolean(first(record, ['pinned', 'isPinned', 'is_pinned'])),
   }
+}
+
+const normalizePostMotion = (value: unknown): CommunityPost['motion'] => {
+  if (!isRecord(value) || (value.kind !== 'video' && value.kind !== 'live_photo')) return undefined
+  const url = asString(value.url), posterUrl = asString(value.posterUrl)
+  const width = asNumber(value.width), height = asNumber(value.height), durationMs = asNumber(value.durationMs)
+  if (!url || !posterUrl || ![width, height, durationMs].every(Number.isFinite) || width <= 0 || height <= 0 || durationMs < 500 || durationMs > 60000 || (value.kind === 'live_photo' && durationMs > 5000)) return undefined
+  return { kind: value.kind, url, posterUrl, width, height, durationMs }
 }
 
 const normalizeComment = (raw: unknown): CommunityComment => {
@@ -310,6 +320,7 @@ export async function createCommunityPost(input: CreateCommunityPostInput): Prom
       topic: input.topic || '湛科日常',
       tags: input.tags ?? [],
       imageAssetIds: input.imageAssetIds ?? [],
+      ...(input.motion ? { motion: input.motion } : {}),
       clientRequestId,
     },
     header: { 'Idempotency-Key': clientRequestId },

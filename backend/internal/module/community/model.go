@@ -24,9 +24,19 @@ type Post struct {
 	CommentCount      int64          `json:"commentCount"`
 	FavoriteCount     int64          `json:"favoriteCount"`
 	Images            []PostImage    `json:"images"`
+	Motion            *PostMotion    `json:"motion,omitempty" gorm:"serializer:json;type:json"`
 	CreatedAt         time.Time      `json:"createdAt"`
 	UpdatedAt         time.Time      `json:"updatedAt"`
 	DeletedAt         gorm.DeletedAt `json:"-" gorm:"index"`
+}
+
+type PostMotion struct {
+	Kind       string `json:"kind"`
+	URL        string `json:"url"`
+	PosterURL  string `json:"posterUrl"`
+	Width      uint32 `json:"width"`
+	Height     uint32 `json:"height"`
+	DurationMS uint32 `json:"durationMs"`
 }
 
 type PostImage struct {

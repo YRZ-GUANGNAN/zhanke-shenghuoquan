@@ -59,6 +59,9 @@ func NewHandlerWithIdentity(service *Service, currentIdentity func(*gin.Context)
 // Register exposes only the Module 10 mini-program orchestration contract.
 // Authentication and muted-user checks are attached by the composition root.
 func (h *Handler) Register(group *gin.RouterGroup) {
+	group.GET("/capabilities", func(c *gin.Context) {
+		response.OK(c, gin.H{"postMotion": h.service.VideoEnabled(), "maxVideoSeconds": 60, "maxLivePhotoSeconds": 5, "maxVideoBytes": 30 << 20})
+	})
 	group.POST("/uploads", h.createUpload)
 	group.POST("/uploads/:ticketId/complete", h.completeUpload)
 	group.GET("/assets/:assetId", h.status)
@@ -216,7 +219,9 @@ func (h *Handler) writeError(c *gin.Context, err error) {
 		errors.Is(err, coremedia.ErrConcurrentUpdate), errors.Is(err, coremedia.ErrCompletionInProgress):
 		response.Fail(c, http.StatusConflict, err.Error())
 	case errors.Is(err, coremedia.ErrCompletionValidation):
-		response.Fail(c, http.StatusUnprocessableEntity, "uploaded image failed validation")
+		response.Fail(c, http.StatusUnprocessableEntity, "媒体校验失败，请使用兼容的图片或 H.264 MP4 视频")
+	case errors.Is(err, coremedia.ErrVideoUnavailable):
+		response.Fail(c, http.StatusServiceUnavailable, "视频上传暂未开放")
 	case errors.Is(err, ErrSubmissionPending):
 		response.Fail(c, http.StatusServiceUnavailable, "review submission is pending; retry completion")
 	default:

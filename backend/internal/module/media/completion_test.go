@@ -125,12 +125,14 @@ func (r *completionRepositoryStub) MarkCompletionPromoting(_ context.Context, wo
 	r.work.Completion.VerifiedSize = uint64Pointer(validation.VerifiedSize)
 	r.work.Completion.VerifiedWidth = uint32Pointer(validation.Width)
 	r.work.Completion.VerifiedHeight = uint32Pointer(validation.Height)
+	r.work.Completion.VerifiedDurationMS = uint32Pointer(validation.DurationMS)
 	r.work.Completion.FinalKey = stringPointer(validation.FinalKey)
 	r.work.Bundle.Asset.TechnicalStatus = TechnicalPromoting
 	r.work.Bundle.Asset.TrustedSHA256 = stringPointer(validation.TrustedSHA256)
 	r.work.Bundle.Asset.VerifiedMIME = validation.VerifiedMIME
 	r.work.Bundle.Asset.ByteSize = validation.VerifiedSize
 	r.work.Bundle.Asset.Width, r.work.Bundle.Asset.Height = validation.Width, validation.Height
+	r.work.Bundle.Asset.DurationMS = validation.DurationMS
 	return r.work, nil
 }
 

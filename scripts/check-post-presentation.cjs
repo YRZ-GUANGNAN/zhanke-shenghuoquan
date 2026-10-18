@@ -137,7 +137,12 @@ async function pageBehavior() {
       }
       if (id.endsWith('/services/api')) return { isApiError: () => false }
       if (id.endsWith('/b-community')) return options.community || {}
-      if (id.endsWith('/services/media')) return options.media || {}
+      if (id.endsWith('/services/media')) return {
+        postMotionAvailable: async () => false,
+        ...(options.media || {}),
+      }
+      if (id.endsWith('/components/post-motion-media')) return { default: View }
+      if (id.endsWith('/hooks/use-post-motion-preview')) return { usePostMotionPreview: () => ({ activeId: '', enabled: false, coordinator: {} }) }
       if (id.endsWith('/c-trade')) return options.trade || {}
       if (id.endsWith('/d-navigation')) return options.navigation || { listNavigationItems: async () => [] }
       if (id.endsWith('/e-im')) return { listIMConversations: async () => [] }

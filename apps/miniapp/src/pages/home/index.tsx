@@ -14,6 +14,8 @@ import { isMiniProgramJumpCancelled } from '../../utils/mini-program-jump'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import StudentBottomNav from '../../components/student-bottom-nav'
 import StudentSecondhandContent from '../student-secondhand/content'
+import PostMotionMedia from '../../components/post-motion-media'
+import { usePostMotionPreview } from '../../hooks/use-post-motion-preview'
 import CampusInfoHome from '../../components/campus-info-home'
 import { useIdentityGuard } from '../../hooks/use-identity-guard'
 import type { CommunityPost, Product, ToolLink } from '../../types'
@@ -48,6 +50,7 @@ type DiscoverCard = {
   mediaCount: number
   price?: number
   imageUrl?: string
+  motion?: CommunityPost['motion']
 }
 
 type SettledResult<T> =
@@ -79,6 +82,7 @@ function toPostCard(post: CommunityPost): DiscoverCard {
     target: 'post',
     category: post.topic || '校园帖子',
     imageUrl: post.images[0],
+    motion: post.motion,
     mediaCount: post.images.length,
     title: post.title || post.content,
     summary: postBodyWithoutTitle(post.title, post.content),
@@ -187,6 +191,7 @@ function HomeContent() {
   const identityAllowed = useIdentityGuard('student')
   const currentUserId = useSessionStore((state) => state.profile.id)
   const currentSessionKey = useSessionStore((state) => `${state.token}:${state.profile.id}`)
+  const motionPreview = usePostMotionPreview(activeTab === 'discover' && identityAllowed && visibility.forum, currentSessionKey)
   const visibleTabs = useMemo(() => {
     if (!visibility) return []
     if (isMessagesPage) return visibility.messages
@@ -494,7 +499,8 @@ function HomeContent() {
         onClick={() => openCard(card)}
       >
         {card.imageUrl ? <View className={`student-post-card__media student-post-card__media--${card.target}`}>
-          {!failedImageKeys.has(imageKey) ? (
+          {card.motion ? <PostMotionMedia id={cardKey} motion={card.motion} mode='preview' enabled={motionPreview.enabled}
+            activeId={motionPreview.activeId} coordinator={motionPreview.coordinator} order={cards.indexOf(card)} /> : !failedImageKeys.has(imageKey) ? (
             <Image
               className='student-post-card__image'
               src={card.imageUrl}
@@ -509,7 +515,7 @@ function HomeContent() {
           ) : (
             <Text className='student-post-card__media-error'>图片暂时无法显示</Text>
           )}
-          {card.mediaCount > 1 && !failedImageKeys.has(imageKey) && <Text className='student-post-card__media-count'>{card.mediaCount} 图</Text>}
+          {!card.motion && card.mediaCount > 1 && !failedImageKeys.has(imageKey) && <Text className='student-post-card__media-count'>{card.mediaCount} 图</Text>}
         </View> : null}
         <View className='student-post-card__body'>
           <Text className='student-post-card__category'>{card.category}</Text>
