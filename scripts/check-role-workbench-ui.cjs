@@ -23,7 +23,6 @@ for (const fragment of [
   "useIdentityGuard('merchant')",
   "getIdentityApplication('merchant')",
   'merchant-home-metrics',
-  'merchant-home-publish',
   'merchant-home-tabs',
   'merchant-order-card',
   'onScrollToLower={() => { if (activeTab === tab && channelInteraction.canActivate()) void loadMoreOrders() }}',
@@ -35,6 +34,7 @@ for (const fragment of [
 ]) {
   assert.ok(merchant.includes(fragment), `merchant workbench missing: ${fragment}`)
 }
+assert.doesNotMatch(merchant, /merchant-home-publish/, 'merchant workbench must keep a single publish entry in the workspace navigation')
 
 assert.match(
   merchant,

@@ -431,12 +431,6 @@ function MerchantHomeContent() {
             <Text className='merchant-home-workspace-heading__title'>订单管理</Text>
             <Text className='merchant-home-workspace-heading__caption'>从发单到送达，随时掌握进度</Text>
           </View>
-          {visibility.delivery && visibility.merchant ? (
-            <View className='merchant-home-publish' ariaRole='button' ariaLabel='发布配送单' hoverClass='merchant-home-control--pressed'
-              onClick={() => { if (workspace.swipe.canActivate()) void Taro.navigateTo({ url: '/pages/merchant-publish/index' }) }}>
-              <MerchantHomeIcon name='publish' className='merchant-home-publish__icon' /><Text>发单</Text>
-            </View>
-          ) : null}
         </View>
         <View className='merchant-home-metrics'>
           <View className='merchant-home-metric merchant-home-metric--wallet'>
