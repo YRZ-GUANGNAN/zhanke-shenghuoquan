@@ -9,6 +9,10 @@ const merchant = read('apps', 'miniapp', 'src', 'pages', 'merchant-home', 'index
 const merchantStyle = read('apps', 'miniapp', 'src', 'pages', 'merchant-home', 'index.scss')
 const rider = read('apps', 'miniapp', 'src', 'pages', 'delivery-rider', 'index.tsx')
 const riderStyle = read('apps', 'miniapp', 'src', 'pages', 'delivery-rider', 'index.scss')
+const workspaceNav = read('apps', 'miniapp', 'src', 'components', 'delivery-workspace-nav.tsx')
+const profile = read('apps', 'miniapp', 'src', 'pages', 'delivery-profile', 'index.tsx')
+const profileStyle = read('apps', 'miniapp', 'src', 'pages', 'delivery-profile', 'index.scss')
+const messages = read('apps', 'miniapp', 'src', 'pages', 'merchant-messages', 'content.tsx')
 const riderWallet = read('apps', 'miniapp', 'src', 'pages', 'rider-wallet', 'index.tsx')
 const merchantService = read('apps', 'miniapp', 'src', 'services', 'delivery-merchant.ts')
 const riderService = read('apps', 'miniapp', 'src', 'services', 'delivery-rider.ts')
@@ -22,7 +26,7 @@ for (const fragment of [
   'merchant-home-publish',
   'merchant-home-tabs',
   'merchant-order-card',
-  'onScrollToLower={() => void loadMoreOrders()}',
+  'onScrollToLower={() => { if (activeTab === tab && channelInteraction.canActivate()) void loadMoreOrders() }}',
   "listMerchantDeliveryOrders(1, 50, 'pending')",
   "listMerchantDeliveryOrders(1, 50, 'delivering')",
   "listMerchantDeliveryOrders(1, 50, 'completed')",
@@ -53,7 +57,7 @@ for (const fragment of [
   'rider-grab-task-summary',
   'rider-grab-tabs',
   'rider-order-card',
-  'onScrollToLower={() => void loadMoreOrders()}',
+  'onScrollToLower={() => { if (activeTab === tab) void loadMoreOrders() }}',
   "listAssignedDeliveryOrders(1, 50, 'pickup')",
   "listAssignedDeliveryOrders(1, 50, 'delivery')",
   "listAssignedDeliveryOrders(1, 1, 'completed')",
@@ -80,6 +84,20 @@ assert.match(merchantStyle, /\.merchant-home-order-grid\s*\{[^}]*grid-template-c
 assert.match(riderStyle, /\.rider-grab-tabs\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/, '骑手配送视图显示取货和送达两个阶段')
 assert.doesNotMatch(merchantStyle, /merchant-home-hero__orb/, 'merchant workbench must not use decorative hero orbs')
 assert.doesNotMatch(riderStyle, /rider-grab-hero__orb/, 'rider workbench must not use decorative hero orbs')
+assert.match(merchant, /<View className='merchant-home-page' style=\{capsuleStyle\} \{\.\.\.workspace\.swipe\.handlers\}>/, 'merchant page-level swipe handlers must cover the full workspace')
+assert.match(rider, /<View className='rider-grab-page' \{\.\.\.workspace\.swipe\.handlers\}>/, 'rider page-level swipe handlers must cover the full workspace')
+assert.match(workspaceNav, /swipeItems = items\.filter\(item => item\.swipe !== false\)/, 'workspace swipe order must exclude independent publish action')
+assert.match(workspaceNav, /key: 'publish',[\s\S]*swipe: false/, 'merchant publish must remain an independent action')
+assert.match(workspaceNav, /gestureGuard\?: \(\) => boolean/, 'bottom navigation must accept the page gesture guard')
+assert.match(workspaceNav, /const canActivate = gestureGuard \?\? swipe\.canActivate/, 'bottom navigation must share the page gesture guard')
+assert.doesNotMatch(workspaceNav, /return <View className='delivery-workspace-nav' \{\.\.\.swipe\.handlers\}>/, 'navigation must not install a second nested swipe tracker')
+for (const [name, source] of [['merchant', merchant], ['rider', rider], ['profile', profile], ['messages', messages]]) {
+  assert.match(source, /gestureGuard=\{workspace\.swipe\.canActivate\}/, `${name} navigation must share the page gesture guard`)
+}
+assert.match(merchant, /merchant-home-hero__cover-image/, 'merchant workbench must render the existing profile cover media')
+assert.match(rider, /rider-grab-hero__cover-image/, 'rider workbench must render the existing profile cover media')
+assert.match(profile, /delivery-profile__hero-image/, 'role profile must keep the real cover image')
+assert.match(profileStyle, /background: linear-gradient\(to bottom, rgba\(\$bg-surface, 0\), rgba\(\$bg-surface, \.54\) 45%, \$bg-surface 100%\)/, 'profile cover edge must finish on an opaque surface')
 assert.match(riderWallet, /骑手结算功能尚未开放/, 'rider wallet must expose an honest unavailable state until a real API exists')
 assert.doesNotMatch(riderWallet, /ledgerItems|128\.50|静态示意/, 'rider wallet must not present fabricated balances or ledger records')
 

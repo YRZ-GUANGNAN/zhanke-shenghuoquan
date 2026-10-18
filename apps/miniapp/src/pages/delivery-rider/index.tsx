@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Text, View } from '@tarojs/components'
+import { Image, Text, View } from '@tarojs/components'
 import { getCurrentInstance, useDidShow } from '@tarojs/taro'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import { AppDialog } from '../../components/ui'
-import DeliveryWorkspaceNav from '../../components/delivery-workspace-nav'
+import DeliveryWorkspaceNav, { useDeliveryWorkspaceNavigation } from '../../components/delivery-workspace-nav'
+import ChannelPager, { useChannelInteraction } from '../../components/channel-pager'
 import RefreshScrollView from '../../components/refresh-scroll-view'
 import { DeliveryLoadDots, DeliveryOrderLoading, DeliveryOrderState } from '../../components/delivery-order-feedback'
 import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
@@ -31,6 +32,7 @@ import { deliveryPickupLabel, deliverySourceLabel } from '../../utils/delivery-o
 import RiderWorkbenchIcon from './rider-workbench-icon'
 import './index.scss'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
+import ChatAvatar from '../../components/chat-avatar'
 
 type RiderTab = 'grab' | 'pickup' | 'delivery'
 
@@ -116,7 +118,10 @@ export default function DeliveryRiderPage() {
   const canClaim = visibility.delivery && visibility.rider
   const identityAllowed = useIdentityGuard('rider')
   const accountId = useSessionStore((state) => state.profile.id)
+  const profile = useSessionStore((state) => state.profile)
   const [activeTab, setActiveTab] = useState<RiderTab>(() => getCurrentInstance().router?.params.tab === 'tasks' ? 'pickup' : 'grab')
+  const channelInteraction = useChannelInteraction()
+  const workspace = useDeliveryWorkspaceNavigation({ role: 'rider', active: activeTab === 'grab' ? 'grab' : 'tasks', onSelect: key => setActiveTab(key === 'grab' ? 'grab' : 'pickup') })
   const [me, setMe] = useState<DeliveryRiderMe | null>(null)
   const [claimable, setClaimable] = useState<ClaimableDeliveryOrder[]>([])
   const [pickupOrders, setPickupOrders] = useState<AssignedDeliveryOrder[]>([])
@@ -136,6 +141,7 @@ export default function DeliveryRiderPage() {
   const [actionFeedbackByOrder, setActionFeedbackByOrder] = useState<Record<string, ActionFeedback | undefined>>({})
   const [error, setError] = useState('')
   const [loadMoreError, setLoadMoreError] = useState<{ tab: RiderTab; message: string } | null>(null)
+  const [failedCover, setFailedCover] = useState('')
   const [releaseCandidate, setReleaseCandidate] = useState<AssignedDeliveryOrder | null>(null)
   const [releaseReviewOnly, setReleaseReviewOnly] = useState(false)
   const releaseCandidateRef = useRef<AssignedDeliveryOrder | null>(null)
@@ -491,6 +497,7 @@ export default function DeliveryRiderPage() {
   }
 
   const claim = async (order: ClaimableDeliveryOrder) => {
+    if (!channelInteraction.canActivate()) return
     const shouldContinue = createOperationGuard()
     const orderId = order.deliveryOrderPublicId
     if (!shouldContinue() || isOrderBusy(orderId)) return
@@ -672,6 +679,7 @@ export default function DeliveryRiderPage() {
   }
 
   const openConversation = (orderId: string) => {
+    if (!channelInteraction.canActivate()) return
     void Taro.navigateTo({
       url: `/pages/delivery-conversation/index?orderId=${encodeURIComponent(orderId)}&role=rider`
     })
@@ -742,31 +750,29 @@ export default function DeliveryRiderPage() {
   }
 
   const rider = me.rider
+  const hasCover = Boolean(profile.cover && failedCover !== profile.cover)
   const tabs: Array<{ key: RiderTab; label: string; count: number }> = [
     { key: 'pickup', label: '待取货', count: pickupTotal },
     { key: 'delivery', label: '待送达', count: deliveryTotal }
   ]
-  const activeOrderCount = activeTab === 'grab'
-    ? claimable.length
-    : activeTab === 'pickup'
-      ? pickupOrders.length
-      : deliveryOrders.length
   const refreshBusy = loading || loadingMore || Object.values(busyByOrder).some(Boolean) || releaseCandidate !== null
 
   return (
-    <View className='rider-grab-page'>
-      <View className='rider-grab-hero'>
+    <View className='rider-grab-page' {...workspace.swipe.handlers}>
+      <View className={`rider-grab-hero${hasCover ? ' rider-grab-hero--cover' : ''}`}>
+        {hasCover ? <View className='rider-grab-hero__media' ariaLabel='骑手个人封面'>
+          <Image src={profile.cover || ''} mode='aspectFill' className='rider-grab-hero__cover-image'
+            onError={() => setFailedCover(profile.cover || '')} />
+        </View> : null}
         <CapsuleSystemRow className='rider-grab-system-row' />
 
         <View className='rider-grab-user'>
+          <ChatAvatar className='rider-grab-user__avatar' src={profile.avatar} name={rider.realName || profile.nickname || '骑手'} />
           <View className='rider-grab-user__main'>
             <View className='rider-grab-user__name-row'>
               <Text className='rider-grab-user__name'>{rider.realName || '校园骑手'}</Text>
               <Text className={`rider-grab-user__badge rider-grab-user__badge--${rider.status}`}>{riderStatusLabel(rider.status)}</Text>
             </View>
-          </View>
-          <View className='rider-grab-user__switch' ariaRole='button' ariaLabel='切换身份' onClick={() => void switchToStudent()}>
-            <Text>切换身份</Text>
           </View>
         </View>
 
@@ -810,35 +816,40 @@ export default function DeliveryRiderPage() {
         ))}
       </View> : <View className='rider-grab-pool-heading'><Text>可接订单</Text><Text>下拉刷新 · 接单后查看完整信息</Text></View>}
 
+      <ChannelPager<RiderTab> keys={canClaim ? ['grab', 'pickup', 'delivery'] : ['pickup', 'delivery']} activeKey={activeTab}
+        onChange={key => { if (releaseCandidate === null) setActiveTab(key) }} interaction={channelInteraction}
+        renderPage={tab => (
       <RefreshScrollView
         scrollY
         enhanced
         showScrollbar={false}
         className='rider-grab-content delivery-orders-scroll'
-        refreshKey={`rider:${accountId}:${activeTab}:${canClaim}`}
-        enabled={identityAllowed && releaseCandidate === null}
+        refreshKey={`rider:${accountId}:${tab}:${canClaim}`}
+        enabled={identityAllowed && releaseCandidate === null && activeTab === tab}
         busy={refreshBusy}
-        onRefresh={requestRefresh}
+        onRefresh={() => activeTab === tab ? requestRefresh() : Promise.resolve(false)}
         lowerThreshold={120}
-        onScrollToLower={() => void loadMoreOrders()}
+        onScrollToLower={() => { if (activeTab === tab) void loadMoreOrders() }}
       >
         <View className='rider-grab-content__inner'>
-          {error ? <DeliveryOrderState kind='error' compact={activeOrderCount > 0}
+          {error ? <DeliveryOrderState kind='error' compact={(tab === 'grab' ? claimable.length : tab === 'pickup' ? pickupOrders.length : deliveryOrders.length) > 0}
             title={hasLoadedOrders ? '订单刷新失败' : '订单加载失败'} description={error}
             onAction={() => void requestRefresh()} /> : null}
-          {(!error || activeOrderCount > 0) && <>
-              {activeTab === 'grab' ? renderClaimableOrders() : null}
-              {activeTab === 'pickup' ? renderAssignedOrders(pickupOrders, 'pickup') : null}
-              {activeTab === 'delivery' ? renderAssignedOrders(deliveryOrders, 'delivery') : null}
+          {(!error || (tab === 'grab' ? claimable.length : tab === 'pickup' ? pickupOrders.length : deliveryOrders.length) > 0) && <>
+              {tab === 'grab' ? renderClaimableOrders() : null}
+              {tab === 'pickup' ? renderAssignedOrders(pickupOrders, 'pickup') : null}
+              {tab === 'delivery' ? renderAssignedOrders(deliveryOrders, 'delivery') : null}
           </>}
-          {loadMoreError?.tab === activeTab ? <DeliveryOrderState kind='error' compact title='更多订单暂未加载'
-            description={loadMoreError.message} actionLabel='重试加载' onAction={() => void loadMoreOrders()} /> : null}
+          {loadMoreError?.tab === tab ? <DeliveryOrderState kind='error' compact title='更多订单暂未加载'
+            description={loadMoreError.message} actionLabel='重试加载' onAction={() => { if (activeTab === tab) void loadMoreOrders() }} /> : null}
           {loadingMore ? <DeliveryOrderLoading compact label='正在加载更多订单' /> : null}
         </View>
       </RefreshScrollView>
+        )} />
       <DeliveryWorkspaceNav
         role='rider'
         active={activeTab === 'grab' ? 'grab' : 'tasks'}
+        gestureGuard={workspace.swipe.canActivate}
         onSelect={(key) => {
           if (key === 'grab') setActiveTab(canClaim ? 'grab' : 'pickup')
           if (key === 'tasks') setActiveTab('pickup')
@@ -1010,7 +1021,7 @@ export default function DeliveryRiderPage() {
             className={`rider-order-card__secondary${!contactPhone?.trim() ? ' rider-order-card__secondary--disabled' : ''}`}
             ariaRole='button' ariaLabel={`${deliveryStage ? '联系收货人' : '联系取货人'}${contactPhone?.trim() ? '' : '，暂无号码'}`}
             onClick={() => {
-              if (!contactPhone?.trim()) return
+              if (!channelInteraction.canActivate() || !contactPhone?.trim()) return
               void Taro.makePhoneCall({ phoneNumber: contactPhone }).catch(() => {
                 void Taro.showToast({ title: '拨号未完成，可重试或联系商家', icon: 'none' }).catch(() => undefined)
               })
@@ -1023,7 +1034,7 @@ export default function DeliveryRiderPage() {
             <View
               className={`rider-order-card__secondary rider-order-card__secondary--danger ${disabled || needsRefresh ? 'rider-order-card__secondary--disabled' : ''}`}
               onClick={() => {
-                if (!disabled && !needsRefresh && !isOrderBusy(orderId)) updateReleaseCandidate(order)
+                if (channelInteraction.canActivate() && !disabled && !needsRefresh && !isOrderBusy(orderId)) updateReleaseCandidate(order)
               }}
             >
               <Text>释放</Text>
@@ -1039,7 +1050,7 @@ export default function DeliveryRiderPage() {
             <View
               className={`rider-order-card__grab ${disabled ? 'rider-order-card__grab--disabled' : ''}`}
               onClick={() => {
-                if (!disabled) primaryAction.run()
+                if (channelInteraction.canActivate() && !disabled) primaryAction.run()
               }}
             >
               <Text>{busy ? '处理中…' : refreshing ? '同步中…' : needsRefresh ? '刷新状态' : primaryAction.label}</Text>

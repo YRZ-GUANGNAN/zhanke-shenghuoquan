@@ -1,20 +1,22 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { ScrollView, Text, View } from '@tarojs/components'
+import { Image, ScrollView, Text, View } from '@tarojs/components'
 import { useDidHide, useDidShow } from '@tarojs/taro'
-import CapsulePageHeader from '../../components/capsule-page-header'
+import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import { AppButton, AppDialog } from '../../components/ui'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
-import DeliveryWorkspaceNav from '../../components/delivery-workspace-nav'
+import DeliveryWorkspaceNav, { useDeliveryWorkspaceNavigation } from '../../components/delivery-workspace-nav'
+import ChatAvatar from '../../components/chat-avatar'
 import AppIcon from '../../components/app-icon'
 import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
 import { getIdentityApplication } from '../../services/a-user'
-import { deliveryPaymentEnabled } from '../../feature-flags'
+import { useDeliveryPayment } from '../../hooks/use-delivery-payment'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
 import type { IdentityApplicationView } from '../../types'
 import './index.scss'
 
 function DeliveryProfileContent() {
+  const { enabled: deliveryPaymentEnabled } = useDeliveryPayment()
   const role = Taro.getCurrentInstance().router?.params.role === 'merchant' ? 'merchant' : 'rider'
   const allowed = useIdentityGuard(role)
   const profile = useSessionStore(state => state.profile)
@@ -25,6 +27,8 @@ function DeliveryProfileContent() {
   const [confirmSwitch, setConfirmSwitch] = useState(false)
   const [switching, setSwitching] = useState(false)
   const [switchError, setSwitchError] = useState('')
+  const [failedCover, setFailedCover] = useState('')
+  const workspace = useDeliveryWorkspaceNavigation({ role, active: 'mine' }, allowed && !confirmSwitch && !switching)
   const lock = useRef(false)
   const visible = useRef(true)
   const epoch = useRef(0)
@@ -72,18 +76,25 @@ function DeliveryProfileContent() {
     } finally { if (current()) { lock.current = false; setSwitching(false) } }
   }
   const open = (url: string) => {
+    if (!workspace.swipe.canActivate()) return
     void Taro.navigateTo({ url }).catch(() => Taro.showToast({ title: '页面打开失败，请重试', icon: 'none' }))
   }
   if (!allowed) return <View className='delivery-profile' />
   const roleName = role === 'merchant' ? '商家' : '骑手'
   const name = (role === 'merchant' ? application?.merchantName : application?.realName) || profile.nickname || roleName
-  return <View className='delivery-profile'>
-    <CapsulePageHeader title='我的' />
+  const hasCover = Boolean(profile.cover && failedCover !== profile.cover)
+  return <View className='delivery-profile' {...workspace.swipe.handlers}>
+    <View className={`delivery-profile__hero${hasCover ? ' delivery-profile__hero--cover' : ''}`}>
+      {hasCover ? <Image src={profile.cover || ''} mode='aspectFill' className='delivery-profile__hero-image' ariaLabel={`${roleName}个人封面`} onError={() => setFailedCover(profile.cover || '')} /> : null}
+      <CapsuleSystemRow className='delivery-profile__system-row' />
+      <View className={`delivery-profile__hero-title${hasCover ? ' delivery-profile__hero-title--cover' : ''}`}><Text>我的</Text></View>
+    </View>
     <ScrollView scrollY enhanced showScrollbar={false} className='delivery-profile__scroll'>
-      <View className='delivery-profile__identity'>
-        <View className='delivery-profile__avatar'><Text>{name.slice(0, 1)}</Text></View>
+      <View className={`delivery-profile__identity${hasCover ? ' delivery-profile__identity--cover' : ''}`}>
+        <ChatAvatar className='delivery-profile__avatar' src={profile.avatar} name={name} />
         <View className='delivery-profile__name'><Text className='delivery-profile__role'>{roleName}工作区</Text><Text>{name}</Text><Text className='delivery-profile__caption'>{role === 'merchant' ? '管理店铺资料与配送资金' : '管理骑手资料与配送身份'}</Text></View>
       </View>
+      <View className='delivery-profile__edit' ariaRole='button' ariaLabel='编辑头像、昵称与背景图' hoverClass='delivery-profile__edit--pressed' onClick={() => open('/pages/edit-profile/index')}><AppIcon name='document' /><Text>编辑资料与封面</Text><AppIcon name='chevron-right' /></View>
       <View className='delivery-profile__section delivery-profile__section--funds'>
         <Text className='delivery-profile__heading'>{role === 'merchant' ? '配送资金' : '配送收入'}</Text>
         {role === 'merchant' ? <View className='delivery-profile__link' ariaRole='button' ariaLabel='查看商家钱包与账单' onClick={() => open('/pages/merchant-wallet/index')}>
@@ -102,10 +113,10 @@ function DeliveryProfileContent() {
       <View className='delivery-profile__section'>
         <Text className='delivery-profile__heading'>账号与身份</Text>
         <Text className='delivery-profile__caption'>在本工作区处理{roleName === '商家' ? '商家订单和配送消息' : '接单、取送货和配送消息'}。切换身份后可返回学生端。</Text>
-        <AppButton variant='secondary' onClick={() => { setSwitchError(''); setConfirmSwitch(true) }}>切换到学生端</AppButton>
+        <AppButton variant='secondary' onClick={() => { if (workspace.swipe.canActivate()) { setSwitchError(''); setConfirmSwitch(true) } }}>切换到学生端</AppButton>
       </View>
     </ScrollView>
-    <DeliveryWorkspaceNav role={role} active='mine' />
+    <DeliveryWorkspaceNav role={role} active='mine' gestureGuard={workspace.swipe.canActivate} />
     <AppDialog visible={confirmSwitch} title='切换到学生端' description='配送订单会保留，再次进入对应身份即可继续处理。'
       confirmText='确认切换' loading={switching} error={switchError}
       onConfirm={() => void switchToStudent()} onCancel={() => { if (!switching) setConfirmSwitch(false) }} />

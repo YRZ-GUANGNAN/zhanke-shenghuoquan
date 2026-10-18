@@ -11,9 +11,27 @@
   background: $bg-app;
   color: $text-primary;
 }
-.merchant-home-hero { flex: 0 0 auto; padding: 0 28rpx; background: $bg-surface; }
+.merchant-home-hero { position: relative; flex: 0 0 auto; padding: 0 28rpx; overflow: hidden; background: $bg-surface; }
+.merchant-home-hero--cover { padding-top: 0; }
+.merchant-home-hero__media { position: absolute; z-index: 0; top: 0; right: 0; left: 0; height: 240rpx; overflow: hidden; background: $bg-app; }
+.merchant-home-hero__media::after { position: absolute; inset: 0; content: ''; pointer-events: none; background: linear-gradient(to bottom, rgba($text-strong, .16) 0%, rgba($text-strong, .04) 42%, $bg-surface 100%); }
+.merchant-home-hero__cover-image { display: block; width: 100%; height: 100%; }
+.merchant-home-page .channel-pager__item > .merchant-home-orders { height: 100%; }
+.merchant-home-hero > .capsule-system-row,
+.merchant-home-hero > .merchant-home-header,
+.merchant-home-hero > .merchant-home-workspace-heading,
+.merchant-home-hero > .merchant-home-metrics { position: relative; z-index: 1; }
 .merchant-home-header { display: flex; align-items: center; gap: 24rpx; padding: 8rpx 0 20rpx; }
-.merchant-home-shop, .merchant-home-shop__main { min-width: 0; flex: 1; }
+.merchant-home-hero--cover .merchant-home-header { padding-top: 156rpx; color: $text-on-color; }
+.merchant-home-hero--cover .merchant-home-shop__eyebrow,
+.merchant-home-hero--cover .merchant-home-shop__status { color: rgba($text-on-color, .84); text-shadow: 0 1PX 5PX rgba($text-strong, .32); }
+.merchant-home-hero--cover .merchant-home-shop__name { text-shadow: 0 1PX 6PX rgba($text-strong, .36); }
+.merchant-home-hero--cover .merchant-home-shop__avatar { border: 2PX solid rgba($bg-surface, .92); border-radius: 16PX; }
+.merchant-home-hero--cover .merchant-home-workspace-heading,
+.merchant-home-hero--cover .merchant-home-metrics { position: relative; z-index: 1; }
+.merchant-home-shop { min-width: 0; flex: 1; display: flex; align-items: center; gap: 16rpx; }
+.merchant-home-shop__avatar { flex: 0 0 44PX; width: 44PX; height: 44PX; }
+.merchant-home-shop__main { min-width: 0; flex: 1; }
 .merchant-home-shop__eyebrow { display: block; font-size: 11PX; line-height: 18PX; color: $text-secondary; letter-spacing: 2rpx; }
 .merchant-home-shop__name-row { min-width: 0; }
 .merchant-home-shop__name { display: block; font-size: 17PX; line-height: 26PX; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

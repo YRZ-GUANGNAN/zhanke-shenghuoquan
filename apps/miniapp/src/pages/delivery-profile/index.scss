@@ -12,8 +12,71 @@
   color: $text-primary;
 }
 .delivery-profile__scroll { flex: 1; min-height: 0; }
+.delivery-profile__hero {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  min-height: calc(var(--capsule-system-row-height, 72px) + var(--capsule-business-row-height, 44px));
+  overflow: hidden;
+  background: $bg-surface;
+}
+.delivery-profile__hero--cover {
+  min-height: 56vw;
+  max-height: 430PX;
+}
+.delivery-profile__hero-image {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+}
+.delivery-profile__hero::after {
+  position: absolute;
+  z-index: 1;
+  right: 0;
+  bottom: -1PX;
+  left: 0;
+  height: 52%;
+  pointer-events: none;
+  content: '';
+  background: linear-gradient(to bottom, rgba($bg-surface, 0), rgba($bg-surface, .54) 45%, $bg-surface 100%);
+}
+.delivery-profile__system-row {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  right: 0;
+  left: 0;
+  background: linear-gradient(to bottom, rgba($text-strong, .2), rgba($text-strong, 0));
+}
+.delivery-profile__hero-title {
+  position: absolute;
+  z-index: 3;
+  top: var(--capsule-system-row-height, 72px);
+  right: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--capsule-business-row-height, 44px);
+  color: $text-strong;
+  font-size: 18PX;
+  font-weight: 750;
+}
+.delivery-profile__hero-title--cover {
+  color: $text-on-color;
+  text-shadow: 0 1PX 8PX rgba($text-strong, .36);
+}
 .delivery-profile__identity { padding: 36rpx 32rpx 40rpx; display: flex; align-items: center; gap: 24rpx; background: $bg-surface; margin-bottom: 24rpx; }
-.delivery-profile__avatar { width: 60PX; height: 60PX; flex-shrink: 0; border-radius: 18PX; background: $brand-tint; color: $brand-primary-strong; font-size: 27PX; font-weight: 650; display: flex; align-items: center; justify-content: center; }
+.delivery-profile__avatar { width: 64PX; height: 64PX; flex: 0 0 64PX; border: 3PX solid $bg-surface; border-radius: 20PX; box-sizing: border-box; }
+.delivery-profile__identity--cover { position: relative; margin-top: -28PX; padding-top: 0; background: transparent; align-items: flex-start; }
+.delivery-profile__identity--cover .delivery-profile__name { padding-top: 40PX; }
+.delivery-profile__edit { display: flex; align-items: center; gap: 16rpx; min-height: 48PX; padding: 0 32rpx; background: $bg-surface; border-top: 1PX solid $border-subtle; margin-top: -24rpx; font-size: 14PX; }
+.delivery-profile__edit > text { flex: 1; }
+.delivery-profile__edit .app-icon { width: 20PX; height: 20PX; }
+.delivery-profile__edit--pressed { background: $brand-tint; }
 .delivery-profile__name { display: flex; flex-direction: column; gap: 8rpx; font-size: 23PX; line-height: 1.4; font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
 .delivery-profile__role { display: block; font-size: 11PX; line-height: 18PX; letter-spacing: 2rpx; color: $brand-primary-strong; font-weight: 600; }
 .delivery-profile__caption { @include ref.type(meta); @include ref.wrap; display: block; color: $text-secondary; font-weight: 400; }

@@ -43,13 +43,14 @@ function navHarness(options = {}) {
   }
   const exports = loadModule('components/delivery-workspace-nav.tsx', {
     '@tarojs/components': { View: 'View', Text: 'Text' },
-    '@tarojs/taro': { useDidShow: (fn) => { show = fn } },
+    '@tarojs/taro': { useDidShow: (fn) => { show = fn }, useDidHide: () => {} },
+    '../hooks/use-horizontal-navigation': { useHorizontalNavigation: () => ({ handlers: {}, canActivate: () => true }) },
     './app-icon': 'AppIcon',
     '../services/taro': { navigateTo: invoke('navigate'), redirectTo: invoke('redirect'), showToast: invoke('toast') },
     '../hooks/use-feature-visibility': { useFeatureVisibility: () => visibility },
     './delivery-workspace-nav.scss': {},
   }, renderer)
-  const props = { role: options.role || 'merchant', active: options.active || 'orders', onSelect: options.localSelect ? (key) => calls.select.push(key) : undefined }
+  const props = { role: options.role || 'merchant', active: options.active || 'orders', onSelect: options.localSelect ? (key) => calls.select.push(key) : undefined, gestureGuard: options.gestureGuard }
   renderer.setComponent(() => exports.default(props))
   const item = (label) => nodes(renderer.tree, (node) => hasClass(node, 'delivery-workspace-nav__item') && text(node) === label)[0]
   return {
@@ -83,7 +84,9 @@ function profileHarness(options = {}) {
     '@tarojs/components': { View: 'View', Text: 'Text', ScrollView: 'ScrollView' },
     '@tarojs/taro': { useDidShow: (fn) => { show = fn }, useDidHide: (fn) => { hide = fn } },
     '../../components/capsule-page-header': header,
-    '../../components/delivery-workspace-nav': 'DeliveryWorkspaceNav',
+    '../../components/delivery-workspace-nav': { __esModule: true, default: 'DeliveryWorkspaceNav', useDeliveryWorkspaceNavigation: () => ({ swipe: { handlers: {}, canActivate: () => true } }) },
+    '../../components/chat-avatar': 'ChatAvatar',
+    '../../hooks/use-delivery-payment': { useDeliveryPayment: () => ({ enabled: options.paymentEnabled ?? true }) },
     '../../components/app-icon': 'AppIcon',
     '../../components/ui': { AppButton: 'AppButton', AppDialog: 'AppDialog' },
     '../../components/runtime-session-gate': 'RuntimeSessionGate',
@@ -134,7 +137,9 @@ function messagesHarness(options = {}) {
     '../../components/capsule-page-header': header,
     '../../components/ui': { AppIconButton: 'AppIconButton' },
     '../../components/runtime-session-gate': 'RuntimeSessionGate',
-    '../../components/delivery-workspace-nav': 'DeliveryWorkspaceNav',
+    '../../components/delivery-workspace-nav': { __esModule: true, default: 'DeliveryWorkspaceNav', useDeliveryWorkspaceNavigation: () => ({ swipe: { handlers: {}, canActivate: () => true } }) },
+    '../../components/chat-avatar': 'ChatAvatar',
+    '../../hooks/use-delivery-payment': { useDeliveryPayment: () => ({ enabled: options.paymentEnabled ?? true }) },
     '../../hooks/use-identity-guard': { useIdentityGuard: (role) => { calls.guards.push(role); return allowed } },
     '../../stores/session': { useSessionStore: session.useSessionStore },
     '../../services/delivery-im': {
@@ -219,6 +224,15 @@ async function run() {
     check.deepEqual(app.calls.select, ['tasks'])
     check.equal(app.calls.redirect.length + app.calls.navigate.length, 0)
     passed('骑手接单与配送在同工作台切换，不堆叠页面')
+  }
+  {
+    let allowed = false
+    const app = navHarness({ gestureGuard: () => allowed })
+    await app.mount(); await app.click('消息')
+    check.equal(app.calls.redirect.length + app.calls.navigate.length, 0, '页面横滑保护期内底部导航不得误触发')
+    allowed = true; await app.click('消息')
+    check.equal(app.calls.redirect.length, 1)
+    passed('底部导航复用页面手势保护，横滑结束后不会误跳页')
   }
   {
     const app = profileHarness()

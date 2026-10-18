@@ -1,14 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Text, View } from '@tarojs/components'
+import { Image, Text, View } from '@tarojs/components'
 import { useDidShow } from '@tarojs/taro'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
-import IdentitySwitchModal from '../../components/IdentitySwitchModal'
+import ChannelPager, { useChannelInteraction } from '../../components/channel-pager'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
-import DeliveryWorkspaceNav from '../../components/delivery-workspace-nav'
+import DeliveryWorkspaceNav, { useDeliveryWorkspaceNavigation } from '../../components/delivery-workspace-nav'
 import RefreshScrollView from '../../components/refresh-scroll-view'
 import { DeliveryLoadDots, DeliveryOrderLoading, DeliveryOrderState } from '../../components/delivery-order-feedback'
-import { deliveryPaymentEnabled } from '../../feature-flags'
-import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
+import { useDeliveryPayment } from '../../hooks/use-delivery-payment'
+import { useIdentityGuard } from '../../hooks/use-identity-guard'
 import { getIdentityApplication } from '../../services/a-user'
 import {
   centsToYuan,
@@ -24,6 +24,7 @@ import MerchantHomeIcon from './merchant-home-icon'
 import './index.scss'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
+import ChatAvatar from '../../components/chat-avatar'
 
 type MerchantTabKey = 'pending' | 'delivering' | 'completed'
 type MerchantOrdersByTab = Record<MerchantTabKey, MerchantDeliveryOrder[]>
@@ -114,7 +115,7 @@ function openOrderDetail(order: MerchantDeliveryOrder) {
   })
 }
 
-function OrderCard({ order }: { order: MerchantDeliveryOrder }) {
+function OrderCard({ order, canActivate }: { order: MerchantDeliveryOrder; canActivate: () => boolean }) {
   const tone = orderTone(order.status)
   return (
     <View className='merchant-order-card'>
@@ -157,13 +158,13 @@ function OrderCard({ order }: { order: MerchantDeliveryOrder }) {
           <Text className='merchant-order-fee__amount'>¥{centsToYuan(order.deliveryFeeCents)}</Text>
         </View>
         {order.riderUserId ? (
-          <View className='merchant-order-rider' ariaRole='button' ariaLabel='联系本单骑手' hoverClass='merchant-home-control--pressed' onClick={() => openConversation(order)}>
+          <View className='merchant-order-rider' ariaRole='button' ariaLabel='联系本单骑手' hoverClass='merchant-home-control--pressed' onClick={() => { if (canActivate()) openConversation(order) }}>
             <MerchantHomeIcon name='message' className='merchant-order-rider__action-icon' />
             <Text>联系骑手</Text>
           </View>
         ) : null}
         <View className='merchant-order-card__buttons'>
-          <View className='merchant-order-button merchant-order-button--primary' ariaRole='button' ariaLabel={`查看${deliverySourceLabel(order.sourcePlatform)}${deliveryPickupLabel(order)}详情`} hoverClass='merchant-home-control--pressed' onClick={() => openOrderDetail(order)}>
+          <View className='merchant-order-button merchant-order-button--primary' ariaRole='button' ariaLabel={`查看${deliverySourceLabel(order.sourcePlatform)}${deliveryPickupLabel(order)}详情`} hoverClass='merchant-home-control--pressed' onClick={() => { if (canActivate()) openOrderDetail(order) }}>
             <Text>查看详情</Text>
           </View>
         </View>
@@ -173,6 +174,7 @@ function OrderCard({ order }: { order: MerchantDeliveryOrder }) {
 }
 
 function MerchantHomeContent() {
+  const { enabled: deliveryPaymentEnabled } = useDeliveryPayment()
   const capsuleStyle = useViewportRefresh()
   const visibility = useFeatureVisibility()
   const [activeTab, setActiveTab] = useState<MerchantTabKey>('pending')
@@ -189,12 +191,11 @@ function MerchantHomeContent() {
   const [approvalState, setApprovalState] = useState<ApprovalState>('checking')
   const [approvalMessage, setApprovalMessage] = useState('正在核验商家审核状态…')
   const [loading, setLoading] = useState(false)
-  const [showStudentSwitch, setShowStudentSwitch] = useState(false)
-  const [switchingIdentity, setSwitchingIdentity] = useState(false)
-  const [switchIdentityError, setSwitchIdentityError] = useState('')
+  const [failedCover, setFailedCover] = useState('')
+  const channelInteraction = useChannelInteraction()
   const profile = useSessionStore((state) => state.profile)
-  const switchIdentity = useSessionStore((state) => state.switchIdentity)
   const identityAllowed = useIdentityGuard('merchant')
+  const workspace = useDeliveryWorkspaceNavigation({ role: 'merchant', active: 'orders' }, identityAllowed)
   const requestVersion = useRef(0)
   const activeLoad = useRef<number | null>(null)
   const activePageLoad = useRef<{ version: number; tab: MerchantTabKey } | null>(null)
@@ -203,7 +204,6 @@ function MerchantHomeContent() {
   const accountRef = useRef(profile.id)
   const dataAccountRef = useRef(profile.id)
   const mountedRef = useRef(true)
-  const switchLockRef = useRef(false)
   identityRef.current = identityAllowed
   approvalRef.current = approvalState
   accountRef.current = profile.id
@@ -291,7 +291,7 @@ function MerchantHomeContent() {
     setLoading(false)
     activeLoad.current = null
     return pendingResult.ok && deliveringResult.ok && completedResult.ok
-  }, [identityAllowed, profile.id])
+  }, [identityAllowed, profile.id, deliveryPaymentEnabled])
 
   useEffect(() => {
     requestVersion.current += 1
@@ -299,10 +299,6 @@ function MerchantHomeContent() {
     activePageLoad.current = null
     setLoading(false)
     setLoadingMore(false)
-    setShowStudentSwitch(false)
-    switchLockRef.current = false
-    setSwitchingIdentity(false)
-    setSwitchIdentityError('')
     // A transient authentication retry keeps this account's known data. A new
     // account must never inherit the previous merchant's orders or balance.
     if (profile.id && profile.id !== dataAccountRef.current) {
@@ -373,43 +369,15 @@ function MerchantHomeContent() {
   }, [activeTab, identityAllowed, profile.id, loading, loadingMore, ordersByTab, ordersPageByTab, ordersTotalByTab])
 
   const requestRefresh = async (): Promise<boolean> => {
-    if (activePageLoad.current !== null || showStudentSwitch || switchLockRef.current) return false
+    if (activePageLoad.current !== null) return false
     return loadWorkbench()
   }
 
   const totalOrderCount = ordersTotalByTab.pending + ordersTotalByTab.delivering + ordersTotalByTab.completed
-  const loadError = loadErrorsByTab[activeTab]
   const allCountsLoaded = tabCopy.every((tab) => loadedByTab[tab.key])
   const shopName = merchantName || profile.nickname || '已认证商家'
   const shopAddress = merchantAddress || profile.campus || profile.school || '商家资料已通过审核'
-
-  const confirmStudentSwitch = async () => {
-    if (switchLockRef.current || !identityRef.current) return
-    const previous = useSessionStore.getState()
-    const account = previous.profile.id
-    const token = previous.token
-    const current = () => {
-      const session = useSessionStore.getState()
-      return mountedRef.current && session.status === 'authenticated'
-        && session.profile.id === account && session.token === token
-    }
-    switchLockRef.current = true
-    setSwitchingIdentity(true)
-    setSwitchIdentityError('')
-    try {
-      const identity = await switchIdentity('student')
-      if (!current() || useSessionStore.getState().identity !== identity || identity.currentIdentity !== 'student') return
-      await Taro.reLaunch({ url: identityRoute('student') })
-      if (current()) setShowStudentSwitch(false)
-    } catch (error) {
-      if (current()) setSwitchIdentityError(error instanceof Error ? error.message : '身份切换失败，请重试')
-    } finally {
-      if (current()) {
-        switchLockRef.current = false
-        setSwitchingIdentity(false)
-      }
-    }
-  }
+  const hasCover = Boolean(profile.cover && failedCover !== profile.cover)
 
   if (!identityAllowed || profile.id && profile.id !== dataAccountRef.current) return <View className='merchant-home-page' />
   if (approvalState !== 'approved') {
@@ -436,11 +404,16 @@ function MerchantHomeContent() {
   }
 
   return (
-    <View className='merchant-home-page' style={capsuleStyle}>
-      <View className='merchant-home-hero'>
+    <View className='merchant-home-page' style={capsuleStyle} {...workspace.swipe.handlers}>
+      <View className={`merchant-home-hero${hasCover ? ' merchant-home-hero--cover' : ''}`}>
+        {hasCover ? <View className='merchant-home-hero__media' ariaLabel='商家个人封面'>
+          <Image src={profile.cover || ''} mode='aspectFill' className='merchant-home-hero__cover-image'
+            onError={() => setFailedCover(profile.cover || '')} />
+        </View> : null}
         <CapsuleSystemRow />
         <View className='merchant-home-header'>
           <View className='merchant-home-shop'>
+            <ChatAvatar className='merchant-home-shop__avatar' src={profile.avatar} name={shopName || profile.nickname || '商家'} />
             <View className='merchant-home-shop__main'>
               <Text className='merchant-home-shop__eyebrow'>商家工作区</Text>
               <View className='merchant-home-shop__name-row'>
@@ -451,12 +424,6 @@ function MerchantHomeContent() {
               </View>
             </View>
           </View>
-          <View className='merchant-home-switch' ariaRole='button' ariaLabel='切换身份' hoverClass='merchant-home-control--pressed' onClick={() => {
-            setSwitchIdentityError('')
-            setShowStudentSwitch(true)
-          }}>
-            <Text>切换身份</Text>
-          </View>
         </View>
 
         <View className='merchant-home-workspace-heading'>
@@ -466,7 +433,7 @@ function MerchantHomeContent() {
           </View>
           {visibility.delivery && visibility.merchant ? (
             <View className='merchant-home-publish' ariaRole='button' ariaLabel='发布配送单' hoverClass='merchant-home-control--pressed'
-              onClick={() => void Taro.navigateTo({ url: '/pages/merchant-publish/index' })}>
+              onClick={() => { if (workspace.swipe.canActivate()) void Taro.navigateTo({ url: '/pages/merchant-publish/index' }) }}>
               <MerchantHomeIcon name='publish' className='merchant-home-publish__icon' /><Text>发单</Text>
             </View>
           ) : null}
@@ -507,20 +474,22 @@ function MerchantHomeContent() {
         ))}
       </View>
 
+      <ChannelPager keys={tabCopy.map(tab => tab.key)} activeKey={activeTab} onChange={setActiveTab} interaction={channelInteraction}
+        renderPage={tab => (
       <RefreshScrollView
         scrollY
         className='merchant-home-orders delivery-orders-scroll'
-        refreshKey={`merchant:${profile.id}:${activeTab}`}
-        enabled={identityAllowed && !showStudentSwitch}
-        busy={loading || loadingMore || switchingIdentity}
-        onRefresh={requestRefresh}
+        refreshKey={`merchant:${profile.id}:${tab}`}
+        enabled={identityAllowed && activeTab === tab}
+        busy={loading || loadingMore}
+        onRefresh={() => activeTab === tab ? requestRefresh() : Promise.resolve(false)}
         enhanced
         showScrollbar={false}
         lowerThreshold={120}
-        onScrollToLower={() => void loadMoreOrders()}
+        onScrollToLower={() => { if (activeTab === tab && channelInteraction.canActivate()) void loadMoreOrders() }}
       >
         <View className='merchant-home-orders__inner'>
-          {loadedByTab[activeTab] || !loading ? <View className='delivery-order-toolbar'>
+          {loadedByTab[tab] || !loading ? <View className='delivery-order-toolbar'>
             <Text>{loading ? '正在更新订单' : '下拉刷新订单'}</Text>
             <View className={`delivery-order-toolbar__refresh${loading || loadingMore ? ' delivery-order-toolbar__refresh--disabled' : ''}`}
               ariaRole='button' ariaLabel={loading ? '正在刷新配送订单' : '刷新配送订单'} hoverClass='delivery-order-control--pressed'
@@ -528,39 +497,31 @@ function MerchantHomeContent() {
               {loading ? <DeliveryLoadDots /> : null}<Text>{loading ? '刷新中' : '刷新'}</Text>
             </View>
           </View> : null}
-          {loading && !loadedByTab[activeTab] ? <DeliveryOrderLoading columns={2} /> : null}
-          {!loading && loadError ? (
-            <DeliveryOrderState kind='error' compact={ordersByTab[activeTab].length > 0}
-              title={`配送单${loadedByTab[activeTab] ? '刷新' : '加载'}失败`} description={loadError}
+          {loading && !loadedByTab[tab] ? <DeliveryOrderLoading columns={2} /> : null}
+          {!loading && loadErrorsByTab[tab] ? (
+            <DeliveryOrderState kind='error' compact={ordersByTab[tab].length > 0}
+              title={`配送单${loadedByTab[tab] ? '刷新' : '加载'}失败`} description={loadErrorsByTab[tab]}
               actionLabel='重新加载' onAction={() => void requestRefresh()} />
           ) : null}
-          {loadedByTab[activeTab] && !loadError && ordersByTab[activeTab].length === 0 ? (
-            <DeliveryOrderState kind='empty' title={`暂无${tabCopy.find((item) => item.key === activeTab)?.label}配送单`}
+          {loadedByTab[tab] && !loadErrorsByTab[tab] && ordersByTab[tab].length === 0 ? (
+            <DeliveryOrderState kind='empty' title={`暂无${tabCopy.find((item) => item.key === tab)?.label}配送单`}
               description='新配送单和状态更新会显示在这里，可下拉刷新。' />
           ) : null}
           <View className='merchant-home-order-grid'>
-            {ordersByTab[activeTab].map((order) => <OrderCard key={order.deliveryOrderPublicId} order={order} />)}
+            {ordersByTab[tab].map((order) => <OrderCard key={order.deliveryOrderPublicId} order={order} canActivate={() => activeTab === tab && channelInteraction.canActivate()} />)}
           </View>
-          {pageErrorsByTab[activeTab] ? <DeliveryOrderState kind='error' compact title='更多订单暂未加载'
-            description={pageErrorsByTab[activeTab]} actionLabel='重试加载' onAction={() => void loadMoreOrders()} /> : null}
+          {pageErrorsByTab[tab] ? <DeliveryOrderState kind='error' compact title='更多订单暂未加载'
+            description={pageErrorsByTab[tab]} actionLabel='重试加载' onAction={() => { if (activeTab === tab && channelInteraction.canActivate()) void loadMoreOrders() }} /> : null}
           {loadingMore ? <DeliveryOrderLoading compact label='正在加载更多订单' /> : null}
-          {!loading && !loadingMore && !loadError && ordersByTab[activeTab].length > 0 && ordersByTab[activeTab].length >= ordersTotalByTab[activeTab] ? (
+          {!loading && !loadingMore && !loadErrorsByTab[tab] && ordersByTab[tab].length > 0 && ordersByTab[tab].length >= ordersTotalByTab[tab] ? (
             <Text className='merchant-home-orders__end'>— 已显示全部配送单 —</Text>
           ) : null}
         </View>
       </RefreshScrollView>
+        )} />
 
-      <DeliveryWorkspaceNav role='merchant' active='orders' />
+      <DeliveryWorkspaceNav role='merchant' active='orders' gestureGuard={workspace.swipe.canActivate} />
 
-      <IdentitySwitchModal
-        visible={showStudentSwitch}
-        currentRole='merchant'
-        targetRole='student'
-        onCancel={() => setShowStudentSwitch(false)}
-        onConfirm={() => void confirmStudentSwitch()}
-        confirming={switchingIdentity}
-        error={switchIdentityError}
-      />
     </View>
   )
 }

@@ -3,7 +3,7 @@ import { ScrollView, Text, View } from '@tarojs/components'
 import { useDidHide, useDidShow } from '@tarojs/taro'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import { AppIconButton } from '../../components/ui'
-import DeliveryWorkspaceNav from '../../components/delivery-workspace-nav'
+import DeliveryWorkspaceNav, { useDeliveryWorkspaceNavigation } from '../../components/delivery-workspace-nav'
 import { useSessionStore } from '../../stores/session'
 import {
   getDeliveryConversationUnread,
@@ -26,6 +26,7 @@ function formatTime(value: string) {
 }
 
 export function DeliveryMessagesContent({ role, identityAllowed }: { role: 'merchant' | 'rider'; identityAllowed: boolean }) {
+  const workspace = useDeliveryWorkspaceNavigation({ role, active: 'messages' }, identityAllowed)
   const accountId = useSessionStore(state => state.profile.id)
   const token = useSessionStore(state => state.token)
   const [items, setItems] = useState<DeliveryConversation[]>([])
@@ -96,6 +97,7 @@ export function DeliveryMessagesContent({ role, identityAllowed }: { role: 'merc
   }, [identityAllowed, accountId, token, role, loadMessages])
 
   const openConversation = (item: DeliveryConversation) => {
+    if (!workspace.swipe.canActivate()) return
     void Taro.navigateTo({
       url: `/pages/delivery-conversation/index?orderId=${encodeURIComponent(item.deliveryOrderPublicId)}&role=${role}`,
     }).catch(() => Taro.showToast({ title: '会话打开失败，请重试', icon: 'none' }))
@@ -104,7 +106,7 @@ export function DeliveryMessagesContent({ role, identityAllowed }: { role: 'merc
   if (!identityAllowed) return <View className='merchant-messages-page' />
 
   return (
-    <View className='merchant-messages-page'>
+    <View className='merchant-messages-page' {...workspace.swipe.handlers}>
       <CapsulePageHeader
         className='merchant-messages-nav'
         title='消息'
@@ -154,7 +156,7 @@ export function DeliveryMessagesContent({ role, identityAllowed }: { role: 'merc
           {!loading && items.length < total ? <Text className='merchant-messages-card__footer' onClick={() => void loadMessages(true)}>加载更多会话</Text> : null}
         </View>
       </ScrollView>
-      <DeliveryWorkspaceNav role={role} active='messages' />
+      <DeliveryWorkspaceNav role={role} active='messages' gestureGuard={workspace.swipe.canActivate} />
     </View>
   )
 }
