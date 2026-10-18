@@ -47,6 +47,23 @@
 .merchant-home-metric__label { @include ref.type(meta); color: $text-secondary; }
 .merchant-home-metric__value { @include ref.wrap; font-size: 16PX; font-weight: 700; font-variant-numeric: tabular-nums; }
 .merchant-home-metric__value--pending { color: $text-secondary; }
+.merchant-home-intake { margin: 0 0 4rpx; padding: 16rpx 0 8rpx; border-top: 1PX solid $border-subtle; }
+.merchant-home-intake__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16rpx; }
+.merchant-home-intake__copy { min-width: 0; }
+.merchant-home-intake__title { display: block; font-size: 14PX; line-height: 20PX; font-weight: 700; color: $text-strong; }
+.merchant-home-intake__caption { display: block; margin-top: 4rpx; color: $text-secondary; font-size: 11PX; line-height: 17PX; }
+.merchant-home-intake__status { flex: 0 0 auto; padding: 2rpx 0 0; font-size: 11PX; line-height: 18PX; color: $text-secondary; white-space: nowrap; }
+.merchant-home-intake__status--ready { color: $success; background: transparent; }
+.merchant-home-intake__status--pending { color: $warning; background: transparent; }
+.merchant-home-intake__status--idle { color: $text-secondary; background: transparent; }
+.merchant-home-intake__sources { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin-top: 14rpx; }
+.merchant-home-intake__source { min-width: 0; display: flex; align-items: flex-start; gap: 8rpx; padding: 0 12rpx; border-left: 1PX solid $border-default; }
+.merchant-home-intake__source:first-child { padding-left: 0; border-left: 0; }
+.merchant-home-intake__source--connected .merchant-home-intake__source-mark { background: $success; }
+.merchant-home-intake__source-mark { flex: 0 0 6PX; width: 6PX; height: 6PX; margin-top: 6PX; border-radius: 50%; background: $border-strong; }
+.merchant-home-intake__source-copy { min-width: 0; }
+.merchant-home-intake__source-name { @include ref.wrap; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11PX; line-height: 17PX; color: $text-strong; font-weight: 600; }
+.merchant-home-intake__source-detail { @include ref.wrap; display: block; margin-top: 2rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10PX; line-height: 16PX; color: $text-secondary; }
 .merchant-home-section-head { @include ref.type(meta); padding: 16rpx 28rpx; color: $warning; background: $warning-tint; }
 
 .merchant-home-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 0 20rpx; background: $bg-surface; border-bottom: 1PX solid $border-default; flex: 0 0 auto; }

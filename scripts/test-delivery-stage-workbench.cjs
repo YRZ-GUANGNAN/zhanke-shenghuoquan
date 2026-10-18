@@ -192,7 +192,10 @@ function riderHarness(overrides = {}) {
       useDidHide: (fn) => { hide = fn },
     },
     '../../components/capsule-page-header': { CapsuleSystemRow: 'CapsuleSystemRow' },
-    '../../components/delivery-workspace-nav': 'DeliveryWorkspaceNav',
+    '../../components/delivery-workspace-nav': { __esModule: true, default: 'DeliveryWorkspaceNav', useDeliveryWorkspaceNavigation: () => ({ swipe: { handlers: {}, canActivate: () => true } }) },
+    '../../components/chat-avatar': 'ChatAvatar',
+    '../../components/channel-pager': { __esModule: true, default: ({ activeKey, renderPage }) => renderPage(activeKey), useChannelInteraction: () => ({ canActivate: () => true }) },
+    '../../hooks/use-delivery-payment': { useDeliveryPayment: () => ({ enabled: true }) },
     '../../components/refresh-scroll-view': 'ScrollView',
     '../../components/delivery-order-feedback': feedbackComponents(renderer),
     '../../components/ui': { AppDialog: 'AppDialog' },
@@ -263,6 +266,7 @@ function merchantHarness(kind, overrides = {}) {
   const services = {
     getIdentityApplication: async () => ({ status: 'approved', merchantName: '测试商家', merchantAddress: '测试取货点' }),
     getDeliveryWallet: async () => ({ availableBalanceCents: 1000 }),
+    getMerchantOrderIntake: async () => ({ manualAvailable: true, externalAvailable: false, platforms: ['taobao', 'jd', 'meituan'].map((platform) => ({ platform, label: platform, connected: false })) }),
     listMerchantDeliveryOrders: async () => page([]),
     getMerchantDeliveryOrder: async () => order('ORDER-A'),
     getDeliveryOrderFunds: async () => ({ deliveryOrderPublicId: 'ORDER-A', payment: null, settlement: null, refund: null }),
@@ -280,7 +284,10 @@ function merchantHarness(kind, overrides = {}) {
     '../../components/ui': { AppIconButton: 'AppIconButton' },
     '../../components/ui/status-glyph': { StatusGlyph: 'StatusGlyph' },
     '../../components/IdentitySwitchModal': 'IdentitySwitchModal',
-    '../../components/delivery-workspace-nav': 'DeliveryWorkspaceNav',
+    '../../components/delivery-workspace-nav': { __esModule: true, default: 'DeliveryWorkspaceNav', useDeliveryWorkspaceNavigation: () => ({ swipe: { handlers: {}, canActivate: () => true } }) },
+    '../../components/chat-avatar': 'ChatAvatar',
+    '../../components/channel-pager': { __esModule: true, default: ({ activeKey, renderPage }) => renderPage(activeKey), useChannelInteraction: () => ({ canActivate: () => true }) },
+    '../../hooks/use-delivery-payment': { useDeliveryPayment: () => ({ enabled: true }) },
     '../../components/refresh-scroll-view': 'ScrollView',
     '../../components/delivery-order-feedback': feedbackComponents(renderer),
     '../../components/runtime-session-gate': 'RuntimeSessionGate',
@@ -291,6 +298,7 @@ function merchantHarness(kind, overrides = {}) {
     '../../services/a-user': { getIdentityApplication: (...args) => services.getIdentityApplication(...args) },
     '../../services/delivery-merchant': {
       centsToYuan: (value) => String(value / 100),
+      getMerchantOrderIntake: (...args) => services.getMerchantOrderIntake(...args),
       listMerchantDeliveryOrders: (...args) => services.listMerchantDeliveryOrders(...args),
       getMerchantDeliveryOrder: (...args) => { orderCalls++; return services.getMerchantDeliveryOrder(...args) },
     },
@@ -913,22 +921,14 @@ async function run() {
   }
   {
     for (const role of ['merchant', 'rider']) {
-      for (const accountChanged of [false, true]) {
-        const pending = deferred()
-        const options = { switchIdentity: () => pending.promise }
-        const app = role === 'merchant' ? merchantHarness('merchant-home', options) : riderHarness(options)
-        await app.mount()
-        const action = role === 'merchant'
-          ? nodes(app.tree, node => node.type === 'IdentitySwitchModal')[0].props.onConfirm
-          : nodes(app.tree, node => hasClass(node, 'rider-grab-user__switch'))[0].props.onClick
-        action(); action(); await app.flush()
-        assert.equal(app.switchCalls, 1, `${role} 身份切换同帧防重`)
-        if (accountChanged) await app.setAccount(202)
-        pending.resolve({ currentIdentity: 'student' }); await app.flush()
-        assert.equal(app.relaunches, accountChanged ? 0 : 1, `${role} 仅当前账号成功切换后跳页`)
-      }
+      const app = role === 'merchant' ? merchantHarness('merchant-home') : riderHarness()
+      await app.mount()
+      assert.equal(nodes(app.tree, node => node.type === 'IdentitySwitchModal').length, 0)
+      assert.doesNotMatch(text(app.tree), /切换身份/)
+      assert.equal(app.switchCalls, 0)
+      await app.unmount()
     }
-    console.log('PASS 两端工作台身份切换防重复，旧账号迟到响应不会导航')
+    console.log('PASS 两端订单页移除重复身份切换，统一入口由角色资料页测试覆盖')
   }
   {
     const late = deferred()
@@ -1527,7 +1527,7 @@ async function run() {
   }
   console.log(`PASS 详情紧凑布局与照片联系新增12组，${detailAssertions}项行为断言`)
 }
-module.exports = { deferred, page, order, nodes, text, hasClass, hookRenderer, loadPage }
+module.exports = { deferred, page, order, nodes, text, hasClass, hookRenderer, loadPage, loadSource }
 if (require.main === module) {
   run().catch((error) => { console.error(error); process.exitCode = 1 })
 }

@@ -12,9 +12,11 @@ import { useIdentityGuard } from '../../hooks/use-identity-guard'
 import { getIdentityApplication } from '../../services/a-user'
 import {
   centsToYuan,
+  getMerchantOrderIntake,
   listMerchantDeliveryOrders,
   type DeliveryStatus,
   type MerchantDeliveryOrder,
+  type MerchantOrderIntake,
 } from '../../services/delivery-merchant'
 import { getDeliveryWallet } from '../../services/delivery-payment'
 import Taro from '../../services/taro'
@@ -84,6 +86,18 @@ const statusCopy: Record<DeliveryStatus, string> = {
   delivering: '配送中',
   delivered: '已完成',
   cancelled: '已取消',
+}
+
+const externalPlatforms = ['taobao', 'jd', 'meituan'] as const
+type ExternalPlatform = typeof externalPlatforms[number]
+
+function countExternalOrders(byTab: MerchantOrdersByTab): Record<ExternalPlatform, number> {
+  const counts: Record<ExternalPlatform, number> = { taobao: 0, jd: 0, meituan: 0 }
+  Object.values(byTab).forEach((orders) => orders.forEach((order) => {
+    const platform = order.sourcePlatform as ExternalPlatform | undefined
+    if (platform && externalPlatforms.includes(platform)) counts[platform] += 1
+  }))
+  return counts
 }
 
 function orderTone(status: DeliveryStatus): 'waiting' | 'pickup' | 'delivering' | 'completed' {
@@ -188,6 +202,9 @@ function MerchantHomeContent() {
   const [balanceCents, setBalanceCents] = useState<number | null>(null)
   const [merchantName, setMerchantName] = useState('')
   const [merchantAddress, setMerchantAddress] = useState('')
+  const [intake, setIntake] = useState<MerchantOrderIntake | null>(null)
+  const [intakeLoading, setIntakeLoading] = useState(false)
+  const [intakeError, setIntakeError] = useState('')
   const [approvalState, setApprovalState] = useState<ApprovalState>('checking')
   const [approvalMessage, setApprovalMessage] = useState('正在核验商家审核状态…')
   const [loading, setLoading] = useState(false)
@@ -229,6 +246,7 @@ function MerchantHomeContent() {
     // A failed check or revoked approval still leaves the guarded workbench.
     if (approvalRef.current !== 'approved') setApprovalState('checking')
     setApprovalMessage('正在核验商家审核状态…')
+    setIntakeLoading(false)
     const applicationResult = await settle(getIdentityApplication('merchant'))
     if (!current()) return false
     if (!applicationResult.ok) {
@@ -255,11 +273,13 @@ function MerchantHomeContent() {
     setMerchantAddress(applicationResult.value.merchantAddress)
     approvalRef.current = 'approved'
     setApprovalState('approved')
-    const [pendingResult, deliveringResult, completedResult, walletResult] = await Promise.all([
+    setIntakeLoading(true)
+    const [pendingResult, deliveringResult, completedResult, walletResult, intakeResult] = await Promise.all([
       settle(listMerchantDeliveryOrders(1, 50, 'pending')),
       settle(listMerchantDeliveryOrders(1, 50, 'delivering')),
       settle(listMerchantDeliveryOrders(1, 50, 'completed')),
       deliveryPaymentEnabled ? settle(getDeliveryWallet()) : null,
+      settle(getMerchantOrderIntake()),
     ])
     if (!current()) return false
     setLoadedByTab((current) => ({
@@ -288,6 +308,9 @@ function MerchantHomeContent() {
       completed: orderLoadError(completedResult),
     })
     setBalanceCents(walletResult?.ok ? walletResult.value.availableBalanceCents : null)
+    setIntake(intakeResult.ok ? intakeResult.value : null)
+    setIntakeError(intakeResult.ok ? '' : '暂时无法确认外部订单回推状态')
+    setIntakeLoading(false)
     setLoading(false)
     activeLoad.current = null
     return pendingResult.ok && deliveringResult.ok && completedResult.ok
@@ -312,6 +335,9 @@ function MerchantHomeContent() {
       setBalanceCents(null)
       setMerchantName('')
       setMerchantAddress('')
+      setIntake(null)
+      setIntakeLoading(false)
+      setIntakeError('')
       setApprovalState('checking')
       setActiveTab('pending')
     }
@@ -378,6 +404,29 @@ function MerchantHomeContent() {
   const shopName = merchantName || profile.nickname || '已认证商家'
   const shopAddress = merchantAddress || profile.campus || profile.school || '商家资料已通过审核'
   const hasCover = Boolean(profile.cover && failedCover !== profile.cover)
+  const externalOrderCounts = countExternalOrders(ordersByTab)
+  const connectedPlatforms = externalPlatforms.filter((platform) => intake?.platforms.some((item) => item.platform === platform && item.connected))
+  const intakeStatus = intakeLoading
+    ? '正在确认'
+    : intakeError
+      ? '状态未确认'
+      : connectedPlatforms.length > 0
+        ? `已连接 ${connectedPlatforms.length} 个`
+        : intake?.externalAvailable
+          ? '待授权'
+          : '暂未接入'
+  const intakeStatusTone = intakeLoading || intakeError
+    ? 'pending'
+    : connectedPlatforms.length > 0
+      ? 'ready'
+      : 'idle'
+  const intakeCaption = intakeError
+    ? '暂时无法确认平台接入状态，订单列表仍可正常使用'
+    : intake?.externalAvailable
+      ? connectedPlatforms.length > 0
+        ? '已连接平台的订单会进入待处理列表，并按取餐号优先显示'
+        : '外部订单入口已开放，完成平台授权后会进入同一列表'
+      : '当前使用自行发单；平台接入后会进入同一订单列表'
 
   if (!identityAllowed || profile.id && profile.id !== dataAccountRef.current) return <View className='merchant-home-page' />
   if (approvalState !== 'approved') {
@@ -444,6 +493,34 @@ function MerchantHomeContent() {
             <Text className={`merchant-home-metric__value${!allCountsLoaded ? ' merchant-home-metric__value--pending' : ''}`}>
               {allCountsLoaded ? totalOrderCount : '—'}
             </Text>
+          </View>
+        </View>
+        <View className='merchant-home-intake'>
+          <View className='merchant-home-intake__head'>
+            <View className='merchant-home-intake__copy'>
+              <Text className='merchant-home-intake__title'>平台订单</Text>
+              <Text className='merchant-home-intake__caption'>{intakeCaption}</Text>
+            </View>
+            <Text className={`merchant-home-intake__status merchant-home-intake__status--${intakeStatusTone}`}>
+              {intakeStatus}
+            </Text>
+          </View>
+          <View className='merchant-home-intake__sources' ariaLabel='平台订单来源状态'>
+            {externalPlatforms.map((platform) => {
+              const connection = intake?.platforms.find((item) => item.platform === platform)
+              const detail = connection?.connected
+                ? externalOrderCounts[platform] > 0 ? `列表内 ${externalOrderCounts[platform]} 单` : '已连接'
+                : intakeError ? '待确认' : intake?.externalAvailable ? '待授权' : '未连接'
+              return (
+                <View key={platform} className={`merchant-home-intake__source${connection?.connected ? ' merchant-home-intake__source--connected' : ''}`}>
+                  <View className='merchant-home-intake__source-mark' />
+                  <View className='merchant-home-intake__source-copy'>
+                    <Text className='merchant-home-intake__source-name'>{connection?.label || deliverySourceLabel(platform)}</Text>
+                    <Text className='merchant-home-intake__source-detail'>{detail}</Text>
+                  </View>
+                </View>
+              )
+            })}
           </View>
         </View>
       </View>
