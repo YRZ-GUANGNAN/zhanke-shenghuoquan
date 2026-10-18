@@ -1,19 +1,33 @@
 @use '../../styles/design-tokens.scss' as *;
 @use '../../styles/reference-layout.scss' as ref;
-.delivery-profile { @include ref.page-foundation; height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; background: $bg-surface; color: $text-primary; }
+
+.delivery-profile {
+  @include ref.page-foundation;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: $bg-app;
+  color: $text-primary;
+}
 .delivery-profile__scroll { flex: 1; min-height: 0; }
-.delivery-profile__identity { padding: 32rpx; display: flex; align-items: center; gap: 24rpx; }
-.delivery-profile__avatar { width: 104rpx; height: 104rpx; flex-shrink: 0; border-radius: 26rpx; background: $brand-tint; color: $brand-primary-strong; font-size: 40rpx; display: flex; align-items: center; justify-content: center; }
-.delivery-profile__name { display: flex; flex-direction: column; gap: 8rpx; font-size: 40rpx; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
-.delivery-profile__caption { @include ref.type(meta); @include ref.wrap; display: block; color: $text-secondary; }
-.delivery-profile__section { margin: 0 32rpx; padding: 32rpx 0; border-top: 1PX solid $border-subtle; }
-.delivery-profile__heading { display: block; font-size: 30rpx; font-weight: 600; margin-bottom: 20rpx; }
-.delivery-profile__fact { display: flex; justify-content: space-between; gap: 32rpx; padding: 12rpx 0; font-size: 28rpx; line-height: 1.5; }
+.delivery-profile__identity { padding: 36rpx 32rpx 40rpx; display: flex; align-items: center; gap: 24rpx; background: $bg-surface; margin-bottom: 24rpx; }
+.delivery-profile__avatar { width: 60PX; height: 60PX; flex-shrink: 0; border-radius: 18PX; background: $brand-tint; color: $brand-primary-strong; font-size: 27PX; font-weight: 650; display: flex; align-items: center; justify-content: center; }
+.delivery-profile__name { display: flex; flex-direction: column; gap: 8rpx; font-size: 23PX; line-height: 1.4; font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+.delivery-profile__role { display: block; font-size: 11PX; line-height: 18PX; letter-spacing: 2rpx; color: $brand-primary-strong; font-weight: 600; }
+.delivery-profile__caption { @include ref.type(meta); @include ref.wrap; display: block; color: $text-secondary; font-weight: 400; }
+.delivery-profile__section { margin: 20rpx 24rpx; padding: 28rpx; border: 1PX solid $border-default; border-radius: 20rpx; background: $bg-surface; }
+.delivery-profile__section--funds { border-color: rgba($brand-primary, .2); background: $brand-tint; }
+.delivery-profile__heading { display: block; font-size: 16PX; font-weight: 650; margin-bottom: 20rpx; }
+.delivery-profile__fact { display: flex; justify-content: space-between; gap: 24rpx; padding: 20rpx 0; font-size: 14PX; line-height: 1.5; border-bottom: 1PX solid $border-subtle; }
+.delivery-profile__fact:last-child { border-bottom: 0; padding-bottom: 0; }
 .delivery-profile__fact > text:first-child, .delivery-profile__fact > span:first-child { flex: 0 0 4em; color: $text-secondary; }
-.delivery-profile__fact > text:last-child, .delivery-profile__fact > span:last-child { min-width: 0; text-align: right; overflow-wrap: anywhere; }
+.delivery-profile__fact > text:last-child, .delivery-profile__fact > span:last-child { min-width: 0; text-align: right; overflow-wrap: anywhere; font-weight: 500; }
 .delivery-profile__link { min-height: 56PX; display: flex; align-items: center; gap: 20rpx; }
-.delivery-profile__link-copy { flex: 1; min-width: 0; font-size: 30rpx; }
+.delivery-profile__link-copy { flex: 1; min-width: 0; font-size: 17PX; font-weight: 650; }
+.delivery-profile__link-copy .delivery-profile__caption { margin-top: 10rpx; }
 .delivery-profile__link .app-icon { width: 24PX; height: 24PX; flex-shrink: 0; }
-.delivery-profile__retry { display: flex; min-height: 44PX; align-items: center; color: $danger; font-size: 28rpx; }
-.delivery-profile__section .app-button { margin-top: 24rpx; min-height: 44PX; }
+.delivery-profile__retry { @include ref.touch; display: flex; align-items: center; color: $danger; font-size: 14PX; line-height: 1.5; }
+.delivery-profile__section .app-button { margin-top: 24rpx; min-height: 48PX; }
 .delivery-profile__link:active { opacity: .7; }

@@ -4,16 +4,14 @@ import publishIcon from './icons/action-publish.svg'
 import walletIcon from './icons/action-wallet.svg'
 import billIcon from './icons/action-bill.svg'
 import messageIcon from './icons/action-message.svg'
-import emptyIcon from './icons/empty-orders.svg'
 
-export type MerchantHomeIconName = 'publish' | 'wallet' | 'bill' | 'message' | 'empty'
+export type MerchantHomeIconName = 'publish' | 'wallet' | 'bill' | 'message'
 
 const sources: Record<MerchantHomeIconName, string> = {
   publish: publishIcon,
   wallet: walletIcon,
   bill: billIcon,
   message: messageIcon,
-  empty: emptyIcon,
 }
 
 export default function MerchantHomeIcon({

@@ -557,7 +557,6 @@ function MerchantPublishContent() {
         left={<AppIconButton name='back' label='返回' className='merchant-publish-nav__back' onClick={() => void Taro.navigateBack()} />}
       />
 
-      <ScrollView scrollY className='merchant-publish-scroll' enhanced showScrollbar={false}>
         <View className='merchant-publish-intake-tabs'>
           {([{ key: 'manual', title: '自行发单' }, { key: 'external', title: '平台接入' }] as const).map((item) => (
             <View key={item.key} className={`merchant-publish-intake-tab ${intakeMode === item.key ? 'merchant-publish-intake-tab--active' : ''} ${formLocked ? 'merchant-publish-control--disabled' : ''}`} ariaRole='button' ariaLabel={item.title}
@@ -567,6 +566,7 @@ function MerchantPublishContent() {
           ))}
         </View>
 
+      <ScrollView scrollY className='merchant-publish-scroll' enhanced showScrollbar={false}>
         {intakeMode === 'external' ? (
           <View className='merchant-publish-card merchant-publish-intake'>
             <Text className='merchant-publish-intake__title'>外卖订单接入</Text>
@@ -584,27 +584,6 @@ function MerchantPublishContent() {
             {intakeError ? <AppButton variant='secondary' block onClick={() => void loadIntake()}>重新确认接入状态</AppButton> : null}
           </View>
         ) : <>
-        <View className='merchant-publish-card merchant-publish-source'>
-          <View className='merchant-publish-section-head'>
-            <Text className='merchant-publish-section-head__title'>订单来源</Text>
-            <Text className='merchant-publish-section-head__hint'>仅标记来源，不会自动接单</Text>
-          </View>
-          <View className='merchant-publish-source__options'>
-            {sourceOptions.map((platform) => (
-              <View key={platform} className={`merchant-publish-source__option ${sourcePlatform === platform ? 'merchant-publish-source__option--active' : ''} ${formLocked ? 'merchant-publish-control--disabled' : ''}`} ariaRole='button' ariaLabel={`订单来源${deliverySourceLabel(platform)}`}
-                onClick={() => { if (!submittingRef.current && !attemptRef.current) setSourcePlatform(platform) }}>
-                <Text>{deliverySourceLabel(platform)}</Text>
-              </View>
-            ))}
-          </View>
-          <View className='merchant-publish-field merchant-publish-field--last'>
-            <Text className='merchant-publish-field__label'>取餐号</Text>
-            <Input className='merchant-publish-source__code' value={pickupCode} maxlength={16} disabled={formLocked}
-              placeholder={sourcePlatform === 'local' ? '选填，如 0022 或 A15' : '必填，使用平台取餐号'}
-              onInput={(event) => { if (!submittingRef.current && !attemptRef.current) setPickupCode(inputValue(event)) }} />
-          </View>
-          <Text className='merchant-publish-source__hint'>取餐号用于门店核对，不是平台完整订单编号。</Text>
-        </View>
         <View className='merchant-publish-import-card'>
           <View className='merchant-publish-import-card__icon'>
             <AppIcon name='order' />
@@ -623,10 +602,31 @@ function MerchantPublishContent() {
           </View>
         </View>
 
-        <View className='merchant-publish-card'>
+        <View className='merchant-publish-card merchant-publish-source'>
+          <View className='merchant-publish-section-head'>
+            <View className='merchant-publish-section-head__left'><Text className='merchant-publish-step'>01</Text><Text className='merchant-publish-section-head__title'>订单来源与取餐号</Text></View>
+            <Text className='merchant-publish-section-head__hint'>仅标记来源，不会自动接单</Text>
+          </View>
+          <View className='merchant-publish-source__options'>
+            {sourceOptions.map((platform) => (
+              <View key={platform} className={`merchant-publish-source__option ${sourcePlatform === platform ? 'merchant-publish-source__option--active' : ''} ${formLocked ? 'merchant-publish-control--disabled' : ''}`} ariaRole='button' ariaLabel={`订单来源${deliverySourceLabel(platform)}`}
+                onClick={() => { if (!submittingRef.current && !attemptRef.current) setSourcePlatform(platform) }}>
+                <Text>{deliverySourceLabel(platform)}</Text>
+              </View>
+            ))}
+          </View>
+          <View className='merchant-publish-field merchant-publish-field--last'>
+            <Text className='merchant-publish-field__label'>取餐号</Text>
+            <Input className='merchant-publish-source__code' value={pickupCode} maxlength={16} disabled={formLocked}
+              placeholder={sourcePlatform === 'local' ? '选填，如 0022 或 A15' : '必填，使用平台取餐号'}
+              onInput={(event) => { if (!submittingRef.current && !attemptRef.current) setPickupCode(inputValue(event)) }} />
+          </View>
+          <Text className='merchant-publish-source__hint'>取餐号用于门店核对，不是平台完整订单编号。</Text>
+        </View>
+        <View className='merchant-publish-card merchant-publish-address'>
           <View className='merchant-publish-section-head'>
             <View className='merchant-publish-section-head__left'>
-              <View className='merchant-publish-dot merchant-publish-dot--pickup' />
+              <Text className='merchant-publish-step'>02</Text>
               <Text className='merchant-publish-section-head__title'>取货信息</Text>
               <Text className='merchant-publish-pill'>本店</Text>
             </View>
@@ -658,10 +658,10 @@ function MerchantPublishContent() {
           ))}
         </View>
 
-        <View className='merchant-publish-card'>
+        <View className='merchant-publish-card merchant-publish-address'>
           <View className='merchant-publish-section-head'>
             <View className='merchant-publish-section-head__left'>
-              <View className='merchant-publish-dot merchant-publish-dot--dropoff' />
+              <Text className='merchant-publish-step merchant-publish-step--dropoff'>03</Text>
               <Text className='merchant-publish-section-head__title'>收货信息</Text>
             </View>
           </View>

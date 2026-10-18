@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { ScrollView, Text, View } from '@tarojs/components'
+import { Text, View } from '@tarojs/components'
 import { useDidShow } from '@tarojs/taro'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import IdentitySwitchModal from '../../components/IdentitySwitchModal'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import DeliveryWorkspaceNav from '../../components/delivery-workspace-nav'
-import { StatusGlyph } from '../../components/ui/status-glyph'
+import RefreshScrollView from '../../components/refresh-scroll-view'
+import { DeliveryLoadDots, DeliveryOrderLoading, DeliveryOrderState } from '../../components/delivery-order-feedback'
 import { deliveryPaymentEnabled } from '../../feature-flags'
 import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
 import { getIdentityApplication } from '../../services/a-user'
@@ -19,7 +20,7 @@ import { getDeliveryWallet } from '../../services/delivery-payment'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
 import { deliveryPickupLabel, deliverySourceLabel } from '../../utils/delivery-order-source'
-import MerchantHomeIcon, { type MerchantHomeIconName } from './merchant-home-icon'
+import MerchantHomeIcon from './merchant-home-icon'
 import './index.scss'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
@@ -67,22 +68,9 @@ async function settle<T>(promise: Promise<T>): Promise<Settled<T>> {
 }
 
 const tabCopy: Array<{ key: MerchantTabKey; label: string }> = [
-  { key: 'pending', label: '待接单' },
+  { key: 'pending', label: '待处理' },
   { key: 'delivering', label: '配送中' },
-  { key: 'completed', label: '已完成' },
-]
-
-const shortcutCopy: Array<{
-  key: string
-  label: string
-  description: string
-  icon: MerchantHomeIconName
-  url: string
-}> = [
-  { key: 'publish', label: '发布配送单', description: '创建新的校内配送', icon: 'publish', url: '/pages/merchant-publish/index' },
-  { key: 'wallet', label: '钱包', description: '查看余额与充值', icon: 'wallet', url: '/pages/merchant-wallet/index' },
-  { key: 'bill', label: '账单', description: '核对资金流水', icon: 'bill', url: '/pages/merchant-wallet/index' },
-  { key: 'message', label: '消息', description: '联系正在配送的骑手', icon: 'message', url: '/pages/merchant-messages/index' },
+  { key: 'completed', label: '已结束' },
 ]
 
 const statusCopy: Record<DeliveryStatus, string> = {
@@ -140,7 +128,6 @@ function OrderCard({ order }: { order: MerchantDeliveryOrder }) {
         <Text className={`merchant-order-card__status merchant-order-card__status--${tone}`}>
           {statusCopy[order.status]}
         </Text>
-        <Text className='merchant-order-card__time'>{formatTime(order.createdAt)}</Text>
       </View>
 
       <View className='merchant-order-route'>
@@ -164,6 +151,7 @@ function OrderCard({ order }: { order: MerchantDeliveryOrder }) {
       </View> : null}
 
       <View className='merchant-order-card__footer'>
+        <Text className='merchant-order-card__time'>{formatTime(order.createdAt)} 下单</Text>
         <View className='merchant-order-fee'>
           <Text className='merchant-order-fee__label'>配送费</Text>
           <Text className='merchant-order-fee__amount'>¥{centsToYuan(order.deliveryFeeCents)}</Text>
@@ -193,6 +181,7 @@ function MerchantHomeContent() {
   const [ordersTotalByTab, setOrdersTotalByTab] = useState<MerchantNumbersByTab>(emptyTotalsByTab)
   const [loadedByTab, setLoadedByTab] = useState<MerchantLoadedByTab>(unloadedTabs)
   const [loadErrorsByTab, setLoadErrorsByTab] = useState<MerchantErrorsByTab>(emptyErrorsByTab)
+  const [pageErrorsByTab, setPageErrorsByTab] = useState<MerchantErrorsByTab>(emptyErrorsByTab)
   const [loadingMore, setLoadingMore] = useState(false)
   const [balanceCents, setBalanceCents] = useState<number | null>(null)
   const [merchantName, setMerchantName] = useState('')
@@ -224,8 +213,8 @@ function MerchantHomeContent() {
     return () => { mountedRef.current = false }
   }, [])
 
-  const loadWorkbench = useCallback(async () => {
-    if (!mountedRef.current || !identityAllowed || !identityRef.current || profile.id !== accountRef.current || activeLoad.current !== null) return
+  const loadWorkbench = useCallback(async (): Promise<boolean> => {
+    if (!mountedRef.current || !identityAllowed || !identityRef.current || profile.id !== accountRef.current || activeLoad.current !== null) return false
     const account = accountRef.current
     const version = requestVersion.current + 1
     requestVersion.current = version
@@ -235,18 +224,23 @@ function MerchantHomeContent() {
     setLoading(true)
     setLoadingMore(false)
     setLoadErrorsByTab(emptyErrorsByTab())
-    setApprovalState('checking')
+    setPageErrorsByTab(emptyErrorsByTab())
+    // A background check must not unmount the list and native refresh slot.
+    // A failed check or revoked approval still leaves the guarded workbench.
+    if (approvalRef.current !== 'approved') setApprovalState('checking')
     setApprovalMessage('正在核验商家审核状态…')
     const applicationResult = await settle(getIdentityApplication('merchant'))
-    if (!current()) return
+    if (!current()) return false
     if (!applicationResult.ok) {
+      approvalRef.current = 'error'
       setApprovalState('error')
       setApprovalMessage('暂时无法确认商家审核状态，请稍后重试')
       setLoading(false)
       activeLoad.current = null
-      return
+      return false
     }
     if (applicationResult.value.status !== 'approved') {
+      approvalRef.current = 'blocked'
       setApprovalState('blocked')
       setApprovalMessage(
         applicationResult.value.status === 'pending'
@@ -255,10 +249,11 @@ function MerchantHomeContent() {
       )
       setLoading(false)
       activeLoad.current = null
-      return
+      return false
     }
     setMerchantName(applicationResult.value.merchantName)
     setMerchantAddress(applicationResult.value.merchantAddress)
+    approvalRef.current = 'approved'
     setApprovalState('approved')
     const [pendingResult, deliveringResult, completedResult, walletResult] = await Promise.all([
       settle(listMerchantDeliveryOrders(1, 50, 'pending')),
@@ -266,7 +261,7 @@ function MerchantHomeContent() {
       settle(listMerchantDeliveryOrders(1, 50, 'completed')),
       deliveryPaymentEnabled ? settle(getDeliveryWallet()) : null,
     ])
-    if (!current()) return
+    if (!current()) return false
     setLoadedByTab((current) => ({
       pending: pendingResult.ok || current.pending,
       delivering: deliveringResult.ok || current.delivering,
@@ -295,6 +290,7 @@ function MerchantHomeContent() {
     setBalanceCents(walletResult?.ok ? walletResult.value.availableBalanceCents : null)
     setLoading(false)
     activeLoad.current = null
+    return pendingResult.ok && deliveringResult.ok && completedResult.ok
   }, [identityAllowed, profile.id])
 
   useEffect(() => {
@@ -316,6 +312,7 @@ function MerchantHomeContent() {
       setOrdersTotalByTab(emptyTotalsByTab())
       setLoadedByTab(unloadedTabs())
       setLoadErrorsByTab(emptyErrorsByTab())
+      setPageErrorsByTab(emptyErrorsByTab())
       setBalanceCents(null)
       setMerchantName('')
       setMerchantAddress('')
@@ -349,7 +346,7 @@ function MerchantHomeContent() {
       && requestVersion.current === version && activePageLoad.current === pageRequest
     const nextPage = ordersPageByTab[requestedTab] + 1
     setLoadingMore(true)
-    setLoadErrorsByTab((current) => ({ ...current, [requestedTab]: '' }))
+    setPageErrorsByTab((current) => ({ ...current, [requestedTab]: '' }))
     try {
       const result = await listMerchantDeliveryOrders(nextPage, 50, requestedTab)
       if (!current()) return
@@ -362,7 +359,7 @@ function MerchantHomeContent() {
       setOrdersTotalByTab((current) => ({ ...current, [requestedTab]: result.total }))
     } catch (error) {
       if (current()) {
-        setLoadErrorsByTab((current) => ({
+        setPageErrorsByTab((current) => ({
           ...current,
           [requestedTab]: error instanceof Error ? error.message : '更多配送单加载失败',
         }))
@@ -374,6 +371,11 @@ function MerchantHomeContent() {
       }
     }
   }, [activeTab, identityAllowed, profile.id, loading, loadingMore, ordersByTab, ordersPageByTab, ordersTotalByTab])
+
+  const requestRefresh = async (): Promise<boolean> => {
+    if (activePageLoad.current !== null || showStudentSwitch || switchLockRef.current) return false
+    return loadWorkbench()
+  }
 
   const totalOrderCount = ordersTotalByTab.pending + ordersTotalByTab.delivering + ordersTotalByTab.completed
   const loadError = loadErrorsByTab[activeTab]
@@ -415,13 +417,9 @@ function MerchantHomeContent() {
       <View className='merchant-home-page merchant-home-page--review' style={capsuleStyle}>
         <CapsuleSystemRow />
         <View className='merchant-home-review'>
-          <View className='merchant-home-review__status'>
-            <StatusGlyph kind={approvalState === 'checking' ? 'loading' : approvalState === 'error' ? 'error' : 'forbidden'} />
-          </View>
-          <Text className='merchant-home-review__title'>
-            {approvalState === 'checking' ? '正在核验商家资格' : approvalState === 'error' ? '商家资格核验失败' : '暂时无法进入商家端'}
-          </Text>
-          <Text className='merchant-home-review__message'>{approvalMessage}</Text>
+          {approvalState === 'checking' ? <DeliveryOrderLoading compact label='正在核验商家资格' /> :
+            <DeliveryOrderState kind={approvalState === 'error' ? 'error' : 'access'}
+              title={approvalState === 'error' ? '商家资格核验失败' : '暂时无法进入商家端'} description={approvalMessage} />}
           {approvalState === 'error' ? (
             <View className='merchant-home-review__action merchant-home-review__retry' ariaRole='button' ariaLabel='重新核验商家资格' hoverClass='merchant-home-control--pressed' onClick={() => void loadWorkbench()}>
               <Text>重新尝试</Text>
@@ -443,14 +441,12 @@ function MerchantHomeContent() {
         <CapsuleSystemRow />
         <View className='merchant-home-header'>
           <View className='merchant-home-shop'>
-            <View className='merchant-home-shop__avatar'><Text>{shopName.slice(0, 1)}</Text></View>
             <View className='merchant-home-shop__main'>
+              <Text className='merchant-home-shop__eyebrow'>商家工作区</Text>
               <View className='merchant-home-shop__name-row'>
                 <Text className='merchant-home-shop__name'>{shopName}</Text>
-                <Text className='merchant-home-shop__badge'>已审核</Text>
               </View>
               <View className='merchant-home-shop__status'>
-                <View className='merchant-home-shop__green-dot' />
                 <Text>{shopAddress}</Text>
               </View>
             </View>
@@ -459,10 +455,22 @@ function MerchantHomeContent() {
             setSwitchIdentityError('')
             setShowStudentSwitch(true)
           }}>
-            <Text>⇄ 切换身份</Text>
+            <Text>切换身份</Text>
           </View>
         </View>
 
+        <View className='merchant-home-workspace-heading'>
+          <View className='merchant-home-workspace-heading__copy'>
+            <Text className='merchant-home-workspace-heading__title'>订单管理</Text>
+            <Text className='merchant-home-workspace-heading__caption'>从发单到送达，随时掌握进度</Text>
+          </View>
+          {visibility.delivery && visibility.merchant ? (
+            <View className='merchant-home-publish' ariaRole='button' ariaLabel='发布配送单' hoverClass='merchant-home-control--pressed'
+              onClick={() => void Taro.navigateTo({ url: '/pages/merchant-publish/index' })}>
+              <MerchantHomeIcon name='publish' className='merchant-home-publish__icon' /><Text>发单</Text>
+            </View>
+          ) : null}
+        </View>
         <View className='merchant-home-metrics'>
           <View className='merchant-home-metric merchant-home-metric--wallet'>
             <Text className='merchant-home-metric__label'>钱包余额</Text>
@@ -476,52 +484,10 @@ function MerchantHomeContent() {
               {allCountsLoaded ? totalOrderCount : '—'}
             </Text>
           </View>
-          <View className='merchant-home-metric'>
-            <Text className='merchant-home-metric__label'>配送中</Text>
-            <Text className={`merchant-home-metric__value${!loadedByTab.delivering ? ' merchant-home-metric__value--pending' : ''}`}>
-              {loadedByTab.delivering ? ordersTotalByTab.delivering : '—'}
-            </Text>
-          </View>
         </View>
       </View>
 
-      <View className='merchant-home-tools'>
-        {(!visibility.delivery || !visibility.merchant) && <View className='merchant-home-section-head'><Text>新业务暂未开放，以下仅供处理已有订单与资金。</Text></View>}
-        <View className={`merchant-home-shortcuts${visibility.delivery && visibility.merchant ? '' : ' merchant-home-shortcuts--existing-only'}`}>
-          {shortcutCopy.filter(item => item.key === 'publish' && visibility.delivery && visibility.merchant).map((item) => (
-            <View
-              key={item.key}
-              className={`merchant-home-shortcut merchant-home-shortcut--${item.key}`}
-              ariaRole='button'
-              ariaLabel={`${item.label}，${item.description}`}
-              hoverClass='merchant-home-control--pressed'
-              onClick={() => void Taro.navigateTo({ url: item.url })}
-            >
-              <View className='merchant-home-shortcut__icon'>
-                <MerchantHomeIcon name={item.icon} />
-              </View>
-              <View className='merchant-home-shortcut__copy'>
-                <Text className='merchant-home-shortcut__label'>{item.label}</Text>
-              </View>
-            </View>
-          ))}
-          <View className='merchant-home-shortcuts__secondary'>
-            {shortcutCopy.filter(item => item.key !== 'publish').map((item) => (
-              <View
-                key={item.key}
-                className={`merchant-home-shortcut merchant-home-shortcut--${item.key}`}
-                ariaRole='button'
-                ariaLabel={`${item.label}，${item.description}`}
-                hoverClass='merchant-home-control--pressed'
-                onClick={() => void Taro.navigateTo({ url: item.url })}
-              >
-                <MerchantHomeIcon name={item.icon} className='merchant-home-shortcut__aux-icon' />
-                <Text className='merchant-home-shortcut__label'>{item.label}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      </View>
+      {(!visibility.delivery || !visibility.merchant) && <View className='merchant-home-section-head'><Text>新业务暂未开放，可继续处理已有订单与资金。</Text></View>}
 
       <View className='merchant-home-tabs'>
         {tabCopy.map((tab) => (
@@ -541,45 +507,48 @@ function MerchantHomeContent() {
         ))}
       </View>
 
-      <ScrollView
+      <RefreshScrollView
         scrollY
-        className='merchant-home-orders'
+        className='merchant-home-orders delivery-orders-scroll'
+        refreshKey={`merchant:${profile.id}:${activeTab}`}
+        enabled={identityAllowed && !showStudentSwitch}
+        busy={loading || loadingMore || switchingIdentity}
+        onRefresh={requestRefresh}
         enhanced
         showScrollbar={false}
         lowerThreshold={120}
         onScrollToLower={() => void loadMoreOrders()}
       >
         <View className='merchant-home-orders__inner'>
-          {loading ? <Text className='merchant-home-orders__notice merchant-home-orders__notice--loading'>正在加载真实配送单…</Text> : null}
+          {loadedByTab[activeTab] || !loading ? <View className='delivery-order-toolbar'>
+            <Text>{loading ? '正在更新订单' : '下拉刷新订单'}</Text>
+            <View className={`delivery-order-toolbar__refresh${loading || loadingMore ? ' delivery-order-toolbar__refresh--disabled' : ''}`}
+              ariaRole='button' ariaLabel={loading ? '正在刷新配送订单' : '刷新配送订单'} hoverClass='delivery-order-control--pressed'
+              onClick={() => { void requestRefresh() }}>
+              {loading ? <DeliveryLoadDots /> : null}<Text>{loading ? '刷新中' : '刷新'}</Text>
+            </View>
+          </View> : null}
+          {loading && !loadedByTab[activeTab] ? <DeliveryOrderLoading columns={2} /> : null}
           {!loading && loadError ? (
-            <View className='merchant-home-orders__notice merchant-home-orders__notice--error' hoverClass='merchant-home-orders__notice--pressed' ariaRole='button' ariaLabel='重试配送单加载' onClick={() => void loadWorkbench()}>
-              <Text>配送单{loadedByTab[activeTab] ? '刷新' : '加载'}失败</Text>
-              <Text>{loadError}</Text>
-              <Text className='merchant-home-orders__retry'>点击重试</Text>
-            </View>
+            <DeliveryOrderState kind='error' compact={ordersByTab[activeTab].length > 0}
+              title={`配送单${loadedByTab[activeTab] ? '刷新' : '加载'}失败`} description={loadError}
+              actionLabel='重新加载' onAction={() => void requestRefresh()} />
           ) : null}
-          {!loading && !loadError && ordersByTab[activeTab].length === 0 ? (
-            <View className='merchant-home-empty'>
-              <View className='merchant-home-empty__icon'>
-                <MerchantHomeIcon name='empty' />
-              </View>
-              <Text className='merchant-home-empty__title'>
-                暂无{tabCopy.find((item) => item.key === activeTab)?.label}配送单
-              </Text>
-              <Text className='merchant-home-empty__description'>
-                新配送单和状态更新会显示在这里
-              </Text>
-            </View>
+          {loadedByTab[activeTab] && !loadError && ordersByTab[activeTab].length === 0 ? (
+            <DeliveryOrderState kind='empty' title={`暂无${tabCopy.find((item) => item.key === activeTab)?.label}配送单`}
+              description='新配送单和状态更新会显示在这里，可下拉刷新。' />
           ) : null}
           <View className='merchant-home-order-grid'>
             {ordersByTab[activeTab].map((order) => <OrderCard key={order.deliveryOrderPublicId} order={order} />)}
           </View>
-          {loadingMore ? <Text className='merchant-home-orders__end'>正在加载更多配送单…</Text> : null}
+          {pageErrorsByTab[activeTab] ? <DeliveryOrderState kind='error' compact title='更多订单暂未加载'
+            description={pageErrorsByTab[activeTab]} actionLabel='重试加载' onAction={() => void loadMoreOrders()} /> : null}
+          {loadingMore ? <DeliveryOrderLoading compact label='正在加载更多订单' /> : null}
           {!loading && !loadingMore && !loadError && ordersByTab[activeTab].length > 0 && ordersByTab[activeTab].length >= ordersTotalByTab[activeTab] ? (
             <Text className='merchant-home-orders__end'>— 已显示全部配送单 —</Text>
           ) : null}
         </View>
-      </ScrollView>
+      </RefreshScrollView>
 
       <DeliveryWorkspaceNav role='merchant' active='orders' />
 

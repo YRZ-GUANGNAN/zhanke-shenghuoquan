@@ -19,7 +19,7 @@ for (const fragment of [
   "useIdentityGuard('merchant')",
   "getIdentityApplication('merchant')",
   'merchant-home-metrics',
-  'merchant-home-shortcuts',
+  'merchant-home-publish',
   'merchant-home-tabs',
   'merchant-order-card',
   'onScrollToLower={() => void loadMoreOrders()}',
@@ -75,9 +75,9 @@ for (const [name, source] of [['merchant', merchant], ['rider', rider]]) {
   assert.doesNotMatch(source, /mock(?:Orders?|Data)|fake(?:Orders?|Data)|demo(?:Orders?|Data)/i, `${name} workbench must not introduce fabricated records`)
 }
 
-assert.match(merchantStyle, /grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/, 'merchant metrics must keep three balanced columns')
-assert.match(merchantStyle, /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/, 'merchant shortcuts must keep a compact two-column grid')
-assert.match(riderStyle, /grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/, 'rider tabs must keep three balanced columns')
+assert.match(merchantStyle, /\.merchant-home-tabs\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/, '商家保留三个真实订单分组')
+assert.match(merchantStyle, /\.merchant-home-order-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/, '商家订单使用双列队列')
+assert.match(riderStyle, /\.rider-grab-tabs\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/, '骑手配送视图显示取货和送达两个阶段')
 assert.doesNotMatch(merchantStyle, /merchant-home-hero__orb/, 'merchant workbench must not use decorative hero orbs')
 assert.doesNotMatch(riderStyle, /rider-grab-hero__orb/, 'rider workbench must not use decorative hero orbs')
 assert.match(riderWallet, /骑手结算功能尚未开放/, 'rider wallet must expose an honest unavailable state until a real API exists')

@@ -100,8 +100,8 @@ function hookRenderer() {
   return { React, render, flush, unmount, setComponent(value) { component = value }, get tree() { return tree } }
 }
 
-function loadPage(relativePath, imports, renderer) {
-  const filename = path.join(root, 'apps/miniapp/src/pages', relativePath, 'index.tsx')
+function loadSource(relativePath, imports, renderer) {
+  const filename = path.join(root, 'apps/miniapp/src', relativePath)
   const compiled = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React, target: ts.ScriptTarget.ES2020, esModuleInterop: true },
     fileName: filename,
@@ -113,8 +113,20 @@ function loadPage(relativePath, imports, renderer) {
     return id === 'react' ? renderer.React : imports[id]
   }
   loaded._compile(compiled, filename)
-  renderer.setComponent(loaded.exports.default)
   return loaded.exports
+}
+
+function loadPage(relativePath, imports, renderer) {
+  const exports = loadSource(`pages/${relativePath}/index.tsx`, imports, renderer)
+  renderer.setComponent(exports.default)
+  return exports
+}
+
+function feedbackComponents(renderer) {
+  return loadSource('components/delivery-order-feedback.tsx', {
+    '@tarojs/components': { View: 'View', Text: 'Text' },
+    './delivery-order-feedback.scss': {},
+  }, renderer)
 }
 
 function riderHarness(overrides = {}) {
@@ -181,6 +193,8 @@ function riderHarness(overrides = {}) {
     },
     '../../components/capsule-page-header': { CapsuleSystemRow: 'CapsuleSystemRow' },
     '../../components/delivery-workspace-nav': 'DeliveryWorkspaceNav',
+    '../../components/refresh-scroll-view': 'ScrollView',
+    '../../components/delivery-order-feedback': feedbackComponents(renderer),
     '../../components/ui': { AppDialog: 'AppDialog' },
     '../../hooks/use-identity-guard': { useIdentityGuard: () => identityAllowed, identityRoute: () => '' },
     '../../hooks/use-feature-visibility': { useFeatureVisibility: () => ({ delivery: true, rider: true }) },
@@ -214,7 +228,16 @@ function riderHarness(overrides = {}) {
     async setAccount(value) { accountId = value; render(); await flush() },
     async unmount() { renderer.unmount(); await flush() },
     async hide() { hide?.(); await flush() },
+    async show() { show?.(); await flush() },
+    scroll() { return nodes(renderer.tree, node => hasClass(node, 'rider-grab-content'))[0].props },
     async tab(label) {
+      const navigation = nodes(renderer.tree, (node) => node.type === 'DeliveryWorkspaceNav')[0]
+      if (label === '待抢单') {
+        navigation.props.onSelect('grab'); await flush(); return
+      }
+      if (navigation.props.active === 'grab') {
+        navigation.props.onSelect('tasks'); await flush()
+      }
       const tab = nodes(renderer.tree, (node) => hasClass(node, 'rider-grab-tabs__item') && text(node).startsWith(label))[0]
       assert.ok(tab, `${label} 标签应存在`)
       tab.props.onClick(); await flush()
@@ -258,6 +281,8 @@ function merchantHarness(kind, overrides = {}) {
     '../../components/ui/status-glyph': { StatusGlyph: 'StatusGlyph' },
     '../../components/IdentitySwitchModal': 'IdentitySwitchModal',
     '../../components/delivery-workspace-nav': 'DeliveryWorkspaceNav',
+    '../../components/refresh-scroll-view': 'ScrollView',
+    '../../components/delivery-order-feedback': feedbackComponents(renderer),
     '../../components/runtime-session-gate': 'RuntimeSessionGate',
     '../../feature-flags': { deliveryPaymentEnabled: true },
     '../../hooks/use-identity-guard': { useIdentityGuard: () => identityAllowed, identityRoute: () => '' },
@@ -338,7 +363,252 @@ function merchantHarness(kind, overrides = {}) {
   }
 }
 
+async function runRefreshFeedbackScenarios() {
+  {
+    let approved = true, reads = 0
+    const app = merchantHarness('merchant-home', {
+      getIdentityApplication: async () => ({ status: approved ? 'approved' : 'pending' }),
+      listMerchantDeliveryOrders: async (_, __, group) => { reads++; return { ...page(group === 'pending' ? [order('GUARDED')] : []), total: group === 'pending' ? 2 : 0 } },
+    })
+    await app.mount()
+    const scroll = app.one('merchant-home-orders').props
+    approved = false
+    assert.equal(await scroll.onRefresh(), false)
+    scroll.onScrollToLower()
+    assert.equal(reads, 3, '资格撤回后立即关闭读取，不等 React 下一次重绘')
+    await app.flush(); await app.unmount()
+    console.log('PASS 商家背景核验撤回资格时同步阻止迟到触底事件')
+  }
+  {
+    let approvalCalls = 0, rejectPending = false
+    const approval = deferred()
+    const app = merchantHarness('merchant-home', {
+      getIdentityApplication: () => ++approvalCalls === 2 ? approval.promise : Promise.resolve({ status: 'approved' }),
+      listMerchantDeliveryOrders: async (_, __, group) => {
+        if (rejectPending && group === 'pending') throw new Error('测试刷新网络失败')
+        return page(group === 'pending' ? [order('MERCHANT-KEPT')] : [])
+      },
+    })
+    await app.mount()
+    const scroll = app.one('merchant-home-orders').props
+    assert.equal(scroll.enabled, true)
+    assert.match(scroll.refreshKey, /merchant:101:pending/)
+    const refresh = scroll.onRefresh()
+    const duplicate = scroll.onRefresh()
+    app.one('delivery-order-toolbar__refresh').props.onClick()
+    await app.flush()
+    assert.equal(approvalCalls, 2, '同帧下拉和手动刷新只重新核验一次')
+    assert.equal(await duplicate, false)
+    assert.equal(app.serials().length, 1, '背景资格核验不卸载订单和原生下拉槽')
+    assert.equal(app.one('merchant-home-orders').props.busy, true)
+    rejectPending = true
+    approval.resolve({ status: 'approved' })
+    assert.equal(await refresh, false, '单个分组失败不能让下拉槽提示成功')
+    await app.flush()
+    assert.equal(app.serials().length, 1)
+    assert.match(text(app.tree), /配送单刷新失败/)
+    assert.equal(app.one('merchant-home-orders').props.busy, false)
+    rejectPending = false
+    assert.equal(await app.one('merchant-home-orders').props.onRefresh(), true)
+    await app.flush()
+    assert.doesNotMatch(text(app.tree), /测试刷新网络失败/)
+    await app.setAccount(202)
+    const before = approvalCalls
+    assert.equal(await scroll.onRefresh(), false)
+    assert.equal(approvalCalls, before, '旧账号下拉事件不能刷新当前商家')
+    await app.unmount()
+    console.log('PASS 商家原生刷新回调返回真实结果，防连拉/连点，背景核验保留列表，失败可恢复')
+  }
+  {
+    let approvals = 0, pages = 0
+    const next = deferred()
+    const app = merchantHarness('merchant-home', {
+      getIdentityApplication: async () => { approvals++; return { status: 'approved' } },
+      listMerchantDeliveryOrders: async (number, _, group) => {
+        if (number > 1) { pages++; return next.promise }
+        return { ...page(group === 'pending' ? [order('PAGE-ONE')] : []), total: group === 'pending' ? 2 : 0 }
+      },
+    })
+    await app.mount()
+    const scroll = app.one('merchant-home-orders').props
+    scroll.onScrollToLower()
+    assert.equal(await scroll.onRefresh(), false, '触底同帧发起的下拉不能中断分页')
+    await app.flush()
+    assert.equal(approvals, 1)
+    assert.equal(pages, 1)
+    next.reject(new Error('测试分页失败')); await app.flush()
+    assert.match(text(app.tree), /更多订单暂未加载/)
+    assert.equal(app.one('merchant-home-orders').props.busy, false)
+    await app.unmount()
+    console.log('PASS 商家分页期间不接管下拉，分页错误独立反馈且保留原页重试')
+  }
+  {
+    let reads = 0, writes = 0
+    const response = deferred()
+    const app = riderHarness({ services: {
+      listAssignedDeliveryOrders: async (_, __, group) => {
+        if (group !== 'pickup') return page([])
+        reads++
+        return reads === 2 ? response.promise : page([order('RIDER-KEPT')])
+      },
+      startToPickup: async value => { writes++; return value },
+    } })
+    await app.mount(); await app.tab('待取货')
+    const scroll = app.scroll()
+    const action = app.primary('RIDER-KEPT')
+    const refresh = scroll.onRefresh()
+    const duplicate = scroll.onRefresh()
+    nodes(app.tree, node => hasClass(node, 'rider-grab-refresh'))[0].props.onClick()
+    action.props.onClick()
+    await app.flush()
+    assert.equal(reads, 2)
+    assert.equal(writes, 0, '下拉刷新同帧不提交旧版本订单动作')
+    assert.equal(await duplicate, false)
+    assert.ok(app.card('RIDER-KEPT'), '等待期间保留当前卡片')
+    assert.equal(text(app.primary('RIDER-KEPT')), '同步中…', '刷新不能显示为接单或履约处理中')
+    assert.equal(app.scroll().busy, true)
+    response.resolve(page([order('RIDER-NEW')]))
+    assert.equal(await refresh, true)
+    await app.flush()
+    assert.ok(app.card('RIDER-NEW'))
+    assert.equal(app.scroll().busy, false)
+    await app.unmount()
+    assert.equal(await scroll.onRefresh(), false, '卸载后的旧下拉不能重新读取数据')
+    console.log('PASS 骑手下拉与按钮共同防重，等待保留卡片，保护旧版本写入，结束正确解锁')
+  }
+  {
+    let fail = false
+    const app = riderHarness({ services: {
+      listAssignedDeliveryOrders: async (_, __, group) => {
+        if (fail) throw new Error('测试弱网订单读取失败')
+        return page(group === 'pickup' ? [order('WEAK-NET-KEPT')] : [])
+      },
+    } })
+    await app.mount(); await app.tab('待取货')
+    fail = true
+    assert.equal(await app.scroll().onRefresh(), false)
+    await app.flush()
+    assert.ok(app.card('WEAK-NET-KEPT'))
+    assert.match(text(app.tree), /订单刷新失败/)
+    assert.equal(nodes(app.tree, node => hasClass(node, 'delivery-order-state--empty')).length, 0)
+    assert.equal(app.scroll().busy, false)
+    fail = false
+    assert.equal(await app.scroll().onRefresh(), true)
+    await app.flush()
+    assert.doesNotMatch(text(app.tree), /测试弱网订单读取失败/)
+    assert.ok(!app.toasts.some(toast => toast.icon === 'success'), '刷新成功不伪装成履约动作成功')
+    await app.unmount()
+    console.log('PASS 骑手刷新失败保留旧订单，空态与错误分离，重试恢复')
+  }
+  {
+    let pageReads = 0
+    const next = deferred()
+    const app = riderHarness({ services: {
+      listAssignedDeliveryOrders: async (number, _, group) => {
+        if (group !== 'pickup') return page([])
+        if (number > 1) { pageReads++; return pageReads === 1 ? next.promise : { ...page([order('PAGE-TWO')]), page: 2, total: 2 } }
+        return { ...page([order('PAGE-ONE')]), total: 2 }
+      },
+    } })
+    await app.mount(); await app.tab('待取货')
+    const scroll = app.scroll(), meCalls = app.meCalls
+    scroll.onScrollToLower(); scroll.onScrollToLower(); scroll.onScrollToLower()
+    assert.equal(await scroll.onRefresh(), false)
+    await app.flush()
+    assert.equal(pageReads, 1, '骑手同帧触底仅发一个分页请求')
+    assert.equal(app.meCalls, meCalls, '分页期间手势不重新同步身份')
+    next.reject(new Error('测试下一页读取失败')); await app.flush()
+    assert.match(text(app.tree), /更多订单暂未加载/)
+    await app.tab('待送达')
+    assert.doesNotMatch(text(app.tree), /测试下一页读取失败/, '失败文案不能串入另一个阶段')
+    await app.tab('待取货')
+    nodes(app.tree, node => node.props?.ariaLabel === '重试加载')[0].props.onClick()
+    await app.flush()
+    assert.equal(pageReads, 2)
+    assert.ok(app.card('PAGE-TWO'))
+    assert.equal(app.scroll().busy, false)
+    await app.setAccount(202)
+    const currentMeCalls = app.meCalls
+    assert.equal(await scroll.onRefresh(), false)
+    scroll.onScrollToLower(); await app.flush()
+    assert.equal(app.meCalls, currentMeCalls)
+    assert.equal(pageReads, 2, '旧账号触底事件不能读取新账号页')
+    await app.unmount()
+    console.log('PASS 骑手分页同步防重，与手势互斥，原页重试和错误按阶段隔离')
+  }
+  {
+    const photo = deferred()
+    const app = riderHarness({
+      services: { listAssignedDeliveryOrders: async (_, __, group) => page(group === 'pickup' ? [order('PROOF-WAIT', 'to_pickup')] : []) },
+      media: { chooseAndUploadImages: () => photo.promise },
+    })
+    await app.mount(); await app.tab('待取货')
+    const scroll = app.scroll(), reads = app.meCalls
+    app.primary('PROOF-WAIT').props.onClick()
+    assert.equal(await scroll.onRefresh(), false, '选择凭证即锁定手势入口，不等待重绘')
+    await app.hide(); await app.show()
+    assert.equal(app.meCalls, reads, '相册返回不能用 didShow 刷新打断原凭证链')
+    photo.resolve([]); await app.flush()
+    assert.equal(app.scroll().busy, false)
+    assert.equal(await app.scroll().onRefresh(), true)
+    await app.flush(); await app.unmount()
+    console.log('PASS 凭证选择和暂时隐藏阻止外部刷新，取消后恢复正常下拉')
+  }
+}
+
 async function run() {
+  await runRefreshFeedbackScenarios()
+  {
+    let reads = 0
+    const app = riderHarness({ services: {
+      listClaimableDeliveryOrders: async () => { reads++; return { ...page([order('GRAB', 'ready_for_claim')]), total: 61 } },
+      listAssignedDeliveryOrders: async (_, __, group) => {
+        reads++
+        return { ...page(group === 'pickup' ? [order('PICKUP', 'to_pickup')] : group === 'delivery' ? [order('DELIVERY', 'delivering')] : []), total: group === 'pickup' ? 52 : group === 'delivery' ? 3 : 9 }
+      },
+    } })
+    await app.mount()
+    assert.match(text(app.tree), /接单大厅/)
+    assert.match(text(nodes(app.tree, node => hasClass(node, 'rider-grab-task-summary'))), /61/)
+    assert.equal(nodes(app.tree, node => hasClass(node, 'rider-grab-tabs__item')).length, 0, '大厅不混入取送阶段')
+    assert.ok(app.card('GRAB'))
+    const loadedReads = reads
+    await app.tab('待取货')
+    assert.match(text(app.tree), /我的配送/)
+    assert.ok(app.card('PICKUP'))
+    assert.equal(app.card('GRAB'), undefined, '配送视图不显示可接订单')
+    assert.equal(nodes(app.tree, node => hasClass(node, 'rider-grab-tabs__item')).length, 2)
+    assert.match(text(nodes(app.tree, node => hasClass(node, 'rider-grab-task-summary'))), /55/, '进行中数量使用服务端总量')
+    await app.tab('待送达')
+    assert.ok(app.card('DELIVERY'))
+    assert.equal(text(app.primary('DELIVERY')), '确认送达')
+    await app.tab('待抢单')
+    assert.ok(app.card('GRAB'))
+    assert.equal(reads, loadedReads, '视图切换保留已加载队列，不重启业务请求')
+    assert.equal(app.navigations.length, 0, '骑手视图切换不叠加路由')
+    console.log('PASS 接单大厅与取送任务独立切换，保留真实总量、已加载数据和阶段动作')
+  }
+  {
+    const app = merchantHarness('merchant-home', { listMerchantDeliveryOrders: async (_, __, group) => page(
+      group === 'pending' ? [order('UNPAID', 'pending_fee_payment'), order('FAILED', 'payment_failed'), order('READY', 'ready_for_claim')]
+        : group === 'completed' ? [order('DONE', 'delivered'), order('CANCELLED', 'cancelled')] : [],
+    ) })
+    await app.mount()
+    const labels = nodes(app.tree, node => hasClass(node, 'merchant-home-tab__label')).map(text)
+    assert.deepEqual(labels, ['待处理', '配送中', '已结束'])
+    const openPending = nodes(app.tree, node => hasClass(node, 'merchant-order-button'))
+    assert.equal(openPending.length, 3)
+    openPending.forEach(button => button.props.onClick())
+    await app.flush()
+    assert.equal(app.navigations.length, 3, '每张待处理卡都能进入详情')
+    assert.match(text(app.tree), /待支付配送费/)
+    assert.match(text(app.tree), /支付失败/)
+    await app.tab('completed')
+    assert.equal(nodes(app.tree, node => hasClass(node, 'merchant-order-card')).length, 2)
+    assert.match(text(app.tree), /已完成/)
+    assert.match(text(app.tree), /已取消/)
+    console.log('PASS 商家分组文案覆盖待支付、支付失败与已取消订单，不改变服务分组')
+  }
   {
     let writes = 0, failReads = false
     const app = riderHarness({ services: {
@@ -745,7 +1015,7 @@ async function run() {
     })) })
     await app.mount()
     assert.deepEqual(['pending', 'delivering', 'completed'].map((key) => app.count(key)), ['—', '—', '—'])
-    assert.match(text(app.tree), /正在加载真实配送单/)
+    assert.match(text(app.tree), /正在加载订单/)
     response.resolve(); await app.flush()
     assert.deepEqual(['pending', 'delivering', 'completed'].map((key) => app.count(key)), ['62', '8', '120'], '数量使用服务端 total，不用当前页条数')
     const total = nodes(app.tree, (node) => hasClass(node, 'merchant-home-metric') && text(node).startsWith('累计单量'))[0]
@@ -767,7 +1037,7 @@ async function run() {
     assert.equal(app.serials().length, 2, '一个分组刷新失败保留已加载的多页订单')
     assert.equal(app.count('pending'), '10', '刷新失败保留已知 total')
     assert.match(text(app.tree), /配送单刷新失败/)
-    assert.equal(nodes(app.tree, (node) => hasClass(node, 'merchant-home-empty')).length, 0)
+    assert.equal(nodes(app.tree, (node) => hasClass(node, 'delivery-order-state--empty')).length, 0)
     await app.tab('delivering')
     assert.doesNotMatch(text(app.tree), /测试待接单网络失败/, '单组错误不得污染其他成功分组')
     await app.tab('pending')
@@ -803,7 +1073,7 @@ async function run() {
     await app.flush()
     assert.equal(orderReads, 3)
     assert.equal(walletReads, 1)
-    assert.match(text(app.tree), /暂无待接单配送单/)
+    assert.match(text(app.tree), /暂无待处理配送单/)
     await app.unmount()
     retry.props.onClick(); await app.flush()
     assert.equal(identityReads, 2, '卸载后旧重试事件不能发起资格核验')
