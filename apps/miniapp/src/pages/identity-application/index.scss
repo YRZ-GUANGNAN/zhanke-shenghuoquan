@@ -17,6 +17,7 @@
   .app-field__label { font-size: 14PX; font-weight: 550; }
   .app-field__control { min-height: 44PX; box-sizing: border-box; }
   .app-field__input, .app-field__textarea { font-size: 15PX; line-height: 1.6; }
+  .app-field__input { height: 44PX; min-height: 44PX; }
   .app-field__control--multiline { min-height: 92PX; }
   .app-field__textarea { min-height: 64PX; height: 64PX; }
   .app-field__message { font-size: 12PX; line-height: 1.6; }
@@ -25,7 +26,7 @@
   .app-state { min-height: 320PX; padding: 64rpx 24rpx; }
   .app-state__description { font-size: 14PX; line-height: 1.65; }
 }
-.identity-application-nav__back { display: flex; align-items: center; justify-content: center; flex: none; width: 44PX; height: 44PX; }
+.identity-application-nav__back { @include ref.touch; display: flex; align-items: center; justify-content: center; flex: none; width: 44PX; height: 44PX; }
 .identity-application-scroll { flex: 1; min-height: 0; height: 0; }
 .identity-application-content { padding: 24rpx 28rpx 40rpx; }
 .identity-application-card { margin-bottom: 24rpx; padding: 32rpx; border: 1rpx solid $divider-nav; border-radius: $radius-card; background: $bg-surface; box-sizing: border-box; }
