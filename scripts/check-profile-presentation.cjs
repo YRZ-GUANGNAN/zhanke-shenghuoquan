@@ -69,6 +69,7 @@ async function run() {
         if (id.endsWith('/feature-page-gate')) return { withFeaturePage: (pageComponent) => pageComponent }
         if (id.endsWith('/student-bottom-nav') || id.endsWith('/app-icon')) return { default: View }
         if (id.endsWith('/IdentitySwitchModal')) return { default: (props) => React.createElement(View, { ...props, className: 'test-identity-modal' }) }
+        if (id.endsWith('/IdentityApplicationEntryModal')) return { default: (props) => React.createElement(View, { ...props, className: 'test-application-modal' }) }
         if (id.endsWith('/capsule-page-header')) return { CapsuleSystemRow: View, default: (props) => React.createElement(View, { className: 'test-header' }, props.left, props.right) }
         if (id.endsWith('/use-viewport-refresh')) return { useViewportRefresh: () => ({}) }
         if (id.endsWith('/capsule-safe')) return { getCapsuleSafeStyle: () => ({}) }
@@ -194,6 +195,36 @@ async function run() {
     await profile.event(() => { profile.props('.test-identity-modal').onConfirm(); profile.props('.test-identity-modal').onConfirm() })
     assert.equal(switches.length, 1, '身份确认同步防重，不重复切换')
     await profile.event(() => switches[0].reject(new Error('isolated switch failure')))
+    await profile.event(() => profile.props('.test-identity-modal').onCancel())
+    for (const status of ['missing', 'pending', 'rejected']) {
+      profile.options.session.identity.identities[2] = { identity: 'merchant', available: false, status }
+      await profile.render()
+      await profile.event(() => profile.all('.student-profile-role')[2].onClick())
+      assert.equal(profile.props('.test-application-modal').role, 'merchant', `${status} 可进入申请摘要`)
+      await profile.event(() => profile.props('.test-application-modal').onCancel())
+    }
+    for (const status of ['disabled', 'suspended', 'resting']) {
+      profile.options.session.identity.identities[2] = { identity: 'merchant', available: false, status }
+      await profile.render()
+      await profile.event(() => profile.all('.student-profile-role')[2].onClick())
+      assert.equal(profile.container.querySelector('.test-application-modal'), null, `${status} 不绕过身份守卫`)
+    }
+    profile.options.session.identity.identities[2] = { identity: 'merchant', available: false, status: 'missing' }
+    profile.options.visibility.identity_application = false
+    await profile.render()
+    await profile.event(() => profile.all('.student-profile-role')[2].onClick())
+    assert.equal(profile.container.querySelector('.test-application-modal'), null, '申请功能关闭不展示申请弹窗')
+    profile.options.visibility.identity_application = true
+    await profile.render()
+    await profile.event(() => profile.all('.student-profile-role')[2].onClick())
+    let applicationNavigationFailed = false
+    await profile.event(() => { void profile.props('.test-application-modal').onContinue('merchant').catch(() => { applicationNavigationFailed = true }) })
+    assert.equal(navigations.at(-1).url, '/pages/identity-application/index?role=merchant')
+    await profile.event(() => navigations.at(-1).reject(new Error('isolated application navigation failure')))
+    assert.equal(applicationNavigationFailed, true, '导航错误传回弹窗，允许原位重试')
+    profile.options.session = { ...session(), token: 'isolated-account-c' }
+    await profile.render()
+    assert.equal(profile.container.querySelector('.test-application-modal'), null, '账号变化销毁旧申请弹窗')
 
     const requests = { favorites: [], posts: [], comments: [], items: [] }
     const fetchPage = (tab) => (page) => { const task = deferred(); requests[tab].push({ ...task, page }); return task.promise }
