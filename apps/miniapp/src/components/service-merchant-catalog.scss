@@ -1,0 +1,34 @@
+@use '../styles/design-tokens.scss' as *;
+.service-catalog { padding: 24rpx 32rpx 32rpx; border-bottom: 1PX solid $border-subtle; background: $bg-surface; }
+.service-catalog__heading { display: flex; align-items: baseline; justify-content: space-between; gap: 24rpx; margin-bottom: 20rpx; }
+.service-catalog__heading > text:first-child { font-size: 20PX; line-height: 1.4; font-weight: 650; overflow-wrap: anywhere; }
+.service-catalog__heading > text:last-child { font-size: 12PX; color: $text-secondary; flex-shrink: 0; }
+.service-catalog__shop, .service-catalog__dish { display: flex; gap: 24rpx; padding: 28rpx 0; border-bottom: 1PX solid $border-subtle; }
+.service-catalog__shop:last-child, .service-catalog__dish:last-child { border-bottom: 0; }
+.service-catalog__shop--pressed { opacity: .7; }
+.service-catalog__shop .app-icon { width: 20PX; height: 20PX; align-self: center; flex-shrink: 0; }
+.service-catalog__logo { width: 64PX; height: 64PX; flex: 0 0 64PX; border-radius: 12PX; background: $bg-surface-subtle; }
+.service-catalog--merchant .service-catalog__dish { display: flex; flex-direction: column; gap: 0; min-width: 0; padding: 0; overflow: hidden; border: 1PX solid $border-subtle; border-radius: 14PX; background: $bg-surface; }
+.service-catalog--merchant { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14rpx; }
+.service-catalog--merchant .service-catalog__heading,
+.service-catalog--merchant .service-catalog__description,
+.service-catalog--merchant .app-skeleton,
+.service-catalog--merchant .app-state,
+.service-catalog--merchant .service-catalog__more { grid-column: 1 / -1; }
+.service-catalog__dish-image { width: 100%; height: 190rpx; flex: 0 0 auto; border-radius: 0; background: $bg-surface-subtle; }
+.service-catalog__dish-main, .service-catalog__shop-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.service-catalog--merchant .service-catalog__dish-main { padding: 14rpx; }
+.service-catalog__name { display: block; overflow: hidden; font-size: 16PX; line-height: 1.5; font-weight: 600; overflow-wrap: anywhere; text-overflow: ellipsis; white-space: nowrap; }
+.service-catalog__description { display: block; font-size: 13PX; color: $text-secondary; line-height: 1.6; margin-top: 8rpx; overflow-wrap: anywhere; }
+.service-catalog--merchant .service-catalog__description { margin: 0 0 14rpx; }
+.service-catalog__hours { display: block; font-size: 11PX; color: $text-secondary; line-height: 1.5; margin-top: 8rpx; }
+.service-catalog__price { margin-top: auto; padding-top: 12rpx; font-size: 20PX; font-weight: 750; line-height: 1.25; color: $text-strong; font-variant-numeric: tabular-nums; }
+.service-catalog__currency { font-size: 12PX; margin-right: 4rpx; }
+.service-catalog__more { min-height: 48PX; display: flex; align-items: center; justify-content: center; font-size: 14PX; color: $brand-primary; }
+.service-catalog .cc-placeholder { display: flex; align-items: center; justify-content: center; font-size: 12PX; color: $text-secondary; }
+
+@media (max-width: 360px) {
+  .service-catalog--merchant { gap: 10rpx; }
+  .service-catalog__dish-image { height: 166rpx; }
+  .service-catalog--merchant .service-catalog__dish-main { padding: 12rpx; }
+}

@@ -949,6 +949,26 @@ td span {
 .takeout-timeline strong { margin-top: 5px; color: #233046; font-size: 13px; }
 .takeout-form { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); align-items: end; gap: 14px; max-width: 920px; }
 
+/* Catalog settings and product rows: documented fields stay scannable without a card wall. */
+.takeout-console .takeout-tabs { border: 1px solid var(--color-border); border-radius: 10px; background: #f2f5f8; }
+.takeout-console .takeout-tabs button { min-height: 38px; border-radius: 7px; background: transparent; color: var(--color-text-secondary); font-weight: 650; }
+.takeout-console .takeout-tabs button.active { border-color: transparent; background: #fff; color: var(--color-text); box-shadow: 0 1px 4px rgba(23, 34, 51, .08); }
+.takeout-console .takeout-subtabs { border-bottom: 1px solid var(--color-border); }
+.takeout-console .takeout-subtabs button { border: 0; border-radius: 0; background: transparent; color: var(--color-text-secondary); }
+.takeout-console .takeout-subtabs button.active { border-bottom: 2px solid #356f9f; background: transparent; color: var(--color-text); }
+.takeout-console .takeout-panel { border: 1px solid var(--color-border); border-radius: 10px; background: #fff; }
+.takeout-console .takeout-header { padding-bottom: 14px; border-bottom: 1px solid var(--color-border); }
+.takeout-console .takeout-header h2 { font-size: 16px; letter-spacing: -.01em; }
+.takeout-console .takeout-controls { padding: 12px; border: 1px solid #e6ebf0; border-radius: 8px; background: #fafbfd; }
+.takeout-console .takeout-controls label { font-weight: 650; }
+.takeout-console .takeout-controls input,
+.takeout-console .takeout-controls select { background: #fff; }
+.takeout-console .takeout-badge { border: 1px solid transparent; border-radius: 6px; font-weight: 700; }
+.takeout-console .takeout-detail { border-radius: 10px; background: #fbfcfd; }
+.takeout-console .takeout-fact { border: 1px solid #e6ebf0; background: #fff; }
+.takeout-console .takeout-price-cell { color: #b84b3d; font-variant-numeric: tabular-nums; font-weight: 750; }
+.takeout-console .takeout-price-cell span { color: var(--color-text-muted); font-weight: 500; }
+
 .content-takedown-button { padding: 8px 12px; border: 0; border-radius: 7px; background: #fff1f1; color: #c2410c; font-weight: 700; }
 .content-takedown-button:disabled { cursor: not-allowed; opacity: .55; }
 .content-takedown-error { margin-bottom: 14px; padding: 11px 13px; border-radius: 7px; background: #fff1f1; color: #c2410c; font-weight: 700; }
