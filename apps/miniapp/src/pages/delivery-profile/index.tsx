@@ -82,7 +82,13 @@ function DeliveryProfileContent() {
     <ScrollView scrollY enhanced showScrollbar={false} className='delivery-profile__scroll'>
       <View className='delivery-profile__identity'>
         <View className='delivery-profile__avatar'><Text>{name.slice(0, 1)}</Text></View>
-        <View className='delivery-profile__name'><Text>{name}</Text><Text className='delivery-profile__caption'>{roleName}工作区</Text></View>
+        <View className='delivery-profile__name'><Text className='delivery-profile__role'>{roleName}工作区</Text><Text>{name}</Text><Text className='delivery-profile__caption'>{role === 'merchant' ? '管理店铺资料与配送资金' : '管理骑手资料与配送身份'}</Text></View>
+      </View>
+      <View className='delivery-profile__section delivery-profile__section--funds'>
+        <Text className='delivery-profile__heading'>{role === 'merchant' ? '配送资金' : '配送收入'}</Text>
+        {role === 'merchant' ? <View className='delivery-profile__link' ariaRole='button' ariaLabel='查看商家钱包与账单' onClick={() => open('/pages/merchant-wallet/index')}>
+          <AppIcon name='wallet' /><View className='delivery-profile__link-copy'><Text>钱包与账单</Text><Text className='delivery-profile__caption'>{deliveryPaymentEnabled ? '查看真实余额、配送支出与充值记录' : '支付功能未开通，查看资金说明'}</Text></View><AppIcon name='chevron-right' />
+        </View> : <Text className='delivery-profile__caption'>配送收入以后端结算记录为准，当前未开放骑手端余额查询与提现。</Text>}
       </View>
       <View className='delivery-profile__section'>
         <Text className='delivery-profile__heading'>{roleName}资料</Text>
@@ -92,12 +98,6 @@ function DeliveryProfileContent() {
           <View className='delivery-profile__fact'><Text>联系电话</Text><Text>{application.phone || '未填写'}</Text></View>
           {role === 'merchant' ? <View className='delivery-profile__fact'><Text>取货地址</Text><Text>{application.merchantAddress || '未填写'}</Text></View> : null}
         </>}
-      </View>
-      <View className='delivery-profile__section'>
-        <Text className='delivery-profile__heading'>{role === 'merchant' ? '配送资金' : '配送收入'}</Text>
-        {role === 'merchant' ? <View className='delivery-profile__link' ariaRole='button' ariaLabel='查看商家钱包与账单' onClick={() => open('/pages/merchant-wallet/index')}>
-          <AppIcon name='wallet' /><View className='delivery-profile__link-copy'><Text>钱包与账单</Text><Text className='delivery-profile__caption'>{deliveryPaymentEnabled ? '查看真实余额、配送支出与充值记录' : '支付功能未开通，查看资金说明'}</Text></View><AppIcon name='chevron-right' />
-        </View> : <Text className='delivery-profile__caption'>配送收入以后端结算记录为准，当前未开放骑手端余额查询与提现。</Text>}
       </View>
       <View className='delivery-profile__section'>
         <Text className='delivery-profile__heading'>账号与身份</Text>

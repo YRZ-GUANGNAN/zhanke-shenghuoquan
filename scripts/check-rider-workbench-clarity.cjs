@@ -43,8 +43,9 @@ assert.doesNotMatch(source, /rider-grab-list-head/)
 
 assert.match(style, /\.rider-grab-task-summary\s*\{/)
 assert.match(style, /\.rider-grab-refresh\s*\{/)
-assert.match(style, /\.rider-grab-tabs\s*\{[\s\S]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/)
-assert.match(style, /\.rider-empty-state\s*\{/)
+assert.match(style, /\.rider-grab-tabs\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/)
+assert.match(source, /activeTab !== 'grab' \? <View className='rider-grab-tabs'>/)
+assert.match(style, /\.rider-empty-state\s*(?:,\s*\.rider-grab-placeholder\s*)?\{/)
 assert.match(style, /@keyframes\s+rider-refresh-spin/)
 assert.doesNotMatch(
   style.match(/\.rider-grab-content\s*\{[^}]*\}/)?.[0] || '',

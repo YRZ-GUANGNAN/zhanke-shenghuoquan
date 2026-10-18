@@ -44,7 +44,7 @@ for (const token of [
   'RiderWorkbenchIcon',
   "className='rider-grab-task-summary'",
   "className='rider-empty-state'",
-  "label: '待抢单'",
+  "'接单大厅'",
   "label: '待取货'",
   "label: '待送达'",
   'claimDeliveryOrder(order)',

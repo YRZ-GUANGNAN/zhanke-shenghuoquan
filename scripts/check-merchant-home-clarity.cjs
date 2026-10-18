@@ -26,15 +26,16 @@ for (const [icon, binding] of icons) {
 }
 
 assert.match(source, /MerchantHomeIcon/)
-assert.match(source, /icon:\s*'publish'/)
-assert.match(source, /icon:\s*'wallet'/)
-assert.match(source, /icon:\s*'bill'/)
-assert.match(source, /icon:\s*'message'/)
+assert.match(source, /name='publish'/)
+assert.match(source, /name='message'/)
+assert.match(source, /visibility\.delivery && visibility\.merchant/)
+assert.match(source, /key: 'pending', label: '待处理'/)
+assert.match(source, /key: 'completed', label: '已结束'/)
 assert.match(source, /name='empty'/)
 assert.doesNotMatch(source, /icon:\s*['"](?:\+|¥|楼|账|聊)['"]/)
 assert.match(
   style,
-  /\.merchant-home-shortcuts[\s\S]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/,
+  /\.merchant-home-order-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/,
 )
 assert.match(
   style,

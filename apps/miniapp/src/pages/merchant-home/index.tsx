@@ -19,7 +19,7 @@ import { getDeliveryWallet } from '../../services/delivery-payment'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
 import { deliveryPickupLabel, deliverySourceLabel } from '../../utils/delivery-order-source'
-import MerchantHomeIcon, { type MerchantHomeIconName } from './merchant-home-icon'
+import MerchantHomeIcon from './merchant-home-icon'
 import './index.scss'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
@@ -67,22 +67,9 @@ async function settle<T>(promise: Promise<T>): Promise<Settled<T>> {
 }
 
 const tabCopy: Array<{ key: MerchantTabKey; label: string }> = [
-  { key: 'pending', label: '待接单' },
+  { key: 'pending', label: '待处理' },
   { key: 'delivering', label: '配送中' },
-  { key: 'completed', label: '已完成' },
-]
-
-const shortcutCopy: Array<{
-  key: string
-  label: string
-  description: string
-  icon: MerchantHomeIconName
-  url: string
-}> = [
-  { key: 'publish', label: '发布配送单', description: '创建新的校内配送', icon: 'publish', url: '/pages/merchant-publish/index' },
-  { key: 'wallet', label: '钱包', description: '查看余额与充值', icon: 'wallet', url: '/pages/merchant-wallet/index' },
-  { key: 'bill', label: '账单', description: '核对资金流水', icon: 'bill', url: '/pages/merchant-wallet/index' },
-  { key: 'message', label: '消息', description: '联系正在配送的骑手', icon: 'message', url: '/pages/merchant-messages/index' },
+  { key: 'completed', label: '已结束' },
 ]
 
 const statusCopy: Record<DeliveryStatus, string> = {
@@ -140,7 +127,6 @@ function OrderCard({ order }: { order: MerchantDeliveryOrder }) {
         <Text className={`merchant-order-card__status merchant-order-card__status--${tone}`}>
           {statusCopy[order.status]}
         </Text>
-        <Text className='merchant-order-card__time'>{formatTime(order.createdAt)}</Text>
       </View>
 
       <View className='merchant-order-route'>
@@ -164,6 +150,7 @@ function OrderCard({ order }: { order: MerchantDeliveryOrder }) {
       </View> : null}
 
       <View className='merchant-order-card__footer'>
+        <Text className='merchant-order-card__time'>{formatTime(order.createdAt)} 下单</Text>
         <View className='merchant-order-fee'>
           <Text className='merchant-order-fee__label'>配送费</Text>
           <Text className='merchant-order-fee__amount'>¥{centsToYuan(order.deliveryFeeCents)}</Text>
@@ -443,14 +430,12 @@ function MerchantHomeContent() {
         <CapsuleSystemRow />
         <View className='merchant-home-header'>
           <View className='merchant-home-shop'>
-            <View className='merchant-home-shop__avatar'><Text>{shopName.slice(0, 1)}</Text></View>
             <View className='merchant-home-shop__main'>
+              <Text className='merchant-home-shop__eyebrow'>商家工作区</Text>
               <View className='merchant-home-shop__name-row'>
                 <Text className='merchant-home-shop__name'>{shopName}</Text>
-                <Text className='merchant-home-shop__badge'>已审核</Text>
               </View>
               <View className='merchant-home-shop__status'>
-                <View className='merchant-home-shop__green-dot' />
                 <Text>{shopAddress}</Text>
               </View>
             </View>
@@ -459,10 +444,22 @@ function MerchantHomeContent() {
             setSwitchIdentityError('')
             setShowStudentSwitch(true)
           }}>
-            <Text>⇄ 切换身份</Text>
+            <Text>切换身份</Text>
           </View>
         </View>
 
+        <View className='merchant-home-workspace-heading'>
+          <View className='merchant-home-workspace-heading__copy'>
+            <Text className='merchant-home-workspace-heading__title'>订单管理</Text>
+            <Text className='merchant-home-workspace-heading__caption'>从发单到送达，随时掌握进度</Text>
+          </View>
+          {visibility.delivery && visibility.merchant ? (
+            <View className='merchant-home-publish' ariaRole='button' ariaLabel='发布配送单' hoverClass='merchant-home-control--pressed'
+              onClick={() => void Taro.navigateTo({ url: '/pages/merchant-publish/index' })}>
+              <MerchantHomeIcon name='publish' className='merchant-home-publish__icon' /><Text>发单</Text>
+            </View>
+          ) : null}
+        </View>
         <View className='merchant-home-metrics'>
           <View className='merchant-home-metric merchant-home-metric--wallet'>
             <Text className='merchant-home-metric__label'>钱包余额</Text>
@@ -476,52 +473,10 @@ function MerchantHomeContent() {
               {allCountsLoaded ? totalOrderCount : '—'}
             </Text>
           </View>
-          <View className='merchant-home-metric'>
-            <Text className='merchant-home-metric__label'>配送中</Text>
-            <Text className={`merchant-home-metric__value${!loadedByTab.delivering ? ' merchant-home-metric__value--pending' : ''}`}>
-              {loadedByTab.delivering ? ordersTotalByTab.delivering : '—'}
-            </Text>
-          </View>
         </View>
       </View>
 
-      <View className='merchant-home-tools'>
-        {(!visibility.delivery || !visibility.merchant) && <View className='merchant-home-section-head'><Text>新业务暂未开放，以下仅供处理已有订单与资金。</Text></View>}
-        <View className={`merchant-home-shortcuts${visibility.delivery && visibility.merchant ? '' : ' merchant-home-shortcuts--existing-only'}`}>
-          {shortcutCopy.filter(item => item.key === 'publish' && visibility.delivery && visibility.merchant).map((item) => (
-            <View
-              key={item.key}
-              className={`merchant-home-shortcut merchant-home-shortcut--${item.key}`}
-              ariaRole='button'
-              ariaLabel={`${item.label}，${item.description}`}
-              hoverClass='merchant-home-control--pressed'
-              onClick={() => void Taro.navigateTo({ url: item.url })}
-            >
-              <View className='merchant-home-shortcut__icon'>
-                <MerchantHomeIcon name={item.icon} />
-              </View>
-              <View className='merchant-home-shortcut__copy'>
-                <Text className='merchant-home-shortcut__label'>{item.label}</Text>
-              </View>
-            </View>
-          ))}
-          <View className='merchant-home-shortcuts__secondary'>
-            {shortcutCopy.filter(item => item.key !== 'publish').map((item) => (
-              <View
-                key={item.key}
-                className={`merchant-home-shortcut merchant-home-shortcut--${item.key}`}
-                ariaRole='button'
-                ariaLabel={`${item.label}，${item.description}`}
-                hoverClass='merchant-home-control--pressed'
-                onClick={() => void Taro.navigateTo({ url: item.url })}
-              >
-                <MerchantHomeIcon name={item.icon} className='merchant-home-shortcut__aux-icon' />
-                <Text className='merchant-home-shortcut__label'>{item.label}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      </View>
+      {(!visibility.delivery || !visibility.merchant) && <View className='merchant-home-section-head'><Text>新业务暂未开放，可继续处理已有订单与资金。</Text></View>}
 
       <View className='merchant-home-tabs'>
         {tabCopy.map((tab) => (

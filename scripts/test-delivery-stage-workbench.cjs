@@ -215,6 +215,13 @@ function riderHarness(overrides = {}) {
     async unmount() { renderer.unmount(); await flush() },
     async hide() { hide?.(); await flush() },
     async tab(label) {
+      const navigation = nodes(renderer.tree, (node) => node.type === 'DeliveryWorkspaceNav')[0]
+      if (label === '待抢单') {
+        navigation.props.onSelect('grab'); await flush(); return
+      }
+      if (navigation.props.active === 'grab') {
+        navigation.props.onSelect('tasks'); await flush()
+      }
       const tab = nodes(renderer.tree, (node) => hasClass(node, 'rider-grab-tabs__item') && text(node).startsWith(label))[0]
       assert.ok(tab, `${label} 标签应存在`)
       tab.props.onClick(); await flush()
@@ -339,6 +346,57 @@ function merchantHarness(kind, overrides = {}) {
 }
 
 async function run() {
+  {
+    let reads = 0
+    const app = riderHarness({ services: {
+      listClaimableDeliveryOrders: async () => { reads++; return { ...page([order('GRAB', 'ready_for_claim')]), total: 61 } },
+      listAssignedDeliveryOrders: async (_, __, group) => {
+        reads++
+        return { ...page(group === 'pickup' ? [order('PICKUP', 'to_pickup')] : group === 'delivery' ? [order('DELIVERY', 'delivering')] : []), total: group === 'pickup' ? 52 : group === 'delivery' ? 3 : 9 }
+      },
+    } })
+    await app.mount()
+    assert.match(text(app.tree), /接单大厅/)
+    assert.match(text(nodes(app.tree, node => hasClass(node, 'rider-grab-task-summary'))), /61/)
+    assert.equal(nodes(app.tree, node => hasClass(node, 'rider-grab-tabs__item')).length, 0, '大厅不混入取送阶段')
+    assert.ok(app.card('GRAB'))
+    const loadedReads = reads
+    await app.tab('待取货')
+    assert.match(text(app.tree), /我的配送/)
+    assert.ok(app.card('PICKUP'))
+    assert.equal(app.card('GRAB'), undefined, '配送视图不显示可接订单')
+    assert.equal(nodes(app.tree, node => hasClass(node, 'rider-grab-tabs__item')).length, 2)
+    assert.match(text(nodes(app.tree, node => hasClass(node, 'rider-grab-task-summary'))), /55/, '进行中数量使用服务端总量')
+    await app.tab('待送达')
+    assert.ok(app.card('DELIVERY'))
+    assert.equal(text(app.primary('DELIVERY')), '确认送达')
+    await app.tab('待抢单')
+    assert.ok(app.card('GRAB'))
+    assert.equal(reads, loadedReads, '视图切换保留已加载队列，不重启业务请求')
+    assert.equal(app.navigations.length, 0, '骑手视图切换不叠加路由')
+    console.log('PASS 接单大厅与取送任务独立切换，保留真实总量、已加载数据和阶段动作')
+  }
+  {
+    const app = merchantHarness('merchant-home', { listMerchantDeliveryOrders: async (_, __, group) => page(
+      group === 'pending' ? [order('UNPAID', 'pending_fee_payment'), order('FAILED', 'payment_failed'), order('READY', 'ready_for_claim')]
+        : group === 'completed' ? [order('DONE', 'delivered'), order('CANCELLED', 'cancelled')] : [],
+    ) })
+    await app.mount()
+    const labels = nodes(app.tree, node => hasClass(node, 'merchant-home-tab__label')).map(text)
+    assert.deepEqual(labels, ['待处理', '配送中', '已结束'])
+    const openPending = nodes(app.tree, node => hasClass(node, 'merchant-order-button'))
+    assert.equal(openPending.length, 3)
+    openPending.forEach(button => button.props.onClick())
+    await app.flush()
+    assert.equal(app.navigations.length, 3, '每张待处理卡都能进入详情')
+    assert.match(text(app.tree), /待支付配送费/)
+    assert.match(text(app.tree), /支付失败/)
+    await app.tab('completed')
+    assert.equal(nodes(app.tree, node => hasClass(node, 'merchant-order-card')).length, 2)
+    assert.match(text(app.tree), /已完成/)
+    assert.match(text(app.tree), /已取消/)
+    console.log('PASS 商家分组文案覆盖待支付、支付失败与已取消订单，不改变服务分组')
+  }
   {
     let writes = 0, failReads = false
     const app = riderHarness({ services: {
@@ -803,7 +861,7 @@ async function run() {
     await app.flush()
     assert.equal(orderReads, 3)
     assert.equal(walletReads, 1)
-    assert.match(text(app.tree), /暂无待接单配送单/)
+    assert.match(text(app.tree), /暂无待处理配送单/)
     await app.unmount()
     retry.props.onClick(); await app.flush()
     assert.equal(identityReads, 2, '卸载后旧重试事件不能发起资格核验')

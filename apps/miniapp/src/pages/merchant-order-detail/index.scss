@@ -18,7 +18,7 @@ page {
   @include ref.page-foundation;
   height: 100vh;
   height: 100dvh;
-  background: $bg-surface;
+  background: $bg-app;
   color: $text-primary;
   overflow: hidden;
   display: flex;
@@ -55,7 +55,7 @@ page {
 }
 
 .merchant-detail-content {
-  padding: 0 32rpx calc(32rpx + env(safe-area-inset-bottom));
+  padding: 20rpx 24rpx calc(32rpx + env(safe-area-inset-bottom));
 }
 
 .merchant-detail-content--with-actions { padding-bottom: 32rpx; }
@@ -67,7 +67,7 @@ page {
   margin-bottom: 20rpx;
   border-radius: 16rpx;
   background: $bg-surface;
-  color: $text-tertiary;
+  color: $text-secondary;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -114,22 +114,32 @@ page {
 .merchant-detail-route-card,
 .merchant-detail-fee-card,
 .merchant-detail-progress-card,
-.merchant-detail-photo-card {
-  border-bottom: 1rpx solid $border-default;
+.merchant-detail-photo-card,
+.merchant-detail-record-card {
+  margin-bottom: 20rpx;
+  border: 1PX solid $border-default;
+  border-radius: 20rpx;
   background: $bg-surface;
   box-sizing: border-box;
-  padding: 28rpx 0;
+  padding: 24rpx 28rpx;
 }
 
 .merchant-detail-status-card {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-  align-items: start;
-  column-gap: 24rpx;
-  padding: 32rpx 0 28rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+  border-color: transparent;
+  background: $brand-tint;
+  padding: 32rpx 28rpx 24rpx;
 }
 
 .merchant-detail-order-identity {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+  align-items: center;
+  gap: 8rpx 24rpx;
+  border-top: 1PX solid rgba($brand-primary, .18);
+  padding-top: 20rpx;
   min-width: 0;
 }
 
@@ -142,15 +152,12 @@ page {
 
 .merchant-detail-order-identity__code {
   display: block;
-  margin-top: 6rpx;
-  color: $text-primary;
-  font-size: 68rpx;
-  font-size: clamp(28PX, 9.067vw, 40PX);
+  text-align: right;
+  color: $text-strong;
+  font-size: 36PX;
   line-height: 1.2;
   font-weight: 780;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -1rpx;
-  overflow-wrap: anywhere;
   word-break: break-all;
 }
 
@@ -169,18 +176,24 @@ page {
 
 .merchant-detail-order-identity__caption {
   @include ref.type(meta);
-  display: block;
-  margin-top: 10rpx;
-  color: $text-tertiary;
+  grid-column: 1 / -1;
+  color: $text-secondary;
 }
 
 .merchant-detail-status-card__main {
   min-width: 0;
-  padding-left: 24rpx;
-  border-left: 1rpx solid $border-subtle;
 }
 
-.merchant-detail-status-card__meta { grid-column: 1 / -1; }
+.merchant-detail-status-card__meta {
+  @include ref.type(meta);
+  @include ref.wrap;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+  margin-top: 16rpx;
+  color: $text-secondary;
+  font-variant-numeric: tabular-nums;
+}
 
 .merchant-detail-section-head {
   display: flex;
@@ -242,15 +255,16 @@ page {
 .merchant-detail-action-bar__contact {
   @include ref.touch;
   @include ref.type(label);
+  min-height: 48PX;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12rpx;
   flex: 0 0 auto;
   padding: 0 28rpx;
-  border-radius: 14rpx;
-  background: $detail-blue-soft;
-  color: $brand-primary-strong;
+  border-radius: 12rpx;
+  background: $brand-primary-strong;
+  color: $text-on-color;
   font-weight: 650;
 }
 .merchant-detail-photo-card__preview-error {
@@ -276,9 +290,8 @@ page {
 .merchant-detail-status-card__state {
   display: block;
   color: $brand-primary-strong;
-  font-size: 44rpx;
-  font-size: clamp(22PX, 5.867vw, 26PX);
-  font-weight: 700;
+  font-size: 28PX;
+  font-weight: 750;
   line-height: 1.3;
 }
 
@@ -336,7 +349,7 @@ page {
   align-items: flex-start;
   justify-content: space-between;
   gap: 8rpx;
-  color: $text-tertiary;
+  color: $text-secondary;
   font-variant-numeric: tabular-nums;
 }
 
@@ -377,11 +390,12 @@ page {
 }
 
 .merchant-detail-route__address {
-  @include ref.type(comment);
   @include ref.wrap;
   display: block;
-  color: $text-primary;
-  font-weight: 600;
+  color: $text-strong;
+  font-size: 16PX;
+  line-height: 1.5;
+  font-weight: 650;
 }
 
 .merchant-detail-route__contact {
@@ -413,6 +427,7 @@ page {
   width: 20PX;
   height: 20PX;
   flex: 0 0 20PX;
+  filter: brightness(0) invert(1);
 }
 
 .merchant-detail-section-title {
@@ -506,13 +521,13 @@ page {
 }
 
 .merchant-detail-timeline__title--todo {
-  color: $text-faint;
+  color: $text-secondary;
 }
 
 .merchant-detail-timeline__time {
   @include ref.type(meta);
   flex: 0 0 auto;
-  color: $text-tertiary;
+  color: $text-secondary;
 }
 
 .merchant-detail-timeline__note {
@@ -520,7 +535,7 @@ page {
   @include ref.wrap;
   display: block;
   margin-top: 10rpx;
-  color: $text-tertiary;
+  color: $text-secondary;
 }
 
 .merchant-detail-photo-card {
@@ -539,7 +554,7 @@ page {
   @include ref.type(meta);
   display: block;
   margin-top: 4rpx;
-  color: $text-tertiary;
+  color: $text-secondary;
 }
 
 .merchant-detail-photo-grid {
@@ -594,7 +609,7 @@ page {
 }
 
 .merchant-detail-photo-item__caption--pending {
-  color: $text-faint;
+  color: $text-secondary;
 }
 
 @media (max-width: 350PX) {

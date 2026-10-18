@@ -18,6 +18,7 @@ page {
 .merchant-publish-page {
   @include ref.page-foundation;
   height: 100vh;
+  height: 100dvh;
   background: $bg-app;
   color: $text-primary;
   overflow: hidden;
@@ -43,20 +44,22 @@ page {
 }
 
 .merchant-publish-intake-tabs {
-  margin: 16rpx 24rpx 0;
+  flex: 0 0 auto;
+  padding: 0 28rpx;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  border-bottom: 1rpx solid $divider-hairline;
+  background: $bg-surface;
+  border-bottom: 1PX solid $border-default;
 }
 
 .merchant-publish-intake-tab {
   @include ref.type(label);
-  min-height: 44PX;
+  min-height: 50PX;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: $text-tertiary;
-  border-bottom: 4rpx solid transparent;
+  color: $text-secondary;
+  border-bottom: 3PX solid transparent;
   box-sizing: border-box;
 }
 
@@ -69,18 +72,18 @@ page {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12rpx;
-  margin-bottom: 12rpx;
+  padding: 12rpx 0 24rpx;
 }
 
 .merchant-publish-source__option {
   @include ref.type(comment);
   min-height: 44PX;
-  padding: 8rpx 12rpx;
+  padding: 12rpx;
   display: flex;
   justify-content: center;
   align-items: center;
-  border: 1rpx solid $divider-hairline;
-  border-radius: 10rpx;
+  border: 1PX solid $border-default;
+  border-radius: 12rpx;
   box-sizing: border-box;
   color: $text-secondary;
 }
@@ -101,7 +104,7 @@ page {
   @include ref.type(meta);
   @include ref.wrap;
   display: block;
-  color: $text-tertiary;
+  color: $text-secondary;
   line-height: 1.6;
   margin: 8rpx 0 16rpx;
 }
@@ -121,38 +124,37 @@ page {
   gap: 16rpx;
   border-bottom: 1rpx solid $divider-hairline;
 }
-.merchant-publish-intake__status { color: $text-tertiary; flex-shrink: 0; }
+.merchant-publish-intake__status { color: $text-secondary; flex-shrink: 0; }
 .merchant-publish-intake__notice { margin-top: 24rpx; }
 
 .merchant-publish-card,
 .merchant-publish-fee-card,
 .merchant-publish-import-card {
-  margin: 16rpx 24rpx 0;
-  border-radius: 16rpx;
-  border: 1rpx solid $border-subtle;
+  margin: 20rpx 24rpx 0;
+  border-radius: 20rpx;
+  border: 1PX solid $border-default;
   background: $bg-surface;
   box-sizing: border-box;
 }
 
 .merchant-publish-import-card {
-  min-height: 120rpx;
-  padding: 16rpx 20rpx;
+  padding: 20rpx 24rpx;
   display: grid;
-  grid-template-columns: 48rpx minmax(0, 1fr);
+  grid-template-columns: 40PX minmax(0, 1fr);
   column-gap: 16rpx;
-  row-gap: 8rpx;
+  row-gap: 16rpx;
   align-items: center;
-  border-color: rgba($brand-primary, .18);
-  background: $bg-surface;
+  border-color: transparent;
+  background: $brand-tint;
 }
 
 .merchant-publish-import-card__icon {
-  width: 48rpx;
-  height: 48rpx;
-  padding: 10rpx;
+  width: 36PX;
+  height: 36PX;
+  padding: 8PX;
   box-sizing: border-box;
-  border-radius: 12rpx;
-  background: $publish-blue-soft;
+  border-radius: 10PX;
+  background: $bg-surface;
 }
 
 .merchant-publish-import-card__main,
@@ -171,14 +173,14 @@ page {
 
 .merchant-publish-import-card__title {
   color: $text-strong;
-  font-size: 27rpx;
-  font-weight: 850;
-  line-height: 1.25;
+  font-size: 15PX;
+  font-weight: 650;
+  line-height: 22PX;
 }
 
 .merchant-publish-import-card__description {
   margin-top: 8rpx;
-  color: $text-muted;
+  color: $text-secondary;
 }
 
 .merchant-publish-import-card__actions {
@@ -198,18 +200,19 @@ page {
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  font-weight: 750;
+  font-weight: 650;
 }
 
 .merchant-publish-import-card__secondary {
-  border: 1rpx solid rgba($brand-primary, .2);
-  color: $brand-primary;
-  background: $bg-surface;
+  border: 1PX solid rgba($brand-primary, .25);
+  color: $brand-primary-strong;
+  background: transparent;
 }
 
 .merchant-publish-import-card__primary {
-  color: $text-on-color;
-  background: $brand-primary;
+  color: $brand-primary-strong;
+  background: $bg-surface;
+  border: 1PX solid rgba($brand-primary, .25);
 }
 
 .merchant-publish-import-card__secondary:active,
@@ -218,55 +221,45 @@ page {
 }
 
 .merchant-publish-card {
-  padding: 24rpx 24rpx 8rpx;
+  padding: 28rpx 28rpx 16rpx;
 }
 
 .merchant-publish-section-head {
-  min-height: 42rpx;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12rpx 16rpx;
-  margin-bottom: 16rpx;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12rpx;
+  padding-bottom: 20rpx;
+  margin-bottom: 8rpx;
+  border-bottom: 1PX solid $border-subtle;
 }
 
 .merchant-publish-section-head__left {
   min-width: 0;
   display: flex;
   align-items: center;
+  gap: 14rpx;
 }
 
-.merchant-publish-dot {
-  width: 18rpx;
-  height: 18rpx;
-  flex: 0 0 18rpx;
-  border-radius: 999rpx;
-  margin-right: 14rpx;
-  box-shadow: 0 0 0 8rpx $publish-blue-soft;
+.merchant-publish-step {
+  display: flex; align-items: center; justify-content: center;
+  width: 28PX; height: 28PX; flex: 0 0 28PX;
+  border-radius: 8PX; background: $brand-tint; color: $brand-primary-strong;
+  font-size: 12PX; font-weight: 700; font-variant-numeric: tabular-nums;
 }
-
-.merchant-publish-dot--pickup {
-  background: $brand-primary;
-}
-
-.merchant-publish-dot--dropoff {
-  width: 18rpx;
-  height: 18rpx;
-  border-radius: 5rpx;
-  background: $publish-orange;
-  box-shadow: 0 0 0 8rpx $publish-orange-pale;
-}
+.merchant-publish-step--dropoff { background: $success-tint; color: $success; }
 
 .merchant-publish-section-head__title {
   @include ref.type(label);
   color: $text-strong;
+  font-size: 16PX;
+  font-weight: 650;
 }
 
 .merchant-publish-section-head__hint {
   @include ref.type(meta);
   @include ref.wrap;
-  color: $text-muted;
+  color: $text-secondary;
 }
 
 .merchant-publish-pill {
@@ -281,10 +274,10 @@ page {
 }
 
 .merchant-publish-field {
-  min-height: 44PX;
-  padding: 8rpx 0;
-  gap: 16rpx;
-  border-bottom: 1rpx solid $divider-hairline;
+  min-height: 52PX;
+  padding: 12rpx 0;
+  gap: 20rpx;
+  border-bottom: 1PX solid $border-subtle;
   display: flex;
   align-items: center;
 }
@@ -307,8 +300,8 @@ page {
   min-width: 0;
   flex: 1;
   color: $text-primary;
-  font-size: 28rpx;
-  line-height: 1.3;
+  font-size: 15PX;
+  line-height: 1.5;
   text-align: left;
 }
 
@@ -331,11 +324,12 @@ page {
 .merchant-publish-textarea {
   @include ref.type(comment);
   width: 100%;
-  min-height: 96rpx;
-  padding: 16rpx;
+  min-height: 76PX;
+  padding: 20rpx;
   box-sizing: border-box;
+  border: 1PX solid $border-default;
   border-radius: 12rpx;
-  background: $publish-blue-field;
+  background: $bg-app;
   color: $text-primary;
 }
 
@@ -365,7 +359,7 @@ page {
   @include ref.type(meta);
   @include ref.wrap;
   margin-top: 12rpx;
-  color: $text-muted;
+  color: $text-secondary;
 }
 
 .merchant-publish-fee-card__summary {
@@ -409,7 +403,7 @@ page {
   @include ref.type(label);
   padding: 16rpx 24rpx;
   border-radius: 16rpx;
-  background: $brand-primary;
+  background: $brand-primary-strong;
   color: $text-on-color;
   display: flex;
   align-items: center;
@@ -446,7 +440,7 @@ page {
   line-height: 1.5;
 }
 
-.merchant-publish-feedback__order { word-break: break-all; color: $text-tertiary; }
+.merchant-publish-feedback__order { word-break: break-all; color: $text-secondary; }
 .merchant-publish-feedback--success .merchant-publish-feedback__title { color: $brand-primary; }
 .merchant-publish-feedback--error .merchant-publish-feedback__title,
 .merchant-publish-feedback__error { color: $publish-orange; }
@@ -462,7 +456,7 @@ page {
 
 .merchant-publish-footer__button--disabled {
   background: $divider-nav;
-  color: $text-tertiary;
+  color: $text-secondary;
   box-shadow: none;
 }
 
@@ -505,7 +499,7 @@ page {
 
 .merchant-publish-import-preview__label {
   @include ref.type(meta);
-  color: $text-tertiary;
+  color: $text-secondary;
 }
 
 .merchant-publish-import-preview__value {
@@ -533,7 +527,7 @@ page {
 }
 
 .merchant-publish-import-preview__state--keep {
-  color: $text-tertiary;
+  color: $text-secondary;
   background: $bg-subtle;
 }
 
@@ -541,7 +535,7 @@ page {
   @include ref.type(meta);
   @include ref.wrap;
   display: block;
-  color: $text-muted;
+  color: $text-secondary;
 }
 
 .merchant-publish-payments { display: grid; gap: 18rpx; }
@@ -599,7 +593,7 @@ page {
   @include ref.type(meta);
   @include ref.wrap;
   margin-top: 13rpx;
-  color: $text-muted;
+  color: $text-secondary;
 }
 
 .merchant-publish-payment__radio {
@@ -628,8 +622,7 @@ page {
 @media (max-width: 340px) {
   .merchant-publish-card,
   .merchant-publish-fee-card,
-  .merchant-publish-import-card,
-  .merchant-publish-intake-tabs { margin-left: 16rpx; margin-right: 16rpx; }
+  .merchant-publish-import-card { margin-left: 16rpx; margin-right: 16rpx; }
 
   .merchant-publish-card { padding-left: 20rpx; padding-right: 20rpx; }
   .merchant-publish-fee-card { flex-wrap: wrap; }

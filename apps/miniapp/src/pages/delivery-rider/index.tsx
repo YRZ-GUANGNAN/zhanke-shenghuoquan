@@ -720,9 +720,7 @@ export default function DeliveryRiderPage() {
   }
 
   const rider = me.rider
-  const riderInitial = rider.realName.trim().slice(0, 1) || '骑'
   const tabs: Array<{ key: RiderTab; label: string; count: number }> = [
-    { key: 'grab', label: '待抢单', count: claimableTotal },
     { key: 'pickup', label: '待取货', count: pickupTotal },
     { key: 'delivery', label: '待送达', count: deliveryTotal }
   ]
@@ -738,39 +736,28 @@ export default function DeliveryRiderPage() {
         <CapsuleSystemRow className='rider-grab-system-row' />
 
         <View className='rider-grab-user'>
-          <View className='rider-grab-user__avatar'><Text>{riderInitial}</Text></View>
           <View className='rider-grab-user__main'>
             <View className='rider-grab-user__name-row'>
               <Text className='rider-grab-user__name'>{rider.realName || '校园骑手'}</Text>
-              <Text className='rider-grab-user__badge'>骑手</Text>
+              <Text className={`rider-grab-user__badge rider-grab-user__badge--${rider.status}`}>{riderStatusLabel(rider.status)}</Text>
             </View>
-            <Text className={`rider-grab-user__meta rider-grab-user__meta--${rider.status}`}>已认证 · {riderStatusLabel(rider.status)}</Text>
           </View>
-          <View className='rider-grab-user__switch' onClick={() => void switchToStudent()}>
+          <View className='rider-grab-user__switch' ariaRole='button' ariaLabel='切换身份' onClick={() => void switchToStudent()}>
             <Text>切换身份</Text>
           </View>
         </View>
 
         <View className='rider-grab-task-summary'>
           <View className='rider-grab-task-summary__primary'>
-            <Text className='rider-grab-task-summary__label'>当前配送任务</Text>
+            <Text className='rider-grab-task-summary__label'>{activeTab === 'grab' ? '接单大厅' : '我的配送'}</Text>
             <View className='rider-grab-task-summary__value-row'>
-              <Text className='rider-grab-task-summary__value'>{hasLoadedOrders ? activeTaskCount : '—'}</Text>
-              <Text className='rider-grab-task-summary__unit'>单</Text>
-            </View>
-          </View>
-          <View className='rider-grab-task-summary__stats'>
-            <View className='rider-grab-task-summary__stat'>
-              <Text className='rider-grab-task-summary__stat-value'>{hasLoadedOrders ? claimableTotal : '—'}</Text>
-              <Text className='rider-grab-task-summary__stat-label'>可抢</Text>
-            </View>
-            <View className='rider-grab-task-summary__stat'>
-              <Text className='rider-grab-task-summary__stat-value'>{hasLoadedOrders ? completedTotal : '—'}</Text>
-              <Text className='rider-grab-task-summary__stat-label'>已结束</Text>
+              <Text className='rider-grab-task-summary__value'>{hasLoadedOrders ? activeTab === 'grab' ? claimableTotal : activeTaskCount : '—'}</Text>
+              <Text className='rider-grab-task-summary__unit'>{activeTab === 'grab' ? '单可以接取' : '单正在进行'}</Text>
             </View>
           </View>
           <View
             className={`rider-grab-refresh ${loading ? 'rider-grab-refresh--loading' : ''}`}
+            ariaRole='button' ariaLabel='刷新配送订单'
             onClick={() => {
               if (!loading) void load()
             }}
@@ -782,20 +769,25 @@ export default function DeliveryRiderPage() {
             <Text>{loading ? '刷新中' : '刷新'}</Text>
           </View>
         </View>
+        <View className='rider-grab-context'>
+          <Text>{activeTab === 'grab' ? '核对取送路线，再选择接单' : '先取货，再送达，按阶段处理'}</Text>
+          <Text>已结束 {hasLoadedOrders ? completedTotal : '—'} 单</Text>
+        </View>
       </View>
 
-      <View className={`rider-grab-tabs ${canClaim ? '' : 'rider-grab-tabs--assigned-only'}`}>
-        {tabs.filter(item => item.key !== 'grab' || canClaim).map((item) => (
+      {activeTab !== 'grab' ? <View className='rider-grab-tabs'>
+        {tabs.map((item) => (
           <View
             key={item.key}
             className={`rider-grab-tabs__item ${activeTab === item.key ? 'rider-grab-tabs__item--active' : ''}`}
+            ariaRole='button' ariaLabel={`${item.label}${activeTab === item.key ? '，已选中' : ''}`}
             onClick={() => setActiveTab(item.key)}
           >
             <Text>{item.label}</Text>
             <Text className={`rider-grab-tabs__count rider-grab-tabs__count--${item.key}`}>{hasLoadedOrders ? item.count : '—'}</Text>
           </View>
         ))}
-      </View>
+      </View> : <View className='rider-grab-pool-heading'><Text>可接订单</Text><Text>接单后查看完整地址与联系方式</Text></View>}
 
       <ScrollView
         scrollY
