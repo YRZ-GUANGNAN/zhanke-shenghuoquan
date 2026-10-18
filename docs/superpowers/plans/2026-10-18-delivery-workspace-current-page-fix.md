@@ -17,7 +17,7 @@
 - Modify: `scripts/check-role-workbench-ui.cjs`
 - Test: `scripts/check-channel-pager.cjs`
 
-- [ ] 把商家入口顺序固定为 `orders,publish,messages,mine`，骑手入口顺序固定为 `grab,tasks,messages,mine`，过滤后仍由同一数组计算当前索引。
+- [ ] 把商家底部入口保留为 `orders,publish,messages,mine`，但只将 `orders,messages,mine` 放入手势索引；骑手手势入口保持 `grab,tasks,messages,mine`，过滤后仍由同一数组计算当前索引。
 - [ ] 保留 `select` 的路由锁和 `onSelect` 回调；手势使用同一个 `useHorizontalNavigation` 实例，边界不循环。
 - [ ] 增加静态断言，确保消息和我的仍在两种角色入口中，且没有重复身份切换入口或 `navigateToMiniProgram` 直连逻辑。
 - [ ] 运行 `node scripts/check-role-workbench-ui.cjs`，预期输出 `role workbench ui contract: ok`。
