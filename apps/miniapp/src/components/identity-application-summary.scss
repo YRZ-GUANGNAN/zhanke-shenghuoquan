@@ -1,0 +1,46 @@
+@use '../styles/design-tokens.scss' as *;
+
+.application-summary { min-width: 0; }
+.application-summary__top { display: flex; flex-wrap: wrap; align-items: center; gap: 20rpx; }
+.application-summary__role { display: flex; align-items: center; justify-content: center; flex: none; width: 48PX; height: 48PX; border-radius: $radius-control; background: $brand-tint; }
+.application-summary__role .app-icon { display: block; flex: none; width: 28PX; height: 28PX; }
+.application-summary__identity { flex: 1; min-width: 140rpx; }
+.application-summary__eyebrow { display: block; color: $text-secondary; font-size: 12PX; line-height: 1.5; }
+.application-summary__title { display: block; margin-top: 4rpx; color: $text-strong; font-size: 18PX; font-weight: 650; line-height: 1.45; overflow-wrap: anywhere; }
+.application-summary__description { display: block; margin-top: 24rpx; color: $text-secondary; font-size: 14PX; line-height: 1.65; overflow-wrap: anywhere; }
+.application-summary__benefit { display: block; margin-top: 12rpx; color: $text-secondary; font-size: 12PX; line-height: 1.65; }
+.application-summary__reference { display: flex; flex-wrap: wrap; gap: 8rpx 16rpx; margin-top: 24rpx; padding-top: 24rpx; border-top: 1rpx solid $divider-nav; font-size: 11PX; line-height: 1.6; }
+.application-summary__reference-label { flex: none; color: $text-secondary; }
+.application-summary__reference-id { min-width: 0; color: $text-primary; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; word-break: break-all; }
+.application-status { flex: none; max-width: 100%; padding: 6rpx 12rpx; border-radius: 8rpx; color: $text-secondary; background: $bg-surface-subtle; font-size: 11PX; font-weight: 600; line-height: 1.5; }
+.application-status--pending { color: $warning; background: $warning-tint; }
+.application-status--approved { color: $success; background: $success-tint; }
+.application-status--rejected { color: $danger; background: $danger-tint; }
+.application-status--new { color: $brand-primary-strong; background: $brand-tint; }
+.application-summary--compact .application-summary__title { font-size: 16PX; }
+.application-summary--compact .application-summary__role { width: 40PX; height: 40PX; }
+.application-summary--compact .application-summary__role .app-icon { width: 24PX; height: 24PX; }
+
+.application-timeline__heading { display: block; color: $text-strong; font-size: 15PX; font-weight: 650; line-height: 1.5; }
+.application-timeline__steps { margin-top: 24rpx; }
+.application-timeline__step { display: flex; gap: 16rpx; }
+.application-timeline__rail { position: relative; display: flex; justify-content: center; flex: none; width: 16PX; padding-top: 5PX; }
+.application-timeline__rail::after { position: absolute; top: 18PX; bottom: 0; left: calc(50% - .5PX); width: 1PX; content: ''; background: $border-default; }
+.application-timeline__dot { width: 10PX; height: 10PX; border: 2PX solid $brand-primary; border-radius: 50%; box-sizing: border-box; background: $bg-surface; }
+.application-timeline__dot--done { background: $brand-primary; }
+.application-timeline__dot--approved { background: $success; border-color: $success; }
+.application-timeline__dot--rejected { border-color: $danger; }
+.application-timeline__dot--pending { border-color: $warning; }
+.application-timeline__copy { min-width: 0; padding-bottom: 28rpx; }
+.application-timeline__title { display: block; font-size: 14PX; line-height: 1.5; color: $text-primary; }
+.application-timeline__time { display: block; margin-top: 6rpx; font-size: 12PX; line-height: 1.5; color: $text-secondary; font-variant-numeric: tabular-nums; }
+.application-timeline__step--last .application-timeline__rail::after { display: none; }
+.application-timeline__step--last .application-timeline__copy { padding-bottom: 0; }
+
+.application-activity { display: inline-flex; flex: none; align-items: center; justify-content: center; gap: 3PX; width: 24PX; height: 18PX; }
+.application-activity > view { width: 4PX; height: 4PX; border-radius: 50%; background: currentColor; animation: application-wait 900ms ease-in-out infinite; }
+.application-activity > view:nth-child(2) { animation-delay: 120ms; }
+.application-activity > view:nth-child(3) { animation-delay: 240ms; }
+@keyframes application-wait { 0%, 70%, 100% { opacity: .3; } 35% { opacity: 1; } }
+@media (max-width: 340px) { .application-summary__top { gap: 12rpx; } .application-summary__title { font-size: 16PX; } }
+@media (prefers-reduced-motion: reduce) { .application-activity > view { animation: none; opacity: .65; } }

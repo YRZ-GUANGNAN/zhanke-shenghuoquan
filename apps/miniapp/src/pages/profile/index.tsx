@@ -3,6 +3,7 @@ import { Image, Text, View } from '@tarojs/components'
 import { useDidShow } from '@tarojs/taro'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import IdentitySwitchModal from '../../components/IdentitySwitchModal'
+import IdentityApplicationEntryModal from '../../components/IdentityApplicationEntryModal'
 import AppIcon, { type AppIconName } from '../../components/app-icon'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import StudentBottomNav from '../../components/student-bottom-nav'
@@ -11,7 +12,7 @@ import Taro from '../../services/taro'
 import { getMyCommunitySummary } from '../../services/b-community'
 import { getMyProductsPage } from '../../services/c-trade'
 import { useSessionStore } from '../../stores/session'
-import type { IdentityAvailability, IdentityRoleKey } from '../../types'
+import type { IdentityApplicationRole, IdentityAvailability, IdentityRoleKey } from '../../types'
 import './index.scss'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
@@ -146,6 +147,7 @@ function ProfileContent() {
   const capsuleStyle = useViewportRefresh()
   const visibility = useFeatureVisibility()
   const [pendingRole, setPendingRole] = useState<RoleKey | null>(null)
+  const [applicationRole, setApplicationRole] = useState<IdentityApplicationRole | null>(null)
   const [switching, setSwitching] = useState(false)
   const [switchError, setSwitchError] = useState('')
   const [failedAvatar, setFailedAvatar] = useState('')
@@ -194,16 +196,17 @@ function ProfileContent() {
   }
 
   const handleRoleClick = (role: RoleOption) => {
-    if (roleSwitchLockRef.current || profileNavigationLockRef.current) return
+    if (roleSwitchLockRef.current || profileNavigationLockRef.current || applicationRole || pendingRole) return
     if (role.key === activeRole) {
       showPlaceholder(`当前为${role.title}身份`)
       return
     }
     const availability = identity?.identities.find((item) => item.identity === role.key)
     if (!availability?.available) {
-      if ((role.key === 'rider' || role.key === 'merchant') && availability?.status === 'missing') {
+      if ((role.key === 'rider' || role.key === 'merchant') &&
+        (availability?.status === 'missing' || availability?.status === 'pending' || availability?.status === 'rejected')) {
         if (!visibility.identity_application) { showPlaceholder('身份申请暂未开放'); return }
-        navigateProfile(`/pages/identity-application/index?role=${role.key}`)
+        setApplicationRole(role.key)
         return
       }
       showPlaceholder(unavailableMessage(availability))
@@ -211,6 +214,17 @@ function ProfileContent() {
     }
     setSwitchError('')
     setPendingRole(role.key)
+  }
+
+  const continueApplication = async (role: IdentityApplicationRole) => {
+    if (profileNavigationLockRef.current || roleSwitchLockRef.current) throw new Error('页面正在打开')
+    profileNavigationLockRef.current = true
+    try {
+      await Taro.navigateTo({ url: `/pages/identity-application/index?role=${role}` })
+    } catch (error) {
+      profileNavigationLockRef.current = false
+      throw error
+    }
   }
 
   const openProfileEditor = () => {
@@ -367,6 +381,9 @@ function ProfileContent() {
       </View>
 
       <StudentBottomNav active='profile' />
+
+      {applicationRole && <IdentityApplicationEntryModal key={applicationRole} role={applicationRole}
+        onCancel={() => setApplicationRole(null)} onContinue={continueApplication} />}
 
       <IdentitySwitchModal
         visible={Boolean(pendingRole)}

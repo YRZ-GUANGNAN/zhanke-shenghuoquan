@@ -21,9 +21,11 @@
 - `apps/miniapp/src/pages/profile/index.tsx`：只调整商家/骑手身份卡片的入口分流；
 - `apps/miniapp/src/components/IdentityApplicationEntryModal.tsx`；
 - `apps/miniapp/src/components/IdentityApplicationEntryModal.scss`；
+- `apps/miniapp/src/components/identity-application-summary.tsx` / `.scss`：申请专属状态展示；
 - `apps/miniapp/src/pages/identity-application/index.tsx`；
 - `apps/miniapp/src/pages/identity-application/index.scss`；
 - `scripts/check-identity-application-ui.cjs`；
+- `scripts/test-identity-application-ui.cjs`：真实组件的隔离行为回归；
 - `package.json`：只在已有 `verify` 中加入新的 UI 合同检查。
 
 不会修改后端、迁移、身份 API、媒体服务、共享设计 token、学生内容页面、学生底部导航、配送工作台和当前学生端进行中的工作树。当前实现使用独立工作树，构建产物和预览文件不写回主工作树。
@@ -60,7 +62,7 @@
 
 1. **身份状态头部**：角色图标、角色名称、状态徽标、申请编号和提交时间；
 2. **审核反馈区**：pending 显示等待说明，approved 显示开通说明，rejected 显示审核原因和审核时间，读取失败显示重试；
-3. **审核时间线**：提交、重新提交、审核完成事件按真实时间展示；没有事件时不虚构记录；
+3. **本次申请进度**：使用 `submittedAt` 与 `reviewedAt` 展示当前提交、等待审核或审核结果。用户接口没有历史事件列表，不展示推测的重新提交历史；
 4. **申请资料区**：姓名、手机号，商家额外显示商家名称和地址；pending/approved 只读，rejected/空申请可编辑；
 5. **证明材料区**：最多 6 张，2 列网格，上传中的图片显示处理中状态，失败显示可理解的原因；历史私有媒体使用锁定占位，禁止猜测或拼接预览 URL；
 6. **底部操作栏**：安全区感知的主按钮和次按钮，主按钮为“提交申请”或“重新提交申请”，审核中/通过时显示“返回我的”。
@@ -76,7 +78,7 @@
 - `rejected`：保留原资料和审核原因，可编辑并重新提交；
 - `error`：保留已加载的内容，显示页面内错误和重试动作；首次读取失败且无内容时使用统一错误状态。
 
-上传、提交和加载继续使用现有 `operationGenerationRef`、锁和取消恢复逻辑。失败时不清空用户输入；提交前仍逐个调用真实媒体状态接口，只允许 `approved` 资产进入现有 PUT 请求。所有异步回调在页面卸载、离开或新一轮操作开始后失效。
+上传、提交和加载继续使用现有 `operationGenerationRef`、锁和取消恢复逻辑。失败时不清空用户输入；提交前仍逐个调用真实媒体状态接口，按当前 `purpose === 'identity_application' && isMediaUsable(status)` 合同校验。材料上传完成可提交，申请仍由管理员人工核验，不恢复旧的微信图片审核阻塞逻辑。所有异步回调在页面卸载、离开、账号变化或新一轮操作开始后失效。
 
 ### 4. 视觉与响应式规则
 

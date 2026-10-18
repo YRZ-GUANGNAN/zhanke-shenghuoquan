@@ -1,0 +1,28 @@
+@use '../styles/design-tokens.scss' as *;
+
+.identity-application-entry {
+  .app-dialog-layer { padding: 32rpx; box-sizing: border-box; }
+  .app-dialog { width: 100%; max-width: 390PX; max-height: calc(100vh - 48PX); padding: 32rpx; border: 0; box-sizing: border-box; }
+  .app-dialog__title { text-align: left; font-size: 19PX; font-weight: 650; }
+  .app-dialog__content { margin-top: 28rpx; }
+  .app-dialog__actions { grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr); margin-top: 28rpx; }
+  .app-button { min-width: 0; min-height: 44PX; height: auto; padding: 12PX 8PX; font-size: 14PX; line-height: 1.4; box-shadow: none; }
+  .app-button__loading-dot { display: none; }
+  .app-dialog__error { font-size: 13PX; line-height: 1.5; text-align: left; }
+  .app-notice { margin-top: 24rpx; }
+  .app-notice__content { font-size: 13PX; line-height: 1.65; word-break: break-word; }
+  .app-skeleton { padding: 0; }
+  .app-skeleton__row { padding: 16rpx 0; }
+}
+.identity-application-entry__scroll { height: min(46vh, 290PX); }
+.identity-application-entry__waiting { display: flex; align-items: center; gap: 8rpx; padding: 24rpx 0; color: $text-secondary; font-size: 13PX; }
+.identity-application-entry__time { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8rpx 16rpx; margin-top: 16rpx; font-size: 12PX; line-height: 1.6; color: $text-secondary; font-variant-numeric: tabular-nums; }
+.identity-application-entry__checklist { margin-top: 24rpx; padding: 24rpx; border-radius: $radius-control; background: $bg-surface-subtle; }
+.identity-application-entry__checklist > text { display: block; color: $text-secondary; font-size: 13PX; line-height: 1.65; }
+.identity-application-entry__checklist > text:first-child { color: $text-primary; font-weight: 600; margin-bottom: 8rpx; }
+.identity-application-entry__unread { padding: 32rpx 0; color: $text-secondary; font-size: 14PX; line-height: 1.65; }
+.identity-application-entry__unread > text { display: block; margin-bottom: 16rpx; }
+.identity-application-entry__unread > text:first-child { color: $text-strong; font-weight: 600; }
+@media (prefers-reduced-motion: reduce) {
+  .identity-application-entry .app-dialog, .identity-application-entry .app-dialog-layer__mask { transition: none; }
+}
