@@ -81,6 +81,17 @@ func TestSafetyClientPreservesRiskySuggestion(t *testing.T) {
 
 var _ TextSafetyChecker = (*SafetyClient)(nil)
 
+func TestSafetyClientRequiresExplicitPass(t *testing.T) {
+	for _, body := range []string{`{}`, `{"errcode":0}`, `{"errcode":0,"result":{}}`, `{"errcode":0,"result":{"suggest":""}}`, `{"errcode":0,"result":{"suggest":"unknown"}}`} {
+		client := safetyClientForTest(tokenThen(func(*http.Request) (*http.Response, error) {
+			return safetyResponse(http.StatusOK, body), nil
+		}))
+		if got := client.CheckText(context.Background(), "openid-test", "text-test"); got != "manual:wechat_response_invalid" {
+			t.Fatalf("body=%s classified as %s", body, got)
+		}
+	}
+}
+
 func TestSafetyClientShortCircuitsUnsafeInputs(t *testing.T) {
 	calls := 0
 	transport := safetyRoundTripFunc(func(*http.Request) (*http.Response, error) {

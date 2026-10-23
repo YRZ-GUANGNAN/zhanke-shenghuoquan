@@ -31,13 +31,18 @@
   background: $brand-tint;
 }
 
-.app-icon-button:active {
+.app-icon-button:not(.app-icon-button--disabled):active {
   background: $bg-surface-subtle;
   transform: scale(.94);
 }
 
 .app-icon-button--disabled {
   opacity: .42;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-icon-button { transition: none; }
+  .app-icon-button:not(.app-icon-button--disabled):active { transform: none; }
 }
 
 .app-icon-button__icon {

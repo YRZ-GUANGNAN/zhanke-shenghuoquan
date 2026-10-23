@@ -1,0 +1,6 @@
+@use '../styles/design-tokens.scss' as *;
+.refresh-feedback { display: flex; align-items: center; justify-content: center; gap: 12rpx; width: 100%; height: 60PX; box-sizing: border-box; color: $text-secondary; font-size: 24rpx; line-height: 1.5; }
+.refresh-feedback .status-glyph { animation: none; transition: transform 200ms $ease-standard; }
+.refresh-feedback--ready .status-glyph { transform: rotate(180deg); }
+.refresh-feedback--success { color: $brand-primary-strong; }
+@media (prefers-reduced-motion: reduce) { .refresh-feedback .status-glyph { transition: none; } }

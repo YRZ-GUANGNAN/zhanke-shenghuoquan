@@ -14,6 +14,7 @@ type Credentials struct {
 }
 
 type ConversationContext struct {
+	ReferenceType  string `json:"referenceType"`
 	RelationID     uint   `json:"relationId"`
 	ConversationID string `json:"conversationId"`
 	PeerUserID     string `json:"peerUserId"`
@@ -63,6 +64,9 @@ func (s *Service) Credentials(ctx context.Context, userID uint) (Credentials, er
 func (s *Service) ensureIMUser(ctx context.Context, userID uint) (UserMapping, error) {
 	if userID == 0 {
 		return UserMapping{}, errors.New("invalid IM user")
+	}
+	if s.importer == nil {
+		return UserMapping{}, errors.New("Tencent IM is not configured")
 	}
 	mapping := UserMapping{UserID: userID, IMUserID: "campus_" + strconv.FormatUint(uint64(userID), 10)}
 	if err := s.importer.ImportAccount(ctx, mapping.IMUserID); err != nil {
@@ -189,9 +193,9 @@ func (s *Service) contextForParticipant(ctx context.Context, value Conversation,
 	return toContext(value, mapping.IMUserID), nil
 }
 
-func (s *Service) Conversations(ctx context.Context, userID uint, page, size int) (ConversationPage, error) {
+func (s *Service) Conversations(ctx context.Context, userID uint, page, size int, includeProducts ...bool) (ConversationPage, error) {
 	page, size = normalize(page, size)
-	values, total, err := s.repo.ListConversations(ctx, userID, page, size)
+	values, total, err := s.repo.ListConversations(ctx, userID, page, size, includeProducts...)
 	if err != nil {
 		return ConversationPage{}, err
 	}
@@ -207,9 +211,14 @@ func (s *Service) Conversations(ctx context.Context, userID uint, page, size int
 }
 
 func toContext(value Conversation, peerUserID string) ConversationContext {
+	productID := uint(0)
+	if value.ReferenceType == "product" {
+		productID = value.ReferenceID
+	}
 	return ConversationContext{
-		RelationID: value.ID, ConversationID: "C2C" + peerUserID, PeerUserID: peerUserID,
-		ProductID: value.ReferenceID, BuyerID: value.BuyerID, SellerID: value.SellerID,
+		ReferenceType: value.ReferenceType,
+		RelationID:    value.ID, ConversationID: "C2C" + peerUserID, PeerUserID: peerUserID,
+		ProductID: productID, BuyerID: value.BuyerID, SellerID: value.SellerID,
 	}
 }
 

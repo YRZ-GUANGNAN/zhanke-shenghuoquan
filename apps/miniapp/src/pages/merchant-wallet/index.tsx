@@ -3,7 +3,7 @@ import { ScrollView, Text, View } from '@tarojs/components'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import { AppActionSheet, AppButton, AppIconButton, AppNotice } from '../../components/ui'
-import { deliveryPaymentEnabled } from '../../feature-flags'
+import { useDeliveryPayment } from '../../hooks/use-delivery-payment'
 import { useIdentityGuard } from '../../hooks/use-identity-guard'
 import {
   getDeliveryWallet,
@@ -40,6 +40,7 @@ function entrySymbol(entryType: DeliveryLedgerEntryType) {
 }
 
 function MerchantWalletContent() {
+  const { enabled: deliveryPaymentEnabled } = useDeliveryPayment()
   const identityAllowed = useIdentityGuard('merchant')
   const [wallet, setWallet] = useState<DeliveryWallet | null>(null)
   const [ledger, setLedger] = useState<DeliveryWalletLedger[]>([])
@@ -67,11 +68,11 @@ function MerchantWalletContent() {
     } finally {
       setLoading(false)
     }
-  }, [identityAllowed, loading])
+  }, [identityAllowed, loading, deliveryPaymentEnabled])
 
   useEffect(() => {
     if (identityAllowed && deliveryPaymentEnabled) void loadWallet()
-  }, [identityAllowed]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [identityAllowed, deliveryPaymentEnabled]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const confirmRecharge = async () => {
     if (!deliveryPaymentEnabled || paying) return

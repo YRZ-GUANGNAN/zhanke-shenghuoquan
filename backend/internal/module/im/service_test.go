@@ -54,7 +54,7 @@ func (r *imMemoryRepo) FindConversationForParticipant(_ context.Context, relatio
 		return Conversation{}, false, r.conversationLookupErr
 	}
 	for _, value := range r.conversations {
-		if value.ID == relationID && value.ReferenceType == "product" && (value.BuyerID == userID || value.SellerID == userID) {
+		if value.ID == relationID && (value.ReferenceType == "product" || value.ReferenceType == "user") && (value.BuyerID == userID || value.SellerID == userID) {
 			return value, true, nil
 		}
 	}
@@ -74,10 +74,11 @@ func (r *imMemoryRepo) EnsureConversationStable(ctx context.Context, v *Conversa
 	r.conversations = append(r.conversations, *v)
 	return nil
 }
-func (r *imMemoryRepo) ListConversations(_ context.Context, userID uint, _, _ int) ([]Conversation, int64, error) {
+func (r *imMemoryRepo) ListConversations(_ context.Context, userID uint, _, _ int, includeProducts ...bool) ([]Conversation, int64, error) {
 	values := []Conversation{}
 	for _, v := range r.conversations {
-		if v.ReferenceType == "product" && (v.BuyerID == userID || v.SellerID == userID) {
+		allowedType := v.ReferenceType == "user" || v.ReferenceType == "product" && (len(includeProducts) == 0 || includeProducts[0])
+		if allowedType && (v.BuyerID == userID || v.SellerID == userID) {
 			values = append(values, v)
 		}
 	}

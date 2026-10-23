@@ -1,0 +1,25 @@
+@use '../styles/design-tokens.scss' as *;
+.tool-directory { padding: 32rpx 32rpx 48rpx; background: #FFF; }
+.tool-directory__heading { padding: 8rpx 0 40rpx; }
+.tool-directory__eyebrow, .tool-directory__title, .tool-directory__description, .tool-directory__footer { display: block; }
+.tool-directory__eyebrow { color: $brand-primary-strong; font-size: 24rpx; font-weight: 500; line-height: 1.5; }
+.tool-directory__title { margin-top: 12rpx; font-size: 44rpx; font-weight: 700; color: $text-strong; line-height: 1.3; }
+.tool-directory__description { margin-top: 16rpx; color: $text-secondary; font-size: 26rpx; line-height: 1.6; }
+.tool-directory__group + .tool-directory__group { margin-top: 32rpx; }
+.tool-directory__group-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 16rpx; padding: 8rpx 0 16rpx; font-size: 26rpx; font-weight: 600; color: $text-secondary; }
+.tool-directory__count { flex: 0 0 auto; color: $text-muted; font-size: 22rpx; font-weight: 400; }
+.tool-entry { display: flex; align-items: center; gap: 24rpx; min-height: 128rpx; padding: 24rpx 0; box-sizing: border-box; border-bottom: 1rpx solid #EDF0F4; transition: opacity 120ms, transform 160ms $ease-standard; }
+.tool-entry--pressed { opacity: .64; transform: translateX(4rpx); }
+.tool-entry__mark { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 80rpx; height: 80rpx; border-radius: 24rpx; background: $brand-tint; color: $brand-primary-strong; font-size: 28rpx; font-weight: 600; }
+.tool-entry__mark .app-icon { width: 40rpx; height: 40rpx; }
+.tool-entry__body { flex: 1; min-width: 0; }
+.tool-entry__title { display: block; overflow-wrap: anywhere; color: $text-strong; font-size: 30rpx; font-weight: 600; line-height: 1.45; }
+.tool-entry__description { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; margin-top: 8rpx; color: $text-secondary; font-size: 24rpx; line-height: 1.6; }
+.tool-entry__arrow { flex: 0 0 auto; width: 28rpx; height: 28rpx; opacity: .42; }
+.tool-directory__footer { padding-top: 32rpx; color: $text-muted; font-size: 22rpx; line-height: 1.7; text-align: center; }
+.tool-directory__retry { display: flex; align-items: center; min-height: 44PX; margin-top: 16rpx; color: $brand-primary-strong; font-size: 24rpx; line-height: 1.6; }
+.tool-directory--compact { padding: 16rpx 0 40rpx; }
+.tool-directory--compact .tool-directory__eyebrow { display: none; }
+.tool-directory--compact .tool-directory__title { font-size: 34rpx; }
+.tool-directory--compact .tool-directory__heading { padding-bottom: 24rpx; }
+@media (prefers-reduced-motion: reduce) { .tool-entry { transition: none; } .tool-entry--pressed { transform: none; } }

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"campus-circle/backend/internal/module/admin/review"
 	coremedia "campus-circle/backend/internal/module/media"
 	legacymedia "campus-circle/backend/internal/pkg/media"
 )
@@ -13,15 +14,48 @@ import (
 const communityAdapterAssetID = "01J00000000000000000000001"
 
 type communityBindingStub struct {
-	reserveInput  coremedia.BindingReserveInput
-	commitInput   coremedia.BindingCommitInput
-	ensureInput   coremedia.BindingCommitInput
-	reserveResult coremedia.BindingReservation
-	reserveErr    error
-	commitCalls   int
-	ensureCalls   int
-	cancelCalls   int
-	revokeCalls   int
+	reserveInput   coremedia.BindingReserveInput
+	commitInput    coremedia.BindingCommitInput
+	ensureInput    coremedia.BindingCommitInput
+	reserveResult  coremedia.BindingReservation
+	reserveErr     error
+	commitCalls    int
+	ensureCalls    int
+	cancelCalls    int
+	revokeCalls    int
+	publishCalls   int
+	publishPurpose coremedia.Purpose
+	publishID      string
+	publishErr     error
+}
+
+func (s *communityBindingStub) Publish(_ context.Context, purpose coremedia.Purpose, id string) error {
+	s.publishCalls++
+	s.publishPurpose, s.publishID = purpose, id
+	return s.publishErr
+}
+
+func TestApprovedPostPublishesImagesAndOtherStatusesDoNot(t *testing.T) {
+	for _, status := range []review.Status{review.StatusSubmitted, review.StatusReviewing, review.StatusApproved, review.StatusRejected} {
+		t.Run(string(status), func(t *testing.T) {
+			core := &communityBindingStub{}
+			gateway, _ := NewHybridMediaGateway(core, &communityLegacyMediaStub{}, "")
+			service := NewService(&communityMemoryRepo{}, nil, nil, gateway)
+			if err := (ReviewTarget{service, "post"}).SetReviewStatus(context.Background(), 23, status); err != nil {
+				t.Fatal(err)
+			}
+			want := 0
+			if status == review.StatusApproved {
+				want = 1
+			}
+			if core.publishCalls != want {
+				t.Fatalf("published=%d want=%d", core.publishCalls, want)
+			}
+			if want == 1 && (core.publishPurpose != coremedia.PurposePost || core.publishID != "23") {
+				t.Fatal("wrong post binding published")
+			}
+		})
+	}
 }
 
 func (s *communityBindingStub) Reserve(_ context.Context, input coremedia.BindingReserveInput) (coremedia.BindingReservation, error) {

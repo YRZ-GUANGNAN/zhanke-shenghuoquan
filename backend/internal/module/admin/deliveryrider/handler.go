@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
+	_ "time/tzdata" // Keep the business timezone available in the minimal runtime image.
 
 	"github.com/gin-gonic/gin"
 
@@ -17,15 +19,22 @@ import (
 
 type Handler struct {
 	service       *delivery.DispatchService
-	identity      *IdentityAdapter
+	identity      riderIdentity
 	users         *user.Service
 	currentUserID func(*gin.Context) uint64
 	proofs        proofCommands
 	conversations conversationCommands
+	todayStats    delivery.RiderTodayStatsReader
+	now           func() time.Time
 }
 
 type proofCommands interface {
 	AdvanceWithProof(context.Context, delivery.ProofTransitionInput) (delivery.Order, delivery.Proof, error)
+}
+
+type riderIdentity interface {
+	Find(context.Context, uint64) (takeout.Rider, error)
+	RegisterApproved(context.Context, uint64, string, string) (takeout.Rider, error)
 }
 
 type conversationCommands interface {
@@ -40,11 +49,32 @@ func NewHandler(
 	currentUserID func(*gin.Context) uint64,
 	proofs ...proofCommands,
 ) *Handler {
-	handler := &Handler{service: service, identity: identity, users: users, currentUserID: currentUserID}
+	var identityPort riderIdentity
+	if identity != nil {
+		identityPort = identity
+	}
+	handler := &Handler{service: service, identity: identityPort, users: users, currentUserID: currentUserID}
 	if len(proofs) > 0 {
 		handler.proofs = proofs[0]
 	}
+	handler.now = time.Now
 	return handler
+}
+
+// WithTodayStats adds the optional read-only daily summary without changing
+// the existing constructor or any of the order command dependencies.
+func (h *Handler) WithTodayStats(reader delivery.RiderTodayStatsReader) *Handler {
+	h.todayStats = reader
+	return h
+}
+
+// WithNow exists for deterministic business-day tests. Production keeps the
+// default time.Now clock.
+func (h *Handler) WithNow(now func() time.Time) *Handler {
+	if now != nil {
+		h.now = now
+	}
+	return h
 }
 
 func (h *Handler) WithConversationCommands(commands conversationCommands) *Handler {
@@ -54,6 +84,7 @@ func (h *Handler) WithConversationCommands(commands conversationCommands) *Handl
 
 func (h *Handler) Register(group *gin.RouterGroup) {
 	group.GET("/me", h.me)
+	group.GET("/stats/today", h.today)
 	group.GET("/orders/claimable", h.claimable)
 	group.POST("/orders/:id/claim", h.claim)
 	group.GET("/orders", h.list)
@@ -63,6 +94,55 @@ func (h *Handler) Register(group *gin.RouterGroup) {
 	group.PATCH("/orders/:id/delivering", h.delivering)
 	group.PATCH("/orders/:id/delivered", h.delivered)
 	group.PATCH("/orders/:id/release", h.release)
+}
+
+func (h *Handler) today(c *gin.Context) {
+	if h.todayStats == nil || h.identity == nil || h.currentUserID == nil {
+		response.Fail(c, http.StatusServiceUnavailable, "delivery rider statistics unavailable")
+		return
+	}
+	riderID := h.currentUserID(c)
+	if riderID == 0 {
+		response.Fail(c, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	rider, err := h.identity.Find(c.Request.Context(), riderID)
+	if errors.Is(err, takeout.ErrNotFound) {
+		h.write(c, nil, delivery.ErrRiderNotRegistered)
+		return
+	}
+	if err != nil {
+		h.write(c, nil, err)
+		return
+	}
+	// Resting riders may still read income already earned. This does not make
+	// them eligible to claim or advance orders, which retain RequireActive.
+	if rider.RiderUserID != riderID || rider.Status != takeout.RiderActive && rider.Status != takeout.RiderResting {
+		h.write(c, nil, delivery.ErrRiderUnavailable)
+		return
+	}
+	location, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, "delivery rider statistics unavailable")
+		return
+	}
+	now := h.now
+	if now == nil {
+		now = time.Now
+	}
+	localNow := now().In(location)
+	startLocal := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 0, 0, 0, 0, location)
+	endLocal := startLocal.AddDate(0, 0, 1)
+	value, err := h.todayStats.ReadRiderTodayStats(c.Request.Context(), riderID, startLocal.UTC(), endLocal.UTC())
+	if err != nil {
+		h.write(c, nil, err)
+		return
+	}
+	response.OK(c, TodayStatsView{
+		Date: startLocal.Format("2006-01-02"), Timezone: "Asia/Shanghai",
+		TodayOrders: value.TodayOrders, TodayIncomeCents: value.TodayIncomeCents,
+		Definition: "当天已完成并产生骑手收入记录的配送单",
+	})
 }
 
 func (h *Handler) RegisterAdmin(group *gin.RouterGroup) {

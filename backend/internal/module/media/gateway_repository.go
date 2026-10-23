@@ -20,6 +20,7 @@ const gatewaySnapshotSelect = `
 	a.byte_size AS byte_size,
 	a.width AS width,
 	a.height AS height,
+	a.duration_ms AS duration_ms,
 	(a.final_key IS NOT NULL AND a.final_key <> '' AND a.final_version_id IS NOT NULL AND a.final_version_id <> '') AS final_identity_ready,
 	(a.delete_requested_at IS NOT NULL OR a.deleted_at IS NOT NULL) AS delete_requested,
 	COALESCE(p.status, '') AS projection_status,

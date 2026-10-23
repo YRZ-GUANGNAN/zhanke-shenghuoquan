@@ -1,15 +1,20 @@
 @use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
 
 .my-content-page {
+  @include ref.page-foundation;
   height: 100vh;
   display: flex;
   flex-direction: column;
   padding-bottom: env(safe-area-inset-bottom);
-  background: $bg-app;
+  background: $bg-surface;
+  box-sizing: border-box;
   color: $text-strong;
+  overflow: hidden;
 }
 
 .my-content-header__back {
+  @include ref.touch;
   width: 88rpx;
   height: 88rpx;
   display: flex;
@@ -22,6 +27,8 @@
 
 .my-content-tabs {
   height: 88rpx;
+  min-height: 44PX;
+  flex: 0 0 auto;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   align-items: center;
@@ -30,14 +37,14 @@
 }
 
 .my-content-tab {
+  @include ref.type(label);
   position: relative;
   height: 88rpx;
+  min-height: 44PX;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: $text-muted;
-  font-size: 28rpx;
-  font-weight: 500;
+  color: $text-secondary;
   transition: color 160ms ease;
 }
 
@@ -51,8 +58,8 @@
   position: absolute;
   left: 50%;
   bottom: 0;
-  width: 44rpx;
-  height: 7rpx;
+  width: 40rpx;
+  height: 6rpx;
   border-radius: 999rpx;
   background: $brand-primary;
   transform: translateX(-50%);
@@ -60,40 +67,67 @@
 
 .my-content-body {
   box-sizing: border-box;
-  flex: 1 1 auto;
   min-height: 0;
-  padding: 18rpx 24rpx 64rpx;
+  height: 100%;
+  padding: 8rpx 32rpx 48rpx;
 }
 
 .my-content-load-more {
+  @include ref.type(meta);
+  @include ref.wrap;
   display: block;
   padding: 28rpx 0 10rpx;
   color: $text-muted;
-  font-size: 23rpx;
   text-align: center;
 }
 
 .my-content-load-more--retry {
+  min-height: 44PX;
+  box-sizing: border-box;
   color: $brand-primary;
+}
+
+.my-content-refresh {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8rpx;
+  min-height: 44PX;
+  color: $brand-primary-strong;
+  font-size: 24rpx;
+  line-height: 32rpx;
+  white-space: nowrap;
+}
+
+.my-content-refresh--retry:active {
+  opacity: .65;
+}
+
+.my-content-refresh--pending {
+  color: $text-secondary;
+  font-size: 22rpx;
+}
+
+.my-content-refresh__icon {
+  width: 28rpx;
+  height: 28rpx;
 }
 
 .my-content-list {
   display: flex;
   flex-direction: column;
-  gap: 16rpx;
+  gap: 0;
 }
 
 .my-content-row {
   min-height: 144rpx;
   display: flex;
   align-items: center;
-  gap: 16rpx;
-  padding: 18rpx;
+  gap: 24rpx;
+  padding: 24rpx 0;
   box-sizing: border-box;
-  border: 1rpx solid rgba(26, 55, 82, 0.04);
-  border-radius: 24rpx;
+  border-bottom: 1rpx solid $divider-nav;
   background: $bg-surface;
-  box-shadow: $shadow-card;
   transition: transform 120ms ease, background-color 120ms ease;
 }
 
@@ -105,10 +139,10 @@
 }
 
 .my-content-thumb {
-  width: 104rpx;
-  height: 104rpx;
+  width: 120rpx;
+  height: 120rpx;
   flex: none;
-  border-radius: 18rpx;
+  border-radius: 16rpx;
   overflow: hidden;
   background: $bg-screen;
 }
@@ -118,10 +152,12 @@
   align-items: center;
   justify-content: center;
   background-color: $bg-screen;
-  background-image: $placeholder-stripe;
-  color: $text-faint;
+  color: $text-secondary;
   font-size: 22rpx;
   font-weight: 500;
+  padding: 12rpx;
+  box-sizing: border-box;
+  text-align: center;
 }
 
 .my-content-row__main {
@@ -130,35 +166,28 @@
 }
 
 .my-content-row__title {
+  @include ref.type(label);
+  @include ref.wrap;
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   color: $text-strong;
-  font-size: 28rpx;
-  font-weight: 650;
-  line-height: 40rpx;
-  word-break: break-word;
+  font-weight: 600;
 }
 
 .my-content-row__meta {
+  @include ref.type(meta);
   display: block;
-  margin-top: 10rpx;
+  margin-top: 8rpx;
   overflow: hidden;
-  color: $text-muted;
-  font-size: 23rpx;
-  line-height: 32rpx;
+  color: $text-secondary;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .my-content-row__price {
-  display: block;
   margin-top: 8rpx;
-  color: $like-active;
-  font-size: 30rpx;
-  font-weight: 800;
-  line-height: 38rpx;
 }
 
 .my-content-row__tail {
@@ -196,25 +225,22 @@
 }
 
 .my-content-comment {
-  padding: 24rpx;
+  padding: 24rpx 0;
   box-sizing: border-box;
-  border: 1rpx solid rgba(26, 55, 82, 0.04);
-  border-radius: 24rpx;
+  border-bottom: 1rpx solid $divider-nav;
   background: $bg-surface;
-  box-shadow: $shadow-card;
   transition: transform 120ms ease, background-color 120ms ease;
 }
 
 .my-content-comment__content {
+  @include ref.type(comment);
+  @include ref.wrap;
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
   color: $text-strong;
-  font-size: 29rpx;
   font-weight: 600;
-  line-height: 43rpx;
-  word-break: break-word;
 }
 
 .my-content-comment__source {
@@ -225,21 +251,19 @@
 }
 
 .my-content-comment__source-title {
+  @include ref.type(meta);
   display: block;
   overflow: hidden;
   color: $text-muted;
-  font-size: 24rpx;
-  line-height: 34rpx;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .my-content-comment__meta {
+  @include ref.type(meta);
   display: block;
   margin-top: 4rpx;
   color: $text-faint;
-  font-size: 21rpx;
-  line-height: 30rpx;
 }
 
 .my-content-state {
@@ -252,38 +276,55 @@
   align-items: center;
   justify-content: center;
   background: $bg-surface;
-  box-shadow: $shadow-card;
   text-align: center;
 }
 
 .my-content-state__title {
+  @include ref.type(label);
+  @include ref.wrap;
   color: $text-strong;
-  font-size: 30rpx;
   font-weight: 700;
-  line-height: 42rpx;
 }
 
 .my-content-state__desc {
+  @include ref.type(meta);
+  @include ref.wrap;
   display: block;
   max-width: 560rpx;
   margin-top: 10rpx;
   color: $text-muted;
-  font-size: 24rpx;
-  line-height: 36rpx;
-  word-break: break-word;
 }
 
 .my-content-state__action {
+  @include ref.type(meta);
+  display: flex;
+  align-items: center;
+  min-height: 44PX;
+  box-sizing: border-box;
   margin-top: 24rpx;
   padding: 12rpx 24rpx;
   border-radius: 999rpx;
   background: $brand-tint;
   color: $brand-primary;
-  font-size: 24rpx;
   font-weight: 650;
-  line-height: 32rpx;
+}
+
+@media (max-width: 360px) {
+  .my-content-row { gap: 16rpx; }
+  .my-content-thumb { width: 104rpx; height: 104rpx; }
+  .my-content-row__tail { min-width: 0; }
+  .my-content-row__status { max-width: 96rpx; }
 }
 
 .my-content-state--retry {
   transition: transform 120ms ease, background-color 120ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .my-content-tab,
+  .my-content-row,
+  .my-content-comment,
+  .my-content-state--retry {
+    transition: none;
+  }
 }

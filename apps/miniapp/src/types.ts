@@ -51,9 +51,19 @@ export interface UserProfile {
   id: string
   nickname: string
   avatar: string
+  cover?: string
   school: string
   campus: string
   role?: 'user' | 'admin' | 'superadmin'
+}
+
+export interface PostMotion {
+  kind: 'video' | 'live_photo'
+  url: string
+  posterUrl: string
+  width: number
+  height: number
+  durationMs: number
 }
 
 export interface CommunityPost {
@@ -67,6 +77,7 @@ export interface CommunityPost {
   title: string
   content: string
   images: string[]
+  motion?: PostMotion
   likedCount: number
   commentCount: number
   favoriteCount: number
@@ -81,6 +92,18 @@ export interface CommunityComment {
   avatar: string
   content: string
   createdAt: string
+}
+
+export interface CommunityThreadComment extends CommunityComment {
+  authorId: string
+  parentCommentId: string
+  replyToCommentId: string
+  replyToUserId: string
+  replyToAuthor: string
+  reviewStatus: NonNullable<CommunityPost['reviewStatus']>
+  liked?: boolean
+  likedCount: number
+  replyCount: number
 }
 
 export interface CommunityNotification {
@@ -139,6 +162,8 @@ export interface Product {
 }
 
 export interface ToolLink {
+  categoryId?: string
+  categoryName?: string
   id: string
   title: string
   subtitle: string

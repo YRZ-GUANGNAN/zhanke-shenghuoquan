@@ -19,6 +19,7 @@ type GormStatusRepository struct{ db *gorm.DB }
 func NewStatusRepository(db *gorm.DB) *GormStatusRepository { return &GormStatusRepository{db: db} }
 
 type statusRow struct {
+	MIMEType        string                      `gorm:"column:verified_mime"`
 	AssetID         uint64                      `gorm:"column:asset_id"`
 	AssetPublicID   string                      `gorm:"column:asset_public_id"`
 	OwnerID         uint64                      `gorm:"column:owner_id"`
@@ -26,6 +27,7 @@ type statusRow struct {
 	StorageStage    coremedia.StorageStage      `gorm:"column:storage_stage"`
 	TechnicalStatus coremedia.TechnicalStatus   `gorm:"column:technical_status"`
 	AssetReview     coremedia.ReviewStatus      `gorm:"column:asset_review"`
+	DeleteRequested bool                        `gorm:"column:delete_requested"`
 	TicketStatus    coremedia.TicketStatus      `gorm:"column:ticket_status"`
 	TicketID        string                      `gorm:"column:ticket_id"`
 	Projection      *coremedia.ProjectionStatus `gorm:"column:projection_status"`
@@ -70,7 +72,8 @@ func (r *GormStatusRepository) ListStatus(ctx context.Context, ownerID uint64, p
 func statusQuery(db *gorm.DB) *gorm.DB {
 	return db.Table("media_assets AS a").
 		Select(`a.id AS asset_id, a.asset_public_id, a.owner_id, a.purpose, a.storage_stage,
-			a.technical_status, a.review_status AS asset_review, a.updated_at,
+			(a.delete_requested_at IS NOT NULL OR a.deleted_at IS NOT NULL) AS delete_requested,
+			a.technical_status, a.review_status AS asset_review, a.updated_at, a.verified_mime,
 			t.ticket_id, t.status AS ticket_status, p.status AS projection_status`).
 		Joins("JOIN media_upload_tickets AS t ON t.asset_id = a.id").
 		Joins("LEFT JOIN media_review_projections AS p ON p.asset_id = a.id")
@@ -78,9 +81,11 @@ func statusQuery(db *gorm.DB) *gorm.DB {
 
 func factFromRow(row statusRow) StatusFact {
 	return StatusFact{
-		AssetID: row.AssetID, AssetPublicID: row.AssetPublicID, OwnerID: row.OwnerID,
+		MIMEType: row.MIMEType,
+		AssetID:  row.AssetID, AssetPublicID: row.AssetPublicID, OwnerID: row.OwnerID,
 		Purpose: row.Purpose, StorageStage: row.StorageStage, TechnicalStatus: row.TechnicalStatus,
 		AssetReview: row.AssetReview, TicketStatus: row.TicketStatus, TicketID: row.TicketID, Projection: row.Projection,
-		UpdatedAt: row.UpdatedAt,
+		DeleteRequested: row.DeleteRequested,
+		UpdatedAt:       row.UpdatedAt,
 	}
 }

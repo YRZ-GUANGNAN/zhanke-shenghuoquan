@@ -3,6 +3,7 @@ import { ScrollView, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import { AppIconButton } from '../../components/ui'
 import Taro from '../../services/taro'
+import { navigateBackOrHome } from '../../utils/navigation'
 import './index.scss'
 
 type LegalTab = 'agreement' | 'privacy'
@@ -20,11 +21,11 @@ const tabs: Array<{ key: LegalTab; label: string }> = [
 const agreementSections: LegalSection[] = [
   {
     title: '一、服务范围',
-    body: '湛科生活圈为湛江科技学院在校师生提供校园社交、二手信息展示、同城跑腿配送及校园工具聚合服务。部分功能（如外卖点单）由第三方商家小程序提供，本平台仅作入口聚合。'
+    body: '湛科生活圈提供校园信息与生活服务。产品支持原版和校园资讯两种展示模式，对所有用户统一采用当前配置。原版按已开放模块提供校园社交、二手信息展示、跑腿配送及校园工具入口；校园资讯模式提供指南阅读、账号与私密反馈，暂停上述新业务，保留已有订单的必要处理。指南根据公开资料独立整理，附来源与核验日期，非学校官方服务。部分服务由第三方商家小程序提供。'
   },
   {
     title: '二、账号与实名',
-    body: '用户需使用本人微信授权登录并绑定校园身份。账号不得转借、出售或用于违法违规用途。因账号泄露造成的损失由用户自行承担。'
+    body: '用户通过微信登录建立账号，可主动填写昵称、头像、学校和校区；填写学校资料不等于学校官方认证。骑手和商家身份按相应申请流程审核。账号不得转借、出售或用于违法违规用途。本应用不会要求提供图书馆账号密码。'
   },
   {
     title: '三、内容规范',
@@ -36,18 +37,18 @@ const agreementSections: LegalSection[] = [
   },
   {
     title: '五、责任限制',
-    body: '因不可抗力、系统维护或第三方原因导致的服务中断，平台不承担赔偿责任，但会尽力提前告知并及时恢复。'
+    body: '我们会处理服务问题与信息更正反馈，并尽力提前告知维护安排。指南反映核验时可查到的资料，实际服务以学校和馆方最新通知为准。业务暂停不删除历史数据，也不免除既有履约义务；依法应承担的责任不因本说明而免除。'
   }
 ]
 
 const privacySections: LegalSection[] = [
   {
     title: '一、我们收集的信息',
-    body: '为提供服务，我们会收集你的微信昵称与头像、校园身份信息、下单与配送所需的联系方式与地址，以及必要的设备与日志信息。'
+    body: '微信登录用于建立账号并校验会话。你主动填写或授权的昵称、头像、学校和校区用于资料展示；反馈文字与主动上传的图片用于处理问题。下单和配送按实际业务需要处理联系方式与地址，以及必要的安全日志。校园指南阅读不要求提供定位、通讯录或图书馆账号密码。'
   },
   {
     title: '二、信息如何使用',
-    body: '收集的信息仅用于账号登录、订单履约、消息通知、内容推荐与安全风控，不会用于与服务无关的用途。'
+    body: '信息仅用于你实际使用的账号、资料、内容、反馈、消息与订单服务及安全保障。校园资讯模式不按阅读行为提供个性化推荐；原业务暂停后，历史订单和资金信息继续用于必要履约、退款、争议处理与审计。'
   },
   {
     title: '三、信息共享',
@@ -76,7 +77,7 @@ export default function LegalPage() {
     <View className='student-legal-page'>
       <CapsulePageHeader
         title='法律条款'
-        left={<AppIconButton name='back' label='返回' className='student-legal-nav__back' onClick={() => void Taro.navigateBack()} />}
+        left={<AppIconButton name='back' label='返回' className='student-legal-nav__back' onClick={() => void navigateBackOrHome()} />}
       />
       <View className='student-legal-tabs'>
         {tabs.map((tab) => (

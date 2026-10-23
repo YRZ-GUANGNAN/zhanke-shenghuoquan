@@ -118,7 +118,7 @@ func evaluateVisibility(value GatewaySnapshot) VisibilityReason {
 		!value.FinalIdentityReady || value.DeleteRequested {
 		return VisibilityNotReady
 	}
-	if value.ProjectionStatus != ProjectionApproved {
+	if !ReviewAllowsUse(value.Purpose, value.ProjectionStatus) {
 		return VisibilityNotApproved
 	}
 	if !value.HasReference || value.ReferenceStatus != ReferenceActive {
@@ -140,6 +140,7 @@ func metadataView(value GatewaySnapshot) MediaMetadataView {
 	return MediaMetadataView{
 		MediaID: value.AssetPublicID, Purpose: value.Purpose, MIMEType: value.VerifiedMIME,
 		ByteSize: value.ByteSize, Width: value.Width, Height: value.Height,
+		DurationMS:   value.DurationMS,
 		ReviewStatus: value.ProjectionStatus,
 	}
 }

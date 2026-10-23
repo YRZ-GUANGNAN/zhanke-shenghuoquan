@@ -451,6 +451,7 @@ func TestApplyWechatReviewFailureIgnoresTerminalProjection(t *testing.T) {
 		coremedia.ProjectionApproved,
 		coremedia.ProjectionRejected,
 		coremedia.ProjectionReviewFailed,
+		coremedia.ProjectionNotRequired,
 	} {
 		status := status
 		t.Run(string(status), func(t *testing.T) {
@@ -523,7 +524,7 @@ func TestNewServiceRejectsLocalMockAndRealWechatTogether(t *testing.T) {
 }
 
 func TestServerOwnedStatusProjection(t *testing.T) {
-	base := StatusFact{AssetPublicID: testULID(t), TicketID: testULID(t), Purpose: coremedia.PurposeAvatar, UpdatedAt: time.Now()}
+	base := StatusFact{AssetPublicID: testULID(t), TicketID: testULID(t), Purpose: coremedia.PurposeAvatar, StorageStage: coremedia.StorageStageFinal, UpdatedAt: time.Now()}
 	tests := []struct {
 		name     string
 		mutate   func(*StatusFact)
@@ -547,6 +548,22 @@ func TestServerOwnedStatusProjection(t *testing.T) {
 			v.TechnicalStatus = coremedia.TechnicalFinalReady
 			v.Projection = pointer(coremedia.ProjectionRejected)
 		}, StateRejected, false, RecoveryNewUpload},
+		{"profile ready", func(v *StatusFact) {
+			v.TicketStatus, v.TechnicalStatus = coremedia.TicketConsumed, coremedia.TechnicalFinalReady
+			v.Projection = pointer(coremedia.ProjectionNotRequired)
+		}, StateReady, true, RecoveryNone},
+		{"post cannot be exempt", func(v *StatusFact) {
+			v.Purpose, v.TicketStatus, v.TechnicalStatus = coremedia.PurposePost, coremedia.TicketConsumed, coremedia.TechnicalFinalReady
+			v.Projection = pointer(coremedia.ProjectionNotRequired)
+		}, StateReviewPending, false, RecoveryPoll},
+		{"incomplete profile", func(v *StatusFact) {
+			v.TicketStatus, v.TechnicalStatus = coremedia.TicketConsumed, coremedia.TechnicalPromoting
+			v.Projection = pointer(coremedia.ProjectionNotRequired)
+		}, StateProcessing, false, RecoveryPoll},
+		{"deleted profile", func(v *StatusFact) {
+			v.TicketStatus, v.TechnicalStatus, v.DeleteRequested = coremedia.TicketConsumed, coremedia.TechnicalFinalReady, true
+			v.Projection = pointer(coremedia.ProjectionNotRequired)
+		}, StateDeleted, false, RecoveryNewUpload},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

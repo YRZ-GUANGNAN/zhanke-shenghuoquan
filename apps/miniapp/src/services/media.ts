@@ -1,12 +1,13 @@
 import Taro from './taro'
-import { request } from './api'
+import { isApiError, request } from './api'
 
-export type MediaPurpose = 'post_image' | 'product_image' | 'avatar' | 'dish' | 'merchant_logo' | 'delivery_proof' | 'delivery_im' | 'feedback' | 'identity_application'
+export type MediaPurpose = 'post_image' | 'product_image' | 'avatar' | 'profile_cover' | 'dish' | 'merchant_logo' | 'delivery_proof' | 'delivery_im' | 'feedback' | 'identity_application'
 export type MediaClientState =
   | 'waiting_upload'
   | 'processing'
   | 'review_pending'
   | 'approved'
+  | 'ready'
   | 'rejected'
   | 'review_failed'
   | 'expired'
@@ -16,7 +17,7 @@ export type MediaClientState =
 export interface MediaStatus {
   assetId: string
   ticketId: string
-  purpose: 'post' | 'product' | 'avatar' | 'dish' | 'merchant_logo' | 'delivery_proof' | 'delivery_im' | 'feedback' | 'identity_application'
+  purpose: 'post' | 'product' | 'avatar' | 'profile_cover' | 'dish' | 'merchant_logo' | 'delivery_proof' | 'delivery_im' | 'feedback' | 'identity_application'
   state: MediaClientState
   technicalStatus: string
   reviewStatus: string
@@ -48,6 +49,99 @@ export interface UploadedMedia extends MediaStatus {
   previewPath: string
 }
 
+export interface UploadedPostMotion {
+  kind: 'video' | 'live_photo'
+  poster: UploadedMedia
+  video: UploadedMedia
+  durationMs: number
+}
+
+export async function postMotionAvailable(): Promise<boolean> {
+  try { return (await request<{ postMotion: boolean }>('/miniapp/media/capabilities')).postMotion === true }
+  catch { return false }
+}
+
+export async function chooseAndUploadPostMotion(
+  kind: UploadedPostMotion['kind'], onProgress: (message: string) => void, shouldContinue: () => boolean
+): Promise<UploadedPostMotion> {
+  let posterPath = ''
+  if (kind === 'live_photo') {
+    const photo = await Taro.chooseMedia({ count: 1, mediaType: ['image'], sourceType: ['album'], sizeType: ['original'] })
+    assertUploadActive(shouldContinue)
+    posterPath = photo.tempFiles[0]?.tempFilePath ?? ''
+    if (!posterPath) throw new Error('请选择实况照片')
+  }
+  const selected = await Taro.chooseMedia({ count: 1, mediaType: ['video'], sourceType: ['album', 'camera'], maxDuration: kind === 'live_photo' ? 5 : 60, sizeType: ['compressed'] })
+  assertUploadActive(shouldContinue)
+  const clip = selected.tempFiles[0]
+  const seconds = clip?.duration ?? 0
+  if (!clip || !Number.isFinite(seconds) || seconds < .5 || seconds > (kind === 'live_photo' ? 5 : 60)) {
+    throw new Error(kind === 'live_photo' ? '请选择 0.5～5 秒的对应实况片段' : '请选择 0.5～60 秒的视频')
+  }
+  if (clip.size > 30 * 1024 * 1024) throw new Error('视频不能超过 30 MB，请先压缩或裁剪')
+  if (!posterPath) posterPath = clip.thumbTempFilePath ?? ''
+  if (!posterPath) {
+    const cover = await Taro.chooseMedia({ count: 1, mediaType: ['image'], sourceType: ['album'], sizeType: ['original'] })
+    posterPath = cover.tempFiles[0]?.tempFilePath ?? ''
+  }
+  assertUploadActive(shouldContinue)
+  if (!posterPath) throw new Error('请为视频选择封面')
+  // Validate before creating either upload; extension alone is not trusted.
+  const info = await Taro.getFileInfo({ filePath: clip.tempFilePath, digestAlgorithm: 'md5' })
+  if (info.size <= 0 || info.size > 30 * 1024 * 1024) throw new Error('视频不能超过 30 MB')
+  const bytes = readFileBytes(clip.tempFilePath)
+  if (bytes.byteLength !== info.size) throw new Error('视频读取失败，请重新选择')
+  const header = new Uint8Array(bytes, 0, Math.min(12, bytes.byteLength))
+  if (header.length < 12 || String.fromCharCode(...header.slice(4, 8)) !== 'ftyp') throw new Error('请先将视频导出为 MP4 格式')
+  const poster = await uploadImage(posterPath, 'post_image', (_p, _s, message) => onProgress(`封面：${message}`), shouldContinue)
+  assertUploadActive(shouldContinue)
+  onProgress('正在上传视频')
+  const session = await request<UploadSession>('/miniapp/media/uploads', {
+    url: '', method: 'POST', timeout: 20000,
+    data: { purpose: 'post', sizeBytes: info.size, contentMD5: hexMD5ToBase64(info.digest), contentType: 'video/mp4', idempotencyKey: newAttemptKey('post_image', info.digest, info.size) }
+  })
+  assertUploadActive(shouldContinue)
+  await putSignedObject(session, bytes)
+  assertUploadActive(shouldContinue)
+  onProgress('正在校验视频并提交自动审核')
+  let status: MediaStatus
+  try { status = await retryUploadCompletion(session.ticketId) }
+  catch (error) {
+    if (isApiError(error) && error.status >= 400 && error.status < 500 && ![408, 409, 429].includes(error.status)) throw error
+    // Keep the immutable ticket when completion or cloud submission times out.
+    // A later publish retries completion; never upload the same bytes twice.
+    status = { assetId: session.assetId, ticketId: session.ticketId, purpose: 'post', state: 'processing', technicalStatus: 'validating', reviewStatus: 'pending', ticketStatus: 'uploaded', message: '视频已上传，待继续确认', recovery: 'complete_upload', canUse: false, updatedAt: new Date().toISOString() }
+  }
+  assertUploadActive(shouldContinue)
+  return { kind, poster, video: { ...status, previewPath: clip.tempFilePath }, durationMs: Math.round(seconds * 1000) }
+}
+
+export async function confirmPostMotion(
+  motion: UploadedPostMotion, timeoutMs = 105000,
+  onProgress?: (message: string) => void, shouldContinue?: () => boolean
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  const active = () => { assertUploadActive(shouldContinue); if (Date.now() >= deadline) throw new Error('媒体仍在处理中，内容已保留，请稍后再发布') }
+  active()
+  // Only retry unfinished technical completion. Confirmed files retain their
+  // immutable asset identity while the durable review job is polled.
+  await Promise.all([motion.poster, motion.video].map(async asset => {
+    if (asset.technicalStatus !== 'final_ready' || asset.recovery === 'complete_upload') {
+      await retryUploadCompletion(asset.ticketId, Math.max(1, Math.min(30000, deadline - Date.now())))
+    }
+  }))
+  while (true) {
+    active()
+    const statuses = await Promise.all([motion.poster.assetId, motion.video.assetId].map(getMediaStatus))
+    active()
+    if (statuses.every(status => status.canUse && status.state === 'approved')) return
+    const failed = statuses.find(status => ['rejected', 'review_failed', 'expired', 'upload_failed', 'deleted'].includes(status.state))
+    if (failed) throw new Error(failed.message || '媒体处理失败，请更换后重试')
+    onProgress?.('视频与封面审核中，完成后自动发布')
+    await delay(Math.min(1500, Math.max(0, deadline - Date.now())))
+  }
+}
+
 export type ImageUploadSettlement =
   | { index: number; status: 'fulfilled'; value: UploadedMedia }
   | { index: number; status: 'rejected'; reason: Error }
@@ -71,6 +165,7 @@ const MAX_EDGE: Record<MediaPurpose, number> = {
   post_image: 1920,
   product_image: 1920,
   avatar: 1024,
+  profile_cover: 1920,
   dish: 1920,
   merchant_logo: 1024,
   delivery_proof: 1920,
@@ -83,13 +178,15 @@ const DELIVERY_PROOF_MAX_BYTES = 5 * 1024 * 1024
 export async function chooseAndUploadImages(
   purpose: MediaPurpose,
   count: number,
-  onProgress?: (value: UploadProgress) => void
+  onProgress?: (value: UploadProgress) => void,
+  shouldContinue?: () => boolean
 ): Promise<UploadedMedia[]> {
   const selected = await Taro.chooseMedia({ count, mediaType: ['image'], sourceType: ['album', 'camera'], sizeType: ['original'] })
+  assertUploadActive(shouldContinue)
   return mapConcurrent(selected.tempFiles, 3, async (file, index) =>
-    uploadImage(file.tempFilePath, purpose, (percent, stage, message) =>
+    uploadImage(file.tempFilePath, purpose, (percent, stage, message) => {
       onProgress?.({ index, total: selected.tempFiles.length, percent, stage, message })
-    )
+    }, shouldContinue)
   )
 }
 
@@ -123,10 +220,32 @@ export async function getMediaHistory(page = 1, pageSize = 20): Promise<MediaHis
   return request<MediaHistory>(`/miniapp/media/uploads?page=${page}&pageSize=${pageSize}`, { url: '', timeout: 10000 })
 }
 
-export async function retryUploadCompletion(ticketId: string): Promise<MediaStatus> {
+export async function retryUploadCompletion(ticketId: string, timeout = 120000): Promise<MediaStatus> {
   return request<MediaStatus>(`/miniapp/media/uploads/${ticketId}/complete`, {
-    url: '', method: 'POST', timeout: 120000
+    url: '', method: 'POST', timeout
   })
+}
+
+export function isMediaUsable(status: MediaStatus): boolean {
+  if (!status.canUse) return false
+  if (status.state === 'approved') return true
+  return status.state === 'ready' && status.reviewStatus === 'not_required' &&
+    ['avatar', 'profile_cover', 'identity_application', 'dish', 'merchant_logo'].includes(status.purpose)
+}
+
+// Direct-use uploads finish their technical checks in the completion request.
+// Do not start a 90-second content-review spinner for profile or takeout media.
+export async function confirmDirectUpload(uploaded: UploadedMedia, shouldContinue?: () => boolean): Promise<MediaStatus> {
+  assertUploadActive(shouldContinue)
+  if (!['avatar', 'profile_cover', 'identity_application', 'dish', 'merchant_logo'].includes(uploaded.purpose)) {
+    throw new Error('此类图片仍需内容审核')
+  }
+  const status = isMediaUsable(uploaded) ? uploaded : await getMediaStatus(uploaded.assetId)
+  assertUploadActive(shouldContinue)
+  if (status.assetId !== uploaded.assetId || status.purpose !== uploaded.purpose || !isMediaUsable(status)) {
+    throw new Error(status.message || '图片尚不可用，请重新选择并完成上传')
+  }
+  return status
 }
 
 export async function waitForMediaApproval(
@@ -176,13 +295,19 @@ export async function waitForMediaApprovals(
 async function uploadImage(
   sourcePath: string,
   purpose: MediaPurpose,
-  progress: (percent: number, stage: UploadProgress['stage'], message: string) => void
+  progress: (percent: number, stage: UploadProgress['stage'], message: string) => void,
+  shouldContinue?: () => boolean
 ): Promise<UploadedMedia> {
+  assertUploadActive(shouldContinue)
   progress(5, 'compressing', '正在压缩图片')
   const prepared = await prepareImage(sourcePath, purpose)
   const file = await Taro.getFileInfo({ filePath: prepared.path, digestAlgorithm: 'md5' })
+  assertUploadActive(shouldContinue)
   if (purpose === 'delivery_proof' && file.size > DELIVERY_PROOF_MAX_BYTES) {
     throw new Error('凭证照片压缩后仍超过 5 MiB，请重新拍摄')
+  }
+  if (purpose === 'profile_cover' && file.size > 10 * 1024 * 1024) {
+    throw new Error('封面压缩后仍超过 10 MB，请选择较小的照片')
   }
   const bytes = readFileBytes(prepared.path)
   if (bytes.byteLength !== file.size) throw new Error('压缩文件大小校验失败，请重新选择图片')
@@ -199,10 +324,14 @@ async function uploadImage(
     }
   })
 
+  assertUploadActive(shouldContinue)
   progress(35, 'uploading', '正在直传腾讯云 COS')
   await putSignedObject(session, bytes)
-  progress(85, 'completing', '正在校验图片并提交审核')
+  assertUploadActive(shouldContinue)
+  progress(85, 'completing', ['avatar', 'profile_cover', 'identity_application', 'dish', 'merchant_logo'].includes(purpose)
+    ? '正在确认图片上传' : '正在校验图片并提交自动审核')
   const status = await retryUploadCompletion(session.ticketId)
+  assertUploadActive(shouldContinue)
   progress(100, 'done', status.message)
   return { ...status, ticketId: session.ticketId, previewPath: prepared.path }
 }
@@ -273,9 +402,10 @@ function readFileBytes(path: string): ArrayBuffer {
   return copy.buffer
 }
 
-function domainPurpose(value: MediaPurpose): 'post' | 'product' | 'avatar' | 'dish' | 'merchant_logo' | 'delivery_proof' | 'delivery_im' | 'feedback' | 'identity_application' {
+function domainPurpose(value: MediaPurpose): MediaStatus['purpose'] {
   if (value === 'post_image') return 'post'
   if (value === 'product_image') return 'product'
+  if (value === 'profile_cover') return 'profile_cover'
   if (value === 'dish') return 'dish'
   if (value === 'merchant_logo') return 'merchant_logo'
   if (value === 'delivery_proof') return 'delivery_proof'
@@ -283,6 +413,10 @@ function domainPurpose(value: MediaPurpose): 'post' | 'product' | 'avatar' | 'di
   if (value === 'feedback') return 'feedback'
   if (value === 'identity_application') return 'identity_application'
   return 'avatar'
+}
+
+function assertUploadActive(shouldContinue?: () => boolean): void {
+  if (shouldContinue && !shouldContinue()) throw new Error('图片上传已取消')
 }
 
 function delay(milliseconds: number): Promise<void> {

@@ -1,6 +1,7 @@
 export default defineAppConfig({
   pages: [
     'pages/home/index',
+    'pages/campus-guide/index',
     'pages/search/index',
     'pages/publish-entry/index',
     'pages/publish-post/index',
@@ -25,6 +26,8 @@ export default defineAppConfig({
     'pages/merchant-messages/index',
     'pages/merchant-order-detail/index',
     'pages/delivery-rider/index',
+    'pages/rider-messages/index',
+    'pages/delivery-profile/index',
     'pages/delivery-conversation/index',
     'pages/post-detail/index'
   ],

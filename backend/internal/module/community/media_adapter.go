@@ -14,11 +14,16 @@ import (
 
 const communityMediaReservationTTL = 15 * time.Minute
 
+type postMediaPublisher interface {
+	PublishPost(context.Context, uint64) error
+}
+
 type communityReferenceBindingGateway interface {
 	Reserve(context.Context, coremedia.BindingReserveInput) (coremedia.BindingReservation, error)
 	Commit(context.Context, coremedia.BindingCommitInput) error
 	EnsureCommitted(context.Context, coremedia.BindingCommitInput) error
 	Cancel(context.Context, uint64, string) error
+	Publish(context.Context, coremedia.Purpose, string) error
 	Revoke(context.Context, coremedia.Purpose, string, []uint64) error
 }
 
@@ -80,9 +85,10 @@ func (g *HybridMediaGateway) Reserve(ctx context.Context, ownerID uint, purpose 
 			return legacymedia.Reservation{}, legacymedia.ErrInvalidAsset
 		}
 		result.References = append(result.References, legacymedia.Reference{
-			InternalID: reference.InternalID,
-			PublicID:   reference.AssetPublicID,
-			URL:        g.publicBase + "/api/v1/media/assets/" + reference.AssetPublicID + "/content",
+			InternalID:   reference.InternalID,
+			PublicID:     reference.AssetPublicID,
+			URL:          g.publicBase + "/api/v1/media/assets/" + reference.AssetPublicID + "/content",
+			VerifiedMIME: reference.VerifiedMIME, Width: reference.Width, Height: reference.Height, DurationMS: reference.DurationMS,
 		})
 	}
 	return result, nil
@@ -130,6 +136,17 @@ func (g *HybridMediaGateway) DeleteReference(ctx context.Context, referenceType 
 	}
 	legacyErr := g.legacy.DeleteReference(ctx, referenceType, referenceID, append([]uint64(nil), keep...))
 	return errors.Join(mapCommunityCoreMediaError(coreErr), legacyErr)
+}
+
+func (g *HybridMediaGateway) PublishPost(ctx context.Context, postID uint64) error {
+	if postID == 0 {
+		return legacymedia.ErrInvalidAsset
+	}
+	err := g.core.Publish(ctx, coremedia.PurposePost, strconv.FormatUint(postID, 10))
+	if errors.Is(err, coremedia.ErrNotFound) {
+		return nil
+	} // Text-only and legacy posts have no core references.
+	return mapCommunityCoreMediaError(err)
 }
 
 func communityBindingCommitInput(ownerID uint, token, referenceType string, referenceID uint64, orderedIDs []string) (coremedia.BindingCommitInput, error) {

@@ -19,7 +19,7 @@ function ProductDetailPage(){
   useEffect(()=>{void load().catch(showError)},[params.id])
 
   const isSeller=Boolean(product&&profile.id&&product.sellerId===profile.id)
-  const startChat=async()=>{if(!product)return;try{const relation=await contactSeller(product.id);await Taro.navigateTo({url:`/pages/chat/index?conversationId=${encodeURIComponent(relation.conversationId)}&peerUserId=${encodeURIComponent(relation.peerUserId)}&productId=${relation.productId}&buyerId=${relation.buyerId}&sellerId=${relation.sellerId}&relationId=${relation.relationId}`})}catch(error){showError(error)}}
+  const startChat=async()=>{if(!product)return;try{const relation=await contactSeller(product.id);await Taro.navigateTo({url:`/pages/secondhand-chat/index?relationId=${encodeURIComponent(String(relation.relationId))}`})}catch(error){showError(error)}}
   const updateStatus=async(status:Product['status'])=>{if(!product)return;try{await changeProductStatus(product.id,status);await load();await Taro.showToast({title:'商品状态已更新',icon:'success'})}catch(error){showError(error)}}
 
   if(!product)return <View className='product-detail-page'><View className='card'>商品加载中</View></View>

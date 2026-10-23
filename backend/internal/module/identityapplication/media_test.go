@@ -250,6 +250,26 @@ func TestResolveAdminProofsUsesAuthoritativeReviewProjection(t *testing.T) {
 	}
 }
 
+func TestResolveAdminProofsAcceptsUploadedMaterialsWithoutCloudApproval(t *testing.T) {
+	repository := readyProofRepository(proofAppID1, proofAssetID1)
+	repository.snapshots[proofAssetID1][0].ProjectionStatus = coremedia.ProjectionNotRequired
+	signer := &proofSignerStub{}
+	adapter, err := NewApplicationMedia(&applicationBindingStub{}, repository, signer, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proofs, err := adapter.ResolveAdminProofs(context.Background(), proofAppID1, []string{proofAssetID1})
+	if err != nil || len(proofs) != 1 || len(signer.calls) != 1 {
+		t.Fatalf("private proof unavailable: %+v %v", proofs, err)
+	}
+	if coremedia.PurposeIdentityApplication.PubliclyResolvable() {
+		t.Fatal("identity materials must never be publicly resolvable")
+	}
+	if _, err := adapter.ResolveAdminProofs(context.Background(), proofAppID2, []string{proofAssetID1}); !errors.Is(err, ErrProofMediaUnavailable) {
+		t.Fatal("direct upload escaped application binding")
+	}
+}
+
 func TestResolveAdminProofsRejectsCrossApplicationWrongOrderAndDuplicates(t *testing.T) {
 	tests := []struct {
 		name   string

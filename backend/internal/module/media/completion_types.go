@@ -44,6 +44,7 @@ type UploadCompletion struct {
 	VerifiedSize         *uint64         `gorm:"column:verified_size"`
 	VerifiedWidth        *uint32         `gorm:"column:verified_width"`
 	VerifiedHeight       *uint32         `gorm:"column:verified_height"`
+	VerifiedDurationMS   *uint32         `gorm:"column:verified_duration_ms"`
 	FinalKey             *string         `gorm:"column:final_key;size:512"`
 	FinalVersionID       *string         `gorm:"column:final_version_id;size:128"`
 	FinalETag            *string         `gorm:"column:final_etag;size:128"`
@@ -81,15 +82,16 @@ type CompletionObject struct {
 }
 
 type PromoteObjectRequest struct {
-	SourceKey       string
-	SourceVersionID string
-	SourceETag      string
-	DestinationKey  string
-	AssetPublicID   string
-	TicketID        string
-	TrustedSHA256   string
-	VerifiedMIME    string
-	VerifiedSize    uint64
+	SourceKey          string
+	SourceVersionID    string
+	SourceETag         string
+	DestinationKey     string
+	AssetPublicID      string
+	TicketID           string
+	TrustedSHA256      string
+	VerifiedMIME       string
+	VerifiedSize       uint64
+	VerifiedDurationMS uint32
 }
 
 type CompletionObjectStore interface {
@@ -107,6 +109,7 @@ type CompletionValidation struct {
 	VerifiedSize        uint64
 	Width               uint32
 	Height              uint32
+	DurationMS          uint32
 	FinalKey            string
 }
 
@@ -135,7 +138,11 @@ func NewTencentCompletionStore(config TencentCompletionStoreConfig) (*TencentCom
 	if err != nil {
 		return nil, err
 	}
-	client := cos.NewClient(&cos.BaseURL{BucketURL: bucketURL}, &http.Client{
+	ciURL, err := url.Parse(fmt.Sprintf("https://%s.ci.%s.myqcloud.com", config.Bucket, config.Region))
+	if err != nil {
+		return nil, err
+	}
+	client := cos.NewClient(&cos.BaseURL{BucketURL: bucketURL, CIURL: ciURL}, &http.Client{
 		Timeout:   30 * time.Second,
 		Transport: &cos.AuthorizationTransport{SecretID: config.SecretID, SecretKey: config.SecretKey},
 	})
@@ -228,6 +235,7 @@ func (s *TencentCompletionStore) PromoteObject(ctx context.Context, request Prom
 	headers.Set("x-cos-meta-media-sha256", request.TrustedSHA256)
 	headers.Set("x-cos-meta-media-source-version", request.SourceVersionID)
 	headers.Set("x-cos-meta-media-verified-size", strconv.FormatUint(request.VerifiedSize, 10))
+	headers.Set("x-cos-meta-media-duration-ms", strconv.FormatUint(uint64(request.VerifiedDurationMS), 10))
 	options := &cos.ObjectCopyOptions{ObjectCopyHeaderOptions: &cos.ObjectCopyHeaderOptions{
 		ContentType: request.VerifiedMIME, XCosMetadataDirective: "Replaced",
 		XCosCopySourceIfMatch: quoteETag(request.SourceETag), XOptionHeader: &headers,

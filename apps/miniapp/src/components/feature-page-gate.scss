@@ -1,6 +1,5 @@
 .feature-page-state {
-  min-height: 100vh; box-sizing: border-box; padding: 180px 40px 64px;
-  background: #fff; display: flex; flex-direction: column; align-items: stretch; gap: 24px;
+  min-height: 100vh; box-sizing: border-box; padding: calc(88PX + env(safe-area-inset-top)) 32rpx 48rpx;
+  background: #fff; display: flex; flex-direction: column; align-items: stretch; gap: 24rpx;
 }
-.feature-page-state__title { font-size: 36px; font-weight: 600; text-align: center; color: #273244; }
-.feature-page-state__description { margin-bottom: 24px; font-size: 28px; line-height: 1.6; text-align: center; color: #697586; }
+.feature-page-state__actions { display: flex; flex-direction: column; align-items: center; gap: 16rpx; }

@@ -14,7 +14,8 @@ const profileStyle = fs.readFileSync(
 
 assert.match(profilePage, /profile\.avatar/)
 assert.match(profilePage, /mode='aspectFill'/)
-assert.match(profilePage, /学校未设置/)
+assert.doesNotMatch(profilePage, /学校未设置/)
+assert.doesNotMatch(profilePage, /student-profile-user__campus/)
 
 for (const tab of ['favorites', 'posts', 'comments', 'items']) {
   assert.match(profilePage, new RegExp(`tab:\\s*'${tab}'`))

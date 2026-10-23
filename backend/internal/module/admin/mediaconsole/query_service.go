@@ -24,8 +24,8 @@ func (s *QueryService) Summary(ctx context.Context) (Summary, error) {
 func (s *QueryService) Assets(ctx context.Context, filter ListFilter) (Page[AssetRow], error) {
 	filter, err := normalizeFilter(filter)
 	if err != nil || !oneOf(filter.Status, "", "pending_upload", "uploaded", "validating", "promoting", "final_ready", "submitted", "reviewing", "approved", "rejected", "review_failed", "delete_pending", "delete_deadletter", "deleted") ||
-		!oneOf(filter.ReviewStatus, "", "pending", "submitted", "reviewing", "approved", "rejected", "review_failed") ||
-		!oneOf(filter.Purpose, "", "post", "product", "avatar") {
+		!oneOf(filter.ReviewStatus, "", "pending", "submitted", "reviewing", "approved", "rejected", "review_failed", "not_required") ||
+		!oneOf(filter.Purpose, "", "post", "product", "avatar", "profile_cover", "identity_application", "dish", "merchant_logo", "delivery_proof", "delivery_im", "feedback") {
 		return Page[AssetRow]{}, ErrInvalidQuery
 	}
 	items, total, err := s.repository.ListAssets(ctx, filter)

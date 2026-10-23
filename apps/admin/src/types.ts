@@ -1,5 +1,5 @@
 // Domain F presentation contracts. Admin never queries domain databases directly.
-export type AdminSection = 'dashboard' | 'users' | 'identities' | 'moderation' | 'media' | 'delivery' | 'takeout' | 'community' | 'trade' | 'reports' | 'feedbacks' | 'navigation' | 'feature-policy'
+export type AdminSection = 'dashboard' | 'users' | 'identities' | 'moderation' | 'media' | 'delivery' | 'takeout' | 'community' | 'trade' | 'reports' | 'feedbacks' | 'navigation' | 'feature-policy' | 'share-settings'
 export interface AdminUser{id:number;nickname:string;role:'admin'|'superadmin'}
 export interface AdminSession{user:AdminUser;csrfToken:string;expiresAt:string}
 export interface Page<T>{items:T[];page:number;pageSize:number;total:number}
@@ -26,7 +26,9 @@ export interface Stats{totals:{users:number;posts:number;products:number;pending
 export const FEATURE_POLICY_KEYS = ['forum','post','comment','secondhand','secondhand_publish','secondhand_chat','takeout','campus_tools','delivery','merchant','rider','messages','following','search','likes','favorites','notifications','identity_application','publish','secondhand_comments'] as const
 export type FeaturePolicyKey = typeof FEATURE_POLICY_KEYS[number]
 export type PostingMode = 'admin_only'|'all_users'
+export type PresentationMode = 'standard'|'campus_info'
 export interface FeaturePolicy {
+  presentationMode?: PresentationMode
   flags: Record<FeaturePolicyKey, boolean>
   postingMode: PostingMode
   rowVersion: number

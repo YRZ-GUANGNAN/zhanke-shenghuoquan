@@ -25,6 +25,7 @@ export function ResolvedMediaImage({
   useEffect(() => {
     let active = true
     const key = contentUrl?.trim()
+    setSrc('')
     setFailed(false)
     if (!key) {
       setSrc('')

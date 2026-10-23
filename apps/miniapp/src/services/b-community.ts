@@ -1,4 +1,4 @@
-import type { CommunityComment, CommunityNotification, CommunityPost } from '../types'
+import type { CommunityComment, CommunityNotification, CommunityPost, CommunityThreadComment } from '../types'
 import { request } from './api'
 import { createClientRequestId } from './client-request-id'
 
@@ -9,6 +9,7 @@ export interface PageResult<T> {
   page: number
   pageSize: number
   total: number
+  publicCount?: number
 }
 
 export interface CreateCommunityPostInput {
@@ -17,11 +18,13 @@ export interface CreateCommunityPostInput {
   topic?: string
   tags?: string[]
   imageAssetIds?: string[]
+  motion?: { kind: 'video' | 'live_photo'; assetId: string; posterAssetId: string }
   clientRequestId?: string
 }
 
 export interface CommunityViewerState {
   liked: boolean
+  likedCount: number
   favorited: boolean
   followingAuthor: boolean
 }
@@ -63,6 +66,7 @@ export interface PublicCommunityProfile {
 		id: number
 		nickname: string
 		avatar: string
+		cover?: string
 		school: string
 		campus: string
 	}
@@ -149,6 +153,7 @@ const normalizePost = (raw: unknown): CommunityPost => {
     title: asString(first(record, ['title', 'headline'])),
     content: asString(first(record, ['content', 'body', 'text']), ''),
     images: normalizeImages(first(record, ['images', 'imageUrls', 'image_urls', 'media'])),
+    motion: normalizePostMotion(record.motion),
     likedCount: asNumber(first(record, ['likedCount', 'liked_count', 'likeCount', 'like_count']), 0),
     commentCount: asNumber(first(record, ['commentCount', 'comment_count']), 0),
     favoriteCount: asNumber(first(record, ['favoriteCount', 'favorite_count']), 0),
@@ -158,16 +163,72 @@ const normalizePost = (raw: unknown): CommunityPost => {
   }
 }
 
+const normalizePostMotion = (value: unknown): CommunityPost['motion'] => {
+  if (!isRecord(value) || (value.kind !== 'video' && value.kind !== 'live_photo')) return undefined
+  const url = asString(value.url), posterUrl = asString(value.posterUrl)
+  const width = asNumber(value.width), height = asNumber(value.height), durationMs = asNumber(value.durationMs)
+  if (!url || !posterUrl || ![width, height, durationMs].every(Number.isFinite) || width <= 0 || height <= 0 || durationMs < 500 || durationMs > 60000 || (value.kind === 'live_photo' && durationMs > 5000)) return undefined
+  return { kind: value.kind, url, posterUrl, width, height, durationMs }
+}
+
 const normalizeComment = (raw: unknown): CommunityComment => {
   const record = isRecord(raw) ? raw : {}
   const authorRecord = isRecord(record.author) ? record.author : {}
   return {
     id: asString(first(record, ['id', 'commentId', 'comment_id'])),
-    author: asString(first(record, ['authorName', 'author_name', 'author'], first(authorRecord, ['name', 'nickname'])), '同学'),
+    author: asString(first(record, ['authorName', 'author_name'], first(authorRecord, ['name', 'nickname'], typeof record.author === 'string' ? record.author : '同学')), '同学'),
     avatar: asString(first(record, ['avatar', 'avatarUrl', 'avatar_url'], first(authorRecord, ['avatar', 'avatarUrl', 'avatar_url']))),
     content: asString(first(record, ['content', 'body', 'text']), ''),
     createdAt: dateLabel(first(record, ['createdAt', 'created_at'])),
   }
+}
+
+const normalizeThreadComment = (raw: unknown): CommunityThreadComment => {
+  const record = isRecord(raw) ? raw : {}
+  const replyTo = isRecord(record.replyTo) ? record.replyTo : {}
+  const status = asString(record.reviewStatus)
+  return {
+    ...normalizeComment(raw),
+    authorId: asString(record.userId),
+    parentCommentId: asString(record.parentCommentId, '0'),
+    replyToCommentId: asString(record.replyToCommentId, '0'),
+    replyToUserId: asString(record.replyToUserId, '0'),
+    replyToAuthor: asString(replyTo.nickname, '同学'),
+    reviewStatus: ['approved', 'reviewing', 'rejected', 'taken_down'].includes(status) ? status as CommunityThreadComment['reviewStatus'] : 'submitted',
+    liked: typeof record.liked === 'boolean' ? record.liked : undefined,
+    likedCount: Math.max(0, asNumber(record.likedCount)),
+    replyCount: Math.max(0, asNumber(record.replyCount)),
+  }
+}
+
+export interface LikeState { liked: boolean; likedCount: number }
+
+const normalizeLikeState = (raw: unknown): LikeState => {
+  if (!isRecord(raw) || typeof raw.liked !== 'boolean' || typeof raw.likedCount !== 'number' || !Number.isSafeInteger(raw.likedCount) || raw.likedCount < 0) {
+    throw new Error('点赞状态暂未确认，请重新读取')
+  }
+  return { liked: raw.liked, likedCount: raw.likedCount }
+}
+
+export async function getCommentThreads(postId: string, page = 1): Promise<PageResult<CommunityThreadComment>> {
+  return normalizePage(await request(`/community/posts/${encodeURIComponent(postId)}/comments/threads?page=${page}&pageSize=20`), normalizeThreadComment)
+}
+
+export async function getCommentReplies(postId: string, rootId: string, page = 1): Promise<PageResult<CommunityThreadComment>> {
+  return normalizePage(await request(`/community/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(rootId)}/replies?page=${page}&pageSize=20`), normalizeThreadComment)
+}
+
+export async function submitThreadComment(postId: string, content: string, clientRequestId: string, targetId?: string): Promise<CommunityThreadComment> {
+  const suffix = targetId ? `/${encodeURIComponent(targetId)}/replies` : ''
+  return normalizeThreadComment(await request(`/community/posts/${encodeURIComponent(postId)}/comments${suffix}`, {
+    url: '', method: 'POST', data: { content, clientRequestId }, header: { 'Idempotency-Key': clientRequestId },
+  }))
+}
+
+export async function setCommentLiked(postId: string, commentId: string, liked: boolean): Promise<LikeState> {
+  return normalizeLikeState(await request(`/community/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}/like`, {
+    url: '', method: liked ? 'PUT' : 'DELETE',
+  }))
 }
 
 const normalizeNotification = (raw: unknown): CommunityNotification => {
@@ -203,6 +264,7 @@ const normalizePage = <T>(raw: unknown, mapper: (item: unknown) => T): PageResul
     page: asNumber(first(record, ['page', 'pageNo', 'page_no']), 1),
     pageSize: asNumber(first(record, ['pageSize', 'page_size', 'limit']), items.length || 20),
     total: asNumber(first(record, ['total', 'count']), items.length),
+    ...(typeof record.publicCount === 'number' ? { publicCount: Math.max(0, record.publicCount) } : {}),
   }
 }
 
@@ -258,6 +320,7 @@ export async function createCommunityPost(input: CreateCommunityPostInput): Prom
       topic: input.topic || '湛科日常',
       tags: input.tags ?? [],
       imageAssetIds: input.imageAssetIds ?? [],
+      ...(input.motion ? { motion: input.motion } : {}),
       clientRequestId,
     },
     header: { 'Idempotency-Key': clientRequestId },
@@ -304,10 +367,18 @@ export async function getPublicUserPosts(userId: string, page = 1, pageSize = 20
 	return normalizePage(data, normalizePost)
 }
 
-export async function searchCommunityPosts(keyword: string, page = 1, pageSize = 20): Promise<PageResult<CommunityPost>> {
+export interface CommunitySearchFilters {
+  sort?: 'relevance' | 'recent' | 'likes' | 'comments' | 'favorites'
+  contentType?: 'all' | 'image' | 'text'
+  withinDays?: 0 | 1 | 7 | 180
+}
+
+export async function searchCommunityPosts(keyword: string, page = 1, pageSize = 20, filters: CommunitySearchFilters = {}): Promise<PageResult<CommunityPost>> {
+  const filtered = Boolean((filters.sort && filters.sort !== 'relevance') || (filters.contentType && filters.contentType !== 'all') || filters.withinDays)
   const data = await request<unknown>('/community/searches', {
-    url: '', method: 'POST', data: { keyword, page, pageSize }, timeout: 10000,
+    url: '', method: 'POST', data: { keyword, page, pageSize, ...(filtered ? { filters } : {}) }, timeout: 10000,
   })
+  if (filtered && (!isRecord(data) || data.filterVersion !== 1)) throw new Error('当前服务暂不支持筛选，请清除筛选后重试')
   return normalizePage(data, normalizePost)
 }
 
@@ -359,17 +430,17 @@ export async function getCommunityViewerState(postId: string): Promise<Community
   const data = await request<unknown>(`/community/posts/${encodeURIComponent(postId)}/viewer-state`)
   const record = isRecord(data) ? data : {}
   return {
-    liked: asBoolean(first(record, ['liked', 'isLiked', 'is_liked'])),
+    ...normalizeLikeState(record),
     favorited: asBoolean(first(record, ['favorited', 'favorite', 'isFavorited', 'is_favorited'])),
     followingAuthor: asBoolean(first(record, ['followingAuthor', 'following_author', 'isFollowingAuthor'])),
   }
 }
 
-export async function setPostLiked(postId: string, liked: boolean): Promise<void> {
-  await request(`/community/posts/${encodeURIComponent(postId)}/like`, {
+export async function setPostLiked(postId: string, liked: boolean): Promise<LikeState> {
+  return normalizeLikeState(await request(`/community/posts/${encodeURIComponent(postId)}/like`, {
     url: '',
     method: liked ? 'PUT' : 'DELETE',
-  })
+  }))
 }
 
 export async function setPostFavorited(postId: string, favorited: boolean): Promise<void> {

@@ -35,6 +35,10 @@ type bindingAssetRow struct {
 	ReservationExpiresAt *time.Time       `gorm:"column:reservation_expires_at"`
 	HasProjection        bool             `gorm:"column:has_projection"`
 	ProjectionStatus     ProjectionStatus `gorm:"column:projection_status"`
+	VerifiedMIME         string           `gorm:"column:verified_mime"`
+	Width                uint32           `gorm:"column:width"`
+	Height               uint32           `gorm:"column:height"`
+	DurationMS           uint32           `gorm:"column:duration_ms"`
 }
 
 const bindingAssetSelect = `
@@ -51,6 +55,10 @@ const bindingAssetSelect = `
 	a.deleted_at AS deleted_at,
 	COALESCE(a.reservation_token, '') AS reservation_token,
 	a.reservation_expires_at AS reservation_expires_at,
+	COALESCE(a.verified_mime, '') AS verified_mime,
+	COALESCE(a.width, 0) AS width,
+	COALESCE(a.height, 0) AS height,
+	COALESCE(a.duration_ms, 0) AS duration_ms,
 	(p.asset_id IS NOT NULL) AS has_projection,
 	COALESCE(p.status, '') AS projection_status`
 
@@ -99,6 +107,7 @@ func (r *GormReferenceBindingRepository) ReserveBinding(ctx context.Context, inp
 			}
 			result = append(result, BindingAsset{
 				InternalID: row.ID, AssetPublicID: row.AssetPublicID, Slot: uint16(index), Kept: kept,
+				VerifiedMIME: row.VerifiedMIME, Width: row.Width, Height: row.Height, DurationMS: row.DurationMS,
 			})
 		}
 
@@ -369,7 +378,7 @@ func classifyBindingAssetRows(rows []bindingAssetRow, lookupIDs []string) ([]bin
 func validCoreBindingAsset(row bindingAssetRow, ownerID uint64, purpose Purpose) bool {
 	return row.OwnerID == ownerID && row.Purpose == purpose && row.StorageStage == StorageStageFinal &&
 		row.TechnicalStatus == TechnicalFinalReady && row.FinalKey != "" && row.FinalVersionID != "" &&
-		row.HasProjection && row.ProjectionStatus == ProjectionApproved && row.DeleteRequestedAt == nil && row.DeletedAt == nil
+		row.HasProjection && ReviewAllowsUse(row.Purpose, row.ProjectionStatus) && row.DeleteRequestedAt == nil && row.DeletedAt == nil
 }
 
 func bindingRowIDs(rows []bindingAssetRow) []uint64 {

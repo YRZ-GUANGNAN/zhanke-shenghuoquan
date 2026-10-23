@@ -44,7 +44,7 @@ func TestPolicyDurabilityRefreshAndFailClosed(t *testing.T) {
 	}
 	p := Snapshot()
 	p.Flags[KeyTakeout] = false
-	saved, err := Update(7, UpdateInput{p.Flags, "admin_only", p.RowVersion})
+	saved, err := Update(7, UpdateInput{p.Flags, "admin_only", p.RowVersion, nil})
 	if err != nil || saved.UpdatedBy != 7 || store.audits != 1 {
 		t.Fatalf("save: %+v %v", saved, err)
 	}
@@ -67,7 +67,7 @@ func TestPolicyDurabilityRefreshAndFailClosed(t *testing.T) {
 			t.Fatalf("database error opened %s", key)
 		}
 	}
-	if _, err := Update(7, UpdateInput{saved.Flags, "admin_only", saved.RowVersion}); !errors.Is(err, ErrUnavailable) {
+	if _, err := Update(7, UpdateInput{saved.Flags, "admin_only", saved.RowVersion, nil}); !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("unavailable write: %v", err)
 	}
 }
@@ -77,17 +77,17 @@ func TestPartialFlagsAndUnknownKeysCannotReopenModules(t *testing.T) {
 	t.Cleanup(func() { Configure(false) })
 	p := Snapshot()
 	p.Flags[KeyMessages] = false
-	p, err := Update(1, UpdateInput{p.Flags, "admin_only", p.RowVersion})
+	p, err := Update(1, UpdateInput{p.Flags, "admin_only", p.RowVersion, nil})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Update(1, UpdateInput{map[string]bool{KeyForum: true}, "all_users", p.RowVersion}); !errors.Is(err, ErrInvalidKey) {
+	if _, err := Update(1, UpdateInput{map[string]bool{KeyForum: true}, "all_users", p.RowVersion, nil}); !errors.Is(err, ErrInvalidKey) {
 		t.Fatalf("partial update accepted: %v", err)
 	}
 	flags := clonePolicy(p).Flags
 	delete(flags, KeySearch)
 	flags["unknown"] = true
-	if _, err := Update(1, UpdateInput{flags, "all_users", p.RowVersion}); !errors.Is(err, ErrInvalidKey) {
+	if _, err := Update(1, UpdateInput{flags, "all_users", p.RowVersion, nil}); !errors.Is(err, ErrInvalidKey) {
 		t.Fatalf("unknown key accepted: %v", err)
 	}
 	if Can(KeyMessages) || Snapshot().RowVersion != p.RowVersion {
@@ -100,7 +100,7 @@ func TestDependenciesAndRoleAreIndependent(t *testing.T) {
 	t.Cleanup(func() { Configure(false) })
 	p := Snapshot()
 	p.Flags[KeyForum] = false
-	if _, err := Update(1, UpdateInput{p.Flags, "all_users", p.RowVersion}); err != nil {
+	if _, err := Update(1, UpdateInput{p.Flags, "all_users", p.RowVersion, nil}); err != nil {
 		t.Fatal(err)
 	}
 	if Can(KeyPost) || Can(KeyComment) || Can(KeyFollowing) || !Can(KeySecondhandComments) {
@@ -111,7 +111,7 @@ func TestDependenciesAndRoleAreIndependent(t *testing.T) {
 	}
 	p = Snapshot()
 	p.Flags[KeyForum] = true
-	if _, err := Update(1, UpdateInput{p.Flags, "admin_only", p.RowVersion}); err != nil {
+	if _, err := Update(1, UpdateInput{p.Flags, "admin_only", p.RowVersion, nil}); err != nil {
 		t.Fatal(err)
 	}
 	if CanPost(user.RoleUser) || !CanPost(user.RoleAdmin) || !CanPost(user.RoleSuperAdmin) {
@@ -119,7 +119,7 @@ func TestDependenciesAndRoleAreIndependent(t *testing.T) {
 	}
 	p = Snapshot()
 	p.Flags[KeyPublish] = false
-	if _, err := Update(1, UpdateInput{p.Flags, "all_users", p.RowVersion}); err != nil {
+	if _, err := Update(1, UpdateInput{p.Flags, "all_users", p.RowVersion, nil}); err != nil {
 		t.Fatal(err)
 	}
 	if CanPost(user.RoleSuperAdmin) || Can(KeySecondhandPublish) || !Can(KeyComment) {
@@ -177,7 +177,7 @@ func TestAdminAuthorizationAndPublicPayload(t *testing.T) {
 		router.Use(func(c *gin.Context) { user.SetCurrentUser(c, user.User{ID: 3, Role: role, Status: user.StatusActive}) })
 		router.PATCH("/policy", AdminUpdateHandler)
 		p := Snapshot()
-		data, _ := json.Marshal(UpdateInput{p.Flags, "all_users", p.RowVersion})
+		data, _ := json.Marshal(UpdateInput{p.Flags, "all_users", p.RowVersion, nil})
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, httptest.NewRequest("PATCH", "/policy", bytes.NewReader(data)))
 		expected := 403

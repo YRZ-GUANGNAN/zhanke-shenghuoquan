@@ -32,6 +32,7 @@ type MediaMetadataView struct {
 	ByteSize     uint64           `json:"byteSize"`
 	Width        uint32           `json:"width"`
 	Height       uint32           `json:"height"`
+	DurationMS   uint32           `json:"durationMs,omitempty"`
 	ReviewStatus ProjectionStatus `json:"reviewStatus"`
 }
 
@@ -67,6 +68,7 @@ type GatewaySnapshot struct {
 	ByteSize               uint64
 	Width                  uint32
 	Height                 uint32
+	DurationMS             uint32
 	FinalIdentityReady     bool
 	DeleteRequested        bool
 	ProjectionStatus       ProjectionStatus

@@ -55,7 +55,8 @@ func RequestKeys(method, path string) []string {
 		}
 		return keys
 	case strings.HasPrefix(path, "/im/"):
-		return []string{KeyMessages, KeySecondhandChat}
+		// Product relations are checked after participant authorization by IM.
+		return []string{KeyMessages}
 	case strings.HasPrefix(path, "/navigation/external-takeout"):
 		keys := []string{KeyTakeout}
 		if strings.Contains(path, "/search") {
@@ -73,7 +74,7 @@ func RequestKeys(method, path string) []string {
 		return []string{KeyDelivery, KeyMerchant}
 	case path == "/delivery/rider/orders/claimable" || strings.HasPrefix(path, "/delivery/rider/orders/") && strings.HasSuffix(path, "/claim") && method == http.MethodPost:
 		return []string{KeyDelivery, KeyRider}
-	case strings.HasPrefix(path, "/takeout/buyer/merchants") || path == "/takeout/buyer/orders" && method == http.MethodPost:
+	case strings.HasPrefix(path, "/takeout/catalog/") || strings.HasPrefix(path, "/takeout/buyer/merchants") || path == "/takeout/buyer/orders" && method == http.MethodPost:
 		return []string{KeyTakeout}
 	case strings.HasPrefix(path, "/takeout/merchant/") && (strings.Contains(path, "/categories") || strings.Contains(path, "/dishes") || strings.HasSuffix(path, "/onboarding")):
 		return []string{KeyTakeout, KeyMerchant}

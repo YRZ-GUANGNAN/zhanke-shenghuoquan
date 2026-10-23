@@ -28,6 +28,8 @@ type User struct {
 	Nickname        string         `json:"nickname" gorm:"size:64"`
 	Avatar          string         `json:"avatar" gorm:"size:512"`
 	AvatarAssetID   *uint64        `json:"-" gorm:"index"`
+	Cover           string         `json:"cover" gorm:"size:512;not null;default:''"`
+	CoverAssetID    *uint64        `json:"-" gorm:"index"`
 	School          string         `json:"school" gorm:"size:80"`
 	Campus          string         `json:"campus" gorm:"size:80"`
 	CurrentIdentity Identity       `json:"currentIdentity" gorm:"column:current_identity;size:24;not null;default:student"`
@@ -44,6 +46,7 @@ type Profile struct {
 	ID            uint    `json:"id"`
 	Nickname      string  `json:"nickname"`
 	Avatar        string  `json:"avatar"`
+	Cover         string  `json:"cover"`
 	AvatarAssetID *uint64 `json:"-"`
 	School        string  `json:"school"`
 	Campus        string  `json:"campus"`
@@ -53,7 +56,7 @@ func (u User) Profile() Profile {
 	if u.Status == StatusClosed {
 		return Profile{ID: u.ID, Nickname: "账号已注销"}
 	}
-	return Profile{ID: u.ID, Nickname: u.Nickname, Avatar: u.Avatar, AvatarAssetID: u.AvatarAssetID, School: u.School, Campus: u.Campus}
+	return Profile{ID: u.ID, Nickname: u.Nickname, Avatar: u.Avatar, Cover: u.Cover, AvatarAssetID: u.AvatarAssetID, School: u.School, Campus: u.Campus}
 }
 
 type UserSettings struct {
@@ -68,6 +71,7 @@ type UserSettings struct {
 }
 
 type SettingsView struct {
+	WechatBound    bool   `json:"wechatBound"`
 	OrderNotice    bool   `json:"orderNotice"`
 	SocialNotice   bool   `json:"socialNotice"`
 	QuietHours     bool   `json:"quietHours"`

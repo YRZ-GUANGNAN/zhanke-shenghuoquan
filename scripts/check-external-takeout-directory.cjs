@@ -22,13 +22,18 @@ for (const required of [
   'navigateToMiniProgram',
   "merchant.operatingStatus === 'resting'",
   '/pages/search/index?scope=takeout',
-  '商家加载失败，点击重试',
+  '商家加载失败',
 ]) assertIncludes(takeoutPage, required)
 
 for (const forbidden of [
   'const merchants', '茶知味', '华莱士', '正新鸡排', '一点点', '塔斯汀', '蜜雪冰城',
-  'g-takeout', 'stores/cart', 'pages/takeout/', 'getCurrentInstance',
+  'g-takeout', 'stores/cart', 'pages/takeout/',
 ]) assertExcludes(takeoutPage, forbidden)
+
+assertIncludes(takeoutPage, 'ServiceMerchantCatalog')
+const catalog = read('apps', 'miniapp', 'src', 'components', 'service-merchant-catalog.tsx')
+assertIncludes(catalog, '/takeout/catalog/merchants')
+for (const forbidden of ['createBuyerOrder', 'payBuyerOrder', 'requestPayment', 'stores/cart']) assertExcludes(catalog, forbidden)
 
 for (const required of [
   'external_takeout_merchants', 'listNavigationItems',

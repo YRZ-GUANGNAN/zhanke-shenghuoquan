@@ -14,12 +14,14 @@ import {
 import { isApiError } from '../../services/api'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
+import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import './index.scss'
 
 type ToggleKey = 'orderNotice' | 'socialNotice' | 'quietHours' | 'personalized'
 type CloseStage = 'idle' | 'first' | 'final' | 'blocked'
 
 const defaults: UserSettingsView = {
+	wechatBound: true,
   orderNotice: true,
   socialNotice: true,
   quietHours: false,
@@ -51,6 +53,11 @@ function currentVersion(): string {
 export default function SettingsPage() {
   const logout = useSessionStore((state) => state.logout)
   const identity = useSessionStore((state) => state.identity)
+  const visibility = useFeatureVisibility()
+  const isCampusInfo = visibility.presentationMode === 'campus_info'
+  const hasHistoricalWork = Boolean(identity?.identities.some(item => item.identity !== 'student' && item.available))
+  const visibleNoticeRows = isCampusInfo ? noticeRows.filter(row => row.key === 'orderNotice' ? hasHistoricalWork : row.key === 'socialNotice' ? visibility.notifications || visibility.messages : hasHistoricalWork || visibility.messages) : noticeRows
+  const visiblePrivacyRows = isCampusInfo ? privacyRows.filter(() => visibility.forum || visibility.secondhand) : privacyRows
   const [settings, setSettings] = useState<UserSettingsView>(defaults)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -148,47 +155,63 @@ export default function SettingsPage() {
         <View className='student-settings-section'>
           <Text className='student-settings-section__label'>账号与绑定</Text>
           <View className='student-settings-card'>
-            <View className='student-settings-row'>
+            <View className='student-settings-row student-settings-account-row'>
+              <View className='student-settings-row__main'>
+                <Text className='student-settings-row__title'>微信登录</Text>
+                <Text className='student-settings-row__subtitle'>当前账号已与微信稳定绑定，退出后可重新登录</Text>
+              </View>
+              <View className='student-settings-bind'>
+                <View className='student-settings-bind__dot' />
+                <Text>{settings.wechatBound ? '已绑定' : '待确认'}</Text>
+              </View>
+            </View>
+            {(!isCampusInfo || settings.phoneBound || hasHistoricalWork) && <View className='student-settings-row'>
               <Text className='student-settings-row__title'>手机号</Text>
               <Button className='student-settings-phone' openType='getPhoneNumber' onGetPhoneNumber={bindPhone}>
                 {settings.phoneBound ? settings.maskedPhone : '绑定手机号'}
               </Button>
-            </View>
+            </View>}
             <View className='student-settings-row'>
               <Text className='student-settings-row__title'>当前身份</Text>
               <Text className='student-settings-row__value'>{identityName}</Text>
             </View>
+            {!settings.phoneBound && <View className='student-settings-row student-settings-account-row'>
+              <View className='student-settings-row__main'>
+                <Text className='student-settings-row__title'>手机号登录</Text>
+                <Text className='student-settings-row__subtitle'>功能预留中，暂不影响微信登录</Text>
+              </View>
+              <Text className='student-settings-row__value'>暂未启用</Text>
+            </View>}
           </View>
         </View>
 
-        <View className='student-settings-section'>
+        {visibleNoticeRows.length > 0 && <View className='student-settings-section'>
           <Text className='student-settings-section__label'>消息通知</Text>
           <View className='student-settings-card'>
-            {noticeRows.map((row) => (
+            {visibleNoticeRows.map((row) => (
               <View key={row.key} className='student-settings-row student-settings-row--tall'>
                 <View className='student-settings-row__main'>
                   <Text className='student-settings-row__title'>{row.title}</Text>
                   <Text className='student-settings-row__subtitle'>{row.subtitle}</Text>
                 </View>
-                <View className={`student-settings-switch ${settings[row.key] ? 'student-settings-switch--on' : ''}`} onClick={() => void toggle(row.key)}>
-                  <View className='student-settings-switch__knob' />
+                <View className='student-settings-switch-target' ariaRole='button' ariaLabel={`${row.title}，${settings[row.key] ? '已开启' : '已关闭'}`} onClick={() => void toggle(row.key)}>
+                  <View className={`student-settings-switch ${settings[row.key] ? 'student-settings-switch--on' : ''}`}><View className='student-settings-switch__knob' /></View>
                 </View>
               </View>
             ))}
           </View>
-        </View>
-
-        <View className='student-settings-section'>
+        </View>}
+        {(visiblePrivacyRows.length > 0 || settings.blacklistCount > 0) && <View className='student-settings-section'>
           <Text className='student-settings-section__label'>隐私</Text>
           <View className='student-settings-card'>
-            {privacyRows.map((row) => (
+            {visiblePrivacyRows.map((row) => (
               <View key={row.key} className='student-settings-row student-settings-row--tall'>
                 <View className='student-settings-row__main'>
                   <Text className='student-settings-row__title'>{row.title}</Text>
                   <Text className='student-settings-row__subtitle'>{row.subtitle}</Text>
                 </View>
-                <View className={`student-settings-switch ${settings[row.key] ? 'student-settings-switch--on' : ''}`} onClick={() => void toggle(row.key)}>
-                  <View className='student-settings-switch__knob' />
+                <View className='student-settings-switch-target' ariaRole='button' ariaLabel={`${row.title}，${settings[row.key] ? '已开启' : '已关闭'}`} onClick={() => void toggle(row.key)}>
+                  <View className={`student-settings-switch ${settings[row.key] ? 'student-settings-switch--on' : ''}`}><View className='student-settings-switch__knob' /></View>
                 </View>
               </View>
             ))}
@@ -200,7 +223,7 @@ export default function SettingsPage() {
               </View>
             </View>
           </View>
-        </View>
+        </View>}
 
         <View className='student-settings-section'>
           <Text className='student-settings-section__label'>通用</Text>

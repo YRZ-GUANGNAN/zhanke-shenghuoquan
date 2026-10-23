@@ -26,6 +26,7 @@ type ConfigRow struct {
 	Following         bool      `gorm:"not null"`
 	ExtraFlags        string    `gorm:"type:json;not null"`
 	PostingMode       string    `gorm:"size:16;not null"`
+	PresentationMode  string    `gorm:"size:24;not null;default:standard"`
 	RowVersion        uint64    `gorm:"not null"`
 	UpdatedBy         uint      `gorm:"not null"`
 	UpdatedAt         time.Time `gorm:"not null"`
@@ -50,8 +51,8 @@ func NewGormStore(db *gorm.DB) *GormStore { return &GormStore{db: db} }
 
 func (s *GormStore) Ensure(ctx context.Context) error {
 	m := s.db.WithContext(ctx).Migrator()
-	if !m.HasTable(&ConfigRow{}) || !m.HasTable(&AuditRow{}) || !m.HasColumn(&ConfigRow{}, "extra_flags") {
-		return errors.New("feature policy schema missing; apply migrations 038 and 039 before starting the server")
+	if !m.HasTable(&ConfigRow{}) || !m.HasTable(&AuditRow{}) || !m.HasColumn(&ConfigRow{}, "extra_flags") || !m.HasColumn(&ConfigRow{}, "presentation_mode") {
+		return errors.New("feature policy schema missing; apply migrations 038, 039 and 041 before starting the server")
 	}
 	return nil
 }
@@ -66,6 +67,9 @@ func (s *GormStore) Load(ctx context.Context) (Policy, bool, error) {
 		return Policy{}, false, err
 	}
 	value := rowPolicy(row)
+	if !validPresentationMode(value.PresentationMode) {
+		return Policy{}, false, ErrInvalidPresentationMode
+	}
 	if err := json.Unmarshal([]byte(row.ExtraFlags), &value.Flags); err != nil {
 		return Policy{}, false, err
 	}
@@ -89,7 +93,8 @@ func (s *GormStore) Save(ctx context.Context, before, after Policy) error {
 			"merchant": after.Flags[KeyMerchant], "rider": after.Flags[KeyRider], "messages": after.Flags[KeyMessages],
 			"following": after.Flags[KeyFollowing], "posting_mode": after.PostingMode, "row_version": after.RowVersion,
 			"updated_by": after.UpdatedBy, "updated_at": after.UpdatedAt,
-			"extra_flags": extraFlagsJSON(after),
+			"extra_flags":       extraFlagsJSON(after),
+			"presentation_mode": after.PresentationMode,
 		})
 		if result.Error != nil {
 			return result.Error
@@ -104,11 +109,11 @@ func (s *GormStore) Save(ctx context.Context, before, after Policy) error {
 }
 
 func policyRow(value Policy) ConfigRow {
-	return ConfigRow{ID: 1, Forum: value.Flags[KeyForum], Post: value.Flags[KeyPost], Comment: value.Flags[KeyComment], Secondhand: value.Flags[KeySecondhand], SecondhandPublish: value.Flags[KeySecondhandPublish], SecondhandChat: value.Flags[KeySecondhandChat], Takeout: value.Flags[KeyTakeout], CampusTools: value.Flags[KeyCampusTools], Delivery: value.Flags[KeyDelivery], Merchant: value.Flags[KeyMerchant], Rider: value.Flags[KeyRider], Messages: value.Flags[KeyMessages], Following: value.Flags[KeyFollowing], PostingMode: value.PostingMode, RowVersion: value.RowVersion, UpdatedBy: value.UpdatedBy, UpdatedAt: value.UpdatedAt, CreatedAt: time.Now().UTC()}
+	return ConfigRow{ID: 1, Forum: value.Flags[KeyForum], Post: value.Flags[KeyPost], Comment: value.Flags[KeyComment], Secondhand: value.Flags[KeySecondhand], SecondhandPublish: value.Flags[KeySecondhandPublish], SecondhandChat: value.Flags[KeySecondhandChat], Takeout: value.Flags[KeyTakeout], CampusTools: value.Flags[KeyCampusTools], Delivery: value.Flags[KeyDelivery], Merchant: value.Flags[KeyMerchant], Rider: value.Flags[KeyRider], Messages: value.Flags[KeyMessages], Following: value.Flags[KeyFollowing], PostingMode: value.PostingMode, PresentationMode: value.PresentationMode, RowVersion: value.RowVersion, UpdatedBy: value.UpdatedBy, UpdatedAt: value.UpdatedAt, CreatedAt: time.Now().UTC()}
 }
 
 func rowPolicy(row ConfigRow) Policy {
-	return Policy{Flags: map[string]bool{KeyForum: row.Forum, KeyPost: row.Post, KeyComment: row.Comment, KeySecondhand: row.Secondhand, KeySecondhandPublish: row.SecondhandPublish, KeySecondhandChat: row.SecondhandChat, KeyTakeout: row.Takeout, KeyCampusTools: row.CampusTools, KeyDelivery: row.Delivery, KeyMerchant: row.Merchant, KeyRider: row.Rider, KeyMessages: row.Messages, KeyFollowing: row.Following}, PostingMode: row.PostingMode, RowVersion: row.RowVersion, UpdatedBy: row.UpdatedBy, UpdatedAt: row.UpdatedAt, LabEnabled: true}
+	return Policy{Flags: map[string]bool{KeyForum: row.Forum, KeyPost: row.Post, KeyComment: row.Comment, KeySecondhand: row.Secondhand, KeySecondhandPublish: row.SecondhandPublish, KeySecondhandChat: row.SecondhandChat, KeyTakeout: row.Takeout, KeyCampusTools: row.CampusTools, KeyDelivery: row.Delivery, KeyMerchant: row.Merchant, KeyRider: row.Rider, KeyMessages: row.Messages, KeyFollowing: row.Following}, PostingMode: row.PostingMode, PresentationMode: row.PresentationMode, RowVersion: row.RowVersion, UpdatedBy: row.UpdatedBy, UpdatedAt: row.UpdatedAt, LabEnabled: true}
 }
 
 func extraFlagsJSON(value Policy) string {

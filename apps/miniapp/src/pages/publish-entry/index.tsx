@@ -1,11 +1,13 @@
 import { withFeaturePage } from '../../components/feature-page-gate'
-import React, { useEffect, useState } from 'react'
+import { useEffect, useRef } from 'react'
+import { useDidHide, useDidShow } from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import AppIcon, { type AppIconName } from '../../components/app-icon'
 import { AppIconButton } from '../../components/ui'
 import Taro from '../../services/taro'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
+import { navigateBackOrHome } from '../../utils/navigation'
 import './index.scss'
 
 type PublishEntry = {
@@ -38,12 +40,28 @@ const entries: PublishEntry[] = [
 
 function PublishEntryPage() {
   const visibility = useFeatureVisibility()
+  const active = useRef(true)
+  const navigation = useRef<{ key: PublishEntry['key'] } | null>(null)
+  useEffect(() => {
+    active.current = true
+    return () => { active.current = false; navigation.current = null }
+  }, [])
+  useDidHide(() => { active.current = false; navigation.current = null })
+  useDidShow(() => { active.current = true; navigation.current = null })
   const openEntry = (entry: PublishEntry) => {
+    if (!active.current || navigation.current) return
     if (!visibility || (entry.key === 'post' ? !visibility.post : !visibility.secondhand_publish)) {
       void Taro.showToast({ title: '该功能暂未开放', icon: 'none' })
       return
     }
-    void Taro.navigateTo({ url: entry.url })
+    const request = { key: entry.key }
+    navigation.current = request
+    const failed = () => {
+      if (!active.current || navigation.current !== request) return
+      navigation.current = null
+      void Taro.showToast({ title: '页面打开失败，请重试', icon: 'none' }).catch(() => undefined)
+    }
+    try { void Taro.navigateTo({ url: entry.url }).catch(failed) } catch { failed() }
   }
 
   return (
@@ -55,7 +73,7 @@ function PublishEntryPage() {
             name='back'
             label='返回'
             className='publish-entry-topbar__back'
-            onClick={() => void Taro.navigateBack()}
+            onClick={() => { if (active.current && !navigation.current) void navigateBackOrHome() }}
           />
         }
       />

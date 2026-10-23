@@ -1,0 +1,24 @@
+@use '../styles/design-tokens.scss' as *;
+
+// Reuse the product detail's existing price accent; no external font assets.
+.product-price {
+  display: inline-flex;
+  align-items: baseline;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  color: $badge-unread;
+  font-family: 'DIN Alternate', 'Bahnschrift', 'Arial', sans-serif;
+  font-weight: 700;
+  font-variant-numeric: lining-nums tabular-nums;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+.product-price--card { font-size: 44rpx; font-size: clamp(20PX, 5.867vw, 25PX); }
+.product-price--compact { font-size: 34rpx; font-size: clamp(17PX, 4.534vw, 20PX); }
+.product-price--detail { font-size: 64rpx; font-size: clamp(30PX, 8.534vw, 36PX); }
+.product-price--long { font-size: 34rpx; font-size: clamp(16PX, 4.534vw, 20PX); }
+.product-price--detail.product-price--long { font-size: 52rpx; font-size: clamp(24PX, 6.934vw, 30PX); }
+.product-price__currency { margin-right: 2rpx; font-size: .55em; }
+.product-price__major { font-size: 1em; letter-spacing: -.02em; }
+.product-price__minor { font-size: .68em; }

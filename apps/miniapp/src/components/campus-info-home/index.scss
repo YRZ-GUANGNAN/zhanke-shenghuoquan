@@ -1,0 +1,26 @@
+@use '../../styles/campus-info.scss';
+
+.campus-info-intro { padding: 32rpx 40rpx 40rpx; }
+.campus-info-eyebrow { display: block; color: var(--guide-accent); font-size: 24rpx; line-height: 1.5; letter-spacing: 2rpx; }
+.campus-info-heading { display: block; margin-top: 16rpx; font-size: 44rpx; font-weight: 650; line-height: 1.35; letter-spacing: -1rpx; }
+.campus-info-description { display: block; max-width: 620rpx; margin-top: 20rpx; font-size: 28rpx; line-height: 1.75; color: var(--guide-secondary); }
+.campus-info-categories { display: flex; gap: 40rpx; padding: 0 40rpx; border-bottom: 1rpx solid var(--guide-line); }
+.campus-info-category { position: relative; margin: 0; padding: 20rpx 0 24rpx; min-height: 88rpx; background: transparent; color: var(--guide-secondary); font-size: 28rpx; line-height: 1.5; border-radius: 0; }
+.campus-info-category::after { border: 0; }
+.campus-info-category--active { font-weight: 650; color: var(--guide-text); }
+.campus-info-category--active::before { position: absolute; content: ''; bottom: 0; left: 0; right: 0; height: 4rpx; background: var(--guide-accent); border-radius: 4rpx; }
+.campus-info-list { padding: 0 40rpx; }
+.campus-info-item { display: block; width: 100%; padding: 32rpx 0; margin: 0; background: transparent; text-align: left; border-radius: 0; border-bottom: 1rpx solid var(--guide-line); white-space: normal; }
+.campus-info-item::after { border: 0; }
+.campus-info-item:active { background: #faf8f5; }
+.campus-info-item__meta, .campus-info-item__footer { display: flex; align-items: center; justify-content: space-between; font-size: 24rpx; line-height: 1.5; color: var(--guide-secondary); }
+.campus-info-item__meta { color: var(--guide-accent); font-weight: 500; }
+.campus-info-item__number { color: #b6b0a9; font-size: 24rpx; font-variant-numeric: tabular-nums; }
+.campus-info-item__title { display: block; margin-top: 12rpx; color: var(--guide-text); font-size: 34rpx; font-weight: 600; line-height: 1.55; }
+.campus-info-item__summary { display: block; margin-top: 12rpx; color: var(--guide-secondary); font-size: 28rpx; line-height: 1.7; }
+.campus-info-item__footer { margin-top: 20rpx; color: #8e8983; font-size: 22rpx; }
+.campus-info-item__footer .app-icon { width: 28rpx; height: 28rpx; opacity: .65; }
+@media (max-width: 360px) {
+  .campus-info-intro, .campus-info-list { padding-left: 32rpx; padding-right: 32rpx; }
+  .campus-info-heading { font-size: 40rpx; }
+}

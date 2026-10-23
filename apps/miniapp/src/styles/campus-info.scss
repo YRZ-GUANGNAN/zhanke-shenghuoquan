@@ -1,0 +1,17 @@
+.campus-info-page {
+  --guide-text: #292824;
+  --guide-secondary: #74706a;
+  --guide-accent: #8a6544;
+  --guide-line: #eeeae5;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: #fff;
+  color: var(--guide-text);
+}
+.campus-info-scroll { flex: 1; min-height: 0; height: 0; box-sizing: border-box; }
+.campus-info-note { display: flex; flex-direction: column; gap: 12rpx; margin: 0 40rpx; padding: 40rpx 0 calc(176rpx + env(safe-area-inset-bottom)); font-size: 24rpx; line-height: 1.8; color: var(--guide-secondary); }
+.campus-info-text-button { margin: 0; padding: 16rpx 0; min-height: 88rpx; background: transparent; color: var(--guide-accent); font-size: 26rpx; line-height: 1.8; text-align: left; white-space: normal; }
+.campus-info-text-button::after { border: 0; }
+.campus-info-text-button:active { opacity: .6; }

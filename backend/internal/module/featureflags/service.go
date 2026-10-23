@@ -50,19 +50,21 @@ var (
 )
 
 type Policy struct {
-	Flags       map[string]bool `json:"flags"`
-	PostingMode string          `json:"postingMode"`
-	RowVersion  uint64          `json:"rowVersion"`
-	UpdatedBy   uint            `json:"updatedBy"`
-	UpdatedAt   time.Time       `json:"updatedAt"`
-	LabEnabled  bool            `json:"labEnabled"`
-	Enabled     bool            `json:"enabled"`
+	PresentationMode string          `json:"presentationMode"`
+	Flags            map[string]bool `json:"flags"`
+	PostingMode      string          `json:"postingMode"`
+	RowVersion       uint64          `json:"rowVersion"`
+	UpdatedBy        uint            `json:"updatedBy"`
+	UpdatedAt        time.Time       `json:"updatedAt"`
+	LabEnabled       bool            `json:"labEnabled"`
+	Enabled          bool            `json:"enabled"`
 }
 
 type UpdateInput struct {
 	Flags              map[string]bool `json:"flags"`
 	PostingMode        string          `json:"postingMode"`
 	ExpectedRowVersion uint64          `json:"expectedRowVersion"`
+	PresentationMode   *string         `json:"presentationMode,omitempty"`
 }
 
 type Store interface {
@@ -90,7 +92,7 @@ func newDefaultFlags() map[string]bool {
 }
 
 func newDefaultPolicy(labEnabled bool) Policy {
-	return Policy{Flags: newDefaultFlags(), PostingMode: "admin_only", RowVersion: 1, LabEnabled: labEnabled, Enabled: labEnabled}
+	return Policy{PresentationMode: PresentationStandard, Flags: newDefaultFlags(), PostingMode: "admin_only", RowVersion: 1, LabEnabled: labEnabled, Enabled: labEnabled}
 }
 
 // Configure without a store is reserved for tests. The server uses ConfigureStore.
@@ -134,6 +136,9 @@ func ConfigureStore(ctx context.Context, enabled bool, store Store) error {
 	}
 	value.LabEnabled = true
 	value.Enabled = true
+	if !validPresentationMode(value.PresentationMode) {
+		return ErrInvalidPresentationMode
+	}
 	state.Lock()
 	state.policy = clonePolicy(value)
 	state.store = store
@@ -188,6 +193,13 @@ func UpdateContext(ctx context.Context, actorID uint, input UpdateInput) (Policy
 	if mode != "admin_only" && mode != "all_users" {
 		return clonePolicy(state.policy), ErrInvalidPostingMode
 	}
+	presentation := state.policy.PresentationMode
+	if input.PresentationMode != nil {
+		presentation = *input.PresentationMode
+	}
+	if !validPresentationMode(presentation) {
+		return clonePolicy(state.policy), ErrInvalidPresentationMode
+	}
 	if input.Flags == nil || len(input.Flags) != len(AllKeys) {
 		return clonePolicy(state.policy), ErrInvalidKey
 	}
@@ -201,6 +213,7 @@ func UpdateContext(ctx context.Context, actorID uint, input UpdateInput) (Policy
 	next := clonePolicy(state.policy)
 	next.Flags = flags
 	next.PostingMode = mode
+	next.PresentationMode = presentation
 	next.RowVersion++
 	next.UpdatedBy = actorID
 	next.UpdatedAt = time.Now().UTC()
@@ -229,6 +242,9 @@ func Set(next Policy) Policy {
 	}
 	state.policy.Flags = flags
 	state.policy.PostingMode = mode
+	if validPresentationMode(next.PresentationMode) {
+		state.policy.PresentationMode = next.PresentationMode
+	}
 	state.policy.RowVersion++
 	state.policy.UpdatedBy = next.UpdatedBy
 	state.policy.UpdatedAt = time.Now().UTC()
@@ -236,7 +252,7 @@ func Set(next Policy) Policy {
 }
 
 func Can(key string) bool {
-	value := Snapshot()
+	value := EffectivePolicy(Snapshot())
 	if !value.Enabled {
 		return true
 	}
@@ -244,7 +260,7 @@ func Can(key string) bool {
 }
 
 func CanPost(role user.Role) bool {
-	value := Snapshot()
+	value := EffectivePolicy(Snapshot())
 	if !value.Enabled {
 		return true
 	}
@@ -255,7 +271,7 @@ func CanPost(role user.Role) bool {
 }
 
 func CanComment(role user.Role) bool {
-	value := Snapshot()
+	value := EffectivePolicy(Snapshot())
 	if !value.Enabled {
 		return true
 	}
@@ -295,7 +311,7 @@ func refresh(force bool) {
 	defer cancel()
 	value, found, err := state.store.Load(ctx)
 	state.refreshedAt = time.Now()
-	if err != nil || !found {
+	if err != nil || !found || !validPresentationMode(value.PresentationMode) {
 		state.loadError = ErrUnavailable
 		for key := range state.policy.Flags {
 			state.policy.Flags[key] = false

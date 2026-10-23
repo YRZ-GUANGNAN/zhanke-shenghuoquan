@@ -20,7 +20,7 @@ export async function listNavigationItems():Promise<ToolLink[]>{
 	const categories=await listNavigationCategories()
 	return categories
 		.filter((category)=>category.systemKey!==externalTakeoutSystemKey)
-		.reduce<ToolLink[]>((all,category)=>all.concat(category.items.filter(isRealTool).map((item)=>({id:String(item.id),title:item.title,subtitle:item.subtitle,iconText:item.iconText,appId:item.appId.trim(),path:item.path.trim(),color:item.color}))),[])
+		.reduce<ToolLink[]>((all,category)=>all.concat(category.items.filter(isRealTool).map((item)=>({id:String(item.id),categoryId:String(category.id),categoryName:category.name,title:item.title,subtitle:item.subtitle,iconText:item.iconText,appId:item.appId.trim(),path:item.path.trim(),color:item.color}))),[])
 }
 export async function listExternalTakeoutMerchants():Promise<ExternalTakeoutMerchantLink[]>{
 	const categories=await listNavigationCategories()

@@ -108,19 +108,22 @@ function TakeoutPage() {
         </View>
       )}
 
-      <View className='takeout-section-title'>已上架菜品</View>
+      <View className='takeout-section-heading'>
+        <View>
+          <Text className='takeout-section-title'>已上架菜品</Text>
+          <Text className='takeout-section-caption'>价格以提交订单时的服务端校验为准</Text>
+        </View>
+        <Text className='takeout-section-count'>{dishes.length} 件</Text>
+      </View>
       <View className='takeout-dish-list'>
         {dishes.map((dish) => (
           <View key={dish.dishPublicId} className='card takeout-dish-card'>
             <ResolvedMediaImage className='takeout-dish-card__image' contentUrl={dish.imageContentUrl} placeholder='菜品图' />
             <View className='takeout-dish-card__body'>
-              <View className='between'>
-                <Text className='takeout-dish-card__name'>{dish.name}</Text>
-                <Text className='takeout-price'>¥{centsToYuan(dish.priceCents)}</Text>
-              </View>
-              <Text className='takeout-muted'>{dish.description || '暂无描述'}</Text>
+              <Text className='takeout-dish-card__name'>{dish.name}</Text>
+              <Text className='takeout-muted takeout-dish-card__description'>{dish.description || '暂无描述'}</Text>
+              <Text className='takeout-price'><Text className='takeout-price__currency'>¥</Text>{centsToYuan(dish.priceCents)}</Text>
               <View className='between takeout-dish-card__actions'>
-                <Text className='takeout-muted'>图源：resolve → COS 短签 URL</Text>
                 <Button className='cc-button cc-button--small cc-button--primary' onClick={() => void addToCart(dish)}>加购</Button>
               </View>
             </View>

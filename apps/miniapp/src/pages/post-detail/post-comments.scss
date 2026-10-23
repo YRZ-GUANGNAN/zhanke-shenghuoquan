@@ -1,0 +1,45 @@
+@use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
+
+// Scoped to the comment surface: readable at 320px, bounded on wider windows.
+.post-detail-comments {
+  .post-detail-comment { gap: 8PX; padding: 12PX 0 4PX; }
+  .post-detail-comment__avatar { width: 32PX; height: 32PX; margin-right: 0; font-size: 13PX; }
+  .post-detail-comment__main { min-width: 0; }
+  .post-detail-comment__author { font-size: clamp(13PX, 26rpx, 15PX); line-height: 1.4; }
+  .post-detail-comment__content { font-size: clamp(14PX, 28rpx, 16PX); line-height: 1.55; margin-top: 4PX; }
+  .post-detail-comment__meta { font-size: clamp(12PX, 24rpx, 14PX); line-height: 1.5; margin: 0; }
+  .post-detail-comment__recipient { display: block; font-size: clamp(12PX, 24rpx, 14PX); line-height: 1.5; color: $text-secondary; overflow-wrap: anywhere; margin-top: 2PX; }
+  .post-detail-comment__footer { display: flex; flex-wrap: wrap; align-items: center; column-gap: 8PX; min-height: 32PX; }
+  .post-detail-comment__reply-button { @include ref.touch; display: flex; align-items: center; justify-content: center; color: $text-secondary; font-size: 12PX; font-weight: 500; }
+  .post-detail-comment__status { display: block; color: $text-tertiary; font-size: 12PX; line-height: 1.5; padding-bottom: 8PX; }
+  .post-detail-comment__like {
+    @include ref.touch;
+    flex: none; align-self: flex-start; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    width: 44PX; gap: 3PX; color: $text-tertiary; font-size: 11PX; line-height: 1.3; font-variant-numeric: tabular-nums;
+    transition: opacity 120ms ease;
+  }
+  .post-detail-comment__like-icon { width: 18PX; height: 18PX; transition: transform 120ms ease; }
+  .post-detail-comment__like--active { color: $like-active; }
+  .post-detail-comment__like--pending { opacity: .5; }
+  .post-detail-comment__like:active .post-detail-comment__like-icon { transform: scale(.92); }
+  .post-detail-comment__reply-button:active, .post-detail-comments__more:active, .post-detail-comments__collapse:active { opacity: .6; }
+  .post-detail-comment-thread + .post-detail-comment-thread { margin-top: 8PX; }
+  .post-detail-comment-thread__replies { margin-left: 40PX; }
+  .post-detail-comment--reply { padding-top: 8PX; }
+  .post-detail-comment--reply .post-detail-comment__avatar { width: 20PX; height: 20PX; font-size: 10PX; }
+  .post-detail-comments__more, .post-detail-comments__collapse {
+    @include ref.touch;
+    display: flex; align-items: center; gap: 8PX; color: $brand-primary-strong; font-size: 13PX; line-height: 1.5; overflow-wrap: anywhere;
+  }
+  .post-detail-comments__collapse { color: $text-secondary; justify-content: center; }
+  .post-detail-comments__more .app-icon { width: 12PX; height: 12PX; flex: none; }
+  .post-detail-comments__connector { width: 16PX; height: 1PX; background: $divider-nav; flex: none; }
+  .post-detail-comments__reply-controls { display: flex; flex-wrap: wrap; column-gap: 16PX; align-items: center; }
+  .post-detail-comments__loading { display: block; padding: 12PX 0; font-size: 12PX; line-height: 1.5; color: $text-tertiary; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .post-detail-comments .post-detail-comment__like,
+  .post-detail-comments .post-detail-comment__like-icon { transition: none; transform: none; }
+}

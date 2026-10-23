@@ -1,0 +1,273 @@
+// Exercise the actual identity mapping, avatar and chat handlers. All services
+// are isolated; this does not log into IM or send a network message.
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+const Module = require('node:module')
+const ts = require('typescript')
+const { deferred, nodes, text, hasClass, hookRenderer, loadPage } = require('./test-delivery-stage-workbench.cjs')
+const root = path.resolve(__dirname, '..')
+
+function loadSource(relative, imports = {}) {
+  const filename = path.join(root, relative)
+  const compiled = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
+    fileName: filename,
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
+  }).outputText
+  const loaded = new Module(filename, module)
+  loaded.filename = filename
+  loaded.require = id => { assert.ok(id in imports, `unisolated dependency: ${id}`); return imports[id] }
+  loaded._compile(compiled, filename)
+  return loaded.exports
+}
+
+const presentation = loadSource('apps/miniapp/src/utils/conversation-presentation.ts')
+const resource = loadSource('apps/miniapp/src/services/resource-url.ts')
+const context = viewer => ({ relationId: 7, productId: 9, buyerId: 2, sellerId: 3, peerUserId: viewer === '3' ? 'campus_2' : 'campus_3', conversationId: viewer === '3' ? 'C2Ccampus_2' : 'C2Ccampus_3', peer: { id: viewer === '3' ? 2 : 3, nickname: viewer === '3' ? '买家昵称' : '卖家昵称', avatar: viewer === '3' ? '/buyer.jpg' : '/seller.jpg' } })
+const product = { id: '9', sellerId: '3', sellerName: '旧卖家资料', sellerAvatar: '/old.jpg', title: '测试商品', images: [], price: 35 }
+const msg = (ID, from, content) => ({ ID, from, time: 1792200000, type: 'TIMTextElem', payload: { text: content } })
+
+function chatHarness(options = {}) {
+  const renderer = hookRenderer()
+  let viewer = options.viewer || '2', subscribed, unsubscribeCount = 0
+  const params = options.params || { relationId: '7' }
+  const toasts = [], writes = [], navigations = []
+  const state = () => ({ status: 'authenticated', profile: { id: viewer, nickname: '自己', avatar: '/self.jpg' }, retry: async () => {} })
+  const useSessionStore = selector => selector(state())
+  useSessionStore.getState = state
+  const reset = () => {}, focus = () => {}, height = () => {}
+  let detailCalls = 0, productCalls = 0, contactCalls = 0
+  const directContext = () => ({ ...context(viewer), referenceType: 'user', productId: 0 })
+  const services = {
+    getIMConversation: async () => { detailCalls++; return context(viewer) },
+    contactUser: async () => { contactCalls++; return directContext() },
+    getTencentIMLoginUser: async id => id,
+    subscribeTencentMessages: async (_, callback) => { subscribed = callback; return () => { unsubscribeCount++ } },
+    loadTencentMessages: async () => [],
+    sendTencentText: async (_, value) => { writes.push(value); return options.send ? options.send(value) : msg('sent', `campus_${viewer}`, value) },
+    ...options.services,
+  }
+  const imports = {
+    '../../components/product-price': 'ProductPrice',
+    '../../components/feature-page-gate': { withFeaturePage: Page => Page },
+    '@tarojs/components': { View: 'View', Text: 'Text', Image: 'Image', ScrollView: 'ScrollView', Textarea: 'Textarea' },
+    '@tarojs/taro': { hideKeyboard: async () => {}, useDidShow: fn => { services.show = fn } },
+    '../../components/capsule-page-header': ({ left, center, right }) => renderer.React.createElement('Header', {}, left, center, right),
+    '../../components/app-icon': 'AppIcon',
+    '../../components/chat-avatar': 'ChatAvatar',
+    '../../services/api': { isApiError: () => false },
+    '../../services/c-trade': { getProduct: async () => { productCalls++; if (options.missingProduct) throw Error('unavailable'); return product }, contactSeller: async () => ({ ...context(viewer), peer: undefined }) },
+    '../../services/e-im': services,
+    '../../services/session-recovery': { requestWithSingleSessionRecovery: fn => fn() },
+    '../../services/taro': { getCurrentInstance: () => ({ router: { params } }), showToast: async ({ title }) => { toasts.push(title) }, navigateTo: async ({ url }) => { navigations.push(url) }, navigateBack: async () => {}, redirectTo: async () => {} },
+    '../../stores/session': { useSessionStore },
+    '../../hooks/use-viewport-refresh': { useViewportRefresh: () => ({}) },
+    '../../hooks/use-keyboard-inset': { useKeyboardInset: () => ({ inset: 0, onFocus: focus, onKeyboardHeightChange: height, reset }) },
+    '../../utils/conversation-presentation': presentation,
+    './index.scss': {},
+  }
+  loadPage('secondhand-chat', imports, renderer)
+  const byClass = name => nodes(renderer.tree, node => hasClass(node, name))[0]
+  const input = () => nodes(renderer.tree, node => node.type === 'Textarea')[0]
+  return {
+    ...renderer, toasts, writes, navigations, services,
+    get tree() { return renderer.tree }, get detailCalls() { return detailCalls }, get productCalls() { return productCalls }, get contactCalls() { return contactCalls }, get unsubscribeCount() { return unsubscribeCount },
+    async mount() { renderer.render(); await renderer.flush() },
+    input, byClass,
+    type(value) { input().props.onInput({ detail: { value } }); renderer.render() },
+    send() { return byClass('secondhand-chat-send').props.onClick() },
+    changeAccount(id) { viewer = id; renderer.render() },
+    incoming(values) { subscribed(values); renderer.render() },
+  }
+}
+
+async function run() {
+  assert.equal(presentation.conversationPeer(context('2'), product, '2').avatar, '/seller.jpg')
+  assert.equal(presentation.conversationPeer(context('3'), product, '3').avatar, '/buyer.jpg')
+  assert.deepEqual(presentation.conversationPeer(context('2'), product, '99'), { id: '', name: '交易对方', avatar: '' })
+  assert.equal(presentation.conversationPeer({ ...context('3'), peer: undefined }, product, '3').avatar, '')
+  assert.equal(presentation.conversationPeer({ ...context('2'), peer: undefined }, product, '2').avatar, '/old.jpg')
+  assert.equal(presentation.conversationPeer({ ...context('2'), peer: { id: 99, nickname: '错误账号', avatar: '/wrong.jpg' } }, { ...product, sellerId: '999' }, '2').avatar, '')
+  assert.equal(presentation.conversationPeer({ ...context('2'), peer: { id: 3, nickname: '账号已注销', avatar: '' } }, product, '2').avatar, '')
+  console.log('PASS 双向身份、旧接口、注销与错误资料回退')
+
+  const direct = { ...context('2'), referenceType: 'user', productId: 0, relationId: 8 }
+  assert.equal(presentation.conversationPeer({ ...direct, peer: undefined }, product, '2').name, '校园用户')
+  assert.deepEqual(presentation.uniquePeerConversations([context('2'), direct, { ...context('2'), relationId: 9 }]), [direct])
+  for (const options of [{ params: { userId: '3' } }, { params: { relationId: '8' }, services: { getIMConversation: async () => direct } }]) {
+    const app = chatHarness(options); await app.mount()
+    assert.equal(app.productCalls, 0)
+    assert.equal(app.byClass('secondhand-chat-product'), undefined)
+    assert.equal(app.input().props.disabled, false)
+    assert.ok(text(app.tree).includes('发一句问候'))
+    assert.ok(!text(app.tree).includes('当面验货'))
+    app.byClass('secondhand-chat-header__home').props.onClick()
+    assert.equal(app.navigations[0], '/pages/user-profile/index?userId=3')
+    app.type('你好'); app.send(); await app.flush()
+    assert.deepEqual(app.writes, ['你好'])
+    app.unmount()
+  }
+  for (const params of [{userId:'3',productId:'9'}, {userId:'bad'}, {userId:'0'}, {userId:'2'}]) {
+    const app = chatHarness({params}); await app.mount()
+    assert.equal(app.input().props.disabled, true)
+    assert.equal(app.productCalls, 0)
+    app.unmount()
+  }
+  const denied = chatHarness({params:{userId:'3'},services:{contactUser:async()=>{throw Error('当前无法与该用户私信')}}})
+  await denied.mount()
+  assert.equal(denied.input().props.disabled, true)
+  assert.ok(text(denied.tree).includes('当前无法与该用户私信'))
+  denied.unmount()
+  console.log('PASS 主页与会话入口支持用户私信、不请求商品、无效/自己/被拒绝会话不能发送，同人列表去重')
+
+  const avatarRenderer = hookRenderer()
+  let avatarProps = { src: '/avatar.jpg', name: '头像昵称' }
+  const Avatar = loadSource('apps/miniapp/src/components/chat-avatar.tsx', {
+    react: avatarRenderer.React,
+    'react/jsx-runtime': { jsx: (type, props) => avatarRenderer.React.createElement(type, props, props.children), jsxs: (type, props) => avatarRenderer.React.createElement(type, props, props.children) },
+    '@tarojs/components': { View: 'View', Image: 'Image', Text: 'Text' },
+    '../services/api': { API_BASE: 'https://example.test/api/v1' },
+    '../services/resource-url': resource,
+    './chat-avatar.scss': {},
+  }).default
+  avatarRenderer.setComponent(() => Avatar(avatarProps))
+  avatarRenderer.render()
+  let image = nodes(avatarRenderer.tree, node => node.type === 'Image')[0]
+  assert.equal(image.props.src, 'https://example.test/avatar.jpg')
+  image.props.onError(); await avatarRenderer.flush()
+  assert.equal(text(avatarRenderer.tree), '头')
+  avatarProps = { src: '/new.jpg', name: '新用户' }
+  await avatarRenderer.flush()
+  assert.equal(nodes(avatarRenderer.tree, node => node.type === 'Image')[0].props.src, 'https://example.test/new.jpg')
+  avatarProps = { src: '', name: '无图用户' }; await avatarRenderer.flush()
+  assert.equal(text(avatarRenderer.tree), '无')
+  console.log('PASS 头像资源地址、坏图首字与账号资料变化')
+
+  for (const viewer of ['2', '3']) {
+    const app = chatHarness({ viewer, missingProduct: true, services: { loadTencentMessages: async () => [msg('1', 'campus_2', '多行\n消息'), msg('2', 'campus_3', '卖家回复')] } })
+    await app.mount()
+    const avatars = nodes(app.tree, node => node.type === 'ChatAvatar')
+    const peerAvatar = viewer === '2' ? '/seller.jpg' : '/buyer.jpg'
+    assert.equal(avatars.filter(node => node.props.src === peerAvatar).length, 2)
+    assert.equal(avatars.filter(node => node.props.src === '/self.jpg').length, 1)
+    assert.equal(app.input().props.disabled, false)
+    assert.ok(text(app.tree).includes('多行\n消息'))
+    app.byClass('secondhand-chat-header__home').props.onClick()
+    assert.ok(app.navigations[0].includes(`userId=${viewer === '2' ? '3' : '2'}&tab=secondhand`))
+    app.unmount(); assert.equal(app.unsubscribeCount, 1)
+  }
+  const productEntry = chatHarness({ params: { productId: '9' } }); await productEntry.mount()
+  assert.equal(productEntry.detailCalls, 1)
+  assert.ok(text(productEntry.tree).includes('卖家昵称')); productEntry.unmount()
+  console.log('PASS 列表进入与商品进入均取得对方头像，商品缺失仍可聊天')
+
+  const pending = deferred()
+  const app = chatHarness({ send: () => pending.promise }); await app.mount(); app.type('第一条')
+  app.send(); app.send()
+  await app.flush()
+  assert.equal(app.writes.length, 1)
+  app.type('继续输入第二条')
+  pending.resolve(msg('one', 'campus_2', '第一条')); await app.flush()
+  assert.equal(app.input().props.value, '继续输入第二条')
+  assert.equal(nodes(app.tree, node => hasClass(node, 'secondhand-chat-row')).length, 1)
+  app.incoming([msg('one', 'campus_2', '第一条')])
+  assert.equal(nodes(app.tree, node => hasClass(node, 'secondhand-chat-row')).length, 1)
+  app.unmount()
+  const failed = chatHarness({ send: async () => { throw Error('测试网络故障') } }); await failed.mount(); failed.type('不能丢的草稿'); failed.send(); await failed.flush()
+  assert.equal(failed.input().props.value, '')
+  assert.ok(text(failed.tree).includes('不能丢的草稿'))
+  assert.ok(text(failed.tree).includes('发送失败'))
+  assert.ok(text(failed.tree).includes('测试网络故障'))
+  assert.equal(failed.toasts.length, 0)
+  const retry = failed.byClass('secondhand-chat-bubble__retry').props.onClick
+  retry(); retry(); await failed.flush()
+  assert.equal(failed.writes.length, 2, '同一条失败消息连点只重试一次')
+  failed.unmount()
+  console.log('PASS 连点只发送一次，成功去重不清新草稿，失败保留原文')
+
+  const old = deferred()
+  const switched = chatHarness({ send: () => old.promise }); await switched.mount(); switched.type('旧账号消息'); switched.send()
+  await switched.flush()
+  switched.changeAccount('3'); await switched.flush()
+  old.resolve(msg('stale', 'campus_2', '旧账号消息')); await switched.flush()
+  assert.ok(!text(switched.tree).includes('旧账号消息'))
+  assert.ok(text(switched.tree).includes('买家昵称'))
+  switched.unmount()
+  const gone = deferred()
+  const unmounted = chatHarness({ send: () => gone.promise }); await unmounted.mount(); unmounted.type('离开页面'); unmounted.send(); await unmounted.flush(); unmounted.unmount()
+  gone.reject(Error('离开后失败')); await new Promise(setImmediate)
+  assert.equal(unmounted.toasts.length, 0)
+  console.log('PASS 切换账号与页面卸载隔离旧收发结果')
+
+  const authWait = deferred(), imWait = deferred()
+  const queued = chatHarness({ services: { getIMConversation: () => authWait.promise, getTencentIMLoginUser: () => imWait.promise } })
+  await queued.mount()
+  assert.equal(queued.input().props.disabled, false, '服务器鉴权等待期间先允许输入')
+  assert.ok(!text(queued.tree).includes('正在连接'))
+  queued.type('先写下这一条'); queued.send(); await queued.flush()
+  assert.equal(queued.writes.length, 0, '鉴权前不把消息送给SDK')
+  assert.ok(text(queued.tree).includes('先写下这一条'))
+  authWait.resolve(context('2')); await queued.flush()
+  assert.equal(queued.writes.length, 1, '页面不等待历史或订阅；发送适配器负责IM就绪')
+  queued.unmount(); imWait.resolve('campus_2'); await queued.flush()
+
+  let subscriptions = 0
+  const recovering = chatHarness({ services: { subscribeTencentMessages: async () => { if (++subscriptions === 1) throw Error('断网'); return () => {} } } })
+  await recovering.mount()
+  assert.equal(recovering.input().props.disabled, false)
+  recovering.services.show(); await recovering.flush()
+  assert.equal(subscriptions, 2, '前台恢复后重建失败的订阅')
+  recovering.unmount()
+  console.log('PASS 慢鉴权允许先输入排队，失败订阅可静默恢复')
+
+  let canMessage = true, canTrade = false, deniedByServer = false, wrongPeer = false, sdkSends = 0
+  const requests = []
+  const sdk = {
+    isReady: () => true, getLoginUser: () => 'campus_2', setLogLevel: () => {},
+    createTextMessage: value => { sdkSends++; return { ...value, ID: 'test-local', from: 'campus_2', conversationID: `C2C${value.to}` } },
+    sendMessage: async value => ({data: {message: value}}), destroy: async () => {},
+  }
+  const api = loadSource('apps/miniapp/src/services/e-im.ts', {
+    '@tencentcloud/chat': { create: () => sdk, TYPES: { CONV_C2C: 'C2C' } },
+    './api': { request: async (url, options) => {
+      requests.push({url,options})
+      if (url === '/im/usersig') return {sdkAppId:'1400000000',userId:'campus_2',userSig:'isolated-test-only'}
+      if (deniedByServer) throw Error('当前无法与该用户私信')
+      return wrongPeer ? {...direct, peerUserId:'campus_99'} : direct
+    } },
+    './feature-visibility': {getFeatureVisibility: async () => ({messages:canMessage,secondhand_chat:canTrade})},
+  })
+  await api.contactUser('3')
+  assert.equal(requests[0].url, '/im/users/3/conversation')
+  assert.equal(requests[0].options.method, 'PUT')
+  await api.sendTencentText(direct, '测试', 'campus_2')
+  assert.equal(sdkSends, 1, '二手关闭仍可发普通私信')
+  deniedByServer = true
+  await assert.rejects(api.sendTencentText(direct, '测试', 'campus_2'), /无法/)
+  deniedByServer = false; wrongPeer = true
+  await assert.rejects(api.sendTencentText(direct, '测试', 'campus_2'), /会话已变化/)
+  wrongPeer = false
+  await assert.rejects(api.sendTencentText(direct, '测试', 'campus_99'), /账号尚未切换/)
+  canMessage = false
+  await assert.rejects(api.sendTencentText(direct, '测试', 'campus_2'), /未开放/)
+  canMessage = true
+  await assert.rejects(api.sendTencentText(context('2'), '测试', 'campus_2'), /未开放/)
+  assert.equal(sdkSends, 1, '服务端拒绝、对方变化、账号切换与开关均不调用 SDK 发送')
+  const attempt = {}
+  sdk.sendMessage = async () => { throw Error('测试发送失败') }
+  await assert.rejects(api.sendTencentText(direct, '原消息重试', 'campus_2', attempt), /失败/)
+  const same = attempt.message
+  let retries = 0
+  sdk.resendMessage = async value => { retries++; assert.equal(value, same); return { data: { message: value } } }
+  const retried = await api.sendTencentText(direct, '原消息重试', 'campus_2', attempt)
+  assert.equal(retried.ID, same.ID)
+  assert.equal(retries, 1)
+  assert.equal(sdkSends, 2, '重试没有新建另一条SDK消息')
+  await assert.rejects(api.sendTencentText(direct, '错误正文', 'campus_2', attempt), /不一致/)
+  sdk.sendMessage = async () => ({ data: {} })
+  await assert.rejects(api.sendTencentText(direct, '无确认结果', 'campus_2'), /未确认/)
+  await api.resetTencentIMSession()
+  console.log('PASS 实际 IM 适配器在发送前复核用户会话，二手与用户开关独立，拒绝与账号切换不触发发送')
+}
+
+run().catch(error => { console.error(error); process.exitCode = 1 })

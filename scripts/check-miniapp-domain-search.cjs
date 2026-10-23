@@ -6,7 +6,7 @@ const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8')
 
 const page = read('apps', 'miniapp', 'src', 'pages', 'search', 'index.tsx')
 const home = read('apps', 'miniapp', 'src', 'pages', 'home', 'index.tsx')
-const secondhand = read('apps', 'miniapp', 'src', 'pages', 'student-secondhand', 'index.tsx')
+const secondhand = read('apps', 'miniapp', 'src', 'pages', 'student-secondhand', 'content.tsx')
 const community = read('apps', 'miniapp', 'src', 'services', 'b-community.ts')
 const trade = read('apps', 'miniapp', 'src', 'services', 'c-trade.ts')
 const navigation = read('apps', 'miniapp', 'src', 'services', 'd-navigation.ts')
@@ -29,7 +29,7 @@ for (const fragment of [
   'const [total, setTotal]',
   'const [loadingMore, setLoadingMore]',
   'onScrollToLower={() => void loadMore()}',
-  'searchPage(scope, normalized, nextPage)',
+  'searchPage(scope, normalized, nextPage, appliedFilters)',
   'mergeResults(current, result.items)',
 ]) {
   if (!page.includes(fragment)) throw new Error(`search pagination contract is missing: ${fragment}`)
@@ -39,6 +39,15 @@ if (!/const version = searchVersion\.current \+ 1[\s\S]{0,100}searchVersion\.cur
 }
 if (!/找到 \$\{total\} 条结果/.test(page)) {
   throw new Error('search result heading must use the server total')
+}
+for (const fragment of [
+  'SearchFilterPanel',
+  'setFilterPanelOpen(true)',
+  'onApply={applyFilters}',
+  'communitySearchFilters(filters)',
+  'tradeSearchFilters(filters)',
+]) {
+  if (!page.includes(fragment)) throw new Error(`search filters contract is missing: ${fragment}`)
 }
 if (!page.includes('搜索入口无效') || !page.includes('isSearchScope')) {
   throw new Error('invalid or missing scope must fail closed')
@@ -64,6 +73,9 @@ for (const [source, ownerColumn, label] of [
 }
 if (!communitySearch.includes('user.CurrentUserID(c), keyword') || !tradeSearch.includes('user.CurrentUserID(c), keyword')) {
   throw new Error('authenticated search must pass the current user id into repository filtering')
+}
+for (const source of [communitySearch, tradeSearch]) {
+  if (!source.includes('request.Filters') || !source.includes('FilterVersion')) throw new Error('search handler must validate and version filters')
 }
 
 console.log('miniapp domain search check PASS')

@@ -57,6 +57,13 @@ type CreatePostInput struct {
 	Title, Content, Topic string
 	Tags                  []string
 	ImageAssetIDs         []string
+	Motion                *CreatePostMotionInput
+}
+
+type CreatePostMotionInput struct {
+	Kind          string `json:"kind"`
+	AssetID       string `json:"assetId"`
+	PosterAssetID string `json:"posterAssetId"`
 }
 
 type KeyedCreateResult[T any] struct {
@@ -92,10 +99,11 @@ type NotificationPage struct {
 	Unread   int64              `json:"unread"`
 }
 type Page[T any] struct {
-	Items    []T   `json:"items"`
-	Page     int   `json:"page"`
-	PageSize int   `json:"pageSize"`
-	Total    int64 `json:"total"`
+	Items       []T    `json:"items"`
+	Page        int    `json:"page"`
+	PageSize    int    `json:"pageSize"`
+	Total       int64  `json:"total"`
+	PublicCount *int64 `json:"publicCount,omitempty"`
 }
 
 func (s *Service) CreatePost(ctx context.Context, input CreatePostInput, risk string) (Post, error) {
@@ -106,20 +114,26 @@ func (s *Service) CreatePost(ctx context.Context, input CreatePostInput, risk st
 	if err != nil {
 		return Post{}, err
 	}
+	assetIDs, err := postAssetIDs(input)
+	if err != nil {
+		return Post{}, err
+	}
 	reservation := media.Reservation{}
-	if len(input.ImageAssetIDs) > 0 {
+	if len(assetIDs) > 0 {
 		if s.media == nil {
 			return Post{}, errors.New("media pipeline is unavailable")
 		}
-		reservation, err = s.media.Reserve(ctx, input.UserID, media.PurposePostImage, input.ImageAssetIDs)
+		reservation, err = s.media.Reserve(ctx, input.UserID, media.PurposePostImage, assetIDs)
 		if err != nil {
 			return Post{}, err
 		}
 	}
 	value := Post{UserID: input.UserID, Title: input.Title, Content: input.Content, Topic: fallback(input.Topic, "校园生活"), Tags: tags, ReviewStatus: review.StatusSubmitted}
-	for i, ref := range reservation.References {
-		assetID := ref.InternalID
-		value.Images = append(value.Images, PostImage{AssetID: &assetID, URL: ref.URL, Sort: i})
+	if err := applyPostMedia(&value, input, reservation.References); err != nil {
+		if s.media != nil && reservation.Token != "" {
+			_ = s.media.Cancel(ctx, input.UserID, reservation)
+		}
+		return Post{}, err
 	}
 	if err := s.repo.CreatePost(ctx, &value); err != nil {
 		if s.media != nil && reservation.Token != "" {
@@ -155,6 +169,10 @@ func (s *Service) CreatePostKeyed(ctx context.Context, input CreatePostInput, cl
 		return KeyedCreateResult[Post]{}, err
 	}
 	input.Tags = tags
+	assetIDs, err := postAssetIDs(input)
+	if err != nil {
+		return KeyedCreateResult[Post]{}, err
+	}
 
 	input.Topic = fallback(input.Topic, "校园生活")
 	requestHash, err := postCreateRequestHash(input)
@@ -171,11 +189,11 @@ func (s *Service) CreatePostKeyed(ctx context.Context, input CreatePostInput, cl
 	}
 
 	reservation := media.Reservation{}
-	if len(input.ImageAssetIDs) > 0 {
+	if len(assetIDs) > 0 {
 		if s.media == nil {
 			return KeyedCreateResult[Post]{}, errors.New("media pipeline is unavailable")
 		}
-		reservation, err = s.media.Reserve(ctx, input.UserID, media.PurposePostImage, input.ImageAssetIDs)
+		reservation, err = s.media.Reserve(ctx, input.UserID, media.PurposePostImage, assetIDs)
 		if err != nil {
 			if errors.Is(err, media.ErrAlreadyBound) || errors.Is(err, media.ErrInvalidAsset) {
 				if replay, replayErr, found := s.awaitPostReplay(ctx, input.UserID, clientRequestID, requestHash); found {
@@ -189,13 +207,15 @@ func (s *Service) CreatePostKeyed(ctx context.Context, input CreatePostInput, cl
 		UserID: input.UserID, ClientRequestID: &clientRequestID, CreateRequestHash: append([]byte(nil), requestHash...),
 		Title: input.Title, Content: input.Content, Topic: input.Topic, Tags: input.Tags, ReviewStatus: review.StatusSubmitted,
 	}
-	for index, ref := range reservation.References {
-		assetID := ref.InternalID
-		value.Images = append(value.Images, PostImage{AssetID: &assetID, URL: ref.URL, Sort: index})
+	if err := applyPostMedia(&value, input, reservation.References); err != nil {
+		if s.media != nil && reservation.Token != "" {
+			_ = s.media.Cancel(ctx, input.UserID, reservation)
+		}
+		return KeyedCreateResult[Post]{}, err
 	}
 	payload, err := json.Marshal(communityCreationPayload{
 		Version: "community-post-created:v1", ReferenceType: "post", ReferenceIDSource: "aggregateId",
-		OrderedAssetPublicIDs: normalizedAssetIDs(input.ImageAssetIDs), ReviewTargetType: "post", ReviewRisk: risk,
+		OrderedAssetPublicIDs: normalizedAssetIDs(assetIDs), ReviewTargetType: "post", ReviewRisk: risk,
 	})
 	if err != nil {
 		return KeyedCreateResult[Post]{}, err
@@ -244,8 +264,9 @@ func (s *Service) Post(ctx context.Context, id uint) (PostView, error) {
 	return views[0], nil
 }
 func (s *Service) AddComment(ctx context.Context, postID, userID uint, content, risk string) (Comment, error) {
-	if content == "" {
-		return Comment{}, errors.New("comment is required")
+	content = strings.TrimSpace(content)
+	if utf8.RuneCountInString(content) < 1 || utf8.RuneCountInString(content) > 1000 {
+		return Comment{}, ErrInvalidComment
 	}
 	if _, err := s.repo.FindPost(ctx, postID, true); err != nil {
 		return Comment{}, err
@@ -261,8 +282,9 @@ func (s *Service) AddComment(ctx context.Context, postID, userID uint, content, 
 }
 
 func (s *Service) AddCommentKeyed(ctx context.Context, postID, userID uint, content, clientRequestID, risk string) (KeyedCreateResult[Comment], error) {
-	if content == "" {
-		return KeyedCreateResult[Comment]{}, errors.New("comment is required")
+	content = strings.TrimSpace(content)
+	if utf8.RuneCountInString(content) < 1 || utf8.RuneCountInString(content) > 1000 {
+		return KeyedCreateResult[Comment]{}, ErrInvalidComment
 	}
 	if !validWriteContractULID(clientRequestID) {
 		return KeyedCreateResult[Comment]{}, ErrWriteContractInvalid
@@ -343,6 +365,16 @@ func normalizeTags(values []string) ([]string, error) {
 
 func postCreateRequestHash(input CreatePostInput) ([]byte, error) {
 	assets := normalizedAssetIDs(input.ImageAssetIDs)
+	if input.Motion != nil {
+		return canonicalCommunityHash(struct {
+			Version string                 `json:"version"`
+			Title   string                 `json:"title"`
+			Content string                 `json:"content"`
+			Topic   string                 `json:"topic"`
+			Tags    []string               `json:"tags"`
+			Motion  *CreatePostMotionInput `json:"motion"`
+		}{"community-post-create:v3", input.Title, input.Content, input.Topic, input.Tags, input.Motion})
+	}
 	if len(input.Tags) == 0 {
 		return canonicalCommunityHash(struct {
 			Version       string   `json:"version"`
@@ -399,6 +431,9 @@ func (s *Service) awaitPostReplay(ctx context.Context, ownerID uint, clientReque
 	return KeyedCreateResult[Post]{}, nil, false
 }
 func (s *Service) Comments(ctx context.Context, postID uint, page, size int) (Page[CommentView], error) {
+	if _, err := s.repo.FindPost(ctx, postID, true); err != nil {
+		return Page[CommentView]{}, err
+	}
 	page, size = normalize(page, size)
 	values, total, err := s.repo.ListComments(ctx, postID, page, size, true)
 	if err != nil {
@@ -457,6 +492,20 @@ func (s *Service) SetLike(ctx context.Context, postID, userID uint, desired bool
 		return false, err
 	}
 	return s.repo.SetLike(ctx, postID, userID, desired)
+}
+
+func (s *Service) SetLikeState(ctx context.Context, postID, userID uint, desired bool) (CommentLikeState, error) {
+	if repo, ok := s.repo.(interface {
+		SetLikeState(context.Context, uint, uint, bool) (CommentLikeState, error)
+	}); ok {
+		return repo.SetLikeState(ctx, postID, userID, desired)
+	}
+	liked, err := s.SetLike(ctx, postID, userID, desired)
+	if err != nil {
+		return CommentLikeState{}, err
+	}
+	post, err := s.repo.FindPost(ctx, postID, true)
+	return CommentLikeState{Liked: liked, LikedCount: post.LikedCount}, err
 }
 
 func (s *Service) SetFavorite(ctx context.Context, postID, userID uint, desired bool) (bool, error) {
@@ -551,6 +600,11 @@ func (t ReviewTarget) SetReviewStatus(ctx context.Context, id uint, status revie
 	}
 	if t.objectType == "post" && status == review.StatusRejected && t.service.media != nil {
 		return t.service.media.DeleteReference(ctx, "post", uint64(id), nil)
+	}
+	if t.objectType == "post" && status == review.StatusApproved && t.service.media != nil {
+		if publisher, ok := t.service.media.(postMediaPublisher); ok {
+			return publisher.PublishPost(ctx, uint64(id))
+		}
 	}
 	return nil
 }

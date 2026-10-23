@@ -1,10 +1,20 @@
 @use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
+.publish-post-motion { grid-column: 1 / -1; display: flex; align-items: center; gap: 20rpx; width: 100%; min-width: 0; padding: 16rpx 0; font-size: 26rpx; }
+.publish-post-motion image { width: 128rpx; height: 160rpx; flex-shrink: 0; border-radius: 12rpx; }
+.publish-post-motion > view { min-width: 0; }
+.publish-post-motion > view:first-of-type { flex: 1; }
+.publish-post-motion > view:last-of-type { padding: 24rpx 12rpx; color: $text-secondary; }
+.publish-post-motion__hint, .publish-post-motion-tip { display: block; margin-top: 12rpx; color: $text-secondary; font-size: 24rpx; line-height: 1.6; }
+.publish-post-motion-actions { display: flex; gap: 32rpx; color: $brand-primary; font-size: 28rpx; }
+.publish-post-motion-actions view { display: flex; align-items: center; min-height: 44PX; }
 
 page {
   background: $bg-surface;
 }
 
 .publish-post-page {
+  @include ref.page-foundation;
   min-height: 100vh;
   background: $bg-surface;
   color: $text-strong;
@@ -12,18 +22,20 @@ page {
 }
 
 .publish-post-nav__side {
+  @include ref.touch;
   display: flex;
   align-items: center;
-  min-width: 44px;
-  min-height: 44px;
+  width: 88rpx;
+  height: 88rpx;
   font-size: 30rpx;
   line-height: 1;
   color: $text-secondary;
 }
 
 .publish-post-nav__publish {
+  @include ref.touch;
   min-width: 104rpx;
-  min-height: 44px;
+  height: 88rpx;
   padding: 0 30rpx;
   border-radius: 999rpx;
   display: flex;
@@ -43,45 +55,82 @@ page {
 }
 
 .publish-post-body {
-  padding: 32rpx 32rpx 0;
+  padding: 32rpx 32rpx calc(48rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
 }
 
+.publish-post-media {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16rpx;
+}
+
+.publish-post-media__item,
 .publish-post-upload {
-  width: 160rpx;
-  height: 160rpx;
-  border-radius: 18rpx;
-  border: 2rpx dashed $text-faint;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  position: relative;
+  width: 100%;
+  height: 0;
+  padding-bottom: 100%;
+  overflow: hidden;
+  border-radius: 16rpx;
+}
+
+.publish-post-media__image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: $bg-screen;
+}
+
+.publish-post-upload {
+  outline: 2rpx dashed $text-faint;
+  outline-offset: -2rpx;
   box-sizing: border-box;
   background: $bg-surface;
   color: $text-muted;
 }
 
 .publish-post-upload__icon {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  transform: translateY(-36rpx);
+  text-align: center;
   font-size: 36rpx;
   line-height: 40rpx;
   color: $text-muted;
 }
 
 .publish-post-upload__count {
-  margin-top: 14rpx;
-  font-size: 26rpx;
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  margin-top: 8rpx;
+  text-align: center;
+  font-size: 24rpx;
   line-height: 32rpx;
   color: $text-muted;
 }
 
 .publish-post-textarea {
+  @include ref.type(body);
   width: 100%;
   height: 330rpx;
-  margin-top: 38rpx;
-  font-size: 30rpx;
-  line-height: 46rpx;
+  margin-top: 32rpx;
   color: $text-primary;
   box-sizing: border-box;
+}
+
+.publish-post-length {
+  @include ref.type(meta);
+  display: block;
+  margin-top: 16rpx;
+  color: $text-secondary;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .publish-post-textarea__placeholder {
@@ -90,21 +139,23 @@ page {
 
 .publish-post-divider {
   height: 1rpx;
-  background: $divider-hairline;
-  margin: 24rpx 0 28rpx;
+  background: $divider-nav;
+  margin: 24rpx 0 32rpx;
 }
 
 .publish-post-topic-head {
+  gap: 16rpx;
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 22rpx;
+  margin-bottom: 24rpx;
 }
 
 .publish-post-topic-head__title {
   font-size: 30rpx;
   line-height: 40rpx;
-  font-weight: 800;
+  font-weight: 600;
   color: $text-strong;
 }
 
@@ -117,7 +168,7 @@ page {
 .publish-post-topics {
   display: flex;
   flex-wrap: wrap;
-  gap: 16rpx 18rpx;
+  gap: 16rpx;
 }
 
 .publish-post-topics__empty {
@@ -127,15 +178,16 @@ page {
 }
 
 .publish-post-topic {
-  height: 54rpx;
-  padding: 0 28rpx;
+  @include ref.wrap;
+  @include ref.touch;
+  padding: 8rpx 24rpx;
   border-radius: 999rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   background: $brand-tint;
   color: $brand-primary;
-  font-size: 28rpx;
+  font-size: 26rpx;
   line-height: 36rpx;
   box-sizing: border-box;
 }
@@ -147,7 +199,7 @@ page {
 }
 
 .publish-post-custom-tag {
-  height: 70rpx;
+  min-height: 44PX;
   margin-top: 24rpx;
   padding-left: 24rpx;
   border: 1rpx solid $divider-nav;
@@ -158,6 +210,7 @@ page {
 }
 
 .publish-post-custom-tag__input {
+  min-height: 44PX;
   flex: 1;
   min-width: 0;
   font-size: 26rpx;
@@ -165,7 +218,8 @@ page {
 }
 
 .publish-post-custom-tag__button {
-  height: 70rpx;
+  @include ref.touch;
+  align-self: stretch;
   padding: 0 26rpx;
   display: flex;
   align-items: center;
@@ -176,11 +230,11 @@ page {
 }
 
 .publish-post-selected {
-  margin-top: 20rpx;
+  margin-top: 24rpx;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 14rpx;
+  gap: 16rpx;
   font-size: 24rpx;
 }
 
@@ -189,6 +243,8 @@ page {
 }
 
 .publish-post-selected__item {
+  @include ref.wrap;
+  max-width: 100%;
   padding: 8rpx 14rpx;
   border-radius: 999rpx;
   background: $brand-primary;
@@ -197,20 +253,21 @@ page {
 
 .publish-post-note {
   min-height: 58rpx;
-  margin-top: 44rpx;
-  padding: 0 24rpx;
+  margin-top: 32rpx;
+  padding: 16rpx 24rpx;
   border-radius: 10rpx;
   display: flex;
   align-items: center;
   gap: 14rpx;
   background: $divider-hairline;
-  color: $text-muted;
+  color: $text-secondary;
   font-size: 24rpx;
   line-height: 34rpx;
   box-sizing: border-box;
 }
 
 .publish-post-note__icon {
+  flex: none;
   width: 24rpx;
   height: 24rpx;
   border-radius: 50%;
@@ -223,3 +280,17 @@ page {
   line-height: 20rpx;
   font-weight: 700;
 }
+
+.publish-post-error {
+  margin-top: 16rpx;
+  color: $danger;
+  font-size: 24rpx;
+  line-height: 36rpx;
+  word-break: break-word;
+}
+
+.publish-post-control--pending { opacity: .55; }
+
+.publish-post-topic:active,
+.publish-post-upload:active,
+.publish-post-custom-tag__button:active { opacity: .7; }

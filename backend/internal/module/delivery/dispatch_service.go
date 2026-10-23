@@ -70,6 +70,10 @@ func (p staticFeePolicyProvider) FeePolicyForMerchant(context.Context, uint64) (
 type CreateDispatchInput struct {
 	MerchantUserID    uint64
 	MerchantRequestID string
+	SourcePlatform    SourcePlatform
+	PickupCode        string
+	SourceOrderID     string
+	SourceShopID      string
 	Pickup            Contact
 	Recipient         Contact
 	Remark            string
@@ -79,6 +83,10 @@ func (s *DispatchService) CreateOrder(ctx context.Context, input CreateDispatchI
 	requestID := strings.TrimSpace(input.MerchantRequestID)
 	if input.MerchantUserID == 0 || !ValidULID(requestID) {
 		return Order{}, ErrInvalidRecord
+	}
+	source, err := NormalizeSourceMetadata(input.SourcePlatform, input.PickupCode, input.SourceOrderID, input.SourceShopID)
+	if err != nil {
+		return Order{}, err
 	}
 	publicID, err := NewULID()
 	if err != nil {
@@ -94,7 +102,9 @@ func (s *DispatchService) CreateOrder(ctx context.Context, input CreateDispatchI
 	now := s.now().UTC()
 	order := Order{
 		DeliveryOrderPublicID: publicID, MerchantUserID: input.MerchantUserID,
-		MerchantRequestID:  &requestID,
+		MerchantRequestID: &requestID,
+		SourcePlatform:    source.SourcePlatform, PickupCode: source.PickupCode,
+		SourceOrderID: source.SourceOrderID, SourceShopID: source.SourceShopID,
 		PickupContactName:  strings.TrimSpace(input.Pickup.Name),
 		PickupContactPhone: strings.TrimSpace(input.Pickup.Phone),
 		PickupAddress:      strings.TrimSpace(input.Pickup.Address),

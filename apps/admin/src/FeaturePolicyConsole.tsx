@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { adminAPI, AdminAPIError } from './services/f-admin'
 import { useAdminStore } from './store'
 import { AdminButton, AdminNotice, AdminPanel, AdminState } from './components'
-import type { FeaturePolicy, FeaturePolicyKey } from './types'
+import type { FeaturePolicy, FeaturePolicyKey, PresentationMode } from './types'
 
 type PolicyGroup = { title: string; description: string; keys: Array<{ key: FeaturePolicyKey; label: string; description: string }> }
 
@@ -55,6 +55,8 @@ export function FeaturePolicyConsole() {
   const [data, setData] = useState<FeaturePolicy | null>(null)
   const [draft, setDraft] = useState<Record<FeaturePolicyKey, boolean> | null>(null)
   const [mode, setMode] = useState<FeaturePolicy['postingMode']>('admin_only')
+  const [presentation, setPresentation] = useState<PresentationMode>('standard')
+  const canSelectPresentation = data?.presentationMode === 'standard' || data?.presentationMode === 'campus_info'
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -66,10 +68,13 @@ export function FeaturePolicyConsole() {
     try {
       const value = await adminAPI.featurePolicy()
       if (!value.enabled || allKeys.some(key => typeof value.flags[key] !== 'boolean')) throw new Error('服务端功能配置版本不完整，请部署最新后端后重试。')
+      if (value.presentationMode !== undefined && value.presentationMode !== 'standard' && value.presentationMode !== 'campus_info') throw new Error('服务端展示模式无法识别，请更新后台后重试。')
       const flags = Object.fromEntries(allKeys.map((key) => [key, value.flags[key] === true])) as Record<FeaturePolicyKey, boolean>
       setData(value)
       setDraft(flags)
       setMode(value.postingMode)
+      setPresentation(value.presentationMode || 'standard')
+      setNotice('')
     } catch (reason) {
       setError(String(reason))
     } finally {
@@ -81,8 +86,8 @@ export function FeaturePolicyConsole() {
 
   const changed = useMemo(() => {
     if (!data || !draft) return false
-    return mode !== data.postingMode || allKeys.some((key) => draft[key] !== data.flags[key])
-  }, [data, draft, mode])
+    return presentation !== (data.presentationMode || 'standard') || mode !== data.postingMode || allKeys.some((key) => draft[key] !== data.flags[key])
+  }, [data, draft, mode, presentation])
 
   const save = async () => {
     if (!canEdit || !data || !draft || saving || !changed) return
@@ -90,10 +95,11 @@ export function FeaturePolicyConsole() {
     setError('')
     setNotice('')
     try {
-      const value = await adminAPI.updateFeaturePolicy({ flags: draft, postingMode: mode, expectedRowVersion: data.rowVersion })
+      const value = await adminAPI.updateFeaturePolicy({ flags: draft, postingMode: mode, ...(canSelectPresentation ? { presentationMode: presentation } : {}), expectedRowVersion: data.rowVersion })
       setData(value)
       setDraft({ ...value.flags })
       setMode(value.postingMode)
+      setPresentation(value.presentationMode || 'standard')
       setNotice('配置已保存到服务器。小程序回前台立即刷新，使用中最迟约 15 秒更新入口；新的业务请求同时受服务端控制。')
     } catch (reason) {
       setError(reason instanceof AdminAPIError && reason.status === 409 ? '配置已被其他管理员更新。请读取已保存配置后重新修改和保存；本次修改未覆盖服务器。' : String(reason))
@@ -120,6 +126,13 @@ export function FeaturePolicyConsole() {
           <strong>{changed ? '有未保存的修改' : '当前显示服务器已保存配置'}</strong>
           <span>版本 {data.rowVersion} · 操作人 #{data.updatedBy} · 最近更新 {data.updatedAt ? new Date(data.updatedAt).toLocaleString('zh-CN') : '尚未更新'}</span>
         </div>
+        <section className='feature-policy-mode' aria-label='小程序展示模式'>
+          <div><h3>小程序展示模式</h3><p>当前已保存：{data.presentationMode === 'campus_info' ? '校园资讯' : '原版'}。选择后点击“保存配置”，对所有用户统一生效。</p></div>
+          <label><input disabled={!canEdit || !canSelectPresentation || saving || loading} type='radio' name='presentation-mode' checked={presentation === 'standard'} onChange={() => setPresentation('standard')} /><span><strong>原版</strong><small>恢复原首页、服务和二手等模块，按下方已保存的开关开放</small></span></label>
+          <label><input disabled={!canEdit || !canSelectPresentation || saving || loading} type='radio' name='presentation-mode' checked={presentation === 'campus_info'} onChange={() => setPresentation('campus_info')} /><span><strong>校园资讯</strong><small>展示独立的校园指南，保留账号、反馈和既有订单的必要处理</small></span></label>
+        </section>
+        {!canSelectPresentation && <AdminNotice tone='info'>当前后端尚未支持展示模式；原模块开关仍可使用，更新后端后可选择模式。</AdminNotice>}
+        <AdminNotice tone='info' title={presentation === 'campus_info' ? '原版配置会保留' : '恢复的是原配置'}>{presentation === 'campus_info' ? '资讯模式下，下方20项原业务暂不对用户开放。开关值和发言权限仍保存，切回原版按这些值恢复，不会删除内容或改变账号角色。' : '选择原版不会自动打开全部功能，仍按下方开关和发言权限生效。'} 展示模式切换需配套本次小程序版本；实际开放功能应与平台已审核范围一致。</AdminNotice>
         <section className='feature-policy-mode' aria-label='发帖评论模式'>
           <div><h3>发帖与评论权限</h3><p>普通用户不会因此获得后台管理权限；这里只控制社区写入能力。</p></div>
           <label><input disabled={!canEdit || saving || loading} type='radio' name='posting-mode' checked={mode === 'admin_only'} onChange={() => setMode('admin_only')} /><span><strong>仅管理员</strong><small>普通用户只能浏览，管理员与超级管理员可发帖评论</small></span></label>

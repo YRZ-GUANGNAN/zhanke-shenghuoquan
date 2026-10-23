@@ -188,3 +188,120 @@
   color: #64748b;
 }
 
+/* Catalog settings follow the documented field order and state machine. */
+.takeout-merchant-page {
+  background: #f7f9fb;
+}
+
+.takeout-merchant-page .merchant-hero {
+  margin-bottom: 18rpx;
+  padding: 34rpx 24rpx 28rpx;
+  border-bottom: 1rpx solid #e6ebf0;
+  background: #fff;
+}
+
+.takeout-merchant-page .merchant-hero__title { color: #172033; font-size: 40rpx; }
+.takeout-merchant-page .merchant-hero__desc { color: #748297; font-weight: 500; }
+.takeout-merchant-page .merchant-card {
+  border: 1rpx solid #e3e9ef;
+  border-radius: 18rpx;
+  background: #fff;
+  box-shadow: 0 6rpx 22rpx rgba(25, 47, 74, .04);
+}
+
+.takeout-merchant-page .merchant-tabs {
+  gap: 28rpx;
+  margin: 18rpx 0 22rpx;
+  padding: 0 4rpx;
+  border-bottom: 1rpx solid #e4e9ef;
+}
+
+.takeout-merchant-page .merchant-tabs text,
+.takeout-merchant-page .merchant-filter text {
+  min-height: 64rpx;
+  padding: 0 4rpx;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #78869a;
+  font-weight: 650;
+}
+
+.takeout-merchant-page .merchant-tabs__active,
+.takeout-merchant-page .merchant-filter__active {
+  position: relative;
+  background: transparent !important;
+  color: #172033 !important;
+}
+
+.takeout-merchant-page .merchant-tabs__active::after,
+.takeout-merchant-page .merchant-filter__active::after {
+  position: absolute;
+  right: 0;
+  bottom: -1rpx;
+  left: 0;
+  height: 5rpx;
+  border-radius: 5rpx 5rpx 0 0;
+  background: #1d6fd8;
+  content: '';
+}
+
+.takeout-merchant-page .merchant-filter {
+  gap: 22rpx;
+  margin: 0 4rpx 18rpx;
+  padding-bottom: 0;
+  border-bottom: 1rpx solid #e4e9ef;
+}
+
+.takeout-merchant-page .merchant-chip {
+  border: 1rpx solid #e1e8ef;
+  border-radius: 12rpx;
+  background: #fff;
+  box-shadow: none;
+  color: #67758a;
+}
+
+.takeout-merchant-page .merchant-chip--active {
+  border-color: #b8d3f5;
+  background: #eef5ff !important;
+  color: #155eb7 !important;
+}
+
+.takeout-merchant-page .dish-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12rpx 18rpx;
+  align-items: start;
+}
+
+.takeout-merchant-page .dish-card > .merchant-desc,
+.takeout-merchant-page .dish-card > .action-grid { grid-column: 1 / -1; }
+.takeout-merchant-page .dish-card > .merchant-desc { margin: 0; }
+.takeout-merchant-page .dish-card .merchant-tip { line-height: 1.5; }
+.takeout-merchant-page .dish-card .merchant-status { margin-top: 2rpx; }
+.takeout-merchant-page .dish-card .action-grid { margin-top: 2rpx; padding-top: 14rpx; border-top: 1rpx solid #edf1f4; }
+
+.takeout-merchant-page .media-picker {
+  align-items: flex-start;
+  padding: 14rpx;
+  border: 1rpx dashed #d6dee7;
+  border-radius: 14rpx;
+  background: #fafbfd;
+}
+
+.takeout-merchant-page .media-picker image,
+.takeout-merchant-page .media-picker .cc-placeholder {
+  width: 132rpx;
+  height: 132rpx;
+  border-radius: 12rpx;
+}
+
+.takeout-merchant-page .cc-field,
+.takeout-merchant-page .cc-textarea { border-color: #dfe6ed; background: #fff; }
+.takeout-merchant-page .action-row .cc-button--primary { background: #1d6fd8; }
+
+@media (max-width: 360px) {
+  .takeout-merchant-page .dish-card { grid-template-columns: 1fr; }
+  .takeout-merchant-page .dish-card .merchant-status { justify-self: start; }
+}
+

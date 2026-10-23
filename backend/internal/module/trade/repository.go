@@ -3,6 +3,7 @@ package trade
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -53,26 +54,51 @@ type GormRepository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *GormRepository { return &GormRepository{db: db} }
 
-func (r *GormRepository) SearchProducts(ctx context.Context, viewerID uint, keyword string, page, size int) ([]Product, int64, error) {
+func (r *GormRepository) searchProductsQuery(ctx context.Context, viewerID uint, keyword string, filters SearchFilters) *gorm.DB {
 	like, prefix := "%"+keyword+"%", keyword+"%"
 	query := r.db.WithContext(ctx).Model(&Product{}).
 		Where("review_status = ? AND status = ?", review.StatusApproved, StatusSelling).
 		Where("NOT EXISTS (SELECT 1 FROM user_blocks AS ub WHERE ub.blocker_id = ? AND ub.blocked_id = products.seller_id)", viewerID).
 		Where("title LIKE ? OR description LIKE ? OR category LIKE ?", like, like, like)
+	if category := strings.TrimSpace(filters.Category); category != "" {
+		query = query.Where("category = ?", category)
+	}
+	if filters.MinPrice != nil {
+		query = query.Where("price >= ?", *filters.MinPrice)
+	}
+	if filters.MaxPrice != nil {
+		query = query.Where("price <= ?", *filters.MaxPrice)
+	}
+	switch filters.Sort {
+	case "recent":
+		return query.Order("created_at DESC, id DESC")
+	case "price_asc":
+		return query.Order("price ASC, created_at DESC, id DESC")
+	case "price_desc":
+		return query.Order("price DESC, created_at DESC, id DESC")
+	default:
+		return query.Clauses(clause.OrderBy{Expression: clause.Expr{SQL: `CASE
+			WHEN title = ? THEN 0 WHEN title LIKE ? THEN 1 WHEN title LIKE ? THEN 2
+			WHEN category = ? THEN 3 WHEN category LIKE ? THEN 4 ELSE 5 END,
+			created_at DESC, favorite_count DESC, id DESC`, Vars: []any{keyword, prefix, like, keyword, like}}})
+	}
+}
+
+func (r *GormRepository) SearchProducts(ctx context.Context, viewerID uint, keyword string, page, size int, options ...SearchFilters) ([]Product, int64, error) {
+	filters := SearchFilters{}
+	if len(options) > 0 {
+		filters = options[0]
+	}
+	if err := validateSearchFilters(filters); err != nil {
+		return nil, 0, err
+	}
+	query := r.searchProductsQuery(ctx, viewerID, keyword, filters)
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 	values := make([]Product, 0, size)
-	rank := clause.Expr{SQL: `CASE
-		WHEN title = ? THEN 0
-		WHEN title LIKE ? THEN 1
-		WHEN title LIKE ? THEN 2
-		WHEN category = ? THEN 3
-		WHEN category LIKE ? THEN 4
-		ELSE 5 END`, Vars: []any{keyword, prefix, like, keyword, like}}
 	err := query.Preload("Images", func(db *gorm.DB) *gorm.DB { return db.Order("sort ASC") }).
-		Order(rank).Order("created_at DESC").Order("favorite_count DESC").Order("id DESC").
 		Offset((page - 1) * size).Limit(size).Find(&values).Error
 	return values, total, err
 }

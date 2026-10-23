@@ -1,7 +1,19 @@
 declare module '@tarojs/taro' {
+  export interface SelectorQuery {
+    select(selector: string): { boundingClientRect(): SelectorQuery }
+    exec(callback: (result: Array<{ height?: number } | null>) => void): void
+  }
+  export function createSelectorQuery(): SelectorQuery
+  export function nextTick(callback: () => void): void
+  export function hideKeyboard(): Promise<unknown>
   export function useDidShow(callback: () => void): void
   export function useDidHide(callback: () => void): void
-  export function useRouter(): { path: string; params: Record<string, string | undefined> }
+  export function useResize(callback: () => void): void
+  export function useShareAppMessage(callback: (payload: { from?: string; target?: unknown; webViewUrl?: string }) => { title?: string; path?: string; imageUrl?: string }): void
+  export function getCurrentInstance(): CurrentInstance
+  export function showShareMenu(options?: { menus?: Array<'shareAppMessage' | 'shareTimeline'> }): Promise<unknown>
+  export function hideShareMenu(options?: { menus?: Array<'shareAppMessage' | 'shareTimeline'> }): Promise<unknown>
+  export function useRouter(): { path: string; $taroPath?: string; params: Record<string, string | undefined> }
 
   interface NavigateOptions {
     url: string
@@ -28,6 +40,7 @@ declare module '@tarojs/taro' {
 
   interface Router {
     path?: string
+    $taroPath?: string
     params: Record<string, string | undefined>
   }
 
@@ -46,6 +59,8 @@ declare module '@tarojs/taro' {
 
   interface WindowInfo {
     windowWidth: number
+    windowHeight?: number
+    screenHeight?: number
     statusBarHeight: number
     pixelRatio: number
     safeArea?: {
@@ -70,7 +85,9 @@ declare module '@tarojs/taro' {
     setStorageSync<T = unknown>(key: string, value: T): void
     removeStorageSync(key: string): void
     getCurrentInstance(): CurrentInstance
-    chooseMedia(options: { count: number; mediaType: ['image']; sourceType: Array<'album' | 'camera'>; sizeType?: Array<'original' | 'compressed'> }): Promise<{ tempFiles: Array<{ tempFilePath: string; size: number; fileType?: string }> }>
+    showShareMenu(options?: { menus?: Array<'shareAppMessage' | 'shareTimeline'> }): Promise<unknown>
+    hideShareMenu(options?: { menus?: Array<'shareAppMessage' | 'shareTimeline'> }): Promise<unknown>
+    chooseMedia(options: { count: number; mediaType: Array<'image' | 'video'>; sourceType: Array<'album' | 'camera'>; sizeType?: Array<'original' | 'compressed'>; maxDuration?: number }): Promise<{ tempFiles: Array<{ tempFilePath: string; size: number; fileType?: string; duration?: number; width?: number; height?: number; thumbTempFilePath?: string }> }>
     previewImage(options: { urls: string[]; current?: string }): Promise<unknown>
     getImageInfo(options: { src: string }): Promise<{ width: number; height: number; type: string; path: string }>
     compressImage(options: { src: string; quality: number; compressedWidth?: number; compressedHeight?: number; format?: 'webp' }): Promise<{ tempFilePath: string }>

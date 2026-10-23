@@ -84,6 +84,7 @@ assert.match(styleSource, /pointer-events:\s*none/)
 const miniappPagesRoot = path.join(__dirname, '..', 'apps', 'miniapp', 'src', 'pages')
 const standardPages = [
   'about',
+  'campus-guide',
   'blacklist',
   'feedback',
   'edit-profile',
@@ -117,7 +118,11 @@ for (const pageName of publishingAndDetailPages) {
 const mainPages = ['home', 'search', 'student-secondhand', 'student-takeout']
 
 for (const pageName of mainPages) {
-  const source = fs.readFileSync(path.join(miniappPagesRoot, pageName, 'index.tsx'), 'utf8')
+  let source = fs.readFileSync(path.join(miniappPagesRoot, pageName, 'index.tsx'), 'utf8')
+  if (pageName === 'student-secondhand') {
+    assert.match(source, /return <StudentSecondhandContent \/>/, '二手直达页复用真实频道内容')
+    source += fs.readFileSync(path.join(miniappPagesRoot, pageName, 'content.tsx'), 'utf8')
+  }
   const style = fs.readFileSync(path.join(miniappPagesRoot, pageName, 'index.scss'), 'utf8')
   assert.match(source, /CapsulePageHeader/, `${pageName} must use CapsulePageHeader`)
   assert.doesNotMatch(style, /--capsule-safe-right/, `${pageName} must not squeeze business navigation beside the capsule`)
@@ -133,7 +138,8 @@ for (const pageName of heroPages) {
 const merchantPages = ['merchant-messages', 'merchant-order-detail', 'merchant-publish']
 
 for (const pageName of merchantPages) {
-  const source = fs.readFileSync(path.join(miniappPagesRoot, pageName, 'index.tsx'), 'utf8')
+  let source = fs.readFileSync(path.join(miniappPagesRoot, pageName, 'index.tsx'), 'utf8')
+  if (pageName === 'merchant-messages') source += fs.readFileSync(path.join(miniappPagesRoot, pageName, 'content.tsx'), 'utf8')
   assert.match(source, /CapsulePageHeader/, `${pageName} must use CapsulePageHeader`)
 }
 
@@ -145,17 +151,22 @@ const customNavigationPages = fs.readdirSync(miniappPagesRoot, { withFileTypes: 
     return fs.existsSync(configPath) && /navigationStyle:\s*'custom'/.test(fs.readFileSync(configPath, 'utf8'))
   })
 
-assert.equal(customNavigationPages.length, 27, 'custom navigation page inventory changed')
+assert.equal(customNavigationPages.length, 30, 'custom navigation page inventory changed')
 
 for (const pageName of customNavigationPages) {
   const sourcePath = path.join(miniappPagesRoot, pageName, 'index.tsx')
   assert.ok(fs.existsSync(sourcePath), `${pageName} custom navigation page source is missing`)
-  const source = fs.readFileSync(sourcePath, 'utf8')
+  let source = fs.readFileSync(sourcePath, 'utf8')
+  if (pageName === 'student-secondhand') source += fs.readFileSync(path.join(miniappPagesRoot, pageName, 'content.tsx'), 'utf8')
+  if (pageName === 'rider-messages' || pageName === 'merchant-messages') {
+    assert.match(source, /DeliveryMessagesContent role='(?:rider|merchant)' identityAllowed=\{allowed\}/, '配送消息复用带身份守卫的内容组件')
+    source += fs.readFileSync(path.join(miniappPagesRoot, 'merchant-messages', 'content.tsx'), 'utf8')
+  }
   assert.match(source, /CapsulePageHeader|CapsuleSystemRow/, `${pageName} custom navigation is not capsule-safe`)
 }
 
 const allCustomNavigationSource = customNavigationPages
-  .flatMap((pageName) => ['index.tsx', 'index.scss'].map((fileName) => path.join(miniappPagesRoot, pageName, fileName)))
+  .flatMap((pageName) => (['student-secondhand', 'merchant-messages'].includes(pageName) ? ['index.tsx', 'content.tsx', 'index.scss'] : ['index.tsx', 'index.scss']).map((fileName) => path.join(miniappPagesRoot, pageName, fileName)))
   .filter(fs.existsSync)
   .map((fileName) => fs.readFileSync(fileName, 'utf8'))
   .join('\n')
@@ -165,13 +176,16 @@ assert.doesNotMatch(allCustomNavigationSource, /--capsule-safe-right|--home-head
 assert.equal(fs.existsSync(path.join(miniappPagesRoot, 'home', 'header-layout.ts')), false)
 const studentTakeoutSource = fs.readFileSync(path.join(miniappPagesRoot, 'student-takeout', 'index.tsx'), 'utf8')
 const studentTakeoutStyle = fs.readFileSync(path.join(miniappPagesRoot, 'student-takeout', 'index.scss'), 'utf8')
-assert.match(studentTakeoutSource, /style=\{getCapsuleSafeStyle\(\)\}/)
+assert.match(studentTakeoutSource, /useViewportRefresh/)
+assert.match(studentTakeoutSource, /style=\{capsuleStyle\}/)
 assert.match(studentTakeoutStyle, /calc\(var\(--capsule-total-header-height\)/)
 assert.doesNotMatch(studentTakeoutStyle, /204rpx/)
 
 const postDetailSource = fs.readFileSync(path.join(miniappPagesRoot, 'post-detail', 'index.tsx'), 'utf8')
 const postDetailStyle = fs.readFileSync(path.join(miniappPagesRoot, 'post-detail', 'index.scss'), 'utf8')
-assert.match(postDetailSource, /style=\{getCapsuleSafeStyle\(\)\}/)
+assert.match(postDetailSource, /useViewportRefresh/)
+assert.match(postDetailSource, /style=\{pageStyle\}/)
+assert.match(postDetailSource, /pageStyle\s*=\s*\{[\s\S]*capsuleStyle/)
 assert.match(postDetailStyle, /padding-top:\s*var\(--capsule-total-header-height\)/)
 assert.match(postDetailStyle, /\.capsule-page-header\.post-detail-nav[\s\S]*position:\s*fixed/)
 assert.doesNotMatch(postDetailStyle, /184px/)
@@ -184,14 +198,11 @@ assert.match(
   /\.capsule-page-header\.secondhand-detail-header\s+\.capsule-page-header__business-row[\s\S]*margin-top:\s*-8px/,
 )
 
+const homeSource = fs.readFileSync(path.join(miniappPagesRoot, 'home', 'index.tsx'), 'utf8')
 const homeStyle = fs.readFileSync(path.join(miniappPagesRoot, 'home', 'index.scss'), 'utf8')
-assert.match(homeStyle, /\.student-home-header__search::before[\s\S]*width:\s*14px/)
-assert.match(homeStyle, /\.student-home-header__search::after[\s\S]*width:\s*8px/)
-assert.doesNotMatch(
-  homeStyle.match(/\.student-home-header__search::(?:before|after)[\s\S]*?(?=\n\})/g)?.join('\n') || '',
-  /\d+rpx/,
-  'search icon geometry must not mix rpx and px',
-)
+assert.match(homeSource, /AppIcon name='search'/, 'home search must use the shared icon set')
+assert.match(homeSource, /student-home-header__search-icon/, 'home search icon class is required')
+assert.doesNotMatch(homeStyle, /student-home-header__search::(?:before|after)/, 'home search must not draw a second pseudo-element icon')
 
 const editProfileSource = fs.readFileSync(path.join(miniappPagesRoot, 'edit-profile', 'index.tsx'), 'utf8')
 const editProfileStyle = fs.readFileSync(path.join(miniappPagesRoot, 'edit-profile', 'index.scss'), 'utf8')

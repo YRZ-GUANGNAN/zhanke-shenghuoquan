@@ -23,6 +23,10 @@ type BindingAsset struct {
 	AssetPublicID string
 	Slot          uint16
 	Kept          bool
+	VerifiedMIME  string
+	Width         uint32
+	Height        uint32
+	DurationMS    uint32
 }
 
 type BindingReservation struct {

@@ -46,7 +46,7 @@ export const adminAPI={
 	setExternalTakeoutVisibility:(id:number,enabled:boolean)=>api<{updated:boolean}>(`/admin/navigation/external-takeout-merchants/${id}/visibility`,{method:'PATCH',body:JSON.stringify({enabled})}),
 	setExternalTakeoutCategoryVisibility:(enabled:boolean)=>api<{updated:boolean}>('/admin/navigation/external-takeout-merchants/category-visibility',{method:'PATCH',body:JSON.stringify({enabled})}),
 	featurePolicy:()=>api<FeaturePolicy>('/admin/feature-policy'),
-	updateFeaturePolicy:(input:{flags:Record<FeaturePolicyKey,boolean>;postingMode:FeaturePolicy['postingMode'];expectedRowVersion:number})=>api<FeaturePolicy>('/admin/feature-policy',{method:'PATCH',body:JSON.stringify(input)}),
+	updateFeaturePolicy:(input:{flags:Record<FeaturePolicyKey,boolean>;postingMode:FeaturePolicy['postingMode'];presentationMode?:FeaturePolicy['presentationMode'];expectedRowVersion:number})=>api<FeaturePolicy>('/admin/feature-policy',{method:'PATCH',body:JSON.stringify(input)}),
 	mediaSummary:()=>api<MediaSummary>('/admin/media/summary'),
 	mediaAssets:(query:MediaQuery={})=>api<Page<MediaAssetRow>>(`/admin/media/assets${queryString(query)}`),
 	mediaAsset:(assetId:string)=>api<MediaAssetDetail>(`/admin/media/assets/${encodeURIComponent(assetId)}`),

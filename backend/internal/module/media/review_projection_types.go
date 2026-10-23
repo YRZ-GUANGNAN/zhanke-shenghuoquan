@@ -16,12 +16,13 @@ const (
 	ProjectionApproved     ProjectionStatus = "approved"
 	ProjectionRejected     ProjectionStatus = "rejected"
 	ProjectionReviewFailed ProjectionStatus = "review_failed"
+	ProjectionNotRequired  ProjectionStatus = "not_required"
 )
 
 func (s ProjectionStatus) Valid() bool {
 	switch s {
 	case ProjectionPending, ProjectionSubmitted, ProjectionReviewing,
-		ProjectionApproved, ProjectionRejected, ProjectionReviewFailed:
+		ProjectionApproved, ProjectionRejected, ProjectionReviewFailed, ProjectionNotRequired:
 		return true
 	default:
 		return false
@@ -29,10 +30,12 @@ func (s ProjectionStatus) Valid() bool {
 }
 
 func (s ProjectionStatus) Terminal() bool {
-	return s == ProjectionApproved || s == ProjectionRejected || s == ProjectionReviewFailed
+	return s.Decision() || s == ProjectionNotRequired
 }
 
-func (s ProjectionStatus) Decision() bool { return s.Terminal() }
+func (s ProjectionStatus) Decision() bool {
+	return s == ProjectionApproved || s == ProjectionRejected || s == ProjectionReviewFailed
+}
 
 type ReviewProjection struct {
 	ProjectionID           string           `gorm:"column:projection_id;size:26;primaryKey"`

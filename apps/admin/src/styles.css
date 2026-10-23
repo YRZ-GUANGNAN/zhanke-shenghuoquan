@@ -303,7 +303,7 @@ h1 {
 
 .admin-state { min-height: 220px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 36px; border: 1px dashed var(--color-border); border-radius: var(--radius-card); background: #fbfcfe; text-align: center; }
 .admin-state__mark { width: 34px; height: 34px; border: 3px solid #c9d5e3; border-radius: 50%; }
-.admin-state--loading .admin-state__mark { border-right-color: var(--color-primary); animation: admin-spin .8s linear infinite; }
+.admin-state--loading .admin-state__mark { border-right-color: var(--color-primary); }
 .admin-state--error .admin-state__mark { position: relative; border-color: #efb9c1; }
 .admin-state--error .admin-state__mark::before, .admin-state--error .admin-state__mark::after { content: ''; position: absolute; top: 14px; left: 6px; width: 16px; height: 2px; background: var(--color-danger); transform: rotate(45deg); }
 .admin-state--error .admin-state__mark::after { transform: rotate(-45deg); }
@@ -335,7 +335,7 @@ h1 {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+  *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
 }
 
 .metric-grid {
@@ -888,7 +888,7 @@ td span {
 .media-tabs button.active { border-bottom-color: #1677ff; color: #1677ff; }
 .media-filters { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
 .media-filters label { display: grid; gap: 5px; color: #64748b; font-size: 12px; }
-.media-filters input { min-width: 190px; padding: 9px 10px; border: 1px solid #dbe3ee; border-radius: 7px; }
+.media-filters input, .media-filters select { min-width: 190px; padding: 9px 10px; border: 1px solid #dbe3ee; border-radius: 7px; }
 .media-filters button, .media-detail button { padding: 9px 14px; border: 0; border-radius: 7px; background: #1677ff; color: #fff; cursor: pointer; }
 .media-filters button.secondary, .media-detail button { background: #eef2f7; color: #475569; }
 .media-error { margin: 12px 0; padding: 10px 12px; border-radius: 7px; background: #fff1f1; color: #c2410c; }
@@ -948,6 +948,26 @@ td span {
 .takeout-timeline span { color: #718096; font-size: 12px; }
 .takeout-timeline strong { margin-top: 5px; color: #233046; font-size: 13px; }
 .takeout-form { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); align-items: end; gap: 14px; max-width: 920px; }
+
+/* Catalog settings and product rows: documented fields stay scannable without a card wall. */
+.takeout-console .takeout-tabs { border: 1px solid var(--color-border); border-radius: 10px; background: #f2f5f8; }
+.takeout-console .takeout-tabs button { min-height: 38px; border-radius: 7px; background: transparent; color: var(--color-text-secondary); font-weight: 650; }
+.takeout-console .takeout-tabs button.active { border-color: transparent; background: #fff; color: var(--color-text); box-shadow: 0 1px 4px rgba(23, 34, 51, .08); }
+.takeout-console .takeout-subtabs { border-bottom: 1px solid var(--color-border); }
+.takeout-console .takeout-subtabs button { border: 0; border-radius: 0; background: transparent; color: var(--color-text-secondary); }
+.takeout-console .takeout-subtabs button.active { border-bottom: 2px solid #356f9f; background: transparent; color: var(--color-text); }
+.takeout-console .takeout-panel { border: 1px solid var(--color-border); border-radius: 10px; background: #fff; }
+.takeout-console .takeout-header { padding-bottom: 14px; border-bottom: 1px solid var(--color-border); }
+.takeout-console .takeout-header h2 { font-size: 16px; letter-spacing: -.01em; }
+.takeout-console .takeout-controls { padding: 12px; border: 1px solid #e6ebf0; border-radius: 8px; background: #fafbfd; }
+.takeout-console .takeout-controls label { font-weight: 650; }
+.takeout-console .takeout-controls input,
+.takeout-console .takeout-controls select { background: #fff; }
+.takeout-console .takeout-badge { border: 1px solid transparent; border-radius: 6px; font-weight: 700; }
+.takeout-console .takeout-detail { border-radius: 10px; background: #fbfcfd; }
+.takeout-console .takeout-fact { border: 1px solid #e6ebf0; background: #fff; }
+.takeout-console .takeout-price-cell { color: #b84b3d; font-variant-numeric: tabular-nums; font-weight: 750; }
+.takeout-console .takeout-price-cell span { color: var(--color-text-muted); font-weight: 500; }
 
 .content-takedown-button { padding: 8px 12px; border: 0; border-radius: 7px; background: #fff1f1; color: #c2410c; font-weight: 700; }
 .content-takedown-button:disabled { cursor: not-allowed; opacity: .55; }
@@ -1579,6 +1599,7 @@ td button:hover:not(:disabled) { border-color: var(--color-border-strong); backg
 .takeout-form,
 .external-merchant-form { border-color: var(--color-border); border-radius: 9px; background: var(--color-surface-muted); }
 .media-filters input,
+.media-filters select,
 .delivery-controls input,
 .delivery-controls select,
 .delivery-form input,
@@ -1594,6 +1615,7 @@ td button:hover:not(:disabled) { border-color: var(--color-border-strong); backg
   color: var(--color-text);
 }
 .media-filters input:hover,
+.media-filters select:hover,
 .delivery-controls input:hover,
 .delivery-controls select:hover,
 .delivery-form input:hover,
@@ -1604,6 +1626,7 @@ td button:hover:not(:disabled) { border-color: var(--color-border-strong); backg
 .external-merchant-form input:hover,
 .identity-decision textarea:hover { border-color: var(--color-border-strong); }
 .media-filters input:focus,
+.media-filters select:focus,
 .delivery-controls input:focus,
 .delivery-controls select:focus,
 .delivery-form input:focus,
@@ -2107,7 +2130,9 @@ table code { color: #405167; font-family: "Cascadia Code", Consolas, monospace; 
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
+  .admin-button:hover:not(:disabled), .admin-button:active:not(:disabled),
+  .main button:not(:disabled):active, .admin-navigation button:active { transform: none; }
 }
 }
 

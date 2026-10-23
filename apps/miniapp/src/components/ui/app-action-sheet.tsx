@@ -1,5 +1,7 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { Text, View } from '@tarojs/components'
+import { useLayerPresence } from '../../hooks/use-layer-presence'
+import { useSheetDismiss } from '../../hooks/use-sheet-dismiss'
 import { AppIconButton } from './app-icon-button'
 import './app-action-sheet.scss'
 
@@ -13,12 +15,29 @@ export interface AppActionSheetProps {
 }
 
 export function AppActionSheet({ visible, title, description, children, loading = false, onClose }: AppActionSheetProps) {
-  if (!visible) return null
+  const { mounted, phase } = useLayerPresence(visible)
+  const closeRequested = useRef(false)
+  useEffect(() => { if (visible) closeRequested.current = false }, [visible])
+  const interactive = visible && phase !== 'exit'
+  const handleClose = () => {
+    if (interactive && !loading && !closeRequested.current) {
+      closeRequested.current = true
+      onClose()
+    }
+  }
+  const drag = useSheetDismiss(visible && phase === 'open' && !loading, handleClose)
+  if (!mounted) return null
   return (
-    <View className='app-action-sheet-layer'>
-      <View className='app-action-sheet-layer__mask' onClick={() => !loading && onClose()} />
-      <View className='app-action-sheet' role='dialog' aria-modal>
-        <View className='app-action-sheet__handle' />
+    <View className={`app-action-sheet-layer app-action-sheet-layer--${phase}`} onClick={(event) => event.stopPropagation()}>
+      <View className='app-action-sheet-layer__mask' onClick={handleClose} />
+      <View
+        className={`app-action-sheet app-action-sheet--${phase}${drag.dragging ? ' app-action-sheet--dragging' : ''}`}
+        style={drag.dragging ? { transform: `translateY(${drag.offset}px)` } : undefined}
+        role='dialog' aria-modal
+      >
+        <View className='app-action-sheet__drag-handle' {...drag.handlers} catchMove ariaLabel='向下拖动关闭面板'>
+          <View className='app-action-sheet__handle' />
+        </View>
         <View className='app-action-sheet__header'>
           <View className='app-action-sheet__heading'>
             <Text className='app-action-sheet__title'>{title}</Text>
@@ -31,7 +50,7 @@ export function AppActionSheet({ visible, title, description, children, loading 
             tone='surface'
             disabled={loading}
             className='app-action-sheet__close'
-            onClick={onClose}
+            onClick={handleClose}
           />
         </View>
         <View className='app-action-sheet__content'>{children}</View>

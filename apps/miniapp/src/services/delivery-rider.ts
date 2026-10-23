@@ -1,5 +1,6 @@
 import { request } from './api'
 import type { DeliveryStatus, Page, StageTimestamps } from './delivery-merchant'
+import type { SourcePlatform } from '../utils/delivery-order-source'
 
 export type RiderStatus = 'active' | 'resting' | 'suspended'
 export type RiderAssignedStatusGroup = 'pickup' | 'delivery' | 'completed'
@@ -18,8 +19,19 @@ export interface DeliveryRiderMe {
   rider?: DeliveryRider
 }
 
+export interface DeliveryRiderTodayStats {
+  /** 服务端按业务时区计算的统计日期，便于跨午夜时避免旧结果误标为今天。 */
+  date: string
+  timezone: string
+  todayOrders: number
+  todayIncomeCents: number
+  definition: string
+}
+
 export interface ClaimableDeliveryOrder {
   deliveryOrderPublicId: string
+  sourcePlatform?: SourcePlatform
+  pickupCode?: string
   routeSummary: string
   deliveryFeeCents: number
   status: DeliveryStatus
@@ -29,6 +41,10 @@ export interface ClaimableDeliveryOrder {
 
 export interface AssignedDeliveryOrder extends StageTimestamps {
   deliveryOrderPublicId: string
+  sourcePlatform?: SourcePlatform
+  pickupCode?: string
+  sourceOrderId?: string
+  sourceShopId?: string
   merchantUserId: number
   riderUserId: number
   pickupContactName: string
@@ -49,6 +65,10 @@ const BASE = '/delivery/rider'
 
 export function getDeliveryRiderMe(): Promise<DeliveryRiderMe> {
   return request<DeliveryRiderMe>(`${BASE}/me`, { url: '', timeout: 10000 })
+}
+
+export function getDeliveryRiderTodayStats(): Promise<DeliveryRiderTodayStats> {
+  return request<DeliveryRiderTodayStats>(`${BASE}/stats/today`, { url: '', timeout: 10000 })
 }
 
 export function listClaimableDeliveryOrders(page = 1, pageSize = 50): Promise<Page<ClaimableDeliveryOrder>> {

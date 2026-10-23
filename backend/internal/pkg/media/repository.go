@@ -294,7 +294,7 @@ func (r *GormRepository) RequestDeleteOwned(ctx context.Context, publicID string
 }
 
 func (r *GormRepository) RequestDeleteReference(ctx context.Context, referenceType string, referenceID uint64, keep []uint64) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return dbtx.DB(ctx, r.db).Transaction(func(tx *gorm.DB) error {
 		query := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("reference_type = ? AND reference_id = ? AND delete_requested_at IS NULL", referenceType, referenceID)
 		if len(keep) > 0 {
 			query = query.Where("id NOT IN ?", keep)

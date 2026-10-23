@@ -16,16 +16,21 @@ function forbidMatch(source, pattern, message) {
 }
 
 const home = read('apps/miniapp/src/pages/home/index.tsx')
-requireMatch(home, /import\s*\{[^}]*ScrollView[^}]*\}\s*from\s*'@tarojs\/components'/s, '首页必须使用原生 ScrollView')
-requireMatch(home, /<ScrollView[\s\S]*scrollY[\s\S]*onScrollToLower=/, '首页必须通过 onScrollToLower 触发翻页')
+const refreshScroll = read('apps/miniapp/src/components/refresh-scroll-view.tsx')
+requireMatch(home, /import RefreshScrollView from '..\/..\/components\/refresh-scroll-view'/, '首页必须使用共享原生刷新滚动组件')
+requireMatch(refreshScroll, /import\s*\{[^}]*ScrollView[^}]*\}\s*from\s*'@tarojs\/components'/s, '共享刷新组件必须使用原生 ScrollView')
+requireMatch(refreshScroll, /<ScrollView\s+\{\.\.\.props\}/, '共享刷新组件必须透传原生滚动和分页事件')
+requireMatch(home, /<RefreshScrollView[\s\S]*scrollY[\s\S]*onScrollToLower=/, '首页必须通过 onScrollToLower 触发翻页')
 forbidMatch(home, /createIntersectionObserver|home-discover-sentinel/, '首页不得继续使用不稳定的 IntersectionObserver sentinel')
 requireMatch(home, /conversationOwnerRef\.current\s*!==\s*ownerKey/, '私信列表必须拒绝旧账号请求写回')
-requireMatch(home, /key=\{activeTab\}/, '首页标签切换时必须隔离 ScrollView 滚动位置')
+requireMatch(home, /key=\{channel\}/, '每个首页频道保留独立 ScrollView')
+requireMatch(home, /scrollTop=\{tabScrollPositions\.current\[channel\]\}/, '首页标签切换时必须独立保存滚动位置')
 
 const chatPage = read('apps/miniapp/src/pages/secondhand-chat/index.tsx')
-requireMatch(chatPage, /<AppIcon\s+name='home'/, '聊天页主页入口必须使用标准 home 图标')
+requireMatch(chatPage, /onClick=\{openPeerProfile\}[\s\S]{0,100}<Text>主页<\/Text>/, '聊天页必须保留明确的对方主页入口')
 requireMatch(chatPage, /`campus_\$\{currentUserId\}`/, '聊天页必须绑定当前后端用户对应的 Tencent IM 账号')
-requireMatch(chatPage, /activeChatKeyRef\.current\s*!==\s*operationKey/, '聊天发送完成后必须拒绝旧账号结果写回')
+requireMatch(chatPage, /const isCurrent = \(\) => activeChatKeyRef\.current === operationKey && useSessionStore.getState\(\).profile.id === sendingUserId/, '聊天发送完成后必须拒绝旧账号结果写回')
+requireMatch(chatPage, /await sendTencentText[\s\S]{0,180}if \(!isCurrent\(\)\) return/, '聊天发送完成必须先检查当前上下文')
 
 forbidMatch(
   chatPage,
@@ -34,9 +39,12 @@ forbidMatch(
 )
 requireMatch(
   chatPage,
-  /className=\{`secondhand-chat-inputbar[\s\S]{0,240}bottom:\s*`\$\{keyboardHeight\}px`/,
-  '聊天输入栏必须跟随键盘高度移动'
+  /className='secondhand-chat-page'[\s\S]{0,100}paddingBottom:\s*`\$\{keyboardHeight\}px`/,
+  '聊天页面应由 flex 布局统一避让键盘，输入栏与消息滚动区共享剩余空间'
 )
+const chatStyle = read('apps/miniapp/src/pages/secondhand-chat/index.scss')
+requireMatch(chatStyle, /\.secondhand-chat-scroll\s*\{[^}]*flex:\s*1 1 0;[^}]*height:\s*0;/, '聊天滚动区必须收缩以让出输入区与键盘空间')
+forbidMatch(chatStyle, /\.secondhand-chat-inputbar\s*\{[^}]*(position:\s*fixed|bottom:)/, '聊天输入区必须参与布局，不能重复固定定位')
 requireMatch(chatPage, /adjustPosition=\{false\}/, '聊天输入框必须关闭系统自动顶起，避免与手动键盘适配冲突')
 
 const sessionStore = read('apps/miniapp/src/stores/session.ts')
@@ -85,6 +93,8 @@ for (const call of ['getConversationProfile', 'getMessageList', 'setMessageRead'
 }
 
 const postDetail = read('apps/miniapp/src/pages/post-detail/index.tsx')
+const postComments = read('apps/miniapp/src/pages/post-detail/post-comments.tsx')
+const commentSession = read('apps/miniapp/src/services/comment-session.ts')
 const myContent = read('apps/miniapp/src/pages/my-content/index.tsx')
 const myContentStyle = read('apps/miniapp/src/pages/my-content/index.scss')
 const postDetailStyle = read('apps/miniapp/src/pages/post-detail/index.scss')
@@ -117,25 +127,27 @@ for (const className of [
 }
 requireMatch(myContent, /my-content-thumb--empty/, '无图片内容必须使用紧凑无图样式')
 requireMatch(myContent, /label\s*=\s*'无图'/, '无图片内容必须显示真实无图文案')
-requireMatch(postDetail, /heroAvailable[\s\S]*onError=\{\(\) => setHeroAvailable\(false\)\}/, '帖子首图加载失败后必须收起媒体区')
-requireMatch(postDetail, /Taro\.getImageInfo\(\{\s*src:\s*heroImage\s*\}\)/, '帖子首图展示前必须先校验媒体资源可用')
-requireMatch(postDetail, /showHero\s*\?[\s\S]*post-detail-hero/, '帖子详情必须只在首图有效时渲染媒体区')
+requireMatch(postDetail, /onError=\{\(\) => setGallery\([\s\S]*removeFailedPostMedia\([\s\S]*image\.src/, '附件渲染失败时必须按附件身份移除失效图片并保留其他附件')
+requireMatch(postDetail, /removeFailedPostMedia/, '帖子详情必须使用稳定的图集失败状态处理')
+requireMatch(postDetail, /preparePostMedia\(images,\s*\(src\) => Taro\.getImageInfo\(\{ src \}\)\)/, '帖子全部附件展示前必须校验媒体资源可用')
+requireMatch(postDetail, /showHero\s*\?[\s\S]*post-detail-hero/, '帖子详情必须只在存在有效附件时展示图集')
 forbidMatch(postDetailStyle, /post-detail-hero[\s\S]{0,240}background:\s*\$like-active/, '帖子媒体区不得恢复粉色占位背景')
 requireMatch(postDetail, /post-detail-follow-hitbox/, '帖子关注按钮必须使用独立点击热区')
-requireMatch(postDetail, /post-detail-comments__empty[\s\S]*还没有评论[\s\S]*成为第一个评论的人/, '无评论状态必须使用紧凑语义空态')
+requireMatch(postComments, /post-detail-comments__empty[\s\S]*还没有评论[\s\S]*说说你的看法吧/, '无评论状态必须使用紧凑语义空态')
 requireMatch(postDetailStyle, /\.post-detail-follow-hitbox[\s\S]*width:\s*116rpx[\s\S]*height:\s*88rpx/, '帖子关注点击热区必须保持 58×44 逻辑像素')
 requireMatch(postDetailStyle, /\.post-detail-follow\s*\{[\s\S]*width:\s*116rpx[\s\S]*height:\s*64rpx/, '帖子关注按钮视觉尺寸必须收敛为 58×32 逻辑像素')
-requireMatch(postDetailStyle, /\.post-detail-comments__empty[\s\S]*min-height:\s*148rpx/, '无评论空态必须使用受控高度')
+requireMatch(postComments, /post-detail-comments__empty/, '评论组件必须提供结构化空态')
 forbidMatch(postDetailStyle, /\.post-detail-follow\s*\{[\s\S]{0,160}width:\s*72px[\s\S]{0,160}height:\s*44px/, '帖子关注按钮不得恢复为会被 Taro 二次缩小的 px 写法')
 requireMatch(postDetailStyle, /\.post-detail-action\s*\{[\s\S]*flex-direction:\s*column/, '帖子底部统计动作必须纵向排列')
 
 const communityService = read('apps/miniapp/src/services/b-community.ts')
-requireMatch(communityService, /addPostComment\([\s\S]{0,260}clientRequestId\s*=\s*createCommunityClientRequestId\(\)/, '帖子评论必须生成可复用的幂等请求号')
-requireMatch(communityService, /data:\s*\{\s*content,\s*clientRequestId\s*\}[\s\S]{0,160}'Idempotency-Key':\s*clientRequestId/, '帖子评论必须同时发送 clientRequestId 与 Idempotency-Key')
-requireMatch(postDetail, /const pendingComment = useRef<PendingCommentSubmission \| null>/, '帖子评论页必须在可重试失败后保留请求号')
-requireMatch(postDetail, /getPostCommentsPage\(post\.id,\s*\{\s*page:\s*nextPage/, '帖子评论必须按页加载后续数据')
-requireMatch(postDetail, /onScrollToLower=\{\(\) => void loadMoreComments\(\)\}/, '帖子详情滚动到底必须加载下一页评论')
-requireMatch(postDetail, /mergeComments\(current,\s*result\.items\)/, '帖子评论翻页必须去重并保留现有内容')
+requireMatch(communityService, /submitThreadComment\(/, '必须提供楼内回复请求方法')
+requireMatch(communityService, /data:\s*\{\s*content,\s*clientRequestId\s*\}[\s\S]{0,120}Idempotency-Key/, '楼内回复必须同时发送 clientRequestId 与 Idempotency-Key')
+requireMatch(postDetail, /usePostComments\(/, '帖子详情必须接入独立评论会话')
+requireMatch(commentSession, /same idempotency key|Keep text|submission/, '评论会话必须保留失败重试所需的幂等状态')
+requireMatch(commentSession, /like = async|api\.like/, '评论点赞必须走独立请求与确认状态')
+requireMatch(postComments, /查看 \{comment\.replyCount\} 条回复/, '评论组件必须提供楼内回复入口')
+requireMatch(postComments, /onClick=\{\(\) => \{ if \(interactive\) props\.onLike\(comment\.id\) \}\}/, '评论组件必须提供单条点赞入口并拦截退出中的点击')
 requireMatch(communityService, /\/community\/me\/posts\/\$\{encodeURIComponent\(postId\)\}/, '前端必须接入本人帖子详情接口')
 
 const communityHandler = read('backend/internal/module/community/handler.go')

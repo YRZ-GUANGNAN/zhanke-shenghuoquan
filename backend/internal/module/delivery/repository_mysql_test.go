@@ -47,6 +47,15 @@ func Test00DeliveryMigrationRollbackApplyAgainstRealMySQL84(t *testing.T) {
 	if _, err := os.Stat("../../../migrations/024_delivery_dispatch.sql"); err == nil {
 		applyD1SQLFile(t, db, "../../../migrations/024_delivery_dispatch.sql")
 	}
+	// The historical assertion above intentionally verifies the original D-1
+	// schema. Restore additive source fields before subsequent tests use today's
+	// Order model, while preserving the original rollback/apply verification.
+	applyD1SQLFile(t, db, "../../../migrations/045_delivery_order_source.sql")
+	for _, column := range []string{"source_platform", "pickup_code", "source_shop_id", "source_order_id"} {
+		if !db.Migrator().HasColumn(&Order{}, column) {
+			t.Fatalf("migration 045 source column not restored: %s", column)
+		}
+	}
 	t.Log("migration_023_apply_rollback_apply=PASS tables=1 foreign_keys=0 checks=status+fee_snapshot")
 }
 
@@ -402,15 +411,27 @@ func applyD1SQLFile(t *testing.T, db *gorm.DB, relativePath string) {
 	}
 	defer file.Close()
 	var statement strings.Builder
+	delimiter := ";"
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
-		statement.WriteString(line)
-		statement.WriteByte('\n')
-		if !strings.HasSuffix(strings.TrimSpace(line), ";") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "--") {
 			continue
 		}
-		query := strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(statement.String()), ";"))
+		if strings.HasPrefix(trimmed, "DELIMITER ") {
+			if strings.TrimSpace(statement.String()) != "" {
+				t.Fatalf("apply %s: delimiter changed during a statement", relativePath)
+			}
+			delimiter = strings.TrimSpace(strings.TrimPrefix(trimmed, "DELIMITER "))
+			continue
+		}
+		statement.WriteString(line)
+		statement.WriteByte('\n')
+		if !strings.HasSuffix(trimmed, delimiter) {
+			continue
+		}
+		query := strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(statement.String()), delimiter))
 		statement.Reset()
 		if query != "" {
 			if err := db.Exec(query).Error; err != nil {
@@ -420,6 +441,9 @@ func applyD1SQLFile(t *testing.T, db *gorm.DB, relativePath string) {
 	}
 	if err := scanner.Err(); err != nil {
 		t.Fatal(err)
+	}
+	if strings.TrimSpace(statement.String()) != "" {
+		t.Fatalf("apply %s: unterminated SQL statement", relativePath)
 	}
 }
 

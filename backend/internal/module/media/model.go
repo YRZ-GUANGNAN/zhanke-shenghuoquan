@@ -16,6 +16,7 @@ const (
 	PurposePost                Purpose = "post"
 	PurposeProduct             Purpose = "product"
 	PurposeAvatar              Purpose = "avatar"
+	PurposeProfileCover        Purpose = "profile_cover"
 	PurposeDish                Purpose = "dish"
 	PurposeMerchantLogo        Purpose = "merchant_logo"
 	PurposeDeliveryProof       Purpose = "delivery_proof"
@@ -26,7 +27,7 @@ const (
 
 func (v Purpose) Valid() bool {
 	switch v {
-	case PurposePost, PurposeProduct, PurposeAvatar, PurposeDish, PurposeMerchantLogo, PurposeDeliveryProof, PurposeDeliveryIM, PurposeFeedback, PurposeIdentityApplication:
+	case PurposePost, PurposeProduct, PurposeAvatar, PurposeProfileCover, PurposeDish, PurposeMerchantLogo, PurposeDeliveryProof, PurposeDeliveryIM, PurposeFeedback, PurposeIdentityApplication:
 		return true
 	default:
 		return false
@@ -38,7 +39,7 @@ func (v Purpose) Valid() bool {
 // participant fence has been checked.
 func (v Purpose) PubliclyResolvable() bool {
 	switch v {
-	case PurposePost, PurposeProduct, PurposeAvatar, PurposeDish, PurposeMerchantLogo:
+	case PurposePost, PurposeProduct, PurposeAvatar, PurposeProfileCover, PurposeDish, PurposeMerchantLogo:
 		return true
 	default:
 		return false
@@ -127,6 +128,7 @@ type Asset struct {
 	ByteSize               uint64          `gorm:"column:byte_size;not null"`
 	Width                  uint32          `gorm:"column:width;not null"`
 	Height                 uint32          `gorm:"column:height;not null"`
+	DurationMS             uint32          `gorm:"column:duration_ms;not null"`
 	StagingKey             *string         `gorm:"column:staging_key;size:512;uniqueIndex:uq_media_staging_key_v11"`
 	StagingVersionID       *string         `gorm:"column:staging_version_id;size:128"`
 	FinalKey               *string         `gorm:"column:final_key;size:512;uniqueIndex:uq_media_final_key_v11"`

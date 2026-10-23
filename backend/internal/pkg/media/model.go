@@ -104,9 +104,13 @@ type CreateUploadInput struct {
 }
 
 type Reference struct {
-	InternalID uint64
-	PublicID   string
-	URL        string
+	InternalID   uint64
+	PublicID     string
+	URL          string
+	VerifiedMIME string
+	Width        uint32
+	Height       uint32
+	DurationMS   uint32
 }
 
 type Reservation struct {

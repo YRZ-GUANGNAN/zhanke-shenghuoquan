@@ -1,6 +1,6 @@
 import { cloneElement, isValidElement, type ReactNode } from 'react'
 import { Text, View } from '@tarojs/components'
-import { getCapsuleSafeStyle } from '../utils/capsule-safe'
+import { useViewportRefresh } from '../hooks/use-viewport-refresh'
 import './capsule-page-header.scss'
 
 export type CapsuleHeaderVariant = 'standard' | 'search' | 'tabs'
@@ -26,10 +26,11 @@ function addSlotContentClass(content: ReactNode) {
 }
 
 export function CapsuleSystemRow({ className = '' }: CapsuleSystemRowProps) {
+  const safeStyle = useViewportRefresh()
   return (
     <View
       className={`capsule-system-row ${className}`.trim()}
-      style={getCapsuleSafeStyle()}
+      style={safeStyle}
     />
   )
 }
@@ -43,10 +44,11 @@ export default function CapsulePageHeader({
   right,
   divider = true,
 }: CapsulePageHeaderProps) {
+  const safeStyle = useViewportRefresh()
   return (
     <View
       className={`capsule-page-header ${divider ? 'capsule-page-header--divider' : ''} ${className}`.trim()}
-      style={getCapsuleSafeStyle()}
+      style={safeStyle}
     >
       <View className='capsule-page-header__system-row' />
       <View className={`capsule-page-header__business-row capsule-page-header__business-row--${variant}`}>

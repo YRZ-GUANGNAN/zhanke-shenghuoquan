@@ -42,6 +42,11 @@ func (h *Handler) Register(rg *gin.RouterGroup) {
 	auth.POST("/notifications/:id/read", h.readNotification)
 	auth.POST("/posts", user.UnmutedRequired(), h.create)
 	auth.POST("/posts/:id/comments", user.UnmutedRequired(), h.addComment)
+	auth.GET("/posts/:id/comments/threads", h.commentThreads)
+	auth.GET("/posts/:id/comments/:commentId/replies", h.commentReplies)
+	auth.POST("/posts/:id/comments/:commentId/replies", user.UnmutedRequired(), h.replyComment)
+	auth.PUT("/posts/:id/comments/:commentId/like", h.setCommentLiked(true))
+	auth.DELETE("/posts/:id/comments/:commentId/like", h.setCommentLiked(false))
 	auth.POST("/posts/:id/like", h.like)
 	auth.POST("/posts/:id/favorite", h.favorite)
 	auth.POST("/users/:id/follow", h.follow)
@@ -148,12 +153,13 @@ func (h *Handler) create(c *gin.Context) {
 		return
 	}
 	var req struct {
-		Title           string   `json:"title"`
-		Content         string   `json:"content"`
-		Topic           string   `json:"topic"`
-		Tags            []string `json:"tags"`
-		ImageAssetIDs   []string `json:"imageAssetIds"`
-		ClientRequestID string   `json:"clientRequestId"`
+		Title           string                 `json:"title"`
+		Content         string                 `json:"content"`
+		Topic           string                 `json:"topic"`
+		Tags            []string               `json:"tags"`
+		ImageAssetIDs   []string               `json:"imageAssetIds"`
+		Motion          *CreatePostMotionInput `json:"motion"`
+		ClientRequestID string                 `json:"clientRequestId"`
 	}
 	if c.ShouldBindJSON(&req) != nil {
 		response.Fail(c, 400, "invalid post")
@@ -166,7 +172,7 @@ func (h *Handler) create(c *gin.Context) {
 	}
 	currentUser := cu
 	risk := h.safety.CheckText(c.Request.Context(), currentUser.OpenID, req.Title+"\n"+req.Content)
-	input := CreatePostInput{UserID: currentUser.ID, Title: req.Title, Content: req.Content, Topic: req.Topic, Tags: req.Tags, ImageAssetIDs: req.ImageAssetIDs}
+	input := CreatePostInput{UserID: currentUser.ID, Title: req.Title, Content: req.Content, Topic: req.Topic, Tags: req.Tags, ImageAssetIDs: req.ImageAssetIDs, Motion: req.Motion}
 	if keyed {
 		result, err := h.service.CreatePostKeyed(c, input, clientRequestID, risk)
 		writeKeyedCreate(c, result.Value, result.Replayed, err)
@@ -252,7 +258,7 @@ func writeKeyedCreate(c *gin.Context, data any, replayed bool, err error) {
 	switch {
 	case errors.Is(err, ErrIdempotencyConflict):
 		response.Fail(c, http.StatusConflict, err.Error())
-	case errors.Is(err, ErrWriteContractInvalid), errors.Is(err, ErrInvalidTags):
+	case errors.Is(err, ErrWriteContractInvalid), errors.Is(err, ErrInvalidTags), errors.Is(err, ErrInvalidComment):
 		response.Fail(c, http.StatusBadRequest, err.Error())
 	case errors.Is(err, ErrWriteContractUnavailable):
 		response.Fail(c, http.StatusServiceUnavailable, err.Error())
@@ -303,8 +309,8 @@ func (h *Handler) setLike(desired bool) gin.HandlerFunc {
 		if !ok {
 			return
 		}
-		liked, err := h.service.SetLike(c, id, user.CurrentUserID(c), desired)
-		writeTargetState(c, gin.H{"liked": liked}, err)
+		state, err := h.service.SetLikeState(c, id, user.CurrentUserID(c), desired)
+		writeTargetState(c, state, err)
 	}
 }
 func (h *Handler) setFavorite(desired bool) gin.HandlerFunc {

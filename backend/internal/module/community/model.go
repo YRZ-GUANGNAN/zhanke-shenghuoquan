@@ -24,9 +24,19 @@ type Post struct {
 	CommentCount      int64          `json:"commentCount"`
 	FavoriteCount     int64          `json:"favoriteCount"`
 	Images            []PostImage    `json:"images"`
+	Motion            *PostMotion    `json:"motion,omitempty" gorm:"serializer:json;type:json"`
 	CreatedAt         time.Time      `json:"createdAt"`
 	UpdatedAt         time.Time      `json:"updatedAt"`
 	DeletedAt         gorm.DeletedAt `json:"-" gorm:"index"`
+}
+
+type PostMotion struct {
+	Kind       string `json:"kind"`
+	URL        string `json:"url"`
+	PosterURL  string `json:"posterUrl"`
+	Width      uint32 `json:"width"`
+	Height     uint32 `json:"height"`
+	DurationMS uint32 `json:"durationMs"`
 }
 
 type PostImage struct {
@@ -45,9 +55,19 @@ type Comment struct {
 	ClientRequestID   *string       `json:"-" gorm:"column:client_request_id;type:char(26)"`
 	CreateRequestHash []byte        `json:"-" gorm:"column:create_request_hash;type:binary(32)"`
 	Content           string        `json:"content" gorm:"type:text"`
+	ParentCommentID   uint          `json:"parentCommentId" gorm:"not null;default:0;index"`
+	ReplyToCommentID  uint          `json:"replyToCommentId" gorm:"not null;default:0"`
+	ReplyToUserID     uint          `json:"replyToUserId" gorm:"not null;default:0"`
+	LikedCount        int64         `json:"likedCount" gorm:"not null;default:0"`
 	ReviewStatus      review.Status `json:"reviewStatus" gorm:"size:24;index;default:submitted"`
 	CreatedAt         time.Time     `json:"createdAt"`
 	UpdatedAt         time.Time     `json:"updatedAt"`
+}
+
+type CommentLike struct {
+	CommentID uint `gorm:"primaryKey"`
+	UserID    uint `gorm:"primaryKey"`
+	CreatedAt time.Time
 }
 
 type PostLike struct {

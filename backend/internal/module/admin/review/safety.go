@@ -94,7 +94,7 @@ func (c *SafetyClient) checkTextOnce(ctx context.Context, openID, content string
 	}
 	suggest := strings.ToLower(strings.TrimSpace(result.Result.Suggest))
 	switch suggest {
-	case "", "pass":
+	case "pass":
 		return "wechat pass", false
 	case "review", "risky":
 		return fmt.Sprintf("wechat %s label=%d", suggest, result.Result.Label), false

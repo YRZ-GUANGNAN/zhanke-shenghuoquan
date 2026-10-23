@@ -1,0 +1,102 @@
+@use 'sass:map';
+@use 'sass:list';
+
+// Project decisions derived from research through f754573, not Android dp/sp conversion.
+// No emitted global selectors: consultation pages remain unchanged unless opted in.
+$typography: (
+  title: (36rpx, 52rpx, 600),
+  body: (30rpx, 44rpx, 400),
+  comment: (28rpx, 42rpx, 400),
+  author: (26rpx, 36rpx, 500),
+  meta: (24rpx, 36rpx, 400),
+  label: (28rpx, 40rpx, 500)
+);
+
+// Keep the existing rpx declarations as the baseline for older WebView
+// engines, then cap the same roles with a small fluid range. This avoids tiny
+// type on compact phones and runaway type on tablets without changing the
+// page hierarchy or the consultation pages that do not opt into this mixin.
+// Uppercase PX opts out of Taro's px-to-rpx transform: these bounds are
+// physical CSS pixels, not values in the 750-unit design coordinate space.
+$fluid-font-size: (
+  title: (17PX, 4.8vw, 21PX),
+  body: (15PX, 4vw, 17PX),
+  comment: (14PX, 3.733vw, 16PX),
+  author: (13PX, 3.467vw, 15PX),
+  meta: (12PX, 3.2vw, 14PX),
+  label: (14PX, 3.733vw, 16PX)
+);
+
+$fluid-line-height: (
+  title: 1.44,
+  body: 1.47,
+  comment: 1.5,
+  author: 1.38,
+  meta: 1.5,
+  label: 1.43
+);
+
+@mixin type($role) {
+  $values: map.get($typography, $role);
+  @if $values == null { @error 'Unknown reference typography role: #{$role}'; }
+  font-size: list.nth($values, 1);
+  line-height: list.nth($values, 2);
+  font-weight: list.nth($values, 3);
+  $fluid-size: map.get($fluid-font-size, $role);
+  @if $fluid-size != null {
+    font-size: clamp(list.nth($fluid-size, 1), list.nth($fluid-size, 2), list.nth($fluid-size, 3));
+    line-height: map.get($fluid-line-height, $role);
+  }
+}
+
+@mixin wrap {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@mixin touch {
+  min-width: 44PX;
+  min-height: 44PX;
+}
+
+@mixin page-foundation {
+  min-width: 0;
+
+  .app-button {
+    @include touch;
+    height: auto;
+    padding-top: 16rpx;
+    padding-bottom: 16rpx;
+    line-height: 40rpx;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    font-weight: 600;
+  }
+
+  .app-icon-button { @include touch; }
+  .capsule-page-header__slot,
+  .capsule-page-header__slot-content { @include touch; }
+  .app-field, .app-field__control, .app-field__input, .app-field__textarea { min-width: 0; }
+  .app-field__control { min-height: 44PX; }
+  .app-field__label { @include type(label); @include wrap; }
+  .app-field__message { @include type(meta); @include wrap; }
+  .app-field__textarea { @include type(body); }
+  .app-state__title { @include type(label); @include wrap; }
+  .app-state__description { @include type(meta); @include wrap; }
+  .app-dialog__title, .app-action-sheet__title { @include type(title); @include wrap; }
+  .app-dialog__description, .app-dialog__error, .app-action-sheet__description {
+    @include type(meta);
+    @include wrap;
+  }
+  .app-dialog { max-height: calc(100vh - 64rpx); overflow-y: auto; }
+  .app-dialog__actions .app-button { min-width: 0; }
+  .capsule-page-header__title {
+    max-width: 54%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+    line-height: 44rpx;
+  }
+}

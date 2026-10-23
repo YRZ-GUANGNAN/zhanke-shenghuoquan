@@ -33,15 +33,32 @@ func (r *GormRepository) CreateIdempotent(ctx context.Context, value *Order) (Or
 	}
 	var result Order
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var duplicateErr error
 		if err := tx.Create(value).Error; err == nil {
 			result = *value
 			return nil
 		} else if !isDuplicateKey(err) {
 			return err
+		} else {
+			duplicateErr = err
 		}
 		if err := tx.Where("merchant_user_id = ? AND merchant_request_id = ?",
 			value.MerchantUserID, *value.MerchantRequestID).First(&result).Error; err != nil {
-			return normalizeNotFound(err)
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+			if value.SourceOrderID != nil && value.SourceShopID != nil {
+				var existing Order
+				sourceErr := tx.Where("merchant_user_id = ? AND source_platform = ? AND source_shop_id = ? AND source_order_id = ?",
+					value.MerchantUserID, value.SourcePlatform, *value.SourceShopID, *value.SourceOrderID).First(&existing).Error
+				if sourceErr == nil {
+					return ErrSourceOrderExists
+				}
+				if !errors.Is(sourceErr, gorm.ErrRecordNotFound) {
+					return sourceErr
+				}
+			}
+			return duplicateErr
 		}
 		if !sameCreateSnapshot(result, *value) {
 			return ErrIdempotencyConflict
@@ -330,19 +347,22 @@ func (r *GormRepository) FailOutbox(
 	return status, nil
 }
 
+// Fees are server-owned snapshots, not part of the merchant's request. A retry
+// after a fee-policy update must return the original order and original fees.
 func sameCreateSnapshot(left, right Order) bool {
 	return left.MerchantUserID == right.MerchantUserID &&
 		stringPointerEqual(left.MerchantRequestID, right.MerchantRequestID) &&
+		left.SourcePlatform.Effective() == right.SourcePlatform.Effective() &&
+		left.PickupCode == right.PickupCode &&
+		stringPointerEqual(left.SourceOrderID, right.SourceOrderID) &&
+		stringPointerEqual(left.SourceShopID, right.SourceShopID) &&
 		left.PickupContactName == right.PickupContactName &&
 		left.PickupContactPhone == right.PickupContactPhone &&
 		left.PickupAddress == right.PickupAddress &&
 		left.RecipientName == right.RecipientName &&
 		left.RecipientPhone == right.RecipientPhone &&
 		left.DeliveryAddress == right.DeliveryAddress &&
-		left.Remark == right.Remark &&
-		left.DeliveryFeeCents == right.DeliveryFeeCents &&
-		left.RiderFeeCents == right.RiderFeeCents &&
-		left.PlatformCutCents == right.PlatformCutCents
+		left.Remark == right.Remark
 }
 
 func stringPointerEqual(left, right *string) bool {

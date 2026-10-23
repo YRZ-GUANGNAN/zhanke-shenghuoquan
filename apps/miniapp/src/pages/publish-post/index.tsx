@@ -1,6 +1,6 @@
 import { withFeaturePage } from '../../components/feature-page-gate'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Input, Text, Textarea, View } from '@tarojs/components'
+import { Image, Input, Text, Textarea, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import Taro from '../../services/taro'
 import { isApiError } from '../../services/api'
@@ -9,9 +9,9 @@ import {
   createCommunityPost,
   listHotCommunityTags,
 } from '../../services/b-community'
-import { chooseAndUploadImages, waitForMediaApprovals, type UploadedMedia } from '../../services/media'
-import { getCapsuleSafeStyle } from '../../utils/capsule-safe'
+import { chooseAndUploadImages, waitForMediaApprovals, chooseAndUploadPostMotion, confirmPostMotion, postMotionAvailable, type UploadedPostMotion, type UploadedMedia } from '../../services/media'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
+import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
 import './index.scss'
 
 const MAX_IMAGES = 9
@@ -36,17 +36,31 @@ const validateTag = (value: string): string => {
 }
 
 function PublishPostPage() {
+  const capsuleStyle = useViewportRefresh()
   const [content, setContent] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [hotTags, setHotTags] = useState<string[]>([])
   const [customTag, setCustomTag] = useState('')
   const [images, setImages] = useState<UploadedMedia[]>([])
+  const [motion, setMotion] = useState<UploadedPostMotion | null>(null)
+  const [motionEnabled, setMotionEnabled] = useState(false)
+  const alive = useRef(true)
+  useEffect(() => {
+    alive.current = true
+    void postMotionAvailable().then(value => { if (alive.current) setMotionEnabled(value) })
+    return () => { alive.current = false }
+  }, [])
   const [uploading, setUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [publishedId, setPublishedId] = useState('')
   const [submitStage, setSubmitStage] = useState<SubmitStage>('idle')
   const [uploadHint, setUploadHint] = useState('0/9')
+  const [editorError, setEditorError] = useState('')
   const visibility = useFeatureVisibility()
   const clientRequestIdRef = useRef<string | null>(null)
+  const submitLock = useRef(false)
+  const uploadLock = useRef(false)
+  const publishedIdRef = useRef('')
 
   const canPublish = useMemo(
     () => content.trim().length > 0 && !uploading && !submitting,
@@ -67,9 +81,11 @@ function PublishPostPage() {
 
   const resetClientRequestId = () => {
     clientRequestIdRef.current = null
+    setEditorError('')
   }
 
   const toggleTag = (rawTag: string) => {
+    if (submitLock.current || publishedIdRef.current) return
     const tag = normalizeTag(rawTag)
     if (!tag) return
     resetClientRequestId()
@@ -85,6 +101,7 @@ function PublishPostPage() {
   }
 
   const addCustomTag = () => {
+    if (submitLock.current || publishedIdRef.current) return
     const validationError = validateTag(customTag)
     if (validationError) {
       toast(validationError)
@@ -102,13 +119,15 @@ function PublishPostPage() {
   }
 
   const handlePickImages = async () => {
-    if (uploading || submitting) return
+    if (uploadLock.current || submitLock.current || publishedIdRef.current || motion) return
     const remaining = MAX_IMAGES - images.length
     if (remaining <= 0) {
       toast(`最多上传 ${MAX_IMAGES} 张图`)
       return
     }
+    uploadLock.current = true
     setUploading(true)
+    setEditorError('')
     setUploadHint('上传中')
     try {
       const uploaded = await chooseAndUploadImages('post_image', remaining, (progress) => {
@@ -121,25 +140,62 @@ function PublishPostPage() {
     } catch (error) {
       console.error('upload post image failed', error)
       setUploadHint(`${images.length}/${MAX_IMAGES}`)
-      toast(error instanceof Error ? error.message : '图片上传失败', 'error')
+      const message = error instanceof Error ? error.message : '图片上传失败'
+      setEditorError(message)
+      toast(message, 'error')
     } finally {
+      uploadLock.current = false
       setUploading(false)
     }
   }
 
+  const handlePickMotion = async (kind: UploadedPostMotion['kind']) => {
+    if (!motionEnabled || images.length || motion || uploadLock.current || submitLock.current || publishedIdRef.current) return
+    uploadLock.current = true
+    setUploading(true); setEditorError('')
+    try {
+      const value = await chooseAndUploadPostMotion(kind, message => { if (alive.current) setUploadHint(message) }, () => alive.current)
+      if (!alive.current) return
+      resetClientRequestId(); setMotion(value); setUploadHint('已上传，发布时确认审核')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String((error as { errMsg?: string })?.errMsg ?? '媒体上传失败')
+      if (alive.current && !/cancel/i.test(message)) setEditorError(message)
+    } finally {
+      uploadLock.current = false
+      if (alive.current) setUploading(false)
+    }
+  }
+
   const handlePublish = async () => {
+    if (uploadLock.current || submitLock.current) return
+    if (publishedIdRef.current) {
+      submitLock.current = true
+      setSubmitting(true)
+      try {
+        await Taro.redirectTo({ url: `/pages/post-detail/index?id=${encodeURIComponent(publishedIdRef.current)}` })
+      } catch {
+        setEditorError('帖子已提交，页面打开失败，可点击“查看帖子”重试')
+      } finally {
+        submitLock.current = false
+        setSubmitting(false)
+      }
+      return
+    }
     if (!content.trim()) {
       toast('先写点内容吧')
       return
     }
-    if (submitting) return
+    submitLock.current = true
     const clientRequestId = clientRequestIdRef.current ?? createCommunityClientRequestId()
     clientRequestIdRef.current = clientRequestId
     setSubmitting(true)
+    setEditorError('')
     setSubmitStage('reviewing')
     const deadline = Date.now() + SUBMIT_TIMEOUT_MS
     try {
       setUploadHint('审核中')
+      if (motion) await confirmPostMotion(motion, APPROVAL_TIMEOUT_MS,
+        message => { if (alive.current) setUploadHint(message) }, () => alive.current)
       await waitForMediaApprovals(
         images.map((image) => image.assetId),
         () => setUploadHint('审核中'),
@@ -149,6 +205,7 @@ function PublishPostPage() {
       if (deadline - Date.now() < 12000) {
         throw new Error('本次提交等待超时，草稿和图片已保留，请稍后重试')
       }
+      if (!alive.current) return
       setSubmitStage('publishing')
       setUploadHint('发布中')
       const normalizedContent = content.trim()
@@ -159,17 +216,20 @@ function PublishPostPage() {
         topic: selectedTags[0] ?? '湛科日常',
         tags: selectedTags,
         imageAssetIds: images.map((image) => image.assetId),
+        ...(motion ? { motion: { kind: motion.kind, assetId: motion.video.assetId, posterAssetId: motion.poster.assetId } } : {}),
         clientRequestId,
       })
+      publishedIdRef.current = post.id
+      setPublishedId(post.id)
       clientRequestIdRef.current = null
       toast('发布成功', 'success')
-      void Taro.redirectTo({ url: `/pages/post-detail/index?id=${encodeURIComponent(post.id)}` })
+      await Taro.redirectTo({ url: `/pages/post-detail/index?id=${encodeURIComponent(post.id)}` })
     } catch (error) {
       console.error('publish community post failed', error)
       if (isApiError(error) && error.status >= 400 && error.status < 500) {
         clientRequestIdRef.current = null
       }
-      const message = !isApiError(error)
+      const message = publishedIdRef.current ? '帖子已提交，页面打开失败，可点击“查看帖子”重试' : !isApiError(error)
         ? error instanceof Error ? error.message : '发布失败，请稍后再试'
         : error.status === 0
           ? '网络异常，内容已保留'
@@ -179,7 +239,9 @@ function PublishPostPage() {
               ? '服务暂不可用，稍后可重试'
               : error.message || '发布内容不符合要求'
       toast(message)
+      setEditorError(message)
     } finally {
+      submitLock.current = false
       setSubmitting(false)
       setSubmitStage('idle')
       setUploadHint(`${images.length}/${MAX_IMAGES}`)
@@ -190,37 +252,61 @@ function PublishPostPage() {
     return <View className='publish-post-page'><Text>发帖功能暂未开放</Text></View>
   }
   return (
-    <View className='publish-post-page' style={getCapsuleSafeStyle()}>
+    <View className='publish-post-page' style={capsuleStyle}>
       <CapsulePageHeader
         title='发布帖子'
-        left={<Text className='publish-post-nav__side' onClick={() => void Taro.navigateBack()}>取消</Text>}
+        left={<Text className={`publish-post-nav__side${submitting ? ' publish-post-control--pending' : ''}`} onClick={() => {
+          if (submitLock.current || uploadLock.current) { toast('内容正在处理，请稍候'); return }
+          void Taro.navigateBack()
+        }}>取消</Text>}
         right={
           <Text
             className={`publish-post-nav__publish${canPublish ? ' publish-post-nav__publish--active' : ''}`}
             onClick={() => void handlePublish()}
           >
-            {submitting ? submitStage === 'reviewing' ? '审核中' : '发布中' : '发布'}
+            {publishedId ? submitting ? '打开中' : '查看帖子' : submitting ? submitStage === 'reviewing' ? '审核中' : '发布中' : '发布'}
           </Text>
         }
       />
 
       <View className='publish-post-body'>
-        <View className='publish-post-upload' onClick={() => void handlePickImages()}>
-          <Text className='publish-post-upload__icon'>{images.length > 0 ? '✓' : '＋'}</Text>
-          <Text className='publish-post-upload__count'>{uploading ? uploadHint : `${images.length}/${MAX_IMAGES}`}</Text>
+        <View className='publish-post-media'>
+          {motion && <View className='publish-post-motion'>
+            <Image src={motion.poster.previewPath} mode='aspectFill' />
+            <View><Text>{motion.kind === 'live_photo' ? '实况照片' : '视频'} · {Math.ceil(motion.durationMs / 1000)} 秒</Text><Text className='publish-post-motion__hint'>首页静音短预览，详情可完整播放</Text></View>
+            <View role='button' aria-label='移除动态媒体' onClick={() => { if (!uploadLock.current && !submitLock.current && !publishedIdRef.current) { setMotion(null); resetClientRequestId() } }}><Text>移除</Text></View>
+          </View>}
+          {images.map((image) => <View className='publish-post-media__item' key={image.assetId}>
+            <Image className='publish-post-media__image' src={image.previewPath} mode='aspectFill' />
+          </View>)}
+          {!motion && <View className={`publish-post-upload${uploading || submitting || images.length === MAX_IMAGES ? ' publish-post-control--pending' : ''}`} role='button' aria-label='添加帖子图片' aria-disabled={uploading || submitting || images.length === MAX_IMAGES} onClick={() => void handlePickImages()}>
+            <Text className='publish-post-upload__icon'>{images.length === MAX_IMAGES ? '✓' : '＋'}</Text>
+            <Text className='publish-post-upload__count'>{uploading ? uploadHint : `${images.length}/${MAX_IMAGES}`}</Text>
+          </View>}
         </View>
+        {motionEnabled && !images.length && !motion && <View className='publish-post-motion-actions'>
+          <View role='button' aria-disabled={uploading || submitting} className={uploading || submitting ? 'publish-post-control--pending' : ''} onClick={() => void handlePickMotion('video')}><Text>添加视频</Text></View>
+          <View role='button' aria-disabled={uploading || submitting} className={uploading || submitting ? 'publish-post-control--pending' : ''} onClick={() => void handlePickMotion('live_photo')}><Text>添加实况照片</Text></View>
+        </View>}
+        {motionEnabled && !images.length && !motion && <Text className='publish-post-motion-tip'>视频最长 60 秒；实况照片由封面照片和对应的 5 秒内片段组成</Text>}
+        {uploading && <View className='publish-post-motion-tip' role='status'><Text>{uploadHint}</Text></View>}
 
         <Textarea
           className='publish-post-textarea'
           value={content}
+          disabled={submitting || Boolean(publishedId)}
           maxlength={600}
           autoHeight={false}
           placeholder='分享你的校园生活：好吃的、求助、找搭子、攻略……'
+          placeholderClass='publish-post-textarea__placeholder'
           onInput={(event) => {
+            if (submitLock.current || publishedIdRef.current) return
             resetClientRequestId()
             setContent(event.detail.value)
           }}
         />
+        <Text className='publish-post-length'>{content.length} / 600</Text>
+        {editorError && <View className='publish-post-error' role='alert'><Text>{editorError}</Text></View>}
 
         <View className='publish-post-divider' />
 
@@ -228,7 +314,7 @@ function PublishPostPage() {
           <Text className='publish-post-topic-head__title'>添加标签</Text>
           <Text className='publish-post-topic-head__hint'>最多选择 {MAX_TAGS} 个</Text>
         </View>
-        <View className='publish-post-topics'>
+        <View className={`publish-post-topics${submitting ? ' publish-post-control--pending' : ''}`}>
           {hotTags.length > 0
             ? hotTags.map((tag) => (
                 <Text
@@ -246,13 +332,14 @@ function PublishPostPage() {
           <Input
             className='publish-post-custom-tag__input'
             value={customTag}
+            disabled={submitting || Boolean(publishedId)}
             maxlength={13}
             confirmType='done'
             placeholder='自定义标签，最多 12 个字'
-            onInput={(event) => setCustomTag(event.detail.value)}
+            onInput={(event) => { if (!submitLock.current && !publishedIdRef.current) setCustomTag(event.detail.value) }}
             onConfirm={addCustomTag}
           />
-          <Text className='publish-post-custom-tag__button' onClick={addCustomTag}>添加</Text>
+          <Text className={`publish-post-custom-tag__button${submitting ? ' publish-post-control--pending' : ''}`} onClick={addCustomTag}>添加</Text>
         </View>
 
         {selectedTags.length > 0 && (

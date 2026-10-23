@@ -1,15 +1,16 @@
 @use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
 
-.about-page { min-height: 100vh; background: $bg-app; color: $text-primary; }
-.about-nav__back { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; font-size: 54rpx; line-height: 1; }
-.about-content { padding: 64rpx 36rpx; }
+.about-page { @include ref.page-foundation; min-height: 100vh; background: $bg-app; color: $text-primary; }
+.about-nav__back { @include ref.touch; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; font-size: 54rpx; line-height: 1; }
+.about-content { padding: 64rpx 32rpx calc(64rpx + env(safe-area-inset-bottom)); }
 .about-brand { display: flex; flex-direction: column; align-items: center; }
 .about-brand__mark { display: flex; align-items: center; justify-content: center; width: 126rpx; height: 126rpx; border-radius: 36rpx; background: $gradient-primary; box-shadow: 0 24rpx 50rpx -18rpx rgba(33, 104, 184, .6); color: #fff; font-size: 52rpx; font-weight: 900; }
-.about-brand__name { margin-top: 28rpx; color: $text-strong; font-size: 36rpx; font-weight: 900; }
-.about-brand__version { margin-top: 10rpx; color: $text-muted; font-size: 23rpx; }
-.about-description { display: block; max-width: 600rpx; margin: 42rpx auto; color: $text-secondary; font-size: 26rpx; line-height: 1.75; text-align: center; }
+.about-brand__name { @include ref.type(title); margin-top: 24rpx; color: $text-strong; }
+.about-brand__version { @include ref.type(meta); margin-top: 8rpx; color: $text-muted; }
+.about-description { @include ref.type(body); @include ref.wrap; display: block; max-width: 600rpx; margin: 40rpx auto; color: $text-secondary; text-align: left; }
 .about-card { overflow: hidden; border-radius: 26rpx; background: $bg-surface; box-shadow: $shadow-card; }
-.about-row { position: relative; display: flex; align-items: center; justify-content: space-between; min-height: 94rpx; padding: 0 30rpx; color: $text-strong; font-size: 27rpx; }
+.about-row { @include ref.touch; @include ref.type(label); position: relative; display: flex; align-items: center; justify-content: space-between; gap: 16rpx; min-height: max(44PX, 94rpx); padding: 16rpx 24rpx; color: $text-strong; }
 .about-row + .about-row::before { position: absolute; top: 0; right: 30rpx; left: 30rpx; height: 1rpx; background: $divider-hairline; content: ''; }
 .about-row text:last-child { color: $text-muted; font-size: 38rpx; }
-.about-footer { display: block; margin-top: 70rpx; color: $text-faint; font-size: 21rpx; text-align: center; }
+.about-footer { @include ref.type(meta); display: block; margin-top: 64rpx; color: $text-faint; text-align: center; }

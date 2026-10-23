@@ -11,7 +11,10 @@ const forbiddenCopy = /静态(?:预览|占位|示意)|后续接入|下一阶段�
 const violations = []
 for (const route of routes) {
   const file = path.join(src, `${route}.tsx`)
-  const source = fs.readFileSync(file, 'utf8')
+  let source = fs.readFileSync(file, 'utf8')
+  if (route === 'pages/merchant-messages/index' || route === 'pages/rider-messages/index') {
+    source += fs.readFileSync(path.join(src, 'pages/merchant-messages/content.tsx'), 'utf8')
+  }
   if (forbiddenCopy.test(source)) violations.push(`${route}: contains placeholder or fake-value copy`)
 }
 
@@ -23,10 +26,10 @@ const mustContain = [
   ['pages/delivery-rider/index.tsx', 'listClaimableDeliveryOrders'],
   ['pages/delivery-conversation/index.tsx', 'loadDeliveryTencentMessages'],
   ['pages/merchant-home/index.tsx', 'listMerchantDeliveryOrders'],
-  ['pages/merchant-home/index.tsx', 'getDeliveryWallet'],
+  ['pages/merchant-wallet/index.tsx', 'getDeliveryWallet'],
   ['pages/merchant-publish/index.tsx', 'createMerchantDeliveryOrder'],
   ['pages/merchant-wallet/index.tsx', 'listDeliveryWalletLedger'],
-  ['pages/merchant-messages/index.tsx', 'listDeliveryConversations'],
+  ['pages/merchant-messages/content.tsx', 'listDeliveryConversations'],
   ['pages/merchant-order-detail/index.tsx', 'getMerchantDeliveryOrder']
 ]
 for (const [relative, token] of mustContain) {
@@ -40,8 +43,8 @@ for (const token of [
   "className='rider-grab-hero'",
   'RiderWorkbenchIcon',
   "className='rider-grab-task-summary'",
-  "className='rider-empty-state'",
-  "label: '待抢单'",
+  "<DeliveryOrderState kind='empty'",
+  "'接单大厅'",
   "label: '待取货'",
   "label: '待送达'",
   'claimDeliveryOrder(order)',
@@ -70,6 +73,9 @@ if (!identityGuard.includes("merchant: '/pages/merchant-home/index'")) {
   violations.push('merchant identity must route to the new real-data merchant workbench')
 }
 const merchantHome = fs.readFileSync(path.join(src, 'pages/merchant-home/index.tsx'), 'utf8')
+if (/getDeliveryWallet|listDeliveryWalletLedger|startDeliveryWalletRecharge/.test(merchantHome)) {
+  violations.push('pages/merchant-home/index.tsx: wallet reads and payments belong to the dedicated merchant-wallet page')
+}
 for (const token of [
   "getIdentityApplication('merchant')",
   "applicationResult.value.status !== 'approved'",
@@ -100,11 +106,6 @@ for (const pageName of merchantPages) {
 }
 
 const merchantPaymentGateContracts = [
-  [
-    'merchant-home',
-    /deliveryPaymentEnabled\s*\?\s*settle\(getDeliveryWallet\(\)\)\s*:\s*null/,
-    'merchant home must not request the gated wallet endpoint when delivery payment is disabled'
-  ],
   [
     'merchant-wallet',
     /if\s*\(\s*!deliveryPaymentEnabled\s*\)/,
