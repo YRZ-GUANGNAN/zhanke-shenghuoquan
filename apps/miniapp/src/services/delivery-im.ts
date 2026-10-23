@@ -1,9 +1,9 @@
 import TencentCloudChat, { type Message } from '@tencentcloud/chat'
 import { request } from './api'
-import { ensureTencentIMReady, type IMCredentials } from './e-im'
+import { ensureTencentIMReady, withTimeout, type IMCredentials, type TencentTextAttempt } from './e-im'
 
-function readyForDeliveryIM() {
-  return ensureTencentIMReady('', () => request<IMCredentials>('/delivery/im-credentials'))
+function readyForDeliveryIM(expectedUserId = '') {
+  return ensureTencentIMReady(expectedUserId, () => request<IMCredentials>('/delivery/im-credentials', { url: '', timeout: 10000 }))
 }
 
 export type DeliveryConversationStatus =
@@ -127,41 +127,63 @@ export function resolveDeliveryConversationImage(
 }
 
 export async function loadDeliveryTencentMessages(
-  conversation: DeliveryConversation
+  conversation: DeliveryConversation,
+  expectedUserId = ''
 ): Promise<Message[]> {
-  const chat = await readyForDeliveryIM()
-  await chat.getConversationProfile(conversation.tencentConversationId)
-  const result = await chat.getMessageList({
+  const chat = await readyForDeliveryIM(expectedUserId)
+  const result = await withTimeout(chat.getMessageList({
     conversationID: conversation.tencentConversationId
-  }) as MessageListResult
-  await chat.setMessageRead({ conversationID: conversation.tencentConversationId })
+  }), 15000, '历史消息读取失败，请稍后重试') as MessageListResult
+  void withTimeout(chat.setMessageRead({ conversationID: conversation.tencentConversationId }), 5000, '更新已读状态超时').catch(() => undefined)
   return result.data?.messageList || []
+}
+
+async function authorizeDeliverySend(conversation: DeliveryConversation) {
+  const current = await getDeliveryOrderConversation(conversation.deliveryOrderPublicId)
+  if (!deliveryConversationCanSend(current) || current.conversationPublicId !== conversation.conversationPublicId ||
+      current.assignmentVersion !== conversation.assignmentVersion || current.tencentConversationId !== conversation.tencentConversationId) {
+    throw new Error('订单状态或配送人员已变化，请返回订单查看')
+  }
 }
 
 export async function sendDeliveryTencentText(
   conversation: DeliveryConversation,
-  text: string
+  text: string,
+  expectedUserId = '',
+  attempt?: TencentTextAttempt
 ): Promise<Message> {
-  const chat = await readyForDeliveryIM()
-  const message = chat.createTextMessage({
+  await authorizeDeliverySend(conversation)
+  const chat = await readyForDeliveryIM(expectedUserId)
+  const sender = chat.getLoginUser()
+  if (attempt?.message && (attempt.message.conversationID !== conversation.tencentConversationId || attempt.message.from !== sender || attempt.message.payload?.text !== text)) {
+    throw new Error('待发送消息与当前会话不一致')
+  }
+  const retry = Boolean(attempt?.message)
+  const message = attempt?.message || chat.createTextMessage({
     to: groupIDFromConversationID(conversation.tencentConversationId),
     conversationType: TencentCloudChat.TYPES.CONV_GROUP,
     payload: { text },
     needReadReceipt: false
   })
-  const result = await chat.sendMessage(message) as SendMessageResult
-  return result.data?.message || message
+  if (attempt) attempt.message = message
+  if (retry && message.status === 'success') return message
+  const result = await withTimeout(retry ? chat.resendMessage(message) : chat.sendMessage(message), 30000, '消息发送超时，请重试') as SendMessageResult
+  if (chat.getLoginUser() !== sender) throw new Error('登录账号已变化')
+  if (!result.data?.message?.ID) throw new Error('消息发送结果未确认，请重试')
+  return result.data.message
 }
 
 export async function sendDeliveryTencentImage(
   conversation: DeliveryConversation,
-  assetPublicId: string
+  assetPublicId: string,
+  expectedUserId = ''
 ): Promise<Message> {
+  await authorizeDeliverySend(conversation)
   const prepared = await prepareDeliveryConversationImage(
     conversation.conversationPublicId,
     assetPublicId
   )
-  const chat = await readyForDeliveryIM()
+  const chat = await readyForDeliveryIM(expectedUserId)
   const message = chat.createCustomMessage({
     to: groupIDFromConversationID(conversation.tencentConversationId),
     conversationType: TencentCloudChat.TYPES.CONV_GROUP,
@@ -172,8 +194,9 @@ export async function sendDeliveryTencentImage(
     },
     needReadReceipt: false
   })
-  const result = await chat.sendMessage(message) as SendMessageResult
-  return result.data?.message || message
+  const result = await withTimeout(chat.sendMessage(message), 30000, '图片发送超时') as SendMessageResult
+  if (!result.data?.message?.ID) throw new Error('图片发送结果未确认')
+  return result.data.message
 }
 
 export async function getDeliveryConversationUnread(
@@ -196,9 +219,10 @@ export async function getDeliveryConversationUnreadByOrder(
 
 export async function subscribeDeliveryTencentMessages(
   conversation: DeliveryConversation,
-  handler: (messages: Message[]) => void
+  handler: (messages: Message[]) => void,
+  expectedUserId = ''
 ): Promise<() => void> {
-  const chat = await readyForDeliveryIM()
+  const chat = await readyForDeliveryIM(expectedUserId)
   const listener = (event: MessageEvent) => {
     handler((event.data || []).filter((item) => item.conversationID === conversation.tencentConversationId))
   }

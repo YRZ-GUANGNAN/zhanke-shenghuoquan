@@ -83,7 +83,7 @@ func validOrderSource(value Order) bool {
 }
 
 // ExternalOrderAdapter is a reserved integration boundary. There is deliberately
-// no provider implementation or registered webhook in this release. An adapter
+// no provider implementation in this release; its HTTP entry fails closed. An adapter
 // must verify the provider signature, timestamp and event replay token against
 // a server-owned shop binding before returning normalized data. Returning an
 // event is not permission to charge a wallet or publish a delivery order.
@@ -93,6 +93,9 @@ type ExternalOrderAdapter interface {
 }
 
 type ExternalOrderEnvelope struct {
+	Method     string
+	Path       string
+	RawQuery   string
 	Payload    []byte
 	Headers    map[string][]string
 	ReceivedAt time.Time

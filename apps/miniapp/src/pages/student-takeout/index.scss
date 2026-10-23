@@ -70,6 +70,8 @@
   display: flex;
   flex-direction: column;
 }
+.student-takeout-page--catalog { padding-top: 0; }
+.student-takeout-catalog-back { width: 44PX; min-height: 44PX; display: flex; align-items: center; }
 
 .student-takeout-services {
   padding: 34rpx 32rpx 28rpx;

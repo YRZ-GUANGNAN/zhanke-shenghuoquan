@@ -41,7 +41,7 @@ const TENCENT_IM_TIMEOUT_MS = 30000
 const TENCENT_IM_READY_TIMEOUT_MS = 20000
 const TENCENT_IM_HISTORY_PAGE_LIMIT = 20
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+export function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(message)), timeoutMs)
     promise.then(
@@ -328,31 +328,45 @@ export async function loadTencentMessages(
 export async function sendTencentText(
   context: IMConversationContext,
   text: string,
-  expectedUserId = ''
+  expectedUserId = '',
+  attempt?: TencentTextAttempt
 ): Promise<Message> {
   const visibility = await getFeatureVisibility(true)
   if (!visibility.messages || (context.referenceType !== 'user' && !visibility.secondhand_chat)) throw new Error('私信功能暂未开放')
-  if (context.referenceType === 'user') {
+  {
     const authorized = await getIMConversation(context.relationId)
-    if (authorized.relationId !== context.relationId || authorized.referenceType !== 'user' || authorized.productId !== 0 ||
+    if (authorized.relationId !== context.relationId || (authorized.referenceType || 'product') !== (context.referenceType || 'product') || authorized.productId !== context.productId ||
         authorized.buyerId !== context.buyerId || authorized.sellerId !== context.sellerId ||
         authorized.peerUserId !== context.peerUserId || authorized.conversationId !== context.conversationId) {
       throw new Error('会话已变化，请返回后重新进入')
     }
   }
   const chat = await ensureTencentIMReady(expectedUserId)
-  const message = chat.createTextMessage({
+  const generation = sessionGeneration
+  if (attempt?.message && (attempt.message.conversationID !== context.conversationId || attempt.message.payload?.text !== text || attempt.message.from !== chat.getLoginUser())) {
+    throw new Error('待发送消息与当前会话不一致')
+  }
+  const message = attempt?.message || chat.createTextMessage({
     to: context.peerUserId,
     conversationType: TencentCloudChat.TYPES.CONV_C2C,
     payload: { text }
   })
+  const retry = Boolean(attempt?.message)
+  if (attempt) attempt.message = message
+  if (retry && message.status === 'success') return message
   const result = await withTimeout(
-    chat.sendMessage(message),
+    retry ? chat.resendMessage(message) : chat.sendMessage(message),
     TENCENT_IM_TIMEOUT_MS,
     '发送腾讯云 IM 消息超时'
   ) as { data?: { message?: Message } }
-  return result.data?.message || message
+  assertCurrentGeneration(generation, chat)
+  if (!result.data?.message?.ID) throw new Error('消息发送结果未确认，请重试')
+  return result.data.message
 }
+
+// Retain the SDK message identity when retrying after an uncertain transport
+// result. Recreating a new message here can duplicate a message already sent.
+export interface TencentTextAttempt { message?: Message }
 
 export async function subscribeTencentMessages(
   context: IMConversationContext,

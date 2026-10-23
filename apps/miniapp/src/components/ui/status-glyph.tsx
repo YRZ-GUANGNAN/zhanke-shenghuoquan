@@ -13,7 +13,8 @@ export type StatusGlyphKind = keyof typeof symbols | 'loading'
 
 export function StatusGlyph({ kind, small = false }: { kind: StatusGlyphKind; small?: boolean }) {
   return <View className={`status-glyph status-glyph--${kind}${small ? ' status-glyph--small' : ''}`}>
-    {(kind === 'loading' || kind === 'login') && <View className='status-glyph__ring' />}
+    {kind === 'loading' && <View className='status-glyph__ring' />}
+    {kind === 'login' && <View className='status-glyph__login-progress'><View /><View /><View /></View>}
     {kind !== 'loading' && <Image className='status-glyph__image' src={symbols[kind]} mode='aspectFit' />}
   </View>
 }

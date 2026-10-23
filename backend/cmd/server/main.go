@@ -18,6 +18,7 @@ import (
 	"campus-circle/backend/internal/module/admin"
 	"campus-circle/backend/internal/module/admin/deliveryconsole"
 	"campus-circle/backend/internal/module/admin/deliveryim"
+	"campus-circle/backend/internal/module/admin/deliveryintake"
 	"campus-circle/backend/internal/module/admin/deliverymerchant"
 	"campus-circle/backend/internal/module/admin/deliverynotify"
 	"campus-circle/backend/internal/module/admin/deliverypayment"
@@ -46,6 +47,7 @@ import (
 	"campus-circle/backend/internal/module/trade"
 	"campus-circle/backend/internal/module/user"
 	legacymedia "campus-circle/backend/internal/pkg/media"
+	"campus-circle/backend/internal/pkg/response"
 	"campus-circle/backend/internal/pkg/searchmetrics"
 	"gorm.io/gorm"
 )
@@ -459,6 +461,11 @@ func main() {
 	mediaAdminRoutes := api.Group("/admin/media", adminAuthRequired, user.AdminRequired())
 	mediaconsole.NewHandler(mediaAdminQuery).Register(mediaAdminRoutes)
 	registerLegacyTakeoutRoutes(legacyTakeout, api, userService, reviewService, coreMediaService, adminAuthRequired)
+	catalog, err := takeout.NewBuyerQueryService(takeout.NewRepository(db))
+	if err != nil {
+		log.Fatalf("configure merchant catalog: %v", err)
+	}
+	takeoutbuyer.NewHandler(catalog, nil, nil).RegisterCatalog(api.Group("/takeout/catalog", userService.AuthRequired()))
 	registerDeliveryRoutes(deliveryRuntime, api, userService, adminAuthRequired)
 
 	if err := router.Run(cfg.HTTPAddr); err != nil {
@@ -513,6 +520,7 @@ func newSanitizedRecovery(recoveryOutput io.Writer) gin.HandlerFunc {
 }
 
 type deliveryRuntime struct {
+	externalIntake                 *delivery.ExternalIntake
 	orders                         *delivery.Service
 	dispatch                       *delivery.DispatchService
 	funds                          *delivery.FundsService
@@ -593,6 +601,13 @@ func newDeliveryRuntime(cfg config.Config, db *gorm.DB, proofPorts ...delivery.M
 }
 
 func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, userService *user.Service, adminAuth ...gin.HandlerFunc) {
+	var intake deliveryintake.Intake
+	if runtime != nil && runtime.externalIntake != nil {
+		intake = runtime.externalIntake
+	}
+	intakeHandler := deliveryintake.NewHandler(intake, func(c *gin.Context) uint64 { return uint64(user.CurrentUserID(c)) })
+	intakeHandler.RegisterWebhook(api.Group("/delivery/external-orders"))
+	registerDeliveryCapabilities(api, runtime, userService.AuthRequired())
 	if runtime == nil {
 		return
 	}
@@ -605,6 +620,7 @@ func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, user
 		userService.IdentityRequired(user.IdentityMerchant),
 	)
 	deliverymerchant.NewHandler(runtime.dispatch, currentUserID, runtime.allowMockConfirm).Register(merchantRoutes)
+	intakeHandler.RegisterMerchant(merchantRoutes)
 	var paymentHandler *deliverypayment.Handler
 	if runtime.funds != nil {
 		paymentHandler = deliverypayment.NewHandler(
@@ -650,6 +666,17 @@ func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, user
 	deliveryconsole.NewHandler(
 		runtime.consoleQueries, runtime.fees, runtime.riderWallets, currentUserID, nil,
 	).Register(adminRoutes)
+}
+
+func registerDeliveryCapabilities(api *gin.RouterGroup, runtime *deliveryRuntime, authentication gin.HandlerFunc) {
+	api.GET("/delivery/capabilities", authentication, func(c *gin.Context) {
+		ready := false
+		if runtime != nil && runtime.funds != nil {
+			provider, configured := runtime.paymentProvider.(*deliverypayment.WechatProvider)
+			ready = configured && provider != nil
+		}
+		response.OK(c, gin.H{"wechatPayment": ready, "externalOrders": runtime != nil && runtime.externalIntake != nil})
+	})
 }
 
 type legacyTakeoutRuntime struct {

@@ -189,6 +189,8 @@ async function run() {
       '../../components/capsule-page-header': { default: (props) => React.createElement(View, {}, props.center, props.right) },
       '../../components/app-icon': { default: View },
       '../../components/chat-avatar': { default: View },
+      '../../components/post-motion-media': { default: View },
+      '../../hooks/use-post-motion-preview': { usePostMotionPreview: () => ({ enabled: false, activeCardId: '', onScroll: () => {}, refresh: () => {} }) },
       '../../utils/conversation-presentation': load(path.join(root, 'apps/miniapp/src/utils/conversation-presentation.ts')),
       '../../components/ui': { AppState: component('AppState'), AppSkeleton: component('AppSkeleton') },
       '../../hooks/use-identity-guard': { useIdentityGuard: () => true },

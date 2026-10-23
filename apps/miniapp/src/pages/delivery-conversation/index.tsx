@@ -1,5 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Image, Input, ScrollView, Text, View } from '@tarojs/components'
+import { useDidShow } from '@tarojs/taro'
+import type { TencentTextAttempt } from '../../services/e-im'
 import AppIcon from '../../components/app-icon'
 import { isApiError } from '../../services/api'
 import {
@@ -21,6 +23,7 @@ import { useKeyboardInset } from '../../hooks/use-keyboard-inset'
 import './index.scss'
 
 type PageStatus = 'loading' | 'ready' | 'error'
+type PendingText = { id: string; text: string; time: number; state: 'sending' | 'failed'; error?: string; attempt: TencentTextAttempt }
 
 function mergeMessages(current: DeliveryTencentMessage[], next: DeliveryTencentMessage[]): DeliveryTencentMessage[] {
   const values = new Map(current.map((item) => [item.ID, item]))
@@ -52,9 +55,21 @@ export default function DeliveryConversationPage() {
   const orderId = String(params.orderId || '').trim()
   const identity = useSessionStore((state) => state.identity?.currentIdentity)
   const [status, setStatus] = useState<PageStatus>('loading')
-  const [reloadKey, setReloadKey] = useState(0)
+  const selfId = useSessionStore(state => state.profile.id)
+  const operationKey = `${selfId}:${identity}:${orderId}`
+  const activeRef = useRef(operationKey)
+  activeRef.current = operationKey
+  const draftRef = useRef('')
+  const sequence = useRef(0)
+  const locks = useRef(new Set<string>())
+  const imageLock = useRef(false)
+  const authorizeRef = useRef<() => Promise<DeliveryConversation>>(async () => { throw new Error('会话不可用') })
+  const reconnectRef = useRef<() => void>(() => undefined)
+  const [historyLoading, setHistoryLoading] = useState(true)
+  useDidShow(() => reconnectRef.current())
   const [conversation, setConversation] = useState<DeliveryConversation | null>(null)
   const [messages, setMessages] = useState<DeliveryTencentMessage[]>([])
+  const [pendingMessages, setPendingMessages] = useState<PendingText[]>([])
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({})
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
@@ -64,52 +79,75 @@ export default function DeliveryConversationPage() {
   useEffect(() => {
     let active = true
     let unsubscribe: (() => void) | undefined
+    let authorized: DeliveryConversation | null = null
+    let authorizing: Promise<DeliveryConversation> | null = null
+    let connecting = false
+    activeRef.current = operationKey
+    const current = () => active && activeRef.current === operationKey
+    const expectedUser = `campus_${selfId}`
     setStatus('loading')
     setConversation(null)
     setMessages([])
+    setPendingMessages([])
     setImageUrls({})
+    setDraft('')
+    draftRef.current = ''
+    locks.current.clear()
+    setSending(false)
     setError('')
+    setHistoryLoading(true)
     resetKeyboardInset()
-
-    if (!orderId) {
-      setStatus('error')
-      setError('配送会话入口无效，请从订单详情重新进入')
-      return () => { active = false }
-    }
-
-    void (async () => {
-      try {
-        const nextConversation = await getDeliveryOrderConversation(orderId)
-        if (!active) return
-        setConversation(nextConversation)
-        unsubscribe = await subscribeDeliveryTencentMessages(nextConversation, (incoming) => {
-          if (!active) return
-          setMessages((current) => mergeMessages(current, incoming))
-        })
-        if (!active) {
-          unsubscribe()
-          unsubscribe = undefined
-          return
+    const connect = () => {
+      if (!current() || !authorized || connecting) return
+      connecting = true
+      const target = authorized
+      void (async () => {
+        try {
+          const stop = await subscribeDeliveryTencentMessages(target, incoming => {
+            const session = useSessionStore.getState()
+            if (current() && session.status === 'authenticated' && session.profile.id === selfId && session.identity?.currentIdentity === identity) setMessages(values => mergeMessages(values, incoming))
+          }, expectedUser)
+          if (!current()) { stop(); return }
+          unsubscribe?.()
+          unsubscribe = stop
+          const history = await loadDeliveryTencentMessages(target, expectedUser)
+          if (current()) setMessages(values => mergeMessages(values, history))
+        } catch {
+          // A background connection failure never blocks composing.
+        } finally {
+          connecting = false
+          if (current()) setHistoryLoading(false)
         }
-        const history = await loadDeliveryTencentMessages(nextConversation)
-        if (!active) return
-        setMessages((current) => mergeMessages(current, history))
+      })()
+    }
+    reconnectRef.current = connect
+    authorizeRef.current = () => {
+      if (!current() || !orderId || !selfId) return Promise.reject(new Error('配送会话入口无效'))
+      if (authorized) return Promise.resolve(authorized)
+      if (authorizing) return authorizing
+      authorizing = getDeliveryOrderConversation(orderId).then(value => {
+        if (!current()) throw new Error('账号或会话已切换')
+        if (value.deliveryOrderPublicId !== orderId || !value.conversationPublicId || !value.tencentConversationId.startsWith('GROUP')) throw new Error('配送会话校验失败')
+        authorized = value
+        setConversation(value)
         setStatus('ready')
-      } catch (value) {
-        unsubscribe?.()
-        unsubscribe = undefined
-        if (!active) return
-        const nextError = messageError(value)
-        setError(nextError)
-        setStatus('error')
-      }
-    })()
-
+        setError('')
+        connect()
+        return value
+      }).catch(value => {
+        authorizing = null
+        if (current()) { setStatus('error'); setError(messageError(value)); setHistoryLoading(false) }
+        throw value
+      })
+      return authorizing
+    }
+    void authorizeRef.current().catch(() => undefined)
     return () => {
       active = false
+      if (activeRef.current === operationKey) activeRef.current = ''
       unsubscribe?.()
     }
-  }, [orderId, reloadKey, resetKeyboardInset])
+  }, [operationKey, orderId, selfId, resetKeyboardInset])
 
   useEffect(() => {
     if (!conversation) return
@@ -147,41 +185,74 @@ export default function DeliveryConversationPage() {
     [messages]
   )
 
-  const sendText = async () => {
-    const text = draft.trim()
-    if (!text) return
-    if (!conversation || !canSend || sending) return
-    setSending(true)
+  const canCompose = Boolean(orderId && selfId && status !== 'error' && (!conversation || canSend))
+  const deliverText = async (item: PendingText) => {
+    const key = activeRef.current
+    if (!key || locks.current.has(item.id)) return
+    locks.current.add(item.id)
+    const current = () => {
+      const session = useSessionStore.getState()
+      return activeRef.current === key && session.status === 'authenticated' && session.profile.id === selfId && session.identity?.currentIdentity === identity
+    }
+    setPendingMessages(values => values.map(value => value.id === item.id ? { ...value, state: 'sending', error: undefined } : value))
     try {
-      const sent = await sendDeliveryTencentText(conversation, text)
-      setMessages((current) => mergeMessages(current, [sent]))
-      setDraft('')
+      const target = await authorizeRef.current()
+      if (!current()) return
+      if (!deliveryConversationCanSend(target)) throw new Error('订单已结束或会话已只读')
+      const sent = await sendDeliveryTencentText(target, item.text, `campus_${selfId}`, item.attempt)
+      if (!current()) return
+      setMessages(values => mergeMessages(values, [sent]))
+      setPendingMessages(values => values.filter(value => value.id !== item.id))
+      reconnectRef.current()
     } catch (value) {
-      await Taro.showToast({ title: messageError(value, '消息发送失败'), icon: 'none' })
+      if (current()) setPendingMessages(values => values.map(valueItem => valueItem.id === item.id ? { ...valueItem, state: 'failed', error: messageError(value, '消息发送失败') } : valueItem))
     } finally {
-      setSending(false)
+      locks.current.delete(item.id)
     }
   }
 
+  const sendText = async () => {
+    const value = draftRef.current.trim()
+    if (!value || !canCompose) return
+    draftRef.current = ''
+    setDraft('')
+    const item: PendingText = { id: `pending-${Date.now()}-${++sequence.current}`, text: value, time: Math.floor(Date.now() / 1000), state: 'sending', attempt: {} }
+    setPendingMessages(values => [...values, item])
+    await deliverText(item)
+  }
+
+  const retryText = (item: PendingText) => {
+    if (item.state === 'failed') void deliverText(item)
+  }
+
   const sendImage = async () => {
-    if (!conversation || !canSend || !conversation.imagesEnabled || sending) return
+    if (!conversation || !canSend || !conversation.imagesEnabled || imageLock.current) return
+    const key = activeRef.current
+    const current = () => {
+      const session = useSessionStore.getState()
+      return activeRef.current === key && session.status === 'authenticated' && session.profile.id === selfId && session.identity?.currentIdentity === identity
+    }
+    imageLock.current = true
     setSending(true)
     try {
       const [uploaded] = await chooseAndUploadImages('delivery_im', 1, (progress) => {
         void Taro.showLoading({ title: `${progress.message} ${progress.percent}%`, mask: true })
       })
-      if (!uploaded) return
+      if (!uploaded || !current()) return
       await waitForMediaApproval(uploaded.assetId, (mediaStatus) => {
         void Taro.showLoading({ title: mediaStatus.message || '图片审核中', mask: true })
       })
-      const sent = await sendDeliveryTencentImage(conversation, uploaded.assetId)
+      if (!current()) return
+      const sent = await sendDeliveryTencentImage(conversation, uploaded.assetId, `campus_${selfId}`)
+      if (!current()) return
       setImageUrls((current) => ({ ...current, [sent.ID]: uploaded.previewPath }))
       setMessages((current) => mergeMessages(current, [sent]))
     } catch (value) {
-      await Taro.showToast({ title: messageError(value, '图片发送失败'), icon: 'none' })
+      if (current()) await Taro.showToast({ title: messageError(value, '图片发送失败'), icon: 'none' })
     } finally {
       Taro.hideLoading()
-      setSending(false)
+      imageLock.current = false
+      if (current()) setSending(false)
     }
   }
 
@@ -211,15 +282,25 @@ export default function DeliveryConversationPage() {
         enhanced
         showScrollbar={false}
       >
-        {status === 'loading' ? <View className='delivery-chat-state'>正在连接配送会话…</View> : null}
         {status === 'error' ? (
-          <View className='delivery-chat-state delivery-chat-state--error' onClick={() => setReloadKey((value) => value + 1)}>
+          <View className='delivery-chat-state delivery-chat-state--error' onClick={() => void authorizeRef.current().catch(() => undefined)}>
             <Text>{error}</Text>
             <Text className='delivery-chat-state__retry'>点击重试</Text>
           </View>
         ) : null}
-        {status === 'ready' && visibleMessages.length === 0 ? <View className='delivery-chat-state'>会话已建立，发送第一条消息吧</View> : null}
-        {visibleMessages.map((message) => {
+        {status === 'ready' && !historyLoading && visibleMessages.length === 0 && pendingMessages.length === 0 ? <View className='delivery-chat-state'>会话已建立，发送第一条消息吧</View> : null}
+        {[
+          ...visibleMessages.filter(message => !pendingMessages.some(item => item.attempt.message?.ID === message.ID)).map(message => ({ message, pending: undefined as PendingText | undefined, time: message.time })),
+          ...pendingMessages.map(pending => ({ message: undefined as DeliveryTencentMessage | undefined, pending, time: pending.time }))
+        ].sort((a, b) => a.time - b.time).map(({ message, pending }) => {
+          if (pending) return <View key={pending.id} className='delivery-chat-row delivery-chat-row--mine'>
+            <View className='delivery-chat-bubble delivery-chat-bubble--mine'>
+              <Text>{pending.text}</Text>
+              {pending.state === 'failed' ? <View className='delivery-chat-retry' role='button' aria-label='重试发送消息' onClick={() => retryText(pending)}><Text>发送失败 · 重试</Text><Text className='delivery-chat-retry__reason'>{pending.error}</Text></View> : null}
+              <Text className='delivery-chat-time'>{pending.state === 'sending' ? '发送中' : formatTime(pending.time)}</Text>
+            </View>
+          </View>
+          if (!message) return null
           const mine = message.flow === 'out'
           const text = messageText(message)
           const imagePayload = parseDeliveryImagePayload(message)
@@ -250,17 +331,17 @@ export default function DeliveryConversationPage() {
           className='delivery-chat-input'
           value={draft}
           maxlength={500}
-          disabled={!canSend || sending}
-          placeholder={canSend ? '输入消息' : '当前会话不可发送'}
+          disabled={!canCompose}
+          placeholder={canCompose ? '输入消息' : '当前会话不可发送'}
           confirmType='send'
           adjustPosition={false}
-          onInput={(event) => setDraft(String(event.detail.value ?? ''))}
+          onInput={(event) => { draftRef.current = String(event.detail.value ?? ''); setDraft(draftRef.current) }}
           onFocus={onKeyboardFocus}
           onKeyboardHeightChange={onKeyboardHeightChange}
           onBlur={resetKeyboardInset}
           onConfirm={() => void sendText()}
         />
-        <Button className='delivery-chat-send' disabled={!canSend || !draft.trim() || sending} onClick={() => void sendText()}>{sending ? '发送中' : '发送'}</Button>
+        <Button className='delivery-chat-send' disabled={!canCompose || !draft.trim()} onClick={() => void sendText()}>发送</Button>
       </View>
     </View>
   )

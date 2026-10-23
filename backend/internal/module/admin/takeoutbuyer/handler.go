@@ -23,12 +23,18 @@ func NewHandler(queries *takeout.BuyerQueryService, orders *takeout.OrderService
 }
 
 func (h *Handler) Register(group *gin.RouterGroup) {
-	group.GET("/merchants", h.listMerchants)
-	group.GET("/merchants/:merchantPublicId", h.merchant)
-	group.GET("/merchants/:merchantPublicId/dishes", h.listDishes)
+	h.RegisterCatalog(group)
 	group.POST("/orders", h.createOrder)
 	group.GET("/orders", h.listOrders)
 	group.GET("/orders/:orderPublicId", h.order)
+}
+
+// RegisterCatalog exposes only approved shops and on-shelf products. It does
+// not activate the legacy cart, order, payment or rider workflow.
+func (h *Handler) RegisterCatalog(group *gin.RouterGroup) {
+	group.GET("/merchants", h.listMerchants)
+	group.GET("/merchants/:merchantPublicId", h.merchant)
+	group.GET("/merchants/:merchantPublicId/dishes", h.listDishes)
 }
 
 func (h *Handler) listMerchants(c *gin.Context) {

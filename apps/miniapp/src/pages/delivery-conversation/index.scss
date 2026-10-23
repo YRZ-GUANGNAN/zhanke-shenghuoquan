@@ -152,6 +152,17 @@ page {
   font-variant-numeric: tabular-nums;
 }
 
+.delivery-chat-retry {
+  @include ref.touch;
+  display: block;
+  margin-top: 8rpx;
+  color: $text-on-color;
+  font-size: 22rpx;
+  line-height: 32rpx;
+  text-decoration: underline;
+}
+.delivery-chat-retry__reason { display: block; font-size: 22rpx; line-height: 1.5; font-weight: 400; margin-top: 8rpx; }
+
 .delivery-chat-image {
   display: block;
   width: 360rpx;

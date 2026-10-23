@@ -6,7 +6,8 @@ import AppIcon from '../../components/app-icon'
 import { AppIconButton } from '../../components/ui'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import { AppActionSheet, AppButton } from '../../components/ui'
-import { deliveryMockFeeEnabled, deliveryPaymentEnabled } from '../../feature-flags'
+import { deliveryMockFeeEnabled } from '../../feature-flags'
+import { useDeliveryPayment } from '../../hooks/use-delivery-payment'
 import { useIdentityGuard } from '../../hooks/use-identity-guard'
 import { getIdentityApplication } from '../../services/a-user'
 import { isApiError } from '../../services/api'
@@ -77,6 +78,7 @@ function inputValue(event: { detail: { value?: string } }) {
 }
 
 function MerchantPublishContent() {
+  const { enabled: deliveryPaymentEnabled } = useDeliveryPayment()
   const testPublishEnabled = deliveryMockFeeEnabled && !deliveryPaymentEnabled
   const profile = useSessionStore((state) => state.profile)
   const identityAllowed = useIdentityGuard('merchant')
@@ -226,7 +228,7 @@ function MerchantPublishContent() {
         if (current()) setBalanceCents(null)
       })
     }
-  }, [identityAllowed, profile.id])
+  }, [identityAllowed, profile.id, deliveryPaymentEnabled])
 
   const currentFormValues: Record<DeliveryClipboardField, string> = {
     sourcePlatform,

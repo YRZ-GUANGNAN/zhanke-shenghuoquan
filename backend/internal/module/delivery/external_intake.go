@@ -8,11 +8,10 @@ import (
 	"errors"
 	"strings"
 	"time"
-
-	"gorm.io/gorm"
 )
 
 var (
+	ErrExternalSignature     = errors.New("external provider signature invalid")
 	ErrExternalBinding       = errors.New("external shop binding unavailable")
 	ErrExternalAdapter       = errors.New("external order adapter unavailable")
 	ErrExternalEventConflict = errors.New("external event identity conflict")
@@ -32,52 +31,6 @@ type ExternalIntakeConfig struct {
 	Now         func() time.Time
 	Lease       time.Duration
 	MaxAttempts uint32
-}
-
-type ExternalIntake struct {
-	db          *gorm.DB
-	bindings    ExternalBindingResolver
-	fees        FeePolicyProvider
-	adapters    map[SourcePlatform]ExternalOrderAdapter
-	now         func() time.Time
-	lease       time.Duration
-	maxAttempts uint32
-}
-
-// NewExternalIntake builds the durable workflow, not an HTTP webhook. Official
-// provider signature verification and an authorized binding resolver are required
-// before Receive can accept any event. There are no default/fake providers.
-func NewExternalIntake(db *gorm.DB, bindings ExternalBindingResolver, fees FeePolicyProvider, adapters []ExternalOrderAdapter, cfg ExternalIntakeConfig) (*ExternalIntake, error) {
-	if db == nil || bindings == nil || fees == nil {
-		return nil, ErrInvalidRecord
-	}
-	if cfg.Now == nil {
-		cfg.Now = time.Now
-	}
-	if cfg.Lease == 0 {
-		cfg.Lease = 30 * time.Second
-	}
-	if cfg.MaxAttempts == 0 {
-		cfg.MaxAttempts = 8
-	}
-	if cfg.Lease < time.Second || cfg.Lease > 10*time.Minute || cfg.MaxAttempts > 32 {
-		return nil, ErrInvalidRecord
-	}
-	registry := make(map[SourcePlatform]ExternalOrderAdapter)
-	for _, adapter := range adapters {
-		if adapter == nil {
-			return nil, ErrInvalidRecord
-		}
-		platform := adapter.Platform()
-		if platform != SourceTaobao && platform != SourceJD && platform != SourceMeituan {
-			return nil, ErrInvalidRecord
-		}
-		if registry[platform] != nil {
-			return nil, ErrInvalidRecord
-		}
-		registry[platform] = adapter
-	}
-	return &ExternalIntake{db: db, bindings: bindings, fees: fees, adapters: registry, now: cfg.Now, lease: cfg.Lease, maxAttempts: cfg.MaxAttempts}, nil
 }
 
 type ExternalReceipt struct {
@@ -207,35 +160,4 @@ func (s *ExternalIntake) Run(ctx context.Context) error {
 		case <-timer.C:
 		}
 	}
-}
-
-// Receipt is merchant-scoped. Delivery callers must still perform their normal
-// authentication/authorization before exposing this through an API.
-func (s *ExternalIntake) Receipt(ctx context.Context, merchantID, id uint64) (ExternalReceipt, error) {
-	var row ExternalInbox
-	if merchantID == 0 || id == 0 {
-		return ExternalReceipt{}, ErrInvalidRecord
-	}
-	err := s.db.WithContext(ctx).Where("id = ? AND merchant_user_id = ?", id, merchantID).First(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return ExternalReceipt{}, ErrNotFound
-	}
-	return intakeReceipt(row, false), err
-}
-
-// Retry only requeues exhausted transient failures; needs_review must not be
-// blindly replayed. Eligibility is checked again by ProcessNext.
-func (s *ExternalIntake) Retry(ctx context.Context, merchantID, id uint64) error {
-	if merchantID == 0 || id == 0 {
-		return ErrInvalidRecord
-	}
-	result := s.db.WithContext(ctx).Model(&ExternalInbox{}).Where("id = ? AND merchant_user_id = ? AND status = ?", id, merchantID, "deadletter").
-		Updates(map[string]any{"status": "pending", "attempts": 0, "next_attempt_at": nil, "reason": "", "updated_at": s.now().UTC()})
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected != 1 {
-		return ErrInvalidTransition
-	}
-	return nil
 }

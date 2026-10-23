@@ -255,6 +255,26 @@
   white-space: nowrap;
 }
 
+.secondhand-chat-bubble__retry {
+  @include ref.touch;
+  align-self: flex-start;
+  margin-top: 4rpx;
+  color: $danger;
+  font-size: 11PX;
+  line-height: 18PX;
+  text-decoration: underline;
+}
+
+.secondhand-chat-bubble__reason {
+  display: block;
+  max-width: 100%;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+  opacity: .78;
+  overflow-wrap: anywhere;
+}
+
 .secondhand-chat-inputbar {
   flex: 0 0 auto;
   display: flex;
@@ -282,7 +302,7 @@
 .secondhand-chat-input {
   display: block;
   width: 100%;
-  min-height: 24PX;
+  min-height: 44PX;
   max-height: 96PX;
   padding: 0;
   color: $text-strong;

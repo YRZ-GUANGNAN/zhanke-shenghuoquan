@@ -4,7 +4,7 @@ import { useDidHide, useDidShow } from '@tarojs/taro'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import { AppIconButton } from '../../components/ui'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
-import { deliveryPaymentEnabled } from '../../feature-flags'
+import { useDeliveryPayment } from '../../hooks/use-delivery-payment'
 import { useIdentityGuard } from '../../hooks/use-identity-guard'
 import {
   centsToYuan,
@@ -135,6 +135,7 @@ function proofStatusLabel(proof: DeliveryProofImage): string {
 }
 
 function MerchantOrderDetailContent() {
+  const { enabled: deliveryPaymentEnabled } = useDeliveryPayment()
   const identityAllowed = useIdentityGuard('merchant')
   const accountId = useSessionStore((state) => state.profile.id)
   const token = useSessionStore((state) => state.token)
@@ -212,7 +213,7 @@ function MerchantOrderDetailContent() {
         setLoading(false)
       }
     }
-  }, [identityAllowed, orderId, context])
+  }, [deliveryPaymentEnabled, identityAllowed, orderId, context])
 
   useEffect(() => {
     setOrder(null)

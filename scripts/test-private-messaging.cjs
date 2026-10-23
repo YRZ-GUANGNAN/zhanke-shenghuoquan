@@ -51,7 +51,7 @@ function chatHarness(options = {}) {
     '../../components/product-price': 'ProductPrice',
     '../../components/feature-page-gate': { withFeaturePage: Page => Page },
     '@tarojs/components': { View: 'View', Text: 'Text', Image: 'Image', ScrollView: 'ScrollView', Textarea: 'Textarea' },
-    '@tarojs/taro': { hideKeyboard: async () => {} },
+    '@tarojs/taro': { hideKeyboard: async () => {}, useDidShow: fn => { services.show = fn } },
     '../../components/capsule-page-header': ({ left, center, right }) => renderer.React.createElement('Header', {}, left, center, right),
     '../../components/app-icon': 'AppIcon',
     '../../components/chat-avatar': 'ChatAvatar',
@@ -164,6 +164,7 @@ async function run() {
   const pending = deferred()
   const app = chatHarness({ send: () => pending.promise }); await app.mount(); app.type('第一条')
   app.send(); app.send()
+  await app.flush()
   assert.equal(app.writes.length, 1)
   app.type('继续输入第二条')
   pending.resolve(msg('one', 'campus_2', '第一条')); await app.flush()
@@ -173,29 +174,57 @@ async function run() {
   assert.equal(nodes(app.tree, node => hasClass(node, 'secondhand-chat-row')).length, 1)
   app.unmount()
   const failed = chatHarness({ send: async () => { throw Error('测试网络故障') } }); await failed.mount(); failed.type('不能丢的草稿'); failed.send(); await failed.flush()
-  assert.equal(failed.input().props.value, '不能丢的草稿')
-  assert.ok(failed.toasts.includes('测试网络故障'))
+  assert.equal(failed.input().props.value, '')
+  assert.ok(text(failed.tree).includes('不能丢的草稿'))
+  assert.ok(text(failed.tree).includes('发送失败'))
+  assert.ok(text(failed.tree).includes('测试网络故障'))
+  assert.equal(failed.toasts.length, 0)
+  const retry = failed.byClass('secondhand-chat-bubble__retry').props.onClick
+  retry(); retry(); await failed.flush()
+  assert.equal(failed.writes.length, 2, '同一条失败消息连点只重试一次')
   failed.unmount()
   console.log('PASS 连点只发送一次，成功去重不清新草稿，失败保留原文')
 
   const old = deferred()
   const switched = chatHarness({ send: () => old.promise }); await switched.mount(); switched.type('旧账号消息'); switched.send()
+  await switched.flush()
   switched.changeAccount('3'); await switched.flush()
   old.resolve(msg('stale', 'campus_2', '旧账号消息')); await switched.flush()
   assert.ok(!text(switched.tree).includes('旧账号消息'))
   assert.ok(text(switched.tree).includes('买家昵称'))
   switched.unmount()
   const gone = deferred()
-  const unmounted = chatHarness({ send: () => gone.promise }); await unmounted.mount(); unmounted.type('离开页面'); unmounted.send(); unmounted.unmount()
+  const unmounted = chatHarness({ send: () => gone.promise }); await unmounted.mount(); unmounted.type('离开页面'); unmounted.send(); await unmounted.flush(); unmounted.unmount()
   gone.reject(Error('离开后失败')); await new Promise(setImmediate)
   assert.equal(unmounted.toasts.length, 0)
   console.log('PASS 切换账号与页面卸载隔离旧收发结果')
+
+  const authWait = deferred(), imWait = deferred()
+  const queued = chatHarness({ services: { getIMConversation: () => authWait.promise, getTencentIMLoginUser: () => imWait.promise } })
+  await queued.mount()
+  assert.equal(queued.input().props.disabled, false, '服务器鉴权等待期间先允许输入')
+  assert.ok(!text(queued.tree).includes('正在连接'))
+  queued.type('先写下这一条'); queued.send(); await queued.flush()
+  assert.equal(queued.writes.length, 0, '鉴权前不把消息送给SDK')
+  assert.ok(text(queued.tree).includes('先写下这一条'))
+  authWait.resolve(context('2')); await queued.flush()
+  assert.equal(queued.writes.length, 1, '页面不等待历史或订阅；发送适配器负责IM就绪')
+  queued.unmount(); imWait.resolve('campus_2'); await queued.flush()
+
+  let subscriptions = 0
+  const recovering = chatHarness({ services: { subscribeTencentMessages: async () => { if (++subscriptions === 1) throw Error('断网'); return () => {} } } })
+  await recovering.mount()
+  assert.equal(recovering.input().props.disabled, false)
+  recovering.services.show(); await recovering.flush()
+  assert.equal(subscriptions, 2, '前台恢复后重建失败的订阅')
+  recovering.unmount()
+  console.log('PASS 慢鉴权允许先输入排队，失败订阅可静默恢复')
 
   let canMessage = true, canTrade = false, deniedByServer = false, wrongPeer = false, sdkSends = 0
   const requests = []
   const sdk = {
     isReady: () => true, getLoginUser: () => 'campus_2', setLogLevel: () => {},
-    createTextMessage: value => { sdkSends++; return { ...value, ID: 'test-local', from: 'campus_2' } },
+    createTextMessage: value => { sdkSends++; return { ...value, ID: 'test-local', from: 'campus_2', conversationID: `C2C${value.to}` } },
     sendMessage: async value => ({data: {message: value}}), destroy: async () => {},
   }
   const api = loadSource('apps/miniapp/src/services/e-im.ts', {
@@ -224,6 +253,19 @@ async function run() {
   canMessage = true
   await assert.rejects(api.sendTencentText(context('2'), '测试', 'campus_2'), /未开放/)
   assert.equal(sdkSends, 1, '服务端拒绝、对方变化、账号切换与开关均不调用 SDK 发送')
+  const attempt = {}
+  sdk.sendMessage = async () => { throw Error('测试发送失败') }
+  await assert.rejects(api.sendTencentText(direct, '原消息重试', 'campus_2', attempt), /失败/)
+  const same = attempt.message
+  let retries = 0
+  sdk.resendMessage = async value => { retries++; assert.equal(value, same); return { data: { message: value } } }
+  const retried = await api.sendTencentText(direct, '原消息重试', 'campus_2', attempt)
+  assert.equal(retried.ID, same.ID)
+  assert.equal(retries, 1)
+  assert.equal(sdkSends, 2, '重试没有新建另一条SDK消息')
+  await assert.rejects(api.sendTencentText(direct, '错误正文', 'campus_2', attempt), /不一致/)
+  sdk.sendMessage = async () => ({ data: {} })
+  await assert.rejects(api.sendTencentText(direct, '无确认结果', 'campus_2'), /未确认/)
   await api.resetTencentIMSession()
   console.log('PASS 实际 IM 适配器在发送前复核用户会话，二手与用户开关独立，拒绝与账号切换不触发发送')
 }

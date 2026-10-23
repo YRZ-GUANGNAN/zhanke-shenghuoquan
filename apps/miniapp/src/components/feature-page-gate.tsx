@@ -19,7 +19,7 @@ export function FeaturePageGate({ children }: { children: React.ReactNode }) {
   const keys = featurePageKeys(router.path, router.params)
   const servicePage = router.path.includes('student-takeout')
   const contentPage = router.path.includes('my-content')
-  const allowed = keys.every(key => visibility[key]) && (!servicePage || visibility.takeout || visibility.campus_tools) && (!contentPage || visibility.forum || visibility.secondhand)
+  const allowed = keys.every(key => visibility[key]) && (!servicePage || visibility.takeout) && (!contentPage || visibility.forum || visibility.secondhand)
   const hideBlockedShare = () => {
     if ((!visibility.available || !allowed) && getCurrentInstance().router?.$taroPath === router.$taroPath) {
       void hideShareMenu({ menus: ['shareAppMessage', 'shareTimeline'] }).catch(() => undefined)

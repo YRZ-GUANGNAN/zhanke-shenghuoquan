@@ -26,6 +26,7 @@ function publishHarness(options = {}) {
     '../../components/ui': { AppIconButton: 'AppIconButton', AppActionSheet: 'AppActionSheet', AppButton: 'AppButton' },
     '../../components/runtime-session-gate': 'RuntimeSessionGate',
     '../../feature-flags': { deliveryPaymentEnabled: true, deliveryMockFeeEnabled: false, ...options.flags },
+    '../../hooks/use-delivery-payment': { useDeliveryPayment: () => ({ enabled: options.flags?.deliveryPaymentEnabled ?? true }) },
     '../../hooks/use-identity-guard': { useIdentityGuard: () => identityAllowed },
     '../../services/a-user': { getIdentityApplication: options.application || (async () => ({})) },
     '../../services/api': { isApiError: (error) => error instanceof ApiError },

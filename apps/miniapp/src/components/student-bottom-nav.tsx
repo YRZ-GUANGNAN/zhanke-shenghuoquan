@@ -31,7 +31,7 @@ export default function StudentBottomNav({ active, className = '' }: StudentBott
   })
 
   const visibleItems = navItems.filter((item) => {
-    if (item.key === 'takeout') return visibility.takeout || visibility.campus_tools
+    if (item.key === 'takeout') return visibility.takeout
     if (item.key === 'messages') return visibility.messages
     return true
   })
