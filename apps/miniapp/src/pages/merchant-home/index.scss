@@ -76,3 +76,108 @@
   .merchant-order-card { padding-left: 16rpx; padding-right: 16rpx; }
 }
 @media (prefers-reduced-motion: reduce) { .merchant-order-card { animation: none; } }
+
+/* v10 商家工作台：只打磨已有组件，保持双列、卡片排布与信息顺序不变。 */
+.merchant-home-page .delivery-order-toolbar__refresh {
+  width: auto;
+  flex: 0 0 auto;
+  min-height: 44PX;
+  padding: 0 16PX;
+  gap: 8PX;
+  border: 0;
+  border-radius: 10rpx;
+  background: $bg-surface-subtle;
+  color: $brand-primary-strong;
+  font-size: 13PX;
+  font-weight: 600;
+  transition: transform 120ms $ease-standard, background-color 120ms $ease-standard;
+}
+
+.merchant-home-page .delivery-order-toolbar__refresh:active {
+  transform: scale(.97);
+  background: $brand-tint;
+}
+
+.merchant-home-page .delivery-order-toolbar__refresh--disabled {
+  opacity: .5;
+}
+
+.merchant-home-page .merchant-order-button {
+  min-height: 44PX;
+  border: 0;
+  border-radius: 10rpx;
+  background: $brand-tint;
+  color: $brand-primary-strong;
+  font-size: 13PX;
+  font-weight: 600;
+  transition: transform 120ms $ease-standard, background-color 120ms $ease-standard;
+}
+
+.merchant-home-page .merchant-order-button:active {
+  transform: scale(.98);
+  background: #DCEBF9;
+}
+
+.merchant-home-page .merchant-order-button--primary {
+  background: $brand-primary-strong;
+  color: $text-on-color;
+}
+
+.merchant-home-page .merchant-order-rider:active {
+  opacity: .6;
+}
+
+.merchant-home-page .merchant-order-card__status {
+  display: inline-block;
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
+  background: $warning-tint;
+  color: $warning;
+  font-size: 12PX;
+  line-height: 18PX;
+  font-weight: 600;
+}
+
+.merchant-home-page .merchant-order-card__status--pickup {
+  background: $brand-tint;
+  color: $brand-primary-strong;
+}
+
+.merchant-home-page .merchant-order-card__status--delivering {
+  background: $success-tint;
+  color: $success;
+}
+
+.merchant-home-page .merchant-order-card__status--completed {
+  background: $bg-surface-subtle;
+  color: $text-primary;
+}
+
+.merchant-home-page .merchant-order-card__status--danger {
+  background: $danger-tint;
+  color: $danger;
+}
+
+.merchant-home-page .merchant-home-tab__count {
+  min-width: 30PX;
+  padding: 0 8PX;
+  border-radius: $radius-pill;
+  background: $bg-surface-subtle;
+  color: $text-tertiary;
+  font-size: 12PX;
+  line-height: 18PX;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.merchant-home-page .merchant-home-tab--active .merchant-home-tab__count {
+  background: $brand-tint;
+  color: $brand-primary-strong;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .merchant-home-page .delivery-order-toolbar__refresh,
+  .merchant-home-page .merchant-order-button { transition: none; }
+  .merchant-home-page .delivery-order-toolbar__refresh:active,
+  .merchant-home-page .merchant-order-button:active { transform: none; }
+}

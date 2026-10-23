@@ -112,3 +112,598 @@
   .rider-order-card__secondary-icon { width: 15PX; height: 15PX; }
 }
 @media (prefers-reduced-motion: reduce) { .rider-order-card, .rider-grab-daily-stats--ready .rider-grab-daily-stats__value { animation: none; } }
+
+/* v10 骑手工作台：克制工具风
+   只覆盖视觉层，保留现有 DOM、原生横滑、刷新与身份守卫。 */
+.rider-grab-page {
+  background: $bg-app;
+  color: $text-strong;
+}
+
+.rider-grab-page .delivery-workspace-nav {
+  background: $bg-surface;
+  border-top: 1PX solid $border-default;
+  box-shadow: 0 -2rpx 14rpx rgba(24, 53, 92, .05);
+}
+
+.rider-grab-page .delivery-workspace-nav__item--active {
+  color: $brand-primary-strong;
+  background: $brand-tint;
+}
+
+.rider-grab-page .delivery-order-state {
+  border: 0;
+  border-radius: 20rpx;
+  padding: 36rpx 32rpx;
+  gap: 14rpx;
+  background: $bg-surface;
+  box-shadow: $shadow-card;
+}
+
+.rider-grab-page .delivery-order-state__eyebrow {
+  margin-bottom: 6rpx;
+  font-size: 24rpx;
+  line-height: 32rpx;
+  color: $text-tertiary;
+}
+
+.rider-grab-page .delivery-order-state__title {
+  font-size: 36rpx;
+  line-height: 48rpx;
+  font-weight: 600;
+  color: $text-strong;
+}
+
+.rider-grab-page .delivery-order-state__description {
+  margin-top: 6rpx;
+  font-size: 28rpx;
+  line-height: 40rpx;
+  color: $text-secondary;
+}
+
+.rider-grab-page .delivery-order-state__action {
+  min-height: 88rpx;
+  padding: 0 28rpx;
+  border: 0;
+  border-radius: 12rpx;
+  background: $brand-tint;
+  color: $brand-primary-strong;
+  font-size: 28rpx;
+  font-weight: 600;
+}
+
+.rider-grab-page .delivery-order-skeleton {
+  border: 0;
+  border-radius: 24rpx;
+  background: $bg-surface;
+  box-shadow: $shadow-card;
+}
+
+.rider-grab-hero {
+  padding: 0 32rpx 24rpx;
+  background: $bg-surface;
+  box-shadow: 0 1rpx 0 $border-default;
+}
+
+.rider-grab-task-summary {
+  align-items: flex-start;
+  gap: 20rpx;
+  padding: 16rpx 0 10rpx;
+}
+
+.rider-grab-task-summary__label {
+  font-size: 40rpx;
+  line-height: 52rpx;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  color: $text-strong;
+}
+
+.rider-grab-task-summary__value-row {
+  align-items: baseline;
+  gap: 10rpx;
+  margin-top: 2rpx;
+}
+
+.rider-grab-task-summary__value {
+  font-size: 64rpx;
+  line-height: 72rpx;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  color: $text-strong;
+  font-variant-numeric: tabular-nums;
+}
+
+.rider-grab-task-summary__unit {
+  font-size: 26rpx;
+  line-height: 36rpx;
+  color: $text-tertiary;
+}
+
+.rider-grab-refresh {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 88rpx;
+  padding: 0 24rpx;
+  gap: 10rpx;
+  border: 1PX solid $border-default;
+  border-radius: 12rpx;
+  background: $bg-surface-subtle;
+  color: $text-secondary;
+  font-size: 26rpx;
+}
+
+.rider-grab-refresh__symbol {
+  flex: 0 0 32rpx;
+  width: 32rpx;
+  height: 32rpx;
+}
+
+.rider-grab-refresh__icon {
+  width: 32rpx;
+  height: 32rpx;
+  flex: 0 0 32rpx;
+}
+
+.rider-grab-refresh__label {
+  width: auto;
+  flex: 0 0 auto;
+  font-size: 26rpx;
+  line-height: 34rpx;
+}
+
+.rider-grab-refresh:active {
+  background: $bg-screen;
+  transform: scale(.98);
+}
+
+.rider-grab-context {
+  gap: 14rpx;
+  font-size: 24rpx;
+  line-height: 34rpx;
+  color: $text-tertiary;
+}
+
+.rider-grab-status {
+  padding: 2rpx 14rpx;
+  border-radius: 6rpx;
+  background: $bg-surface-subtle;
+  color: $text-secondary;
+  font-size: 24rpx;
+  line-height: 32rpx;
+  font-weight: 500;
+}
+
+.rider-grab-status--active {
+  background: $success-tint;
+  color: $success;
+}
+
+.rider-grab-status--suspended {
+  background: $danger-tint;
+  color: $danger;
+}
+
+.rider-grab-daily-stats {
+  gap: 0;
+  margin-top: 14rpx;
+  padding: 20rpx 0;
+  border-top: 0;
+  border-radius: 14rpx;
+  background: $bg-surface-subtle;
+}
+
+.rider-grab-daily-stats__item {
+  padding: 0 28rpx;
+}
+
+.rider-grab-daily-stats__item + .rider-grab-daily-stats__item {
+  border-left: 1PX solid $border-default;
+}
+
+.rider-grab-daily-stats__label {
+  font-size: 24rpx;
+  line-height: 32rpx;
+  color: $text-tertiary;
+}
+
+.rider-grab-daily-stats__value {
+  margin-top: 2rpx;
+  font-size: 40rpx;
+  line-height: 48rpx;
+  font-weight: 600;
+  color: $text-strong;
+  font-variant-numeric: tabular-nums;
+}
+
+.rider-grab-daily-stats__unit {
+  font-size: 24rpx;
+  line-height: 32rpx;
+  color: $text-tertiary;
+}
+
+.rider-grab-tabs {
+  padding: 0 32rpx;
+  border-bottom: 1PX solid $border-default;
+}
+
+.rider-grab-tabs__item {
+  min-height: 96rpx;
+  gap: 12rpx;
+  font-size: 32rpx;
+  color: $text-secondary;
+}
+
+.rider-grab-tabs__item--active {
+  color: $text-strong;
+  font-weight: 600;
+}
+
+.rider-grab-tabs__item--active::after {
+  left: 24%;
+  right: 24%;
+  height: 4rpx;
+  border-radius: 2rpx;
+  background: $brand-primary-strong;
+}
+
+.rider-grab-tabs__count {
+  font-size: 26rpx;
+  color: $text-tertiary;
+  font-variant-numeric: tabular-nums;
+}
+
+.rider-grab-tabs__item--active .rider-grab-tabs__count {
+  color: $brand-primary-strong;
+}
+
+.rider-grab-pool-heading {
+  padding: 28rpx 32rpx 10rpx;
+  font-size: 28rpx;
+  font-weight: 500;
+  color: $text-secondary;
+}
+
+.rider-grab-pool-heading > text:last-child,
+.rider-grab-pool-heading > span:last-child {
+  font-size: 24rpx;
+  color: $text-tertiary;
+}
+
+.rider-grab-content__inner {
+  padding: 20rpx 32rpx 48rpx;
+}
+
+.rider-grab-list {
+  gap: 20rpx;
+}
+
+.rider-order-card {
+  padding: 28rpx;
+  border: 0;
+  border-radius: 24rpx;
+  background: $bg-surface;
+  box-shadow: $shadow-card;
+}
+
+.rider-order-card--busy {
+  box-shadow: 0 0 0 2PX $brand-primary, $shadow-card;
+}
+
+.rider-order-card__top {
+  gap: 20rpx;
+}
+
+.rider-order-card__source {
+  padding: 2rpx 12rpx;
+  background: $bg-surface-subtle;
+  color: $text-tertiary;
+  border-radius: 6rpx;
+  font-size: 24rpx;
+  line-height: 32rpx;
+  font-weight: 500;
+}
+
+.rider-order-card__pickup-code {
+  margin-top: 8rpx;
+  font-size: 64rpx;
+  line-height: 72rpx;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  color: $text-strong;
+  font-variant-numeric: tabular-nums;
+}
+
+.rider-order-card__pickup-code--fallback {
+  font-size: 40rpx;
+  line-height: 52rpx;
+}
+
+.rider-order-card__pickup-unit {
+  margin-left: 4rpx;
+  font-size: 24rpx;
+  font-weight: 500;
+  color: $text-tertiary;
+}
+
+.rider-order-card__fee {
+  max-width: none;
+  align-items: flex-end;
+  gap: 2rpx;
+  font-size: 24rpx;
+  color: $text-tertiary;
+}
+
+.rider-order-card__fee-price {
+  font-size: 40rpx;
+  line-height: 48rpx;
+  font-weight: 700;
+  color: $brand-primary-strong;
+  font-variant-numeric: tabular-nums;
+}
+
+.rider-order-card__meta {
+  padding-top: 10rpx;
+  gap: 8rpx 16rpx;
+}
+
+.rider-order-card__stage {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: $brand-primary-strong;
+}
+
+.rider-order-card__stage--delivery {
+  color: $success;
+}
+
+.rider-order-card__serial,
+.rider-order-card__created-at {
+  font-size: 24rpx;
+  line-height: 32rpx;
+  color: $text-tertiary;
+}
+
+.rider-order-route {
+  margin-top: 20rpx;
+  padding-top: 20rpx;
+  border-top: 1PX solid $border-subtle;
+}
+
+.rider-order-route__row {
+  align-items: flex-start;
+  gap: 16rpx;
+  padding: 12rpx 0;
+}
+
+.rider-order-route__row--current,
+.rider-order-route__row--drop.rider-order-route__row--current {
+  margin: 0;
+  padding: 12rpx 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.rider-order-route__marker {
+  width: 32rpx;
+  height: 32rpx;
+  flex: 0 0 32rpx;
+  margin-top: 6rpx;
+  border-radius: 8rpx;
+  background: $bg-surface-subtle;
+  color: $text-secondary;
+  font-size: 20rpx;
+  font-weight: 600;
+}
+
+.rider-order-route__marker--pickup {
+  background: $brand-tint;
+  color: $brand-primary-strong;
+}
+
+.rider-order-route__marker--drop {
+  background: $success-tint;
+  color: $success;
+}
+
+.rider-order-route__row--current .rider-order-route__marker--pickup {
+  background: $brand-primary-strong;
+  color: $text-on-color;
+}
+
+.rider-order-route__row--current .rider-order-route__marker--drop {
+  background: $success;
+  color: $text-on-color;
+}
+
+.rider-order-route__label {
+  margin-bottom: 2rpx;
+  font-size: 24rpx;
+  line-height: 32rpx;
+  color: $text-tertiary;
+}
+
+.rider-order-route__place {
+  font-size: 30rpx;
+  line-height: 42rpx;
+  font-weight: 500;
+  color: $text-secondary;
+}
+
+.rider-order-route__row--current .rider-order-route__place {
+  font-size: 32rpx;
+  line-height: 44rpx;
+  font-weight: 600;
+  color: $text-strong;
+}
+
+.rider-order-route__lock {
+  margin-top: 4rpx;
+  font-size: 24rpx;
+  line-height: 32rpx;
+  color: $text-tertiary;
+}
+
+.rider-order-card__remark {
+  margin-top: 16rpx;
+  padding: 14rpx 20rpx;
+  border-radius: 10rpx;
+  background: $warning-tint;
+  color: $warning;
+  font-size: 26rpx;
+  line-height: 38rpx;
+}
+
+.rider-order-card__quick-actions {
+  gap: 14rpx;
+  margin-top: 6rpx;
+  padding: 20rpx 0;
+  border-bottom: 0;
+}
+
+.rider-order-card__secondary {
+  min-height: 80rpx;
+  gap: 10rpx;
+  border: 0;
+  border-radius: 12rpx;
+  background: $bg-surface-subtle;
+  color: $text-secondary;
+  font-size: 26rpx;
+}
+
+.rider-order-card__secondary--danger {
+  flex: 0 0 80rpx;
+  background: transparent;
+  color: $danger;
+}
+
+.rider-order-card__secondary-icon {
+  width: 32rpx;
+  height: 32rpx;
+}
+
+.rider-order-card__fulfillment {
+  padding-top: 20rpx;
+  border-top: 1PX solid $border-subtle;
+}
+
+.rider-order-card__next {
+  gap: 6rpx 12rpx;
+  margin-bottom: 18rpx;
+}
+
+.rider-order-card__next-label {
+  font-size: 24rpx;
+  color: $text-tertiary;
+}
+
+.rider-order-card__next-copy {
+  font-size: 26rpx;
+  line-height: 38rpx;
+  font-weight: 600;
+  color: $text-strong;
+}
+
+.rider-order-card__grab {
+  min-height: 96rpx;
+  padding: 0 28rpx;
+  border-radius: 12rpx;
+  background: $brand-primary-strong;
+  color: $text-on-color;
+  font-size: 32rpx;
+  line-height: 42rpx;
+  font-weight: 600;
+}
+
+.rider-order-card__grab:active {
+  background: $brand-primary-pressed;
+  transform: scale(.985);
+}
+
+.rider-order-card__grab--disabled {
+  background: #C6D2DF;
+  color: $text-on-color;
+}
+
+.rider-order-card__bottom {
+  gap: 20rpx;
+  margin-top: 6rpx;
+  padding-top: 20rpx;
+  border-top: 1PX solid $border-subtle;
+}
+
+.rider-order-card__bottom .rider-order-card__grab {
+  min-width: 220rpx;
+}
+
+.rider-order-card__privacy,
+.rider-order-card__status {
+  font-size: 24rpx;
+  line-height: 32rpx;
+  color: $text-tertiary;
+}
+
+.rider-order-card__progress,
+.rider-order-card__feedback {
+  padding: 14rpx 20rpx;
+  border-radius: 10rpx;
+  background: $brand-tint;
+  color: $brand-primary-strong;
+  font-size: 26rpx;
+  line-height: 38rpx;
+}
+
+.rider-order-card__feedback {
+  min-height: 0;
+  margin-top: 10rpx;
+}
+
+.rider-order-card__feedback--error {
+  background: $danger-tint;
+  color: $danger;
+}
+
+.rider-order-card__feedback--success {
+  background: $success-tint;
+  color: $success;
+}
+
+.rider-order-card__feedback--warning {
+  background: $warning-tint;
+  color: $warning;
+}
+
+.rider-order-card__progress-dot {
+  width: 12rpx;
+  height: 12rpx;
+}
+
+.rider-access-hero {
+  padding: 0 32rpx 28rpx;
+  background: $bg-surface;
+}
+
+.rider-access-hero__title {
+  font-size: 36rpx;
+  line-height: 50rpx;
+  font-weight: 600;
+  color: $text-strong;
+}
+
+@media (max-width: 340PX) {
+  .rider-grab-hero { padding-left: 24rpx; padding-right: 24rpx; }
+  .rider-grab-content__inner { padding-left: 24rpx; padding-right: 24rpx; }
+  .rider-order-card { padding: 24rpx 22rpx; }
+  .rider-order-card__secondary { gap: 4rpx; }
+  .rider-order-card__secondary-icon { width: 30rpx; height: 30rpx; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rider-order-card,
+  .rider-grab-daily-stats--ready .rider-grab-daily-stats__value { animation: none; }
+  .rider-order-card__grab,
+  .rider-order-card__secondary,
+  .rider-grab-refresh { transition: none; }
+  .rider-order-card__grab:active,
+  .rider-grab-refresh:active { transform: none; }
+}
