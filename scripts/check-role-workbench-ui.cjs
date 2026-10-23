@@ -52,6 +52,7 @@ for (const fragment of [
   'useDidShow',
   "useIdentityGuard('rider')",
   'getDeliveryRiderMe',
+  'getDeliveryRiderTodayStats',
   'listClaimableDeliveryOrders',
   'listAssignedDeliveryOrders',
   'rider-grab-task-summary',
@@ -62,6 +63,8 @@ for (const fragment of [
   "listAssignedDeliveryOrders(1, 50, 'delivery')",
   "listAssignedDeliveryOrders(1, 1, 'completed')",
   '已结束',
+  '今日单量',
+  '今日收入',
   "const statusGroup = requestedTab === 'pickup' ? 'pickup' : 'delivery'",
   'listClaimableDeliveryOrders(nextPage, 50)',
   'listAssignedDeliveryOrders(nextPage, 50, statusGroup)',
@@ -96,6 +99,9 @@ for (const [name, source] of [['merchant', merchant], ['rider', rider], ['profil
 }
 assert.doesNotMatch(merchant, /profile\.cover|profile\.avatar|merchant-home-hero__cover-image|ChatAvatar/, 'merchant order page must keep personal media on the profile page')
 assert.doesNotMatch(rider, /profile\.cover|profile\.avatar|rider-grab-hero__cover-image|ChatAvatar/, 'rider order page must keep personal media on the profile page')
+assert.match(rider, /todayStatsLoaded && todayStats \? todayStats\.todayOrders : ['"]—['"]/, 'rider daily order count must fail closed until real stats are loaded')
+assert.match(rider, /todayStats\.todayIncomeCents/, 'rider daily income must use the stats service cents field')
+assert.match(riderService, /stats\/today/, 'rider daily stats must use the dedicated read-only endpoint')
 assert.match(merchant, /merchant-home-metric__label.*全部订单|全部订单/, 'merchant order page must show an order-only total')
 assert.match(profile, /delivery-profile__hero-image/, 'role profile must keep the real cover image')
 assert.match(profileStyle, /background: linear-gradient\(to bottom, rgba\(\$bg-surface, 0\), rgba\(\$bg-surface, \.54\) 45%, \$bg-surface 100%\)/, 'profile cover edge must finish on an opaque surface')

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Text, View } from '@tarojs/components'
-import { getCurrentInstance, useDidShow } from '@tarojs/taro'
+import { getCurrentInstance, useDidHide, useDidShow } from '@tarojs/taro'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import { AppDialog } from '../../components/ui'
 import DeliveryWorkspaceNav, { useDeliveryWorkspaceNavigation } from '../../components/delivery-workspace-nav'
@@ -13,6 +13,7 @@ import {
   claimDeliveryOrder,
   getAssignedDeliveryOrder,
   getDeliveryRiderMe,
+  getDeliveryRiderTodayStats,
   listAssignedDeliveryOrders,
   listClaimableDeliveryOrders,
   markDelivered,
@@ -22,7 +23,8 @@ import {
   startToPickup,
   type AssignedDeliveryOrder,
   type ClaimableDeliveryOrder,
-  type DeliveryRiderMe
+  type DeliveryRiderMe,
+  type DeliveryRiderTodayStats
 } from '../../services/delivery-rider'
 import { centsToYuan, type DeliveryStatus } from '../../services/delivery-merchant'
 import { chooseAndUploadImages, waitForMediaApproval } from '../../services/media'
@@ -45,6 +47,18 @@ type ActionFeedback = {
   needsRefresh?: boolean
 }
 type ProofProgress = { stage: ProofStage; message: string }
+
+function businessDateKey(now = new Date()): string {
+  return new Date(now.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10)
+}
+
+function normalizeTodayStats(value: DeliveryRiderTodayStats): DeliveryRiderTodayStats | null {
+  if (!value || typeof value !== 'object') return null
+  if (value.timezone !== 'Asia/Shanghai' || value.date !== businessDateKey()) return null
+  if (!Number.isSafeInteger(value.todayOrders) || value.todayOrders < 0) return null
+  if (!Number.isSafeInteger(value.todayIncomeCents) || value.todayIncomeCents < 0) return null
+  return value
+}
 
 const statusText: Record<DeliveryStatus, string> = {
   pending_fee_payment: '待付配送费',
@@ -131,6 +145,8 @@ export default function DeliveryRiderPage() {
   const [deliveryPage, setDeliveryPage] = useState(1)
   const [deliveryTotal, setDeliveryTotal] = useState(0)
   const [completedTotal, setCompletedTotal] = useState(0)
+  const [todayStats, setTodayStats] = useState<DeliveryRiderTodayStats | null>(null)
+  const [todayStatsLoaded, setTodayStatsLoaded] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [loading, setLoading] = useState(false)
   const [hasLoadedOrders, setHasLoadedOrders] = useState(false)
@@ -146,6 +162,9 @@ export default function DeliveryRiderPage() {
   const busyByOrderRef = useRef<BusyByOrder>({})
   const actionFeedbackRef = useRef<Record<string, ActionFeedback | undefined>>({})
   const operationEpochRef = useRef(0)
+  const todayStatsRequestRef = useRef(0)
+  const todayStatsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const todayStatsVisibleRef = useRef(true)
   const pageMountedRef = useRef(true)
   const pageActiveRef = useRef(identityAllowed)
   const identityAllowedRef = useRef(identityAllowed)
@@ -162,6 +181,7 @@ export default function DeliveryRiderPage() {
     pageActiveRef.current = false
     operationEpochRef.current += 1
     requestVersion.current += 1
+    todayStatsRequestRef.current += 1
     activeLoad.current = null
     activePageLoad.current = null
     userRefreshLock.current = null
@@ -176,6 +196,52 @@ export default function DeliveryRiderPage() {
       && accountRef.current === account
       && operationEpochRef.current === epoch
   }, [])
+
+  const clearTodayStats = useCallback(() => {
+    todayStatsRequestRef.current += 1
+    setTodayStats(null)
+    setTodayStatsLoaded(false)
+  }, [])
+
+  const loadTodayStats = useCallback(async (shouldContinue: () => boolean) => {
+    const account = accountRef.current
+    const requestVersion = todayStatsRequestRef.current + 1
+    todayStatsRequestRef.current = requestVersion
+    const current = () => shouldContinue() && pageMountedRef.current && todayStatsVisibleRef.current
+      && accountRef.current === account && todayStatsRequestRef.current === requestVersion
+    setTodayStatsLoaded(false)
+    try {
+      const result = normalizeTodayStats(await getDeliveryRiderTodayStats())
+      if (!current()) return
+      setTodayStats(result)
+    } catch {
+      if (!current()) return
+      setTodayStats(null)
+    } finally {
+      if (current()) setTodayStatsLoaded(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!identityAllowed || !me?.registered || !me.rider || !todayStatsVisibleRef.current) return
+    const now = new Date()
+    const shanghaiNow = new Date(now.getTime() + 8 * 60 * 60 * 1000)
+    const nextMidnightUtc = Date.UTC(
+      shanghaiNow.getUTCFullYear(), shanghaiNow.getUTCMonth(), shanghaiNow.getUTCDate() + 1,
+    ) - 8 * 60 * 60 * 1000
+    const timer = setTimeout(() => {
+      const shouldContinue = createOperationGuard()
+      if (!shouldContinue() || !pageMountedRef.current || !todayStatsVisibleRef.current) return
+      clearTodayStats()
+      void loadTodayStats(shouldContinue)
+    }, Math.max(1000, nextMidnightUtc - now.getTime() + 50))
+    todayStatsTimerRef.current = timer
+    ;(timer as unknown as { unref?: () => void }).unref?.()
+    return () => {
+      clearTimeout(timer)
+      if (todayStatsTimerRef.current === timer) todayStatsTimerRef.current = null
+    }
+  }, [identityAllowed, accountId, me, todayStats?.date, clearTodayStats, createOperationGuard, loadTodayStats])
 
   useEffect(() => {
     pageMountedRef.current = true
@@ -202,6 +268,7 @@ export default function DeliveryRiderPage() {
       setPickupTotal(0)
       setDeliveryTotal(0)
       setCompletedTotal(0)
+      clearTodayStats()
       setHasLoadedOrders(false)
       setError('')
       setLoadMoreError(null)
@@ -214,7 +281,7 @@ export default function DeliveryRiderPage() {
       updateReleaseCandidate(null)
     }
     return invalidatePageOperations
-  }, [identityAllowed, accountId, invalidatePageOperations])
+  }, [identityAllowed, accountId, invalidatePageOperations, clearTodayStats])
 
   const activeTaskCount = pickupTotal + deliveryTotal
   useEffect(() => { if (!canClaim && activeTab === 'grab') setActiveTab('pickup') }, [canClaim, activeTab])
@@ -286,6 +353,7 @@ export default function DeliveryRiderPage() {
     setLoadingMore(false)
     setError('')
     setLoadMoreError(null)
+    clearTodayStats()
     try {
       const [ordersResult, riderResult] = await Promise.all([
         settleRequest(Promise.all([
@@ -297,7 +365,11 @@ export default function DeliveryRiderPage() {
         settleRequest(getDeliveryRiderMe())
       ])
       if (!shouldContinue() || requestVersion.current !== version) return false
-      if (riderResult.status === 'fulfilled') setMe(riderResult.value)
+      if (riderResult.status === 'fulfilled') {
+        setMe(riderResult.value)
+        if (riderResult.value.registered && riderResult.value.rider) void loadTodayStats(shouldContinue)
+        else clearTodayStats()
+      }
       if (ordersResult.status === 'fulfilled') {
         const [nextClaimable, nextPickup, nextDelivery, nextCompleted] = ordersResult.value
         setClaimable(nextClaimable.items)
@@ -358,6 +430,7 @@ export default function DeliveryRiderPage() {
     setLoadingMore(false)
     setError('')
     setLoadMoreError(null)
+    clearTodayStats()
     try {
       const rider = await getDeliveryRiderMe()
       if (!shouldContinue() || requestVersion.current !== version) return false
@@ -370,8 +443,10 @@ export default function DeliveryRiderPage() {
         setPickupTotal(0)
         setDeliveryTotal(0)
         setCompletedTotal(0)
+        clearTodayStats()
         return false
       }
+      void loadTodayStats(shouldContinue)
       const [claimablePage, pickupPage, deliveryPage, completedPage] = await Promise.all([
         canClaim ? listClaimableDeliveryOrders(1, 50) : Promise.resolve({ items: [] as ClaimableDeliveryOrder[], total: 0, page: 1 }),
         listAssignedDeliveryOrders(1, 50, 'pickup'),
@@ -402,7 +477,7 @@ export default function DeliveryRiderPage() {
       if (activeLoad.current === version) activeLoad.current = null
       if (shouldContinue() && requestVersion.current === version) setLoading(false)
     }
-  }, [createOperationGuard, canClaim, identityAllowed, accountId])
+  }, [createOperationGuard, canClaim, identityAllowed, accountId, clearTodayStats, loadTodayStats])
 
   const requestRefresh = async (): Promise<boolean> => {
     if (!identityAllowed || accountId !== accountRef.current || !pageActiveRef.current
@@ -420,7 +495,15 @@ export default function DeliveryRiderPage() {
   }, [identityAllowed, accountId, load])
 
   useDidShow(() => {
+    todayStatsVisibleRef.current = true
     void load()
+  })
+
+  useDidHide(() => {
+    todayStatsVisibleRef.current = false
+    todayStatsRequestRef.current += 1
+    if (todayStatsTimerRef.current !== null) clearTimeout(todayStatsTimerRef.current)
+    todayStatsTimerRef.current = null
   })
 
   const synchronizeOrder = async (orderId: string, action: BusyAction) => {
@@ -781,6 +864,19 @@ export default function DeliveryRiderPage() {
         <View className='rider-grab-context'>
           <Text className={`rider-grab-status rider-grab-status--${rider.status}`}>{riderStatusLabel(rider.status)}</Text>
           <Text>已结束 {hasLoadedOrders ? completedTotal : '—'} 单</Text>
+        </View>
+        <View className={`rider-grab-daily-stats ${todayStatsLoaded && todayStats ? 'rider-grab-daily-stats--ready' : ''}`} ariaLabel='今日配送统计'>
+          <View className='rider-grab-daily-stats__item'>
+            <Text className='rider-grab-daily-stats__label'>今日单量</Text>
+            <Text className='rider-grab-daily-stats__value'>{todayStatsLoaded && todayStats ? todayStats.todayOrders : '—'}</Text>
+            <Text className='rider-grab-daily-stats__unit'>单</Text>
+          </View>
+          <View className='rider-grab-daily-stats__item'>
+            <Text className='rider-grab-daily-stats__label'>今日收入</Text>
+            <Text className='rider-grab-daily-stats__value'>
+              {todayStatsLoaded && todayStats ? `¥${(todayStats.todayIncomeCents / 100).toFixed(2)}` : '—'}
+            </Text>
+          </View>
         </View>
       </View>
 

@@ -620,6 +620,9 @@ func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, user
 		userService.IdentityRequired(user.IdentityRider),
 	)
 	riderHandler := deliveryrider.NewHandler(runtime.dispatch, runtime.identity, userService, currentUserID, runtime.proofs)
+	if todayStats, ok := runtime.riderWallets.(delivery.RiderTodayStatsReader); ok {
+		riderHandler.WithTodayStats(todayStats)
+	}
 	if runtime.conversationLifecycle != nil {
 		riderHandler.WithConversationCommands(runtime.conversationLifecycle)
 	}

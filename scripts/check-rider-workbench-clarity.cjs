@@ -35,8 +35,12 @@ assert.match(source, /className='rider-grab-task-summary'/)
 assert.match(source, /rider-grab-refresh/)
 assert.match(source, /CapsuleSystemRow/)
 assert.match(source, /getDeliveryRiderMe/)
+assert.match(source, /getDeliveryRiderTodayStats/)
 assert.match(source, /listClaimableDeliveryOrders/)
 assert.match(source, /listAssignedDeliveryOrders/)
+assert.match(source, /rider-grab-daily-stats/)
+assert.match(source, /todayStatsLoaded/)
+assert.match(source, /todayStats\.todayIncomeCents/)
 assert.doesNotMatch(source, /<Text>骑<\/Text>/)
 assert.doesNotMatch(source, /rider-grab-hero__orb/)
 assert.doesNotMatch(source, /rider-grab-list-head/)
@@ -48,6 +52,7 @@ assert.match(source, /activeTab !== 'grab' \? <View className='rider-grab-tabs'>
 assert.match(style, /\.rider-grab-refresh__symbol\s*\{[^}]*flex:\s*0 0 18PX/)
 assert.doesNotMatch(style, /rider-refresh-spin/, '刷新按钮改用稳定容器内的等待动效')
 assert.match(style, /prefers-reduced-motion/)
+assert.match(style, /rider-grab-daily-stats\s*\{/)
 assert.doesNotMatch(
   style.match(/\.rider-grab-content\s*\{[^}]*\}/)?.[0] || '',
   /\bpadding\s*:/,

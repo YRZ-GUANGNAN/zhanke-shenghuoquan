@@ -145,11 +145,16 @@ function riderHarness(overrides = {}) {
   const toasts = []
   const phoneCalls = [], navigations = []
   let meCalls = 0
+  const today = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10)
   const services = {
     getDeliveryRiderMe: async () => {
       meCalls++
       return { registered: true, rider: { status: 'active', realName: '测试骑手' } }
     },
+    getDeliveryRiderTodayStats: async () => ({
+      date: today, timezone: 'Asia/Shanghai', todayOrders: 0, todayIncomeCents: 0,
+      definition: '今日已完成并产生收入的配送单',
+    }),
     listClaimableDeliveryOrders: async () => page([]),
     listAssignedDeliveryOrders: async (_, __, group) => page(group === 'pickup' ? [order('ORDER-A'), order('ORDER-B')] : []),
     startToPickup: async (value) => ({ ...value, rowVersion: 2, status: 'to_pickup' }),

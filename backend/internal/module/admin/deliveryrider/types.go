@@ -28,6 +28,14 @@ type MeView struct {
 	Rider      *RiderView `json:"rider,omitempty"`
 }
 
+type TodayStatsView struct {
+	Date             string `json:"date"`
+	Timezone         string `json:"timezone"`
+	TodayOrders      int64  `json:"todayOrders"`
+	TodayIncomeCents uint64 `json:"todayIncomeCents"`
+	Definition       string `json:"definition"`
+}
+
 type ClaimableOrderView struct {
 	DeliveryOrderPublicID string                  `json:"deliveryOrderPublicId"`
 	SourcePlatform        delivery.SourcePlatform `json:"sourcePlatform"`

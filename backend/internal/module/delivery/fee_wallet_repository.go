@@ -23,14 +23,54 @@ type RiderWalletRepository interface {
 	MarkRiderEarningPaidOffline(context.Context, string, uint64, uint64, string, string, time.Time) (RiderPayoutResult, error)
 }
 
+// RiderTodayStats is the real, read-only earning summary for one rider and
+// one business-day window. TodayOrders counts earning records, which are
+// created exactly once when a delivery reaches delivered, and therefore does
+// not include cancelled orders that never produced rider income.
+type RiderTodayStats struct {
+	TodayOrders      int64
+	TodayIncomeCents uint64
+}
+
+// RiderTodayStatsReader is kept separate from the wallet command interface so
+// the rider workbench can read daily facts without gaining wallet mutation
+// capabilities.
+type RiderTodayStatsReader interface {
+	ReadRiderTodayStats(context.Context, uint64, time.Time, time.Time) (RiderTodayStats, error)
+}
+
 var _ FeeConfigRepository = (*GormRepository)(nil)
 var _ RiderWalletRepository = (*GormRepository)(nil)
+var _ RiderTodayStatsReader = (*GormRepository)(nil)
 
 type RiderPayoutResult struct {
 	Wallet  RiderWallet
 	Earning RiderEarningRecord
 	Ledger  RiderLedger
 	Payout  RiderPayoutRecord
+}
+
+func (r *GormRepository) ReadRiderTodayStats(
+	ctx context.Context,
+	riderUserID uint64,
+	startUTC time.Time,
+	endUTC time.Time,
+) (RiderTodayStats, error) {
+	if riderUserID == 0 || startUTC.IsZero() || endUTC.IsZero() || !startUTC.Before(endUTC) {
+		return RiderTodayStats{}, ErrInvalidRecord
+	}
+	var result RiderTodayStats
+	err := riderTodayStatsQuery(r.db.WithContext(ctx), riderUserID, startUTC, endUTC).Scan(&result).Error
+	return result, err
+}
+
+func riderTodayStatsQuery(db *gorm.DB, riderUserID uint64, startUTC, endUTC time.Time) *gorm.DB {
+	return db.Model(&RiderEarningRecord{}).
+		Where("rider_user_id = ? AND created_at >= ? AND created_at < ?", riderUserID, startUTC, endUTC).
+		Where("rider_fee_cents > 0 AND settlement_status IN ?", []RiderEarningStatus{
+			RiderEarningPending, RiderEarningSettled, RiderEarningPaidOffline,
+		}).
+		Select("COUNT(*) AS today_orders, COALESCE(SUM(rider_fee_cents), 0) AS today_income_cents")
 }
 
 func (r *GormRepository) FeePolicyForMerchant(ctx context.Context, merchantUserID uint64) (FeePolicy, error) {

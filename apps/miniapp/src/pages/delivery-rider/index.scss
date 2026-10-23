@@ -29,6 +29,13 @@
 .rider-grab-refresh__label { display: block; width: 36PX; flex: 0 0 36PX; text-align: center; line-height: 20PX; }
 .rider-grab-refresh--disabled { opacity: .55; }
 .rider-grab-context { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8rpx 20rpx; font-size: 11PX; line-height: 18PX; color: $text-secondary; }
+.rider-grab-daily-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16PX; margin-top: 16PX; padding-top: 12PX; border-top: 1PX solid $border-subtle; }
+.rider-grab-daily-stats__item { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 4PX; min-width: 0; }
+.rider-grab-daily-stats__label { display: block; width: 100%; font-size: 12PX; line-height: 18PX; color: $text-secondary; }
+.rider-grab-daily-stats__value { @include ref.wrap; margin-top: 4PX; font-size: 24PX; line-height: 30PX; font-weight: 750; font-variant-numeric: tabular-nums; color: $brand-primary-strong; }
+.rider-grab-daily-stats__unit { font-size: 12PX; line-height: 18PX; color: $text-secondary; }
+.rider-grab-daily-stats--ready .rider-grab-daily-stats__value { animation: rider-daily-stats-enter 180ms ease-out; }
+@keyframes rider-daily-stats-enter { from { opacity: .35; transform: translateY(2PX); } to { opacity: 1; transform: translateY(0); } }
 .rider-grab-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0 28rpx; background: $bg-surface; border-bottom: 1PX solid $border-default; flex: 0 0 auto; }
 .rider-grab-tabs__item { @include ref.touch; min-height: 50PX; position: relative; display: flex; align-items: center; justify-content: center; gap: 12rpx; padding: 8rpx; color: $text-secondary; font-size: 16PX; }
 .rider-grab-tabs__item--active { color: $brand-primary-strong; font-weight: 700; }
@@ -104,4 +111,4 @@
   .rider-order-card__secondary { gap: 4rpx; }
   .rider-order-card__secondary-icon { width: 15PX; height: 15PX; }
 }
-@media (prefers-reduced-motion: reduce) { .rider-order-card { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .rider-order-card, .rider-grab-daily-stats--ready .rider-grab-daily-stats__value { animation: none; } }
