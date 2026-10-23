@@ -92,7 +92,7 @@ function DeliveryProfileContent() {
     <ScrollView scrollY enhanced showScrollbar={false} className='delivery-profile__scroll'>
       <View className={`delivery-profile__identity${hasCover ? ' delivery-profile__identity--cover' : ''}`}>
         <ChatAvatar className='delivery-profile__avatar' src={profile.avatar} name={name} />
-        <View className='delivery-profile__name'><Text className='delivery-profile__role'>{roleName}工作区</Text><Text>{name}</Text><Text className='delivery-profile__caption'>{role === 'merchant' ? '管理店铺资料与配送资金' : '管理骑手资料与配送身份'}</Text></View>
+        <View className='delivery-profile__name'><Text className='delivery-profile__role'>{roleName}工作区</Text><Text>{name}</Text>{role === 'merchant' ? null : <Text className='delivery-profile__caption'>管理骑手资料与配送身份</Text>}</View>
       </View>
       <View className='delivery-profile__edit' ariaRole='button' ariaLabel='编辑头像、昵称与背景图' hoverClass='delivery-profile__edit--pressed' onClick={() => open('/pages/edit-profile/index')}><AppIcon name='document' /><Text>编辑资料与封面</Text><AppIcon name='chevron-right' /></View>
       <View className='delivery-profile__section delivery-profile__section--funds'>

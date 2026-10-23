@@ -142,7 +142,6 @@ export function DeliveryMessagesContent({ role, identityAllowed }: { role: 'merc
                   <View className='merchant-message-item__top'>
                     <View className='merchant-message-item__title-row'>
                       <Text className='merchant-message-item__title'>配送单 #{item.deliveryOrderPublicId}</Text>
-                      <Text className='merchant-message-item__tag'>{item.canSend ? '可私聊' : '只读'}</Text>
                     </View>
                     <Text className='merchant-message-item__time'>{formatTime(item.updatedAt)}</Text>
                   </View>
