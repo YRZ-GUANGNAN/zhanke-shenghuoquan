@@ -1,28 +1,37 @@
 @use '../../styles/design-tokens.scss' as *;
 @use '../../styles/reference-layout.scss' as ref;
 
+// B 方向：资料与封面一体，订单及履约仍留在各自工作台。
 .delivery-profile {
   @include ref.page-foundation;
-  height: 100vh;
-  height: 100dvh;
   display: flex;
   flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  min-width: 0;
   overflow: hidden;
   background: $bg-app;
   color: $text-primary;
 }
-.delivery-profile__scroll { flex: 1; min-height: 0; }
+.delivery-profile__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 12PX;
+}
 .delivery-profile__hero {
   position: relative;
-  z-index: 2;
-  flex: 0 0 auto;
-  min-height: calc(var(--capsule-system-row-height, 72px) + var(--capsule-business-row-height, 44px));
+  min-height: var(--capsule-system-row-height, 72px);
   overflow: hidden;
   background: $bg-surface;
 }
 .delivery-profile__hero--cover {
-  min-height: 56vw;
-  max-height: 430PX;
+  height: 51vw;
+  min-height: 172PX;
+  max-height: 218PX;
+  height: clamp(172PX, 51vw, 218PX);
+  background: $border-default;
 }
 .delivery-profile__hero-image {
   position: absolute;
@@ -30,67 +39,161 @@
   display: block;
   width: 100%;
   height: 100%;
-  box-sizing: border-box;
+  object-fit: cover;
 }
-.delivery-profile__hero::after {
-  position: absolute;
-  z-index: 1;
-  right: 0;
-  bottom: -1PX;
-  left: 0;
-  height: 52%;
-  pointer-events: none;
-  content: '';
-  background: linear-gradient(to bottom, rgba($bg-surface, 0), rgba($bg-surface, .54) 45%, $bg-surface 100%);
+.delivery-profile__system-row { position: relative; z-index: 1; }
+.delivery-profile__hero-title { display: none; }
+.delivery-profile__identity {
+  position: relative;
+  display: grid;
+  grid-template-columns: 56PX minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12PX;
+  padding: 24PX 18PX 22PX;
+  background: $bg-surface;
 }
-.delivery-profile__system-row {
-  position: absolute;
-  z-index: 3;
-  top: 0;
-  right: 0;
-  left: 0;
-  background: linear-gradient(to bottom, rgba($text-strong, .2), rgba($text-strong, 0));
+.delivery-profile__identity--cover {
+  margin-top: -20PX;
+  border-radius: 20PX 20PX 0 0;
 }
-.delivery-profile__hero-title {
-  position: absolute;
-  z-index: 3;
-  top: var(--capsule-system-row-height, 72px);
-  right: 0;
-  left: 0;
+.delivery-profile__avatar {
+  width: 56PX;
+  height: 56PX;
+  border: 0;
+  border-radius: 16PX;
+}
+.delivery-profile__avatar .chat-avatar__initial { font-size: 22PX; }
+.delivery-profile__name {
+  display: flex;
+  flex-direction: column;
+  gap: 4PX;
+  min-width: 0;
+  font-size: 23PX;
+  line-height: 1.35;
+  font-weight: 600;
+  color: $text-strong;
+  overflow-wrap: anywhere;
+}
+.delivery-profile__role {
+  display: block;
+  color: $brand-primary-strong;
+  font-size: 11PX;
+  line-height: 18PX;
+  font-weight: 500;
+}
+.delivery-profile__name > .delivery-profile__caption { display: none; }
+.delivery-profile__edit {
+  @include ref.touch;
   display: flex;
   align-items: center;
   justify-content: center;
-  height: var(--capsule-business-row-height, 44px);
-  color: $text-strong;
-  font-size: 18PX;
-  font-weight: 750;
+  gap: 5PX;
+  padding: 0 9PX;
+  border: 1PX solid $border-default;
+  border-radius: 9PX;
+  background: $bg-surface;
+  color: $text-primary;
+  font-size: 12PX;
+  line-height: 18PX;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
 }
-.delivery-profile__hero-title--cover {
-  color: $text-on-color;
-  text-shadow: 0 1PX 8PX rgba($text-strong, .36);
+.delivery-profile__edit .app-icon { width: 15PX; height: 15PX; flex: 0 0 15PX; }
+.delivery-profile__section {
+  margin: 16PX 16PX 0;
+  padding: 16PX;
+  border-radius: 14PX;
+  background: $bg-surface;
 }
-.delivery-profile__identity { padding: 36rpx 32rpx 40rpx; display: flex; align-items: center; gap: 24rpx; background: $bg-surface; margin-bottom: 24rpx; }
-.delivery-profile__avatar { width: 64PX; height: 64PX; flex: 0 0 64PX; border: 3PX solid $bg-surface; border-radius: 20PX; box-sizing: border-box; }
-.delivery-profile__identity--cover { position: relative; margin-top: -28PX; padding-top: 0; background: transparent; align-items: flex-start; }
-.delivery-profile__identity--cover .delivery-profile__name { padding-top: 40PX; }
-.delivery-profile__edit { display: flex; align-items: center; gap: 16rpx; min-height: 48PX; padding: 0 32rpx; background: $bg-surface; border-top: 1PX solid $border-subtle; margin-top: -24rpx; font-size: 14PX; }
-.delivery-profile__edit > text { flex: 1; }
-.delivery-profile__edit .app-icon { width: 20PX; height: 20PX; }
-.delivery-profile__edit--pressed { background: $brand-tint; }
-.delivery-profile__name { display: flex; flex-direction: column; gap: 8rpx; font-size: 23PX; line-height: 1.4; font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
-.delivery-profile__role { display: block; font-size: 11PX; line-height: 18PX; letter-spacing: 2rpx; color: $brand-primary-strong; font-weight: 600; }
-.delivery-profile__caption { @include ref.type(meta); @include ref.wrap; display: block; color: $text-secondary; font-weight: 400; }
-.delivery-profile__section { margin: 20rpx 24rpx; padding: 28rpx; border: 1PX solid $border-default; border-radius: 20rpx; background: $bg-surface; }
-.delivery-profile__section--funds { border-color: rgba($brand-primary, .2); background: $brand-tint; }
-.delivery-profile__heading { display: block; font-size: 16PX; font-weight: 650; margin-bottom: 20rpx; }
-.delivery-profile__fact { display: flex; justify-content: space-between; gap: 24rpx; padding: 20rpx 0; font-size: 14PX; line-height: 1.5; border-bottom: 1PX solid $border-subtle; }
-.delivery-profile__fact:last-child { border-bottom: 0; padding-bottom: 0; }
-.delivery-profile__fact > text:first-child, .delivery-profile__fact > span:first-child { flex: 0 0 4em; color: $text-secondary; }
-.delivery-profile__fact > text:last-child, .delivery-profile__fact > span:last-child { min-width: 0; text-align: right; overflow-wrap: anywhere; font-weight: 500; }
-.delivery-profile__link { min-height: 56PX; display: flex; align-items: center; gap: 20rpx; }
-.delivery-profile__link-copy { flex: 1; min-width: 0; font-size: 17PX; font-weight: 650; }
-.delivery-profile__link-copy .delivery-profile__caption { margin-top: 10rpx; }
-.delivery-profile__link .app-icon { width: 24PX; height: 24PX; flex-shrink: 0; }
-.delivery-profile__retry { @include ref.touch; display: flex; align-items: center; color: $danger; font-size: 14PX; line-height: 1.5; }
-.delivery-profile__section .app-button { margin-top: 24rpx; min-height: 48PX; }
-.delivery-profile__link:active { opacity: .7; }
+.delivery-profile__heading {
+  display: block;
+  margin-bottom: 12PX;
+  color: $text-secondary;
+  font-size: 12PX;
+  line-height: 18PX;
+  font-weight: 500;
+}
+.delivery-profile__heading-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8PX 12PX; margin-bottom: 4PX; }
+.delivery-profile__heading-row .delivery-profile__heading { margin: 0; }
+.delivery-profile__status {
+  padding: 3PX 7PX;
+  border-radius: 5PX;
+  background: $bg-surface-subtle;
+  color: $text-secondary;
+  font-size: 11PX;
+  line-height: 16PX;
+}
+.delivery-profile__section--funds { padding-top: 14PX; padding-bottom: 16PX; }
+.delivery-profile__link { display: flex; align-items: center; gap: 12PX; min-height: 56PX; cursor: pointer; }
+.delivery-profile__link > .app-icon:first-child {
+  width: 22PX;
+  height: 22PX;
+  box-sizing: content-box;
+  padding: 11PX;
+  border-radius: 12PX;
+  background: $brand-tint;
+  flex: 0 0 22PX;
+}
+.delivery-profile__link > .app-icon:last-child { width: 18PX; height: 18PX; flex: 0 0 18PX; }
+.delivery-profile__link-copy { flex: 1; min-width: 0; color: $text-strong; font-size: 16PX; line-height: 24PX; font-weight: 600; }
+.delivery-profile__caption {
+  display: block;
+  min-width: 0;
+  color: $text-secondary;
+  font-size: 12PX;
+  line-height: 19PX;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+.delivery-profile__link-copy .delivery-profile__caption { margin-top: 3PX; }
+.delivery-profile--rider .delivery-profile__section--funds { background: $bg-surface-subtle; }
+.delivery-profile--rider .delivery-profile__section--funds .delivery-profile__heading { color: $text-strong; font-size: 15PX; font-weight: 600; margin-bottom: 6PX; }
+.delivery-profile__fact {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18PX;
+  min-height: 50PX;
+  padding: 14PX 0;
+  border-bottom: 1PX solid $border-subtle;
+  font-size: 14PX;
+  line-height: 21PX;
+}
+.delivery-profile__fact:last-child { border-bottom: 0; padding-bottom: 4PX; min-height: 40PX; }
+.delivery-profile__fact > text:first-child { color: $text-secondary; flex: 0 0 4em; }
+.delivery-profile__fact > text:last-child { min-width: 0; text-align: right; overflow-wrap: anywhere; color: $text-strong; font-weight: 500; }
+.delivery-profile__section--account { margin-bottom: 8PX; }
+.delivery-profile__section--account .app-button {
+  display: flex;
+  width: 100%;
+  min-height: 48PX;
+  margin-top: 14PX;
+  padding: 10PX 16PX;
+  border: 0;
+  border-radius: 9PX;
+  background: $bg-screen;
+  color: $text-primary;
+  font-size: 14PX;
+  line-height: 20PX;
+  font-weight: 500;
+  cursor: pointer;
+}
+.delivery-profile__retry { display: flex; align-items: center; min-width: 0; min-height: 48PX; padding-top: 8PX; color: $danger; font-size: 14PX; line-height: 22PX; overflow-wrap: anywhere; word-break: break-word; cursor: pointer; }
+.delivery-profile__edit, .delivery-profile__link { transition: transform $duration-fast $ease-standard, background-color $duration-fast $ease-standard; }
+.delivery-profile__edit--pressed, .delivery-profile__edit:active, .delivery-profile__link:active { transform: scale(.98); background-color: $bg-surface-subtle; }
+.delivery-profile__identity, .delivery-profile__section { animation: profile-panel-in $duration-standard $ease-standard both; }
+@keyframes profile-panel-in { from { opacity: 0; transform: translateY(6PX); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 340PX) {
+  .delivery-profile__identity { grid-template-columns: 48PX minmax(0, 1fr) auto; gap: 9PX; padding-left: 14PX; padding-right: 14PX; }
+  .delivery-profile__avatar { width: 48PX; height: 48PX; border-radius: 14PX; }
+  .delivery-profile__name { font-size: 21PX; }
+  .delivery-profile__edit { padding: 0 8PX; }
+  .delivery-profile__edit .app-icon { display: none; }
+  .delivery-profile__section { margin-left: 12PX; margin-right: 12PX; padding-left: 14PX; padding-right: 14PX; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .delivery-profile__identity, .delivery-profile__section { animation: none; }
+  .delivery-profile__edit, .delivery-profile__link { transition: none; }
+  .delivery-profile__edit--pressed, .delivery-profile__edit:active, .delivery-profile__link:active { transform: none; }
+}

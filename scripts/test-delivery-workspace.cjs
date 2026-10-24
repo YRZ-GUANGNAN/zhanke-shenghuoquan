@@ -73,7 +73,8 @@ function profileHarness(options = {}) {
   const renderer = hookRenderer()
   const session = sessionState(options.role || 'rider')
   let allowed = true, show, hide
-  const calls = { applications: [], switches: [], reLaunch: [], navigate: [], guards: [] }
+  const calls = { applications: [], switches: [], reLaunch: [], navigate: [], guards: [], workspaceNavigation: [] }
+  const swipe = { handlers: options.swipeHandlers || {}, canActivate: options.gestureCanActivate || (() => true) }
   session.update({ switchIdentity: async (role) => {
     calls.switches.push(role)
     const identity = await (options.switchIdentity?.(role) || Promise.resolve({ currentIdentity: role }))
@@ -84,7 +85,7 @@ function profileHarness(options = {}) {
     '@tarojs/components': { View: 'View', Text: 'Text', ScrollView: 'ScrollView', Image: 'Image' },
     '@tarojs/taro': { useDidShow: (fn) => { show = fn }, useDidHide: (fn) => { hide = fn } },
     '../../components/capsule-page-header': header,
-    '../../components/delivery-workspace-nav': { __esModule: true, default: 'DeliveryWorkspaceNav', useDeliveryWorkspaceNavigation: () => ({ swipe: { handlers: {}, canActivate: () => true } }) },
+    '../../components/delivery-workspace-nav': { __esModule: true, default: 'DeliveryWorkspaceNav', useDeliveryWorkspaceNavigation: (...args) => { calls.workspaceNavigation.push(args); return { swipe } } },
     '../../components/chat-avatar': 'ChatAvatar',
     '../../hooks/use-delivery-payment': { useDeliveryPayment: () => ({ enabled: options.paymentEnabled ?? true }) },
     '../../components/app-icon': 'AppIcon',
@@ -108,7 +109,7 @@ function profileHarness(options = {}) {
   const one = (className) => nodes(renderer.tree, (node) => hasClass(node, className))[0]
   const dialog = () => nodes(renderer.tree, (node) => node.type === 'AppDialog')[0]
   return {
-    calls, session, one, dialog, flush: renderer.flush,
+    calls, session, swipe, one, dialog, flush: renderer.flush,
     get tree() { return renderer.tree },
     async mount() { renderer.render(); await renderer.flush() },
     async switch() {
@@ -169,6 +170,180 @@ function messagesHarness(options = {}) {
     async show() { show(); await renderer.flush() },
     async unmount() { renderer.unmount(); await renderer.flush() },
   }
+}
+
+async function profilePresentationScenarios() {
+  const failures = []
+  const scenario = async (label, verify) => {
+    try { await verify(); passed(label) }
+    catch (error) { failures.push(error); console.error(`FAIL ${label}: ${error.message}`) }
+  }
+  for (const role of ['merchant', 'rider']) {
+    const roleName = role === 'merchant' ? '商家' : '骑手'
+    await scenario(`${role} 真实封面随内容滚动，失败收起且新封面可恢复`, async () => {
+      const app = profileHarness({ role })
+      await app.mount()
+      check.equal(app.one('delivery-profile__hero-image'), undefined, '无封面时不能生成占位图片')
+      check.equal(hasClass(app.one('delivery-profile__hero'), 'delivery-profile__hero--cover'), false)
+      const cover = '/test-media/profile-cover-a.png'
+      await app.state({ profile: { ...app.session.state.profile, cover } })
+      const image = app.one('delivery-profile__hero-image')
+      check.equal(image?.type, 'Image', '封面必须使用真实 Image 组件')
+      check.equal(image.props.src, cover)
+      check.equal(image.props.mode, 'aspectFill')
+      check.equal(hasClass(app.one('delivery-profile__hero'), 'delivery-profile__hero--cover'), true)
+      check.equal(hasClass(app.one('delivery-profile__identity'), 'delivery-profile__identity--cover'), true)
+      image.props.onError(); await app.flush()
+      check.equal(app.one('delivery-profile__hero-image'), undefined)
+      check.equal(hasClass(app.one('delivery-profile__hero'), 'delivery-profile__hero--cover'), false)
+      check.equal(hasClass(app.one('delivery-profile__identity'), 'delivery-profile__identity--cover'), false)
+      const nextCover = '/test-media/profile-cover-b.png'
+      await app.state({ profile: { ...app.session.state.profile, cover: nextCover } })
+      check.equal(app.one('delivery-profile__hero-image')?.props.src, nextCover, '旧封面失败不能阻止展示新封面')
+      check.equal(hasClass(app.one('delivery-profile__hero'), 'delivery-profile__hero--cover'), true)
+      const scroll = app.one('delivery-profile__scroll')
+      check.equal(scroll?.type, 'ScrollView')
+      check.equal(scroll.props.scrollY, true)
+      check.equal(nodes(scroll, (node) => hasClass(node, 'delivery-profile__hero')).length, 1, 'hero 必须处于 ScrollView 内')
+      check.equal(nodes(scroll, (node) => node.type === 'Image' && node.props.src === nextCover).length, 1)
+    })
+    await scenario(`${role} 身份区仅有一个编辑按钮且保留原编辑路由`, async () => {
+      const app = profileHarness({ role })
+      await app.mount()
+      const edits = nodes(app.tree, (node) => hasClass(node, 'delivery-profile__edit'))
+      check.equal(edits.length, 1, '页面不能重复编辑入口')
+      check.equal(edits[0].props.ariaRole, 'button')
+      check.ok(edits[0].props.ariaLabel, '编辑入口保留可访问名称')
+      edits[0].props.onClick(); await app.flush()
+      check.deepEqual(app.calls.navigate, [{ url: '/pages/edit-profile/index' }])
+      check.equal(nodes(app.one('delivery-profile__identity'), (node) => node === app.one('delivery-profile__edit')).length, 1, '编辑按钮必须在身份区内')
+    })
+    for (const [status, label] of [['approved', '已通过'], ['pending', '审核中'], ['rejected', '未通过']]) {
+      await scenario(`${role} ${status} 审核状态由真实返回映射至资料标题且不重复`, async () => {
+        const app = profileHarness({ role, application: async () => ({ status, realName: '测试联系人', merchantName: '测试商家' }) })
+        await app.mount()
+        check.equal(text(app.tree).split(label).length - 1, 1, '审核结果只展示一次')
+        check.deepEqual(app.calls.applications, [role])
+        const heading = app.one('delivery-profile__heading-row')
+        check.ok(heading, '资料区必须有 heading-row')
+        check.equal(text(nodes(heading, (node) => hasClass(node, 'delivery-profile__heading'))), `${roleName}资料`)
+        const statuses = nodes(heading, (node) => hasClass(node, 'delivery-profile__status'))
+        check.equal(statuses.length, 1, '审核状态必须置于资料标题行')
+        check.equal(text(statuses[0]), label)
+        check.equal(nodes(app.tree, (node) => hasClass(node, 'delivery-profile__status')).length, 1)
+        check.ok(nodes(app.tree, (node) => hasClass(node, 'delivery-profile__fact')).every((node) => !text(node).includes('审核状态')), '事实列表不能重复审核状态')
+      })
+    }
+    await scenario(`${role} 资料加载和错误不冒充审核通过，重试使用真实结果`, async () => {
+      const pending = deferred()
+      let attempts = 0
+      const app = profileHarness({ role, application: async () => ++attempts === 1 ? pending.promise : { status: 'approved', realName: '重试返回联系人', merchantName: '重试返回商家' } })
+      await app.mount()
+      check.match(text(app.tree), /正在读取已提交资料/)
+      check.doesNotMatch(text(app.tree), /已通过|审核中|未通过/)
+      check.equal(text(app.one('delivery-profile__status')), '资料读取中', '加载时应显示资料读取状态')
+      check.doesNotMatch(text(app.one('delivery-profile__status')), /已通过|审核中|未通过/, '加载时不能冒充审核结论')
+      pending.reject(new Error('测试资料读取失败')); await app.flush()
+      check.match(text(app.tree), /测试资料读取失败.*点击重试/)
+      check.doesNotMatch(text(app.tree), /已通过|审核中|未通过/)
+      check.equal(text(app.one('delivery-profile__status')), '资料待重试', '错误时应显示可重试状态')
+      check.doesNotMatch(text(app.one('delivery-profile__status')), /已通过|审核中|未通过/, '错误时不能冒充审核结论')
+      app.one('delivery-profile__retry').props.onClick(); await app.flush()
+      check.deepEqual(app.calls.applications, [role, role])
+      check.match(text(app.tree), /已通过/)
+      check.doesNotMatch(text(app.tree), /测试资料读取失败|正在读取已提交资料/)
+      check.equal(text(app.one('delivery-profile__status')), '已通过')
+    })
+    await scenario(`${role} 底栏 mine、页面横滑处理器和 gestureGuard 保持同一来源`, async () => {
+      const events = []
+      const swipeHandlers = Object.fromEntries(['onTouchStart', 'onTouchMove', 'onTouchEnd', 'onTouchCancel'].map((name) => [name, (event) => events.push([name, event])]))
+      const gestureCanActivate = () => true
+      const app = profileHarness({ role, swipeHandlers, gestureCanActivate })
+      await app.mount()
+      const nav = nodes(app.tree, (node) => node.type === 'DeliveryWorkspaceNav')
+      check.equal(nav.length, 1)
+      check.equal(nav[0].props.role, role)
+      check.equal(nav[0].props.active, 'mine')
+      check.equal(nav[0].props.gestureGuard, gestureCanActivate)
+      check.deepEqual(app.calls.workspaceNavigation.at(-1), [{ role, active: 'mine' }, true])
+      const page = app.one('delivery-profile')
+      const event = { touches: [{ clientX: 240, clientY: 180 }] }
+      for (const [name, handler] of Object.entries(swipeHandlers)) {
+        check.equal(page.props[name], handler, `${name} 必须继续由工作区 hook 提供`)
+        page.props[name](event)
+      }
+      check.deepEqual(events, Object.keys(swipeHandlers).map((name) => [name, event]))
+      const switchButton = nodes(app.tree, (node) => node.type === 'AppButton' && text(node) === '切换到学生端')[0]
+      switchButton.props.onClick(); await app.flush()
+      check.deepEqual(app.calls.workspaceNavigation.at(-1), [{ role, active: 'mine' }, false], '身份确认时暂停页面横滑')
+      app.dialog().props.onCancel(); await app.flush()
+      check.deepEqual(app.calls.workspaceNavigation.at(-1), [{ role, active: 'mine' }, true])
+    })
+    await scenario(`${role} 支付关闭保留真实说明，骑手不出现钱包操作`, async () => {
+      const app = profileHarness({ role, paymentEnabled: false })
+      await app.mount()
+      const funds = app.one('delivery-profile__section--funds')
+      check.ok(funds)
+      check.doesNotMatch(text(funds), /查看真实余额|充值记录|￥|¥/)
+      if (role === 'merchant') {
+        check.match(text(funds), /支付功能未开通，查看资金说明/)
+        const links = nodes(funds, (node) => hasClass(node, 'delivery-profile__link'))
+        check.equal(links.length, 1)
+        links[0].props.onClick(); await app.flush()
+        check.deepEqual(app.calls.navigate, [{ url: '/pages/merchant-wallet/index' }])
+      } else {
+        check.match(text(funds), /配送收入以后端结算记录为准，当前未开放骑手端余额查询与提现/)
+        check.doesNotMatch(text(app.tree), /钱包与账单/)
+        check.equal(nodes(funds, (node) => typeof node.props?.onClick === 'function').length, 0)
+        check.equal(nodes(app.tree, (node) => node.type === 'AppIcon' && node.props.name === 'wallet').length, 0)
+        check.deepEqual(app.calls.navigate, [])
+      }
+    })
+    await scenario(`${role} 横滑保护拒绝编辑和身份切换，恢复后仍需确认`, async () => {
+      let canActivate = false
+      const app = profileHarness({ role, gestureCanActivate: () => canActivate })
+      await app.mount()
+      const clickSwitch = () => nodes(app.tree, (node) => node.type === 'AppButton' && text(node) === '切换到学生端')[0].props.onClick()
+      app.one('delivery-profile__edit').props.onClick(); clickSwitch(); await app.flush()
+      check.deepEqual(app.calls.navigate, [])
+      check.deepEqual(app.calls.switches, [])
+      check.deepEqual(app.calls.reLaunch, [])
+      check.equal(app.dialog().props.visible, false, '拒绝手势时不打开身份确认弹窗')
+      check.equal(nodes(app.tree, (node) => node.type === 'DeliveryWorkspaceNav')[0].props.gestureGuard(), false)
+      canActivate = true
+      app.one('delivery-profile__edit').props.onClick(); clickSwitch(); await app.flush()
+      check.deepEqual(app.calls.navigate, [{ url: '/pages/edit-profile/index' }])
+      check.equal(app.dialog().props.visible, true)
+      check.deepEqual(app.calls.switches, [], '身份切换必须等待明确确认')
+      app.dialog().props.onConfirm(); await app.flush()
+      check.deepEqual(app.calls.switches, ['student'])
+      check.deepEqual(app.calls.reLaunch, [{ url: '/existing/student' }])
+    })
+    await scenario(`${role} 长名称和联系资料保留完整服务字段，缺少名称才回退昵称`, async () => {
+      const application = { status: 'approved', realName: '测试服务返回的超长联系人姓名'.repeat(3), merchantName: '测试服务返回的超长商家名称'.repeat(3), phone: '+86 13800000000 转 1234567890', merchantAddress: '测试服务返回的校区取货地址和详细楼层说明'.repeat(4) }
+      const app = profileHarness({ role, application: async () => application })
+      await app.mount()
+      const avatar = '/test-media/profile-avatar.png'
+      const nickname = '测试会话中的超长昵称'.repeat(3)
+      await app.state({ profile: { ...app.session.state.profile, nickname, avatar } })
+      const name = role === 'merchant' ? application.merchantName : application.realName
+      const avatarNode = nodes(app.tree, (node) => node.type === 'ChatAvatar')[0]
+      check.equal(avatarNode.props.src, avatar)
+      check.equal(avatarNode.props.name, name)
+      check.ok(text(app.one('delivery-profile__name')).includes(name))
+      const facts = nodes(app.tree, (node) => hasClass(node, 'delivery-profile__fact')).map(text)
+      check.ok(facts.includes(`联系人${application.realName}`))
+      check.ok(facts.includes(`联系电话${application.phone}`))
+      if (role === 'merchant') check.ok(facts.includes(`取货地址${application.merchantAddress}`))
+      else check.ok(facts.every((value) => !value.startsWith('取货地址')))
+      application.realName = ''; application.merchantName = ''
+      await app.show()
+      check.equal(nodes(app.tree, (node) => node.type === 'ChatAvatar')[0].props.name, nickname)
+      check.ok(text(app.one('delivery-profile__name')).includes(nickname))
+      check.ok(nodes(app.tree, (node) => hasClass(node, 'delivery-profile__fact')).map(text).includes('联系人未填写'))
+    })
+  }
+  if (failures.length) throw new AggregateError(failures, `资料页 B 方向 ${failures.length} 组回归场景失败`)
 }
 
 async function run() {
@@ -424,6 +599,7 @@ async function run() {
     check.equal(nodes(app.tree, (node) => node.type === 'DeliveryWorkspaceNav')[0].props.role, role)
     passed(`${role} 消息守卫、完整订单号路由、返回入口与导航身份一致`)
   }
+  await profilePresentationScenarios()
   console.log(`PASS 配送多页工作区 ${scenarios} 组场景，${assertions} 项行为断言`)
 }
 

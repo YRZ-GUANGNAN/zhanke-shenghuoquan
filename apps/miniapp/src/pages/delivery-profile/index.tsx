@@ -83,18 +83,18 @@ function DeliveryProfileContent() {
   const roleName = role === 'merchant' ? '商家' : '骑手'
   const name = (role === 'merchant' ? application?.merchantName : application?.realName) || profile.nickname || roleName
   const hasCover = Boolean(profile.cover && failedCover !== profile.cover)
-  return <View className='delivery-profile' {...workspace.swipe.handlers}>
-    <View className={`delivery-profile__hero${hasCover ? ' delivery-profile__hero--cover' : ''}`}>
-      {hasCover ? <Image src={profile.cover || ''} mode='aspectFill' className='delivery-profile__hero-image' ariaLabel={`${roleName}个人封面`} onError={() => setFailedCover(profile.cover || '')} /> : null}
-      <CapsuleSystemRow className='delivery-profile__system-row' />
-      <View className={`delivery-profile__hero-title${hasCover ? ' delivery-profile__hero-title--cover' : ''}`}><Text>我的</Text></View>
-    </View>
+  return <View className={`delivery-profile delivery-profile--${role}`} {...workspace.swipe.handlers}>
     <ScrollView scrollY enhanced showScrollbar={false} className='delivery-profile__scroll'>
+      <View className={`delivery-profile__hero${hasCover ? ' delivery-profile__hero--cover' : ''}`}>
+        {hasCover ? <Image src={profile.cover || ''} mode='aspectFill' className='delivery-profile__hero-image' ariaLabel={`${roleName}个人封面`} onError={() => setFailedCover(profile.cover || '')} /> : null}
+        <CapsuleSystemRow className='delivery-profile__system-row' />
+        <View className={`delivery-profile__hero-title${hasCover ? ' delivery-profile__hero-title--cover' : ''}`}><Text>我的</Text></View>
+      </View>
       <View className={`delivery-profile__identity${hasCover ? ' delivery-profile__identity--cover' : ''}`}>
         <ChatAvatar className='delivery-profile__avatar' src={profile.avatar} name={name} />
         <View className='delivery-profile__name'><Text className='delivery-profile__role'>{roleName}工作区</Text><Text>{name}</Text><Text className='delivery-profile__caption'>{role === 'merchant' ? '管理店铺资料与配送资金' : '管理骑手资料与配送身份'}</Text></View>
+        <View className='delivery-profile__edit' ariaRole='button' ariaLabel='编辑头像、昵称与背景图' hoverClass='delivery-profile__edit--pressed' onClick={() => open('/pages/edit-profile/index')}><AppIcon name='document' /><Text>编辑资料</Text></View>
       </View>
-      <View className='delivery-profile__edit' ariaRole='button' ariaLabel='编辑头像、昵称与背景图' hoverClass='delivery-profile__edit--pressed' onClick={() => open('/pages/edit-profile/index')}><AppIcon name='document' /><Text>编辑资料与封面</Text><AppIcon name='chevron-right' /></View>
       <View className='delivery-profile__section delivery-profile__section--funds'>
         <Text className='delivery-profile__heading'>{role === 'merchant' ? '配送资金' : '配送收入'}</Text>
         {role === 'merchant' ? <View className='delivery-profile__link' ariaRole='button' ariaLabel='查看商家钱包与账单' onClick={() => open('/pages/merchant-wallet/index')}>
@@ -102,15 +102,19 @@ function DeliveryProfileContent() {
         </View> : <Text className='delivery-profile__caption'>配送收入以后端结算记录为准，当前未开放骑手端余额查询与提现。</Text>}
       </View>
       <View className='delivery-profile__section'>
-        <Text className='delivery-profile__heading'>{roleName}资料</Text>
-        {error ? <Text className='delivery-profile__retry' onClick={() => setReload(value => value + 1)}>{error} · 点击重试</Text> : !application ? <Text className='delivery-profile__caption'>正在读取已提交资料…</Text> : <>
-          <View className='delivery-profile__fact'><Text>审核状态</Text><Text>{application.status === 'approved' ? '已通过' : application.status === 'pending' ? '审核中' : '未通过'}</Text></View>
+        <View className='delivery-profile__heading-row'>
+          <Text className='delivery-profile__heading'>{roleName}资料</Text>
+          <View className='delivery-profile__status' ariaRole='status' ariaLabel='资料审核状态'>
+            {error ? '资料待重试' : !application ? '资料读取中' : application.status === 'approved' ? '已通过' : application.status === 'pending' ? '审核中' : '未通过'}
+          </View>
+        </View>
+        {error ? <View className='delivery-profile__retry' ariaRole='button' ariaLabel='重新读取资料' onClick={() => setReload(value => value + 1)}><Text>{error} · 点击重试</Text></View> : !application ? <Text className='delivery-profile__caption'>正在读取已提交资料…</Text> : <>
           <View className='delivery-profile__fact'><Text>联系人</Text><Text>{application.realName || '未填写'}</Text></View>
           <View className='delivery-profile__fact'><Text>联系电话</Text><Text>{application.phone || '未填写'}</Text></View>
           {role === 'merchant' ? <View className='delivery-profile__fact'><Text>取货地址</Text><Text>{application.merchantAddress || '未填写'}</Text></View> : null}
         </>}
       </View>
-      <View className='delivery-profile__section'>
+      <View className='delivery-profile__section delivery-profile__section--account'>
         <Text className='delivery-profile__heading'>账号与身份</Text>
         <Text className='delivery-profile__caption'>在本工作区处理{roleName === '商家' ? '商家订单和配送消息' : '接单、取送货和配送消息'}。切换身份后可返回学生端。</Text>
         <AppButton variant='secondary' onClick={() => { if (workspace.swipe.canActivate()) { setSwitchError(''); setConfirmSwitch(true) } }}>切换到学生端</AppButton>

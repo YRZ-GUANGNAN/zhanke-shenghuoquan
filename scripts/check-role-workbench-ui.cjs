@@ -104,7 +104,9 @@ assert.match(rider, /todayStats\.todayIncomeCents/, 'rider daily income must use
 assert.match(riderService, /stats\/today/, 'rider daily stats must use the dedicated read-only endpoint')
 assert.match(merchant, /merchant-home-metric__label.*全部订单|全部订单/, 'merchant order page must show an order-only total')
 assert.match(profile, /delivery-profile__hero-image/, 'role profile must keep the real cover image')
-assert.match(profileStyle, /background: linear-gradient\(to bottom, rgba\(\$bg-surface, 0\), rgba\(\$bg-surface, \.54\) 45%, \$bg-surface 100%\)/, 'profile cover edge must finish on an opaque surface')
+assert.match(profileStyle, /\.delivery-profile__hero\s*\{[^}]*overflow:\s*hidden/, 'cover must clip image edges')
+assert.match(profileStyle, /\.delivery-profile__identity\s*\{[^}]*background:\s*\$bg-surface/, 'identity must form an opaque cover boundary')
+assert.match(profileStyle, /\.delivery-profile__identity--cover\s*\{[^}]*margin-top:\s*-20PX/, 'cover and identity must overlap without a seam')
 assert.match(riderWallet, /骑手结算功能尚未开放/, 'rider wallet must expose an honest unavailable state until a real API exists')
 assert.doesNotMatch(riderWallet, /ledgerItems|128\.50|静态示意/, 'rider wallet must not present fabricated balances or ledger records')
 
