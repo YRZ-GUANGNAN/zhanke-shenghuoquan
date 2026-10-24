@@ -405,9 +405,16 @@ func TestDeliveryPaymentProductionCredentialGate(t *testing.T) {
 	complete := validConfig()
 	complete.EnableDeliveryPayment = true
 	complete.WechatPayPlatformKeyPath = "testdata/wechatpay_platform.pem"
+	complete.WechatPayPlatformKeyID = "PUB_KEY_ID_01111111111111111111111111111111"
 	complete.DeliveryWechatPayNotifyURL = "https://api.example.com/api/v1/delivery/payments/wechat/notify"
 	complete.DeliveryWechatRefundNotifyURL = "https://api.example.com/api/v1/delivery/payments/wechat/refund-notify"
 	if err := complete.Validate(); err != nil {
 		t.Fatalf("complete production delivery payment configuration was rejected: %v", err)
+	}
+
+	missingKeyID := complete
+	missingKeyID.WechatPayPlatformKeyID = ""
+	if err := missingKeyID.Validate(); err == nil {
+		t.Fatal("delivery payment accepted a platform public key without its trusted key ID")
 	}
 }

@@ -122,6 +122,8 @@ async function main() {
     const coordinator = createMotionPreviewCoordinator(id => changes.push(id))
     coordinator.setEnabled(true); coordinator.visible('second', 1, () => stops.push('second')); coordinator.visible('first', 0, () => stops.push('first'))
     assert.deepEqual(changes, ['second'], 'newly visible cards cannot interrupt an active preview')
+    coordinator.started('second')
+    assert.equal(changes.at(-1), 'second', 'marking a started preview does not evict the current player')
     coordinator.finish('second'); assert.equal(changes.at(-1), 'first'); assert.deepEqual(stops, ['second'])
     coordinator.hidden('first'); assert.equal(changes.at(-1), '')
     coordinator.dispose()
@@ -170,6 +172,54 @@ async function main() {
     await React.act(async () => stale.forEach(o => o.report?.({ intersectionRatio: 1 })))
     assert.equal(timers.size, 0)
     assert.ok(observers.every(o => o.disconnected), 'unmount disconnects native observers')
+
+    const once = fixture()
+    await once.render(React.createElement(Feed, { session: 'once-one' }))
+    await visible('one', .8)
+    const startedOnce = once.container.querySelector('[data-kind="Video"]').taroProps
+    await React.act(async () => startedOnce.onPlay())
+    await visible('one', 0)
+    await visible('one', .8)
+    assert.equal(once.container.querySelector('[data-kind="Video"]'), null, 'a preview that actually started only auto-plays once per session')
+    await once.unmount()
+
+    const staleEvents = fixture()
+    await staleEvents.render(React.createElement(Feed, { session: 'stale-one' }))
+    await visible('one', .8)
+    const oldPlayer = staleEvents.container.querySelector('[data-kind="Video"]').taroProps
+    await React.act(async () => oldPlayer.onPlay())
+    await notify(hidden)
+    await staleEvents.render(React.createElement(Feed, { session: 'stale-two' }))
+    await notify(shown)
+    await visible('one', .8)
+    const newSessionPlayer = staleEvents.container.querySelector('[data-kind="Video"]').taroProps
+    await React.act(async () => newSessionPlayer.onPlay())
+    await React.act(async () => oldPlayer.onEnded())
+    await React.act(async () => oldPlayer.onTimeUpdate({ detail: { currentTime: 3 } }))
+    await React.act(async () => oldPlayer.onError())
+    assert.ok(staleEvents.container.querySelector('[data-kind="Video"]'), 'late events from a hidden player and another session cannot poison the new session')
+    await staleEvents.unmount()
+
+    const failedSession = fixture()
+    await failedSession.render(React.createElement(Feed, { session: 'failed-one' }))
+    await visible('one', .8)
+    const failedPlayer = failedSession.container.querySelector('[data-kind="Video"]').taroProps
+    await React.act(async () => failedPlayer.onError())
+    await failedSession.render(React.createElement(Feed, { session: 'failed-two' }))
+    await visible('one', .8)
+    assert.ok(failedSession.container.querySelector('[data-kind="Video"]'), 'a failure in one account does not suppress the same media in another account')
+    await failedSession.unmount()
+
+    let resolveNetwork
+    delayedNetwork = new Promise(resolve => { resolveNetwork = resolve })
+    const networkRace = fixture()
+    const observerCount = observers.length
+    await networkRace.render(React.createElement(Feed, { session: 'network-race' }))
+    await React.act(async () => [...networks].forEach(fn => fn({ networkType: 'none' })))
+    await React.act(async () => resolveNetwork({ networkType: 'wifi' }))
+    assert.equal(observers.length, observerCount, 'a stale network query cannot override a newer offline event')
+    delayedNetwork = null
+    await networkRace.unmount()
 
     const detail = fixture()
     await detail.render(React.createElement(Media, { id: 'detail', motion, mode: 'detail' }))

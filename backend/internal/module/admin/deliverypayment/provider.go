@@ -27,10 +27,13 @@ import (
 )
 
 var (
-	ErrProviderNotConfigured = errors.New("delivery payment provider is not configured")
-	ErrProviderRejected      = errors.New("delivery payment provider rejected request")
-	ErrInvalidNotification   = errors.New("invalid delivery payment notification")
+	ErrProviderNotConfigured     = errors.New("delivery payment provider is not configured")
+	ErrProviderRejected          = errors.New("delivery payment provider rejected request")
+	ErrUntrustedProviderResponse = errors.New("untrusted delivery payment provider response")
+	ErrInvalidNotification       = errors.New("invalid delivery payment notification")
 )
+
+const maxProviderBodyBytes = 1 << 20
 
 type JSAPIParameter struct {
 	TimeStamp string `json:"timeStamp"`
@@ -72,8 +75,10 @@ type RefundProviderResult struct {
 }
 
 type RefundNotificationResult struct {
+	OutTradeNo     string
 	OutRefundNo    string
 	WechatRefundID string
+	AmountCents    uint64
 	Success        bool
 	Reason         string
 }
@@ -97,6 +102,7 @@ func NewProviderFromConfig(cfg config.Config) (Provider, error) {
 			MerchantSerialNo: cfg.WechatPayMerchantSerialNo, PrivateKeyPath: cfg.WechatPayPrivateKeyPath,
 			PaymentNotifyURL: cfg.DeliveryWechatPayNotifyURL, RefundNotifyURL: cfg.DeliveryWechatRefundNotifyURL,
 			APIBase: cfg.WechatPayAPIBase, PlatformPublicKeyPath: cfg.WechatPayPlatformKeyPath,
+			PlatformKeyID: cfg.WechatPayPlatformKeyID,
 		})
 	default:
 		return UnconfiguredProvider{}, nil
@@ -156,6 +162,7 @@ type WechatProviderConfig struct {
 	RefundNotifyURL       string
 	APIBase               string
 	PlatformPublicKeyPath string
+	PlatformKeyID         string
 }
 
 type WechatProvider struct {
@@ -171,6 +178,10 @@ func NewWechatProvider(cfg WechatProviderConfig) (*WechatProvider, error) {
 	if cfg.APIBase == "" {
 		cfg.APIBase = "https://api.mch.weixin.qq.com"
 	}
+	cfg.PlatformKeyID = strings.TrimSpace(cfg.PlatformKeyID)
+	if cfg.PlatformKeyID == "" {
+		return nil, ErrProviderNotConfigured
+	}
 	privateKey, err := loadPrivateKey(cfg.PrivateKeyPath)
 	if err != nil {
 		return nil, err
@@ -181,7 +192,10 @@ func NewWechatProvider(cfg WechatProviderConfig) (*WechatProvider, error) {
 	}
 	return &WechatProvider{
 		config: cfg, privateKey: privateKey, platformKey: platformKey,
-		httpClient: &http.Client{Timeout: 8 * time.Second}, nonce: randomNonce, now: time.Now,
+		httpClient: &http.Client{
+			Timeout:       8 * time.Second,
+			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+		}, nonce: randomNonce, now: time.Now,
 	}, nil
 }
 
@@ -240,33 +254,39 @@ func (p *WechatProvider) ClientParams(prepayID string) (*JSAPIParameter, error) 
 }
 
 func (p *WechatProvider) ParsePaymentNotification(req *http.Request, body []byte) (PaymentNotificationResult, error) {
-	plain, err := p.verifyAndDecrypt(req, body)
+	plain, err := p.verifyAndDecrypt(req, body, map[string]struct{}{"TRANSACTION.SUCCESS": {}}, "transaction")
 	if err != nil {
 		return PaymentNotificationResult{}, err
 	}
 	var transaction struct {
+		AppID         string `json:"appid"`
+		MchID         string `json:"mchid"`
 		OutTradeNo    string `json:"out_trade_no"`
 		TransactionID string `json:"transaction_id"`
+		TradeType     string `json:"trade_type"`
 		TradeState    string `json:"trade_state"`
 		SuccessTime   string `json:"success_time"`
 		Amount        struct {
-			Total uint64 `json:"total"`
+			Total    uint64 `json:"total"`
+			Currency string `json:"currency"`
 		} `json:"amount"`
 	}
 	if err := json.Unmarshal(plain, &transaction); err != nil {
-		return PaymentNotificationResult{}, err
-	}
-	if transaction.TradeState != "SUCCESS" || transaction.OutTradeNo == "" ||
-		transaction.TransactionID == "" || transaction.Amount.Total == 0 {
 		return PaymentNotificationResult{}, ErrInvalidNotification
 	}
-	paidAt := p.now().UTC()
-	if parsed, err := time.Parse(time.RFC3339, transaction.SuccessTime); err == nil {
-		paidAt = parsed.UTC()
+	if transaction.AppID != p.config.AppID || transaction.MchID != p.config.MchID ||
+		transaction.TradeType != "JSAPI" || transaction.TradeState != "SUCCESS" ||
+		transaction.OutTradeNo == "" || transaction.TransactionID == "" ||
+		transaction.Amount.Total == 0 || transaction.Amount.Currency != "CNY" {
+		return PaymentNotificationResult{}, ErrInvalidNotification
+	}
+	paidAt, err := time.Parse(time.RFC3339, transaction.SuccessTime)
+	if err != nil || paidAt.IsZero() {
+		return PaymentNotificationResult{}, ErrInvalidNotification
 	}
 	return PaymentNotificationResult{
 		OutTradeNo: transaction.OutTradeNo, WechatTransactionID: transaction.TransactionID,
-		AmountCents: transaction.Amount.Total, PaidAt: paidAt,
+		AmountCents: transaction.Amount.Total, PaidAt: paidAt.UTC(),
 	}, nil
 }
 
@@ -283,34 +303,55 @@ func (p *WechatProvider) CreateRefund(ctx context.Context, input RefundRequest) 
 		return RefundProviderResult{}, err
 	}
 	var response struct {
-		RefundID string `json:"refund_id"`
-		Status   string `json:"status"`
-		Code     string `json:"code"`
-		Message  string `json:"message"`
+		RefundID    string `json:"refund_id"`
+		OutTradeNo  string `json:"out_trade_no"`
+		OutRefundNo string `json:"out_refund_no"`
+		Status      string `json:"status"`
+		Code        string `json:"code"`
+		Message     string `json:"message"`
+		Amount      struct {
+			Refund   uint64 `json:"refund"`
+			Total    uint64 `json:"total"`
+			Currency string `json:"currency"`
+		} `json:"amount"`
 	}
 	if err := p.doJSON(ctx, http.MethodPost, "/v3/refund/domestic/refunds", body, &response); err != nil {
 		return RefundProviderResult{}, err
 	}
-	if response.RefundID == "" {
+	if response.RefundID == "" || response.OutTradeNo != input.OutTradeNo ||
+		response.OutRefundNo != input.OutRefundNo || response.Amount.Refund != input.AmountCents ||
+		response.Amount.Total != input.AmountCents || response.Amount.Currency != "CNY" ||
+		!supportedRefundStatus(response.Status) {
 		return RefundProviderResult{}, fmt.Errorf("%w: code=%s message=%s", ErrProviderRejected, response.Code, response.Message)
 	}
 	return RefundProviderResult{WechatRefundID: response.RefundID, Status: response.Status}, nil
 }
 
 func (p *WechatProvider) ParseRefundNotification(req *http.Request, body []byte) (RefundNotificationResult, error) {
-	plain, err := p.verifyAndDecrypt(req, body)
+	plain, err := p.verifyAndDecrypt(req, body, map[string]struct{}{
+		"REFUND.SUCCESS": {}, "REFUND.ABNORMAL": {}, "REFUND.CLOSED": {},
+	}, "refund")
 	if err != nil {
 		return RefundNotificationResult{}, err
 	}
 	var value struct {
+		MchID       string `json:"mchid"`
+		OutTradeNo  string `json:"out_trade_no"`
 		OutRefundNo string `json:"out_refund_no"`
 		RefundID    string `json:"refund_id"`
 		Status      string `json:"refund_status"`
+		Amount      struct {
+			Refund   uint64 `json:"refund"`
+			Total    uint64 `json:"total"`
+			Currency string `json:"currency"`
+		} `json:"amount"`
 	}
 	if err := json.Unmarshal(plain, &value); err != nil {
-		return RefundNotificationResult{}, err
+		return RefundNotificationResult{}, ErrInvalidNotification
 	}
-	if value.OutRefundNo == "" || value.RefundID == "" || value.Status == "" {
+	if value.MchID != p.config.MchID || value.OutTradeNo == "" || value.OutRefundNo == "" ||
+		value.RefundID == "" || value.Status == "" || value.Amount.Refund == 0 ||
+		value.Amount.Total == 0 || value.Amount.Refund > value.Amount.Total || value.Amount.Currency != "CNY" {
 		return RefundNotificationResult{}, ErrInvalidNotification
 	}
 	success := value.Status == "SUCCESS"
@@ -319,45 +360,42 @@ func (p *WechatProvider) ParseRefundNotification(req *http.Request, body []byte)
 		reason = "wechat refund status: " + value.Status
 	}
 	return RefundNotificationResult{
-		OutRefundNo: value.OutRefundNo, WechatRefundID: value.RefundID,
+		OutTradeNo: value.OutTradeNo, OutRefundNo: value.OutRefundNo,
+		WechatRefundID: value.RefundID, AmountCents: value.Amount.Refund,
 		Success: success, Reason: reason,
 	}, nil
 }
 
-func (p *WechatProvider) verifyAndDecrypt(req *http.Request, body []byte) ([]byte, error) {
-	timestamp := req.Header.Get("Wechatpay-Timestamp")
-	nonce := req.Header.Get("Wechatpay-Nonce")
-	signature := req.Header.Get("Wechatpay-Signature")
-	if timestamp == "" || nonce == "" || signature == "" {
-		return nil, ErrInvalidNotification
-	}
-	unixTime, err := strconv.ParseInt(timestamp, 10, 64)
-	if err != nil || absDuration(p.now().Sub(time.Unix(unixTime, 0))) > 5*time.Minute {
-		return nil, ErrInvalidNotification
-	}
-	rawSignature, err := base64.StdEncoding.DecodeString(signature)
-	if err != nil {
-		return nil, ErrInvalidNotification
-	}
-	signed := []byte(timestamp + "\n" + nonce + "\n" + string(body) + "\n")
-	digest := sha256.Sum256(signed)
-	if err := rsa.VerifyPKCS1v15(p.platformKey, crypto.SHA256, digest[:], rawSignature); err != nil {
+func (p *WechatProvider) verifyAndDecrypt(req *http.Request, body []byte, allowedEvents map[string]struct{}, originalType string) ([]byte, error) {
+	if len(body) == 0 || len(body) > maxProviderBodyBytes || p.verifyWechatSignature(req.Header, body) != nil {
 		return nil, ErrInvalidNotification
 	}
 	var envelope struct {
-		Resource struct {
+		EventType    string `json:"event_type"`
+		ResourceType string `json:"resource_type"`
+		Resource     struct {
 			AssociatedData string `json:"associated_data"`
 			Nonce          string `json:"nonce"`
 			Ciphertext     string `json:"ciphertext"`
+			Algorithm      string `json:"algorithm"`
+			OriginalType   string `json:"original_type"`
 		} `json:"resource"`
 	}
 	if err := json.Unmarshal(body, &envelope); err != nil {
-		return nil, err
+		return nil, ErrInvalidNotification
 	}
-	return decryptResource(
+	if _, ok := allowedEvents[envelope.EventType]; !ok || envelope.ResourceType != "encrypt-resource" ||
+		envelope.Resource.Algorithm != "AEAD_AES_256_GCM" || envelope.Resource.OriginalType != originalType {
+		return nil, ErrInvalidNotification
+	}
+	plain, err := decryptResource(
 		p.config.APIv3Key, envelope.Resource.AssociatedData,
 		envelope.Resource.Nonce, envelope.Resource.Ciphertext,
 	)
+	if err != nil {
+		return nil, ErrInvalidNotification
+	}
+	return plain, nil
 }
 
 func (p *WechatProvider) doJSON(ctx context.Context, method, path string, body []byte, target any) error {
@@ -375,14 +413,73 @@ func (p *WechatProvider) doJSON(ctx context.Context, method, path string, body [
 		return err
 	}
 	defer response.Body.Close()
-	raw, err := io.ReadAll(io.LimitReader(response.Body, 1<<20))
+	raw, err := io.ReadAll(io.LimitReader(response.Body, maxProviderBodyBytes+1))
 	if err != nil {
 		return err
 	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return fmt.Errorf("%w: http=%d body=%s", ErrProviderRejected, response.StatusCode, truncateProviderText(string(raw), 512))
+	if len(raw) > maxProviderBodyBytes {
+		return ErrUntrustedProviderResponse
 	}
-	return json.Unmarshal(raw, target)
+	if err := p.verifyWechatSignature(response.Header, raw); err != nil {
+		return ErrUntrustedProviderResponse
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return fmt.Errorf("%w: http=%d", ErrProviderRejected, response.StatusCode)
+	}
+	if err := json.Unmarshal(raw, target); err != nil {
+		return ErrUntrustedProviderResponse
+	}
+	return nil
+}
+
+func (p *WechatProvider) verifyWechatSignature(header http.Header, body []byte) error {
+	timestamp, ok := singleHeader(header, "Wechatpay-Timestamp")
+	if !ok {
+		return ErrInvalidNotification
+	}
+	nonce, ok := singleHeader(header, "Wechatpay-Nonce")
+	if !ok {
+		return ErrInvalidNotification
+	}
+	signature, ok := singleHeader(header, "Wechatpay-Signature")
+	if !ok {
+		return ErrInvalidNotification
+	}
+	serial, ok := singleHeader(header, "Wechatpay-Serial")
+	if !ok || serial != p.config.PlatformKeyID {
+		return ErrInvalidNotification
+	}
+	unixTime, err := strconv.ParseInt(timestamp, 10, 64)
+	if err != nil || absDuration(p.now().Sub(time.Unix(unixTime, 0))) > 5*time.Minute {
+		return ErrInvalidNotification
+	}
+	rawSignature, err := base64.StdEncoding.DecodeString(signature)
+	if err != nil {
+		return ErrInvalidNotification
+	}
+	digest := sha256.Sum256([]byte(timestamp + "\n" + nonce + "\n" + string(body) + "\n"))
+	if err := rsa.VerifyPKCS1v15(p.platformKey, crypto.SHA256, digest[:], rawSignature); err != nil {
+		return ErrInvalidNotification
+	}
+	return nil
+}
+
+func singleHeader(header http.Header, name string) (string, bool) {
+	values := header.Values(name)
+	if len(values) != 1 {
+		return "", false
+	}
+	value := strings.TrimSpace(values[0])
+	return value, value != ""
+}
+
+func supportedRefundStatus(value string) bool {
+	switch value {
+	case "SUCCESS", "CLOSED", "PROCESSING", "ABNORMAL":
+		return true
+	default:
+		return false
+	}
 }
 
 func (p *WechatProvider) authorize(req *http.Request, body []byte) error {
@@ -479,6 +576,9 @@ func decryptResource(apiKey, associatedData, nonce, ciphertext string) ([]byte, 
 	if err != nil {
 		return nil, err
 	}
+	if len(nonce) != gcm.NonceSize() || len(raw) < gcm.Overhead() {
+		return nil, ErrInvalidNotification
+	}
 	return gcm.Open(nil, []byte(nonce), raw, []byte(associatedData))
 }
 
@@ -493,14 +593,6 @@ func randomNonce() (string, error) {
 func absDuration(value time.Duration) time.Duration {
 	if value < 0 {
 		return -value
-	}
-	return value
-}
-
-func truncateProviderText(value string, limit int) string {
-	value = strings.TrimSpace(value)
-	if len(value) > limit {
-		return value[:limit]
 	}
 	return value
 }

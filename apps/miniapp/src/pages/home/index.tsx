@@ -500,7 +500,7 @@ function HomeContent() {
       >
         {card.imageUrl ? <View className={`student-post-card__media student-post-card__media--${card.target}`}>
           {card.motion ? <PostMotionMedia id={cardKey} motion={card.motion} mode='preview' enabled={motionPreview.enabled}
-            activeId={motionPreview.activeId} coordinator={motionPreview.coordinator} order={cards.indexOf(card)} /> : !failedImageKeys.has(imageKey) ? (
+            activeId={motionPreview.activeId} coordinator={motionPreview.coordinator} order={cards.indexOf(card)} sessionKey={motionPreview.sessionKey} /> : !failedImageKeys.has(imageKey) ? (
             <Image
               className='student-post-card__image'
               src={card.imageUrl}

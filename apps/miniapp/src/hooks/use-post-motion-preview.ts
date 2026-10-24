@@ -10,25 +10,45 @@ export function usePostMotionPreview(active: boolean, sessionKey: string) {
   const [reduced, setReduced] = useState(false)
   const coordinator = useMemo(() => createMotionPreviewCoordinator(setActiveId), [sessionKey])
   const mounted = useRef(true)
+  const networkRevision = useRef(0)
+  const refreshNetwork = () => {
+    const revision = ++networkRevision.current
+    void Taro.getNetworkType().then(value => {
+      if (mounted.current && revision === networkRevision.current) setNetworkOK(value.networkType !== 'none')
+    }).catch(() => {
+      if (mounted.current && revision === networkRevision.current) setNetworkOK(false)
+    })
+  }
   useDidHide(() => { coordinator.setEnabled(false); setShown(false) })
   useDidShow(() => {
     setShown(true)
-      void Taro.getNetworkType().then(value => { if (mounted.current) setNetworkOK(value.networkType !== 'none') }).catch(() => setNetworkOK(false))
+    refreshNetwork()
   })
   useEffect(() => {
     mounted.current = true
-    const update = (value: { networkType: string }) => { if (mounted.current) setNetworkOK(value.networkType !== 'none') }
-    void Taro.getNetworkType().then(update).catch(() => setNetworkOK(false))
+    const update = (value: { networkType: string }) => {
+      networkRevision.current += 1
+      if (mounted.current) setNetworkOK(value.networkType !== 'none')
+    }
+    refreshNetwork()
     try { Taro.onNetworkStatusChange(update) } catch { /* Poster fallback. */ }
     // Browser accessibility preference, when exposed by the runtime. Native
     // clients without that API retain the bounded, silent preview.
     const media = typeof globalThis.matchMedia === 'function' ? globalThis.matchMedia('(prefers-reduced-motion: reduce)') : null
     const motionChange = () => setReduced(Boolean(media?.matches))
     motionChange(); media?.addEventListener?.('change', motionChange)
-    return () => { mounted.current = false; try { Taro.offNetworkStatusChange(update) } catch {} media?.removeEventListener?.('change', motionChange) }
+    return () => {
+      mounted.current = false
+      networkRevision.current += 1
+      try { Taro.offNetworkStatusChange(update) } catch {}
+      media?.removeEventListener?.('change', motionChange)
+    }
   }, [])
   const enabled = active && shown && networkOK && !reduced
   useEffect(() => { coordinator.setEnabled(enabled); return () => coordinator.setEnabled(false) }, [coordinator, enabled])
-  useEffect(() => () => coordinator.dispose(), [coordinator])
-  return { activeId, enabled, coordinator }
+  useEffect(() => {
+    setActiveId('')
+    return () => coordinator.dispose()
+  }, [coordinator])
+  return { activeId, enabled, coordinator, sessionKey }
 }

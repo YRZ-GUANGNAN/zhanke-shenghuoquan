@@ -178,8 +178,16 @@ func (h *Handler) issuePrepay(c *gin.Context, value *delivery.PaymentStartResult
 	if value.Attempt.Provider == delivery.PaymentMock {
 		return nil, nil
 	}
-	if value.Attempt.Status == delivery.PaymentPrepayIssued && value.Attempt.PrepayID != nil {
+	switch value.Attempt.Status {
+	case delivery.PaymentPrepayIssued:
+		if value.Attempt.PrepayID == nil {
+			return nil, delivery.ErrPaymentNotPending
+		}
 		return h.provider.ClientParams(*value.Attempt.PrepayID)
+	case delivery.PaymentCreated:
+		// Continue below and issue the first prepay request.
+	default:
+		return nil, delivery.ErrPaymentNotPending
 	}
 	prepay, err := h.provider.CreatePrepay(c.Request.Context(), PrepayRequest{
 		Description: description, OutTradeNo: value.Attempt.OutTradeNo,
@@ -264,8 +272,8 @@ func (h *Handler) refund(c *gin.Context, admin bool) {
 }
 
 func (h *Handler) paymentNotify(c *gin.Context) {
-	body, err := io.ReadAll(io.LimitReader(c.Request.Body, 1<<20))
-	if err != nil {
+	body, err := io.ReadAll(io.LimitReader(c.Request.Body, maxProviderBodyBytes+1))
+	if err != nil || len(body) > maxProviderBodyBytes {
 		response.Fail(c, http.StatusBadRequest, "invalid payment notification")
 		return
 	}
@@ -286,8 +294,8 @@ func (h *Handler) paymentNotify(c *gin.Context) {
 }
 
 func (h *Handler) refundNotify(c *gin.Context) {
-	body, err := io.ReadAll(io.LimitReader(c.Request.Body, 1<<20))
-	if err != nil {
+	body, err := io.ReadAll(io.LimitReader(c.Request.Body, maxProviderBodyBytes+1))
+	if err != nil || len(body) > maxProviderBodyBytes {
 		response.Fail(c, http.StatusBadRequest, "invalid refund notification")
 		return
 	}

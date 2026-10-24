@@ -52,6 +52,7 @@ type Config struct {
 	WechatPayNotifyURL        string
 	WechatPayAPIBase          string
 	WechatPayPlatformKeyPath  string
+	WechatPayPlatformKeyID    string
 	AllowMockPayment          bool
 
 	EnableLegacyTakeout              bool
@@ -157,6 +158,7 @@ func Load() (Config, error) {
 		WechatPayNotifyURL:        env("WECHAT_PAY_NOTIFY_URL", ""),
 		WechatPayAPIBase:          env("WECHAT_PAY_API_BASE", "https://api.mch.weixin.qq.com"),
 		WechatPayPlatformKeyPath:  env("WECHAT_PAY_PLATFORM_PUBLIC_KEY_PATH", ""),
+		WechatPayPlatformKeyID:    env("WECHAT_PAY_PLATFORM_KEY_ID", ""),
 		AllowMockPayment:          allowMockPayment,
 
 		EnableLegacyTakeout:              enableLegacyTakeout,
@@ -205,7 +207,10 @@ func (c Config) Validate() error {
 	if c.WechatPayNotifyURL != "" && !c.WechatPayCoreConfigured() {
 		return errors.New("legacy WeChat Pay notify URL requires complete core credentials")
 	}
-	if c.WechatPayPlatformKeyPath != "" && !c.WechatPayCoreConfigured() {
+	if (c.WechatPayPlatformKeyPath == "") != (c.WechatPayPlatformKeyID == "") {
+		return errors.New("WeChat Pay platform public key and trusted key ID must be configured together")
+	}
+	if (c.WechatPayPlatformKeyPath != "" || c.WechatPayPlatformKeyID != "") && !c.WechatPayCoreConfigured() {
 		return errors.New("WeChat Pay platform public key requires complete core credentials")
 	}
 	if (c.DeliveryWechatPayNotifyURL != "" || c.DeliveryWechatRefundNotifyURL != "") && !c.WechatPayCoreConfigured() {
@@ -298,13 +303,14 @@ func (c Config) WechatPayCoreConfigured() bool {
 }
 
 func (c Config) DeliveryWechatPayConfigured() bool {
-	return c.WechatPayCoreConfigured() && c.WechatPayPlatformKeyPath != "" &&
+	return c.WechatPayCoreConfigured() && c.WechatPayPlatformKeyPath != "" && c.WechatPayPlatformKeyID != "" &&
 		c.DeliveryWechatPayNotifyURL != "" && c.DeliveryWechatRefundNotifyURL != ""
 }
 
 func (c Config) WechatPayAnyCredentialSet() bool {
 	return c.WechatPayMchID != "" || c.WechatPayAPIv3Key != "" || c.WechatPayMerchantSerialNo != "" ||
-		c.WechatPayPrivateKeyPath != "" || c.WechatPayNotifyURL != "" || c.WechatPayPlatformKeyPath != ""
+		c.WechatPayPrivateKeyPath != "" || c.WechatPayNotifyURL != "" || c.WechatPayPlatformKeyPath != "" ||
+		c.WechatPayPlatformKeyID != ""
 }
 
 func (c Config) WechatPayAnyCoreCredentialSet() bool {
@@ -313,7 +319,7 @@ func (c Config) WechatPayAnyCoreCredentialSet() bool {
 }
 
 func (c Config) DeliveryWechatPayAnyCredentialSet() bool {
-	return c.WechatPayAnyCoreCredentialSet() || c.WechatPayPlatformKeyPath != "" ||
+	return c.WechatPayAnyCoreCredentialSet() || c.WechatPayPlatformKeyPath != "" || c.WechatPayPlatformKeyID != "" ||
 		c.DeliveryWechatPayNotifyURL != "" || c.DeliveryWechatRefundNotifyURL != ""
 }
 

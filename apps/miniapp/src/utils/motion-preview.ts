@@ -8,8 +8,8 @@ export function createMotionPreviewCoordinator(onChange: (id: string) => void) {
   const candidates = new Map<string, { order: number; stop: () => void }>()
   const played = new Set<string>()
   let active = '', enabled = false
-  const select = () => {
-    const currentStillVisible = enabled && candidates.has(active) && !played.has(active)
+  const select = (releaseActive = false) => {
+    const currentStillVisible = !releaseActive && enabled && candidates.has(active)
     const next = currentStillVisible ? active : enabled ? [...candidates.entries()].filter(([id]) => !played.has(id)).sort((a, b) => a[1].order - b[1].order)[0]?.[0] ?? '' : ''
     if (next === active) return
     const previous = active
@@ -21,7 +21,8 @@ export function createMotionPreviewCoordinator(onChange: (id: string) => void) {
     setEnabled(value: boolean) { enabled = value; select() },
     visible(id: string, order: number, stop: () => void) { candidates.set(id, { order, stop }); select() },
     hidden(id: string) { candidates.get(id)?.stop(); candidates.delete(id); select() },
-    finish(id: string) { played.add(id); select() },
+    started(id: string) { if (active === id) played.add(id) },
+    finish(id: string) { played.add(id); select(active === id) },
     dispose() { enabled = false; select(); candidates.clear(); played.clear() },
   }
 }
