@@ -68,6 +68,7 @@ export type ChannelPagerProps<T extends string> = {
   renderPage: (key: T) => ReactNode
   className?: string
   interaction?: ChannelInteraction
+  disabled?: boolean
 }
 
 export default function ChannelPager<T extends string>({
@@ -76,7 +77,8 @@ export default function ChannelPager<T extends string>({
   onChange,
   renderPage,
   className = '',
-  interaction
+  interaction,
+  disabled = false
 }: ChannelPagerProps<T>) {
   const ownInteraction = useChannelInteraction()
   const controls = interaction ?? ownInteraction
@@ -86,7 +88,7 @@ export default function ChannelPager<T extends string>({
   const keySignature = JSON.stringify(visibleKeys)
   const keysAtRender = useRef(keySignature)
   const keysAtTouch = useRef<string | null>(keySignature)
-  if (keysAtRender.current !== keySignature) {
+  if (keysAtRender.current !== keySignature || disabled) {
     keysAtRender.current = keySignature
     // Ignore a late swipe event whose old index now identifies another page.
     keysAtTouch.current = null
@@ -109,19 +111,20 @@ export default function ChannelPager<T extends string>({
       circular={false}
       autoplay={false}
       indicatorDots={false}
+      disableTouch={disabled}
       onTouchStart={() => {
-        if (!ownInteraction.isActive()) return
+        if (disabled || !ownInteraction.isActive()) return
         keysAtTouch.current = keySignature
         controls.onTouchStart()
       }}
       onTouchEnd={controls.onTouchEnd}
       onTouchCancel={controls.onTouchCancel}
       onTransition={(event) => {
-        if (ownInteraction.isActive() && keysAtTouch.current === keySignature && (event.detail.dx !== 0 || event.detail.dy !== 0)) controls.onTransition()
+        if (!disabled && ownInteraction.isActive() && keysAtTouch.current === keySignature && (event.detail.dx !== 0 || event.detail.dy !== 0)) controls.onTransition()
       }}
       onAnimationFinish={controls.onAnimationFinish}
       onChange={(event) => {
-        if (!ownInteraction.isActive()) return
+        if (disabled || !ownInteraction.isActive()) return
         const { current: nextIndex, source, currentItemId } = event.detail
         if (!Number.isInteger(nextIndex) || nextIndex < 0 || nextIndex >= visibleKeys.length) return
         const nextKey = visibleKeys[nextIndex]

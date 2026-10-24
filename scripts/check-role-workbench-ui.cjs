@@ -95,7 +95,12 @@ assert.match(workspaceNav, /gestureGuard\?: \(\) => boolean/, 'bottom navigation
 assert.match(workspaceNav, /const canActivate = gestureGuard \?\? swipe\.canActivate/, 'bottom navigation must share the page gesture guard')
 assert.doesNotMatch(workspaceNav, /return <View className='delivery-workspace-nav' \{\.\.\.swipe\.handlers\}>/, 'navigation must not install a second nested swipe tracker')
 for (const [name, source] of [['merchant', merchant], ['rider', rider], ['profile', profile], ['messages', messages]]) {
-  assert.match(source, /gestureGuard=\{workspace\.swipe\.canActivate\}/, `${name} navigation must share the page gesture guard`)
+  if (name === 'merchant' || name === 'rider') {
+    assert.match(source, /gestureGuard=\{canActivateWorkspace\}/, `${name} navigation must share both gesture guards`)
+    assert.match(source, /workspace\.swipe\.canActivate\(\) && channelInteraction\.canActivate\(\)/)
+    assert.match(source, /<DeliveryStagePager/, `${name} stage gestures must not bubble into workspace navigation`)
+    assert.match(source, /onBoundarySwipe=\{workspace\.step\}/)
+  } else assert.match(source, /gestureGuard=\{workspace\.swipe\.canActivate\}/, `${name} navigation must share the page gesture guard`)
 }
 assert.doesNotMatch(merchant, /profile\.cover|profile\.avatar|merchant-home-hero__cover-image|ChatAvatar/, 'merchant order page must keep personal media on the profile page')
 assert.doesNotMatch(rider, /profile\.cover|profile\.avatar|rider-grab-hero__cover-image|ChatAvatar/, 'rider order page must keep personal media on the profile page')

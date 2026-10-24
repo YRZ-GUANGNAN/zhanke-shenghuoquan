@@ -4,7 +4,8 @@ import { getCurrentInstance, useDidHide, useDidShow } from '@tarojs/taro'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import { AppDialog } from '../../components/ui'
 import DeliveryWorkspaceNav, { useDeliveryWorkspaceNavigation } from '../../components/delivery-workspace-nav'
-import ChannelPager, { useChannelInteraction } from '../../components/channel-pager'
+import { useChannelInteraction } from '../../components/channel-pager'
+import DeliveryStagePager from '../../components/delivery-stage-pager'
 import RefreshScrollView from '../../components/refresh-scroll-view'
 import { DeliveryLoadDots, DeliveryOrderLoading, DeliveryOrderState } from '../../components/delivery-order-feedback'
 import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
@@ -133,7 +134,8 @@ export default function DeliveryRiderPage() {
   const accountId = useSessionStore((state) => state.profile.id)
   const [activeTab, setActiveTab] = useState<RiderTab>(() => getCurrentInstance().router?.params.tab === 'tasks' ? 'pickup' : 'grab')
   const channelInteraction = useChannelInteraction()
-  const workspace = useDeliveryWorkspaceNavigation({ role: 'rider', active: activeTab === 'grab' ? 'grab' : 'tasks', onSelect: key => setActiveTab(key === 'grab' ? 'grab' : 'pickup') })
+  const workspace = useDeliveryWorkspaceNavigation({ role: 'rider', active: activeTab === 'grab' ? 'grab' : 'tasks', onSelect: key => setActiveTab(key === 'grab' ? 'grab' : 'pickup') }, identityAllowed)
+  const canActivateWorkspace = () => workspace.swipe.canActivate() && channelInteraction.canActivate()
   const [me, setMe] = useState<DeliveryRiderMe | null>(null)
   const [claimable, setClaimable] = useState<ClaimableDeliveryOrder[]>([])
   const [pickupOrders, setPickupOrders] = useState<AssignedDeliveryOrder[]>([])
@@ -894,8 +896,9 @@ export default function DeliveryRiderPage() {
         ))}
       </View> : <View className='rider-grab-pool-heading'><Text>可接订单</Text><Text>下拉刷新 · 接单后查看完整信息</Text></View>}
 
-      <ChannelPager<RiderTab> keys={canClaim ? ['grab', 'pickup', 'delivery'] : ['pickup', 'delivery']} activeKey={activeTab}
-        onChange={key => { if (releaseCandidate === null) setActiveTab(key) }} interaction={channelInteraction}
+      <DeliveryStagePager<RiderTab> keys={canClaim ? ['grab', 'pickup', 'delivery'] : ['pickup', 'delivery']} activeKey={activeTab}
+        scopeKey={`rider:${accountId}:${canClaim}`} enabled={identityAllowed && releaseCandidate === null} onBoundarySwipe={workspace.step}
+        onChange={key => { if (identityAllowed && releaseCandidate === null) setActiveTab(key) }} interaction={channelInteraction}
         renderPage={tab => (
       <RefreshScrollView
         scrollY
@@ -927,8 +930,9 @@ export default function DeliveryRiderPage() {
       <DeliveryWorkspaceNav
         role='rider'
         active={activeTab === 'grab' ? 'grab' : 'tasks'}
-        gestureGuard={workspace.swipe.canActivate}
+        gestureGuard={canActivateWorkspace}
         onSelect={(key) => {
+          if (!canActivateWorkspace()) return
           if (key === 'grab') setActiveTab(canClaim ? 'grab' : 'pickup')
           if (key === 'tasks') setActiveTab('pickup')
         }}

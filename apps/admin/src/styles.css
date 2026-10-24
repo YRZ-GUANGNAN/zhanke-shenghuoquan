@@ -1298,6 +1298,10 @@ td span {
 .delivery-badge--disabled { background: #fff1f1; color: #c2410c; }
 .delivery-notice { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 14px; padding: 11px 13px; border-radius: 7px; background: #fff1f1; color: #c2410c; }
 .delivery-notice--conflict { background: #fff8e5; color: #92400e; }
+.delivery-capability-notice { display: flex; align-items: flex-start; gap: 10px; margin: 0; padding: 12px 14px; border: 1px solid #ead9ad; border-radius: 9px; background: #fffaf0; color: #72551c; line-height: 1.55; }
+.delivery-capability-notice strong { flex: 0 0 auto; color: #5f4515; }
+.delivery-capability-notice span { min-width: 0; overflow-wrap: anywhere; }
+.delivery-capability-notice--inline { margin: 0 0 14px; }
 .delivery-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 16px; color: #64748b; font-size: 13px; }
 .delivery-pagination button { padding: 7px 12px; border: 1px solid #dbe3ee; border-radius: 7px; background: #fff; color: #475569; }
 .delivery-pagination button:disabled { cursor: not-allowed; opacity: .45; }

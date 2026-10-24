@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Text, View } from '@tarojs/components'
 import { useDidShow } from '@tarojs/taro'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
-import ChannelPager, { useChannelInteraction } from '../../components/channel-pager'
+import { useChannelInteraction } from '../../components/channel-pager'
+import DeliveryStagePager from '../../components/delivery-stage-pager'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import DeliveryWorkspaceNav, { useDeliveryWorkspaceNavigation } from '../../components/delivery-workspace-nav'
 import RefreshScrollView from '../../components/refresh-scroll-view'
@@ -187,7 +188,8 @@ function MerchantHomeContent() {
   const channelInteraction = useChannelInteraction()
   const profile = useSessionStore((state) => state.profile)
   const identityAllowed = useIdentityGuard('merchant')
-  const workspace = useDeliveryWorkspaceNavigation({ role: 'merchant', active: 'orders' }, identityAllowed)
+  const workspace = useDeliveryWorkspaceNavigation({ role: 'merchant', active: 'orders' }, identityAllowed && approvalState === 'approved')
+  const canActivateWorkspace = () => workspace.swipe.canActivate() && channelInteraction.canActivate()
   const requestVersion = useRef(0)
   const activeLoad = useRef<number | null>(null)
   const activePageLoad = useRef<{ version: number; tab: MerchantTabKey } | null>(null)
@@ -424,7 +426,8 @@ function MerchantHomeContent() {
         ))}
       </View>
 
-      <ChannelPager keys={tabCopy.map(tab => tab.key)} activeKey={activeTab} onChange={setActiveTab} interaction={channelInteraction}
+      <DeliveryStagePager keys={tabCopy.map(tab => tab.key)} activeKey={activeTab} onChange={setActiveTab} interaction={channelInteraction}
+        scopeKey={`merchant:${profile.id}`} enabled={identityAllowed && approvalState === 'approved'} onBoundarySwipe={workspace.step}
         renderPage={tab => (
       <RefreshScrollView
         scrollY
@@ -470,7 +473,7 @@ function MerchantHomeContent() {
       </RefreshScrollView>
         )} />
 
-      <DeliveryWorkspaceNav role='merchant' active='orders' gestureGuard={workspace.swipe.canActivate} />
+      <DeliveryWorkspaceNav role='merchant' active='orders' gestureGuard={canActivateWorkspace} />
 
     </View>
   )

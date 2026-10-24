@@ -55,13 +55,14 @@ export function useDeliveryWorkspaceNavigation({ role, active, onSelect }: Props
     })
   }
   const swipeItems = items.filter(item => item.swipe !== false)
-  const swipe = useHorizontalNavigation(direction => {
+  const step = (direction: -1 | 1) => {
     const index = swipeItems.findIndex(item => item.key === active)
     if (index < 0) return
     const target = swipeItems[index + direction]
     if (target) select(target)
-  }, enabled && swipeItems.length > 1)
-  return { items, select, swipe }
+  }
+  const swipe = useHorizontalNavigation(step, enabled && swipeItems.length > 1)
+  return { items, select, step, swipe }
 }
 
 export default function DeliveryWorkspaceNav(props: WorkspaceNavProps) {

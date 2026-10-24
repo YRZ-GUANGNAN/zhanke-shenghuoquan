@@ -34,6 +34,7 @@ async function run() {
     loaded.require = id => {
       if (id === 'react' || id === 'react/jsx-runtime') return require(id)
       if (id === '@tarojs/components') return { View: primitive('div'), Text: primitive('span') }
+      if (id === '@tarojs/taro') return { useDidShow: () => {}, useDidHide: () => {} }
       if (id.endsWith('.scss')) return {}
       if (id.endsWith('/app-icon-button')) return { AppIconButton: primitive('button') }
       if (id.startsWith('.')) {

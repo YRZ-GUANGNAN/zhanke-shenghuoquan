@@ -55,6 +55,7 @@ export function DeliveryConsole() {
     ['refunds', '退款记录']
   ]
   return <div className="delivery-console">
+    <DeliveryCapabilityNotice />
     <section className="panel delivery-tabs" aria-label="配送后台模块">
       {tabs.map(([key, label]) => <button key={key} className={view === key ? 'active' : ''} onClick={() => setView(key)}>{label}</button>)}
     </section>
@@ -67,6 +68,13 @@ export function DeliveryConsole() {
     {view === 'earnings' && <EarningsPanel />}
     {view === 'refunds' && <RefundsPanel />}
   </div>
+}
+
+function DeliveryCapabilityNotice() {
+  return <aside className="delivery-capability-notice" role="status">
+    <strong>资金能力边界</strong>
+    <span>当前管理端不提供在线支付或自动打款入口；订单管理仅供查询，不提供订单状态流转。钱包与历史记录仍可查询，退款与三端订单流程继续冻结；骑手报酬操作仅登记线下清账，不会发起真实打款。</span>
+  </aside>
 }
 
 function Panel({ title, actions, children }: { title: string; actions?: ReactNode; children: ReactNode }) {
@@ -428,6 +436,7 @@ function EarningsPanel() {
     } finally { setBusy('') }
   }
   return <Panel title="骑手报酬清账">
+    <p className="delivery-capability-notice delivery-capability-notice--inline"><strong>线下清账</strong><span>登记只用于记录已完成的线下支付，需填写可追溯备注；不会调用微信支付或其他自动打款服务。</span></p>
     <div className="delivery-controls"><label>状态<select value={status} onChange={event => { setPage(1); setStatus(event.target.value) }}><option value="">全部</option><option value="pending">pending</option><option value="settled">settled</option><option value="paid_offline">paid_offline</option></select></label><label>骑手用户 ID<input value={riderUserId} inputMode="numeric" onChange={event => { setPage(1); setRiderUserId(event.target.value) }} /></label><button onClick={() => void load()}>刷新</button></div>
     <ErrorNotice error={error} conflict={conflict} refresh={() => void load()} />
     <div className="table-scroll"><table><thead><tr><th>报酬</th><th>配送单</th><th>骑手</th><th>金额</th><th>状态</th><th>版本</th><th>操作</th></tr></thead><tbody>{data.items.map(row => <tr key={row.earningPublicId}>

@@ -10,6 +10,7 @@ function read(...parts) {
 
 const riderSource = read('apps', 'miniapp', 'src', 'pages', 'delivery-rider', 'index.tsx')
 const merchantHomeSource = read('apps', 'miniapp', 'src', 'pages', 'merchant-home', 'index.tsx')
+const stagePagerSource = read('apps', 'miniapp', 'src', 'components', 'delivery-stage-pager.tsx')
 const detailSource = read('apps', 'miniapp', 'src', 'pages', 'merchant-order-detail', 'index.tsx')
 const riderServiceSource = read('apps', 'miniapp', 'src', 'services', 'delivery-rider.ts')
 const merchantServiceSource = read('apps', 'miniapp', 'src', 'services', 'delivery-merchant.ts')
@@ -56,5 +57,12 @@ assert.match(riderServiceSource, /method: 'PATCH',\s*data: \{ expectedRowVersion
 assert.match(riderServiceSource, /data: \{ expectedStatus: order\.status, expectedRowVersion: order\.rowVersion \}/, '释放订单应保留状态与版本检查')
 assert.match(merchantServiceSource, /method: 'POST',\s*data: input,\s*header: \{ 'Idempotency-Key': input\.clientRequestId \}/, '创建配送单应保留 POST 与幂等键')
 assert.match(merchantServiceSource, /method: 'PATCH',\s*data: \{ expectedStatus: order\.status, expectedRowVersion: order\.rowVersion \}/, '取消配送单应保留 PATCH、状态与版本检查')
+
+// 阶段 Swiper 必须消费触摸事件；只有首尾有效外滑才转发给工作区导航。
+assert.match(stagePagerSource, /event\.stopPropagation\(\)/, '阶段 pager 必须阻止手势冒泡')
+assert.match(stagePagerSource, /onBoundarySwipe/, '阶段 pager 必须提供边界转发回调')
+assert.match(stagePagerSource, /next < 0 \|\| next >= context\.keys\.length \? direction : 0/, '阶段 pager 只能在首尾边界转发')
+assert.match(riderSource, /<DeliveryStagePager[\s\S]*onBoundarySwipe=\{workspace\.step\}/, '骑手阶段必须接入边界 pager')
+assert.match(merchantHomeSource, /<DeliveryStagePager[\s\S]*onBoundarySwipe=\{workspace\.step\}/, '商家阶段必须接入边界 pager')
 
 console.log('delivery stage workbench contract: ok')

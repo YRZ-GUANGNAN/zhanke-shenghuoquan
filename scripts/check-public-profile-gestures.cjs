@@ -41,7 +41,7 @@ async function run() {
     loaded.require = id => {
       if (id === 'react' || id === 'react/jsx-runtime') return require(id)
       if (id === '@tarojs/components') return components
-      if (id === '@tarojs/taro') return { useDidShow: () => {}, useResize: () => {}, nextTick: fn => fn(),
+      if (id === '@tarojs/taro') return { useDidShow: () => {}, useDidHide: () => {}, useResize: () => {}, nextTick: fn => fn(),
         createSelectorQuery: () => ({ select() { return this }, boundingClientRect() { return this },
           exec: fn => fn([{height:360}, {height:44}, {height:100}, {height:800}, {height:1800}, {height:900}]) }) }
       if (id.endsWith('/components/product-price') || id.endsWith('/components/app-icon')) return { default: components.View }
