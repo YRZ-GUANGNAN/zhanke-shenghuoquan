@@ -7,3 +7,23 @@
 .app-state__title { color: $text-strong; font-size: 30rpx; font-weight: 600; line-height: 1.5; }
 .app-state__description { max-width: 520rpx; margin-top: 12rpx; color: $text-secondary; font-size: 26rpx; line-height: 1.7; }
 .app-state .app-button { min-height: 44PX; margin-top: $space-4; }
+
+// Keep the existing inline state footprint. Authentication never waits for this animation.
+.app-state--welcome { color: var(--text-strong, #1A2B3C); }
+.app-state__identity { display: flex; justify-content: center; min-height: 112rpx; margin-bottom: 28rpx; }
+.app-state__identity:empty { min-height: 0; margin-bottom: 0; }
+.app-state__identity .app-state__portrait { width: 112rpx; height: 112rpx; border-radius: 32rpx; animation: session-welcome-arrive 420ms $ease-standard both; }
+.app-state__identity .chat-avatar__initial { font-size: 36rpx; }
+.app-state--welcome .app-state__title { max-width: 100%; animation: session-welcome-arrive 440ms 60ms $ease-standard both; }
+.app-state--welcome .app-state__description { animation: session-welcome-arrive 440ms 120ms $ease-standard both; }
+.app-state__connection { display: flex; align-items: center; justify-content: center; gap: 12rpx; margin-top: 24rpx; color: var(--text-secondary, #6B7C8F); font-size: 22rpx; line-height: 1.5; animation: session-welcome-arrive 440ms 160ms $ease-standard both; }
+.app-state__connection-dot { width: 8rpx; height: 8rpx; border-radius: 50%; background: currentColor; animation: session-welcome-pulse 1600ms ease-in-out infinite; }
+@keyframes session-welcome-arrive { from { opacity: 0; transform: translateY(8rpx); } to { opacity: 1; transform: translateY(0); } }
+@keyframes session-welcome-pulse { 0%, 100% { opacity: .35; } 50% { opacity: .85; } }
+@media (prefers-reduced-motion: reduce) {
+  .app-state__identity .app-state__portrait,
+  .app-state--welcome .app-state__title,
+  .app-state--welcome .app-state__description,
+  .app-state__connection,
+  .app-state__connection-dot { animation: none; }
+}

@@ -112,7 +112,7 @@ for (const [route, css] of compiled) {
     assert.match(bounds[2], /^[\d.]+px$/i, `${route} 字号上限必须在构建后保留物理像素`)
   })
 }
-assert.match(read('styles/design-tokens.scss'), /\$brand-primary: #2E7DD4;/, '保持既有蓝色品牌')
+assert.match(read('styles/design-tokens.scss'), /\$brand-primary-static:\s*#2E7DD4;[\s\S]*\$brand-primary:\s*var\(--c0\);/, '保持既有蓝色品牌')
 assert.match(read('pages/post-detail/post-comments.tsx'), /ExpandableText\s+text=\{comment\.content\}/, '评论折叠接收完整正文，不截断数据')
 assert.match(read('components/content-motion.tsx'), /selectable>\{text\}<\/Text>/, '完整正文保留在可展开组件中')
 assert.doesNotMatch(read('pages/delivery-conversation/index.config.ts'), /navigationStyle:\s*['"]custom['"]/, '配送沟通仍由原生导航保留系统区')

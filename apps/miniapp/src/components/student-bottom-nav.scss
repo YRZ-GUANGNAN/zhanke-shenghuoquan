@@ -12,7 +12,7 @@
   min-height: 124rpx;
   padding: 16rpx 12rpx calc(48rpx + env(safe-area-inset-bottom));
   border-top: 1rpx solid $divider-nav;
-  background: rgba($bg-surface, .98);
+  background: rgba($bg-surface-static, .98);
   box-shadow: 0 -10rpx 28rpx rgba(15, 42, 68, .045);
   box-sizing: border-box;
   overflow: visible;
@@ -81,7 +81,7 @@
   justify-content: center;
   width: 72rpx;
   height: 64rpx;
-  border: 1rpx solid rgba($brand-primary, .12);
+  border: 1rpx solid rgba($brand-primary-static, .12);
   border-radius: 18rpx;
   background: $brand-tint;
   box-shadow: 0 8rpx 20rpx -14rpx rgba(33, 104, 184, .35);

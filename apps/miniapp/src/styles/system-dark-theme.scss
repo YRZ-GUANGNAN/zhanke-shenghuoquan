@@ -1,0 +1,147 @@
+// System theme only: the current light palette remains the default everywhere.
+@use './system-dark-colors.generated.scss';
+
+page {
+  --c0: #2E7DD4;
+  --c1: #2168B8;
+  --c2: #3487DE;
+  --c3: #256FBD;
+  --c4: #1F61A6;
+  --c5: #E6F1FB;
+  --c6: #168A5B;
+  --c7: #E8F6F0;
+  --c8: #B7791F;
+  --c9: #FFF6DF;
+  --ca: #C43D4B;
+  --cb: #FDEDEF;
+  --cc: #1A2B3C;
+  --cd: #2A3A4A;
+  --ce: #6B7C8F;
+  --cf: #93A2B4;
+  --cg: #9DB2C8;
+  --ch: #B0BECD;
+  --ci: #FFFFFF;
+  --cj: #F2F5F9;
+  --ck: #F7F8FA;
+  --cl: #FFFFFF;
+  --cm: #F7F9FC;
+  --cn: #DFE7F0;
+  --co: #C9D5E3;
+  --cp: #F7F9FC;
+  --cq: #EDF1F6;
+  --cr: #FF6B8A;
+  --cs: #9DB2C8;
+  --ct: #8A9AAD;
+  --cu: #FF5B5B;
+  --cv: rgba(30, 50, 80, .38);
+  --g0: linear-gradient(135deg, #3487DE, #2168B8);
+  --s0: 0 6rpx 20rpx rgba(24, 53, 92, .04);
+  --s1: 0 8rpx 28rpx -12rpx rgba(24, 53, 92, .08);
+  --s2: 0 20rpx 40rpx -12rpx rgba(33, 104, 184, .55), 0 0 0 10rpx #fff;
+  --s3: 0 30rpx 80rpx rgba(18, 46, 86, .22);
+  --p0: repeating-linear-gradient(135deg, rgba(30, 60, 100, .03) 0 20rpx, transparent 20rpx 40rpx);
+  --brand-primary: var(--c0);
+  --brand-primary-strong: var(--c1);
+  --brand-primary-light: var(--c2);
+  --brand-primary-hover: var(--c3);
+  --brand-primary-pressed: var(--c4);
+  --brand-tint: var(--c5);
+  --text-strong: var(--cc);
+  --text-primary: var(--cd);
+  --text-secondary: var(--ce);
+  --text-tertiary: var(--cf);
+  --text-muted: var(--cg);
+  --text-faint: var(--ch);
+  --bg-app: var(--cj);
+  --bg-screen: var(--ck);
+  --bg-surface: var(--cl);
+  --bg-surface-subtle: var(--cm);
+  --border-default: var(--cn);
+  --radius-control: 16rpx;
+  --radius-card: 24rpx;
+  --radius-dialog: 32rpx;
+}
+
+@media (prefers-color-scheme: dark) {
+  page {
+    --c0: #2E7DD4 !important;
+    --c1: #2168B8 !important;
+    --c2: #3487DE !important;
+    --c3: #256FBD !important;
+    --c4: #1F61A6 !important;
+    --c5: #203A53 !important;
+    --c6: #65CBA3 !important;
+    --c7: #183B31 !important;
+    --c8: #E5BB71 !important;
+    --c9: #3B3020 !important;
+    --ca: #FF939C !important;
+    --cb: #40272E !important;
+    --cc: #EDF3FA !important;
+    --cd: #D6E0EC !important;
+    --ce: #A9B8CA !important;
+    --cf: #91A4BB !important;
+    --cg: #9BB0C8 !important;
+    --ch: #91A4BB !important;
+    --ci: #FFFFFF !important;
+    --cj: #111720 !important;
+    --ck: #202A36 !important;
+    --cl: #18212C !important;
+    --cm: #202A36 !important;
+    --cn: #344253 !important;
+    --co: #435569 !important;
+    --cp: #202A36 !important;
+    --cq: #2C3949 !important;
+    --cr: #FF939C !important;
+    --cs: #9BB0C8 !important;
+    --ct: #A9B8CA !important;
+    --cu: #FF7D87 !important;
+    --cv: rgba(214, 224, 236, .45) !important;
+    --g0: linear-gradient(135deg, #3487DE, #2168B8) !important;
+    --s0: 0 6rpx 20rpx rgba(0, 0, 0, .18) !important;
+    --s1: 0 8rpx 28rpx -12rpx rgba(0, 0, 0, .38) !important;
+    --s2: 0 20rpx 40rpx -12rpx rgba(0, 0, 0, .55), 0 0 0 10rpx #18212c !important;
+    --s3: 0 30rpx 80rpx rgba(0, 0, 0, .46) !important;
+    --p0: repeating-linear-gradient(135deg, rgba(214, 224, 236, .035) 0 20rpx, transparent 20rpx 40rpx) !important;
+    --brand-primary: var(--c0) !important;
+    --brand-primary-strong: var(--c1) !important;
+    --brand-primary-light: var(--c2) !important;
+    --brand-primary-hover: var(--c3) !important;
+    --brand-primary-pressed: var(--c4) !important;
+    --brand-tint: var(--c5) !important;
+    --text-strong: var(--cc) !important;
+    --text-primary: var(--cd) !important;
+    --text-secondary: var(--ce) !important;
+    --text-tertiary: var(--cf) !important;
+    --text-muted: var(--cg) !important;
+    --text-faint: var(--ch) !important;
+    --bg-app: var(--cj) !important;
+    --bg-screen: var(--ck) !important;
+    --bg-surface: var(--cl) !important;
+    --bg-surface-subtle: var(--cm) !important;
+    --border-default: var(--cn) !important;
+    --radius-control: 16rpx !important;
+    --radius-card: 24rpx !important;
+    --radius-dialog: 32rpx !important;
+    --glass-nav: rgba(24, 33, 44, .94) !important;
+    --glass-sheet: rgba(24, 33, 44, .96) !important;
+    --glass-refresh: rgba(24, 33, 44, .92) !important;
+    background-color: #111720 !important;
+    color: #d6e0ec !important;
+  }
+
+  // Only image-backed UI glyphs need brighter contrast. User media is untouched.
+  page .app-icon,
+  page .status-glyph__image {
+    filter: brightness(1.28);
+  }
+
+  // Back, close, search and overflow assets are dark in the light palette.
+  // Target only those semantic controls; photos and user media stay untouched.
+  page .app-icon--back,
+  page .app-icon--close,
+  page .app-icon--search,
+  page .app-icon--more,
+  page .student-home-header__search-icon {
+    filter: brightness(0) saturate(100%) invert(78%) sepia(12%) saturate(540%) hue-rotate(170deg) brightness(91%) contrast(89%);
+  }
+}

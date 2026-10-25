@@ -48,7 +48,7 @@
 .identity-application-proof { overflow: hidden; display: flex; flex-direction: column; min-width: 0; border: 1rpx solid $border-default; border-radius: $radius-control; background: $bg-surface; }
 .identity-application-proof__preview { position: relative; width: 100%; height: 200rpx; overflow: hidden; background: $bg-surface-subtle; }
 .identity-application-proof__preview image { display: block; width: 100%; height: 100%; }
-.identity-application-proof__number { position: absolute; bottom: 12rpx; left: 12rpx; padding: 4rpx 10rpx; border-radius: 8rpx; color: $text-on-color; background: rgba($text-strong, .75); font-size: 11PX; line-height: 1.5; }
+.identity-application-proof__number { position: absolute; bottom: 12rpx; left: 12rpx; padding: 4rpx 10rpx; border-radius: 8rpx; color: $text-on-color; background: rgba($text-strong-static, .75); font-size: 11PX; line-height: 1.5; }
 .identity-application-proof__private { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8rpx; min-height: 200rpx; padding: 20rpx 12rpx; background: $bg-surface-subtle; color: $text-primary; font-size: 13PX; line-height: 1.5; text-align: center; box-sizing: border-box; }
 .identity-application-proof__private > text:last-child { color: $text-secondary; font-size: 11PX; }
 .identity-application-proof__state { display: block; padding: 16rpx; color: $text-secondary; font-size: 12PX; line-height: 1.6; overflow-wrap: anywhere; }

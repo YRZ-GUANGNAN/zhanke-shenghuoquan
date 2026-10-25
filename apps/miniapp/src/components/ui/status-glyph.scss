@@ -1,7 +1,7 @@
 @use '../../styles/design-tokens.scss' as *;
 .status-glyph { position: relative; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 96rpx; height: 96rpx; border-radius: 28rpx; background: $brand-tint; animation: status-arrive 180ms $ease-standard both; }
 .status-glyph__image { display: block; width: 48rpx; height: 48rpx; }
-.status-glyph__ring { box-sizing: border-box; width: 44rpx; height: 44rpx; border: 4rpx solid rgba($brand-primary, .18); border-top-color: $brand-primary; border-right-color: $brand-primary; border-radius: 50%; animation: status-turn 850ms linear infinite; }
+.status-glyph__ring { box-sizing: border-box; width: 44rpx; height: 44rpx; border: 4rpx solid rgba($brand-primary-static, .18); border-top-color: $brand-primary; border-right-color: $brand-primary; border-radius: 50%; animation: status-turn 850ms linear infinite; }
 .status-glyph--login { width: 112rpx; height: 112rpx; background: $brand-tint; border-radius: 32rpx; margin-bottom: 24rpx; }
 .status-glyph--login .status-glyph__image { width: 56rpx; height: 56rpx; }
 .status-glyph__login-progress { position: absolute; left: 0; right: 0; bottom: -26rpx; display: flex; align-items: center; justify-content: center; gap: 10rpx; }

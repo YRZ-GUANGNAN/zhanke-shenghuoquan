@@ -1,4 +1,6 @@
 export default defineAppConfig({
+  darkmode: true,
+  themeLocation: 'theme.json',
   pages: [
     'pages/home/index',
     'pages/campus-guide/index',
@@ -32,10 +34,11 @@ export default defineAppConfig({
     'pages/post-detail/index'
   ],
   window: {
-    backgroundTextStyle: 'light',
-    navigationBarBackgroundColor: '#f7fbff',
+    backgroundTextStyle: '@backgroundHint',
+    backgroundColor: '@backgroundDefault',
+    navigationBarBackgroundColor: '@navigationBackground',
     navigationBarTitleText: '湛科生活圈',
-    navigationBarTextStyle: 'black'
+    navigationBarTextStyle: '@navigationText'
   },
   requiredPrivateInfos: []
 })

@@ -1,1 +1,1 @@
-export default definePageConfig({ navigationStyle: 'custom', backgroundColor: '#FFFFFF', navigationBarTextStyle: 'black' })
+export default definePageConfig({ navigationStyle: 'custom', backgroundColor: '@backgroundSurface', navigationBarTextStyle: '@navigationText' })

@@ -6,7 +6,7 @@
   background: $bg-surface;
 }
 .product-comments-layer { position: fixed; inset: 0; z-index: $z-dialog; }
-.product-comments-layer__mask { position: absolute; inset: 0; background: rgba($text-strong, .36); transition: opacity 180ms $ease-standard; }
+.product-comments-layer__mask { position: absolute; inset: 0; background: rgba($text-strong-static, .36); transition: opacity 180ms $ease-standard; }
 .product-comments-sheet { position: absolute; right: 0; left: 0; height: 78vh; max-height: 100%; display: flex; flex-direction: column; overflow: hidden; border-radius: 24rpx 24rpx 0 0; background: $bg-surface; transition: transform 220ms $ease-standard; }
 .product-comments-layer--enter, .product-comments-layer--exit {
   .product-comments-layer__mask { opacity: 0; }
@@ -118,7 +118,7 @@
   line-height: 28rpx;
 }
 .product-comment__review--rejected {
-  background: rgba($badge-unread, .1);
+  background: rgba($badge-unread-static, .1);
   color: $badge-unread;
 }
 .product-comment__reply-to {

@@ -20,13 +20,13 @@
 .app-button::after { border: 0; }
 .app-button--block { display: flex; width: 100%; }
 .app-button--small { min-width: 112rpx; height: 72rpx; padding: 0 $space-3; font-size: 25rpx; }
-.app-button--primary { background: $brand-primary; color: $text-on-color; box-shadow: 0 12rpx 24rpx -12rpx rgba($brand-primary, .65); }
+.app-button--primary { background: $brand-primary; color: $text-on-color; box-shadow: 0 12rpx 24rpx -12rpx rgba($brand-primary-static, .65); }
 .app-button--primary:active { background: $brand-primary-pressed; }
-.app-button--secondary { border-color: rgba($brand-primary, .22); background: $brand-tint; color: $brand-primary-strong; }
+.app-button--secondary { border-color: rgba($brand-primary-static, .22); background: $brand-tint; color: $brand-primary-strong; }
 .app-button--secondary:active { background: #D8EAF9; }
 .app-button--ghost { border-color: $border-default; background: $bg-surface; color: $text-primary; }
 .app-button--ghost:active { background: $bg-surface-subtle; }
-.app-button--danger { background: $danger; color: $text-on-color; box-shadow: 0 12rpx 24rpx -12rpx rgba($danger, .55); }
+.app-button--danger { background: $danger; color: $text-on-color; box-shadow: 0 12rpx 24rpx -12rpx rgba($danger-static, .55); }
 .app-button--danger:active { background: #A93240; }
 .app-button--text { min-width: 0; height: 72rpx; padding: 0 $space-2; background: transparent; color: $brand-primary; }
 .app-button--text:active { background: $brand-tint; }

@@ -14,6 +14,7 @@ export default function RuntimeSessionGate({
   const status = useSessionStore((state) => state.status)
   const error = useSessionStore((state) => state.error)
   const retry = useSessionStore((state) => state.retry)
+  const profile = useSessionStore((state) => state.profile)
   const previousStatus = useRef(status)
   const preserveCurrentBoot = useRef(false)
 
@@ -28,7 +29,9 @@ export default function RuntimeSessionGate({
   }
 
   if (status === 'idle' || status === 'booting') {
-    return <AppState kind='loading' scene='login' title='正在登录…' description='正在连接你的微信账号' />
+    const name = profile.id ? profile.nickname.trim() : ''
+    return <AppState kind='loading' scene='login' title={name ? `你好，${name}` : '你好'}
+      description='欢迎来到湛科生活圈' loginProfile={name ? { name, avatar: profile.avatar } : undefined} />
   }
 
   if (status !== 'authenticated') {

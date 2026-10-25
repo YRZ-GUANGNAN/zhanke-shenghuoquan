@@ -30,10 +30,10 @@
 }
 
 .identity-switch-modal__role--active {
-  border-color: rgba($brand-primary, .36);
+  border-color: rgba($brand-primary-static, .36);
   color: $brand-primary;
-  background: rgba($brand-primary, .07);
-  box-shadow: inset 0 0 0 1rpx rgba($brand-primary, .04);
+  background: rgba($brand-primary-static, .07);
+  box-shadow: inset 0 0 0 1rpx rgba($brand-primary-static, .04);
 }
 
 .identity-switch-modal__role-icon {
@@ -44,7 +44,7 @@
   box-sizing: border-box;
   border-radius: 14rpx;
   background: $bg-surface;
-  box-shadow: 0 6rpx 16rpx rgba($text-strong, .06);
+  box-shadow: 0 6rpx 16rpx rgba($text-strong-static, .06);
 }
 
 .identity-switch-modal__role-copy {

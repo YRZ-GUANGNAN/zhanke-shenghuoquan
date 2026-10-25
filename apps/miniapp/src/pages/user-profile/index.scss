@@ -90,7 +90,7 @@
   color: $text-on-color;
 }
 .public-profile-navigation--on-cover .public-profile-nav__back::before {
-  filter: drop-shadow(0 1PX 2PX rgba($text-strong, .5));
+  filter: drop-shadow(0 1PX 2PX rgba($text-strong-static, .5));
 }
 .public-profile-edge-back {
   position: fixed;

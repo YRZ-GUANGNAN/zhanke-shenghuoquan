@@ -1,0 +1,20 @@
+{
+  "light": {
+    "navigationBackground": "#f7fbff",
+    "navigationText": "black",
+    "navigationOnCover": "white",
+    "backgroundHint": "light",
+    "backgroundDefault": "#F2F5F9",
+    "backgroundSurface": "#FFFFFF",
+    "backgroundRider": "#EEF3F8"
+  },
+  "dark": {
+    "navigationBackground": "#18212c",
+    "navigationText": "white",
+    "navigationOnCover": "white",
+    "backgroundHint": "dark",
+    "backgroundDefault": "#111720",
+    "backgroundSurface": "#18212c",
+    "backgroundRider": "#111720"
+  }
+}

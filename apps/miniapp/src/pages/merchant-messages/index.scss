@@ -2,13 +2,13 @@
 @use '../../styles/design-tokens.scss' as *;
 @use '../../styles/reference-layout.scss' as ref;
 
-$message-blue-soft: color.mix($brand-primary, $bg-surface, 10%);
-$message-blue-strong: color.mix($brand-primary-strong, $brand-primary, 44%);
-$message-card-shadow: 0 18rpx 46rpx -30rpx rgba($text-strong, .34);
-$message-avatar-shadow: 0 12rpx 26rpx -20rpx rgba($brand-primary-strong, .72);
-$message-order-soft: color.mix($brand-primary, $bg-surface, 8%);
-$message-wallet-soft: color.mix(color.adjust($brand-primary, $hue: 112deg), $bg-surface, 9%);
-$message-ops-soft: color.mix(color.adjust($like-active, $hue: 44deg, $saturation: -22%), $bg-surface, 10%);
+$message-blue-soft: color.mix($brand-primary-static, $bg-surface-static, 10%);
+$message-blue-strong: color.mix($brand-primary-strong-static, $brand-primary-static, 44%);
+$message-card-shadow: 0 18rpx 46rpx -30rpx rgba($text-strong-static, .34);
+$message-avatar-shadow: 0 12rpx 26rpx -20rpx rgba($brand-primary-strong-static, .72);
+$message-order-soft: color.mix($brand-primary-static, $bg-surface-static, 8%);
+$message-wallet-soft: color.mix(color.adjust($brand-primary-static, $hue: 112deg), $bg-surface-static, 9%);
+$message-ops-soft: color.mix(color.adjust($like-active-static, $hue: 44deg, $saturation: -22%), $bg-surface-static, 10%);
 
 page {
   background: $bg-app;
@@ -110,12 +110,12 @@ page {
 
 .merchant-message-item__avatar--wallet {
   background: $message-wallet-soft;
-  color: color.adjust($brand-primary, $hue: 112deg, $lightness: -10%);
+  color: color.adjust($brand-primary-static, $hue: 112deg, $lightness: -10%);
 }
 
 .merchant-message-item__avatar--ops {
   background: $message-ops-soft;
-  color: color.adjust($like-active, $hue: 44deg, $saturation: -24%, $lightness: -4%);
+  color: color.adjust($like-active-static, $hue: 44deg, $saturation: -24%, $lightness: -4%);
 }
 
 .merchant-message-item__dot {

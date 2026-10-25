@@ -1,5 +1,5 @@
 export default definePageConfig({
   navigationStyle: 'custom',
-  backgroundColor: '#EEF3F8',
-  navigationBarTextStyle: 'white'
+  backgroundColor: '@backgroundRider',
+  navigationBarTextStyle: '@navigationOnCover'
 })

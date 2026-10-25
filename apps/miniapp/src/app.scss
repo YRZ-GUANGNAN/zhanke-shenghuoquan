@@ -1,4 +1,6 @@
 @use './components/channel-pager.scss';
+@use './styles/system-dark-theme.scss';
+@use './components/surface-enhancements.scss';
 
 page {
   min-height: 100%;

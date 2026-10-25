@@ -21,7 +21,7 @@
   right: 0;
   left: 0;
   z-index: 20;
-  background: rgba($bg-surface, 0.98);
+  background: rgba($bg-surface-static, 0.98);
   border-bottom: 1rpx solid $divider-hairline;
 }
 
@@ -68,7 +68,7 @@
   justify-content: center;
   overflow: hidden;
   border-radius: 50%;
-  background: rgba($brand-primary, 0.72);
+  background: rgba($brand-primary-static, 0.72);
   color: $text-on-color;
   font-size: 24rpx;
   font-weight: 700;
@@ -169,7 +169,7 @@
 
 .post-detail-review--rejected,
 .post-detail-review--taken_down {
-  background: rgba($like-active, 0.1);
+  background: rgba($like-active-static, 0.1);
   color: $like-active;
 }
 
@@ -208,7 +208,7 @@
   bottom: 24rpx;
   padding: 6rpx 16rpx;
   border-radius: $radius-pill;
-  background: rgba($text-strong, .64);
+  background: rgba($text-strong-static, .64);
   color: $text-on-color;
   font-size: 22rpx;
   line-height: 32rpx;
@@ -425,7 +425,7 @@
   align-items: center;
   gap: 8rpx;
   border-top: 1rpx solid $divider-nav;
-  background: rgba($bg-surface, 0.98);
+  background: rgba($bg-surface-static, 0.98);
 }
 
 .post-detail-input {

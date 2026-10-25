@@ -74,7 +74,7 @@ export default function RefreshScrollView({ enabled = true, busy = false, refres
     if (isCurrentOwner() && !locked.current) { setTriggered(false); setPhase('idle') }
   }
   return <ScrollView {...props} refresherEnabled={enabled && (!busy || locked.current)} refresherThreshold={60}
-    refresherDefaultStyle='none' refresherBackground='#FFFFFF' refresherTriggered={triggered}
+    refresherDefaultStyle='none' refresherBackground='transparent' refresherTriggered={triggered}
     onRefresherPulling={event => {
       if (isCurrentOwner() && enabled && !locked.current && current.current.enabled && !current.current.busy) {
         const dy = Number((event.detail as { dy?: number }).dy || 0)

@@ -100,5 +100,5 @@ interface AppIconProps {
 
 export default function AppIcon({ name, active = false, className = '' }: AppIconProps) {
   const source = sources[name][active ? 'active' : 'normal']
-  return <Image className={`app-icon ${className}`.trim()} src={source} mode='aspectFit' />
+  return <Image className={`app-icon app-icon--${name} ${className}`.trim()} src={source} mode='aspectFit' />
 }

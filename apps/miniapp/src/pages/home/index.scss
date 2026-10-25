@@ -179,7 +179,7 @@
   right: 12rpx;
   padding: 4rpx 12rpx;
   border-radius: $radius-pill;
-  background: rgba($text-strong, .64);
+  background: rgba($text-strong-static, .64);
   color: $text-on-color;
   font-size: 20rpx;
   line-height: 28rpx;
@@ -334,7 +334,7 @@
 }
 
 .student-message-row--pressed {
-  background: rgba($brand-primary, .045);
+  background: rgba($brand-primary-static, .045);
   transform: translateX(2rpx);
 }
 

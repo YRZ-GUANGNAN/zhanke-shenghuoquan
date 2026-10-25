@@ -1,0 +1,37 @@
+// Incremental treatment of existing surfaces. No layout, icon or gesture overrides.
+// Independent adaptation of the ideas demonstrated by nanxiaobei/taro-ux-kits.
+page .student-bottom-nav,
+page .delivery-workspace-nav { background: var(--bg-surface, #FFFFFF); }
+page .refresh-feedback { background: var(--bg-surface, #FFFFFF); }
+page .app-dialog-layer .app-dialog,
+page .app-action-sheet-layer .app-action-sheet { background: var(--bg-surface, #FFFFFF); }
+
+@supports ((backdrop-filter: blur(1PX)) or (-webkit-backdrop-filter: blur(1PX))) {
+  page .student-bottom-nav,
+  page .delivery-workspace-nav {
+    background: var(--glass-nav, rgba(255, 255, 255, .94));
+    -webkit-backdrop-filter: blur(18PX);
+    backdrop-filter: blur(18PX);
+  }
+  page .app-dialog-layer .app-dialog,
+  page .app-action-sheet-layer .app-action-sheet {
+    background: var(--glass-sheet, rgba(255, 255, 255, .96));
+    -webkit-backdrop-filter: blur(18PX);
+    backdrop-filter: blur(18PX);
+  }
+  page .refresh-feedback--pulling,
+  page .refresh-feedback--ready,
+  page .refresh-feedback--refreshing {
+    background: var(--glass-refresh, rgba(255, 255, 255, .92));
+    -webkit-backdrop-filter: blur(10PX);
+    backdrop-filter: blur(10PX);
+  }
+}
+
+// Let the native scroll view retain its request ownership and gesture resistance.
+.refresh-feedback--pulling,
+.refresh-feedback--ready,
+.refresh-feedback--refreshing { transition: background-color 160ms ease; }
+@media (prefers-reduced-motion: reduce) {
+  .refresh-feedback { transition: none; }
+}

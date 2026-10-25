@@ -2,14 +2,14 @@
 @use '../../styles/design-tokens.scss' as *;
 @use '../../styles/reference-layout.scss' as ref;
 
-$publish-orange: color.adjust($like-active, $hue: 28deg, $saturation: -3%, $lightness: 2%);
-$publish-orange-pale: color.mix($publish-orange, $bg-surface, 11%);
-$publish-blue-soft: color.mix($brand-primary, $bg-surface, 10%);
-$publish-blue-field: color.mix($brand-tint, $bg-surface, 42%);
-$publish-green: color.adjust($brand-primary, $hue: 130deg, $saturation: -8%, $lightness: -2%);
-$publish-green-pale: color.mix($publish-green, $bg-surface, 13%);
-$publish-mask: rgba($text-strong, .42);
-$publish-sheet-shadow: 0 -20rpx 54rpx -24rpx rgba($text-strong, .34);
+$publish-orange: color.adjust($like-active-static, $hue: 28deg, $saturation: -3%, $lightness: 2%);
+$publish-orange-pale: color.mix($publish-orange, $bg-surface-static, 11%);
+$publish-blue-soft: color.mix($brand-primary-static, $bg-surface-static, 10%);
+$publish-blue-field: color.mix($brand-tint-static, $bg-surface-static, 42%);
+$publish-green: color.adjust($brand-primary-static, $hue: 130deg, $saturation: -8%, $lightness: -2%);
+$publish-green-pale: color.mix($publish-green, $bg-surface-static, 13%);
+$publish-mask: rgba($text-strong-static, .42);
+$publish-sheet-shadow: 0 -20rpx 54rpx -24rpx rgba($text-strong-static, .34);
 
 page {
   background: $bg-app;
@@ -204,7 +204,7 @@ page {
 }
 
 .merchant-publish-import-card__secondary {
-  border: 1PX solid rgba($brand-primary, .25);
+  border: 1PX solid rgba($brand-primary-static, .25);
   color: $brand-primary-strong;
   background: transparent;
 }
@@ -212,7 +212,7 @@ page {
 .merchant-publish-import-card__primary {
   color: $brand-primary-strong;
   background: $bg-surface;
-  border: 1PX solid rgba($brand-primary, .25);
+  border: 1PX solid rgba($brand-primary-static, .25);
 }
 
 .merchant-publish-import-card__secondary:active,
@@ -601,7 +601,7 @@ page {
   height: 36rpx;
   flex: 0 0 36rpx;
   border-radius: 999rpx;
-  border: 2rpx solid color.mix($text-muted, $bg-surface, 58%);
+  border: 2rpx solid color.mix($text-muted-static, $bg-surface-static, 58%);
   display: flex;
   align-items: center;
   justify-content: center;

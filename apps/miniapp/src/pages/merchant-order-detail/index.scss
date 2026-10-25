@@ -2,13 +2,13 @@
 @use '../../styles/design-tokens.scss' as *;
 @use '../../styles/reference-layout.scss' as ref;
 
-$detail-orange: color.adjust($like-active, $hue: 30deg, $saturation: -7%, $lightness: 1%);
-$detail-orange-soft: color.mix($detail-orange, $bg-surface, 13%);
-$detail-blue-soft: color.mix($brand-primary, $bg-surface, 11%);
-$detail-blue-line: color.mix($brand-primary, $bg-surface, 34%);
-$detail-green: $success;
-$detail-photo-blue: color.mix($brand-tint, $bg-surface, 62%);
-$detail-photo-empty: color.mix($bg-app, $bg-surface, 54%);
+$detail-orange: color.adjust($like-active-static, $hue: 30deg, $saturation: -7%, $lightness: 1%);
+$detail-orange-soft: color.mix($detail-orange, $bg-surface-static, 13%);
+$detail-blue-soft: color.mix($brand-primary-static, $bg-surface-static, 11%);
+$detail-blue-line: color.mix($brand-primary-static, $bg-surface-static, 34%);
+$detail-green: $success-static;
+$detail-photo-blue: color.mix($brand-tint-static, $bg-surface-static, 62%);
+$detail-photo-empty: color.mix($bg-app-static, $bg-surface-static, 54%);
 
 page {
   background: $bg-surface;
@@ -138,7 +138,7 @@ page {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
   align-items: center;
   gap: 8rpx 24rpx;
-  border-top: 1PX solid rgba($brand-primary, .18);
+  border-top: 1PX solid rgba($brand-primary-static, .18);
   padding-top: 20rpx;
   min-width: 0;
 }
@@ -380,7 +380,7 @@ page {
 }
 
 .merchant-detail-route__marker--dropoff {
-  background: color.mix($detail-green, $bg-surface, 12%);
+  background: color.mix($detail-green, $bg-surface-static, 12%);
   color: $detail-green;
 }
 
@@ -478,7 +478,7 @@ page {
 }
 
 .merchant-detail-timeline__marker--todo {
-  border: 3rpx solid color.mix($text-faint, $bg-surface, 52%);
+  border: 3rpx solid color.mix($text-faint-static, $bg-surface-static, 52%);
   background: $bg-surface;
 }
 

@@ -3,8 +3,8 @@
 @use '../../styles/reference-layout.scss' as ref;
 @use '../../styles/profile-cover-surface.scss' as cover;
 
-$profile-accent-soft: color.mix($brand-primary, $bg-surface, 8%);
-$profile-text-secondary: color.mix($text-primary, $text-secondary, 16%);
+$profile-accent-soft: color.mix($brand-primary-static, $bg-surface-static, 8%);
+$profile-text-secondary: color.mix($text-primary-static, $text-secondary-static, 16%);
 $profile-success: #23856d;
 $profile-success-soft: #eaf7f2;
 $profile-warning: #a86418;
@@ -89,7 +89,7 @@ page {
   right: 0;
   left: 0;
   height: var(--capsule-system-row-height, 72px);
-  background: linear-gradient(rgba($bg-surface, .18), rgba($bg-surface, 0));
+  background: linear-gradient(rgba($bg-surface-static, .18), rgba($bg-surface-static, 0));
   pointer-events: none;
   content: '';
 }
@@ -384,7 +384,7 @@ page {
 }
 
 .student-profile-role--active .student-profile-role__icon {
-  background: color.mix($brand-primary, $bg-surface, 12%);
+  background: color.mix($brand-primary-static, $bg-surface-static, 12%);
 }
 
 .student-profile-role__icon-image {
@@ -407,7 +407,7 @@ page {
 .student-profile-role__status--current,
 .student-profile-role__status--available {
   color: $brand-primary-strong;
-  background: color.mix($brand-primary, $bg-surface, 10%);
+  background: color.mix($brand-primary-static, $bg-surface-static, 10%);
 }
 
 .student-profile-role__status--pending {
