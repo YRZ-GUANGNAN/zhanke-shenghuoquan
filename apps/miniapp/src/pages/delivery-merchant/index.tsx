@@ -26,6 +26,8 @@ import {
   pollDeliveryPayment,
   pollDeliveryRefund,
   requestDeliveryOrderRefund,
+  deliveryPaymentStatusLabel,
+  deliveryRefundStatusLabel,
   type DeliveryFundsResponse,
   type DeliveryOrderFunds,
   type DeliveryPayment
@@ -480,6 +482,17 @@ export default function DeliveryMerchantPage() {
             </Button>
           </View>
         )}
+        {deliveryPaymentEnabled && (
+          <View className='delivery-funds-actions'>
+            <Button
+              className='cc-button cc-button--small'
+              disabled={!!busyOrderId}
+              onClick={() => void refreshOrderAndFunds(order.deliveryOrderPublicId)}
+            >
+              刷新资金状态
+            </Button>
+          </View>
+        )}
         {deliveryPaymentEnabled && renderFunds(funds)}
         {deliveryPaymentEnabled && showRefundAction && (
           <Button
@@ -632,15 +645,22 @@ function renderFunds(value: DeliveryOrderFunds | null) {
       )}
       {value.payment && (
         <Text className='delivery-line'>
-          支付：{paymentStatusText[value.payment.status]} · {value.payment.provider === 'mock' ? '本地模拟' : '微信支付'}
+          支付：{deliveryPaymentStatusLabel(value.payment)} · {value.payment.provider === 'mock' ? '本地模拟' : '微信支付'}
         </Text>
       )}
       {value.refund && (
         <>
-          <Text className='delivery-line'>退款：{refundStatusText[value.refund.status]}</Text>
+          <Text className='delivery-line'>退款：{deliveryRefundStatusLabel(value.refund)}</Text>
+          {value.refund.nextVerifyAt && value.refund.status !== 'succeeded' && value.refund.status !== 'failed' && (
+            <Text className='delivery-hint'>后台正在核实原退款单，不会重复提交</Text>
+          )}
           {value.refund.failureReason && <Text className='delivery-line'>说明：{value.refund.failureReason}</Text>}
         </>
       )}
+      {value.payment && value.payment.nextVerifyAt && value.payment.status !== 'paid' &&
+        value.payment.status !== 'failed' && value.payment.status !== 'closed' && (
+          <Text className='delivery-hint'>后台正在核实原支付单，不会重复扣款</Text>
+        )}
     </View>
   )
 }
@@ -655,19 +675,4 @@ const settlementSourceText = {
   wallet: '钱包',
   wechat: '微信',
   mock: '本地模拟'
-} as const
-
-const paymentStatusText = {
-  created: '已创建',
-  prepay_issued: '待确认',
-  paid: '已支付',
-  failed: '失败',
-  closed: '已关闭'
-} as const
-
-const refundStatusText = {
-  pending: '已申请',
-  succeeded: '已完成',
-  failed: '失败',
-  refund_pending: '处理中'
 } as const

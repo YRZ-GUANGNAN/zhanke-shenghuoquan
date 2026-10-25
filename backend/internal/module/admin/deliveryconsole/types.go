@@ -29,6 +29,24 @@ type SummaryView struct {
 	PlatformFeeIncomeCents uint64 `json:"platformFeeIncomeCents"`
 }
 
+// FundingSourceSummaryView is deliberately aggregate-only. It never exposes
+// provider payloads, openids, signatures, or raw error messages to the admin UI.
+type FundingSourceSummaryView struct {
+	FundingTablesAvailable        bool   `json:"fundingTablesAvailable"`
+	FundingLots                   int64  `json:"fundingLots"`
+	FundingAllocations            int64  `json:"fundingAllocations"`
+	WalletBalanceCents            uint64 `json:"walletBalanceCents"`
+	KnownAvailableCents           uint64 `json:"knownAvailableCents"`
+	VerifiedAvailableCents        uint64 `json:"verifiedAvailableCents"`
+	UnverifiedAvailableCents      uint64 `json:"unverifiedAvailableCents"`
+	CoverageGapCents              uint64 `json:"coverageGapCents"`
+	CoverageDirection             string `json:"coverageDirection"`
+	PaymentVerificationPending    int64  `json:"paymentVerificationPending"`
+	PaymentVerificationErrorCount int64  `json:"paymentVerificationErrorCount"`
+	RefundVerificationPending     int64  `json:"refundVerificationPending"`
+	RefundVerificationErrorCount  int64  `json:"refundVerificationErrorCount"`
+}
+
 type FeeConfigView struct {
 	ConfigScope      string                   `json:"configScope"`
 	DeliveryFeeCents uint64                   `json:"deliveryFeeCents"`
@@ -118,6 +136,10 @@ type PaymentView struct {
 	PaidAt                *time.Time               `json:"paidAt,omitempty"`
 	CreatedAt             time.Time                `json:"createdAt"`
 	UpdatedAt             time.Time                `json:"updatedAt"`
+	ProviderStatus        string                   `json:"providerStatus,omitempty"`
+	NextVerifyAt          *time.Time               `json:"nextVerifyAt,omitempty"`
+	VerifyAttemptCount    uint32                   `json:"verifyAttemptCount"`
+	ErrorCode             string                   `json:"errorCode,omitempty"`
 }
 
 type SettlementView struct {
@@ -148,6 +170,10 @@ type RefundView struct {
 	CreatedAt             time.Time                 `json:"createdAt"`
 	UpdatedAt             time.Time                 `json:"updatedAt"`
 	SucceededAt           *time.Time                `json:"succeededAt,omitempty"`
+	ProviderStatus        string                    `json:"providerStatus,omitempty"`
+	NextVerifyAt          *time.Time                `json:"nextVerifyAt,omitempty"`
+	VerifyAttemptCount    uint32                    `json:"verifyAttemptCount"`
+	ErrorCode             string                    `json:"errorCode,omitempty"`
 }
 
 type OrderFundsView struct {
@@ -277,6 +303,8 @@ func paymentView(value delivery.PaymentAttempt) PaymentView {
 		Provider: value.Provider, Status: value.Status, AmountCents: value.AmountCents,
 		OutTradeNo: value.OutTradeNo, RowVersion: value.RowVersion,
 		PaidAt: value.PaidAt, CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt,
+		ProviderStatus: value.ProviderStatus, NextVerifyAt: value.NextVerifyAt,
+		VerifyAttemptCount: value.VerifyAttemptCount, ErrorCode: safeDeliveryErrorCode(value.LastErrorCode),
 	}
 }
 
@@ -296,7 +324,20 @@ func refundView(value delivery.Refund) RefundView {
 		Source: value.Source, AmountCents: value.AmountCents, Status: value.Status,
 		OutRefundNo: value.OutRefundNo, FailureReason: value.FailureReason,
 		RowVersion: value.RowVersion, CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt,
-		SucceededAt: value.SucceededAt,
+		SucceededAt: value.SucceededAt, ProviderStatus: value.ProviderStatus,
+		NextVerifyAt: value.NextVerifyAt, VerifyAttemptCount: value.VerifyAttemptCount,
+		ErrorCode: safeDeliveryErrorCode(value.LastErrorCode),
+	}
+}
+
+func safeDeliveryErrorCode(value string) string {
+	switch value {
+	case "", "payment_closed", "payment_failed", "payment_refunded_before_confirmation",
+		"refund_abnormal", "refund_closed", "provider_not_configured", "provider_rejected",
+		"verification_unknown":
+		return value
+	default:
+		return "provider_error"
 	}
 }
 

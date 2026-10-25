@@ -5,6 +5,7 @@ import {
   type DeliveryOrder,
   type DeliveryQuery,
   type DeliverySummary,
+  type FundingSourceSummary,
   type FeeConfig,
   type MerchantFeeOverride,
   type MerchantLedger,
@@ -20,7 +21,7 @@ import {
 } from './services/delivery-admin'
 import { useAdminDialog } from './components'
 
-type View = 'summary' | 'orders' | 'fee' | 'overrides' | 'merchant-wallets' | 'rider-wallets' | 'earnings' | 'refunds'
+type View = 'summary' | 'funding-sources' | 'orders' | 'fee' | 'overrides' | 'merchant-wallets' | 'rider-wallets' | 'earnings' | 'refunds'
 
 const pageSize = 20
 const emptyPage = <T,>(): Page<T> => ({ items: [], page: 1, pageSize, total: 0 })
@@ -46,6 +47,7 @@ export function DeliveryConsole() {
   const [view, setView] = useState<View>('summary')
   const tabs: Array<[View, string]> = [
     ['summary', '配送总览'],
+    ['funding-sources', '资金核验'],
     ['orders', '订单管理'],
     ['fee', '配送费配置'],
     ['overrides', '商家特殊价'],
@@ -60,6 +62,7 @@ export function DeliveryConsole() {
       {tabs.map(([key, label]) => <button key={key} className={view === key ? 'active' : ''} onClick={() => setView(key)}>{label}</button>)}
     </section>
     {view === 'summary' && <SummaryPanel />}
+    {view === 'funding-sources' && <FundingSourcesPanel />}
     {view === 'orders' && <OrdersPanel />}
     {view === 'fee' && <FeeConfigPanel />}
     {view === 'overrides' && <MerchantOverridesPanel />}
@@ -136,6 +139,43 @@ function SummaryPanel() {
   return <Panel title="配送运营总览" actions={<button className="delivery-secondary" onClick={() => void load()} disabled={loading}>{loading ? '加载中…' : '刷新'}</button>}>
     <ErrorNotice error={error} refresh={() => void load()} />
     {!value ? <p>加载中…</p> : <section className="delivery-summary-grid">{metrics.map(([label, metric]) => <article key={label}><span>{label}</span><strong>{metric}</strong></article>)}</section>}
+  </Panel>
+}
+
+function FundingSourcesPanel() {
+  const [value, setValue] = useState<FundingSourceSummary | null>(null)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try { setValue(await deliveryAdminAPI.fundingSources()) } catch (reason) { setError(errorMessage(reason)) } finally { setLoading(false) }
+  }, [])
+  useEffect(() => { void load() }, [load])
+  const directionText: Record<string, string> = {
+    balanced: '已守恒',
+    untracked_wallet_balance: '钱包有未追踪余额',
+    source_exceeds_wallet: '来源余额高于钱包',
+    data_error: '来源数据异常'
+  }
+  const metrics: Array<[string, string]> = value ? [
+    ['钱包余额', money(value.walletBalanceCents)],
+    ['可核实来源', money(value.knownAvailableCents)],
+    ['其中已核验', money(value.verifiedAvailableCents)],
+    ['待核验 / 历史未知', money(value.unverifiedAvailableCents)],
+    ['差异', money(value.coverageGapCents)],
+    ['支付待核实', String(value.paymentVerificationPending)],
+    ['退款待核实', String(value.refundVerificationPending)],
+    ['支付错误码', String(value.paymentVerificationErrorCount)],
+    ['退款错误码', String(value.refundVerificationErrorCount)]
+  ] : []
+  return <Panel title="资金来源核验（只读）" actions={<button className="delivery-secondary" onClick={() => void load()} disabled={loading}>{loading ? '加载中…' : '刷新'}</button>}>
+    <ErrorNotice error={error} refresh={() => void load()} />
+    {!value ? <p>加载中…</p> : !value.fundingTablesAvailable ? <div className="delivery-notice"><strong>资金来源迁移尚未就绪</strong><span>当前只展示既有钱包数据，不会把历史余额标记为已核验，也不会开放自动打款。</span></div> : <>
+      <div className="delivery-summary-grid">{metrics.map(([label, metric]) => <article key={label}><span>{label}</span><strong>{metric}</strong></article>)}</div>
+      <p className="delivery-description">守恒状态：{directionText[value.coverageDirection] || '需人工核对'} · 批次 {value.fundingLots} · 分配 {value.fundingAllocations}</p>
+      <p className="delivery-description">这里仅显示聚合数字和脱敏错误码；不会提供把未知状态改成已支付、已退款或已打款的按钮。</p>
+    </>}
   </Panel>
 }
 
@@ -224,6 +264,8 @@ function OrderDetailPanel({ value, close }: { value: OrderFunds; close: () => vo
       <Fact label="结算" value={value.settlement ? `${value.settlement.status} / ${money(value.settlement.amountCents)}` : '—'} />
       <Fact label="支付" value={value.payment ? `${value.payment.status} / ${money(value.payment.amountCents)}` : '—'} />
       <Fact label="退款" value={value.refund ? `${value.refund.status} / ${money(value.refund.amountCents)}` : '—'} />
+      <Fact label="支付核实" value={value.payment ? `${value.payment.providerStatus || '—'} / ${value.payment.errorCode || '无错误码'} / ${value.payment.verifyAttemptCount} 次` : '—'} />
+      <Fact label="退款核实" value={value.refund ? `${value.refund.providerStatus || '—'} / ${value.refund.errorCode || '无错误码'} / ${value.refund.verifyAttemptCount} 次` : '—'} />
     </div>
     <h4>阶段时间</h4>
     <div className="delivery-timeline">{stages.map(([label, at]) => <div key={label}><span>{label}</span><strong>{time(at)}</strong></div>)}</div>

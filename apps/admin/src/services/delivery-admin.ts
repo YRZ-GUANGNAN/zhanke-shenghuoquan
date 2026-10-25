@@ -45,6 +45,22 @@ export interface DeliverySummary {
   platformFeeIncomeCents: number
 }
 
+export interface FundingSourceSummary {
+  fundingTablesAvailable: boolean
+  fundingLots: number
+  fundingAllocations: number
+  walletBalanceCents: number
+  knownAvailableCents: number
+  verifiedAvailableCents: number
+  unverifiedAvailableCents: number
+  coverageGapCents: number
+  coverageDirection: 'balanced' | 'untracked_wallet_balance' | 'source_exceeds_wallet' | 'data_error' | string
+  paymentVerificationPending: number
+  paymentVerificationErrorCount: number
+  refundVerificationPending: number
+  refundVerificationErrorCount: number
+}
+
 export interface FeeConfig {
   configScope: string
   deliveryFeeCents: number
@@ -130,6 +146,10 @@ export interface Payment {
   paidAt?: string
   createdAt: string
   updatedAt: string
+  providerStatus?: string
+  nextVerifyAt?: string
+  verifyAttemptCount: number
+  errorCode?: string
 }
 
 export interface Settlement {
@@ -160,6 +180,10 @@ export interface Refund {
   createdAt: string
   updatedAt: string
   succeededAt?: string
+  providerStatus?: string
+  nextVerifyAt?: string
+  verifyAttemptCount: number
+  errorCode?: string
 }
 
 export interface OrderFunds {
@@ -248,6 +272,7 @@ const body = (value: unknown): RequestInit => ({
 
 export const deliveryAdminAPI = {
   summary: () => api<DeliverySummary>('/summary'),
+  fundingSources: () => api<FundingSourceSummary>('/funding-sources'),
   orders: (query: DeliveryQuery = {}) => api<Page<DeliveryOrder>>(`/orders${queryString(query)}`),
   order: (id: string) => api<DeliveryOrder>(`/orders/${encodeURIComponent(id)}`),
   orderFunds: (id: string) => api<OrderFunds>(`/orders/${encodeURIComponent(id)}/funds`),

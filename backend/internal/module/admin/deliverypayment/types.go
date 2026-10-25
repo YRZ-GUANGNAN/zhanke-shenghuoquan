@@ -42,6 +42,9 @@ type PaymentView struct {
 	OutTradeNo            string                   `json:"outTradeNo"`
 	RowVersion            uint64                   `json:"rowVersion"`
 	PaidAt                *time.Time               `json:"paidAt,omitempty"`
+	ProviderStatus        string                   `json:"providerStatus,omitempty"`
+	NextVerifyAt          *time.Time               `json:"nextVerifyAt,omitempty"`
+	VerifyAttemptCount    uint32                   `json:"verifyAttemptCount"`
 	Wechat                *JSAPIParameter          `json:"wechat,omitempty"`
 }
 
@@ -65,6 +68,9 @@ type RefundView struct {
 	FailureReason         string                    `json:"failureReason,omitempty"`
 	CreatedAt             time.Time                 `json:"createdAt"`
 	UpdatedAt             time.Time                 `json:"updatedAt"`
+	ProviderStatus        string                    `json:"providerStatus,omitempty"`
+	NextVerifyAt          *time.Time                `json:"nextVerifyAt,omitempty"`
+	VerifyAttemptCount    uint32                    `json:"verifyAttemptCount"`
 }
 
 type OrderView struct {
@@ -111,7 +117,8 @@ func paymentView(value delivery.PaymentAttempt, params *JSAPIParameter) PaymentV
 		PaymentPublicID: value.PaymentPublicID, Purpose: value.Purpose,
 		DeliveryOrderPublicID: value.DeliveryOrderPublicID, Provider: value.Provider,
 		Status: value.Status, AmountCents: value.AmountCents, OutTradeNo: value.OutTradeNo,
-		RowVersion: value.RowVersion, PaidAt: value.PaidAt, Wechat: params,
+		RowVersion: value.RowVersion, PaidAt: value.PaidAt, ProviderStatus: value.ProviderStatus,
+		NextVerifyAt: value.NextVerifyAt, VerifyAttemptCount: value.VerifyAttemptCount, Wechat: params,
 	}
 }
 
@@ -129,7 +136,8 @@ func refundView(value delivery.Refund) RefundView {
 		RefundPublicID: value.RefundPublicID, DeliveryOrderPublicID: value.DeliveryOrderPublicID,
 		Source: value.Source, AmountCents: value.AmountCents, Status: value.Status,
 		OutRefundNo: value.OutRefundNo, FailureReason: value.FailureReason,
-		CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt,
+		CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt, ProviderStatus: value.ProviderStatus,
+		NextVerifyAt: value.NextVerifyAt, VerifyAttemptCount: value.VerifyAttemptCount,
 	}
 }
 

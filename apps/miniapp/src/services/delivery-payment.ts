@@ -47,6 +47,9 @@ export interface DeliveryPayment {
   outTradeNo: string
   rowVersion: number
   paidAt?: string
+  providerStatus?: string
+  nextVerifyAt?: string
+  verifyAttemptCount?: number
   wechat?: DeliveryWechatPaymentParameters
 }
 
@@ -68,6 +71,9 @@ export interface DeliveryRefund {
   status: DeliveryRefundStatus
   outRefundNo: string
   failureReason?: string
+  providerStatus?: string
+  nextVerifyAt?: string
+  verifyAttemptCount?: number
   createdAt: string
   updatedAt: string
 }
@@ -93,6 +99,24 @@ export interface DeliveryOrderFunds {
   settlement: DeliverySettlement | null
   refund: DeliveryRefund | null
   payment: DeliveryPayment | null
+}
+
+export function deliveryPaymentStatusLabel(value: DeliveryPayment): string {
+  if (value.status === 'paid') return '已确认支付'
+  if (value.status === 'failed') return '支付失败'
+  if (value.status === 'closed') return '支付已关闭'
+  if (value.providerStatus === 'USERPAYING') return '微信处理中，等待核实'
+  if (value.status === 'prepay_issued') return '支付待核实'
+  if (value.status === 'created') return '待发起支付'
+  return '支付待核实'
+}
+
+export function deliveryRefundStatusLabel(value: DeliveryRefund): string {
+  if (value.status === 'succeeded') return '已确认退款'
+  if (value.status === 'failed') return '退款失败'
+  if (value.providerStatus === 'PROCESSING') return '退款处理中，等待核实'
+  if (value.status === 'pending') return '退款已申请，等待核实'
+  return '退款待核实'
 }
 
 const BASE = '/delivery/merchant'

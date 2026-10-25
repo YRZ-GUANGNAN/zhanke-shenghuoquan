@@ -24,6 +24,7 @@ type ListFilter struct {
 
 type QueryRepository interface {
 	Summary(context.Context, time.Time) (SummaryView, error)
+	FundingSources(context.Context, time.Time) (FundingSourceSummaryView, error)
 	ListOrders(context.Context, ListFilter) ([]delivery.Order, int64, error)
 	Order(context.Context, string) (delivery.Order, error)
 	OrderFunds(context.Context, string) (OrderFundsSnapshot, error)
@@ -52,6 +53,93 @@ type OrderFundsSnapshot struct {
 	Settlement *delivery.FeeSettlement
 	Refund     *delivery.Refund
 	Payment    *delivery.PaymentAttempt
+}
+
+func (r *GormQueryRepository) FundingSources(ctx context.Context, now time.Time) (FundingSourceSummaryView, error) {
+	result := FundingSourceSummaryView{}
+	db := r.db.WithContext(ctx)
+	if err := db.Model(&delivery.MerchantWallet{}).
+		Select("COALESCE(SUM(available_balance_cents),0)").Scan(&result.WalletBalanceCents).Error; err != nil {
+		return FundingSourceSummaryView{}, err
+	}
+	if !db.Migrator().HasTable(&delivery.FundingLot{}) ||
+		!db.Migrator().HasTable(&delivery.FundingAllocation{}) {
+		return result, nil
+	}
+	result.FundingTablesAvailable = true
+	if err := db.Model(&delivery.FundingLot{}).Count(&result.FundingLots).Error; err != nil {
+		return FundingSourceSummaryView{}, err
+	}
+	if err := db.Model(&delivery.FundingAllocation{}).Count(&result.FundingAllocations).Error; err != nil {
+		return FundingSourceSummaryView{}, err
+	}
+	var lots []delivery.FundingLot
+	dataError := false
+	if err := db.Select("source, verification_status, total_amount_cents, allocated_amount_cents, refunded_amount_cents").
+		Find(&lots).Error; err != nil {
+		return FundingSourceSummaryView{}, err
+	}
+	for _, lot := range lots {
+		available, err := fundingLotAvailableForAdmin(lot)
+		if err != nil {
+			dataError = true
+			continue
+		}
+		result.KnownAvailableCents += available
+		if lot.VerificationStatus == delivery.FundingVerificationVerified {
+			result.VerifiedAvailableCents += available
+		} else {
+			result.UnverifiedAvailableCents += available
+		}
+	}
+	if dataError {
+		result.CoverageDirection = "data_error"
+	} else if result.WalletBalanceCents > result.KnownAvailableCents {
+		result.CoverageGapCents = result.WalletBalanceCents - result.KnownAvailableCents
+		result.CoverageDirection = "untracked_wallet_balance"
+	} else if result.KnownAvailableCents > result.WalletBalanceCents {
+		result.CoverageGapCents = result.KnownAvailableCents - result.WalletBalanceCents
+		result.CoverageDirection = "source_exceeds_wallet"
+	} else if result.CoverageDirection == "" {
+		result.CoverageDirection = "balanced"
+	}
+
+	if db.Migrator().HasColumn(&delivery.PaymentAttempt{}, "next_verify_at") {
+		if err := db.Model(&delivery.PaymentAttempt{}).
+			Where("status IN ? AND (next_verify_at IS NULL OR next_verify_at <= ?)",
+				[]delivery.PaymentStatus{delivery.PaymentCreated, delivery.PaymentPrepayIssued}, now.UTC()).
+			Count(&result.PaymentVerificationPending).Error; err != nil {
+			return FundingSourceSummaryView{}, err
+		}
+		if err := db.Model(&delivery.PaymentAttempt{}).Where("last_error_code <> ''").
+			Count(&result.PaymentVerificationErrorCount).Error; err != nil {
+			return FundingSourceSummaryView{}, err
+		}
+	}
+	if db.Migrator().HasColumn(&delivery.Refund{}, "next_verify_at") {
+		if err := db.Model(&delivery.Refund{}).
+			Where("status IN ? AND (next_verify_at IS NULL OR next_verify_at <= ?)",
+				[]delivery.RefundStatus{delivery.RefundPending, delivery.RefundRetryPending}, now.UTC()).
+			Count(&result.RefundVerificationPending).Error; err != nil {
+			return FundingSourceSummaryView{}, err
+		}
+		if err := db.Model(&delivery.Refund{}).Where("last_error_code <> ''").
+			Count(&result.RefundVerificationErrorCount).Error; err != nil {
+			return FundingSourceSummaryView{}, err
+		}
+	}
+	return result, nil
+}
+
+func fundingLotAvailableForAdmin(lot delivery.FundingLot) (uint64, error) {
+	if lot.RefundedAmountCents > lot.AllocatedAmountCents {
+		return 0, delivery.ErrFundingSourceMismatch
+	}
+	net := lot.AllocatedAmountCents - lot.RefundedAmountCents
+	if net > lot.TotalAmountCents {
+		return 0, delivery.ErrFundingSourceMismatch
+	}
+	return lot.TotalAmountCents - net, nil
 }
 
 func (r *GormQueryRepository) Summary(ctx context.Context, now time.Time) (SummaryView, error) {

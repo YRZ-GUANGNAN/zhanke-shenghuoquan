@@ -21,6 +21,9 @@ type fakeQueries struct {
 }
 
 func (f fakeQueries) Summary(context.Context, time.Time) (SummaryView, error) { return f.summary, nil }
+func (f fakeQueries) FundingSources(context.Context, time.Time) (FundingSourceSummaryView, error) {
+	return FundingSourceSummaryView{FundingTablesAvailable: true, CoverageDirection: "balanced"}, nil
+}
 func (f fakeQueries) ListOrders(context.Context, ListFilter) ([]delivery.Order, int64, error) {
 	return []delivery.Order{f.order}, 1, nil
 }
@@ -126,6 +129,7 @@ func TestDeliveryConsoleHandlerContract(t *testing.T) {
 		want   int
 	}{
 		{http.MethodGet, "/api/v1/admin/delivery/summary", "", http.StatusOK},
+		{http.MethodGet, "/api/v1/admin/delivery/funding-sources", "", http.StatusOK},
 		{http.MethodGet, "/api/v1/admin/delivery/orders?page=1&pageSize=20", "", http.StatusOK},
 		{http.MethodGet, "/api/v1/admin/delivery/orders/" + order.DeliveryOrderPublicID, "", http.StatusOK},
 		{http.MethodGet, "/api/v1/admin/delivery/orders/" + order.DeliveryOrderPublicID + "/funds", "", http.StatusOK},

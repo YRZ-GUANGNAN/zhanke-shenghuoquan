@@ -41,6 +41,7 @@ func NewHandler(
 
 func (h *Handler) Register(group *gin.RouterGroup) {
 	group.GET("/summary", h.summary)
+	group.GET("/funding-sources", h.fundingSources)
 	group.GET("/orders", h.orders)
 	group.GET("/orders/:id/funds", h.orderFunds)
 	group.GET("/orders/:id", h.order)
@@ -66,6 +67,11 @@ func (h *Handler) Register(group *gin.RouterGroup) {
 
 func (h *Handler) summary(c *gin.Context) {
 	value, err := h.queries.Summary(c.Request.Context(), h.now().UTC())
+	h.write(c, value, err)
+}
+
+func (h *Handler) fundingSources(c *gin.Context) {
+	value, err := h.queries.FundingSources(c.Request.Context(), h.now().UTC())
 	h.write(c, value, err)
 }
 
