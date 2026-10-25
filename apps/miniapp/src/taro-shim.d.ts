@@ -6,6 +6,7 @@ declare module '@tarojs/taro' {
   export function createSelectorQuery(): SelectorQuery
   export function nextTick(callback: () => void): void
   export function hideKeyboard(): Promise<unknown>
+  export function vibrateShort(options: { type: 'heavy' | 'medium' | 'light' }): Promise<unknown>
   export function useDidShow(callback: () => void): void
   export function useDidHide(callback: () => void): void
   export function useResize(callback: () => void): void

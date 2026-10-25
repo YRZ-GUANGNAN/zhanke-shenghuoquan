@@ -242,6 +242,52 @@ type RiderPayoutResultView struct {
 	Payout  RiderPayoutView  `json:"payout"`
 }
 
+type RiderPayoutQueueView struct {
+	PayoutQueuePublicID   string                          `json:"payoutQueuePublicId"`
+	EarningPublicID       string                          `json:"earningPublicId"`
+	DeliveryOrderPublicID string                          `json:"deliveryOrderPublicId"`
+	RiderUserID           uint64                          `json:"riderUserId"`
+	AmountCents           uint64                          `json:"amountCents"`
+	Currency              string                          `json:"currency"`
+	Status                delivery.RiderPayoutQueueStatus `json:"status"`
+	ReasonCode            string                          `json:"reasonCode,omitempty"`
+	RowVersion            uint64                          `json:"rowVersion"`
+	ReservedCents         uint64                          `json:"reservedCents"`
+	CreatedAt             time.Time                       `json:"createdAt"`
+	UpdatedAt             time.Time                       `json:"updatedAt"`
+	CancelledAt           *time.Time                      `json:"cancelledAt,omitempty"`
+}
+
+func riderPayoutQueueView(snapshot RiderPayoutQueueSnapshot) RiderPayoutQueueView {
+	value := snapshot.Queue
+	reserved := uint64(0)
+	if snapshot.Reservation != nil && snapshot.Reservation.Status == delivery.RiderPayoutReservationActive {
+		reserved = snapshot.Reservation.AmountCents
+	}
+	return RiderPayoutQueueView{
+		PayoutQueuePublicID: value.PayoutQueuePublicID, EarningPublicID: value.EarningPublicID,
+		DeliveryOrderPublicID: value.DeliveryOrderPublicID, RiderUserID: value.RiderUserID,
+		AmountCents: value.AmountCents, Currency: value.Currency, Status: value.Status,
+		ReasonCode: value.ReasonCode, RowVersion: value.RowVersion, ReservedCents: reserved,
+		CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt, CancelledAt: value.CancelledAt,
+	}
+}
+
+type RiderPayoutQueueEventView struct {
+	EventPublicID  string                             `json:"eventPublicId"`
+	EventType      delivery.RiderPayoutQueueEventType `json:"eventType"`
+	ActorType      delivery.RiderPayoutQueueActorType `json:"actorType"`
+	OperatorUserID *uint64                            `json:"operatorUserId,omitempty"`
+	ReasonCode     string                             `json:"reasonCode,omitempty"`
+	Reason         string                             `json:"reason,omitempty"`
+	CreatedAt      time.Time                          `json:"createdAt"`
+}
+
+func riderPayoutQueueEventView(value delivery.RiderPayoutQueueEvent) RiderPayoutQueueEventView {
+	return RiderPayoutQueueEventView{EventPublicID: value.EventPublicID, EventType: value.EventType,
+		ActorType: value.ActorType, OperatorUserID: value.OperatorUserID, ReasonCode: value.ReasonCode, Reason: value.Reason, CreatedAt: value.CreatedAt}
+}
+
 func feeConfigView(value delivery.DeliveryFeeConfig) FeeConfigView {
 	return FeeConfigView{
 		ConfigScope: value.ConfigScope, DeliveryFeeCents: value.DeliveryFeeCents,

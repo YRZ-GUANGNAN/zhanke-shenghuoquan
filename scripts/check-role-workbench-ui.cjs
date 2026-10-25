@@ -112,7 +112,11 @@ assert.match(profile, /delivery-profile__hero-image/, 'role profile must keep th
 assert.match(profileStyle, /\.delivery-profile__hero\s*\{[^}]*overflow:\s*hidden/, 'cover must clip image edges')
 assert.match(profileStyle, /\.delivery-profile__identity\s*\{[^}]*background:\s*\$bg-surface/, 'identity must form an opaque cover boundary')
 assert.match(profileStyle, /\.delivery-profile__identity--cover\s*\{[^}]*margin-top:\s*-20PX/, 'cover and identity must overlap without a seam')
-assert.match(riderWallet, /骑手结算功能尚未开放/, 'rider wallet must expose an honest unavailable state until a real API exists')
+assert.match(riderWallet, /RuntimeSessionGate/, 'rider wallet must preserve authenticated session gate')
+assert.match(riderWallet, /useIdentityGuard\('rider'\)/, 'rider wallet must guard rider identity')
+assert.match(riderWallet, /getRiderWallet|listRiderEarnings|listRiderLedger|listRiderPayoutQueue/, 'rider wallet must use read-only wallet services')
+assert.match(riderWallet, /availableBalanceCents|reservedCents|unverifiedCents/, 'rider wallet must show server-owned balance facts')
+assert.doesNotMatch(riderWallet, /start.*Recharge|request.*Withdraw|自动打款|提现申请|微信到账/, 'rider wallet must not expose payout mutations or fake settlement')
 assert.doesNotMatch(riderWallet, /ledgerItems|128\.50|静态示意/, 'rider wallet must not present fabricated balances or ledger records')
 
 console.log('role workbench ui contract: ok')

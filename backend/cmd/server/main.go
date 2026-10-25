@@ -359,6 +359,15 @@ func main() {
 		deliveryRuntime.conversationReadReceiptEnabled = cfg.EnableDeliveryIMReadReceipt
 	}
 	if deliveryRuntime != nil {
+		if deliveryRuntime.payoutQueue != nil {
+			payoutQueueContext, cancelPayoutQueue := context.WithCancel(context.Background())
+			defer cancelPayoutQueue()
+			go func() {
+				if err := deliveryRuntime.payoutQueue.Run(payoutQueueContext, 5*time.Second); err != nil && payoutQueueContext.Err() == nil {
+					log.Printf("delivery rider payout queue reconcile stopped: %v", err)
+				}
+			}()
+		}
 		go func() {
 			for {
 				if err := deliveryRuntime.notificationConsumer.Run(context.Background(), time.Second); err != nil {
@@ -588,6 +597,7 @@ type deliveryRuntime struct {
 	consoleQueries                 *deliveryconsole.GormQueryRepository
 	paymentProvider                deliverypayment.Provider
 	paymentReconciler              *deliverypayment.Reconciler
+	payoutQueue                    *delivery.RiderPayoutQueueService
 	identity                       *deliveryrider.IdentityAdapter
 	notificationConsumer           *deliverynotify.Consumer
 	proofs                         *delivery.ProofService
@@ -664,6 +674,15 @@ func newDeliveryRuntime(cfg config.Config, db *gorm.DB, proofPorts ...delivery.M
 			runtime.paymentReconciler = reconciler
 		}
 	}
+	if cfg.EnableDeliveryRiderPayoutQueue {
+		queueRepository, ok := any(repository).(delivery.RiderPayoutQueueRepository)
+		if !ok || !db.Migrator().HasTable(&delivery.RiderPayoutQueue{}) ||
+			!db.Migrator().HasTable(&delivery.RiderPayoutReservation{}) ||
+			!db.Migrator().HasTable(&delivery.RiderPayoutQueueEvent{}) {
+			return nil, fmt.Errorf("configure rider payout queue: migration 050 is required")
+		}
+		runtime.payoutQueue = delivery.NewRiderPayoutQueueService(queueRepository, time.Now)
+	}
 	return runtime, nil
 }
 
@@ -706,6 +725,9 @@ func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, user
 	if todayStats, ok := runtime.riderWallets.(delivery.RiderTodayStatsReader); ok {
 		riderHandler.WithTodayStats(todayStats)
 	}
+	if walletReader, ok := runtime.riderWallets.(delivery.RiderWalletReader); ok {
+		riderHandler.WithWalletReader(walletReader)
+	}
 	if runtime.conversationLifecycle != nil {
 		riderHandler.WithConversationCommands(runtime.conversationLifecycle)
 	}
@@ -732,7 +754,10 @@ func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, user
 	}
 	deliveryconsole.NewHandler(
 		runtime.consoleQueries, runtime.fees, runtime.riderWallets, currentUserID, nil,
-	).Register(adminRoutes)
+	).WithPayoutQueue(func() delivery.RiderPayoutQueueRepository {
+		value, _ := any(runtime.riderWallets).(delivery.RiderPayoutQueueRepository)
+		return value
+	}()).Register(adminRoutes)
 }
 
 func registerDeliveryCapabilities(api *gin.RouterGroup, runtime *deliveryRuntime, authentication gin.HandlerFunc) {

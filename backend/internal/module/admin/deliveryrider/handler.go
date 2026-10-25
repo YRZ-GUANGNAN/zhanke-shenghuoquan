@@ -25,6 +25,7 @@ type Handler struct {
 	proofs        proofCommands
 	conversations conversationCommands
 	todayStats    delivery.RiderTodayStatsReader
+	walletReader  delivery.RiderWalletReader
 	now           func() time.Time
 }
 
@@ -68,6 +69,11 @@ func (h *Handler) WithTodayStats(reader delivery.RiderTodayStatsReader) *Handler
 	return h
 }
 
+func (h *Handler) WithWalletReader(reader delivery.RiderWalletReader) *Handler {
+	h.walletReader = reader
+	return h
+}
+
 // WithNow exists for deterministic business-day tests. Production keeps the
 // default time.Now clock.
 func (h *Handler) WithNow(now func() time.Time) *Handler {
@@ -85,6 +91,10 @@ func (h *Handler) WithConversationCommands(commands conversationCommands) *Handl
 func (h *Handler) Register(group *gin.RouterGroup) {
 	group.GET("/me", h.me)
 	group.GET("/stats/today", h.today)
+	group.GET("/wallet", h.wallet)
+	group.GET("/wallet/earnings", h.earnings)
+	group.GET("/wallet/ledger", h.ledger)
+	group.GET("/wallet/payout-queue", h.payoutQueue)
 	group.GET("/orders/claimable", h.claimable)
 	group.POST("/orders/:id/claim", h.claim)
 	group.GET("/orders", h.list)
@@ -94,6 +104,124 @@ func (h *Handler) Register(group *gin.RouterGroup) {
 	group.PATCH("/orders/:id/delivering", h.delivering)
 	group.PATCH("/orders/:id/delivered", h.delivered)
 	group.PATCH("/orders/:id/release", h.release)
+}
+
+func (h *Handler) readableRider(c *gin.Context) (uint64, bool) {
+	if h.identity == nil || h.currentUserID == nil {
+		response.Fail(c, http.StatusServiceUnavailable, "delivery rider wallet unavailable")
+		return 0, false
+	}
+	riderID := h.currentUserID(c)
+	if riderID == 0 {
+		response.Fail(c, http.StatusUnauthorized, "authentication required")
+		return 0, false
+	}
+	rider, err := h.identity.Find(c.Request.Context(), riderID)
+	if errors.Is(err, takeout.ErrNotFound) {
+		h.write(c, nil, delivery.ErrRiderNotRegistered)
+		return 0, false
+	}
+	if err != nil {
+		h.write(c, nil, err)
+		return 0, false
+	}
+	if rider.RiderUserID != riderID || (rider.Status != takeout.RiderActive && rider.Status != takeout.RiderResting) {
+		h.write(c, nil, delivery.ErrRiderUnavailable)
+		return 0, false
+	}
+	return riderID, true
+}
+
+func (h *Handler) wallet(c *gin.Context) {
+	if h.walletReader == nil {
+		response.Fail(c, http.StatusServiceUnavailable, "delivery rider wallet unavailable")
+		return
+	}
+	riderID, ok := h.readableRider(c)
+	if !ok {
+		return
+	}
+	value, err := h.walletReader.ReadRiderWalletSnapshot(c.Request.Context(), riderID)
+	if err != nil {
+		h.write(c, nil, err)
+		return
+	}
+	response.OK(c, riderWalletView(value))
+}
+
+func (h *Handler) earnings(c *gin.Context) {
+	if h.walletReader == nil {
+		response.Fail(c, http.StatusServiceUnavailable, "delivery rider wallet unavailable")
+		return
+	}
+	riderID, ok := h.readableRider(c)
+	if !ok {
+		return
+	}
+	page, ok := parsePage(c)
+	if !ok {
+		return
+	}
+	values, total, err := h.walletReader.ListRiderEarningsByRider(c.Request.Context(), riderID, page)
+	if err != nil {
+		h.write(c, nil, err)
+		return
+	}
+	items := make([]RiderWalletEarningView, 0, len(values))
+	for _, value := range values {
+		items = append(items, riderWalletEarningView(value))
+	}
+	response.OK(c, Page[RiderWalletEarningView]{Items: items, Page: page.Page, PageSize: page.Size, Total: total})
+}
+
+func (h *Handler) ledger(c *gin.Context) {
+	if h.walletReader == nil {
+		response.Fail(c, http.StatusServiceUnavailable, "delivery rider wallet unavailable")
+		return
+	}
+	riderID, ok := h.readableRider(c)
+	if !ok {
+		return
+	}
+	page, ok := parsePage(c)
+	if !ok {
+		return
+	}
+	values, total, err := h.walletReader.ListRiderLedgerByRider(c.Request.Context(), riderID, page)
+	if err != nil {
+		h.write(c, nil, err)
+		return
+	}
+	items := make([]RiderWalletLedgerView, 0, len(values))
+	for _, value := range values {
+		items = append(items, riderWalletLedgerView(value))
+	}
+	response.OK(c, Page[RiderWalletLedgerView]{Items: items, Page: page.Page, PageSize: page.Size, Total: total})
+}
+
+func (h *Handler) payoutQueue(c *gin.Context) {
+	if h.walletReader == nil {
+		response.Fail(c, http.StatusServiceUnavailable, "delivery rider wallet unavailable")
+		return
+	}
+	riderID, ok := h.readableRider(c)
+	if !ok {
+		return
+	}
+	page, ok := parsePage(c)
+	if !ok {
+		return
+	}
+	values, total, err := h.walletReader.ListRiderPayoutQueueByRider(c.Request.Context(), riderID, page)
+	if err != nil {
+		h.write(c, nil, err)
+		return
+	}
+	items := make([]RiderWalletQueueView, 0, len(values))
+	for _, value := range values {
+		items = append(items, riderWalletQueueView(value))
+	}
+	response.OK(c, Page[RiderWalletQueueView]{Items: items, Page: page.Page, PageSize: page.Size, Total: total})
 }
 
 func (h *Handler) today(c *gin.Context) {
@@ -370,6 +498,8 @@ func (h *Handler) write(c *gin.Context, value any, err error) {
 		response.Fail(c, http.StatusServiceUnavailable, "delivery proof binding pending")
 	case errors.Is(err, delivery.ErrConversationUnavailable), errors.Is(err, delivery.ErrConversationLease):
 		response.Fail(c, http.StatusServiceUnavailable, "delivery conversation unavailable")
+	case errors.Is(err, delivery.ErrPayoutQueueUnavailable):
+		response.Fail(c, http.StatusServiceUnavailable, "骑手排队结算暂不可用，请稍后重试")
 	default:
 		response.Fail(c, http.StatusInternalServerError, "delivery rider operation failed")
 	}

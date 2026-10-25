@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   DeliveryAPIError,
   deliveryAdminAPI,
@@ -17,11 +17,12 @@ import {
   type RiderLedger,
   type RiderPayout,
   type RiderPayoutResult,
+  type RiderPayoutQueue,
   type RiderWallet
 } from './services/delivery-admin'
 import { useAdminDialog } from './components'
 
-type View = 'summary' | 'funding-sources' | 'orders' | 'fee' | 'overrides' | 'merchant-wallets' | 'rider-wallets' | 'earnings' | 'refunds'
+type View = 'summary' | 'funding-sources' | 'orders' | 'fee' | 'overrides' | 'merchant-wallets' | 'rider-wallets' | 'earnings' | 'payout-queue' | 'refunds'
 
 const pageSize = 20
 const emptyPage = <T,>(): Page<T> => ({ items: [], page: 1, pageSize, total: 0 })
@@ -54,6 +55,7 @@ export function DeliveryConsole() {
     ['merchant-wallets', '商家钱包'],
     ['rider-wallets', '骑手钱包'],
     ['earnings', '报酬清账'],
+    ['payout-queue', '待打款队列'],
     ['refunds', '退款记录']
   ]
   return <div className="delivery-console">
@@ -69,6 +71,7 @@ export function DeliveryConsole() {
     {view === 'merchant-wallets' && <MerchantWalletsPanel />}
     {view === 'rider-wallets' && <RiderWalletsPanel />}
     {view === 'earnings' && <EarningsPanel />}
+    {view === 'payout-queue' && <RiderPayoutQueuePanel />}
     {view === 'refunds' && <RefundsPanel />}
   </div>
 }
@@ -452,6 +455,7 @@ function EarningsPanel() {
   const [error, setError] = useState('')
   const [conflict, setConflict] = useState(false)
   const [busy, setBusy] = useState('')
+  const operationKeys = useRef(new Map<string, { key: string; note: string }>())
   const load = useCallback(async () => {
     setError(''); setConflict(false)
     try {
@@ -465,11 +469,15 @@ function EarningsPanel() {
     try { setDetail(await deliveryAdminAPI.riderEarning(id)) } catch (reason) { setError(errorMessage(reason)) }
   }
   const pay = async (row: RiderEarning) => {
-    const note = await dialog.prompt({ title: '登记线下清账', description: `将骑手 #${row.riderUserId} 的 ${money(row.riderFeeCents)} 登记为已线下支付。本操作不会发起真实打款。`, inputLabel: '清账备注', placeholder: '例如：微信已付截图编号 / 日期', requiredMessage: '清账备注不能为空', confirmLabel: '确认已支付' })
+    const pending = operationKeys.current.get(row.earningPublicId)
+    const note = pending?.note ?? await dialog.prompt({ title: '登记线下清账', description: `将骑手 #${row.riderUserId} 的 ${money(row.riderFeeCents)} 登记为已线下支付。本操作不会发起真实打款。`, inputLabel: '清账备注', placeholder: '例如：微信已付截图编号 / 日期', requiredMessage: '清账备注不能为空', confirmLabel: '确认已支付' })
     if (note === null) return
     setBusy(row.earningPublicId); setError(''); setConflict(false)
     try {
-      const updated = await deliveryAdminAPI.payOffline(row.earningPublicId, row.rowVersion, newIdempotencyKey(row.earningPublicId), note)
+      const operation = pending || { key: newIdempotencyKey(), note }
+      operationKeys.current.set(row.earningPublicId, operation)
+      const updated = await deliveryAdminAPI.payOffline(row.earningPublicId, row.rowVersion, operation.key, operation.note)
+      operationKeys.current.delete(row.earningPublicId)
       setResult(updated)
       setDetail(updated.earning)
       await load()
@@ -490,6 +498,42 @@ function EarningsPanel() {
     {detail && <Detail title={`报酬 ${detail.earningPublicId}`} close={() => { setDetail(null); setResult(null) }}><div className="detail-grid"><Fact label="骑手" value={`#${detail.riderUserId}`} /><Fact label="配送单" value={detail.deliveryOrderPublicId} /><Fact label="骑手报酬" value={money(detail.riderFeeCents)} /><Fact label="状态" value={<Badge value={detail.settlementStatus} />} /><Fact label="Row Version" value={`v${detail.rowVersion}`} /><Fact label="线下支付时间" value={time(detail.paidOfflineAt)} /></div>{result && <p className="delivery-description">后端已返回清账结果：钱包余额 {money(result.wallet.availableBalanceCents)}，流水 {short(result.ledger.ledgerPublicId)}，登记记录 {short(result.payout.payoutPublicId)}。</p>}</Detail>}
     <h3 className="delivery-subtitle">最近清账登记</h3>
     <div className="table-scroll"><table><thead><tr><th>登记</th><th>报酬</th><th>骑手</th><th>金额</th><th>操作人</th><th>时间</th></tr></thead><tbody>{payouts.items.map(row => <tr key={row.payoutPublicId}><td>{short(row.payoutPublicId)}</td><td>{short(row.earningPublicId)}</td><td>#{row.riderUserId}</td><td>{money(row.amountCents)}</td><td>#{row.operatorUserId}</td><td>{time(row.paidOfflineAt)}</td></tr>)}</tbody></table></div>
+  </Panel>
+}
+
+function RiderPayoutQueuePanel() {
+  const [data, setData] = useState<Page<RiderPayoutQueue>>(emptyPage())
+  const [status, setStatus] = useState('')
+  const [page, setPage] = useState(1)
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState('')
+  const operationKeys = useRef(new Map<string, { key: string; reason: string }>())
+  const load = useCallback(async () => {
+    setError('')
+    try { setData(await deliveryAdminAPI.riderPayoutQueue({ status, page, pageSize })) } catch (reason) { setError(errorMessage(reason)) }
+  }, [status, page])
+  useEffect(() => { void load() }, [load])
+  const cancel = async (row: RiderPayoutQueue) => {
+    const pending = operationKeys.current.get(row.payoutQueuePublicId)
+    const reason = pending?.reason ?? window.prompt('请输入取消原因（不会发起微信转账）', '改走后台线下结款')
+    if (!reason?.trim()) return
+    setBusy(row.payoutQueuePublicId); setError('')
+    try {
+      const operation = pending || { key: newIdempotencyKey(), reason: reason.trim() }
+      operationKeys.current.set(row.payoutQueuePublicId, operation)
+      await deliveryAdminAPI.cancelRiderPayoutQueue(row.payoutQueuePublicId, row.rowVersion, operation.key, operation.reason)
+      operationKeys.current.delete(row.payoutQueuePublicId)
+      await load()
+    }
+    catch (value) { setError(errorMessage(value)) }
+    finally { setBusy('') }
+  }
+  return <Panel title="平台待打款队列">
+    <p className="delivery-capability-notice delivery-capability-notice--inline"><strong>内部队列</strong><span>当前仅占用已核验收益，未调用微信转账；只能取消排队，不能标记到账或批准打款。</span></p>
+    <div className="delivery-controls"><label>状态<select value={status} onChange={event => { setPage(1); setStatus(event.target.value) }}><option value="">全部</option><option value="queued">queued</option><option value="blocked">blocked</option><option value="cancelled">cancelled</option></select></label><button onClick={() => void load()}>刷新</button></div>
+    <ErrorNotice error={error} refresh={() => void load()} />
+    <div className="table-scroll"><table><thead><tr><th>队列</th><th>收益/配送单</th><th>骑手</th><th>金额</th><th>来源/状态</th><th>占用</th><th>操作</th></tr></thead><tbody>{data.items.map(row => <tr key={row.payoutQueuePublicId}><td>{short(row.payoutQueuePublicId)}<span>v{row.rowVersion}</span></td><td>{short(row.earningPublicId)}<span>{short(row.deliveryOrderPublicId)}</span></td><td>#{row.riderUserId}</td><td>{money(row.amountCents)}</td><td><Badge value={row.status} /><span>{row.reasonCode || '已核验'}</span></td><td>{money(row.reservedCents)}</td><td>{row.status !== 'cancelled' ? <button disabled={busy === row.payoutQueuePublicId} onClick={() => void cancel(row)}>{busy === row.payoutQueuePublicId ? '取消中…' : '取消排队'}</button> : <span>已释放</span>}</td></tr>)}</tbody></table></div>
+    <Pagination value={data} setPage={setPage} />
   </Panel>
 }
 
@@ -526,8 +570,11 @@ function short(value: string) {
   return value.length > 18 ? `${value.slice(0, 8)}…${value.slice(-6)}` : value
 }
 
-function newIdempotencyKey(seed: string) {
-  const randomUUID = (globalThis.crypto as Crypto & { randomUUID?: () => string } | undefined)?.randomUUID
-  const random = randomUUID ? randomUUID.call(globalThis.crypto) : `${Date.now()}-${Math.random().toString(36).slice(2)}`
-  return `d6c-${seed}-${random}`.slice(0, 128)
+function newIdempotencyKey() {
+  const alphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
+  let value = Math.floor(Date.now() / 1000)
+  let result = ''
+  for (let index = 0; index < 10; index += 1) { result = alphabet[value % 32] + result; value = Math.floor(value / 32) }
+  for (let index = 0; index < 16; index += 1) result += alphabet[Math.floor(Math.random() * alphabet.length)]
+  return result
 }

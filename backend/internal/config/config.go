@@ -58,6 +58,7 @@ type Config struct {
 	EnableLegacyTakeout              bool
 	EnableDelivery                   bool
 	EnableDeliveryPayment            bool
+	EnableDeliveryRiderPayoutQueue   bool
 	AllowMockDeliveryFeeConfirmation bool
 	AllowMockDeliveryPayment         bool
 	EnableDeliveryIMReadReceipt      bool
@@ -96,6 +97,10 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	enableDeliveryPayment, err := envBool("ENABLE_DELIVERY_PAYMENT", false)
+	if err != nil {
+		return Config{}, err
+	}
+	enableDeliveryRiderPayoutQueue, err := envBool("ENABLE_DELIVERY_RIDER_PAYOUT_QUEUE", false)
 	if err != nil {
 		return Config{}, err
 	}
@@ -164,6 +169,7 @@ func Load() (Config, error) {
 		EnableLegacyTakeout:              enableLegacyTakeout,
 		EnableDelivery:                   enableDelivery,
 		EnableDeliveryPayment:            enableDeliveryPayment,
+		EnableDeliveryRiderPayoutQueue:   enableDeliveryRiderPayoutQueue,
 		AllowMockDeliveryFeeConfirmation: allowMockDeliveryFeeConfirmation,
 		AllowMockDeliveryPayment:         allowMockDeliveryPayment,
 		EnableDeliveryIMReadReceipt:      enableDeliveryIMReadReceipt,

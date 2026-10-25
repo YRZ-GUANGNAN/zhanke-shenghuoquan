@@ -13,7 +13,7 @@ import {
   type MerchantDeliveryOrder,
   type StageTimestamps,
 } from '../../services/delivery-merchant'
-import { getDeliveryOrderFunds, type DeliveryOrderFunds } from '../../services/delivery-payment'
+import { deliveryPaymentStatusLabel, deliveryRefundStatusLabel, getDeliveryOrderFunds, type DeliveryOrderFunds } from '../../services/delivery-payment'
 import { loadPrivateDeliveryProofs, type DeliveryProofImage } from '../../services/delivery-proof'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
@@ -112,14 +112,11 @@ export function buildProgressSteps(order: MerchantDeliveryOrder): ProgressStep[]
 
 export function deliveryFundsLabel(funds: DeliveryOrderFunds | null): string {
   if (!funds) return '支付状态暂不可用'
-  if (funds.settlement?.status === 'refunded' || funds.refund?.status === 'succeeded') return '配送费已退还'
-  if (funds.refund?.status === 'failed') return '退款失败，请查看账单'
-  if (funds.settlement?.status === 'refund_pending' || funds.refund?.status === 'pending' || funds.refund?.status === 'refund_pending') return '退款处理中'
+  if (funds.settlement?.status === 'refunded' || funds.refund?.status === 'succeeded') return funds.refund ? deliveryRefundStatusLabel(funds.refund) : '配送费已退还'
+  if (funds.refund?.status === 'failed') return deliveryRefundStatusLabel(funds.refund)
+  if (funds.settlement?.status === 'refund_pending' || funds.refund?.status === 'pending' || funds.refund?.status === 'refund_pending') return funds.refund ? deliveryRefundStatusLabel(funds.refund) : '退款处理中'
   if (funds.settlement?.status === 'paid') return '配送费已支付'
-  if (funds.payment?.status === 'paid') return '支付结果待确认'
-  if (funds.payment?.status === 'failed') return '配送费支付失败'
-  if (funds.payment?.status === 'closed') return '支付已关闭'
-  if (funds.payment) return '等待支付配送费'
+  if (funds.payment) return deliveryPaymentStatusLabel(funds.payment)
   return '暂无支付记录'
 }
 

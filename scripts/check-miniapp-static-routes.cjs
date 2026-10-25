@@ -32,6 +32,7 @@ const expectedRoutes = [
   'pages/merchant-messages/index',
   'pages/merchant-order-detail/index',
   'pages/delivery-rider/index',
+  'pages/rider-wallet/index',
   'pages/rider-messages/index',
   'pages/delivery-profile/index',
   'pages/delivery-conversation/index',

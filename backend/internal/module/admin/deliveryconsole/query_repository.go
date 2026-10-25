@@ -44,9 +44,113 @@ type QueryRepository interface {
 	Refund(context.Context, string) (delivery.Refund, error)
 }
 
+type payoutQueueQueries interface {
+	ListRiderPayoutQueues(context.Context, ListFilter) ([]RiderPayoutQueueSnapshot, int64, error)
+	RiderPayoutQueue(context.Context, string) (RiderPayoutQueueSnapshot, error)
+	ListRiderPayoutQueueEvents(context.Context, string, ListFilter) ([]delivery.RiderPayoutQueueEvent, int64, error)
+}
+
+type RiderPayoutQueueSnapshot struct {
+	Queue       delivery.RiderPayoutQueue
+	Reservation *delivery.RiderPayoutReservation
+}
+
 type GormQueryRepository struct{ db *gorm.DB }
 
 func NewQueryRepository(db *gorm.DB) *GormQueryRepository { return &GormQueryRepository{db: db} }
+
+func (r *GormQueryRepository) ListRiderPayoutQueues(ctx context.Context, filter ListFilter) ([]RiderPayoutQueueSnapshot, int64, error) {
+	if !r.db.Migrator().HasTable(&delivery.RiderPayoutQueue{}) || !r.db.Migrator().HasTable(&delivery.RiderPayoutReservation{}) {
+		return nil, 0, delivery.ErrPayoutQueueUnavailable
+	}
+	if filter.Status != "" && !delivery.RiderPayoutQueueStatus(filter.Status).Valid() {
+		return nil, 0, ErrInvalidQuery
+	}
+	var result []RiderPayoutQueueSnapshot
+	var total int64
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		query := tx.Model(&delivery.RiderPayoutQueue{})
+		if filter.Status != "" {
+			query = query.Where("status = ?", filter.Status)
+		}
+		if filter.RiderUserID != 0 {
+			query = query.Where("rider_user_id = ?", filter.RiderUserID)
+		}
+		if filter.From != nil {
+			query = query.Where("created_at >= ?", filter.From)
+		}
+		if filter.To != nil {
+			query = query.Where("created_at < ?", filter.To)
+		}
+		values, count, err := listModels[delivery.RiderPayoutQueue](query.Order("created_at DESC, id DESC"), filter)
+		if err != nil {
+			return err
+		}
+		total = count
+		result = make([]RiderPayoutQueueSnapshot, 0, len(values))
+		for _, value := range values {
+			snapshot, err := readQueueReservation(tx, value)
+			if err != nil {
+				return err
+			}
+			result = append(result, snapshot)
+		}
+		return nil
+	})
+	return result, total, err
+}
+
+func readQueueReservation(db *gorm.DB, value delivery.RiderPayoutQueue) (RiderPayoutQueueSnapshot, error) {
+	result := RiderPayoutQueueSnapshot{Queue: value}
+	var reservation delivery.RiderPayoutReservation
+	err := db.Where("payout_queue_public_id = ?", value.PayoutQueuePublicID).First(&reservation).Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return result, err
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		if value.Status == delivery.RiderPayoutQueueQueued || value.Status == delivery.RiderPayoutQueueCancelled {
+			return result, delivery.ErrFundingSourceMismatch
+		}
+		return result, nil
+	}
+	if value.Status == delivery.RiderPayoutQueueBlocked {
+		return result, delivery.ErrFundingSourceMismatch
+	}
+	if reservation.EarningPublicID != value.EarningPublicID || reservation.RiderUserID != value.RiderUserID || reservation.AmountCents != value.AmountCents ||
+		(value.Status == delivery.RiderPayoutQueueQueued) != (reservation.Status == delivery.RiderPayoutReservationActive) {
+		return result, delivery.ErrFundingSourceMismatch
+	}
+	result.Reservation = &reservation
+	return result, nil
+}
+
+func (r *GormQueryRepository) RiderPayoutQueue(ctx context.Context, id string) (RiderPayoutQueueSnapshot, error) {
+	if !r.db.Migrator().HasTable(&delivery.RiderPayoutQueue{}) || !r.db.Migrator().HasTable(&delivery.RiderPayoutReservation{}) {
+		return RiderPayoutQueueSnapshot{}, delivery.ErrPayoutQueueUnavailable
+	}
+	var result RiderPayoutQueueSnapshot
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var queue delivery.RiderPayoutQueue
+		if err := tx.Where("payout_queue_public_id = ?", id).First(&queue).Error; err != nil {
+			return normalizeNotFound(err)
+		}
+		var err error
+		result, err = readQueueReservation(tx, queue)
+		return err
+	})
+	return result, err
+}
+
+func (r *GormQueryRepository) ListRiderPayoutQueueEvents(ctx context.Context, id string, filter ListFilter) ([]delivery.RiderPayoutQueueEvent, int64, error) {
+	if !r.db.Migrator().HasTable(&delivery.RiderPayoutQueueEvent{}) {
+		return nil, 0, delivery.ErrPayoutQueueUnavailable
+	}
+	var queue delivery.RiderPayoutQueue
+	if err := r.db.WithContext(ctx).Where("payout_queue_public_id = ?", id).First(&queue).Error; err != nil {
+		return nil, 0, normalizeNotFound(err)
+	}
+	return listModels[delivery.RiderPayoutQueueEvent](r.db.WithContext(ctx).Model(&delivery.RiderPayoutQueueEvent{}).Where("payout_queue_public_id = ?", id), filter)
+}
 
 type OrderFundsSnapshot struct {
 	Order      delivery.Order

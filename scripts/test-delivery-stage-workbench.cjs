@@ -269,6 +269,10 @@ function merchantHarness(kind, overrides = {}) {
   sessionStore.getState = session
   const renderer = hookRenderer()
   const previews = [], proofRequests = [], navigations = [], toasts = []
+  const paymentLabels = loadSource('services/delivery-payment.ts', {
+    './api': { request: () => { throw new Error('测试不得访问真实支付接口') } },
+    './delivery-merchant': { createDeliveryClientRequestId: () => 'TEST-REQUEST' },
+  }, renderer)
   const services = {
     getIdentityApplication: async () => ({ status: 'approved', merchantName: '测试商家', merchantAddress: '测试取货点' }),
     getDeliveryWallet: async () => ({ availableBalanceCents: 1000 }),
@@ -314,6 +318,8 @@ function merchantHarness(kind, overrides = {}) {
       getDeliveryWallet: (...args) => services.getDeliveryWallet(...args),
       listDeliveryWalletLedger: (...args) => services.listDeliveryWalletLedger(...args),
       getDeliveryOrderFunds: (...args) => services.getDeliveryOrderFunds(...args),
+      deliveryPaymentStatusLabel: paymentLabels.deliveryPaymentStatusLabel,
+      deliveryRefundStatusLabel: paymentLabels.deliveryRefundStatusLabel,
     },
     '../../services/delivery-proof': { loadPrivateDeliveryProofs: (...args) => { proofRequests.push(args); return services.loadPrivateDeliveryProofs(...args) } },
     '../../services/taro': {
@@ -322,6 +328,11 @@ function merchantHarness(kind, overrides = {}) {
       showToast: async (value) => { toasts.push(value) },
       navigateTo: async (value) => { navigations.push(value); await overrides.navigateTo?.(value) },
       navigateBack: async () => {}, reLaunch: async () => { relaunches++ },
+    },
+    './wallet-state': {
+      readPendingWalletRecharge: () => null,
+      savePendingWalletRecharge: () => {},
+      clearPendingWalletRecharge: () => {},
     },
     '../../stores/session': { useSessionStore: sessionStore },
     '../../utils/delivery-order-source': { deliverySourceLabel: () => '校内配送', deliveryPickupLabel: (value) => value.pickupCode ? `${value.pickupCode}号` : '配送单' },
@@ -1216,13 +1227,14 @@ async function run() {
     let funds
     const app = merchantHarness('merchant-order-detail', { getDeliveryOrderFunds: async () => funds })
     const cases = [
-      [{ payment: { status: 'failed' } }, '配送费支付失败'],
-      [{ payment: { status: 'created' } }, '等待支付配送费'],
-      [{ payment: { status: 'paid' } }, '支付结果待确认'],
+      [{ payment: { status: 'failed' } }, '支付失败'],
+      [{ payment: { status: 'created' } }, '待发起支付'],
+      [{ payment: { status: 'paid' } }, '已确认支付'],
+      [{ payment: { status: 'prepay_issued', providerStatus: 'USERPAYING' } }, '微信处理中，等待核实'],
       [{ settlement: { status: 'paid' } }, '配送费已支付'],
-      [{ settlement: { status: 'paid' }, refund: { status: 'pending' } }, '退款处理中'],
-      [{ settlement: { status: 'refund_pending' }, refund: { status: 'failed' } }, '退款失败，请查看账单'],
-      [{ settlement: { status: 'paid' }, refund: { status: 'succeeded' } }, '配送费已退还'],
+      [{ settlement: { status: 'paid' }, refund: { status: 'pending' } }, '退款已申请，等待核实'],
+      [{ settlement: { status: 'refund_pending' }, refund: { status: 'failed' } }, '退款失败'],
+      [{ settlement: { status: 'paid' }, refund: { status: 'succeeded' } }, '已确认退款'],
     ]
     for (let index = 0; index < cases.length; index++) {
       funds = { deliveryOrderPublicId: 'ORDER-A', payment: null, settlement: null, refund: null, ...cases[index][0] }

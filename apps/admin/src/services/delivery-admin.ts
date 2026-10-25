@@ -29,6 +29,32 @@ export interface DeliveryQuery {
   to?: string
 }
 
+export interface RiderPayoutQueue {
+  payoutQueuePublicId: string
+  earningPublicId: string
+  deliveryOrderPublicId: string
+  riderUserId: number
+  amountCents: number
+  currency: string
+  status: 'blocked' | 'queued' | 'cancelled'
+  reasonCode?: string
+  rowVersion: number
+  reservedCents: number
+  createdAt: string
+  updatedAt: string
+  cancelledAt?: string | null
+}
+
+export interface RiderPayoutQueueEvent {
+  eventPublicId: string
+  eventType: string
+  actorType: string
+  operatorUserId?: number
+  reasonCode?: string
+  reason?: string
+  createdAt: string
+}
+
 export interface DeliverySummary {
   orders: number
   pendingFeePayment: number
@@ -305,6 +331,13 @@ export const deliveryAdminAPI = {
       method: 'POST'
     }),
   riderPayouts: (query: DeliveryQuery = {}) => api<Page<RiderPayout>>(`/rider-payouts${queryString(query)}`),
+  riderPayoutQueue: (query: DeliveryQuery = {}) => api<Page<RiderPayoutQueue>>(`/rider-payout-queue${queryString(query)}`),
+  riderPayoutQueueDetail: (id: string) => api<RiderPayoutQueue>(`/rider-payout-queue/${encodeURIComponent(id)}`),
+  riderPayoutQueueEvents: (id: string, query: DeliveryQuery = {}) => api<Page<RiderPayoutQueueEvent>>(`/rider-payout-queue/${encodeURIComponent(id)}/events${queryString(query)}`),
+  cancelRiderPayoutQueue: (id: string, expectedRowVersion: number, idempotencyKey: string, reason: string) =>
+    api<RiderPayoutQueue>(`/rider-payout-queue/${encodeURIComponent(id)}/cancel`, {
+      ...body({ expectedRowVersion, idempotencyKey, reason }), method: 'POST'
+    }),
   refunds: (query: DeliveryQuery = {}) => api<Page<Refund>>(`/refunds${queryString(query)}`),
   refund: (id: string) => api<Refund>(`/refunds/${encodeURIComponent(id)}`)
 }

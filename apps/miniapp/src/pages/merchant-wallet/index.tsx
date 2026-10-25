@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
+import { useDidHide, useDidShow } from '@tarojs/taro'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import { AppActionSheet, AppButton, AppIconButton, AppNotice } from '../../components/ui'
@@ -11,10 +12,13 @@ import {
   pollDeliveryPayment,
   startDeliveryWalletRecharge,
   type DeliveryLedgerEntryType,
+  type DeliveryPayment,
   type DeliveryWallet,
   type DeliveryWalletLedger,
 } from '../../services/delivery-payment'
 import Taro from '../../services/taro'
+import { useSessionStore } from '../../stores/session'
+import { clearPendingWalletRecharge, readPendingWalletRecharge, savePendingWalletRecharge } from './wallet-state'
 import './index.scss'
 
 const rechargeOptions = [50, 100, 200, 300, 500, 1000]
@@ -40,7 +44,7 @@ function entrySymbol(entryType: DeliveryLedgerEntryType) {
 }
 
 function MerchantWalletContent() {
-  const { enabled: deliveryPaymentEnabled } = useDeliveryPayment()
+  const { enabled: deliveryPaymentEnabled, checking: paymentChecking, error: paymentError, refresh: refreshPayment } = useDeliveryPayment()
   const identityAllowed = useIdentityGuard('merchant')
   const [wallet, setWallet] = useState<DeliveryWallet | null>(null)
   const [ledger, setLedger] = useState<DeliveryWalletLedger[]>([])
@@ -49,43 +53,72 @@ function MerchantWalletContent() {
   const [loading, setLoading] = useState(false)
   const [paying, setPaying] = useState(false)
   const [loadError, setLoadError] = useState('')
+  const accountId = useSessionStore(state => state.profile.id)
+  const sessionToken = useSessionStore(state => state.token)
+  const sessionKey = `${accountId}:${sessionToken}`
+  const rechargeLock = useRef(false)
+  const activeSessionKey = useRef(sessionKey)
+  const visible = useRef(true)
+  const loadEpoch = useRef(0)
+  const loadingRef = useRef(false)
+  activeSessionKey.current = sessionKey
 
   const loadWallet = useCallback(async () => {
-    if (!identityAllowed || !deliveryPaymentEnabled || loading) return
+    if (!identityAllowed || !deliveryPaymentEnabled || loadingRef.current) return
+    const version = ++loadEpoch.current
+    const current = () => visible.current && loadEpoch.current === version && activeSessionKey.current === sessionKey
+    loadingRef.current = true
     setLoading(true)
     setLoadError('')
     try {
-      const [walletValue, ledgerValue] = await Promise.all([
-        getDeliveryWallet(),
-        listDeliveryWalletLedger(1, 30),
-      ])
+      const walletValue = await getDeliveryWallet()
+      if (!current()) return
       setWallet(walletValue)
-      setLedger(ledgerValue.items)
+      try { const ledgerValue = await listDeliveryWalletLedger(1, 30); if (current()) setLedger(ledgerValue.items) } catch (error) { if (current()) setLoadError(error instanceof Error ? error.message : '账单加载失败') }
     } catch (error) {
-      setWallet(null)
-      setLedger([])
-      setLoadError(error instanceof Error ? error.message : '钱包加载失败')
+      if (current()) setLoadError(error instanceof Error ? error.message : '钱包加载失败')
     } finally {
-      setLoading(false)
+      if (current()) setLoading(false)
+      if (loadEpoch.current === version) loadingRef.current = false
     }
-  }, [identityAllowed, loading, deliveryPaymentEnabled])
+  }, [identityAllowed, deliveryPaymentEnabled, sessionKey])
+
+  useDidHide(() => { visible.current = false; loadEpoch.current += 1; loadingRef.current = false })
+  useDidShow(() => { visible.current = true; void loadWallet() })
 
   useEffect(() => {
+    loadEpoch.current += 1
+    loadingRef.current = false
+    setWallet(null); setLedger([]); setLoadError('')
     if (identityAllowed && deliveryPaymentEnabled) void loadWallet()
-  }, [identityAllowed, deliveryPaymentEnabled]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [identityAllowed, deliveryPaymentEnabled, sessionKey, loadWallet])
 
   const confirmRecharge = async () => {
-    if (!deliveryPaymentEnabled || paying) return
+    if (!deliveryPaymentEnabled || paying || rechargeLock.current || !accountId) return
+    rechargeLock.current = true
     setPaying(true)
     try {
-      const result = await startDeliveryWalletRecharge(selectedAmount * 100)
-      if (!result.payment) throw new Error('后端未返回充值支付记录')
-      if (result.payment.provider === 'wechat') {
-        if (!result.payment.wechat) throw new Error('后端未返回微信支付参数')
-        await Taro.requestPayment(result.payment.wechat)
+      const existing = readPendingWalletRecharge(accountId)
+      if (existing && existing.amountCents !== selectedAmount * 100) throw new Error('已有充值订单待核实，请先恢复原订单')
+      const pending = existing || { accountId, amountCents: selectedAmount * 100, clientRequestId: (await import('../../services/delivery-merchant')).createDeliveryClientRequestId(), createdAt: Date.now() }
+      savePendingWalletRecharge(pending)
+      let payment: DeliveryPayment | null = null
+      let paymentPublicId = pending.paymentPublicId
+      if (!pending.paymentPublicId) {
+        const result = await startDeliveryWalletRecharge(pending.amountCents, pending.clientRequestId)
+        if (!result.payment) throw new Error('后端未返回充值支付记录')
+        payment = result.payment
+        paymentPublicId = result.payment.paymentPublicId
+        savePendingWalletRecharge({ ...pending, paymentPublicId: result.payment.paymentPublicId })
+        if (result.payment.provider === 'wechat' && result.payment.status !== 'paid') {
+          if (!result.payment.wechat) throw new Error('后端未返回微信支付参数')
+          await Taro.requestPayment(result.payment.wechat)
+        }
       }
-      const latest = await pollDeliveryPayment(result.payment.paymentPublicId)
-      if (latest.status !== 'paid') throw new Error('充值支付尚未完成')
+      const latest = await pollDeliveryPayment(paymentPublicId!)
+      if (latest.status === 'failed' || latest.status === 'closed') { clearPendingWalletRecharge(accountId); throw new Error(latest.status === 'failed' ? '充值支付失败' : '充值订单已关闭，请重新发起') }
+      if (latest.status !== 'paid') throw new Error('充值支付尚未完成，可稍后继续核实原单')
+      clearPendingWalletRecharge(accountId)
       setSheetVisible(false)
       await loadWallet()
       await Taro.showToast({ title: '充值已到账', icon: 'success' })
@@ -96,12 +129,12 @@ function MerchantWalletContent() {
         duration: 2200,
       })
     } finally {
-      setPaying(false)
+      setPaying(false); rechargeLock.current = false
     }
   }
 
   if (!identityAllowed) return <View className='merchant-wallet-page' />
-  if (!deliveryPaymentEnabled) {
+  if (paymentChecking || paymentError || !deliveryPaymentEnabled) {
     return (
       <View className='merchant-wallet-page'>
         <View className='merchant-wallet-hero merchant-wallet-hero--disabled'>
@@ -113,17 +146,17 @@ function MerchantWalletContent() {
           </View>
           <View className='merchant-wallet-balance'>
             <Text className='merchant-wallet-balance__label'>钱包余额（元）</Text>
-            <Text className='merchant-wallet-balance__amount merchant-wallet-balance__amount--disabled'>未开通</Text>
-            <Text className='merchant-wallet-balance__hint'>平台尚未配置微信商户支付</Text>
+            <Text className='merchant-wallet-balance__amount merchant-wallet-balance__amount--disabled'>{paymentChecking ? '检查中' : paymentError ? '暂不可用' : '未开通'}</Text>
+            <Text className='merchant-wallet-balance__hint'>{paymentChecking ? '正在检查支付能力…' : paymentError ? paymentError : '平台尚未配置微信商户支付'}</Text>
           </View>
         </View>
         <View className='merchant-wallet-unavailable'>
-          <Text className='merchant-wallet-unavailable__title'>商家钱包暂未开通</Text>
+          <Text className='merchant-wallet-unavailable__title'>{paymentChecking ? '正在检查商家钱包' : paymentError ? '商家钱包暂时不可用' : '商家钱包暂未开通'}</Text>
           <Text className='merchant-wallet-unavailable__description'>
-            当前不会发起充值、支付或资金账本请求。完成微信支付商户配置后，本页面会自动启用真实钱包功能。
+            {paymentChecking ? '正在确认支付能力，请稍后重试。' : paymentError ? '支付状态暂时无法确认，网络恢复后可重试。' : '当前不会发起充值、支付或资金账本请求。完成微信支付商户配置后，本页面会自动启用真实钱包功能。'}
           </Text>
-          <View className='merchant-wallet-unavailable__back' onClick={() => void Taro.navigateBack()}>
-            <Text>返回商家工作台</Text>
+          <View className='merchant-wallet-unavailable__back' onClick={() => paymentError ? void refreshPayment() : void Taro.navigateBack()}>
+            <Text>{paymentError ? '重试检查' : '返回商家工作台'}</Text>
           </View>
         </View>
       </View>

@@ -180,6 +180,7 @@ func TestFeatureGateDefaults(t *testing.T) {
 	t.Setenv("ALLOW_MOCK_DELIVERY_FEE_CONFIRMATION", "")
 	t.Setenv("ALLOW_MOCK_DELIVERY_PAYMENT", "")
 	t.Setenv("ENABLE_DELIVERY_IM_READ_RECEIPT", "")
+	t.Setenv("ENABLE_DELIVERY_RIDER_PAYOUT_QUEUE", "")
 	legacy, err := envBool("ENABLE_LEGACY_TAKEOUT", false)
 	if err != nil || legacy {
 		t.Fatal("legacy takeout default must be fail-closed")
@@ -203,6 +204,14 @@ func TestFeatureGateDefaults(t *testing.T) {
 	readReceipt, err := envBool("ENABLE_DELIVERY_IM_READ_RECEIPT", false)
 	if err != nil || readReceipt {
 		t.Fatal("delivery IM read receipt must be fail-closed")
+	}
+	payoutQueue, err := envBool("ENABLE_DELIVERY_RIDER_PAYOUT_QUEUE", false)
+	if err != nil || payoutQueue {
+		t.Fatal("delivery rider payout queue must be fail-closed")
+	}
+	var cfg Config
+	if cfg.EnableDeliveryRiderPayoutQueue {
+		t.Fatal("zero-value delivery rider payout queue gate must be disabled")
 	}
 }
 

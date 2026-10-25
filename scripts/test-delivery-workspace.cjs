@@ -279,7 +279,7 @@ async function profilePresentationScenarios() {
       app.dialog().props.onCancel(); await app.flush()
       check.deepEqual(app.calls.workspaceNavigation.at(-1), [{ role, active: 'mine' }, true])
     })
-    await scenario(`${role} 支付关闭保留真实说明，骑手不出现钱包操作`, async () => {
+    await scenario(`${role} 支付关闭保留真实说明，骑手只读收入入口可用`, async () => {
       const app = profileHarness({ role, paymentEnabled: false })
       await app.mount()
       const funds = app.one('delivery-profile__section--funds')
@@ -292,11 +292,12 @@ async function profilePresentationScenarios() {
         links[0].props.onClick(); await app.flush()
         check.deepEqual(app.calls.navigate, [{ url: '/pages/merchant-wallet/index' }])
       } else {
-        check.match(text(funds), /配送收入以后端结算记录为准，当前未开放骑手端余额查询与提现/)
+        check.match(text(funds), /配送收入与结算|账面未结款|排队占用/)
         check.doesNotMatch(text(app.tree), /钱包与账单/)
-        check.equal(nodes(funds, (node) => typeof node.props?.onClick === 'function').length, 0)
-        check.equal(nodes(app.tree, (node) => node.type === 'AppIcon' && node.props.name === 'wallet').length, 0)
-        check.deepEqual(app.calls.navigate, [])
+        const links = nodes(funds, (node) => hasClass(node, 'delivery-profile__link'))
+        check.equal(links.length, 1)
+        links[0].props.onClick(); await app.flush()
+        check.deepEqual(app.calls.navigate, [{ url: '/pages/rider-wallet/index' }])
       }
     })
     await scenario(`${role} 横滑保护拒绝编辑和身份切换，恢复后仍需确认`, async () => {

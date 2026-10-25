@@ -238,12 +238,30 @@ func (r *GormRepository) MarkRiderEarningPaidOffline(
 	if !ValidULID(earningPublicID) || expectedRowVersion == 0 || operatorUserID == 0 || !ValidULID(idempotencyKey) {
 		return RiderPayoutResult{}, ErrInvalidRecord
 	}
+	// Read only to determine the lock owner. All writes below use the shared
+	// wallet -> earning -> queue/reservation order used by payout reconciliation.
+	var candidate RiderEarningRecord
+	if err := r.db.WithContext(ctx).Where("earning_public_id = ?", earningPublicID).First(&candidate).Error; err != nil {
+		return RiderPayoutResult{}, normalizeNotFound(err)
+	}
 	var result RiderPayoutResult
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		wallet, err := lockOrCreateRiderWalletTx(tx, candidate.RiderUserID, now)
+		if err != nil {
+			return err
+		}
 		var earning RiderEarningRecord
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("earning_public_id = ?", earningPublicID).First(&earning).Error; err != nil {
 			return normalizeNotFound(err)
+		}
+		if earning.RiderUserID != candidate.RiderUserID {
+			return ErrConcurrentUpdate
+		}
+		if _, active, err := activeRiderPayoutReservationTx(tx, earning.EarningPublicID); err != nil {
+			return err
+		} else if active {
+			return ErrRiderPayoutReserved
 		}
 		if earning.SettlementStatus == RiderEarningPaidOffline {
 			var payout RiderPayoutRecord
@@ -254,19 +272,14 @@ func (r *GormRepository) MarkRiderEarningPaidOffline(
 			if err := tx.Where("idempotency_key = ?", payout.IdempotencyKey).First(&ledger).Error; err != nil {
 				return normalizeNotFound(err)
 			}
-			wallet, err := lockOrCreateRiderWalletTx(tx, earning.RiderUserID, now)
 			result = RiderPayoutResult{Wallet: wallet, Earning: earning, Ledger: ledger, Payout: payout}
-			return err
+			return nil
 		}
 		if earning.SettlementStatus != RiderEarningPending && earning.SettlementStatus != RiderEarningSettled {
 			return ErrEarningSettled
 		}
 		if earning.RowVersion != expectedRowVersion {
 			return ErrConcurrentUpdate
-		}
-		wallet, err := lockOrCreateRiderWalletTx(tx, earning.RiderUserID, now)
-		if err != nil {
-			return err
 		}
 		payoutID, err := NewULID()
 		if err != nil {
@@ -327,8 +340,14 @@ func settleDeliveredOrderTx(tx *gorm.DB, order Order, now time.Time) (RiderEarni
 	if err := validateRiderEarningAmount(order.DeliveryFeeCents, order.PlatformCutCents, order.RiderFeeCents); err != nil {
 		return RiderEarningRecord{}, RiderWallet{}, RiderLedger{}, err
 	}
+	// Keep the rider money lock order consistent with payout queue mutations:
+	// wallet -> earning. The delivery order is already locked by the caller.
+	wallet, err := lockOrCreateRiderWalletTx(tx, *order.RiderUserID, now)
+	if err != nil {
+		return RiderEarningRecord{}, RiderWallet{}, RiderLedger{}, err
+	}
 	var existing RiderEarningRecord
-	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+	err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("delivery_order_public_id = ?", order.DeliveryOrderPublicID).First(&existing).Error
 	if err == nil {
 		if existing.RiderUserID != *order.RiderUserID ||
@@ -337,18 +356,13 @@ func settleDeliveredOrderTx(tx *gorm.DB, order Order, now time.Time) (RiderEarni
 			existing.RiderFeeCents != order.RiderFeeCents {
 			return RiderEarningRecord{}, RiderWallet{}, RiderLedger{}, ErrIdempotencyConflict
 		}
-		wallet, walletErr := lockOrCreateRiderWalletTx(tx, existing.RiderUserID, now)
 		var ledger RiderLedger
 		if ledgerErr := tx.Where("idempotency_key = ?", order.DeliveryOrderPublicID).First(&ledger).Error; ledgerErr != nil {
 			return existing, wallet, ledger, normalizeNotFound(ledgerErr)
 		}
-		return existing, wallet, ledger, walletErr
+		return existing, wallet, ledger, nil
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return RiderEarningRecord{}, RiderWallet{}, RiderLedger{}, err
-	}
-	wallet, err := lockOrCreateRiderWalletTx(tx, *order.RiderUserID, now)
-	if err != nil {
 		return RiderEarningRecord{}, RiderWallet{}, RiderLedger{}, err
 	}
 	earningID, err := NewULID()

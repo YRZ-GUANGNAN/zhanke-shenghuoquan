@@ -36,6 +36,79 @@ type TodayStatsView struct {
 	Definition       string `json:"definition"`
 }
 
+type RiderWalletView struct {
+	WalletState           delivery.RiderWalletState `json:"walletState"`
+	WalletPublicID        string                    `json:"walletPublicId,omitempty"`
+	AvailableBalanceCents uint64                    `json:"availableBalanceCents"`
+	ReservedCents         uint64                    `json:"reservedCents"`
+	UnverifiedCents       uint64                    `json:"unverifiedCents"`
+	UpdatedAt             *time.Time                `json:"updatedAt,omitempty"`
+}
+
+type RiderWalletEarningView struct {
+	EarningPublicID       string                      `json:"earningPublicId"`
+	DeliveryOrderPublicID string                      `json:"deliveryOrderPublicId"`
+	AmountCents           uint64                      `json:"amountCents"`
+	SettlementStatus      delivery.RiderEarningStatus `json:"settlementStatus"`
+	CreatedAt             time.Time                   `json:"createdAt"`
+	PaidOfflineAt         *time.Time                  `json:"paidOfflineAt,omitempty"`
+}
+
+type RiderWalletLedgerView struct {
+	LedgerPublicID     string                        `json:"ledgerPublicId"`
+	Direction          delivery.RiderLedgerDirection `json:"direction"`
+	EntryType          delivery.RiderLedgerEntryType `json:"entryType"`
+	AmountCents        uint64                        `json:"amountCents"`
+	BalanceBeforeCents uint64                        `json:"balanceBeforeCents"`
+	BalanceAfterCents  uint64                        `json:"balanceAfterCents"`
+	ReferencePublicID  string                        `json:"referencePublicId,omitempty"`
+	CreatedAt          time.Time                     `json:"createdAt"`
+}
+
+type RiderWalletQueueView struct {
+	PayoutQueuePublicID   string    `json:"payoutQueuePublicId"`
+	EarningPublicID       string    `json:"earningPublicId"`
+	DeliveryOrderPublicID string    `json:"deliveryOrderPublicId"`
+	AmountCents           uint64    `json:"amountCents"`
+	Status                string    `json:"status"`
+	ReasonCode            string    `json:"reasonCode,omitempty"`
+	CreatedAt             time.Time `json:"createdAt"`
+	UpdatedAt             time.Time `json:"updatedAt"`
+}
+
+func riderWalletView(value delivery.RiderWalletSnapshot) RiderWalletView {
+	return RiderWalletView{
+		WalletState: value.WalletState, WalletPublicID: value.WalletPublicID,
+		AvailableBalanceCents: value.AvailableBalanceCents, ReservedCents: value.ReservedCents,
+		UnverifiedCents: value.UnverifiedCents, UpdatedAt: value.UpdatedAt,
+	}
+}
+
+func riderWalletEarningView(value delivery.RiderEarningRecord) RiderWalletEarningView {
+	return RiderWalletEarningView{
+		EarningPublicID: value.EarningPublicID, DeliveryOrderPublicID: value.DeliveryOrderPublicID,
+		AmountCents: value.RiderFeeCents, SettlementStatus: value.SettlementStatus,
+		CreatedAt: value.CreatedAt, PaidOfflineAt: value.PaidOfflineAt,
+	}
+}
+
+func riderWalletLedgerView(value delivery.RiderLedger) RiderWalletLedgerView {
+	return RiderWalletLedgerView{
+		LedgerPublicID: value.LedgerPublicID, Direction: value.Direction, EntryType: value.EntryType,
+		AmountCents: value.AmountCents, BalanceBeforeCents: value.BalanceBeforeCents,
+		BalanceAfterCents: value.BalanceAfterCents, ReferencePublicID: value.ReferencePublicID,
+		CreatedAt: value.CreatedAt,
+	}
+}
+
+func riderWalletQueueView(value delivery.RiderPayoutQueueReadItem) RiderWalletQueueView {
+	return RiderWalletQueueView{
+		PayoutQueuePublicID: value.PayoutQueuePublicID, EarningPublicID: value.EarningPublicID,
+		DeliveryOrderPublicID: value.DeliveryOrderPublicID, AmountCents: value.AmountCents,
+		Status: value.Status, ReasonCode: value.ReasonCode, CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt,
+	}
+}
+
 type ClaimableOrderView struct {
 	DeliveryOrderPublicID string                  `json:"deliveryOrderPublicId"`
 	SourcePlatform        delivery.SourcePlatform `json:"sourcePlatform"`

@@ -21,6 +21,7 @@ type Handler struct {
 	riderWallets  delivery.RiderWalletRepository
 	currentUserID func(*gin.Context) uint64
 	now           func() time.Time
+	payoutQueue   delivery.RiderPayoutQueueRepository
 }
 
 func NewHandler(
@@ -61,8 +62,89 @@ func (h *Handler) Register(group *gin.RouterGroup) {
 	group.POST("/rider-earnings/:id/pay-offline", h.payOffline)
 	group.GET("/rider-earnings/:id", h.riderEarning)
 	group.GET("/rider-payouts", h.riderPayouts)
+	group.GET("/rider-payout-queue", h.riderPayoutQueue)
+	group.GET("/rider-payout-queue/:id", h.riderPayoutQueueDetail)
+	group.GET("/rider-payout-queue/:id/events", h.riderPayoutQueueEvents)
+	group.POST("/rider-payout-queue/:id/cancel", h.cancelRiderPayoutQueue)
 	group.GET("/refunds", h.refunds)
 	group.GET("/refunds/:id", h.refund)
+}
+
+func (h *Handler) WithPayoutQueue(value delivery.RiderPayoutQueueRepository) *Handler {
+	h.payoutQueue = value
+	return h
+}
+
+func (h *Handler) riderPayoutQueue(c *gin.Context) {
+	query, ok := h.queries.(payoutQueueQueries)
+	if !ok {
+		response.Fail(c, http.StatusServiceUnavailable, "rider payout queue unavailable")
+		return
+	}
+	filter, valid := h.parseFilter(c)
+	if !valid {
+		return
+	}
+	values, total, err := query.ListRiderPayoutQueues(c.Request.Context(), filter)
+	items := make([]RiderPayoutQueueView, 0, len(values))
+	for _, value := range values {
+		items = append(items, riderPayoutQueueView(value))
+	}
+	h.write(c, Page[RiderPayoutQueueView]{Items: items, Page: filter.Page, PageSize: filter.PageSize, Total: total}, err)
+}
+
+func (h *Handler) cancelRiderPayoutQueue(c *gin.Context) {
+	if h.payoutQueue == nil {
+		response.Fail(c, http.StatusServiceUnavailable, "rider payout queue unavailable")
+		return
+	}
+	if !delivery.ValidULID(c.Param("id")) {
+		response.Fail(c, http.StatusBadRequest, "invalid payout queue id")
+		return
+	}
+	var req struct {
+		ExpectedRowVersion uint64 `json:"expectedRowVersion"`
+		IdempotencyKey     string `json:"idempotencyKey"`
+		Reason             string `json:"reason"`
+	}
+	if c.ShouldBindJSON(&req) != nil || req.ExpectedRowVersion == 0 || !delivery.ValidULID(req.IdempotencyKey) || strings.TrimSpace(req.Reason) == "" {
+		response.Fail(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+	value, err := h.payoutQueue.CancelRiderPayoutQueue(c.Request.Context(), c.Param("id"), req.ExpectedRowVersion, h.currentUserID(c), req.IdempotencyKey, req.Reason, h.now().UTC())
+	h.write(c, riderPayoutQueueView(RiderPayoutQueueSnapshot{Queue: value.Queue, Reservation: value.Reservation}), err)
+}
+
+func (h *Handler) riderPayoutQueueDetail(c *gin.Context) {
+	if !delivery.ValidULID(c.Param("id")) {
+		response.Fail(c, http.StatusBadRequest, "invalid payout queue id")
+		return
+	}
+	query, ok := h.queries.(payoutQueueQueries)
+	if !ok {
+		response.Fail(c, http.StatusServiceUnavailable, "rider payout queue unavailable")
+		return
+	}
+	value, err := query.RiderPayoutQueue(c.Request.Context(), c.Param("id"))
+	h.write(c, riderPayoutQueueView(value), err)
+}
+
+func (h *Handler) riderPayoutQueueEvents(c *gin.Context) {
+	if !delivery.ValidULID(c.Param("id")) {
+		response.Fail(c, http.StatusBadRequest, "invalid payout queue id")
+		return
+	}
+	query, ok := h.queries.(payoutQueueQueries)
+	if !ok {
+		response.Fail(c, http.StatusServiceUnavailable, "rider payout queue unavailable")
+		return
+	}
+	filter, ok := h.parseFilter(c)
+	if !ok {
+		return
+	}
+	values, total, err := query.ListRiderPayoutQueueEvents(c.Request.Context(), c.Param("id"), filter)
+	h.write(c, Page[RiderPayoutQueueEventView]{Items: mapValues(values, riderPayoutQueueEventView), Page: filter.Page, PageSize: filter.PageSize, Total: total}, err)
 }
 
 func (h *Handler) summary(c *gin.Context) {
@@ -389,6 +471,10 @@ func (h *Handler) write(c *gin.Context, value any, err error) {
 	case errors.Is(err, delivery.ErrConcurrentUpdate), errors.Is(err, delivery.ErrIdempotencyConflict),
 		errors.Is(err, delivery.ErrEarningSettled), errors.Is(err, delivery.ErrWalletInsufficient):
 		response.Fail(c, http.StatusConflict, err.Error())
+	case errors.Is(err, delivery.ErrRiderPayoutReserved), errors.Is(err, delivery.ErrPayoutQueueNotCancellable):
+		response.Fail(c, http.StatusConflict, err.Error())
+	case errors.Is(err, delivery.ErrPayoutQueueUnavailable):
+		response.Fail(c, http.StatusServiceUnavailable, "rider payout queue unavailable")
 	case errors.Is(err, delivery.ErrInvalidRecord), errors.Is(err, delivery.ErrInvalidULID),
 		errors.Is(err, delivery.ErrAmountOverflow), errors.Is(err, ErrInvalidQuery):
 		response.Fail(c, http.StatusBadRequest, err.Error())

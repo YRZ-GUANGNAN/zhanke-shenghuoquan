@@ -99,7 +99,9 @@ function DeliveryProfileContent() {
         <Text className='delivery-profile__heading'>{role === 'merchant' ? '配送资金' : '配送收入'}</Text>
         {role === 'merchant' ? <View className='delivery-profile__link' ariaRole='button' ariaLabel='查看商家钱包与账单' onClick={() => open('/pages/merchant-wallet/index')}>
           <AppIcon name='wallet' /><View className='delivery-profile__link-copy'><Text>钱包与账单</Text><Text className='delivery-profile__caption'>{deliveryPaymentEnabled ? '查看真实余额、配送支出与充值记录' : '支付功能未开通，查看资金说明'}</Text></View><AppIcon name='chevron-right' />
-        </View> : <Text className='delivery-profile__caption'>配送收入以后端结算记录为准，当前未开放骑手端余额查询与提现。</Text>}
+        </View> : <View className='delivery-profile__link' ariaRole='button' ariaLabel='查看骑手收入与结算' onClick={() => open('/pages/rider-wallet/index')}>
+          <AppIcon name='wallet' /><View className='delivery-profile__link-copy'><Text>收入与结算</Text><Text className='delivery-profile__caption'>查看账面未结款、排队占用与结算记录</Text></View><AppIcon name='chevron-right' />
+        </View>}
       </View>
       <View className='delivery-profile__section'>
         <View className='delivery-profile__heading-row'>

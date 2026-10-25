@@ -108,7 +108,7 @@ for (const pageName of merchantPages) {
 const merchantPaymentGateContracts = [
   [
     'merchant-wallet',
-    /if\s*\(\s*!deliveryPaymentEnabled\s*\)/,
+    /if\s*\(\s*(?:!deliveryPaymentEnabled|paymentChecking\s*\|\|\s*paymentError\s*\|\|\s*!deliveryPaymentEnabled)\s*\)/,
     'merchant wallet must render a disabled state without requesting gated payment endpoints'
   ],
   [
@@ -130,6 +130,12 @@ for (const [pageName, contract, message] of merchantPaymentGateContracts) {
     violations.push(`pages/${pageName}/index.tsx: ${message}`)
   }
 }
+
+const riderWalletSource = fs.readFileSync(path.join(src, 'pages/rider-wallet/index.tsx'), 'utf8')
+for (const token of ["useIdentityGuard('rider')", 'getRiderWallet', 'listRiderEarnings', 'listRiderLedger', 'listRiderPayoutQueue']) {
+  if (!riderWalletSource.includes(token)) violations.push(`pages/rider-wallet/index.tsx: missing ${token}`)
+}
+if (/提现|充值|自动打款|requestPayment/.test(riderWalletSource)) violations.push('pages/rider-wallet/index.tsx: rider self page must remain read-only')
 
 const merchantPublish = fs.readFileSync(path.join(src, 'pages/merchant-publish/index.tsx'), 'utf8')
 if (!/const\s+testPublishEnabled\s*=\s*deliveryMockFeeEnabled\s*&&\s*!deliveryPaymentEnabled/.test(merchantPublish)) {
