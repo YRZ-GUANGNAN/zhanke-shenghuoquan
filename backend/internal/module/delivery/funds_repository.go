@@ -17,13 +17,13 @@ type FundsRepository interface {
 	ListLedger(context.Context, uint64, Page) ([]WalletLedger, int64, error)
 	CreatePaymentAttempt(context.Context, *PaymentAttempt) (PaymentAttempt, error)
 	FindPaymentAttemptOwned(context.Context, string, uint64) (PaymentAttempt, error)
-	MarkPaymentPrepayIssued(context.Context, string, uint64, string, time.Time) (PaymentAttempt, error)
+	MarkPaymentPrepayIssued(context.Context, string, uint64, string, string, time.Time) (PaymentAttempt, error)
 	PayOrderWithWallet(context.Context, uint64, string, uint64, string, time.Time) (FundsResult, error)
 	PayOrderWithMock(context.Context, *PaymentAttempt, uint64, time.Time) (FundsResult, error)
 	CreditMockRecharge(context.Context, *PaymentAttempt, time.Time) (FundsResult, error)
 	ConfirmWechatPayment(context.Context, PaymentConfirmation) (FundsResult, bool, error)
 	RequestRefund(context.Context, RefundRequest) (RefundResult, error)
-	CompleteRefund(context.Context, string, string, bool, string, time.Time) (RefundResult, error)
+	ObserveRefund(context.Context, RefundObservation) (RefundResult, error)
 	FindRefundByOutRefundNo(context.Context, string) (Refund, error)
 	FindOrderFundsOwned(context.Context, string, uint64) (OrderFundsSnapshot, error)
 }
@@ -42,9 +42,21 @@ type FundsResult struct {
 type PaymentConfirmation struct {
 	OutTradeNo          string
 	WechatTransactionID string
+	PayerOpenID         string
 	AmountCents         uint64
+	ProviderStatus      string
 	RawBody             []byte
 	PaidAt              time.Time
+}
+
+type RefundObservation struct {
+	OutRefundNo    string
+	OutTradeNo     string
+	WechatRefundID string
+	AmountCents    uint64
+	ProviderStatus RefundProviderStatus
+	FailureReason  string
+	ObservedAt     time.Time
 }
 
 type RefundRequest struct {
@@ -134,6 +146,7 @@ func (r *GormRepository) MarkPaymentPrepayIssued(
 	publicID string,
 	expectedRowVersion uint64,
 	prepayID string,
+	payerOpenID string,
 	at time.Time,
 ) (PaymentAttempt, error) {
 	var result PaymentAttempt
@@ -142,12 +155,17 @@ func (r *GormRepository) MarkPaymentPrepayIssued(
 			return normalizeNotFound(err)
 		}
 		if result.Status == PaymentPrepayIssued && result.PrepayID != nil && *result.PrepayID == prepayID {
+			if result.PayerOpenID == nil || *result.PayerOpenID != payerOpenID {
+				return ErrPaymentPayer
+			}
 			return nil
 		}
 		update := tx.Model(&PaymentAttempt{}).
 			Where("id = ? AND row_version = ? AND status = ?", result.ID, expectedRowVersion, PaymentCreated).
 			Updates(map[string]any{
 				"status": PaymentPrepayIssued, "prepay_id": prepayID,
+				"payer_openid": payerOpenID, "provider_status": "PREPAY_ISSUED",
+				"next_verify_at": at.Add(30 * time.Second), "last_error_code": "",
 				"row_version": gorm.Expr("row_version + 1"), "updated_at": at,
 			})
 		if update.Error != nil {
@@ -158,6 +176,10 @@ func (r *GormRepository) MarkPaymentPrepayIssued(
 		}
 		result.Status = PaymentPrepayIssued
 		result.PrepayID = &prepayID
+		result.PayerOpenID = &payerOpenID
+		result.ProviderStatus = "PREPAY_ISSUED"
+		result.NextVerifyAt = timePointer(at.Add(30 * time.Second))
+		result.LastErrorCode = ""
 		result.RowVersion++
 		result.UpdatedAt = at
 		return nil
@@ -339,8 +361,8 @@ func (r *GormRepository) ConfirmWechatPayment(ctx context.Context, input Payment
 			Where("out_trade_no = ?", input.OutTradeNo).First(&attempt).Error; err != nil {
 			return normalizeNotFound(err)
 		}
-		if attempt.Provider != PaymentWechat || attempt.AmountCents != input.AmountCents {
-			return ErrPaymentAmount
+		if err := validatePaymentObservation(attempt, input); err != nil {
+			return err
 		}
 		bodyHash := sha256.Sum256(input.RawBody)
 		notificationID, err := NewULID()
@@ -372,6 +394,8 @@ func (r *GormRepository) ConfirmWechatPayment(ctx context.Context, input Payment
 			Where("id = ? AND row_version = ? AND status IN ?", attempt.ID, attempt.RowVersion, []PaymentStatus{PaymentCreated, PaymentPrepayIssued}).
 			Updates(map[string]any{
 				"status": PaymentPaid, "wechat_transaction_id": transactionID,
+				"provider_status": input.ProviderStatus, "next_verify_at": nil,
+				"verify_lease_until": nil, "last_error_code": "",
 				"paid_at": input.PaidAt, "updated_at": input.PaidAt,
 				"row_version": gorm.Expr("row_version + 1"),
 			})
@@ -384,6 +408,10 @@ func (r *GormRepository) ConfirmWechatPayment(ctx context.Context, input Payment
 		attempt.Status = PaymentPaid
 		attempt.WechatTransactionID = &transactionID
 		attempt.PaidAt = timePointer(input.PaidAt)
+		attempt.ProviderStatus = input.ProviderStatus
+		attempt.NextVerifyAt = nil
+		attempt.VerifyLeaseUntil = nil
+		attempt.LastErrorCode = ""
 		attempt.RowVersion++
 		attempt.UpdatedAt = input.PaidAt
 		result.Attempt = &attempt
@@ -466,6 +494,22 @@ func (r *GormRepository) RequestRefund(ctx context.Context, request RefundReques
 		if err != nil {
 			return err
 		}
+		if settlement.Source == SettlementWechat {
+			if settlement.PaymentPublicID == nil {
+				return ErrRefundObservation
+			}
+			var attempt PaymentAttempt
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+				Where("payment_public_id = ?", *settlement.PaymentPublicID).First(&attempt).Error; err != nil {
+				return normalizeNotFound(err)
+			}
+			if attempt.Status != PaymentPaid || attempt.OutTradeNo == "" ||
+				attempt.AmountCents != settlement.AmountCents {
+				return ErrRefundObservation
+			}
+			refund.OutTradeNo = stringPointerOrNil(attempt.OutTradeNo)
+			refund.NextVerifyAt = timePointer(request.Now)
+		}
 		if settlement.Source == SettlementWallet {
 			wallet, err := lockOrCreateWalletTx(tx, settlement.MerchantUserID, request.Now)
 			if err != nil {
@@ -539,44 +583,68 @@ func (r *GormRepository) RequestRefund(ctx context.Context, request RefundReques
 	return result, err
 }
 
-func (r *GormRepository) CompleteRefund(
-	ctx context.Context,
-	outRefundNo string,
-	wechatRefundID string,
-	success bool,
-	reason string,
-	now time.Time,
-) (RefundResult, error) {
+func (r *GormRepository) ObserveRefund(ctx context.Context, input RefundObservation) (RefundResult, error) {
 	var result RefundResult
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var refund Refund
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("out_refund_no = ?", outRefundNo).First(&refund).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("out_refund_no = ?", input.OutRefundNo).First(&refund).Error; err != nil {
 			return normalizeNotFound(err)
 		}
 		var settlement FeeSettlement
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("settlement_public_id = ?", refund.SettlementPublicID).First(&settlement).Error; err != nil {
 			return normalizeNotFound(err)
 		}
+		if err := validateRefundObservation(refund, input); err != nil {
+			return err
+		}
 		if refund.Status == RefundSucceeded {
+			if input.ProviderStatus != RefundProviderSucceeded {
+				result = RefundResult{Refund: refund, Settlement: settlement}
+				return nil
+			}
+			if refund.WechatRefundID == nil || *refund.WechatRefundID != input.WechatRefundID {
+				return ErrRefundObservation
+			}
 			result = RefundResult{Refund: refund, Settlement: settlement}
 			return nil
 		}
-		refundID := strings.TrimSpace(wechatRefundID)
+		if refund.Status == RefundFailed && input.ProviderStatus != RefundProviderSucceeded {
+			result = RefundResult{Refund: refund, Settlement: settlement}
+			return nil
+		}
+		refundID := strings.TrimSpace(input.WechatRefundID)
 		status := RefundRetryPending
 		settlementStatus := SettlementRefundPending
 		updates := map[string]any{
-			"status": status, "failure_reason": truncate(reason, 512),
-			"updated_at": now, "row_version": gorm.Expr("row_version + 1"),
+			"status": status, "wechat_refund_id": refundID,
+			"provider_status":    string(input.ProviderStatus),
+			"failure_reason":     truncate(input.FailureReason, 512),
+			"verify_lease_until": nil, "updated_at": input.ObservedAt,
+			"row_version": gorm.Expr("row_version + 1"),
 		}
-		if refundID != "" {
-			updates["wechat_refund_id"] = refundID
-		}
-		if success {
+		switch input.ProviderStatus {
+		case RefundProviderSucceeded:
 			status = RefundSucceeded
 			settlementStatus = SettlementRefunded
 			updates["status"] = status
 			updates["failure_reason"] = ""
-			updates["succeeded_at"] = now
+			updates["last_error_code"] = ""
+			updates["next_verify_at"] = nil
+			updates["succeeded_at"] = input.ObservedAt
+		case RefundProviderProcessing:
+			updates["next_verify_at"] = input.ObservedAt.Add(30 * time.Second)
+			updates["last_error_code"] = ""
+		case RefundProviderAbnormal:
+			status = RefundFailed
+			updates["status"] = status
+			updates["next_verify_at"] = nil
+			updates["last_error_code"] = "refund_abnormal"
+		case RefundProviderClosed:
+			status = RefundFailed
+			updates["status"] = status
+			updates["next_verify_at"] = nil
+			updates["last_error_code"] = "refund_closed"
 		}
 		updateRefund := tx.Model(&Refund{}).Where("id = ? AND row_version = ?", refund.ID, refund.RowVersion).Updates(updates)
 		if updateRefund.Error != nil {
@@ -586,8 +654,8 @@ func (r *GormRepository) CompleteRefund(
 			return ErrConcurrentUpdate
 		}
 		settlementUpdates := map[string]any{"status": settlementStatus, "row_version": gorm.Expr("row_version + 1")}
-		if success {
-			settlementUpdates["refunded_at"] = now
+		if input.ProviderStatus == RefundProviderSucceeded {
+			settlementUpdates["refunded_at"] = input.ObservedAt
 		}
 		updateSettlement := tx.Model(&FeeSettlement{}).
 			Where("id = ? AND row_version = ?", settlement.ID, settlement.RowVersion).
@@ -600,20 +668,65 @@ func (r *GormRepository) CompleteRefund(
 		}
 		refund.Status = status
 		refund.WechatRefundID = stringPointerOrNil(refundID)
-		refund.FailureReason = truncate(reason, 512)
+		refund.ProviderStatus = string(input.ProviderStatus)
+		refund.FailureReason = truncate(input.FailureReason, 512)
+		refund.VerifyLeaseUntil = nil
 		refund.RowVersion++
-		refund.UpdatedAt = now
+		refund.UpdatedAt = input.ObservedAt
 		settlement.Status = settlementStatus
 		settlement.RowVersion++
-		if success {
+		switch input.ProviderStatus {
+		case RefundProviderSucceeded:
 			refund.FailureReason = ""
-			refund.SucceededAt = timePointer(now)
-			settlement.RefundedAt = timePointer(now)
+			refund.LastErrorCode = ""
+			refund.NextVerifyAt = nil
+			refund.SucceededAt = timePointer(input.ObservedAt)
+			settlement.RefundedAt = timePointer(input.ObservedAt)
+		case RefundProviderProcessing:
+			refund.LastErrorCode = ""
+			refund.NextVerifyAt = timePointer(input.ObservedAt.Add(30 * time.Second))
+		case RefundProviderAbnormal:
+			refund.LastErrorCode = "refund_abnormal"
+			refund.NextVerifyAt = nil
+		case RefundProviderClosed:
+			refund.LastErrorCode = "refund_closed"
+			refund.NextVerifyAt = nil
 		}
 		result = RefundResult{Refund: refund, Settlement: settlement}
 		return nil
 	})
 	return result, err
+}
+
+func validRefundProviderStatus(value RefundProviderStatus) bool {
+	switch value {
+	case RefundProviderProcessing, RefundProviderSucceeded, RefundProviderClosed, RefundProviderAbnormal:
+		return true
+	default:
+		return false
+	}
+}
+
+func validatePaymentObservation(attempt PaymentAttempt, input PaymentConfirmation) error {
+	if attempt.Provider != PaymentWechat || attempt.AmountCents != input.AmountCents {
+		return ErrPaymentAmount
+	}
+	if attempt.PayerOpenID == nil || *attempt.PayerOpenID != input.PayerOpenID {
+		return ErrPaymentPayer
+	}
+	return nil
+}
+
+func validateRefundObservation(refund Refund, input RefundObservation) error {
+	if refund.Source != SettlementWechat || refund.OutTradeNo == nil ||
+		*refund.OutTradeNo != input.OutTradeNo || refund.AmountCents != input.AmountCents ||
+		strings.TrimSpace(input.WechatRefundID) == "" || !validRefundProviderStatus(input.ProviderStatus) {
+		return ErrRefundObservation
+	}
+	if refund.WechatRefundID != nil && *refund.WechatRefundID != input.WechatRefundID {
+		return ErrRefundObservation
+	}
+	return nil
 }
 
 func (r *GormRepository) FindRefundByOutRefundNo(ctx context.Context, outRefundNo string) (Refund, error) {

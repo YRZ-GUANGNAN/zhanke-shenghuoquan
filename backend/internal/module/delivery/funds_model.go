@@ -11,10 +11,12 @@ var (
 	ErrPaymentForbidden   = errors.New("delivery payment is not owned by merchant")
 	ErrPaymentNotPending  = errors.New("delivery payment is not pending")
 	ErrPaymentAmount      = errors.New("delivery payment amount mismatch")
+	ErrPaymentPayer       = errors.New("delivery payment payer mismatch")
 	ErrPaymentConfigured  = errors.New("delivery payment provider is not configured")
 	ErrAlreadySettled     = errors.New("delivery order fee is already settled")
 	ErrRefundNotAllowed   = errors.New("delivery refund is not allowed")
 	ErrRefundNotPending   = errors.New("delivery refund is not pending")
+	ErrRefundObservation  = errors.New("delivery refund observation mismatch")
 )
 
 type LedgerDirection string
@@ -90,6 +92,15 @@ const (
 	RefundRetryPending RefundStatus = "refund_pending"
 )
 
+type RefundProviderStatus string
+
+const (
+	RefundProviderProcessing RefundProviderStatus = "PROCESSING"
+	RefundProviderSucceeded  RefundProviderStatus = "SUCCESS"
+	RefundProviderClosed     RefundProviderStatus = "CLOSED"
+	RefundProviderAbnormal   RefundProviderStatus = "ABNORMAL"
+)
+
 type MerchantWallet struct {
 	ID                    uint64    `gorm:"column:id;primaryKey"`
 	WalletPublicID        string    `gorm:"column:wallet_public_id;size:26;not null;uniqueIndex:uq_delivery_wallet_public_id"`
@@ -127,14 +138,20 @@ type PaymentAttempt struct {
 	Purpose               PaymentPurpose  `gorm:"column:purpose;size:24;not null;uniqueIndex:uq_delivery_payment_client_request,priority:2"`
 	DeliveryOrderPublicID *string         `gorm:"column:delivery_order_public_id;size:26;index:idx_delivery_payment_order"`
 	Provider              PaymentProvider `gorm:"column:provider;size:16;not null"`
-	Status                PaymentStatus   `gorm:"column:status;size:24;not null;index:idx_delivery_payment_status"`
+	Status                PaymentStatus   `gorm:"column:status;size:24;not null;index:idx_delivery_payment_status;index:idx_delivery_payment_verify,priority:1"`
 	AmountCents           uint64          `gorm:"column:amount_cents;not null"`
 	Currency              string          `gorm:"column:currency;size:8;not null"`
 	ClientRequestID       string          `gorm:"column:client_request_id;size:26;not null;uniqueIndex:uq_delivery_payment_client_request,priority:3"`
 	OutTradeNo            string          `gorm:"column:out_trade_no;size:64;not null;uniqueIndex:uq_delivery_payment_out_trade_no"`
 	PrepayID              *string         `gorm:"column:prepay_id;size:128"`
+	PayerOpenID           *string         `gorm:"column:payer_openid;size:128"`
 	WechatTransactionID   *string         `gorm:"column:wechat_transaction_id;size:128;uniqueIndex:uq_delivery_payment_wechat_transaction"`
 	MockTraceID           *string         `gorm:"column:mock_trace_id;size:64"`
+	ProviderStatus        string          `gorm:"column:provider_status;size:32;not null"`
+	NextVerifyAt          *time.Time      `gorm:"column:next_verify_at;index:idx_delivery_payment_verify,priority:2"`
+	VerifyLeaseUntil      *time.Time      `gorm:"column:verify_lease_until;index:idx_delivery_payment_verify,priority:3"`
+	VerifyAttemptCount    uint32          `gorm:"column:verify_attempt_count;not null"`
+	LastErrorCode         string          `gorm:"column:last_error_code;size:64;not null"`
 	RowVersion            uint64          `gorm:"column:row_version;not null"`
 	CreatedAt             time.Time       `gorm:"column:created_at;not null;index:idx_delivery_payment_merchant_created,priority:2"`
 	UpdatedAt             time.Time       `gorm:"column:updated_at;not null"`
@@ -182,11 +199,17 @@ type Refund struct {
 	MerchantUserID        uint64           `gorm:"column:merchant_user_id;not null"`
 	Source                SettlementSource `gorm:"column:source;size:16;not null"`
 	AmountCents           uint64           `gorm:"column:amount_cents;not null"`
-	Status                RefundStatus     `gorm:"column:status;size:24;not null;index:idx_delivery_refund_status"`
+	Status                RefundStatus     `gorm:"column:status;size:24;not null;index:idx_delivery_refund_status;index:idx_delivery_refund_verify,priority:1"`
 	IdempotencyKey        string           `gorm:"column:idempotency_key;size:26;not null;uniqueIndex:uq_delivery_refund_idempotency"`
 	OutRefundNo           string           `gorm:"column:out_refund_no;size:64;not null;uniqueIndex:uq_delivery_refund_out_refund_no"`
+	OutTradeNo            *string          `gorm:"column:out_trade_no;size:64;index:idx_delivery_refund_out_trade_no"`
 	WechatRefundID        *string          `gorm:"column:wechat_refund_id;size:128;uniqueIndex:uq_delivery_refund_wechat_id"`
 	FailureReason         string           `gorm:"column:failure_reason;size:512;not null"`
+	ProviderStatus        string           `gorm:"column:provider_status;size:32;not null"`
+	NextVerifyAt          *time.Time       `gorm:"column:next_verify_at;index:idx_delivery_refund_verify,priority:2"`
+	VerifyLeaseUntil      *time.Time       `gorm:"column:verify_lease_until;index:idx_delivery_refund_verify,priority:3"`
+	VerifyAttemptCount    uint32           `gorm:"column:verify_attempt_count;not null"`
+	LastErrorCode         string           `gorm:"column:last_error_code;size:64;not null"`
 	RowVersion            uint64           `gorm:"column:row_version;not null"`
 	CreatedAt             time.Time        `gorm:"column:created_at;not null"`
 	UpdatedAt             time.Time        `gorm:"column:updated_at;not null"`

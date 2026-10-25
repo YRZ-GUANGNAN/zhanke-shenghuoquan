@@ -30,8 +30,22 @@ func Test02FundsMigrationRollbackApplyAgainstRealMySQL84(t *testing.T) {
 		}
 	}
 	applyD1SQLFile(t, db, "../../../migrations/025_delivery_payment_wallet.sql")
+	applyD1SQLFile(t, db, "../../../migrations/048_delivery_payment_recovery.sql")
 	assertD3Schema(t, db)
 	t.Log("migration_025_apply_rollback_apply=PASS tables=6 foreign_keys=0 money_checks=PASS")
+}
+
+func Test03PaymentRecoveryMigrationRollbackApplyAgainstRealMySQL84(t *testing.T) {
+	db := openD3MySQL(t)
+	cleanupD3(t, db)
+	applyD1SQLFile(t, db, "../../../migrations/rollback/048_delivery_payment_recovery.sql")
+	if db.Migrator().HasColumn(&PaymentAttempt{}, "payer_openid") ||
+		db.Migrator().HasColumn(&Refund{}, "out_trade_no") {
+		t.Fatal("rollback 048 left recovery columns")
+	}
+	applyD1SQLFile(t, db, "../../../migrations/048_delivery_payment_recovery.sql")
+	assertD3Schema(t, db)
+	t.Log("migration_048_apply_rollback_apply=PASS historical_trust_backfill=NONE")
 }
 
 func TestFundsWalletPaymentAtomicityIdempotencyAndRefundAgainstRealMySQL84(t *testing.T) {
@@ -194,9 +208,17 @@ func TestFundsSingleSettlementCompetitionAndWechatCallbackAgainstRealMySQL84(t *
 	if err != nil {
 		t.Fatal(err)
 	}
+	started.Attempt, err = funds.MarkPrepayIssued(
+		ctx, started.Attempt.PaymentPublicID, started.Attempt.RowVersion,
+		"prepay-d3-transaction-1", "openid-d3-merchant",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	confirmation := PaymentConfirmation{
 		OutTradeNo: started.Attempt.OutTradeNo, WechatTransactionID: "wx-d3-transaction-1",
-		AmountCents: 150, RawBody: []byte(`{"fixture":"d3-payment"}`), PaidAt: now,
+		PayerOpenID: "openid-d3-merchant", AmountCents: 150,
+		RawBody: []byte(`{"fixture":"d3-payment"}`), PaidAt: now,
 	}
 	confirmed, duplicate, err := funds.ConfirmWechatPayment(ctx, confirmation)
 	if err != nil || duplicate || confirmed.Order == nil ||
@@ -218,9 +240,17 @@ func TestFundsSingleSettlementCompetitionAndWechatCallbackAgainstRealMySQL84(t *
 	if err != nil {
 		t.Fatal(err)
 	}
+	wrong.Attempt, err = funds.MarkPrepayIssued(
+		ctx, wrong.Attempt.PaymentPublicID, wrong.Attempt.RowVersion,
+		"prepay-d3-wrong", "openid-d3-merchant",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, _, err := funds.ConfirmWechatPayment(ctx, PaymentConfirmation{
 		OutTradeNo: wrong.Attempt.OutTradeNo, WechatTransactionID: "wx-d3-wrong",
-		AmountCents: 151, RawBody: []byte(`{"fixture":"wrong-amount"}`), PaidAt: now,
+		PayerOpenID: "openid-d3-merchant", AmountCents: 151,
+		RawBody: []byte(`{"fixture":"wrong-amount"}`), PaidAt: now,
 	}); !errors.Is(err, ErrPaymentAmount) {
 		t.Fatalf("wrong callback amount returned %v", err)
 	}
@@ -276,9 +306,17 @@ func TestFundsRefundRulesAndWechatRetryAgainstRealMySQL84(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	started.Attempt, err = funds.MarkPrepayIssued(
+		ctx, started.Attempt.PaymentPublicID, started.Attempt.RowVersion,
+		"prepay-d3-refund", "openid-d3-refund",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	confirmed, _, err := funds.ConfirmWechatPayment(ctx, PaymentConfirmation{
 		OutTradeNo: started.Attempt.OutTradeNo, WechatTransactionID: "wx-d3-refund",
-		AmountCents: 150, RawBody: []byte(`{"fixture":"refund"}`), PaidAt: now,
+		PayerOpenID: "openid-d3-refund", AmountCents: 150,
+		RawBody: []byte(`{"fixture":"refund"}`), PaidAt: now,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -291,23 +329,39 @@ func TestFundsRefundRulesAndWechatRetryAgainstRealMySQL84(t *testing.T) {
 		requested.Settlement.Status != SettlementRefundPending {
 		t.Fatalf("wechat refund request=%#v err=%v", requested, err)
 	}
-	retry, err := funds.CompleteRefund(
-		ctx, requested.Refund.OutRefundNo, "wx-refund-1", false, "provider timeout",
-	)
+	if requested.Refund.OutTradeNo == nil || *requested.Refund.OutTradeNo != started.Attempt.OutTradeNo {
+		t.Fatalf("refund source snapshot=%#v", requested.Refund)
+	}
+	if _, err := funds.ObserveRefund(ctx, RefundObservation{
+		OutRefundNo: requested.Refund.OutRefundNo, OutTradeNo: "D3WRONG",
+		WechatRefundID: "wx-refund-1", AmountCents: 150,
+		ProviderStatus: RefundProviderProcessing,
+	}); !errors.Is(err, ErrRefundObservation) {
+		t.Fatalf("mismatched original transaction returned %v", err)
+	}
+	retry, err := funds.ObserveRefund(ctx, RefundObservation{
+		OutRefundNo: requested.Refund.OutRefundNo, OutTradeNo: started.Attempt.OutTradeNo,
+		WechatRefundID: "wx-refund-1", AmountCents: 150,
+		ProviderStatus: RefundProviderProcessing, FailureReason: "provider processing",
+	})
 	if err != nil || retry.Refund.Status != RefundRetryPending ||
 		retry.Settlement.Status != SettlementRefundPending {
 		t.Fatalf("wechat refund retry=%#v err=%v", retry, err)
 	}
-	succeeded, err := funds.CompleteRefund(
-		ctx, requested.Refund.OutRefundNo, "wx-refund-1", true, "",
-	)
+	succeeded, err := funds.ObserveRefund(ctx, RefundObservation{
+		OutRefundNo: requested.Refund.OutRefundNo, OutTradeNo: started.Attempt.OutTradeNo,
+		WechatRefundID: "wx-refund-1", AmountCents: 150,
+		ProviderStatus: RefundProviderSucceeded,
+	})
 	if err != nil || succeeded.Refund.Status != RefundSucceeded ||
 		succeeded.Settlement.Status != SettlementRefunded {
 		t.Fatalf("wechat refund success=%#v err=%v", succeeded, err)
 	}
-	repeated, err := funds.CompleteRefund(
-		ctx, requested.Refund.OutRefundNo, "wx-refund-1", true, "",
-	)
+	repeated, err := funds.ObserveRefund(ctx, RefundObservation{
+		OutRefundNo: requested.Refund.OutRefundNo, OutTradeNo: started.Attempt.OutTradeNo,
+		WechatRefundID: "wx-refund-1", AmountCents: 150,
+		ProviderStatus: RefundProviderSucceeded,
+	})
 	if err != nil || repeated.Refund.Status != RefundSucceeded {
 		t.Fatalf("idempotent refund callback=%#v err=%v", repeated, err)
 	}
@@ -349,10 +403,12 @@ func openD3MySQL(t *testing.T) *gorm.DB {
 
 func ensureD3Schema(t *testing.T, db *gorm.DB) {
 	t.Helper()
-	if db.Migrator().HasTable(&MerchantWallet{}) {
-		return
+	if !db.Migrator().HasTable(&MerchantWallet{}) {
+		applyD1SQLFile(t, db, "../../../migrations/025_delivery_payment_wallet.sql")
 	}
-	applyD1SQLFile(t, db, "../../../migrations/025_delivery_payment_wallet.sql")
+	if !db.Migrator().HasColumn(&PaymentAttempt{}, "payer_openid") {
+		applyD1SQLFile(t, db, "../../../migrations/048_delivery_payment_recovery.sql")
+	}
 }
 
 func assertD3Schema(t *testing.T, db *gorm.DB) {
@@ -375,6 +431,28 @@ func assertD3Schema(t *testing.T, db *gorm.DB) {
 			WHERE table_schema=DATABASE() AND table_name=? AND index_name=?`, table, index).
 			Scan(&count).Error; err != nil || count == 0 {
 			t.Fatalf("missing D-3 index %s.%s count=%d err=%v", table, index, count, err)
+		}
+	}
+	for _, index := range []struct{ table, name string }{
+		{table: "delivery_payment_attempts", name: "idx_delivery_payment_verify"},
+		{table: "delivery_refunds", name: "idx_delivery_refund_verify"},
+		{table: "delivery_refunds", name: "idx_delivery_refund_out_trade_no"},
+	} {
+		var count int64
+		if err := db.Raw(`SELECT COUNT(*) FROM information_schema.statistics
+			WHERE table_schema=DATABASE() AND table_name=? AND index_name=?`, index.table, index.name).
+			Scan(&count).Error; err != nil || count == 0 {
+			t.Fatalf("missing recovery index %s.%s count=%d err=%v", index.table, index.name, count, err)
+		}
+	}
+	for _, column := range []struct{ table, name string }{
+		{table: "delivery_payment_attempts", name: "payer_openid"},
+		{table: "delivery_payment_attempts", name: "next_verify_at"},
+		{table: "delivery_refunds", name: "out_trade_no"},
+		{table: "delivery_refunds", name: "next_verify_at"},
+	} {
+		if !db.Migrator().HasColumn(column.table, column.name) {
+			t.Fatalf("missing recovery column %s.%s", column.table, column.name)
 		}
 	}
 	var foreignKeys int64

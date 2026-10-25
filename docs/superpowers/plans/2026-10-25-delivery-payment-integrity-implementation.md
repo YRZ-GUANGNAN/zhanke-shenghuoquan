@@ -72,11 +72,11 @@ Expected: PASS，测试仅使用 `httptest.Server` 与临时 RSA 密钥，不访
 - Modify: `backend/internal/module/delivery/funds_service.go`
 - Modify: `backend/internal/module/delivery/zz_funds_mysql_test.go`
 
-- [ ] **Step 1: 先写迁移和状态竞争失败测试**
+- [x] **Step 1: 先写迁移和状态竞争失败测试**
 
 支付记录新增付款人快照、供应商状态、下次核实时间、租约、尝试次数和脱敏错误码；退款记录新增原交易号、供应商状态及相同的补偿字段。既有记录字段允许 `NULL`，不得把历史记录猜成真实成功。
 
-- [ ] **Step 2: 添加前向迁移**
+- [x] **Step 2: 添加前向迁移**
 
 ```sql
 ALTER TABLE delivery_payment_attempts
@@ -98,11 +98,11 @@ ALTER TABLE delivery_refunds
 
 同时添加 `(status, next_verify_at, verify_lease_until)` 索引；回滚只移除本迁移字段和索引。迁移测试只允许独立临时库。
 
-- [ ] **Step 3: 保存付款人和退款原交易号**
+- [x] **Step 3: 保存付款人和退款原交易号**
 
 `MarkPrepayIssued` 同时保存创建预支付时使用的 `openid`。创建微信退款时从关联支付记录写入 `out_trade_no`，后续回调与查询必须同时匹配退款单号、原交易号、退款金额及币种。
 
-- [ ] **Step 4: 用显式结果替换退款 success bool**
+- [x] **Step 4: 用显式结果替换退款 success bool**
 
 ```go
 type RefundObservation struct {
@@ -115,7 +115,7 @@ type RefundObservation struct {
 
 `SUCCESS` 原子完成退款；`PROCESSING` 保持锁定；`ABNORMAL` 进入人工异常；`CLOSED` 明确结束本次退款但不把钱恢复成已退款。重复和乱序观察不得覆盖可信成功。
 
-- [ ] **Step 5: 运行领域与 MySQL 测试**
+- [x] **Step 5: 运行领域与 MySQL 测试**
 
 Run: `go test ./internal/module/delivery`
 

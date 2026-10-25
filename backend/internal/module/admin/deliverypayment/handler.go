@@ -189,16 +189,17 @@ func (h *Handler) issuePrepay(c *gin.Context, value *delivery.PaymentStartResult
 	default:
 		return nil, delivery.ErrPaymentNotPending
 	}
+	payerOpenID := strings.TrimSpace(h.currentOpenID(c))
 	prepay, err := h.provider.CreatePrepay(c.Request.Context(), PrepayRequest{
 		Description: description, OutTradeNo: value.Attempt.OutTradeNo,
-		AmountCents: value.Attempt.AmountCents, OpenID: h.currentOpenID(c),
+		AmountCents: value.Attempt.AmountCents, OpenID: payerOpenID,
 	})
 	if err != nil {
 		return nil, err
 	}
 	value.Attempt, err = h.funds.MarkPrepayIssued(
 		c.Request.Context(), value.Attempt.PaymentPublicID,
-		value.Attempt.RowVersion, prepay.PrepayID,
+		value.Attempt.RowVersion, prepay.PrepayID, payerOpenID,
 	)
 	if err != nil {
 		return nil, err
@@ -252,17 +253,19 @@ func (h *Handler) refund(c *gin.Context, admin bool) {
 			OutTradeNo: attempt.OutTradeNo, OutRefundNo: value.Refund.OutRefundNo,
 			AmountCents: value.Refund.AmountCents, Reason: "配送服务取消退款",
 		})
-		success := providerErr == nil && providerResult.Status == "SUCCESS"
-		reason := ""
 		if providerErr != nil {
-			reason = providerErr.Error()
-		} else if !success {
-			reason = "wechat refund accepted; awaiting callback"
+			h.write(c, nil, providerErr)
+			return
 		}
-		value, err = h.funds.CompleteRefund(
-			c.Request.Context(), value.Refund.OutRefundNo,
-			providerResult.WechatRefundID, success, reason,
-		)
+		reason := ""
+		if providerResult.Status != "SUCCESS" && providerResult.Status != "PROCESSING" {
+			reason = "wechat refund requires attention"
+		}
+		value, err = h.funds.ObserveRefund(c.Request.Context(), delivery.RefundObservation{
+			OutRefundNo: value.Refund.OutRefundNo, OutTradeNo: attempt.OutTradeNo,
+			WechatRefundID: providerResult.WechatRefundID, AmountCents: value.Refund.AmountCents,
+			ProviderStatus: delivery.RefundProviderStatus(providerResult.Status), FailureReason: reason,
+		})
 		if err != nil {
 			h.write(c, nil, err)
 			return
@@ -284,7 +287,8 @@ func (h *Handler) paymentNotify(c *gin.Context) {
 	}
 	_, _, err = h.funds.ConfirmWechatPayment(c.Request.Context(), delivery.PaymentConfirmation{
 		OutTradeNo: value.OutTradeNo, WechatTransactionID: value.WechatTransactionID,
-		AmountCents: value.AmountCents, RawBody: body, PaidAt: value.PaidAt,
+		PayerOpenID: value.PayerOpenID, AmountCents: value.AmountCents,
+		ProviderStatus: "SUCCESS", RawBody: body, PaidAt: value.PaidAt,
 	})
 	if err != nil {
 		h.write(c, nil, err)
@@ -304,10 +308,11 @@ func (h *Handler) refundNotify(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, "invalid refund notification")
 		return
 	}
-	if _, err := h.funds.CompleteRefund(
-		c.Request.Context(), value.OutRefundNo, value.WechatRefundID,
-		value.Success, value.Reason,
-	); err != nil {
+	if _, err := h.funds.ObserveRefund(c.Request.Context(), delivery.RefundObservation{
+		OutRefundNo: value.OutRefundNo, OutTradeNo: value.OutTradeNo,
+		WechatRefundID: value.WechatRefundID, AmountCents: value.AmountCents,
+		ProviderStatus: delivery.RefundProviderStatus(value.Status), FailureReason: value.Reason,
+	}); err != nil {
 		h.write(c, nil, err)
 		return
 	}
@@ -325,6 +330,9 @@ func (h *Handler) write(c *gin.Context, value any, err error) {
 		response.Fail(c, http.StatusForbidden, err.Error())
 	case errors.Is(err, delivery.ErrWalletInsufficient):
 		response.Fail(c, http.StatusUnprocessableEntity, err.Error())
+	case errors.Is(err, delivery.ErrPaymentAmount), errors.Is(err, delivery.ErrPaymentPayer),
+		errors.Is(err, delivery.ErrRefundObservation):
+		response.Fail(c, http.StatusBadRequest, "invalid delivery payment result")
 	case errors.Is(err, ErrProviderNotConfigured):
 		response.Fail(c, http.StatusServiceUnavailable, err.Error())
 	case errors.Is(err, ErrProviderRejected):

@@ -173,10 +173,18 @@ func TestD3OrderFundsReadOnlyRealHTTPMySQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	started.Attempt, err = runtime.funds.MarkPrepayIssued(
+		ctx, started.Attempt.PaymentPublicID, started.Attempt.RowVersion,
+		"prepay-d3-readonly", merchant.User.OpenID,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	confirmed, _, err := runtime.funds.ConfirmWechatPayment(ctx, delivery.PaymentConfirmation{
 		OutTradeNo: started.Attempt.OutTradeNo, WechatTransactionID: wechatTransactionID,
-		AmountCents: started.Attempt.AmountCents, RawBody: []byte(`{"d3":"readonly"}`),
-		PaidAt: time.Now().UTC(),
+		PayerOpenID: merchant.User.OpenID, AmountCents: started.Attempt.AmountCents,
+		RawBody: []byte(`{"d3":"readonly"}`),
+		PaidAt:  time.Now().UTC(),
 	})
 	if err != nil || confirmed.Order == nil {
 		t.Fatalf("confirm wechat fixture result=%#v err=%v", confirmed, err)

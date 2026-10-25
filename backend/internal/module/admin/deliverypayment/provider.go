@@ -112,6 +112,7 @@ type RefundNotificationResult struct {
 	OutRefundNo    string
 	WechatRefundID string
 	AmountCents    uint64
+	Status         string
 	Success        bool
 	Reason         string
 }
@@ -535,7 +536,7 @@ func (p *WechatProvider) ParseRefundNotification(req *http.Request, body []byte)
 	return RefundNotificationResult{
 		OutTradeNo: value.OutTradeNo, OutRefundNo: value.OutRefundNo,
 		WechatRefundID: value.RefundID, AmountCents: value.Amount.Refund,
-		Success: success, Reason: reason,
+		Status: value.Status, Success: success, Reason: reason,
 	}, nil
 }
 

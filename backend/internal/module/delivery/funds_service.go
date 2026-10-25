@@ -170,20 +170,28 @@ func (s *FundsService) MarkPrepayIssued(
 	paymentPublicID string,
 	expectedRowVersion uint64,
 	prepayID string,
+	payerOpenID string,
 ) (PaymentAttempt, error) {
-	if !ValidULID(strings.TrimSpace(paymentPublicID)) || expectedRowVersion == 0 || strings.TrimSpace(prepayID) == "" {
+	if !ValidULID(strings.TrimSpace(paymentPublicID)) || expectedRowVersion == 0 ||
+		strings.TrimSpace(prepayID) == "" || strings.TrimSpace(payerOpenID) == "" {
 		return PaymentAttempt{}, ErrInvalidRecord
 	}
 	return s.repository.MarkPaymentPrepayIssued(
 		ctx, strings.TrimSpace(paymentPublicID), expectedRowVersion,
-		strings.TrimSpace(prepayID), s.now().UTC(),
+		strings.TrimSpace(prepayID), strings.TrimSpace(payerOpenID), s.now().UTC(),
 	)
 }
 
 func (s *FundsService) ConfirmWechatPayment(ctx context.Context, input PaymentConfirmation) (FundsResult, bool, error) {
 	input.OutTradeNo = strings.TrimSpace(input.OutTradeNo)
 	input.WechatTransactionID = strings.TrimSpace(input.WechatTransactionID)
-	if input.OutTradeNo == "" || input.WechatTransactionID == "" || input.AmountCents == 0 || len(input.RawBody) == 0 {
+	input.PayerOpenID = strings.TrimSpace(input.PayerOpenID)
+	input.ProviderStatus = strings.TrimSpace(input.ProviderStatus)
+	if input.ProviderStatus == "" {
+		input.ProviderStatus = "SUCCESS"
+	}
+	if input.OutTradeNo == "" || input.WechatTransactionID == "" || input.PayerOpenID == "" ||
+		input.AmountCents == 0 || len(input.RawBody) == 0 || input.ProviderStatus != "SUCCESS" {
 		return FundsResult{}, false, ErrInvalidRecord
 	}
 	if input.PaidAt.IsZero() {
@@ -239,19 +247,21 @@ func (s *FundsService) requestRefund(
 	})
 }
 
-func (s *FundsService) CompleteRefund(
-	ctx context.Context,
-	outRefundNo, wechatRefundID string,
-	success bool,
-	reason string,
-) (RefundResult, error) {
-	if strings.TrimSpace(outRefundNo) == "" {
+func (s *FundsService) ObserveRefund(ctx context.Context, input RefundObservation) (RefundResult, error) {
+	input.OutRefundNo = strings.TrimSpace(input.OutRefundNo)
+	input.OutTradeNo = strings.TrimSpace(input.OutTradeNo)
+	input.WechatRefundID = strings.TrimSpace(input.WechatRefundID)
+	input.FailureReason = strings.TrimSpace(input.FailureReason)
+	if input.OutRefundNo == "" || input.OutTradeNo == "" || input.WechatRefundID == "" ||
+		input.AmountCents == 0 || !validRefundProviderStatus(input.ProviderStatus) {
 		return RefundResult{}, ErrInvalidRecord
 	}
-	return s.repository.CompleteRefund(
-		ctx, strings.TrimSpace(outRefundNo), strings.TrimSpace(wechatRefundID),
-		success, strings.TrimSpace(reason), s.now().UTC(),
-	)
+	if input.ObservedAt.IsZero() {
+		input.ObservedAt = s.now().UTC()
+	} else {
+		input.ObservedAt = input.ObservedAt.UTC()
+	}
+	return s.repository.ObserveRefund(ctx, input)
 }
 
 func (s *FundsService) newAttempt(
