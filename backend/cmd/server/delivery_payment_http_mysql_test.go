@@ -128,10 +128,20 @@ func TestD3DeliveryPaymentRealHTTPMySQLAuthAndGate(t *testing.T) {
 
 func ensureD3ServerSchema(t *testing.T, db *gorm.DB) {
 	t.Helper()
-	if db.Migrator().HasTable(&delivery.MerchantWallet{}) {
-		return
+	if !db.Migrator().HasTable(&delivery.MerchantWallet{}) {
+		applyD3ServerSQLFile(t, db, "../../migrations/025_delivery_payment_wallet.sql")
 	}
-	file, err := os.Open(filepath.Clean("../../migrations/025_delivery_payment_wallet.sql"))
+	if !db.Migrator().HasColumn(&delivery.PaymentAttempt{}, "payer_openid") {
+		applyD3ServerSQLFile(t, db, "../../migrations/048_delivery_payment_recovery.sql")
+	}
+	if !db.Migrator().HasTable(&delivery.FundingLot{}) {
+		applyD3ServerSQLFile(t, db, "../../migrations/049_delivery_funding_sources.sql")
+	}
+}
+
+func applyD3ServerSQLFile(t *testing.T, db *gorm.DB, relativePath string) {
+	t.Helper()
+	file, err := os.Open(filepath.Clean(relativePath))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +159,7 @@ func ensureD3ServerSchema(t *testing.T, db *gorm.DB) {
 		statement.Reset()
 		if query != "" {
 			if err := db.Exec(query).Error; err != nil {
-				t.Fatalf("apply migration 025: %v", err)
+				t.Fatalf("apply %s: %v", relativePath, err)
 			}
 		}
 	}
@@ -183,6 +193,7 @@ func cleanupD3Server(t *testing.T, db *gorm.DB) {
 			t.Errorf("cleanup D-3 HTTP notifications: %v", err)
 		}
 		for _, value := range []any{
+			&delivery.FundingAllocation{}, &delivery.FundingLot{},
 			&delivery.Refund{}, &delivery.FeeSettlement{}, &delivery.PaymentAttempt{},
 			&delivery.WalletLedger{}, &delivery.MerchantWallet{},
 		} {

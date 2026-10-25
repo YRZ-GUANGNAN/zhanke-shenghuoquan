@@ -309,6 +309,7 @@ func assertD3ReadonlyResidueZero(
 	t.Helper()
 	userIDs := []uint64{merchantUserID, otherUserID}
 	for _, value := range []any{
+		&delivery.FundingAllocation{}, &delivery.FundingLot{},
 		&delivery.Refund{}, &delivery.FeeSettlement{}, &delivery.PaymentAttempt{},
 		&delivery.WalletLedger{}, &delivery.MerchantWallet{}, &delivery.Order{},
 	} {

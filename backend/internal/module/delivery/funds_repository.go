@@ -339,6 +339,9 @@ func (r *GormRepository) PayOrderWithWallet(
 		if err := tx.Create(&settlement).Error; err != nil {
 			return mapSettlementConflict(err)
 		}
+		if _, err := allocateWalletFundingTx(tx, wallet, settlement, now); err != nil {
+			return err
+		}
 		ready, event, err := transitionToReadyAndEnqueueTx(
 			tx, orderPublicID, &merchantUserID, expectedRowVersion, StatusPendingFeePayment, nil, now,
 		)
@@ -425,6 +428,13 @@ func (r *GormRepository) CreditMockRecharge(ctx context.Context, attempt *Paymen
 		if err != nil {
 			return err
 		}
+		lots, available, err := lockWalletFundingLotsTx(tx, wallet)
+		if err != nil {
+			return err
+		}
+		if _, _, err := ensureWalletFundingCoverageTx(tx, wallet, lots, available, now); err != nil {
+			return err
+		}
 		ledger, err := newLedger(wallet, LedgerCredit, LedgerRecharge, attempt.AmountCents, "payment", attempt.PaymentPublicID, attempt.PaymentPublicID, now)
 		if err != nil {
 			return err
@@ -436,6 +446,9 @@ func (r *GormRepository) CreditMockRecharge(ctx context.Context, attempt *Paymen
 			return err
 		}
 		if err := tx.Create(&ledger).Error; err != nil {
+			return err
+		}
+		if _, err := createRechargeFundingLotTx(tx, wallet, *attempt, now); err != nil {
 			return err
 		}
 		result = FundsResult{Wallet: &wallet, Ledger: &ledger, Attempt: attempt}
@@ -512,6 +525,13 @@ func (r *GormRepository) ConfirmWechatPayment(ctx context.Context, input Payment
 			if err != nil {
 				return err
 			}
+			lots, available, err := lockWalletFundingLotsTx(tx, wallet)
+			if err != nil {
+				return err
+			}
+			if _, _, err := ensureWalletFundingCoverageTx(tx, wallet, lots, available, input.PaidAt); err != nil {
+				return err
+			}
 			ledger, err := newLedger(wallet, LedgerCredit, LedgerRecharge, attempt.AmountCents, "payment", attempt.PaymentPublicID, attempt.PaymentPublicID, input.PaidAt)
 			if err != nil {
 				return err
@@ -520,6 +540,9 @@ func (r *GormRepository) ConfirmWechatPayment(ctx context.Context, input Payment
 				return err
 			}
 			if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&ledger).Error; err != nil {
+				return err
+			}
+			if _, err := createRechargeFundingLotTx(tx, wallet, attempt, input.PaidAt); err != nil {
 				return err
 			}
 			result.Wallet, result.Ledger = &wallet, &ledger
@@ -609,6 +632,9 @@ func (r *GormRepository) RequestRefund(ctx context.Context, request RefundReques
 			}
 			ledger, err := newLedger(wallet, LedgerCredit, LedgerRefund, settlement.AmountCents, "refund", refund.RefundPublicID, request.IdempotencyKey, request.Now)
 			if err != nil {
+				return err
+			}
+			if err := restoreWalletFundingTx(tx, wallet, settlement, request.Now); err != nil {
 				return err
 			}
 			if err := creditWalletTx(tx, &wallet, settlement.AmountCents, request.Now); err != nil {

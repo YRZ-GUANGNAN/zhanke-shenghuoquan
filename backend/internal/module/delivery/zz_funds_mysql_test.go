@@ -23,6 +23,8 @@ func Test02FundsMigrationRollbackApplyAgainstRealMySQL84(t *testing.T) {
 	ensureD3Schema(t, db)
 	cleanupD3(t, db)
 
+	applyD1SQLFile(t, db, "../../../migrations/rollback/049_delivery_funding_sources.sql")
+	applyD1SQLFile(t, db, "../../../migrations/rollback/048_delivery_payment_recovery.sql")
 	applyD1SQLFile(t, db, "../../../migrations/rollback/025_delivery_payment_wallet.sql")
 	for _, table := range d3Tables() {
 		if db.Migrator().HasTable(table) {
@@ -31,8 +33,9 @@ func Test02FundsMigrationRollbackApplyAgainstRealMySQL84(t *testing.T) {
 	}
 	applyD1SQLFile(t, db, "../../../migrations/025_delivery_payment_wallet.sql")
 	applyD1SQLFile(t, db, "../../../migrations/048_delivery_payment_recovery.sql")
+	applyD1SQLFile(t, db, "../../../migrations/049_delivery_funding_sources.sql")
 	assertD3Schema(t, db)
-	t.Log("migration_025_apply_rollback_apply=PASS tables=6 foreign_keys=0 money_checks=PASS")
+	t.Log("migration_025_048_049_apply_rollback_apply=PASS tables=8 foreign_keys=0 money_checks=PASS")
 }
 
 func Test03PaymentRecoveryMigrationRollbackApplyAgainstRealMySQL84(t *testing.T) {
@@ -46,6 +49,18 @@ func Test03PaymentRecoveryMigrationRollbackApplyAgainstRealMySQL84(t *testing.T)
 	applyD1SQLFile(t, db, "../../../migrations/048_delivery_payment_recovery.sql")
 	assertD3Schema(t, db)
 	t.Log("migration_048_apply_rollback_apply=PASS historical_trust_backfill=NONE")
+}
+
+func Test04FundingSourceMigrationRollbackApplyAgainstRealMySQL84(t *testing.T) {
+	db := openD3MySQL(t)
+	cleanupD3(t, db)
+	applyD1SQLFile(t, db, "../../../migrations/rollback/049_delivery_funding_sources.sql")
+	if db.Migrator().HasTable(&FundingLot{}) || db.Migrator().HasTable(&FundingAllocation{}) {
+		t.Fatal("rollback 049 left funding source tables")
+	}
+	applyD1SQLFile(t, db, "../../../migrations/049_delivery_funding_sources.sql")
+	assertD3Schema(t, db)
+	t.Log("migration_049_apply_rollback_apply=PASS historical_funding_backfill=NONE")
 }
 
 func TestFundsWalletPaymentAtomicityIdempotencyAndRefundAgainstRealMySQL84(t *testing.T) {
@@ -139,6 +154,178 @@ func TestFundsWalletPaymentAtomicityIdempotencyAndRefundAgainstRealMySQL84(t *te
 	assertD3Count(t, db, (&Refund{}).TableName(), "delivery_order_public_id = ?", 1, order.DeliveryOrderPublicID)
 	assertD3Count(t, db, (&WalletLedger{}).TableName(), "merchant_user_id = ? AND entry_type = ?", 1, fundsMerchantOne, LedgerRefund)
 	t.Log("wallet_funds=PASS recharge+atomic_debit+insufficient_rollback+owner_fence+idempotent_refund")
+}
+
+func TestFundingSourcesFIFOConservationRefundAndHistoricalIsolationAgainstRealMySQL84(t *testing.T) {
+	db := openD3MySQL(t)
+	cleanupD3(t, db)
+	t.Cleanup(func() { cleanupD3(t, db) })
+	ctx := context.Background()
+	now := time.Date(2026, 10, 25, 8, 0, 0, 0, time.UTC)
+	repository := NewRepository(db)
+	base, _ := NewService(repository, func() time.Time { return now })
+	dispatch, _ := NewDispatchService(
+		repository, base, activeEligibility{},
+		FeePolicy{DeliveryFeeCents: 150, RiderFeeCents: 100, PlatformCutCents: 50},
+		func() time.Time { return now },
+	)
+	funds, _ := NewFundsService(repository, repository, func() time.Time { return now })
+
+	wechat, err := funds.StartRecharge(ctx, fundsMerchantOne, 200, mustFundsULID(t), PaymentWechat)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wechat.Attempt, err = funds.MarkPrepayIssued(
+		ctx, wechat.Attempt.PaymentPublicID, wechat.Attempt.RowVersion,
+		"prepay-funding-verified", "openid-funding-verified",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := funds.ConfirmWechatPayment(ctx, PaymentConfirmation{
+		OutTradeNo:          wechat.Attempt.OutTradeNo,
+		WechatTransactionID: "wx-funding-verified",
+		PayerOpenID:         "openid-funding-verified",
+		AmountCents:         200,
+		RawBody:             []byte(`{"funding":"verified"}`),
+		PaidAt:              now,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := funds.StartRecharge(ctx, fundsMerchantOne, 200, mustFundsULID(t), PaymentMock); err != nil {
+		t.Fatal(err)
+	}
+
+	firstOrder := createFundsOrder(t, ctx, dispatch, fundsMerchantOne)
+	first, err := funds.PayOrderWithWallet(
+		ctx, fundsMerchantOne, firstOrder.DeliveryOrderPublicID,
+		firstOrder.RowVersion, mustFundsULID(t),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondOrder := createFundsOrder(t, ctx, dispatch, fundsMerchantOne)
+	if _, err := funds.PayOrderWithWallet(
+		ctx, fundsMerchantOne, secondOrder.DeliveryOrderPublicID,
+		secondOrder.RowVersion, mustFundsULID(t),
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	var verified, mock FundingLot
+	if err := db.Where("payment_public_id = ?", wechat.Attempt.PaymentPublicID).First(&verified).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Where("merchant_user_id = ? AND source = ?", fundsMerchantOne, FundingSourceMockRecharge).
+		First(&mock).Error; err != nil {
+		t.Fatal(err)
+	}
+	if verified.VerificationStatus != FundingVerificationVerified ||
+		verified.AllocatedAmountCents != 200 || verified.RefundedAmountCents != 0 {
+		t.Fatalf("verified lot=%#v", verified)
+	}
+	if mock.VerificationStatus != FundingVerificationUnverified ||
+		mock.AllocatedAmountCents != 100 || mock.RefundedAmountCents != 0 {
+		t.Fatalf("mock lot=%#v", mock)
+	}
+
+	refunded, err := funds.RequestMerchantRefund(
+		ctx, fundsMerchantOne, firstOrder.DeliveryOrderPublicID,
+		first.Order.RowVersion, mustFundsULID(t),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if refunded.Wallet == nil || refunded.Wallet.AvailableBalanceCents != 250 {
+		t.Fatalf("refunded wallet=%#v", refunded.Wallet)
+	}
+	if err := db.Where("funding_lot_public_id = ?", verified.FundingLotPublicID).First(&verified).Error; err != nil {
+		t.Fatal(err)
+	}
+	if verified.AllocatedAmountCents != 200 || verified.RefundedAmountCents != 150 {
+		t.Fatalf("released verified lot=%#v", verified)
+	}
+
+	thirdOrder := createFundsOrder(t, ctx, dispatch, fundsMerchantOne)
+	fourthOrder := createFundsOrder(t, ctx, dispatch, fundsMerchantOne)
+	start := make(chan struct{})
+	errorsByOrder := make(chan error, 2)
+	var wait sync.WaitGroup
+	concurrentKeys := []string{mustFundsULID(t), mustFundsULID(t)}
+	for index, order := range []Order{thirdOrder, fourthOrder} {
+		order := order
+		key := concurrentKeys[index]
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			<-start
+			_, payErr := funds.PayOrderWithWallet(
+				ctx, fundsMerchantOne, order.DeliveryOrderPublicID,
+				order.RowVersion, key,
+			)
+			errorsByOrder <- payErr
+		}()
+	}
+	close(start)
+	wait.Wait()
+	close(errorsByOrder)
+	succeeded := 0
+	insufficient := 0
+	for payErr := range errorsByOrder {
+		switch {
+		case payErr == nil:
+			succeeded++
+		case errors.Is(payErr, ErrWalletInsufficient):
+			insufficient++
+		default:
+			t.Fatalf("concurrent funding allocation returned %v", payErr)
+		}
+	}
+	if succeeded != 1 || insufficient != 1 {
+		t.Fatalf("concurrent funding results succeeded=%d insufficient=%d", succeeded, insufficient)
+	}
+	assertFundingConservation(t, db, fundsMerchantOne)
+
+	historicalWallet, err := repository.Wallet(ctx, fundsMerchantTwo, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&MerchantWallet{}).Where("id = ?", historicalWallet.ID).
+		Update("available_balance_cents", 150).Error; err != nil {
+		t.Fatal(err)
+	}
+	historicalOrder := createFundsOrder(t, ctx, dispatch, fundsMerchantTwo)
+	historicalPaid, err := funds.PayOrderWithWallet(
+		ctx, fundsMerchantTwo, historicalOrder.DeliveryOrderPublicID,
+		historicalOrder.RowVersion, mustFundsULID(t),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var historical FundingLot
+	if err := db.Where("merchant_user_id = ?", fundsMerchantTwo).First(&historical).Error; err != nil {
+		t.Fatal(err)
+	}
+	if historical.Source != FundingSourceHistoricalUnknown ||
+		historical.VerificationStatus != FundingVerificationUnverified ||
+		historical.PaymentPublicID != nil || historical.AllocatedAmountCents != 150 {
+		t.Fatalf("historical lot=%#v", historical)
+	}
+	if _, err := funds.RequestMerchantRefund(
+		ctx, fundsMerchantTwo, historicalOrder.DeliveryOrderPublicID,
+		historicalPaid.Order.RowVersion, mustFundsULID(t),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Where("funding_lot_public_id = ?", historical.FundingLotPublicID).First(&historical).Error; err != nil {
+		t.Fatal(err)
+	}
+	if historical.RefundedAmountCents != 150 ||
+		historical.VerificationStatus != FundingVerificationUnverified {
+		t.Fatalf("refunded historical lot=%#v", historical)
+	}
+	assertFundingConservation(t, db, fundsMerchantTwo)
+	t.Log("funding_sources=PASS verified+mock+FIFO+refund_release+concurrency+historical_unknown")
 }
 
 func TestFundsSingleSettlementCompetitionAndWechatCallbackAgainstRealMySQL84(t *testing.T) {
@@ -575,6 +762,9 @@ func ensureD3Schema(t *testing.T, db *gorm.DB) {
 	if !db.Migrator().HasColumn(&PaymentAttempt{}, "payer_openid") {
 		applyD1SQLFile(t, db, "../../../migrations/048_delivery_payment_recovery.sql")
 	}
+	if !db.Migrator().HasTable(&FundingLot{}) {
+		applyD1SQLFile(t, db, "../../../migrations/049_delivery_funding_sources.sql")
+	}
 }
 
 func assertD3Schema(t *testing.T, db *gorm.DB) {
@@ -591,6 +781,8 @@ func assertD3Schema(t *testing.T, db *gorm.DB) {
 		"delivery_payment_notifications": "uq_delivery_notification_transaction",
 		"delivery_fee_settlements":       "uq_delivery_settlement_order",
 		"delivery_refunds":               "uq_delivery_refund_settlement",
+		"delivery_funding_lots":          "uq_delivery_funding_lot_payment",
+		"delivery_funding_allocations":   "uq_delivery_funding_allocation_settlement_lot",
 	} {
 		var count int64
 		if err := db.Raw(`SELECT COUNT(*) FROM information_schema.statistics
@@ -628,10 +820,12 @@ func assertD3Schema(t *testing.T, db *gorm.DB) {
 		t.Fatalf("D-3 foreign keys=%d err=%v", foreignKeys, err)
 	}
 	for table, check := range map[string]string{
-		"delivery_wallet_ledger":    "chk_delivery_ledger_balance",
-		"delivery_payment_attempts": "chk_delivery_payment_reference",
-		"delivery_fee_settlements":  "chk_delivery_settlement_status",
-		"delivery_refunds":          "chk_delivery_refund_status",
+		"delivery_wallet_ledger":       "chk_delivery_ledger_balance",
+		"delivery_payment_attempts":    "chk_delivery_payment_reference",
+		"delivery_fee_settlements":     "chk_delivery_settlement_status",
+		"delivery_refunds":             "chk_delivery_refund_status",
+		"delivery_funding_lots":        "chk_delivery_funding_lot_amounts",
+		"delivery_funding_allocations": "chk_delivery_funding_allocation_amounts",
 	} {
 		var count int64
 		if err := db.Raw(`SELECT COUNT(*) FROM information_schema.table_constraints
@@ -698,6 +892,7 @@ func cleanupD3(t *testing.T, db *gorm.DB) {
 		t.Errorf("cleanup D-3 notifications: %v", err)
 	}
 	for _, value := range []any{
+		&FundingAllocation{}, &FundingLot{},
 		&Refund{}, &FeeSettlement{}, &PaymentAttempt{}, &WalletLedger{}, &MerchantWallet{},
 	} {
 		if err := db.Where("merchant_user_id IN ?", merchants).Delete(value).Error; err != nil {
@@ -715,6 +910,33 @@ func d3Tables() []string {
 	return []string{
 		"delivery_merchant_wallets", "delivery_wallet_ledger", "delivery_payment_attempts",
 		"delivery_payment_notifications", "delivery_fee_settlements", "delivery_refunds",
+		"delivery_funding_lots", "delivery_funding_allocations",
+	}
+}
+
+func assertFundingConservation(t *testing.T, db *gorm.DB, merchantUserID uint64) {
+	t.Helper()
+	var lots []FundingLot
+	if err := db.Where("merchant_user_id = ?", merchantUserID).Order("id").Find(&lots).Error; err != nil {
+		t.Fatal(err)
+	}
+	var sourceAvailable uint64
+	for _, lot := range lots {
+		available, err := fundingLotAvailableCents(lot)
+		if err != nil {
+			t.Fatalf("invalid funding lot %#v: %v", lot, err)
+		}
+		if ^uint64(0)-sourceAvailable < available {
+			t.Fatal("funding availability overflow")
+		}
+		sourceAvailable += available
+	}
+	var wallet MerchantWallet
+	if err := db.Where("merchant_user_id = ?", merchantUserID).First(&wallet).Error; err != nil {
+		t.Fatal(err)
+	}
+	if sourceAvailable != wallet.AvailableBalanceCents {
+		t.Fatalf("funding available=%d wallet balance=%d", sourceAvailable, wallet.AvailableBalanceCents)
 	}
 }
 

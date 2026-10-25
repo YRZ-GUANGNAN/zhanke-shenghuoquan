@@ -176,19 +176,19 @@ Expected: PASS；没有真实资金请求。
 - Create: `backend/internal/module/delivery/funding_source_test.go`
 - Modify: `backend/internal/module/delivery/funds_repository.go`
 
-- [ ] **Step 1: 写同一充值不可重复消费的并发测试**
+- [x] **Step 1: 写同一充值不可重复消费的并发测试**
 
 两个订单同时消费余额时，批次分配总额不得超过已确认充值；退款恢复原分配，不能生成新资金；mock 和历史未知余额永远不能成为 `verified`。
 
-- [ ] **Step 2: 添加资金批次与分配表**
+- [x] **Step 2: 添加资金批次与分配表**
 
 `delivery_funding_lots` 记录真实支付来源、总额、已分配、已退款和核验状态；`delivery_funding_allocations` 记录订单结算使用的批次金额。唯一引用和金额 CHECK 保证守恒。
 
-- [ ] **Step 3: 在现有事务内分配/回滚**
+- [x] **Step 3: 在现有事务内分配/回滚**
 
 微信充值成功时创建 `verified` 批次；钱包支付订单时按创建时间稳定分配；直接微信支付的订单结算直接关联原支付。历史余额保持 `unknown` 并在后台差异报告中显示，迁移不补造批次。
 
-- [ ] **Step 4: 运行资金守恒测试**
+- [x] **Step 4: 运行资金守恒测试**
 
 Run: `go test ./internal/module/delivery -run 'Funding|Funds'`
 
