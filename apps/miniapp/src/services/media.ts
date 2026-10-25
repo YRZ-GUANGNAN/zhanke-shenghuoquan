@@ -61,9 +61,61 @@ export async function postMotionAvailable(): Promise<boolean> {
   catch { return false }
 }
 
+type SelectedMediaFile = Awaited<ReturnType<typeof Taro.chooseMedia>>['tempFiles'][number]
+
+export type UploadedPostSelection =
+  | { kind: 'images'; images: UploadedMedia[] }
+  | { kind: 'motion'; motion: UploadedPostMotion }
+
+/** A single picker, with the entire selection checked before any upload starts. */
+export async function chooseAndUploadPostMedia(
+  count: number, allowMotion: boolean,
+  onProgress: (message: string) => void, shouldContinue: () => boolean
+): Promise<UploadedPostSelection> {
+  assertUploadActive(shouldContinue)
+  if (!Number.isInteger(count) || count < 1 || count > 9) throw new Error('最多选择 9 张图片')
+  const selected = await Taro.chooseMedia({
+    count, mediaType: allowMotion ? ['image', 'video'] : ['image'],
+    sourceType: ['album', 'camera'], sizeType: ['original'], maxDuration: 60
+  })
+  assertUploadActive(shouldContinue)
+  const files = selected.tempFiles
+  if (!files.length) return { kind: 'images', images: [] }
+  if (files.length > count) throw new Error(`最多再选择 ${count} 张图片`)
+  const kinds = files.map(file => file.fileType || (!allowMotion ? 'image' : ''))
+  if (kinds.some(kind => kind !== 'image' && kind !== 'video') || files.some(file => !file.tempFilePath)) {
+    throw new Error('暂时无法识别此媒体，请重新选择照片或视频')
+  }
+  if (kinds.includes('video')) {
+    if (!allowMotion) throw new Error('当前只能添加图片')
+    if (files.length !== 1) throw new Error('请选择最多 9 张图片或 1 条视频，不能混合添加')
+    return { kind: 'motion', motion: await uploadPostMotionClip('video', files[0], '', onProgress, shouldContinue) }
+  }
+  const images = await mapConcurrent(files, 3, (file, index) =>
+    uploadImage(file.tempFilePath, 'post_image', (_percent, _stage, message) => {
+      onProgress(`图片 ${index + 1}/${files.length}：${message}`)
+    }, shouldContinue)
+  )
+  assertUploadActive(shouldContinue)
+  return { kind: 'images', images }
+}
+
+/** Native Live Photo pairing is not exposed: attach an explicitly selected short clip. */
+export async function chooseAndAttachPostLiveClip(
+  poster: UploadedMedia, onProgress: (message: string) => void, shouldContinue: () => boolean
+): Promise<UploadedPostMotion> {
+  assertUploadActive(shouldContinue)
+  if (poster.purpose !== 'post' || !poster.assetId || !poster.previewPath) throw new Error('请先选择一张帖子图片')
+  const selected = await Taro.chooseMedia({ count: 1, mediaType: ['video'], sourceType: ['album'], maxDuration: 5, sizeType: ['compressed'] })
+  assertUploadActive(shouldContinue)
+  if (selected.tempFiles.length !== 1) throw new Error('请选择一个对应的动态片段')
+  return uploadPostMotionClip('live_photo', selected.tempFiles[0], poster, onProgress, shouldContinue)
+}
+
 export async function chooseAndUploadPostMotion(
   kind: UploadedPostMotion['kind'], onProgress: (message: string) => void, shouldContinue: () => boolean
 ): Promise<UploadedPostMotion> {
+  assertUploadActive(shouldContinue)
   let posterPath = ''
   if (kind === 'live_photo') {
     const photo = await Taro.chooseMedia({ count: 1, mediaType: ['image'], sourceType: ['album'], sizeType: ['original'] })
@@ -73,27 +125,40 @@ export async function chooseAndUploadPostMotion(
   }
   const selected = await Taro.chooseMedia({ count: 1, mediaType: ['video'], sourceType: ['album', 'camera'], maxDuration: kind === 'live_photo' ? 5 : 60, sizeType: ['compressed'] })
   assertUploadActive(shouldContinue)
-  const clip = selected.tempFiles[0]
+  if (selected.tempFiles.length !== 1) throw new Error('请选择一个视频片段')
+  return uploadPostMotionClip(kind, selected.tempFiles[0], posterPath, onProgress, shouldContinue)
+}
+
+async function uploadPostMotionClip(
+  kind: UploadedPostMotion['kind'], clip: SelectedMediaFile, existingPoster: string | UploadedMedia,
+  onProgress: (message: string) => void, shouldContinue: () => boolean
+): Promise<UploadedPostMotion> {
+  assertUploadActive(shouldContinue)
+  if (!clip || (clip.fileType && clip.fileType !== 'video')) throw new Error('请选择视频片段')
   const seconds = clip?.duration ?? 0
   if (!clip || !Number.isFinite(seconds) || seconds < .5 || seconds > (kind === 'live_photo' ? 5 : 60)) {
     throw new Error(kind === 'live_photo' ? '请选择 0.5～5 秒的对应实况片段' : '请选择 0.5～60 秒的视频')
   }
   if (clip.size > 30 * 1024 * 1024) throw new Error('视频不能超过 30 MB，请先压缩或裁剪')
-  if (!posterPath) posterPath = clip.thumbTempFilePath ?? ''
-  if (!posterPath) {
-    const cover = await Taro.chooseMedia({ count: 1, mediaType: ['image'], sourceType: ['album'], sizeType: ['original'] })
-    posterPath = cover.tempFiles[0]?.tempFilePath ?? ''
-  }
-  assertUploadActive(shouldContinue)
-  if (!posterPath) throw new Error('请为视频选择封面')
   // Validate before creating either upload; extension alone is not trusted.
   const info = await Taro.getFileInfo({ filePath: clip.tempFilePath, digestAlgorithm: 'md5' })
+  assertUploadActive(shouldContinue)
   if (info.size <= 0 || info.size > 30 * 1024 * 1024) throw new Error('视频不能超过 30 MB')
   const bytes = readFileBytes(clip.tempFilePath)
   if (bytes.byteLength !== info.size) throw new Error('视频读取失败，请重新选择')
   const header = new Uint8Array(bytes, 0, Math.min(12, bytes.byteLength))
   if (header.length < 12 || String.fromCharCode(...header.slice(4, 8)) !== 'ftyp') throw new Error('请先将视频导出为 MP4 格式')
-  const poster = await uploadImage(posterPath, 'post_image', (_p, _s, message) => onProgress(`封面：${message}`), shouldContinue)
+  let posterPath = typeof existingPoster === 'string' ? existingPoster || clip.thumbTempFilePath || '' : existingPoster.previewPath
+  if (!posterPath) {
+    onProgress('请选择视频封面')
+    const cover = await Taro.chooseMedia({ count: 1, mediaType: ['image'], sourceType: ['album'], sizeType: ['original'] })
+    assertUploadActive(shouldContinue)
+    posterPath = cover.tempFiles[0]?.tempFilePath ?? ''
+  }
+  if (!posterPath) throw new Error('请为视频选择封面')
+  const poster = typeof existingPoster === 'string'
+    ? await uploadImage(posterPath, 'post_image', (_p, _s, message) => onProgress(`封面：${message}`), shouldContinue)
+    : existingPoster
   assertUploadActive(shouldContinue)
   onProgress('正在上传视频')
   const session = await request<UploadSession>('/miniapp/media/uploads', {

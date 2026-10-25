@@ -15,6 +15,7 @@ export interface AppDialogProps {
   loading?: boolean
   error?: string
   showCancel?: boolean
+  className?: string
   onConfirm: () => void
   onCancel: () => void
 }
@@ -30,6 +31,7 @@ export function AppDialog({
   loading = false,
   error,
   showCancel = true,
+  className = '',
   onConfirm,
   onCancel,
 }: AppDialogProps) {
@@ -66,7 +68,7 @@ export function AppDialog({
     }
   }
   return (
-    <View className={`app-dialog-layer app-dialog-layer--${phase}`} onClick={(event) => event.stopPropagation()}>
+    <View className={`app-dialog-layer app-dialog-layer--${phase}${className ? ` ${className}` : ''}`} onClick={(event) => event.stopPropagation()}>
       <View className='app-dialog-layer__mask' onClick={handleCancel} />
       <View className={`app-dialog app-dialog--${phase}`} role='dialog' aria-modal>
         <Text className='app-dialog__title'>{title}</Text>

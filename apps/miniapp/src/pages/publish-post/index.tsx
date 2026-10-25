@@ -9,7 +9,7 @@ import {
   createCommunityPost,
   listHotCommunityTags,
 } from '../../services/b-community'
-import { chooseAndUploadImages, waitForMediaApprovals, chooseAndUploadPostMotion, confirmPostMotion, postMotionAvailable, type UploadedPostMotion, type UploadedMedia } from '../../services/media'
+import { chooseAndUploadPostMedia, chooseAndAttachPostLiveClip, waitForMediaApprovals, confirmPostMotion, postMotionAvailable, type UploadedPostMotion, type UploadedMedia } from '../../services/media'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
 import './index.scss'
@@ -118,7 +118,7 @@ function PublishPostPage() {
     setCustomTag('')
   }
 
-  const handlePickImages = async () => {
+  const handlePickMedia = async () => {
     if (uploadLock.current || submitLock.current || publishedIdRef.current || motion) return
     const remaining = MAX_IMAGES - images.length
     if (remaining <= 0) {
@@ -128,41 +128,48 @@ function PublishPostPage() {
     uploadLock.current = true
     setUploading(true)
     setEditorError('')
-    setUploadHint('上传中')
+    setUploadHint('正在选择')
     try {
-      const uploaded = await chooseAndUploadImages('post_image', remaining, (progress) => {
-        setUploadHint(`${Math.min(MAX_IMAGES, images.length + progress.index + 1)}/${MAX_IMAGES}`)
-      })
-      if (uploaded.length > 0) resetClientRequestId()
-      setImages((current) => [...current, ...uploaded].slice(0, MAX_IMAGES))
-      setUploadHint(`${Math.min(MAX_IMAGES, images.length + uploaded.length)}/${MAX_IMAGES}`)
-      if (uploaded.length > 0) toast('图片已上传', 'success')
+      const selected = await chooseAndUploadPostMedia(remaining, motionEnabled && images.length === 0,
+        message => { if (alive.current) setUploadHint(message) }, () => alive.current)
+      if (!alive.current) return
+      if (selected.kind === 'motion') {
+        resetClientRequestId()
+        setMotion(selected.motion)
+      } else if (selected.images.length) {
+        resetClientRequestId()
+        setImages((current) => [...current, ...selected.images].slice(0, MAX_IMAGES))
+        toast('图片已上传', 'success')
+      }
     } catch (error) {
-      console.error('upload post image failed', error)
-      setUploadHint(`${images.length}/${MAX_IMAGES}`)
-      const message = error instanceof Error ? error.message : '图片上传失败'
-      setEditorError(message)
-      toast(message, 'error')
+      const message = error instanceof Error ? error.message : String((error as { errMsg?: string })?.errMsg ?? '媒体上传失败')
+      if (alive.current && !/cancel/i.test(message)) {
+        setEditorError(message)
+        toast(message, 'error')
+      }
     } finally {
       uploadLock.current = false
-      setUploading(false)
+      if (alive.current) {
+        setUploading(false)
+        setUploadHint('')
+      }
     }
   }
 
-  const handlePickMotion = async (kind: UploadedPostMotion['kind']) => {
-    if (!motionEnabled || images.length || motion || uploadLock.current || submitLock.current || publishedIdRef.current) return
+  const handleAttachLiveClip = async () => {
+    if (!motionEnabled || images.length !== 1 || motion || uploadLock.current || submitLock.current || publishedIdRef.current) return
     uploadLock.current = true
-    setUploading(true); setEditorError('')
+    setUploading(true); setEditorError(''); setUploadHint('选择对应的 0.5～5 秒动态片段')
     try {
-      const value = await chooseAndUploadPostMotion(kind, message => { if (alive.current) setUploadHint(message) }, () => alive.current)
+      const value = await chooseAndAttachPostLiveClip(images[0], message => { if (alive.current) setUploadHint(message) }, () => alive.current)
       if (!alive.current) return
-      resetClientRequestId(); setMotion(value); setUploadHint('已上传，发布时确认审核')
+      resetClientRequestId(); setMotion(value); setImages([])
     } catch (error) {
       const message = error instanceof Error ? error.message : String((error as { errMsg?: string })?.errMsg ?? '媒体上传失败')
       if (alive.current && !/cancel/i.test(message)) setEditorError(message)
     } finally {
       uploadLock.current = false
-      if (alive.current) setUploading(false)
+      if (alive.current) { setUploading(false); setUploadHint('') }
     }
   }
 
@@ -279,16 +286,16 @@ function PublishPostPage() {
           {images.map((image) => <View className='publish-post-media__item' key={image.assetId}>
             <Image className='publish-post-media__image' src={image.previewPath} mode='aspectFill' />
           </View>)}
-          {!motion && <View className={`publish-post-upload${uploading || submitting || images.length === MAX_IMAGES ? ' publish-post-control--pending' : ''}`} role='button' aria-label='添加帖子图片' aria-disabled={uploading || submitting || images.length === MAX_IMAGES} onClick={() => void handlePickImages()}>
+          {!motion && <View className={`publish-post-upload${uploading || submitting || publishedId || images.length === MAX_IMAGES ? ' publish-post-control--pending' : ''}`} role='button' aria-label={motionEnabled && !images.length ? '从相册选择照片或视频' : '添加帖子图片'} aria-disabled={uploading || submitting || Boolean(publishedId) || images.length === MAX_IMAGES} onClick={() => void handlePickMedia()}>
             <Text className='publish-post-upload__icon'>{images.length === MAX_IMAGES ? '✓' : '＋'}</Text>
-            <Text className='publish-post-upload__count'>{uploading ? uploadHint : `${images.length}/${MAX_IMAGES}`}</Text>
+            <Text className='publish-post-upload__count'>{uploading ? '处理中' : `${images.length}/${MAX_IMAGES}`}</Text>
           </View>}
         </View>
-        {motionEnabled && !images.length && !motion && <View className='publish-post-motion-actions'>
-          <View role='button' aria-disabled={uploading || submitting} className={uploading || submitting ? 'publish-post-control--pending' : ''} onClick={() => void handlePickMotion('video')}><Text>添加视频</Text></View>
-          <View role='button' aria-disabled={uploading || submitting} className={uploading || submitting ? 'publish-post-control--pending' : ''} onClick={() => void handlePickMotion('live_photo')}><Text>添加实况照片</Text></View>
-        </View>}
-        {motionEnabled && !images.length && !motion && <Text className='publish-post-motion-tip'>视频最长 60 秒；实况照片由封面照片和对应的 5 秒内片段组成</Text>}
+        {motionEnabled && images.length === 1 && !motion && <View
+          className={`publish-post-attach-clip${uploading || submitting || publishedId ? ' publish-post-control--pending' : ''}`}
+          role='button' aria-label='给这张照片添加对应的五秒内动态片段'
+          aria-disabled={uploading || submitting || Boolean(publishedId)} onClick={() => void handleAttachLiveClip()}
+        ><Text>添加动态片段</Text><Text className='publish-post-attach-clip__hint'>对应这张照片 · 5 秒内</Text></View>}
         {uploading && <View className='publish-post-motion-tip' role='status'><Text>{uploadHint}</Text></View>}
 
         <Textarea

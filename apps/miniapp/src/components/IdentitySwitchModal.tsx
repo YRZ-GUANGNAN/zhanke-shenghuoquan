@@ -46,6 +46,7 @@ export default function IdentitySwitchModal({
   return (
     <AppDialog
       visible={visible}
+      className='identity-switch-dialog'
       title={title}
       description={roleDescriptions[targetRole]}
       confirmText={confirmText}
@@ -59,8 +60,10 @@ export default function IdentitySwitchModal({
           <View className='identity-switch-modal__role-icon'>
             <AppIcon name={currentRole} />
           </View>
-          <Text className='identity-switch-modal__role-name'>{roleNames[currentRole]}</Text>
-          <Text className='identity-switch-modal__role-state'>当前</Text>
+          <View className='identity-switch-modal__role-copy'>
+            <Text className='identity-switch-modal__role-name'>{roleNames[currentRole]}</Text>
+            <Text className='identity-switch-modal__role-state'>当前</Text>
+          </View>
         </View>
         <View className='identity-switch-modal__arrow'>
           <AppIcon name='chevron-right' />
@@ -69,8 +72,10 @@ export default function IdentitySwitchModal({
           <View className='identity-switch-modal__role-icon'>
             <AppIcon name={targetRole} active />
           </View>
-          <Text className='identity-switch-modal__role-name'>{roleNames[targetRole]}</Text>
-          <Text className='identity-switch-modal__role-state'>即将使用</Text>
+          <View className='identity-switch-modal__role-copy'>
+            <Text className='identity-switch-modal__role-name'>{roleNames[targetRole]}</Text>
+            <Text className='identity-switch-modal__role-state'>即将使用</Text>
+          </View>
         </View>
       </View>
     </AppDialog>

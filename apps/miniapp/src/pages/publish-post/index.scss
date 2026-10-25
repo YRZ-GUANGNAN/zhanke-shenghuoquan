@@ -4,10 +4,22 @@
 .publish-post-motion image { width: 128rpx; height: 160rpx; flex-shrink: 0; border-radius: 12rpx; }
 .publish-post-motion > view { min-width: 0; }
 .publish-post-motion > view:first-of-type { flex: 1; }
-.publish-post-motion > view:last-of-type { padding: 24rpx 12rpx; color: $text-secondary; }
+.publish-post-motion > view:last-of-type { @include ref.touch; display: flex; align-items: center; justify-content: center; padding: 16rpx 12rpx; box-sizing: border-box; color: $text-secondary; }
 .publish-post-motion__hint, .publish-post-motion-tip { display: block; margin-top: 12rpx; color: $text-secondary; font-size: 24rpx; line-height: 1.6; }
-.publish-post-motion-actions { display: flex; gap: 32rpx; color: $brand-primary; font-size: 28rpx; }
-.publish-post-motion-actions view { display: flex; align-items: center; min-height: 44PX; }
+.publish-post-attach-clip {
+  @include ref.touch;
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8rpx 16rpx;
+  margin-top: 12rpx;
+  padding: 8rpx 0;
+  box-sizing: border-box;
+  color: $brand-primary;
+  font-size: 26rpx;
+  line-height: 1.5;
+}
+.publish-post-attach-clip__hint { color: $text-secondary; font-size: 24rpx; }
 
 page {
   background: $bg-surface;
@@ -72,7 +84,7 @@ page {
   height: 0;
   padding-bottom: 100%;
   overflow: hidden;
-  border-radius: 16rpx;
+  border-radius: 24rpx;
 }
 
 .publish-post-media__image {
@@ -84,10 +96,10 @@ page {
 }
 
 .publish-post-upload {
-  outline: 2rpx dashed $text-faint;
+  outline: 2rpx dashed $border-default;
   outline-offset: -2rpx;
   box-sizing: border-box;
-  background: $bg-surface;
+  background: $bg-screen;
   color: $text-muted;
 }
 
@@ -291,6 +303,34 @@ page {
 
 .publish-post-control--pending { opacity: .55; }
 
+.publish-post-nav__publish,
+.publish-post-nav__side,
+.publish-post-topic,
+.publish-post-upload,
+.publish-post-attach-clip,
+.publish-post-custom-tag__button {
+  transition: transform $duration-fast $ease-standard, opacity $duration-fast $ease-standard, background-color $duration-fast $ease-standard;
+}
+
 .publish-post-topic:active,
 .publish-post-upload:active,
-.publish-post-custom-tag__button:active { opacity: .7; }
+.publish-post-attach-clip:active,
+.publish-post-custom-tag__button:active,
+.publish-post-nav__side:active,
+.publish-post-nav__publish--active:active { opacity: .8; transform: scale(.98); }
+
+.publish-post-control--pending:active { transform: none; opacity: .55; }
+
+@media (prefers-reduced-motion: reduce) {
+  .publish-post-nav__publish,
+  .publish-post-nav__side,
+  .publish-post-topic,
+  .publish-post-upload,
+  .publish-post-attach-clip,
+  .publish-post-custom-tag__button { transition: none; }
+  .publish-post-page [role='button']:active,
+  .publish-post-topic:active,
+  .publish-post-custom-tag__button:active,
+  .publish-post-nav__side:active,
+  .publish-post-nav__publish:active { transform: none; }
+}

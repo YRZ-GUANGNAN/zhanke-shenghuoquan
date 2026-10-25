@@ -159,6 +159,7 @@ async function pageBehavior() {
     return {
       container, options,
       render: async () => { await act(async () => root.render(React.createElement(modulePage.exports.default))) },
+      unmount: async () => { await act(async () => root.unmount()) },
       all: (selector) => Array.from(container.querySelectorAll(selector)).map((node) => node.taroProps),
       props: (selector) => {
         const element = container.querySelector(selector)
@@ -399,6 +400,160 @@ async function pageBehavior() {
     assert.equal(createdPosts, 1, '跳转失败后不能重新创建帖子')
     assert.equal(publishNavigation[1].query.url, '/pages/post-detail/index?id=123')
     await published.event(() => publishNavigation[1].resolve())
+
+    const mediaAsset = (id, previewPath = `/${id}.webp`) => ({
+      assetId: id, ticketId: `ticket-${id}`, purpose: 'post', state: 'approved',
+      technicalStatus: 'final_ready', reviewStatus: 'approved', ticketStatus: 'completed',
+      message: '已完成', recovery: 'none', canUse: true,
+      updatedAt: '2026-10-25T00:00:00.000Z', previewPath,
+    })
+    const fakeMotion = {
+      kind: 'video', poster: mediaAsset('poster'), video: mediaAsset('video', '/video.mp4'), durationMs: 2500,
+    }
+
+    // The unified picker is a single-entry point: a second tap while the first
+    // selection is pending must not reopen the album or duplicate uploads.
+    const pickerCalls = []
+    const pickerResult = deferred()
+    const pickerPage = await mount('publish-post', {
+      community: { listHotCommunityTags: async () => [] },
+      media: {
+        postMotionAvailable: async () => true,
+        chooseAndUploadPostMedia: (...args) => { pickerCalls.push(args); return pickerResult.promise },
+        chooseAndAttachPostLiveClip: async () => { throw new Error('unexpected clip picker') },
+        waitForMediaApprovals: async () => {},
+      },
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await pickerPage.render()
+    await pickerPage.event(() => {
+      pickerPage.props('.publish-post-upload').onClick()
+      pickerPage.props('.publish-post-upload').onClick()
+    })
+    assert.equal(pickerCalls.length, 1, '统一相册入口连续点击只打开一次')
+    assert.equal(pickerCalls[0][0], 9)
+    assert.equal(pickerCalls[0][1], true, '能力开启且尚无图片时允许选择视频')
+    pickerResult.resolve({ kind: 'images', images: [mediaAsset('image-1')] })
+    await pickerPage.event(() => {})
+    assert.equal(pickerPage.all('.publish-post-media__item').length, 1, '图片选择结果显示为媒体格')
+    assert.equal(pickerPage.container.querySelector('.publish-post-error'), null)
+
+    const videoPage = await mount('publish-post', {
+      community: { listHotCommunityTags: async () => [] },
+      media: {
+        postMotionAvailable: async () => true,
+        chooseAndUploadPostMedia: async () => ({ kind: 'motion', motion: fakeMotion }),
+        chooseAndAttachPostLiveClip: async () => { throw new Error('unexpected clip picker') },
+        waitForMediaApprovals: async () => {},
+      },
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await videoPage.render()
+    await videoPage.event(() => videoPage.props('.publish-post-upload').onClick())
+    await videoPage.event(() => {})
+    assert.ok(videoPage.container.querySelector('.publish-post-motion'), '视频选择结果显示为动态媒体块')
+    assert.equal(videoPage.all('.publish-post-media__item').length, 0, '动态媒体不重复显示为图片格')
+
+    const capabilityCalls = []
+    const capabilityOffPage = await mount('publish-post', {
+      community: { listHotCommunityTags: async () => [] },
+      media: {
+        postMotionAvailable: async () => false,
+        chooseAndUploadPostMedia: async (...args) => { capabilityCalls.push(args); return { kind: 'images', images: [] } },
+        chooseAndAttachPostLiveClip: async () => { throw new Error('能力关闭时不应出现动态入口') },
+        waitForMediaApprovals: async () => {},
+      },
+    })
+    await capabilityOffPage.event(() => capabilityOffPage.props('.publish-post-upload').onClick())
+    await capabilityOffPage.event(() => {})
+    assert.equal(capabilityCalls[0][1], false, '能力关闭时统一相册只请求图片')
+    assert.equal(capabilityOffPage.container.querySelector('.publish-post-attach-clip'), null)
+
+    const cancelPage = await mount('publish-post', {
+      community: { listHotCommunityTags: async () => [] },
+      media: {
+        postMotionAvailable: async () => false,
+        chooseAndUploadPostMedia: async () => { throw { errMsg: 'chooseMedia:fail cancel' } },
+        chooseAndAttachPostLiveClip: async () => { throw new Error('unexpected clip picker') },
+        waitForMediaApprovals: async () => {},
+      },
+    })
+    await cancelPage.event(() => cancelPage.props('.publish-post-upload').onClick())
+    await cancelPage.event(() => {})
+    assert.equal(cancelPage.container.querySelector('.publish-post-error'), null, '用户取消选择不显示错误')
+
+    const failedUploadPage = await mount('publish-post', {
+      community: { listHotCommunityTags: async () => [] },
+      media: {
+        postMotionAvailable: async () => false,
+        chooseAndUploadPostMedia: async () => { throw new Error('媒体服务暂不可用') },
+        chooseAndAttachPostLiveClip: async () => { throw new Error('unexpected clip picker') },
+        waitForMediaApprovals: async () => {},
+      },
+    })
+    await failedUploadPage.event(() => failedUploadPage.props('.publish-post-textarea').onInput({ detail: { value: '保留这段草稿' } }))
+    await failedUploadPage.event(() => failedUploadPage.props('.publish-post-upload').onClick())
+    await failedUploadPage.event(() => {})
+    assert.equal(failedUploadPage.props('.publish-post-textarea').value, '保留这段草稿', '媒体失败保留正文草稿')
+    assert.ok(failedUploadPage.container.querySelector('.publish-post-error'), '媒体失败显示内联错误')
+
+    const clipCalls = []
+    const clipResult = deferred()
+    const clipPage = await mount('publish-post', {
+      community: { listHotCommunityTags: async () => [] },
+      media: {
+        postMotionAvailable: async () => true,
+        chooseAndUploadPostMedia: async () => ({ kind: 'images', images: [mediaAsset('clip-poster')] }),
+        chooseAndAttachPostLiveClip: (poster, ...rest) => { clipCalls.push([poster, ...rest]); return clipResult.promise },
+        waitForMediaApprovals: async () => {},
+      },
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await clipPage.render()
+    await clipPage.event(() => clipPage.props('.publish-post-upload').onClick())
+    await clipPage.event(() => {})
+    assert.ok(clipPage.container.querySelector('.publish-post-attach-clip'), '单图时显示动态片段入口')
+    await clipPage.event(() => clipPage.props('.publish-post-attach-clip').onClick())
+    assert.equal(clipCalls.length, 1)
+    assert.equal(clipCalls[0][0].assetId, 'clip-poster', '动态片段复用已上传封面')
+    clipResult.resolve({ kind: 'live_photo', poster: mediaAsset('clip-poster'), video: mediaAsset('clip-video', '/clip.mp4'), durationMs: 1800 })
+    await clipPage.event(() => {})
+    assert.ok(clipPage.container.querySelector('.publish-post-motion'), '动态片段成功后切换为动态媒体块')
+    assert.equal(clipPage.all('.publish-post-media__item').length, 0)
+
+    const cancelledClipPage = await mount('publish-post', {
+      community: { listHotCommunityTags: async () => [] },
+      media: {
+        postMotionAvailable: async () => true,
+        chooseAndUploadPostMedia: async () => ({ kind: 'images', images: [mediaAsset('cancel-poster')] }),
+        chooseAndAttachPostLiveClip: async () => { throw { errMsg: 'chooseMedia:fail cancel' } },
+        waitForMediaApprovals: async () => {},
+      },
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await cancelledClipPage.render()
+    await cancelledClipPage.event(() => cancelledClipPage.props('.publish-post-upload').onClick())
+    await cancelledClipPage.event(() => cancelledClipPage.props('.publish-post-attach-clip').onClick())
+    await cancelledClipPage.event(() => {})
+    assert.equal(cancelledClipPage.all('.publish-post-media__item').length, 1, '取消动态片段保留原图片')
+    assert.equal(cancelledClipPage.container.querySelector('.publish-post-error'), null, '取消动态片段不显示错误')
+
+    const unmountPicker = deferred()
+    const unmountedPage = await mount('publish-post', {
+      community: { listHotCommunityTags: async () => [] },
+      media: {
+        postMotionAvailable: async () => false,
+        chooseAndUploadPostMedia: async () => unmountPicker.promise,
+        chooseAndAttachPostLiveClip: async () => { throw new Error('unexpected clip picker') },
+        waitForMediaApprovals: async () => {},
+      },
+    })
+    await unmountedPage.event(() => unmountedPage.props('.publish-post-upload').onClick())
+    await unmountedPage.unmount()
+    unmountPicker.resolve({ kind: 'images', images: [mediaAsset('late-image')] })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    assert.equal(unmountedPage.container.textContent, '', '页面卸载后迟到的媒体结果不回写状态')
+
     assert.ok(loggedErrors.every(([message]) => typeof message === 'string' && !message.startsWith('Warning:')), '页面状态测试不能产生 React 更新警告')
     console.log('post page behavior: PASS (home retention, source races, search, comments, publishing snapshot and navigation retry)')
   } finally {
