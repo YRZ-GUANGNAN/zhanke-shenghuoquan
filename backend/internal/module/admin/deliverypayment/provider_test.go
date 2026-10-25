@@ -12,6 +12,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -90,7 +91,7 @@ func TestWechatProviderVerifiesAndDecryptsPaymentNotification(t *testing.T) {
 		t.Fatal(err)
 	}
 	provider.now = func() time.Time { return now }
-	plain := []byte(`{"appid":"wx-test","mchid":"1900000001","out_trade_no":"D3TEST","transaction_id":"WXTX1","trade_type":"JSAPI","trade_state":"SUCCESS","success_time":"2027-01-15T08:00:00+08:00","amount":{"total":150,"currency":"CNY"}}`)
+	plain := []byte(`{"appid":"wx-test","mchid":"1900000001","out_trade_no":"D3TEST","transaction_id":"WXTX1","trade_type":"JSAPI","trade_state":"SUCCESS","success_time":"2027-01-15T08:00:00+08:00","payer":{"openid":"openid-test"},"amount":{"total":150,"currency":"CNY"}}`)
 	body := encryptedNotificationBody(t, apiKey, plain)
 	request := httptest.NewRequest("POST", "/notify", nil)
 	timestamp := fmt.Sprintf("%d", now.Unix())
@@ -109,7 +110,7 @@ func TestWechatProviderVerifiesAndDecryptsPaymentNotification(t *testing.T) {
 		t.Fatal(err)
 	}
 	if result.OutTradeNo != "D3TEST" || result.WechatTransactionID != "WXTX1" ||
-		result.AmountCents != 150 {
+		result.PayerOpenID != "openid-test" || result.AmountCents != 150 {
 		t.Fatalf("notification=%+v", result)
 	}
 
@@ -134,7 +135,7 @@ func TestWechatProviderRejectsUntrustedPaymentNotifications(t *testing.T) {
 	}
 	provider.now = func() time.Time { return now }
 
-	valid := `{"appid":"wx-test","mchid":"1900000001","out_trade_no":"D3TEST","transaction_id":"WXTX1","trade_type":"JSAPI","trade_state":"SUCCESS","success_time":"2027-01-15T08:00:00+08:00","amount":{"total":150,"currency":"CNY"}}`
+	valid := `{"appid":"wx-test","mchid":"1900000001","out_trade_no":"D3TEST","transaction_id":"WXTX1","trade_type":"JSAPI","trade_state":"SUCCESS","success_time":"2027-01-15T08:00:00+08:00","payer":{"openid":"openid-test"},"amount":{"total":150,"currency":"CNY"}}`
 	tests := []struct {
 		name, plain, eventType, algorithm, serial string
 	}{
@@ -253,6 +254,110 @@ func TestWechatProviderValidatesRefundResponseAndNotification(t *testing.T) {
 	if notification.OutTradeNo != "D3TEST" || notification.OutRefundNo != "D3RTEST" ||
 		notification.WechatRefundID != "WXREFUND1" || notification.AmountCents != 150 || !notification.Success {
 		t.Fatalf("refund notification=%+v", notification)
+	}
+}
+
+func TestWechatProviderQueriesOriginalPaymentAndRefundAndClosesOrder(t *testing.T) {
+	privatePath, publicPath, signingKey := writeProviderKeys(t)
+	now := time.Date(2027, time.January, 15, 0, 0, 0, 0, time.UTC)
+	paymentBody := []byte(`{"appid":"wx-test","mchid":"1900000001","out_trade_no":"D3TEST","transaction_id":"WXTX1","trade_type":"JSAPI","trade_state":"SUCCESS","trade_state_desc":"支付成功","success_time":"2027-01-15T08:00:00+08:00","payer":{"openid":"openid-test"},"amount":{"total":150,"currency":"CNY"}}`)
+	refundBody := []byte(`{"refund_id":"WXREFUND1","out_trade_no":"D3TEST","out_refund_no":"D3RTEST","status":"PROCESSING","amount":{"refund":150,"total":150,"currency":"CNY"}}`)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
+		case "/v3/pay/transactions/out-trade-no/D3TEST":
+			if request.Method != http.MethodGet || request.URL.Query().Get("mchid") != "1900000001" {
+				t.Errorf("payment query=%s %s", request.Method, request.URL.String())
+			}
+			setWechatSignatureHeaders(t, w.Header(), paymentBody, signingKey, now, "trusted-platform-key")
+			_, _ = w.Write(paymentBody)
+		case "/v3/pay/transactions/out-trade-no/D3TEST/close":
+			if request.Method != http.MethodPost {
+				t.Errorf("close method=%s", request.Method)
+			}
+			body, err := io.ReadAll(request.Body)
+			if err != nil || string(body) != `{"mchid":"1900000001"}` {
+				t.Errorf("close body=%s err=%v", body, err)
+			}
+			setWechatSignatureHeaders(t, w.Header(), nil, signingKey, now, "trusted-platform-key")
+			w.WriteHeader(http.StatusNoContent)
+		case "/v3/refund/domestic/refunds/D3RTEST":
+			if request.Method != http.MethodGet {
+				t.Errorf("refund query method=%s", request.Method)
+			}
+			setWechatSignatureHeaders(t, w.Header(), refundBody, signingKey, now, "trusted-platform-key")
+			_, _ = w.Write(refundBody)
+		default:
+			http.NotFound(w, request)
+		}
+	}))
+	defer server.Close()
+	provider, err := NewWechatProvider(WechatProviderConfig{
+		AppID: "wx-test", MchID: "1900000001", APIv3Key: "12345678901234567890123456789012",
+		MerchantSerialNo: "merchant-serial", PrivateKeyPath: privatePath,
+		PaymentNotifyURL: "https://api.example.com/payment-notify", RefundNotifyURL: "https://api.example.com/refund-notify",
+		APIBase: server.URL, PlatformPublicKeyPath: publicPath, PlatformKeyID: "trusted-platform-key",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider.now = func() time.Time { return now }
+	provider.httpClient = server.Client()
+
+	payment, err := provider.QueryPayment(context.Background(), PaymentQueryRequest{
+		OutTradeNo: "D3TEST", AmountCents: 150, PayerOpenID: "openid-test",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if payment.State != "SUCCESS" || payment.WechatTransactionID != "WXTX1" ||
+		payment.PayerOpenID != "openid-test" || payment.PaidAt == nil {
+		t.Fatalf("payment query=%+v", payment)
+	}
+	if err := provider.ClosePayment(context.Background(), "D3TEST"); err != nil {
+		t.Fatal(err)
+	}
+	refund, err := provider.QueryRefund(context.Background(), RefundQueryRequest{
+		OutRefundNo: "D3RTEST", OutTradeNo: "D3TEST", AmountCents: 150,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if refund.State != "PROCESSING" || refund.WechatRefundID != "WXREFUND1" || refund.AmountCents != 150 {
+		t.Fatalf("refund query=%+v", refund)
+	}
+}
+
+func TestWechatProviderRejectsMismatchedQueriedPaymentAndRefund(t *testing.T) {
+	privatePath, publicPath, signingKey := writeProviderKeys(t)
+	now := time.Date(2027, time.January, 15, 0, 0, 0, 0, time.UTC)
+	responseBody := []byte(`{"appid":"wx-test","mchid":"1900000001","out_trade_no":"D3TEST","transaction_id":"WXTX1","trade_type":"JSAPI","trade_state":"SUCCESS","trade_state_desc":"支付成功","success_time":"2027-01-15T08:00:00+08:00","payer":{"openid":"other-user"},"amount":{"total":150,"currency":"CNY"}}`)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		setWechatSignatureHeaders(t, w.Header(), responseBody, signingKey, now, "trusted-platform-key")
+		_, _ = w.Write(responseBody)
+	}))
+	defer server.Close()
+	provider, err := NewWechatProvider(WechatProviderConfig{
+		AppID: "wx-test", MchID: "1900000001", APIv3Key: "12345678901234567890123456789012",
+		MerchantSerialNo: "merchant-serial", PrivateKeyPath: privatePath,
+		PaymentNotifyURL: "https://api.example.com/payment-notify", RefundNotifyURL: "https://api.example.com/refund-notify",
+		APIBase: server.URL, PlatformPublicKeyPath: publicPath, PlatformKeyID: "trusted-platform-key",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider.now = func() time.Time { return now }
+	provider.httpClient = server.Client()
+	if _, err := provider.QueryPayment(context.Background(), PaymentQueryRequest{
+		OutTradeNo: "D3TEST", AmountCents: 150, PayerOpenID: "openid-test",
+	}); !errors.Is(err, ErrUntrustedProviderResponse) {
+		t.Fatalf("mismatched payer returned %v", err)
+	}
+
+	responseBody = []byte(`{"refund_id":"WXREFUND1","out_trade_no":"D3OTHER","out_refund_no":"D3RTEST","status":"SUCCESS","success_time":"2027-01-15T08:00:00+08:00","amount":{"refund":150,"total":150,"currency":"CNY"}}`)
+	if _, err := provider.QueryRefund(context.Background(), RefundQueryRequest{
+		OutRefundNo: "D3RTEST", OutTradeNo: "D3TEST", AmountCents: 150,
+	}); !errors.Is(err, ErrUntrustedProviderResponse) {
+		t.Fatalf("mismatched refund returned %v", err)
 	}
 }
 

@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -58,8 +59,24 @@ type PrepayResult struct {
 type PaymentNotificationResult struct {
 	OutTradeNo          string
 	WechatTransactionID string
+	PayerOpenID         string
 	AmountCents         uint64
 	PaidAt              time.Time
+}
+
+type PaymentQueryRequest struct {
+	OutTradeNo  string
+	AmountCents uint64
+	PayerOpenID string
+}
+
+type PaymentQueryResult struct {
+	OutTradeNo          string
+	WechatTransactionID string
+	PayerOpenID         string
+	State               string
+	AmountCents         uint64
+	PaidAt              *time.Time
 }
 
 type RefundRequest struct {
@@ -72,6 +89,22 @@ type RefundRequest struct {
 type RefundProviderResult struct {
 	WechatRefundID string
 	Status         string
+}
+
+type RefundQueryRequest struct {
+	OutRefundNo string
+	OutTradeNo  string
+	AmountCents uint64
+}
+
+type RefundQueryResult struct {
+	OutTradeNo     string
+	OutRefundNo    string
+	WechatRefundID string
+	State          string
+	AmountCents    uint64
+	TotalCents     uint64
+	SuccessAt      *time.Time
 }
 
 type RefundNotificationResult struct {
@@ -88,8 +121,11 @@ type Provider interface {
 	CreatePrepay(context.Context, PrepayRequest) (PrepayResult, error)
 	ClientParams(string) (*JSAPIParameter, error)
 	ParsePaymentNotification(*http.Request, []byte) (PaymentNotificationResult, error)
+	QueryPayment(context.Context, PaymentQueryRequest) (PaymentQueryResult, error)
+	ClosePayment(context.Context, string) error
 	CreateRefund(context.Context, RefundRequest) (RefundProviderResult, error)
 	ParseRefundNotification(*http.Request, []byte) (RefundNotificationResult, error)
+	QueryRefund(context.Context, RefundQueryRequest) (RefundQueryResult, error)
 }
 
 func NewProviderFromConfig(cfg config.Config) (Provider, error) {
@@ -126,11 +162,18 @@ func (MockProvider) ClientParams(string) (*JSAPIParameter, error) {
 func (MockProvider) ParsePaymentNotification(*http.Request, []byte) (PaymentNotificationResult, error) {
 	return PaymentNotificationResult{}, ErrProviderNotConfigured
 }
+func (MockProvider) QueryPayment(context.Context, PaymentQueryRequest) (PaymentQueryResult, error) {
+	return PaymentQueryResult{}, ErrProviderNotConfigured
+}
+func (MockProvider) ClosePayment(context.Context, string) error { return ErrProviderNotConfigured }
 func (MockProvider) CreateRefund(context.Context, RefundRequest) (RefundProviderResult, error) {
 	return RefundProviderResult{}, ErrProviderNotConfigured
 }
 func (MockProvider) ParseRefundNotification(*http.Request, []byte) (RefundNotificationResult, error) {
 	return RefundNotificationResult{}, ErrProviderNotConfigured
+}
+func (MockProvider) QueryRefund(context.Context, RefundQueryRequest) (RefundQueryResult, error) {
+	return RefundQueryResult{}, ErrProviderNotConfigured
 }
 
 type UnconfiguredProvider struct{}
@@ -145,11 +188,20 @@ func (UnconfiguredProvider) ClientParams(string) (*JSAPIParameter, error) {
 func (UnconfiguredProvider) ParsePaymentNotification(*http.Request, []byte) (PaymentNotificationResult, error) {
 	return PaymentNotificationResult{}, ErrProviderNotConfigured
 }
+func (UnconfiguredProvider) QueryPayment(context.Context, PaymentQueryRequest) (PaymentQueryResult, error) {
+	return PaymentQueryResult{}, ErrProviderNotConfigured
+}
+func (UnconfiguredProvider) ClosePayment(context.Context, string) error {
+	return ErrProviderNotConfigured
+}
 func (UnconfiguredProvider) CreateRefund(context.Context, RefundRequest) (RefundProviderResult, error) {
 	return RefundProviderResult{}, ErrProviderNotConfigured
 }
 func (UnconfiguredProvider) ParseRefundNotification(*http.Request, []byte) (RefundNotificationResult, error) {
 	return RefundNotificationResult{}, ErrProviderNotConfigured
+}
+func (UnconfiguredProvider) QueryRefund(context.Context, RefundQueryRequest) (RefundQueryResult, error) {
+	return RefundQueryResult{}, ErrProviderNotConfigured
 }
 
 type WechatProviderConfig struct {
@@ -234,6 +286,80 @@ func (p *WechatProvider) CreatePrepay(ctx context.Context, input PrepayRequest) 
 	return PrepayResult{PrepayID: response.PrepayID, JSAPI: *params}, nil
 }
 
+func (p *WechatProvider) QueryPayment(ctx context.Context, input PaymentQueryRequest) (PaymentQueryResult, error) {
+	input.OutTradeNo = strings.TrimSpace(input.OutTradeNo)
+	input.PayerOpenID = strings.TrimSpace(input.PayerOpenID)
+	if input.OutTradeNo == "" || input.AmountCents == 0 || input.PayerOpenID == "" ||
+		p.config.AppID == "" || p.config.MchID == "" {
+		return PaymentQueryResult{}, ErrProviderNotConfigured
+	}
+	var response struct {
+		AppID               string `json:"appid"`
+		MchID               string `json:"mchid"`
+		OutTradeNo          string `json:"out_trade_no"`
+		WechatTransactionID string `json:"transaction_id"`
+		TradeType           string `json:"trade_type"`
+		TradeState          string `json:"trade_state"`
+		SuccessTime         string `json:"success_time"`
+		Payer               struct {
+			OpenID string `json:"openid"`
+		} `json:"payer"`
+		Amount struct {
+			Total    uint64 `json:"total"`
+			Currency string `json:"currency"`
+		} `json:"amount"`
+	}
+	path := "/v3/pay/transactions/out-trade-no/" + url.PathEscape(input.OutTradeNo) +
+		"?mchid=" + url.QueryEscape(p.config.MchID)
+	if err := p.doJSON(ctx, http.MethodGet, path, nil, &response); err != nil {
+		return PaymentQueryResult{}, err
+	}
+	if response.AppID != p.config.AppID || response.MchID != p.config.MchID ||
+		response.OutTradeNo != input.OutTradeNo || !supportedPaymentState(response.TradeState) ||
+		(response.TradeType != "" && response.TradeType != "JSAPI") ||
+		(response.Amount.Total != 0 && response.Amount.Total != input.AmountCents) ||
+		(response.Amount.Currency != "" && response.Amount.Currency != "CNY") ||
+		(response.Payer.OpenID != "" && response.Payer.OpenID != input.PayerOpenID) {
+		return PaymentQueryResult{}, ErrUntrustedProviderResponse
+	}
+	result := PaymentQueryResult{
+		OutTradeNo: response.OutTradeNo, WechatTransactionID: response.WechatTransactionID,
+		PayerOpenID: response.Payer.OpenID, State: response.TradeState,
+		AmountCents: response.Amount.Total,
+	}
+	if response.TradeState == "SUCCESS" {
+		paidAt, err := time.Parse(time.RFC3339, response.SuccessTime)
+		if err != nil || response.WechatTransactionID == "" || response.TradeType != "JSAPI" ||
+			response.Payer.OpenID != input.PayerOpenID || response.Amount.Total != input.AmountCents ||
+			response.Amount.Currency != "CNY" {
+			return PaymentQueryResult{}, ErrUntrustedProviderResponse
+		}
+		paidAt = paidAt.UTC()
+		result.PaidAt = &paidAt
+	}
+	return result, nil
+}
+
+func (p *WechatProvider) ClosePayment(ctx context.Context, outTradeNo string) error {
+	outTradeNo = strings.TrimSpace(outTradeNo)
+	if outTradeNo == "" || p.config.MchID == "" {
+		return ErrProviderNotConfigured
+	}
+	body, err := json.Marshal(map[string]string{"mchid": p.config.MchID})
+	if err != nil {
+		return err
+	}
+	path := "/v3/pay/transactions/out-trade-no/" + url.PathEscape(outTradeNo) + "/close"
+	raw, err := p.doRequest(ctx, http.MethodPost, path, body)
+	if err != nil {
+		return err
+	}
+	if len(bytes.TrimSpace(raw)) != 0 {
+		return ErrUntrustedProviderResponse
+	}
+	return nil
+}
+
 func (p *WechatProvider) ClientParams(prepayID string) (*JSAPIParameter, error) {
 	prepayID = strings.TrimSpace(prepayID)
 	if prepayID == "" {
@@ -266,7 +392,10 @@ func (p *WechatProvider) ParsePaymentNotification(req *http.Request, body []byte
 		TradeType     string `json:"trade_type"`
 		TradeState    string `json:"trade_state"`
 		SuccessTime   string `json:"success_time"`
-		Amount        struct {
+		Payer         struct {
+			OpenID string `json:"openid"`
+		} `json:"payer"`
+		Amount struct {
 			Total    uint64 `json:"total"`
 			Currency string `json:"currency"`
 		} `json:"amount"`
@@ -277,7 +406,7 @@ func (p *WechatProvider) ParsePaymentNotification(req *http.Request, body []byte
 	if transaction.AppID != p.config.AppID || transaction.MchID != p.config.MchID ||
 		transaction.TradeType != "JSAPI" || transaction.TradeState != "SUCCESS" ||
 		transaction.OutTradeNo == "" || transaction.TransactionID == "" ||
-		transaction.Amount.Total == 0 || transaction.Amount.Currency != "CNY" {
+		transaction.Payer.OpenID == "" || transaction.Amount.Total == 0 || transaction.Amount.Currency != "CNY" {
 		return PaymentNotificationResult{}, ErrInvalidNotification
 	}
 	paidAt, err := time.Parse(time.RFC3339, transaction.SuccessTime)
@@ -286,7 +415,7 @@ func (p *WechatProvider) ParsePaymentNotification(req *http.Request, body []byte
 	}
 	return PaymentNotificationResult{
 		OutTradeNo: transaction.OutTradeNo, WechatTransactionID: transaction.TransactionID,
-		AmountCents: transaction.Amount.Total, PaidAt: paidAt.UTC(),
+		PayerOpenID: transaction.Payer.OpenID, AmountCents: transaction.Amount.Total, PaidAt: paidAt.UTC(),
 	}, nil
 }
 
@@ -325,6 +454,50 @@ func (p *WechatProvider) CreateRefund(ctx context.Context, input RefundRequest) 
 		return RefundProviderResult{}, fmt.Errorf("%w: code=%s message=%s", ErrProviderRejected, response.Code, response.Message)
 	}
 	return RefundProviderResult{WechatRefundID: response.RefundID, Status: response.Status}, nil
+}
+
+func (p *WechatProvider) QueryRefund(ctx context.Context, input RefundQueryRequest) (RefundQueryResult, error) {
+	input.OutRefundNo = strings.TrimSpace(input.OutRefundNo)
+	input.OutTradeNo = strings.TrimSpace(input.OutTradeNo)
+	if input.OutRefundNo == "" || input.OutTradeNo == "" || input.AmountCents == 0 {
+		return RefundQueryResult{}, ErrProviderNotConfigured
+	}
+	var response struct {
+		RefundID    string `json:"refund_id"`
+		OutTradeNo  string `json:"out_trade_no"`
+		OutRefundNo string `json:"out_refund_no"`
+		Status      string `json:"status"`
+		SuccessTime string `json:"success_time"`
+		Amount      struct {
+			Refund   uint64 `json:"refund"`
+			Total    uint64 `json:"total"`
+			Currency string `json:"currency"`
+		} `json:"amount"`
+	}
+	path := "/v3/refund/domestic/refunds/" + url.PathEscape(input.OutRefundNo)
+	if err := p.doJSON(ctx, http.MethodGet, path, nil, &response); err != nil {
+		return RefundQueryResult{}, err
+	}
+	if response.RefundID == "" || response.OutTradeNo != input.OutTradeNo ||
+		response.OutRefundNo != input.OutRefundNo || !supportedRefundStatus(response.Status) ||
+		response.Amount.Refund != input.AmountCents || response.Amount.Total != input.AmountCents ||
+		response.Amount.Currency != "CNY" {
+		return RefundQueryResult{}, ErrUntrustedProviderResponse
+	}
+	result := RefundQueryResult{
+		OutTradeNo: response.OutTradeNo, OutRefundNo: response.OutRefundNo,
+		WechatRefundID: response.RefundID, State: response.Status,
+		AmountCents: response.Amount.Refund, TotalCents: response.Amount.Total,
+	}
+	if response.Status == "SUCCESS" {
+		successAt, err := time.Parse(time.RFC3339, response.SuccessTime)
+		if err != nil {
+			return RefundQueryResult{}, ErrUntrustedProviderResponse
+		}
+		successAt = successAt.UTC()
+		result.SuccessAt = &successAt
+	}
+	return result, nil
 }
 
 func (p *WechatProvider) ParseRefundNotification(req *http.Request, body []byte) (RefundNotificationResult, error) {
@@ -399,37 +572,45 @@ func (p *WechatProvider) verifyAndDecrypt(req *http.Request, body []byte, allowe
 }
 
 func (p *WechatProvider) doJSON(ctx context.Context, method, path string, body []byte, target any) error {
-	endpoint := strings.TrimRight(p.config.APIBase, "/") + path
-	req, err := http.NewRequestWithContext(ctx, method, endpoint, bytes.NewReader(body))
+	raw, err := p.doRequest(ctx, method, path, body)
 	if err != nil {
 		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if err := p.authorize(req, body); err != nil {
-		return err
-	}
-	response, err := p.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer response.Body.Close()
-	raw, err := io.ReadAll(io.LimitReader(response.Body, maxProviderBodyBytes+1))
-	if err != nil {
-		return err
-	}
-	if len(raw) > maxProviderBodyBytes {
-		return ErrUntrustedProviderResponse
-	}
-	if err := p.verifyWechatSignature(response.Header, raw); err != nil {
-		return ErrUntrustedProviderResponse
-	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return fmt.Errorf("%w: http=%d", ErrProviderRejected, response.StatusCode)
 	}
 	if err := json.Unmarshal(raw, target); err != nil {
 		return ErrUntrustedProviderResponse
 	}
 	return nil
+}
+
+func (p *WechatProvider) doRequest(ctx context.Context, method, path string, body []byte) ([]byte, error) {
+	endpoint := strings.TrimRight(p.config.APIBase, "/") + path
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if err := p.authorize(req, body); err != nil {
+		return nil, err
+	}
+	response, err := p.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(response.Body, maxProviderBodyBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(raw) > maxProviderBodyBytes {
+		return nil, ErrUntrustedProviderResponse
+	}
+	if err := p.verifyWechatSignature(response.Header, raw); err != nil {
+		return nil, ErrUntrustedProviderResponse
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return nil, fmt.Errorf("%w: http=%d", ErrProviderRejected, response.StatusCode)
+	}
+	return raw, nil
 }
 
 func (p *WechatProvider) verifyWechatSignature(header http.Header, body []byte) error {
@@ -476,6 +657,15 @@ func singleHeader(header http.Header, name string) (string, bool) {
 func supportedRefundStatus(value string) bool {
 	switch value {
 	case "SUCCESS", "CLOSED", "PROCESSING", "ABNORMAL":
+		return true
+	default:
+		return false
+	}
+}
+
+func supportedPaymentState(value string) bool {
+	switch value {
+	case "SUCCESS", "REFUND", "NOTPAY", "CLOSED", "REVOKED", "USERPAYING", "PAYERROR":
 		return true
 	default:
 		return false

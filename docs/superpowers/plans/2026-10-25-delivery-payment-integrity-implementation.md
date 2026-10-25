@@ -16,11 +16,11 @@
 - Modify: `backend/internal/module/admin/deliverypayment/provider.go`
 - Modify: `backend/internal/module/admin/deliverypayment/provider_test.go`
 
-- [ ] **Step 1: 为 Provider 写失败测试**
+- [x] **Step 1: 为 Provider 写失败测试**
 
 覆盖 `QueryPayment`、`ClosePayment`、`QueryRefund`：请求必须使用原 `out_trade_no` / `out_refund_no`，所有 2xx 应答先验签；错误 `appid`、`mchid`、`trade_type`、金额、币种、付款人或业务号必须拒绝。
 
-- [ ] **Step 2: 扩展 Provider 契约**
+- [x] **Step 2: 扩展 Provider 契约**
 
 ```go
 type PaymentQueryResult struct {
@@ -45,7 +45,7 @@ type Provider interface {
 }
 ```
 
-- [ ] **Step 3: 实现官方 API v3 路径**
+- [x] **Step 3: 实现官方 API v3 路径**
 
 ```text
 GET  /v3/pay/transactions/out-trade-no/{out_trade_no}?mchid={mchid}
@@ -55,7 +55,7 @@ GET  /v3/refund/domestic/refunds/{out_refund_no}
 
 `SUCCESS` 才提供可入账支付事实；`NOTPAY`、`USERPAYING` 保持待核实；`CLOSED`、`REVOKED`、`PAYERROR` 归一化为确定终态。退款保留 `PROCESSING`、`ABNORMAL`、`CLOSED` 与 `SUCCESS`，不得用布尔值抹平。
 
-- [ ] **Step 4: 运行适配器测试**
+- [x] **Step 4: 运行适配器测试**
 
 Run: `go test ./internal/module/admin/deliverypayment`
 

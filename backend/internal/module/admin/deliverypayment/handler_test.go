@@ -24,11 +24,20 @@ func (*terminalGuardProvider) ClientParams(string) (*JSAPIParameter, error) {
 func (*terminalGuardProvider) ParsePaymentNotification(*http.Request, []byte) (PaymentNotificationResult, error) {
 	return PaymentNotificationResult{}, errors.New("unused")
 }
+func (*terminalGuardProvider) QueryPayment(context.Context, PaymentQueryRequest) (PaymentQueryResult, error) {
+	return PaymentQueryResult{}, errors.New("unused")
+}
+func (*terminalGuardProvider) ClosePayment(context.Context, string) error {
+	return errors.New("unused")
+}
 func (*terminalGuardProvider) CreateRefund(context.Context, RefundRequest) (RefundProviderResult, error) {
 	return RefundProviderResult{}, errors.New("unused")
 }
 func (*terminalGuardProvider) ParseRefundNotification(*http.Request, []byte) (RefundNotificationResult, error) {
 	return RefundNotificationResult{}, errors.New("unused")
+}
+func (*terminalGuardProvider) QueryRefund(context.Context, RefundQueryRequest) (RefundQueryResult, error) {
+	return RefundQueryResult{}, errors.New("unused")
 }
 
 func TestIssuePrepayRejectsTerminalPaymentAttempts(t *testing.T) {
