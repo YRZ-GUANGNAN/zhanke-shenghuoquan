@@ -2,11 +2,16 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
 	"runtime/debug"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -468,8 +473,62 @@ func main() {
 	takeoutbuyer.NewHandler(catalog, nil, nil).RegisterCatalog(api.Group("/takeout/catalog", userService.AuthRequired()))
 	registerDeliveryRoutes(deliveryRuntime, api, userService, adminAuthRequired)
 
-	if err := router.Run(cfg.HTTPAddr); err != nil {
-		log.Fatalf("run server: %v", err)
+	paymentReconcilerContext, cancelPaymentReconciler := context.WithCancel(context.Background())
+	var paymentReconcilerWait sync.WaitGroup
+	if deliveryRuntime != nil && deliveryRuntime.paymentReconciler != nil {
+		paymentReconcilerWait.Add(1)
+		go func() {
+			defer paymentReconcilerWait.Done()
+			for {
+				err := deliveryRuntime.paymentReconciler.Run(paymentReconcilerContext, time.Second)
+				if paymentReconcilerContext.Err() != nil {
+					return
+				}
+				log.Printf("delivery payment reconciler stopped; retrying in 5s: %v", err)
+				timer := time.NewTimer(5 * time.Second)
+				select {
+				case <-paymentReconcilerContext.Done():
+					timer.Stop()
+					return
+				case <-timer.C:
+				}
+			}
+		}()
+	}
+	var stopPaymentReconcilerOnce sync.Once
+	stopPaymentReconciler := func() {
+		stopPaymentReconcilerOnce.Do(func() {
+			cancelPaymentReconciler()
+			paymentReconcilerWait.Wait()
+		})
+	}
+	defer stopPaymentReconciler()
+	server := &http.Server{Addr: cfg.HTTPAddr, Handler: router}
+	serverErrors := make(chan error, 1)
+	go func() { serverErrors <- server.ListenAndServe() }()
+	shutdownSignal, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stopSignals()
+	select {
+	case err := <-serverErrors:
+		stopPaymentReconciler()
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("run server: %v", err)
+		}
+	case <-shutdownSignal.Done():
+		stopPaymentReconciler()
+		shutdownContext, cancelShutdown := context.WithTimeout(context.Background(), 10*time.Second)
+		shutdownErr := server.Shutdown(shutdownContext)
+		cancelShutdown()
+		if shutdownErr != nil {
+			_ = server.Close()
+		}
+		serverErr := <-serverErrors
+		if shutdownErr != nil {
+			log.Fatalf("shutdown server: %v", shutdownErr)
+		}
+		if serverErr != nil && !errors.Is(serverErr, http.ErrServerClosed) {
+			log.Fatalf("run server: %v", serverErr)
+		}
 	}
 }
 
@@ -528,6 +587,7 @@ type deliveryRuntime struct {
 	riderWallets                   delivery.RiderWalletRepository
 	consoleQueries                 *deliveryconsole.GormQueryRepository
 	paymentProvider                deliverypayment.Provider
+	paymentReconciler              *deliverypayment.Reconciler
 	identity                       *deliveryrider.IdentityAdapter
 	notificationConsumer           *deliverynotify.Consumer
 	proofs                         *delivery.ProofService
@@ -596,6 +656,13 @@ func newDeliveryRuntime(cfg config.Config, db *gorm.DB, proofPorts ...delivery.M
 		}
 		runtime.funds = funds
 		runtime.paymentProvider = provider
+		if wechatProvider, ok := provider.(*deliverypayment.WechatProvider); ok && wechatProvider != nil {
+			reconciler, err := deliverypayment.NewReconciler(funds, wechatProvider, deliverypayment.ReconcilerConfig{})
+			if err != nil {
+				return nil, fmt.Errorf("configure delivery payment reconciler: %w", err)
+			}
+			runtime.paymentReconciler = reconciler
+		}
 	}
 	return runtime, nil
 }
@@ -626,7 +693,7 @@ func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, user
 		paymentHandler = deliverypayment.NewHandler(
 			runtime.funds, runtime.paymentProvider, currentUserID,
 			func(c *gin.Context) string { return user.CurrentUser(c).OpenID },
-		)
+		).WithReconciler(runtime.paymentReconciler)
 		paymentHandler.RegisterMerchant(merchantRoutes)
 		paymentHandler.RegisterWebhook(api.Group("/delivery/payments"))
 	}

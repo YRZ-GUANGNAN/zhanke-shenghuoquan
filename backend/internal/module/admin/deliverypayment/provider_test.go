@@ -310,7 +310,8 @@ func TestWechatProviderQueriesOriginalPaymentAndRefundAndClosesOrder(t *testing.
 		t.Fatal(err)
 	}
 	if payment.State != "SUCCESS" || payment.WechatTransactionID != "WXTX1" ||
-		payment.PayerOpenID != "openid-test" || payment.PaidAt == nil {
+		payment.PayerOpenID != "openid-test" || payment.PaidAt == nil ||
+		string(payment.RawBody) != string(paymentBody) {
 		t.Fatalf("payment query=%+v", payment)
 	}
 	if err := provider.ClosePayment(context.Background(), "D3TEST"); err != nil {

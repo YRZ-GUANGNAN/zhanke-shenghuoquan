@@ -182,6 +182,22 @@ func (s *FundsService) MarkPrepayIssued(
 	)
 }
 
+func (s *FundsService) MarkPrepayRequested(
+	ctx context.Context,
+	paymentPublicID string,
+	expectedRowVersion uint64,
+	payerOpenID string,
+) (PaymentAttempt, error) {
+	if !ValidULID(strings.TrimSpace(paymentPublicID)) || expectedRowVersion == 0 ||
+		strings.TrimSpace(payerOpenID) == "" {
+		return PaymentAttempt{}, ErrInvalidRecord
+	}
+	return s.repository.MarkPaymentPrepayRequested(
+		ctx, strings.TrimSpace(paymentPublicID), expectedRowVersion,
+		strings.TrimSpace(payerOpenID), s.now().UTC(),
+	)
+}
+
 func (s *FundsService) ConfirmWechatPayment(ctx context.Context, input PaymentConfirmation) (FundsResult, bool, error) {
 	input.OutTradeNo = strings.TrimSpace(input.OutTradeNo)
 	input.WechatTransactionID = strings.TrimSpace(input.WechatTransactionID)
@@ -261,7 +277,91 @@ func (s *FundsService) ObserveRefund(ctx context.Context, input RefundObservatio
 	} else {
 		input.ObservedAt = input.ObservedAt.UTC()
 	}
+	if input.SucceededAt != nil {
+		succeededAt := input.SucceededAt.UTC()
+		input.SucceededAt = &succeededAt
+	}
 	return s.repository.ObserveRefund(ctx, input)
+}
+
+func (s *FundsService) ClaimPaymentVerification(
+	ctx context.Context,
+	paymentPublicID string,
+	now time.Time,
+	leaseTTL time.Duration,
+) (PaymentVerificationLease, bool, error) {
+	paymentPublicID = strings.TrimSpace(paymentPublicID)
+	if !ValidULID(paymentPublicID) || now.IsZero() || leaseTTL <= 0 {
+		return PaymentVerificationLease{}, false, ErrInvalidRecord
+	}
+	return s.repository.ClaimPaymentVerification(ctx, paymentPublicID, now.UTC(), leaseTTL)
+}
+
+func (s *FundsService) ClaimNextPaymentVerification(
+	ctx context.Context,
+	now time.Time,
+	leaseTTL time.Duration,
+) (PaymentVerificationLease, bool, error) {
+	if now.IsZero() || leaseTTL <= 0 {
+		return PaymentVerificationLease{}, false, ErrInvalidRecord
+	}
+	return s.repository.ClaimNextPaymentVerification(ctx, now.UTC(), leaseTTL)
+}
+
+func (s *FundsService) UpdatePaymentVerification(
+	ctx context.Context,
+	lease PaymentVerificationLease,
+	update PaymentVerificationUpdate,
+) error {
+	if update.UpdatedAt.IsZero() {
+		return ErrInvalidRecord
+	}
+	update.UpdatedAt = update.UpdatedAt.UTC()
+	if update.NextVerifyAt != nil {
+		next := update.NextVerifyAt.UTC()
+		update.NextVerifyAt = &next
+	}
+	return s.repository.UpdatePaymentVerification(ctx, lease, update)
+}
+
+func (s *FundsService) ClaimRefundVerification(
+	ctx context.Context,
+	refundPublicID string,
+	now time.Time,
+	leaseTTL time.Duration,
+) (RefundVerificationLease, bool, error) {
+	refundPublicID = strings.TrimSpace(refundPublicID)
+	if !ValidULID(refundPublicID) || now.IsZero() || leaseTTL <= 0 {
+		return RefundVerificationLease{}, false, ErrInvalidRecord
+	}
+	return s.repository.ClaimRefundVerification(ctx, refundPublicID, now.UTC(), leaseTTL)
+}
+
+func (s *FundsService) ClaimNextRefundVerification(
+	ctx context.Context,
+	now time.Time,
+	leaseTTL time.Duration,
+) (RefundVerificationLease, bool, error) {
+	if now.IsZero() || leaseTTL <= 0 {
+		return RefundVerificationLease{}, false, ErrInvalidRecord
+	}
+	return s.repository.ClaimNextRefundVerification(ctx, now.UTC(), leaseTTL)
+}
+
+func (s *FundsService) UpdateRefundVerification(
+	ctx context.Context,
+	lease RefundVerificationLease,
+	update RefundVerificationUpdate,
+) error {
+	if update.UpdatedAt.IsZero() {
+		return ErrInvalidRecord
+	}
+	update.UpdatedAt = update.UpdatedAt.UTC()
+	if update.NextVerifyAt != nil {
+		next := update.NextVerifyAt.UTC()
+		update.NextVerifyAt = &next
+	}
+	return s.repository.UpdateRefundVerification(ctx, lease, update)
 }
 
 func (s *FundsService) newAttempt(

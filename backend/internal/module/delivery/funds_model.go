@@ -17,6 +17,7 @@ var (
 	ErrRefundNotAllowed   = errors.New("delivery refund is not allowed")
 	ErrRefundNotPending   = errors.New("delivery refund is not pending")
 	ErrRefundObservation  = errors.New("delivery refund observation mismatch")
+	ErrVerificationLease  = errors.New("delivery payment verification lease lost")
 )
 
 type LedgerDirection string
@@ -100,6 +101,29 @@ const (
 	RefundProviderClosed     RefundProviderStatus = "CLOSED"
 	RefundProviderAbnormal   RefundProviderStatus = "ABNORMAL"
 )
+
+type PaymentVerificationLease struct {
+	Attempt PaymentAttempt
+}
+
+type RefundVerificationLease struct {
+	Refund Refund
+}
+
+type PaymentVerificationUpdate struct {
+	Status         PaymentStatus
+	ProviderStatus string
+	NextVerifyAt   *time.Time
+	LastErrorCode  string
+	UpdatedAt      time.Time
+}
+
+type RefundVerificationUpdate struct {
+	ProviderStatus string
+	NextVerifyAt   *time.Time
+	LastErrorCode  string
+	UpdatedAt      time.Time
+}
 
 type MerchantWallet struct {
 	ID                    uint64    `gorm:"column:id;primaryKey"`

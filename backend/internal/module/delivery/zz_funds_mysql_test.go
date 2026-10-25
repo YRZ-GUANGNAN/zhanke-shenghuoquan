@@ -220,14 +220,43 @@ func TestFundsSingleSettlementCompetitionAndWechatCallbackAgainstRealMySQL84(t *
 		PayerOpenID: "openid-d3-merchant", AmountCents: 150,
 		RawBody: []byte(`{"fixture":"d3-payment"}`), PaidAt: now,
 	}
-	confirmed, duplicate, err := funds.ConfirmWechatPayment(ctx, confirmation)
-	if err != nil || duplicate || confirmed.Order == nil ||
-		confirmed.Order.Status != StatusReadyForClaim || confirmed.Settlement == nil {
-		t.Fatalf("wechat confirmation=%#v duplicate=%v err=%v", confirmed, duplicate, err)
+	queryConfirmation := confirmation
+	queryConfirmation.RawBody = []byte(`{"fixture":"d3-payment-query"}`)
+	type confirmationResult struct {
+		value     FundsResult
+		duplicate bool
+		err       error
 	}
-	_, duplicate, err = funds.ConfirmWechatPayment(ctx, confirmation)
-	if err != nil || !duplicate {
-		t.Fatalf("duplicate callback duplicate=%v err=%v", duplicate, err)
+	callbackStart := make(chan struct{})
+	confirmationResults := make(chan confirmationResult, 2)
+	wait.Add(2)
+	for _, input := range []PaymentConfirmation{confirmation, queryConfirmation} {
+		input := input
+		go func() {
+			defer wait.Done()
+			<-callbackStart
+			value, duplicate, confirmErr := funds.ConfirmWechatPayment(ctx, input)
+			confirmationResults <- confirmationResult{value: value, duplicate: duplicate, err: confirmErr}
+		}()
+	}
+	close(callbackStart)
+	wait.Wait()
+	close(confirmationResults)
+	duplicates := 0
+	completedOrder := false
+	for result := range confirmationResults {
+		if result.err != nil {
+			t.Fatal(result.err)
+		}
+		if result.duplicate {
+			duplicates++
+		}
+		if result.value.Order != nil && result.value.Order.Status == StatusReadyForClaim && result.value.Settlement != nil {
+			completedOrder = true
+		}
+	}
+	if duplicates != 1 || !completedOrder {
+		t.Fatalf("query/callback race duplicates=%d completedOrder=%v", duplicates, completedOrder)
 	}
 	assertD3Count(t, db, (&PaymentNotification{}).TableName(), "out_trade_no = ?", 1, started.Attempt.OutTradeNo)
 	assertD3Count(t, db, (&FeeSettlement{}).TableName(), "delivery_order_public_id = ?", 1, wechatOrder.DeliveryOrderPublicID)
@@ -256,6 +285,123 @@ func TestFundsSingleSettlementCompetitionAndWechatCallbackAgainstRealMySQL84(t *
 	}
 	assertD3Count(t, db, (&PaymentNotification{}).TableName(), "out_trade_no = ?", 0, wrong.Attempt.OutTradeNo)
 	t.Log("single_settlement=PASS wallet_vs_mock; wechat_callback=PASS amount+dedup+ready_outbox")
+}
+
+func TestPaymentVerificationLeaseCompetitionAndRestartRecoveryAgainstRealMySQL84(t *testing.T) {
+	db := openD3MySQL(t)
+	cleanupD3(t, db)
+	t.Cleanup(func() { cleanupD3(t, db) })
+	ctx := context.Background()
+	now := time.Date(2026, 6, 30, 9, 30, 0, 0, time.UTC)
+	repository := NewRepository(db)
+	funds, _ := NewFundsService(repository, repository, func() time.Time { return now })
+	started, err := funds.StartRecharge(ctx, fundsMerchantOne, 150, mustFundsULID(t), PaymentWechat)
+	if err != nil {
+		t.Fatal(err)
+	}
+	started.Attempt, err = funds.MarkPrepayRequested(
+		ctx, started.Attempt.PaymentPublicID, started.Attempt.RowVersion, "openid-d3-lease",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	claimAt := now.Add(31 * time.Second)
+	type claimResult struct {
+		lease PaymentVerificationLease
+		found bool
+		err   error
+	}
+	start := make(chan struct{})
+	results := make(chan claimResult, 2)
+	var wait sync.WaitGroup
+	wait.Add(2)
+	for range 2 {
+		go func() {
+			defer wait.Done()
+			<-start
+			lease, found, claimErr := funds.ClaimPaymentVerification(
+				ctx, started.Attempt.PaymentPublicID, claimAt, 10*time.Second,
+			)
+			results <- claimResult{lease: lease, found: found, err: claimErr}
+		}()
+	}
+	close(start)
+	wait.Wait()
+	close(results)
+	var firstLease PaymentVerificationLease
+	claims := 0
+	for result := range results {
+		if result.err != nil {
+			t.Fatal(result.err)
+		}
+		if result.found {
+			claims++
+			firstLease = result.lease
+		}
+	}
+	if claims != 1 {
+		t.Fatalf("concurrent verification claims=%d want=1", claims)
+	}
+	if _, found, err := funds.ClaimPaymentVerification(
+		ctx, started.Attempt.PaymentPublicID, claimAt.Add(5*time.Second), 10*time.Second,
+	); err != nil || found {
+		t.Fatalf("active lease reclaimed found=%v err=%v", found, err)
+	}
+	secondLease, found, err := funds.ClaimPaymentVerification(
+		ctx, started.Attempt.PaymentPublicID, claimAt.Add(11*time.Second), 10*time.Second,
+	)
+	if err != nil || !found || secondLease.Attempt.RowVersion <= firstLease.Attempt.RowVersion {
+		t.Fatalf("expired lease recovery lease=%#v found=%v err=%v", secondLease, found, err)
+	}
+	if err := funds.UpdatePaymentVerification(ctx, firstLease, PaymentVerificationUpdate{
+		UpdatedAt: claimAt.Add(5 * time.Second),
+	}); !errors.Is(err, ErrVerificationLease) {
+		t.Fatalf("stale lease update returned %v", err)
+	}
+	t.Log("payment_verification_lease=PASS single_claim+expiry_recovery+stale_CAS")
+}
+
+func TestOrderPaymentUnknownResultReusesOriginalBusinessNumberAgainstRealMySQL84(t *testing.T) {
+	db := openD3MySQL(t)
+	cleanupD3(t, db)
+	t.Cleanup(func() { cleanupD3(t, db) })
+	ctx := context.Background()
+	now := time.Date(2026, 6, 30, 9, 45, 0, 0, time.UTC)
+	repository := NewRepository(db)
+	base, _ := NewService(repository, func() time.Time { return now })
+	dispatch, _ := NewDispatchService(
+		repository, base, activeEligibility{},
+		FeePolicy{DeliveryFeeCents: 150, RiderFeeCents: 100, PlatformCutCents: 50},
+		func() time.Time { return now },
+	)
+	funds, _ := NewFundsService(repository, repository, func() time.Time { return now })
+	order := createFundsOrder(t, ctx, dispatch, fundsMerchantOne)
+	first, err := funds.StartOrderPayment(
+		ctx, fundsMerchantOne, order.DeliveryOrderPublicID, order.RowVersion,
+		mustFundsULID(t), PaymentWechat,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pendingFunds, err := funds.OrderFunds(ctx, fundsMerchantOne, order.DeliveryOrderPublicID)
+	if err != nil || pendingFunds.Payment == nil ||
+		pendingFunds.Payment.PaymentPublicID != first.Attempt.PaymentPublicID {
+		t.Fatalf("pending payment absent from order funds snapshot=%#v err=%v", pendingFunds, err)
+	}
+	second, err := funds.StartOrderPayment(
+		ctx, fundsMerchantOne, order.DeliveryOrderPublicID, order.RowVersion,
+		mustFundsULID(t), PaymentWechat,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.Attempt.PaymentPublicID != first.Attempt.PaymentPublicID ||
+		second.Attempt.OutTradeNo != first.Attempt.OutTradeNo {
+		t.Fatalf("unknown payment replaced original first=%#v second=%#v", first.Attempt, second.Attempt)
+	}
+	assertD3Count(t, db, (&PaymentAttempt{}).TableName(), "delivery_order_public_id = ?", 1, order.DeliveryOrderPublicID)
+	t.Log("payment_unknown_result=PASS reused_original_out_trade_no")
 }
 
 func TestFundsRefundRulesAndWechatRetryAgainstRealMySQL84(t *testing.T) {
@@ -332,6 +478,17 @@ func TestFundsRefundRulesAndWechatRetryAgainstRealMySQL84(t *testing.T) {
 	if requested.Refund.OutTradeNo == nil || *requested.Refund.OutTradeNo != started.Attempt.OutTradeNo {
 		t.Fatalf("refund source snapshot=%#v", requested.Refund)
 	}
+	refundLease, found, err := funds.ClaimRefundVerification(
+		ctx, requested.Refund.RefundPublicID, now, 30*time.Second,
+	)
+	if err != nil || !found || refundLease.Refund.VerifyAttemptCount != 1 {
+		t.Fatalf("refund verification lease=%#v found=%v err=%v", refundLease, found, err)
+	}
+	if _, found, err := funds.ClaimRefundVerification(
+		ctx, requested.Refund.RefundPublicID, now.Add(time.Second), 30*time.Second,
+	); err != nil || found {
+		t.Fatalf("active refund lease reclaimed found=%v err=%v", found, err)
+	}
 	if _, err := funds.ObserveRefund(ctx, RefundObservation{
 		OutRefundNo: requested.Refund.OutRefundNo, OutTradeNo: "D3WRONG",
 		WechatRefundID: "wx-refund-1", AmountCents: 150,
@@ -364,6 +521,15 @@ func TestFundsRefundRulesAndWechatRetryAgainstRealMySQL84(t *testing.T) {
 	})
 	if err != nil || repeated.Refund.Status != RefundSucceeded {
 		t.Fatalf("idempotent refund callback=%#v err=%v", repeated, err)
+	}
+	lateProcessing, err := funds.ObserveRefund(ctx, RefundObservation{
+		OutRefundNo: requested.Refund.OutRefundNo, OutTradeNo: started.Attempt.OutTradeNo,
+		WechatRefundID: "wx-refund-1", AmountCents: 150,
+		ProviderStatus: RefundProviderProcessing,
+	})
+	if err != nil || lateProcessing.Refund.Status != RefundSucceeded ||
+		lateProcessing.Settlement.Status != SettlementRefunded {
+		t.Fatalf("late processing downgraded refund=%#v err=%v", lateProcessing, err)
 	}
 	assertD3Count(t, db, (&Refund{}).TableName(), "delivery_order_public_id = ?", 1, wechatOrder.DeliveryOrderPublicID)
 	t.Log("refund_rules=PASS merchant_ready/admin_claimed/original_source/retry/idempotent_callback")

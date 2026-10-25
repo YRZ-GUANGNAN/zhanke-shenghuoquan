@@ -130,11 +130,11 @@ Expected: 无隔离 DSN 时 MySQL 用例明确 SKIP；配置独立临时库时�
 - Modify: `backend/internal/module/admin/deliverypayment/handler_test.go`
 - Modify: `backend/cmd/server/main.go`
 
-- [ ] **Step 1: 写租约、重启恢复和查单/回调竞争测试**
+- [x] **Step 1: 写租约、重启恢复和查单/回调竞争测试**
 
 同一记录只能被一个实例认领；worker 崩溃后租约到期可恢复；查询成功与回调并发只能入账一次；网络未知不得换业务号或标记失败。
 
-- [ ] **Step 2: 实现 Reconciler**
+- [x] **Step 2: 实现 Reconciler**
 
 ```go
 type Reconciler struct {
@@ -151,15 +151,15 @@ func (r *Reconciler) ReconcileRefund(ctx context.Context, refundPublicID string)
 
 退避有上限；明确配置错误暂停重试并记录错误码；日志和 API 不输出 OpenID、密钥、签名、原始微信应答。
 
-- [ ] **Step 3: 让商户查询触发受限核实**
+- [x] **Step 3: 让商户查询触发受限核实**
 
 `GET /delivery/merchant/payments/:id` 和订单资金详情在本地状态非终态、且达到 `next_verify_at` 时仅触发一次受限查单；HTTP 请求不等待无限重试。前端继续轮询本地事实，不相信 `requestPayment` 返回值。
 
-- [ ] **Step 4: 在服务生命周期启动和停止 worker**
+- [x] **Step 4: 在服务生命周期启动和停止 worker**
 
 仅当 `ENABLE_DELIVERY_PAYMENT=true` 且是真实 `WechatProvider` 时启动；mock、未配置或支付开关关闭时不启动。进程关闭要取消 context 并等待退出。
 
-- [ ] **Step 5: 运行 HTTP 与恢复测试**
+- [x] **Step 5: 运行 HTTP 与恢复测试**
 
 Run: `go test ./internal/module/admin/deliverypayment ./cmd/server`
 

@@ -77,6 +77,7 @@ type PaymentQueryResult struct {
 	State               string
 	AmountCents         uint64
 	PaidAt              *time.Time
+	RawBody             []byte
 }
 
 type RefundRequest struct {
@@ -312,8 +313,12 @@ func (p *WechatProvider) QueryPayment(ctx context.Context, input PaymentQueryReq
 	}
 	path := "/v3/pay/transactions/out-trade-no/" + url.PathEscape(input.OutTradeNo) +
 		"?mchid=" + url.QueryEscape(p.config.MchID)
-	if err := p.doJSON(ctx, http.MethodGet, path, nil, &response); err != nil {
+	raw, err := p.doRequest(ctx, http.MethodGet, path, nil)
+	if err != nil {
 		return PaymentQueryResult{}, err
+	}
+	if err := json.Unmarshal(raw, &response); err != nil {
+		return PaymentQueryResult{}, ErrUntrustedProviderResponse
 	}
 	if response.AppID != p.config.AppID || response.MchID != p.config.MchID ||
 		response.OutTradeNo != input.OutTradeNo || !supportedPaymentState(response.TradeState) ||
@@ -326,7 +331,7 @@ func (p *WechatProvider) QueryPayment(ctx context.Context, input PaymentQueryReq
 	result := PaymentQueryResult{
 		OutTradeNo: response.OutTradeNo, WechatTransactionID: response.WechatTransactionID,
 		PayerOpenID: response.Payer.OpenID, State: response.TradeState,
-		AmountCents: response.Amount.Total,
+		AmountCents: response.Amount.Total, RawBody: append([]byte(nil), raw...),
 	}
 	if response.TradeState == "SUCCESS" {
 		paidAt, err := time.Parse(time.RFC3339, response.SuccessTime)

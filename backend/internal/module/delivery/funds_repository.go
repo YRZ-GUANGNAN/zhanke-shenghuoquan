@@ -17,6 +17,7 @@ type FundsRepository interface {
 	ListLedger(context.Context, uint64, Page) ([]WalletLedger, int64, error)
 	CreatePaymentAttempt(context.Context, *PaymentAttempt) (PaymentAttempt, error)
 	FindPaymentAttemptOwned(context.Context, string, uint64) (PaymentAttempt, error)
+	MarkPaymentPrepayRequested(context.Context, string, uint64, string, time.Time) (PaymentAttempt, error)
 	MarkPaymentPrepayIssued(context.Context, string, uint64, string, string, time.Time) (PaymentAttempt, error)
 	PayOrderWithWallet(context.Context, uint64, string, uint64, string, time.Time) (FundsResult, error)
 	PayOrderWithMock(context.Context, *PaymentAttempt, uint64, time.Time) (FundsResult, error)
@@ -24,6 +25,12 @@ type FundsRepository interface {
 	ConfirmWechatPayment(context.Context, PaymentConfirmation) (FundsResult, bool, error)
 	RequestRefund(context.Context, RefundRequest) (RefundResult, error)
 	ObserveRefund(context.Context, RefundObservation) (RefundResult, error)
+	ClaimPaymentVerification(context.Context, string, time.Time, time.Duration) (PaymentVerificationLease, bool, error)
+	ClaimNextPaymentVerification(context.Context, time.Time, time.Duration) (PaymentVerificationLease, bool, error)
+	UpdatePaymentVerification(context.Context, PaymentVerificationLease, PaymentVerificationUpdate) error
+	ClaimRefundVerification(context.Context, string, time.Time, time.Duration) (RefundVerificationLease, bool, error)
+	ClaimNextRefundVerification(context.Context, time.Time, time.Duration) (RefundVerificationLease, bool, error)
+	UpdateRefundVerification(context.Context, RefundVerificationLease, RefundVerificationUpdate) error
 	FindRefundByOutRefundNo(context.Context, string) (Refund, error)
 	FindOrderFundsOwned(context.Context, string, uint64) (OrderFundsSnapshot, error)
 }
@@ -50,13 +57,15 @@ type PaymentConfirmation struct {
 }
 
 type RefundObservation struct {
-	OutRefundNo    string
-	OutTradeNo     string
-	WechatRefundID string
-	AmountCents    uint64
-	ProviderStatus RefundProviderStatus
-	FailureReason  string
-	ObservedAt     time.Time
+	OutRefundNo        string
+	OutTradeNo         string
+	WechatRefundID     string
+	AmountCents        uint64
+	ProviderStatus     RefundProviderStatus
+	FailureReason      string
+	ObservedAt         time.Time
+	SucceededAt        *time.Time
+	ExpectedRowVersion uint64
 }
 
 type RefundRequest struct {
@@ -110,6 +119,36 @@ func (r *GormRepository) ListLedger(ctx context.Context, merchantUserID uint64, 
 func (r *GormRepository) CreatePaymentAttempt(ctx context.Context, value *PaymentAttempt) (PaymentAttempt, error) {
 	var result PaymentAttempt
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if value.Purpose == PaymentOrderFee {
+			if value.DeliveryOrderPublicID == nil {
+				return ErrInvalidRecord
+			}
+			var order Order
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+				Where("delivery_order_public_id = ? AND merchant_user_id = ?", *value.DeliveryOrderPublicID, value.MerchantUserID).
+				First(&order).Error; err != nil {
+				return normalizeNotFound(err)
+			}
+			if order.Status != StatusPendingFeePayment || order.DeliveryFeeCents != value.AmountCents {
+				return ErrPaymentNotPending
+			}
+			var active PaymentAttempt
+			err := tx.Where(
+				"delivery_order_public_id = ? AND merchant_user_id = ? AND provider = ? AND status IN ?",
+				*value.DeliveryOrderPublicID, value.MerchantUserID, PaymentWechat,
+				[]PaymentStatus{PaymentCreated, PaymentPrepayIssued},
+			).Order("id DESC").First(&active).Error
+			if err == nil {
+				if active.AmountCents != value.AmountCents || active.Currency != value.Currency {
+					return ErrIdempotencyConflict
+				}
+				result = active
+				return nil
+			}
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+		}
 		var existing PaymentAttempt
 		err := tx.Where("merchant_user_id = ? AND purpose = ? AND client_request_id = ?",
 			value.MerchantUserID, value.Purpose, value.ClientRequestID).First(&existing).Error
@@ -141,6 +180,56 @@ func (r *GormRepository) FindPaymentAttemptOwned(ctx context.Context, publicID s
 	return result, err
 }
 
+func (r *GormRepository) MarkPaymentPrepayRequested(
+	ctx context.Context,
+	publicID string,
+	expectedRowVersion uint64,
+	payerOpenID string,
+	at time.Time,
+) (PaymentAttempt, error) {
+	var result PaymentAttempt
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("payment_public_id = ?", publicID).First(&result).Error; err != nil {
+			return normalizeNotFound(err)
+		}
+		if result.Status != PaymentCreated {
+			return ErrPaymentNotPending
+		}
+		if result.PayerOpenID != nil && *result.PayerOpenID != payerOpenID {
+			return ErrPaymentPayer
+		}
+		if result.PayerOpenID != nil && *result.PayerOpenID == payerOpenID &&
+			result.ProviderStatus == "PREPAY_REQUESTED" {
+			return nil
+		}
+		nextVerifyAt := at.Add(30 * time.Second)
+		update := tx.Model(&PaymentAttempt{}).
+			Where("id = ? AND row_version = ? AND status = ?", result.ID, expectedRowVersion, PaymentCreated).
+			Updates(map[string]any{
+				"payer_openid": payerOpenID, "provider_status": "PREPAY_REQUESTED",
+				"next_verify_at": nextVerifyAt, "verify_lease_until": nil,
+				"last_error_code": "", "row_version": gorm.Expr("row_version + 1"),
+				"updated_at": at,
+			})
+		if update.Error != nil {
+			return update.Error
+		}
+		if update.RowsAffected != 1 {
+			return ErrConcurrentUpdate
+		}
+		result.PayerOpenID = &payerOpenID
+		result.ProviderStatus = "PREPAY_REQUESTED"
+		result.NextVerifyAt = &nextVerifyAt
+		result.VerifyLeaseUntil = nil
+		result.LastErrorCode = ""
+		result.RowVersion++
+		result.UpdatedAt = at
+		return nil
+	})
+	return result, err
+}
+
 func (r *GormRepository) MarkPaymentPrepayIssued(
 	ctx context.Context,
 	publicID string,
@@ -159,6 +248,9 @@ func (r *GormRepository) MarkPaymentPrepayIssued(
 				return ErrPaymentPayer
 			}
 			return nil
+		}
+		if result.PayerOpenID != nil && *result.PayerOpenID != payerOpenID {
+			return ErrPaymentPayer
 		}
 		update := tx.Model(&PaymentAttempt{}).
 			Where("id = ? AND row_version = ? AND status = ?", result.ID, expectedRowVersion, PaymentCreated).
@@ -609,6 +701,11 @@ func (r *GormRepository) ObserveRefund(ctx context.Context, input RefundObservat
 			result = RefundResult{Refund: refund, Settlement: settlement}
 			return nil
 		}
+		if input.ExpectedRowVersion != 0 &&
+			(refund.RowVersion != input.ExpectedRowVersion || refund.VerifyLeaseUntil == nil ||
+				refund.VerifyLeaseUntil.Before(input.ObservedAt)) {
+			return ErrVerificationLease
+		}
 		if refund.Status == RefundFailed && input.ProviderStatus != RefundProviderSucceeded {
 			result = RefundResult{Refund: refund, Settlement: settlement}
 			return nil
@@ -616,6 +713,7 @@ func (r *GormRepository) ObserveRefund(ctx context.Context, input RefundObservat
 		refundID := strings.TrimSpace(input.WechatRefundID)
 		status := RefundRetryPending
 		settlementStatus := SettlementRefundPending
+		succeededAt := refundObservationSucceededAt(input)
 		updates := map[string]any{
 			"status": status, "wechat_refund_id": refundID,
 			"provider_status":    string(input.ProviderStatus),
@@ -631,7 +729,7 @@ func (r *GormRepository) ObserveRefund(ctx context.Context, input RefundObservat
 			updates["failure_reason"] = ""
 			updates["last_error_code"] = ""
 			updates["next_verify_at"] = nil
-			updates["succeeded_at"] = input.ObservedAt
+			updates["succeeded_at"] = succeededAt
 		case RefundProviderProcessing:
 			updates["next_verify_at"] = input.ObservedAt.Add(30 * time.Second)
 			updates["last_error_code"] = ""
@@ -655,7 +753,7 @@ func (r *GormRepository) ObserveRefund(ctx context.Context, input RefundObservat
 		}
 		settlementUpdates := map[string]any{"status": settlementStatus, "row_version": gorm.Expr("row_version + 1")}
 		if input.ProviderStatus == RefundProviderSucceeded {
-			settlementUpdates["refunded_at"] = input.ObservedAt
+			settlementUpdates["refunded_at"] = succeededAt
 		}
 		updateSettlement := tx.Model(&FeeSettlement{}).
 			Where("id = ? AND row_version = ?", settlement.ID, settlement.RowVersion).
@@ -680,8 +778,8 @@ func (r *GormRepository) ObserveRefund(ctx context.Context, input RefundObservat
 			refund.FailureReason = ""
 			refund.LastErrorCode = ""
 			refund.NextVerifyAt = nil
-			refund.SucceededAt = timePointer(input.ObservedAt)
-			settlement.RefundedAt = timePointer(input.ObservedAt)
+			refund.SucceededAt = timePointer(succeededAt)
+			settlement.RefundedAt = timePointer(succeededAt)
 		case RefundProviderProcessing:
 			refund.LastErrorCode = ""
 			refund.NextVerifyAt = timePointer(input.ObservedAt.Add(30 * time.Second))
@@ -696,6 +794,212 @@ func (r *GormRepository) ObserveRefund(ctx context.Context, input RefundObservat
 		return nil
 	})
 	return result, err
+}
+
+func (r *GormRepository) ClaimPaymentVerification(
+	ctx context.Context,
+	paymentPublicID string,
+	now time.Time,
+	leaseTTL time.Duration,
+) (PaymentVerificationLease, bool, error) {
+	return r.claimPaymentVerification(ctx, paymentPublicID, now, leaseTTL)
+}
+
+func (r *GormRepository) ClaimNextPaymentVerification(
+	ctx context.Context,
+	now time.Time,
+	leaseTTL time.Duration,
+) (PaymentVerificationLease, bool, error) {
+	return r.claimPaymentVerification(ctx, "", now, leaseTTL)
+}
+
+func (r *GormRepository) claimPaymentVerification(
+	ctx context.Context,
+	paymentPublicID string,
+	now time.Time,
+	leaseTTL time.Duration,
+) (PaymentVerificationLease, bool, error) {
+	var lease PaymentVerificationLease
+	found := false
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		query := tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+			Where("status IN ?", []PaymentStatus{PaymentCreated, PaymentPrepayIssued}).
+			Where("payer_openid IS NOT NULL AND payer_openid <> ''").
+			Where("next_verify_at IS NOT NULL AND next_verify_at <= ?", now).
+			Where("verify_lease_until IS NULL OR verify_lease_until <= ?", now)
+		if paymentPublicID != "" {
+			query = query.Where("payment_public_id = ?", paymentPublicID)
+		}
+		var attempt PaymentAttempt
+		err := query.Order("id ASC").First(&attempt).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		expiresAt := now.Add(leaseTTL)
+		update := tx.Model(&PaymentAttempt{}).
+			Where("id = ? AND row_version = ? AND status IN ?", attempt.ID, attempt.RowVersion,
+				[]PaymentStatus{PaymentCreated, PaymentPrepayIssued}).
+			Updates(map[string]any{
+				"verify_lease_until":   expiresAt,
+				"verify_attempt_count": gorm.Expr("verify_attempt_count + 1"),
+				"row_version":          gorm.Expr("row_version + 1"), "updated_at": now,
+			})
+		if update.Error != nil {
+			return update.Error
+		}
+		if update.RowsAffected != 1 {
+			return ErrVerificationLease
+		}
+		attempt.VerifyLeaseUntil = &expiresAt
+		attempt.VerifyAttemptCount++
+		attempt.RowVersion++
+		attempt.UpdatedAt = now
+		lease = PaymentVerificationLease{Attempt: attempt}
+		found = true
+		return nil
+	})
+	return lease, found, err
+}
+
+func (r *GormRepository) UpdatePaymentVerification(
+	ctx context.Context,
+	lease PaymentVerificationLease,
+	update PaymentVerificationUpdate,
+) error {
+	if lease.Attempt.ID == 0 || lease.Attempt.RowVersion == 0 || lease.Attempt.VerifyLeaseUntil == nil ||
+		update.UpdatedAt.IsZero() || (update.Status != "" && update.Status != PaymentFailed && update.Status != PaymentClosed) {
+		return ErrInvalidRecord
+	}
+	updates := map[string]any{
+		"next_verify_at": update.NextVerifyAt, "verify_lease_until": nil,
+		"last_error_code": truncate(strings.TrimSpace(update.LastErrorCode), 64),
+		"row_version":     gorm.Expr("row_version + 1"), "updated_at": update.UpdatedAt,
+	}
+	if providerStatus := strings.TrimSpace(update.ProviderStatus); providerStatus != "" {
+		updates["provider_status"] = truncate(providerStatus, 32)
+	}
+	if update.Status != "" {
+		updates["status"] = update.Status
+		updates["next_verify_at"] = nil
+		if update.Status == PaymentClosed {
+			updates["closed_at"] = update.UpdatedAt
+		}
+	}
+	result := r.db.WithContext(ctx).Model(&PaymentAttempt{}).
+		Where("id = ? AND row_version = ? AND status IN ? AND verify_lease_until >= ?",
+			lease.Attempt.ID, lease.Attempt.RowVersion,
+			[]PaymentStatus{PaymentCreated, PaymentPrepayIssued}, update.UpdatedAt).
+		Updates(updates)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return ErrVerificationLease
+	}
+	return nil
+}
+
+func (r *GormRepository) ClaimRefundVerification(
+	ctx context.Context,
+	refundPublicID string,
+	now time.Time,
+	leaseTTL time.Duration,
+) (RefundVerificationLease, bool, error) {
+	return r.claimRefundVerification(ctx, refundPublicID, now, leaseTTL)
+}
+
+func (r *GormRepository) ClaimNextRefundVerification(
+	ctx context.Context,
+	now time.Time,
+	leaseTTL time.Duration,
+) (RefundVerificationLease, bool, error) {
+	return r.claimRefundVerification(ctx, "", now, leaseTTL)
+}
+
+func (r *GormRepository) claimRefundVerification(
+	ctx context.Context,
+	refundPublicID string,
+	now time.Time,
+	leaseTTL time.Duration,
+) (RefundVerificationLease, bool, error) {
+	var lease RefundVerificationLease
+	found := false
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		query := tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+			Where("source = ?", SettlementWechat).
+			Where("status IN ?", []RefundStatus{RefundPending, RefundRetryPending}).
+			Where("out_trade_no IS NOT NULL AND out_trade_no <> ''").
+			Where("next_verify_at IS NOT NULL AND next_verify_at <= ?", now).
+			Where("verify_lease_until IS NULL OR verify_lease_until <= ?", now)
+		if refundPublicID != "" {
+			query = query.Where("refund_public_id = ?", refundPublicID)
+		}
+		var refund Refund
+		err := query.Order("id ASC").First(&refund).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		expiresAt := now.Add(leaseTTL)
+		update := tx.Model(&Refund{}).
+			Where("id = ? AND row_version = ? AND status IN ?", refund.ID, refund.RowVersion,
+				[]RefundStatus{RefundPending, RefundRetryPending}).
+			Updates(map[string]any{
+				"verify_lease_until":   expiresAt,
+				"verify_attempt_count": gorm.Expr("verify_attempt_count + 1"),
+				"row_version":          gorm.Expr("row_version + 1"), "updated_at": now,
+			})
+		if update.Error != nil {
+			return update.Error
+		}
+		if update.RowsAffected != 1 {
+			return ErrVerificationLease
+		}
+		refund.VerifyLeaseUntil = &expiresAt
+		refund.VerifyAttemptCount++
+		refund.RowVersion++
+		refund.UpdatedAt = now
+		lease = RefundVerificationLease{Refund: refund}
+		found = true
+		return nil
+	})
+	return lease, found, err
+}
+
+func (r *GormRepository) UpdateRefundVerification(
+	ctx context.Context,
+	lease RefundVerificationLease,
+	update RefundVerificationUpdate,
+) error {
+	if lease.Refund.ID == 0 || lease.Refund.RowVersion == 0 || lease.Refund.VerifyLeaseUntil == nil ||
+		update.UpdatedAt.IsZero() {
+		return ErrInvalidRecord
+	}
+	updates := map[string]any{
+		"next_verify_at": update.NextVerifyAt, "verify_lease_until": nil,
+		"last_error_code": truncate(strings.TrimSpace(update.LastErrorCode), 64),
+		"row_version":     gorm.Expr("row_version + 1"), "updated_at": update.UpdatedAt,
+	}
+	if providerStatus := strings.TrimSpace(update.ProviderStatus); providerStatus != "" {
+		updates["provider_status"] = truncate(providerStatus, 32)
+	}
+	result := r.db.WithContext(ctx).Model(&Refund{}).
+		Where("id = ? AND row_version = ? AND status IN ? AND verify_lease_until >= ?",
+			lease.Refund.ID, lease.Refund.RowVersion,
+			[]RefundStatus{RefundPending, RefundRetryPending}, update.UpdatedAt).
+		Updates(updates)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return ErrVerificationLease
+	}
+	return nil
 }
 
 func validRefundProviderStatus(value RefundProviderStatus) bool {
@@ -729,6 +1033,13 @@ func validateRefundObservation(refund Refund, input RefundObservation) error {
 	return nil
 }
 
+func refundObservationSucceededAt(input RefundObservation) time.Time {
+	if input.ProviderStatus == RefundProviderSucceeded && input.SucceededAt != nil && !input.SucceededAt.IsZero() {
+		return input.SucceededAt.UTC()
+	}
+	return input.ObservedAt
+}
+
 func (r *GormRepository) FindRefundByOutRefundNo(ctx context.Context, outRefundNo string) (Refund, error) {
 	var result Refund
 	err := r.db.WithContext(ctx).Where("out_refund_no = ?", outRefundNo).First(&result).Error
@@ -750,6 +1061,16 @@ func (r *GormRepository) FindOrderFundsOwned(
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrForbiddenOrder
 			}
+			return err
+		}
+		var latestPayment PaymentAttempt
+		if err := tx.Where(
+			"delivery_order_public_id = ? AND merchant_user_id = ?",
+			orderPublicID,
+			merchantUserID,
+		).Order("id DESC").First(&latestPayment).Error; err == nil {
+			result.Payment = &latestPayment
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
 
@@ -780,15 +1101,18 @@ func (r *GormRepository) FindOrderFundsOwned(
 		if settlement.PaymentPublicID == nil {
 			return nil
 		}
-		var payment PaymentAttempt
+		if result.Payment != nil && result.Payment.PaymentPublicID == *settlement.PaymentPublicID {
+			return nil
+		}
+		var settledPayment PaymentAttempt
 		if err := tx.Where(
 			"payment_public_id = ? AND merchant_user_id = ?",
 			*settlement.PaymentPublicID,
 			merchantUserID,
-		).First(&payment).Error; err != nil {
+		).First(&settledPayment).Error; err != nil {
 			return normalizeNotFound(err)
 		}
-		result.Payment = &payment
+		result.Payment = &settledPayment
 		return nil
 	})
 	return result, err

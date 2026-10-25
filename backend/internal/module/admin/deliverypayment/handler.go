@@ -16,6 +16,7 @@ import (
 type Handler struct {
 	funds         *delivery.FundsService
 	provider      Provider
+	reconciler    *Reconciler
 	currentUserID func(*gin.Context) uint64
 	currentOpenID func(*gin.Context) string
 }
@@ -27,6 +28,11 @@ func NewHandler(
 	currentOpenID func(*gin.Context) string,
 ) *Handler {
 	return &Handler{funds: funds, provider: provider, currentUserID: currentUserID, currentOpenID: currentOpenID}
+}
+
+func (h *Handler) WithReconciler(reconciler *Reconciler) *Handler {
+	h.reconciler = reconciler
+	return h
 }
 
 func (h *Handler) RegisterMerchant(group *gin.RouterGroup) {
@@ -76,19 +82,44 @@ func (h *Handler) ledger(c *gin.Context) {
 }
 
 func (h *Handler) payment(c *gin.Context) {
-	value, err := h.funds.Payment(c.Request.Context(), h.currentUserID(c), c.Param("id"))
+	ctx := c.Request.Context()
+	merchantUserID := h.currentUserID(c)
+	value, err := h.funds.Payment(ctx, merchantUserID, c.Param("id"))
 	if err != nil {
 		h.write(c, nil, err)
 		return
+	}
+	if h.reconciler != nil {
+		_ = h.reconciler.ReconcilePayment(ctx, value.PaymentPublicID)
+		value, err = h.funds.Payment(ctx, merchantUserID, value.PaymentPublicID)
+		if err != nil {
+			h.write(c, nil, err)
+			return
+		}
 	}
 	response.OK(c, paymentView(value, nil))
 }
 
 func (h *Handler) orderFunds(c *gin.Context) {
-	value, err := h.funds.OrderFunds(c.Request.Context(), h.currentUserID(c), c.Param("id"))
+	ctx := c.Request.Context()
+	merchantUserID := h.currentUserID(c)
+	value, err := h.funds.OrderFunds(ctx, merchantUserID, c.Param("id"))
 	if err != nil {
 		h.write(c, nil, err)
 		return
+	}
+	if h.reconciler != nil {
+		if value.Payment != nil {
+			_ = h.reconciler.ReconcilePayment(ctx, value.Payment.PaymentPublicID)
+		}
+		if value.Refund != nil {
+			_ = h.reconciler.ReconcileRefund(ctx, value.Refund.RefundPublicID)
+		}
+		value, err = h.funds.OrderFunds(ctx, merchantUserID, value.Order.DeliveryOrderPublicID)
+		if err != nil {
+			h.write(c, nil, err)
+			return
+		}
 	}
 	response.OK(c, orderFundsView(value))
 }
@@ -190,6 +221,14 @@ func (h *Handler) issuePrepay(c *gin.Context, value *delivery.PaymentStartResult
 		return nil, delivery.ErrPaymentNotPending
 	}
 	payerOpenID := strings.TrimSpace(h.currentOpenID(c))
+	requestedAttempt, err := h.funds.MarkPrepayRequested(
+		c.Request.Context(), value.Attempt.PaymentPublicID,
+		value.Attempt.RowVersion, payerOpenID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	value.Attempt = requestedAttempt
 	prepay, err := h.provider.CreatePrepay(c.Request.Context(), PrepayRequest{
 		Description: description, OutTradeNo: value.Attempt.OutTradeNo,
 		AmountCents: value.Attempt.AmountCents, OpenID: payerOpenID,
