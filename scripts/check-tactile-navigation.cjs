@@ -88,6 +88,7 @@ async function run() {
       }
       if (id.endsWith('.scss')) return {}
       if (id.endsWith('/use-feature-visibility')) return { useFeatureVisibility: () => options.visibility }
+      if (id.endsWith('/bottom-nav-motion')) return { useBottomNavVisibility: () => false }
       if (id.endsWith('/app-icon')) return { default: View }
       if (id.endsWith('/capsule-page-header')) return { default: props => React.createElement(View, {}, props.left) }
       if (id.endsWith('/components/ui')) return { AppIconButton: props => React.createElement(View, { ...props, className: 'test-back' }) }

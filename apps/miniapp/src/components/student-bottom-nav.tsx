@@ -3,6 +3,7 @@ import { Text, View } from '@tarojs/components'
 import { useDidShow } from '@tarojs/taro'
 import Taro from '../services/taro'
 import { useFeatureVisibility } from '../hooks/use-feature-visibility'
+import { useBottomNavVisibility } from '../utils/bottom-nav-motion'
 import AppIcon from './app-icon'
 import './student-bottom-nav.scss'
 
@@ -23,6 +24,7 @@ interface StudentBottomNavProps {
 
 export default function StudentBottomNav({ active, className = '' }: StudentBottomNavProps) {
   const visibility = useFeatureVisibility()
+  const immersiveHidden = useBottomNavVisibility()
   const visualActive = active === 'market' ? 'home' : active
   const navigationLockRef = useRef<{ key: string } | null>(null)
 
@@ -69,7 +71,7 @@ export default function StudentBottomNav({ active, className = '' }: StudentBott
   )
 
   return (
-    <View className={`student-bottom-nav ${className}`.trim()} style={{ gridTemplateColumns: `repeat(${visibleItems.length + (canPublish ? 1 : 0)}, 1fr)` }}>
+    <View className={`student-bottom-nav${immersiveHidden ? ' student-bottom-nav--hidden' : ''} ${className}`.trim()} style={{ gridTemplateColumns: `repeat(${visibleItems.length + (canPublish ? 1 : 0)}, 1fr)` }}>
       {visibleItems.filter((item) => item.key === 'home' || item.key === 'takeout').map(renderItem)}
       {canPublish && <View
           className='student-bottom-nav__publish'

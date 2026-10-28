@@ -12,6 +12,7 @@ import { getIdentityApplication } from '../../services/a-user'
 import { useDeliveryPayment } from '../../hooks/use-delivery-payment'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
+import { useBottomNavScroll } from '../../utils/bottom-nav-motion'
 import type { IdentityApplicationView } from '../../types'
 import './index.scss'
 
@@ -19,6 +20,7 @@ function DeliveryProfileContent() {
   const { enabled: deliveryPaymentEnabled } = useDeliveryPayment()
   const role = Taro.getCurrentInstance().router?.params.role === 'merchant' ? 'merchant' : 'rider'
   const allowed = useIdentityGuard(role)
+  const navScroll = useBottomNavScroll(allowed, role)
   const profile = useSessionStore(state => state.profile)
   const switchIdentity = useSessionStore(state => state.switchIdentity)
   const [application, setApplication] = useState<IdentityApplicationView | null>(null)
@@ -84,7 +86,8 @@ function DeliveryProfileContent() {
   const name = (role === 'merchant' ? application?.merchantName : application?.realName) || profile.nickname || roleName
   const hasCover = Boolean(profile.cover && failedCover !== profile.cover)
   return <View className={`delivery-profile delivery-profile--${role}`} {...workspace.swipe.handlers}>
-    <ScrollView scrollY enhanced showScrollbar={false} className='delivery-profile__scroll'>
+    <ScrollView scrollY enhanced showScrollbar={false} className='delivery-profile__scroll'
+      onScroll={event => navScroll(Number(event.detail?.scrollTop))}>
       <View className={`delivery-profile__hero${hasCover ? ' delivery-profile__hero--cover' : ''}`}>
         {hasCover ? <Image src={profile.cover || ''} mode='aspectFill' className='delivery-profile__hero-image' ariaLabel={`${roleName}个人封面`} onError={() => setFailedCover(profile.cover || '')} /> : null}
         <CapsuleSystemRow className='delivery-profile__system-row' />

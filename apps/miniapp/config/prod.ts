@@ -18,6 +18,15 @@ export default {
     TARO_APP_ENABLE_DELIVERY_PAYMENT: JSON.stringify(enableDeliveryPayment),
     TARO_APP_ENABLE_DELIVERY_PAYMENT_MOCK: JSON.stringify(enableDeliveryPaymentMock)
   },
-  mini: {},
+  mini: {
+    // Taro's normal production minimizer remains enabled.  UTF-8 output avoids
+    // inflating every Chinese label into a six-character escape sequence and
+    // keeps the generated package under WeChat's 2 MB main-package limit.
+    terser: {
+      config: {
+        output: { ascii_only: false }
+      }
+    }
+  },
   h5: {}
 }

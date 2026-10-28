@@ -30,10 +30,9 @@ for (const forbidden of [
   'g-takeout', 'stores/cart', 'pages/takeout/',
 ]) assertExcludes(takeoutPage, forbidden)
 
-assertIncludes(takeoutPage, 'ServiceMerchantCatalog')
-const catalog = read('apps', 'miniapp', 'src', 'components', 'service-merchant-catalog.tsx')
-assertIncludes(catalog, '/takeout/catalog/merchants')
-for (const forbidden of ['createBuyerOrder', 'payBuyerOrder', 'requestPayment', 'stores/cart']) assertExcludes(catalog, forbidden)
+for (const forbidden of ['ServiceMerchantCatalog', 'g-takeout-buyer', 'merchantId', 'stores/cart', 'pages/takeout/']) {
+  assertExcludes(takeoutPage, forbidden)
+}
 
 for (const required of [
   'external_takeout_merchants', 'listNavigationItems',

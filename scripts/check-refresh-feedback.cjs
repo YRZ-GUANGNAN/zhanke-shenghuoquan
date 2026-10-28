@@ -29,6 +29,11 @@ async function run() {
       if (id.endsWith('app-icon')) return { default: component('AppIcon') }
       if (id === './ui') return { AppState: p => React.createElement('div', { 'data-state': p.kind }, p.title), AppSkeleton: component('Skeleton') }
       if (extra[id]) return extra[id]
+      if (id.startsWith('.')) {
+        const target = path.resolve(path.dirname(file), id)
+        const resolved = ['.tsx', '.ts'].map(ext => target + ext).find(candidate => fs.existsSync(candidate))
+        if (resolved) return load(path.relative(path.join(root, 'apps/miniapp/src'), resolved), extra)
+      }
       throw new Error('Unexpected dependency ' + id)
     }
     loaded._compile(ts.transpileModule(fs.readFileSync(file, 'utf8'), { fileName: file, compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText, file)
@@ -41,22 +46,32 @@ async function run() {
   const event = cb => React.act(async () => { cb() })
   const scroll = () => document.querySelector('[data-kind=ScrollView]').taroProps
   const label = () => document.querySelector('[data-kind=Slot]').textContent
+  const overlay = () => document.querySelector('.taro-ux-loading--overlay')
   const wait = ms => React.act(() => new Promise(resolve => setTimeout(resolve, ms)))
   try {
     await render()
     assert.equal(document.querySelector('[data-kind=Slot]').taroProps.name, 'refresher')
+    assert.equal(scroll().refresherThreshold, 60)
+    await event(() => scroll().onRefresherPulling({ detail: { dy: 39 } }))
+    assert.equal(label(), '下拉刷新')
+    assert.equal(overlay(), null)
     await event(() => scroll().onRefresherPulling({ detail: { dy: 70 } }))
     assert.equal(label(), '松开刷新')
+    assert.equal(overlay(), null, 'stable refresh must not cover the page with an experimental overlay')
     await event(() => { scroll().onRefresherRefresh(); scroll().onRefresherRefresh() })
     assert.equal(count, 1)
     assert.equal(scroll().refresherTriggered, true)
+    assert.equal(document.querySelector('[data-kind=StatusGlyph]').taroProps.kind, 'loading')
     props = { ...props, busy: true }; await render()
     assert.equal(scroll().refresherEnabled, true, 'in-flight pull must keep native slot enabled')
     await event(() => scroll().onRefresherAbort())
     assert.equal(label(), '正在更新', 'abort cannot report a pending request as cancelled or successful')
     await event(() => tasks[0].resolve(true))
     assert.equal(label(), '已更新')
-    await wait(470)
+    await wait(320)
+    assert.equal(overlay(), null)
+    assert.equal(label(), '已更新')
+    await wait(150)
     assert.equal(scroll().refresherTriggered, false)
     await event(() => scroll().onRefresherRefresh())
     assert.equal(count, 1, 'external paging prevents overlapping pull requests')
@@ -70,6 +85,7 @@ async function run() {
     props = { ...props, refreshKey: 'user-b' }; await render()
     await event(() => tasks[2].resolve(true))
     assert.equal(label(), '下拉刷新', 'old owner cannot update refresh feedback')
+    assert.equal(overlay(), null, 'old owner cannot leave a blur layer')
     await event(() => {
       previousOwner.onRefresherPulling({ detail: { dy: 70 } })
       previousOwner.onRefresherRefresh()
@@ -80,6 +96,7 @@ async function run() {
     await event(() => hide())
     await event(() => scroll().onRefresherPulling({ detail: { dy: 70 } }))
     assert.equal(label(), '下拉刷新', 'hidden native pulling events must not leave a ready label on return')
+    assert.equal(overlay(), null)
     await event(() => scroll().onRefresherRefresh())
     assert.equal(count, 4, 'hidden native events cannot start another request')
     await event(() => tasks[3].resolve(true))
@@ -89,7 +106,13 @@ async function run() {
     props = { ...props, enabled: false }; await render()
     await event(() => tasks[4].resolve(true))
     assert.equal(label(), '下拉刷新', 'hidden channel ignores completion')
+    assert.equal(overlay(), null)
     props = { ...props, enabled: true }; await render()
+    await event(() => scroll().onRefresherPulling({ detail: { dy: 80 } }))
+    assert.equal(label(), '松开刷新')
+    await event(() => scroll().onRefresherAbort())
+    assert.equal(label(), '下拉刷新', 'cancelled pull restores the native feedback immediately')
+    assert.equal(overlay(), null)
     await event(() => scroll().onRefresherRefresh())
     const detached = scroll()
     const detachedShow = show

@@ -14,6 +14,11 @@ function filesIn(directory) {
 }
 
 const files = filesIn(dist)
+const requiredFiles = ['app.json', 'app.js', 'common.js', 'vendors.js', 'pages/home/index.js']
+if (files.length < 20 || requiredFiles.some(file => !fs.existsSync(path.join(dist, file)))) {
+  console.error('miniapp package: FAIL (dist is missing required build output)')
+  process.exit(1)
+}
 const total = files.reduce((sum, file) => sum + fs.statSync(file).size, 0)
 if (total > limit) {
   console.error(`miniapp package: FAIL (${total} bytes > ${limit} byte limit)`)

@@ -48,6 +48,7 @@ function navHarness(options = {}) {
     './app-icon': 'AppIcon',
     '../services/taro': { navigateTo: invoke('navigate'), redirectTo: invoke('redirect'), showToast: invoke('toast') },
     '../hooks/use-feature-visibility': { useFeatureVisibility: () => visibility },
+    '../utils/bottom-nav-motion': { useBottomNavVisibility: () => false },
     './delivery-workspace-nav.scss': {},
   }, renderer)
   const props = { role: options.role || 'merchant', active: options.active || 'orders', onSelect: options.localSelect ? (key) => calls.select.push(key) : undefined, gestureGuard: options.gestureGuard }
@@ -103,6 +104,7 @@ function profileHarness(options = {}) {
       navigateTo: async (value) => { calls.navigate.push(value) }, showToast: async () => {},
     },
     '../../stores/session': { useSessionStore: session.useSessionStore },
+    '../../utils/bottom-nav-motion': { useBottomNavScroll: () => () => {} },
     './index.scss': {},
   }
   loadPage('delivery-profile', imports, renderer)
@@ -143,6 +145,7 @@ function messagesHarness(options = {}) {
     '../../hooks/use-delivery-payment': { useDeliveryPayment: () => ({ enabled: options.paymentEnabled ?? true }) },
     '../../hooks/use-identity-guard': { useIdentityGuard: (role) => { calls.guards.push(role); return allowed } },
     '../../stores/session': { useSessionStore: session.useSessionStore },
+    '../../utils/bottom-nav-motion': { useBottomNavScroll: () => () => {} },
     '../../services/delivery-im': {
       listDeliveryConversations: async (...args) => { calls.lists.push(args); return options.list?.(...args) || { items: [conversation('A')], total: 1 } },
       getDeliveryConversationUnread: async (id) => { calls.unread.push(id); return options.unread ? options.unread(id) : 0 },

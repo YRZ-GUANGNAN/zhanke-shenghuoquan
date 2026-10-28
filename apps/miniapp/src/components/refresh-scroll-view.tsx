@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ComponentProps } from 'react'
 import { ScrollView, Slot, Text } from '@tarojs/components'
 import { useDidHide, useDidShow } from '@tarojs/taro'
 import { StatusGlyph } from './ui/status-glyph'
+import { useBottomNavScroll } from '../utils/bottom-nav-motion'
 import './refresh-scroll-view.scss'
 
 type Phase = 'idle' | 'pulling' | 'ready' | 'refreshing' | 'success' | 'error'
@@ -15,9 +16,9 @@ const labels: Record<Phase, string> = {
   idle: '下拉刷新', pulling: '下拉刷新', ready: '松开刷新',
   refreshing: '正在更新', success: '已更新', error: '更新失败，请重试'
 }
-
 /** Native scrolling owns gesture direction and resistance; this owns request feedback only. */
-export default function RefreshScrollView({ enabled = true, busy = false, refreshKey, onRefresh, children, ...props }: Props) {
+export default function RefreshScrollView({ enabled = true, busy = false, refreshKey, onRefresh, children, onScroll, ...props }: Props) {
+  const navScroll = useBottomNavScroll(enabled, refreshKey)
   const [phase, setPhase] = useState<Phase>('idle')
   const [triggered, setTriggered] = useState(false)
   const generation = useRef(0)
@@ -71,9 +72,12 @@ export default function RefreshScrollView({ enabled = true, busy = false, refres
   }
   const resting = () => {
     // A native abort is not cancellation of a request already in flight.
-    if (isCurrentOwner() && !locked.current) { setTriggered(false); setPhase('idle') }
+    if (isCurrentOwner() && !locked.current) {
+      setTriggered(false); setPhase('idle')
+    }
   }
-  return <ScrollView {...props} refresherEnabled={enabled && (!busy || locked.current)} refresherThreshold={60}
+  return <ScrollView {...props}
+    refresherEnabled={enabled && (!busy || locked.current)} refresherThreshold={60}
     refresherDefaultStyle='none' refresherBackground='transparent' refresherTriggered={triggered}
     onRefresherPulling={event => {
       if (isCurrentOwner() && enabled && !locked.current && current.current.enabled && !current.current.busy) {
@@ -82,7 +86,11 @@ export default function RefreshScrollView({ enabled = true, busy = false, refres
       }
     }}
     onRefresherRefresh={() => { void refresh() }}
-    onRefresherRestore={resting} onRefresherAbort={resting}>
+    onRefresherRestore={resting} onRefresherAbort={resting}
+    onScroll={event => {
+      navScroll(Number(event.detail?.scrollTop))
+      onScroll?.(event)
+    }}>
     <Slot name='refresher' className={`refresh-feedback refresh-feedback--${phase}`}>
       <StatusGlyph small kind={phase === 'refreshing' ? 'loading' : phase === 'success' ? 'success' : phase === 'error' ? 'offline' : 'pull'} />
       <Text>{labels[phase]}</Text>

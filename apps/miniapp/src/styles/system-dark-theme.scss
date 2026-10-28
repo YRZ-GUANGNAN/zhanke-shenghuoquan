@@ -55,6 +55,7 @@ page {
   --bg-app: var(--cj);
   --bg-screen: var(--ck);
   --bg-surface: var(--cl);
+  --profile-cover-rgb: 255, 255, 255;
   --bg-surface-subtle: var(--cm);
   --border-default: var(--cn);
   --radius-control: 16rpx;
@@ -117,6 +118,7 @@ page {
     --bg-app: var(--cj) !important;
     --bg-screen: var(--ck) !important;
     --bg-surface: var(--cl) !important;
+    --profile-cover-rgb: 24, 33, 44 !important;
     --bg-surface-subtle: var(--cm) !important;
     --border-default: var(--cn) !important;
     --radius-control: 16rpx !important;

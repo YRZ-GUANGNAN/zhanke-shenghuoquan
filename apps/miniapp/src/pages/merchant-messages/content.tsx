@@ -11,6 +11,7 @@ import {
   type DeliveryConversation,
 } from '../../services/delivery-im'
 import Taro from '../../services/taro'
+import { useBottomNavScroll } from '../../utils/bottom-nav-motion'
 import './index.scss'
 
 const statusCopy: Record<DeliveryConversation['status'], string> = {
@@ -26,6 +27,7 @@ function formatTime(value: string) {
 }
 
 export function DeliveryMessagesContent({ role, identityAllowed }: { role: 'merchant' | 'rider'; identityAllowed: boolean }) {
+  const navScroll = useBottomNavScroll(identityAllowed, role)
   const workspace = useDeliveryWorkspaceNavigation({ role, active: 'messages' }, identityAllowed)
   const accountId = useSessionStore(state => state.profile.id)
   const token = useSessionStore(state => state.token)
@@ -119,6 +121,7 @@ export function DeliveryMessagesContent({ role, identityAllowed }: { role: 'merc
       />
 
       <ScrollView className='merchant-messages-scroll' scrollY enhanced showScrollbar={false} lowerThreshold={100}
+        onScroll={event => navScroll(Number(event.detail?.scrollTop))}
         onScrollToLower={() => { if (items.length < total) void loadMessages(true) }}>
         <View className='merchant-messages-card'>
           {loading ? <Text className='merchant-messages-card__footer'>正在加载真实配送会话…</Text> : null}

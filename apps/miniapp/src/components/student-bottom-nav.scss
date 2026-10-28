@@ -2,9 +2,9 @@
 
 .student-bottom-nav {
   position: fixed;
-  right: 0;
-  bottom: 0;
-  left: 0;
+  right: 8PX;
+  bottom: 8PX;
+  left: 8PX;
   z-index: $z-sticky;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -15,8 +15,12 @@
   background: rgba($bg-surface-static, .98);
   box-shadow: 0 -10rpx 28rpx rgba(15, 42, 68, .045);
   box-sizing: border-box;
-  overflow: visible;
+  border-radius: 24PX;
+  overflow: hidden;
+  transition: transform 180ms $ease-standard, border-radius 180ms $ease-standard;
 }
+
+.student-bottom-nav--hidden { transform: translateY(calc(100% - 12PX)); }
 
 .student-bottom-nav__item {
   display: flex;
@@ -113,7 +117,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .student-bottom-nav__item-visual,
-  .student-bottom-nav__publish-visual {
+  .student-bottom-nav__publish-visual,
+  .student-bottom-nav {
     transition: none;
   }
 
@@ -122,4 +127,6 @@
     opacity: .82;
     transform: none;
   }
+
+  .student-bottom-nav--hidden { transform: none; }
 }

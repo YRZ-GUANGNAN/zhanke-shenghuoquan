@@ -5,6 +5,7 @@ import { useHorizontalNavigation } from '../hooks/use-horizontal-navigation'
 import AppIcon, { type AppIconName } from './app-icon'
 import Taro from '../services/taro'
 import { useFeatureVisibility } from '../hooks/use-feature-visibility'
+import { useBottomNavVisibility } from '../utils/bottom-nav-motion'
 import './delivery-workspace-nav.scss'
 
 type NavKey = 'orders' | 'publish' | 'messages' | 'mine' | 'grab' | 'tasks'
@@ -68,8 +69,9 @@ export function useDeliveryWorkspaceNavigation({ role, active, onSelect }: Props
 export default function DeliveryWorkspaceNav(props: WorkspaceNavProps) {
   const { items, select, swipe } = useDeliveryWorkspaceNavigation(props)
   const { active, gestureGuard } = props
+  const immersiveHidden = useBottomNavVisibility()
   const canActivate = gestureGuard ?? swipe.canActivate
-  return <View className='delivery-workspace-nav'>
+  return <View className={`delivery-workspace-nav${immersiveHidden ? ' delivery-workspace-nav--hidden' : ''}`}>
     {items.map(item => <View key={item.key} className={`delivery-workspace-nav__item ${active === item.key ? 'delivery-workspace-nav__item--active' : ''}`}
       ariaRole='button' ariaLabel={`${item.label}${active === item.key ? '，当前页面' : ''}`}
       hoverClass='delivery-workspace-nav__item--pressed' onClick={() => { if (canActivate()) select(item) }}>

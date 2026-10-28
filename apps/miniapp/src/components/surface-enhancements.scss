@@ -1,5 +1,6 @@
-// Incremental treatment of existing surfaces. No layout, icon or gesture overrides.
-// Independent adaptation of the ideas demonstrated by nanxiaobei/taro-ux-kits.
+// Stable surface treatment shared by the existing pages. Keep the glass layer
+// translucent, but never make the navigation or sheet fully transparent: the
+// page must remain readable on devices without backdrop-filter support.
 page .student-bottom-nav,
 page .delivery-workspace-nav { background: var(--bg-surface, #FFFFFF); }
 page .refresh-feedback { background: var(--bg-surface, #FFFFFF); }
@@ -28,7 +29,6 @@ page .app-action-sheet-layer .app-action-sheet { background: var(--bg-surface, #
   }
 }
 
-// Let the native scroll view retain its request ownership and gesture resistance.
 .refresh-feedback--pulling,
 .refresh-feedback--ready,
 .refresh-feedback--refreshing { transition: background-color 160ms ease; }

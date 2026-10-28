@@ -26,6 +26,17 @@ async function run() {
     ref: node => { if (node) node.taroProps = props },
   }, props.children)
   const modules = new Map()
+  const hides = new Set()
+  const shows = new Set()
+  const lifecycle = callbacks => handler => {
+    const latest = React.useRef(handler)
+    latest.current = handler
+    React.useEffect(() => {
+      const callback = () => latest.current()
+      callbacks.add(callback)
+      return () => callbacks.delete(callback)
+    }, [])
+  }
   const sourceRoot = path.resolve(__dirname, '../apps/miniapp/src')
   const load = source => {
     if (modules.has(source)) return modules.get(source).exports
@@ -34,7 +45,7 @@ async function run() {
     loaded.require = id => {
       if (id === 'react' || id === 'react/jsx-runtime') return require(id)
       if (id === '@tarojs/components') return { View: primitive('div'), Text: primitive('span') }
-      if (id === '@tarojs/taro') return { useDidShow: () => {}, useDidHide: () => {} }
+      if (id === '@tarojs/taro') return { useDidShow: lifecycle(shows), useDidHide: lifecycle(hides) }
       if (id.endsWith('.scss')) return {}
       if (id.endsWith('/app-icon-button')) return { AppIconButton: primitive('button') }
       if (id.startsWith('.')) {
@@ -66,6 +77,7 @@ async function run() {
     const start = async () => send('onTouchStart', [point(100, 100)])
     const move = async (y, x = 100) => send('onTouchMove', [point(x, y)])
     const end = async (y, x = 100) => send('onTouchEnd', [], [point(x, y)])
+    const transform = () => container.querySelector('.app-action-sheet').style.transform
 
     await render()
     await frame(); await frame()
@@ -73,14 +85,15 @@ async function run() {
     assert.equal(contents.onTouchMove, undefined, '内容滚动区不能认领关闭手势')
     assert.equal(handle().catchMove, true, '只有把手应阻止滚动穿透')
     await start(); await move(130)
-    const draggedOffset = Number(container.querySelector('.app-action-sheet').style.transform.match(/translateY\((.+)px\)/)?.[1])
-    assert.ok(Math.abs(draggedOffset - 21.6) < 0.001, '拖动应有阻尼位移')
+    const draggedOffset = Number(transform().match(/translateY\((.+)px\)/)?.[1])
+    assert.ok(Math.abs(draggedOffset - 21.6) < 0.001, '稳定面板保留阻尼位移')
+    await React.act(() => new Promise(resolve => setTimeout(resolve, 210)))
     await end(130)
-    assert.equal(closes, 0, '短拖不能关闭')
-    assert.equal(container.querySelector('.app-action-sheet').style.transform, '', '短拖释放位移以允许CSS回弹')
+    assert.equal(closes, 0, '慢速短拖不能关闭')
+    assert.equal(transform(), '', '短拖释放位移以允许CSS回弹')
     await start(); await move(220); await send('onTouchCancel', [])
     assert.equal(closes, 0, '系统取消必须保留面板')
-    assert.equal(container.querySelector('.app-action-sheet').style.transform, '')
+    assert.equal(transform(), '')
     await start(); await move(220)
     await send('onTouchMove', [point(100, 220), point(110, 230, 2)])
     await end(240)
@@ -90,11 +103,11 @@ async function run() {
     await end(220)
     await React.act(async () => container.querySelector('.app-action-sheet-layer__mask').taroProps.onClick())
     assert.equal(closes, 0, '拖动期间开始提交应复位且禁止关闭')
-    assert.equal(container.querySelector('.app-action-sheet').style.transform, '')
+    assert.equal(transform(), '')
     await render({ loading: false })
     await start(); await move(110, 180); await end(220, 180)
     assert.equal(closes, 0, '最初横向动作不能后续转成关闭')
-    await start(); await move(220); await end(220)
+    await start(); await move(301); await end(301)
     assert.equal(closes, 1, '足够距离的下拉应关闭一次')
     await React.act(async () => {
       container.querySelector('.app-action-sheet-layer__mask').taroProps.onClick()
@@ -105,12 +118,23 @@ async function run() {
     assert.ok(container.querySelector('.app-action-sheet-layer--exit'), '关闭必须复用原退出生命周期')
     await render({ visible: true })
     await frame(); await frame()
-    assert.equal(container.querySelector('.app-action-sheet').style.transform, '', '退出中快速重开无残留位移')
-    await start(); await move(220); await end(220)
+    assert.equal(transform(), '', '退出中快速重开无残留位移')
+    await start(); await move(301); await end(301)
     assert.equal(closes, 2, '快速重开应重新允许拖动关闭')
+    await render({ visible: false }); await render({ visible: true })
+    await frame(); await frame()
+    await start(); await move(301)
+    await React.act(async () => hides.forEach(hide => hide()))
+    assert.equal(transform(), '', '后台隐藏应清除位移')
+    await end(301)
+    assert.equal(closes, 2, '后台事件不能关闭面板')
+    await React.act(async () => shows.forEach(show => show()))
+    await end(301)
+    assert.equal(closes, 2, '回前台不能复用旧手势')
 
     const tracker = createSheetDrag()
     tracker.start([point(0, 0)])
+    assert.equal(tracker.move([point(0, 30)]).offset, 21.599999999999998, '评论面板的旧阻尼保持不变')
     tracker.move([point(0, 120)])
     tracker.move([point(0, 10)])
     assert.equal(tracker.end([point(0, 10)], []), false, '反向拖回起点应取消关闭')
@@ -122,6 +146,14 @@ async function run() {
     }).css
     assert.match(css, /min-height: 44PX/, '把手触控区至少44物理像素')
     assert.match(css, /prefers-reduced-motion/, '保留减少动态效果支持')
+    assert.match(css, /transition: transform 220ms/, '稳定面板使用transform进入退出')
+    assert.match(css, /translateY\(100%\)/, '关闭面板完整退场')
+    assert.doesNotMatch(css, /--taro-ux-sheet-bottom|blur\(64px\)/, '钱包不再依赖实验面板覆盖')
+    await start(); await move(301)
+    const detachedHandle = handle()
+    await React.act(async () => root.unmount())
+    await React.act(async () => detachedHandle.onTouchEnd(event([], [point(100, 301)])))
+    assert.equal(closes, 2, '卸载后抬手不得关闭面板')
   } finally {
     await React.act(async () => root.unmount())
     dom.window.close()

@@ -7,7 +7,6 @@ import AppIcon from '../../components/app-icon'
 import { AppSkeleton, AppState } from '../../components/ui'
 import { isMiniProgramJumpCancelled } from '../../utils/mini-program-jump'
 import StudentBottomNav from '../../components/student-bottom-nav'
-import ServiceMerchantCatalog from '../../components/service-merchant-catalog'
 import {
   listExternalTakeoutMerchants,
   type ExternalTakeoutMerchantLink,
@@ -29,7 +28,6 @@ const filters: Array<{ key: MerchantFilter; label: string }> = [
 
 function StudentTakeoutPage() {
   const capsuleStyle = useViewportRefresh()
-  const merchantId = Taro.getCurrentInstance().router?.params.merchantId || ''
   const [merchants, setMerchants] = useState<ExternalTakeoutMerchantLink[]>([])
   const [status, setStatus] = useState<DirectoryStatus>('loading')
   const [filter, setFilter] = useState<MerchantFilter>('all')
@@ -67,13 +65,13 @@ function StudentTakeoutPage() {
   }, [])
 
   useDidShow(() => {
-    if (visibility.takeout && !merchantId) void load()
+    if (visibility.takeout) void load()
   })
 
   useEffect(() => {
-    if (visibility.takeout && !merchantId) void load()
+    if (visibility.takeout) void load()
     else { merchantRequestVersion.current += 1; setMerchants([]) }
-  }, [visibility.takeout, merchantId, load])
+  }, [visibility.takeout, load])
 
   useEffect(() => () => {
     merchantRequestVersion.current += 1
@@ -114,12 +112,6 @@ function StudentTakeoutPage() {
     return merchants.length
   }
 
-  if (merchantId) return <View className='student-takeout-page student-takeout-page--catalog' style={capsuleStyle}>
-    <CapsulePageHeader title='商家商品' left={<View role='button' aria-label='返回商家列表' className='student-takeout-catalog-back' onClick={() => void Taro.navigateBack().catch(() => Taro.redirectTo({ url: '/pages/student-takeout/index' }))}><AppIcon name='back' /></View>} />
-    {visibility.takeout ? <ServiceMerchantCatalog merchantId={merchantId} /> : null}
-    <StudentBottomNav active='takeout' />
-  </View>
-
   return (
     <View className='student-takeout-page' style={capsuleStyle}>
       <View className='student-takeout-header'>
@@ -140,7 +132,6 @@ function StudentTakeoutPage() {
       </View>
 
       <View className='student-takeout-scroll'>
-        {visibility.takeout ? <ServiceMerchantCatalog /> : null}
         {visibility?.takeout && <View className='student-takeout-directory'>
           <View className='student-takeout-directory__copy'>
             <Text className='student-takeout-directory__title'>合作商家</Text>
