@@ -18,6 +18,7 @@ const allowedDomains = new Set([
   'featureflags',
   'sharesettings',
   'campusinfo',
+  'notification',
 ])
 const transactionOrchestrators = new Set([
   path.join('identityapplication', 'media.go'),
@@ -108,6 +109,15 @@ const deliveryProofSource = files(path.join(moduleRoot, 'admin', 'deliveryproof'
   .join('\n')
 if (/internal\/module\/(takeout|user|community|trade|navigation|im)/.test(deliveryProofSource)) {
   failures.push('delivery proof adapter imports a forbidden business domain')
+}
+
+const notificationSource = files(path.join(moduleRoot, 'notification'))
+  .filter((file) => file.endsWith('.go') && !file.endsWith('_test.go') &&
+    !['subscribe_sender.go', 'consumer.go', 'handler.go', 'im_callback.go'].includes(path.basename(file)))
+  .map((file) => fs.readFileSync(file, 'utf8'))
+  .join('\n')
+if (/internal\/module\/(user|community|trade|navigation|im|admin|media|takeout|delivery)/.test(notificationSource)) {
+  failures.push('notification core imports HTTP or another business domain')
 }
 
 const deliveryIMSource = files(path.join(moduleRoot, 'admin', 'deliveryim'))

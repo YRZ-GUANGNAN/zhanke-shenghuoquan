@@ -45,6 +45,15 @@ type Config struct {
 	WechatAppSecret string
 	AllowMockWechat bool
 
+	// User notification delivery is fail-closed.  The sender remains disabled
+	// unless both the feature and the global sending switch are explicitly
+	// enabled and the server has complete WeChat credentials.
+	EnableWechatSubscribeNotifications bool
+	EnableNotificationSending          bool
+	WechatOrderTemplateKey             string
+	WechatMessageTemplateKey           string
+	NotificationIMCallbackToken        string
+
 	WechatPayMchID            string
 	WechatPayAPIv3Key         string
 	WechatPayMerchantSerialNo string
@@ -81,6 +90,14 @@ func Load() (Config, error) {
 	}
 
 	allowMockWechat, err := envBool("ALLOW_MOCK_WECHAT_LOGIN", false)
+	if err != nil {
+		return Config{}, err
+	}
+	enableWechatSubscribeNotifications, err := envBool("ENABLE_WECHAT_SUBSCRIBE_NOTIFICATIONS", false)
+	if err != nil {
+		return Config{}, err
+	}
+	enableNotificationSending, err := envBool("ENABLE_NOTIFICATION_SENDING", false)
 	if err != nil {
 		return Config{}, err
 	}
@@ -156,6 +173,12 @@ func Load() (Config, error) {
 		WechatAppSecret: env("WECHAT_APP_SECRET", ""),
 		AllowMockWechat: allowMockWechat,
 
+		EnableWechatSubscribeNotifications: enableWechatSubscribeNotifications,
+		EnableNotificationSending:          enableNotificationSending,
+		WechatOrderTemplateKey:             env("WECHAT_ORDER_TEMPLATE_KEY", ""),
+		WechatMessageTemplateKey:           env("WECHAT_MESSAGE_TEMPLATE_KEY", ""),
+		NotificationIMCallbackToken:        env("NOTIFICATION_IM_CALLBACK_TOKEN", ""),
+
 		WechatPayMchID:            env("WECHAT_PAY_MCH_ID", ""),
 		WechatPayAPIv3Key:         env("WECHAT_PAY_API_V3_KEY", ""),
 		WechatPayMerchantSerialNo: env("WECHAT_PAY_MERCHANT_SERIAL_NO", ""),
@@ -206,6 +229,14 @@ func (c Config) Validate() error {
 	}
 	if c.AllowMockWechat && (c.WechatAppID != "" || c.WechatAppSecret != "") {
 		return errors.New("mock WeChat login cannot be enabled with real WeChat credentials")
+	}
+	if c.EnableWechatSubscribeNotifications {
+		if c.WechatAppID == "" || c.WechatAppSecret == "" {
+			return errors.New("enabled WeChat subscribe notifications require WECHAT_APP_ID and WECHAT_APP_SECRET")
+		}
+		if strings.TrimSpace(c.WechatOrderTemplateKey) == "" && strings.TrimSpace(c.WechatMessageTemplateKey) == "" {
+			return errors.New("enabled WeChat subscribe notifications require at least one template key")
+		}
 	}
 	if c.WechatPayAnyCoreCredentialSet() && !c.WechatPayCoreConfigured() {
 		return errors.New("WeChat Pay core credentials must be configured together")

@@ -213,6 +213,45 @@ func TestFeatureGateDefaults(t *testing.T) {
 	if cfg.EnableDeliveryRiderPayoutQueue {
 		t.Fatal("zero-value delivery rider payout queue gate must be disabled")
 	}
+	if cfg.EnableWechatSubscribeNotifications || cfg.EnableNotificationSending {
+		t.Fatal("notification delivery switches must default to disabled")
+	}
+}
+
+func TestWechatSubscribeNotificationConfigurationIsFailClosed(t *testing.T) {
+	cfg := validConfig()
+	cfg.EnableWechatSubscribeNotifications = true
+	cfg.WechatOrderTemplateKey = ""
+	cfg.WechatMessageTemplateKey = ""
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "template key") {
+		t.Fatalf("missing template keys were accepted: %v", err)
+	}
+
+	cfg.WechatOrderTemplateKey = "order-status"
+	cfg.WechatAppSecret = ""
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "WECHAT_APP_ID") {
+		t.Fatalf("missing WeChat credentials were accepted: %v", err)
+	}
+
+	cfg = validConfig()
+	cfg.EnableWechatSubscribeNotifications = true
+	cfg.WechatOrderTemplateKey = "order-status"
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("complete notification configuration was rejected: %v", err)
+	}
+}
+
+func TestWechatSubscribeNotificationEnvironmentDefaults(t *testing.T) {
+	t.Setenv("ENABLE_WECHAT_SUBSCRIBE_NOTIFICATIONS", "")
+	t.Setenv("ENABLE_NOTIFICATION_SENDING", "")
+	value, err := envBool("ENABLE_WECHAT_SUBSCRIBE_NOTIFICATIONS", false)
+	if err != nil || value {
+		t.Fatal("WeChat subscribe notifications must default to disabled")
+	}
+	value, err = envBool("ENABLE_NOTIFICATION_SENDING", false)
+	if err != nil || value {
+		t.Fatal("notification sending must default to disabled")
+	}
 }
 
 func TestBooleanEnvironmentRejectsAmbiguousValues(t *testing.T) {
