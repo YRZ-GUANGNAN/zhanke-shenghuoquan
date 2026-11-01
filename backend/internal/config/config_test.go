@@ -221,9 +221,10 @@ func TestFeatureGateDefaults(t *testing.T) {
 func TestWechatSubscribeNotificationConfigurationIsFailClosed(t *testing.T) {
 	cfg := validConfig()
 	cfg.EnableWechatSubscribeNotifications = true
+	cfg.EnableUserNotifications = true
 	cfg.WechatOrderTemplateKey = ""
 	cfg.WechatMessageTemplateKey = ""
-	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "template key") {
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "template ID") {
 		t.Fatalf("missing template keys were accepted: %v", err)
 	}
 
@@ -235,7 +236,10 @@ func TestWechatSubscribeNotificationConfigurationIsFailClosed(t *testing.T) {
 
 	cfg = validConfig()
 	cfg.EnableWechatSubscribeNotifications = true
+	cfg.EnableUserNotifications = true
 	cfg.WechatOrderTemplateKey = "order-status"
+	cfg.WechatOrderTemplateID = "test-template-id"
+	cfg.WechatOrderTemplateFields = `{"thing1":"status"}`
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("complete notification configuration was rejected: %v", err)
 	}

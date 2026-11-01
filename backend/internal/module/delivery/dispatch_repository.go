@@ -138,7 +138,7 @@ func (r *GormRepository) TransitionToReadyAndEnqueue(
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var err error
 		result, event, err = transitionToReadyAndEnqueueTx(
-			tx, publicID, merchantUserID, expectedRowVersion, from, riderUserID, updatedAt,
+			tx, publicID, merchantUserID, expectedRowVersion, from, riderUserID, updatedAt, r.notificationAppender,
 		)
 		return err
 	})
@@ -153,6 +153,7 @@ func transitionToReadyAndEnqueueTx(
 	from Status,
 	riderUserID *uint64,
 	updatedAt time.Time,
+	appenders ...NotificationEventAppender,
 ) (Order, OutboxEvent, error) {
 	if !CanTransition(from, StatusReadyForClaim) {
 		return Order{}, OutboxEvent{}, ErrInvalidTransition
@@ -174,6 +175,7 @@ func transitionToReadyAndEnqueueTx(
 		err := loadOrInsertRiderPoolEvent(tx, result, updatedAt, &event)
 		return result, event, err
 	}
+	before := result
 	updates, err := buildTransitionUpdates(result, from, StatusReadyForClaim, riderUserID, updatedAt)
 	if err != nil {
 		return Order{}, OutboxEvent{}, err
@@ -195,6 +197,20 @@ func transitionToReadyAndEnqueueTx(
 	result.UpdatedAt = updatedAt
 	if err := loadOrInsertRiderPoolEvent(tx, result, updatedAt, &event); err != nil {
 		return Order{}, OutboxEvent{}, err
+	}
+	if len(appenders) > 0 && appenders[0] != nil {
+		if err := appendOrderNotificationTx(tx, appenders[0], before, result, updatedAt); err != nil {
+			return Order{}, OutboxEvent{}, err
+		}
+		// Fan-out is durable in the same transaction. The legacy WeCom worker
+		// keeps its own outbox; it can never consume the user inbox event.
+		if err := appenders[0](tx, NotificationEvent{
+			EventPublicID: event.EventPublicID, EventType: event.EventType,
+			AggregatePublicID: event.AggregatePublicID, AggregateVersion: event.AggregateVersion,
+			Payload: event.Payload, OccurredAt: event.CreatedAt,
+		}); err != nil {
+			return Order{}, OutboxEvent{}, err
+		}
 	}
 	return result, event, nil
 }

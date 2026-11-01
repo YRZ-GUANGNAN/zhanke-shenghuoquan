@@ -6,6 +6,7 @@ import AppIcon, { type AppIconName } from './app-icon'
 import Taro from '../services/taro'
 import { useFeatureVisibility } from '../hooks/use-feature-visibility'
 import { useBottomNavVisibility } from '../utils/bottom-nav-motion'
+import { notificationBadgeLabel, useNotificationState } from '../hooks/use-notification-runtime'
 import './delivery-workspace-nav.scss'
 
 type NavKey = 'orders' | 'publish' | 'messages' | 'mine' | 'grab' | 'tasks'
@@ -70,12 +71,15 @@ export default function DeliveryWorkspaceNav(props: WorkspaceNavProps) {
   const { items, select, swipe } = useDeliveryWorkspaceNavigation(props)
   const { active, gestureGuard } = props
   const immersiveHidden = useBottomNavVisibility()
+  const notifications = useNotificationState()
+  const unread = notificationBadgeLabel(notifications)
   const canActivate = gestureGuard ?? swipe.canActivate
   return <View className={`delivery-workspace-nav${immersiveHidden ? ' delivery-workspace-nav--hidden' : ''}`}>
     {items.map(item => <View key={item.key} className={`delivery-workspace-nav__item ${active === item.key ? 'delivery-workspace-nav__item--active' : ''}`}
       ariaRole='button' ariaLabel={`${item.label}${active === item.key ? '，当前页面' : ''}`}
       hoverClass='delivery-workspace-nav__item--pressed' onClick={() => { if (canActivate()) select(item) }}>
       <AppIcon name={item.icon} active={active === item.key} className='delivery-workspace-nav__icon' />
+      {item.key === 'messages' && unread ? <Text className='delivery-workspace-nav__badge'>{unread}</Text> : null}
       <Text>{item.label}</Text>
     </View>)}
   </View>

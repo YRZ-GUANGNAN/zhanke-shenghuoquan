@@ -10,7 +10,7 @@ export interface IMCredentials {
   userSig: string
 }
 
-interface ConversationPage {
+export interface ConversationPage {
   items: IMConversationContext[]
   page: number
   pageSize: number
@@ -102,7 +102,11 @@ export async function getIMCredentials(): Promise<IMCredentials> {
 }
 
 export async function listIMConversations(page = 1, pageSize = 20): Promise<IMConversationContext[]> {
-  return (await request<ConversationPage>(`/im/conversations?page=${page}&pageSize=${pageSize}`)).items
+  return (await listIMConversationPage(page, pageSize)).items
+}
+
+export function listIMConversationPage(page = 1, pageSize = 100): Promise<ConversationPage> {
+  return request<ConversationPage>(`/im/conversations?page=${page}&pageSize=${pageSize}`)
 }
 
 export function getIMConversation(relationId: number): Promise<IMConversationContext> {
@@ -316,13 +320,55 @@ export async function loadTencentMessages(
     nextReqMessageID = next
   }
 
-  await withTimeout(
-    chat.setMessageRead({ conversationID: context.conversationId }),
-    5000,
-    '更新腾讯云 IM 已读状态超时'
-  ).catch(() => undefined)
-
   return messages.filter((message) => isParticipantMessage(message, context, currentUserId))
+}
+
+/** Reading history is not a read receipt. Call only after rendering a visible, authorized conversation. */
+export async function markTencentConversationRead(context: IMConversationContext, expectedUserId: string, isVisible: () => boolean, displayedIDs: string[]): Promise<void> {
+  if (!isVisible()) return
+  const generation = sessionGeneration
+  const authorized = await getIMConversation(context.relationId)
+  assertCurrentGeneration(generation)
+  if (authorized.conversationId !== context.conversationId || authorized.peerUserId !== context.peerUserId ||
+    authorized.buyerId !== context.buyerId || authorized.sellerId !== context.sellerId) return
+  const chat = await ensureTencentIMReady(expectedUserId)
+  assertCurrentGeneration(generation, chat)
+  if (!isVisible() || hasUnrenderedTencentMessages(chat, context.conversationId, displayedIDs)) return
+  await withTimeout(chat.setMessageRead({ conversationID: context.conversationId }), 5000, '更新已读状态超时')
+}
+
+// Page-local message consumers share one physical SDK message listener with the app runtime.
+const messageListeners = new WeakMap<ChatSDK, { handlers: Set<(messages: Message[]) => void>; listener: (event: { data?: Message[] }) => void }>()
+const latestReceived = new WeakMap<ChatSDK, Map<string, string>>()
+export function hasUnrenderedTencentMessages(chat: ChatSDK, conversationID: string, displayedIDs: string[]): boolean {
+  const latest = latestReceived.get(chat)?.get(conversationID)
+  return Boolean(latest && !displayedIDs.includes(latest))
+}
+export function listenTencentMessageEvents(chat: ChatSDK, handler: (messages: Message[]) => void): () => void {
+  let binding = messageListeners.get(chat)
+  if (!binding) {
+    const handlers = new Set<(messages: Message[]) => void>()
+    const generation = sessionGeneration
+    const listener = (event: { data?: Message[] }) => {
+      if (generation !== sessionGeneration || sdk !== chat) return
+      const received = latestReceived.get(chat) || new Map<string, string>()
+      for (const message of event.data || []) if (message.conversationID && message.ID) received.set(message.conversationID, message.ID)
+      latestReceived.set(chat, received)
+      for (const notify of handlers) notify(event.data || [])
+    }
+    binding = { handlers, listener }
+    messageListeners.set(chat, binding)
+    chat.on(TencentCloudChat.EVENT.MESSAGE_RECEIVED, listener)
+  }
+  const current = binding
+  current.handlers.add(handler)
+  return () => {
+    current.handlers.delete(handler)
+    if (!current.handlers.size) {
+      chat.off(TencentCloudChat.EVENT.MESSAGE_RECEIVED, current.listener)
+      messageListeners.delete(chat)
+    }
+  }
 }
 
 export async function sendTencentText(
@@ -377,14 +423,12 @@ export async function subscribeTencentMessages(
   const currentUserId = String(chat.getLoginUser() || '')
   if (!currentUserId) throw new Error('腾讯云 IM 当前登录用户为空，请重新登录')
 
-  const listener = (event: { data?: Message[] }) => {
-    const incoming = (event.data || []).filter((message) =>
+  return listenTencentMessageEvents(chat, messages => {
+    const incoming = messages.filter((message) =>
       isParticipantMessage(message, context, currentUserId)
     )
     if (incoming.length > 0) handler(incoming)
-  }
-  chat.on(TencentCloudChat.EVENT.MESSAGE_RECEIVED, listener)
-  return () => chat.off(TencentCloudChat.EVENT.MESSAGE_RECEIVED, listener)
+  })
 }
 
 export type { Message as TencentMessage }

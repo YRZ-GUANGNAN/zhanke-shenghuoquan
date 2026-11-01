@@ -32,6 +32,7 @@
 }
 .delivery-workspace-nav--hidden::before { opacity: .28; }
 .delivery-workspace-nav__item {
+  position: relative;
   flex: 1;
   min-width: 0;
   min-height: 44PX;
@@ -47,6 +48,19 @@
   transition: background 120ms, opacity 120ms;
 }
 .delivery-workspace-nav .delivery-workspace-nav__icon { width: 24PX; height: 24PX; }
+.delivery-workspace-nav__badge {
+  position: absolute;
+  top: 0;
+  left: 55%;
+  min-width: 14PX;
+  padding: 0 3PX;
+  border-radius: 12PX;
+  color: #fff;
+  background: $badge-unread;
+  font-size: 10PX;
+  line-height: 16PX;
+  text-align: center;
+}
 .delivery-workspace-nav__item:not(.delivery-workspace-nav__item--active) .delivery-workspace-nav__icon { filter: grayscale(1); }
 .delivery-workspace-nav__item--active { color: $brand-primary-strong; background: $brand-tint; font-weight: 650; }
 .delivery-workspace-nav__item--pressed { opacity: 1; }

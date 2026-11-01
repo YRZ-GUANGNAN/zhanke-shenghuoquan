@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"net/url"
@@ -93,6 +94,9 @@ func NewSubscribeSender(cfg config.Config, clients ...*http.Client) (*SubscribeS
 	if len(clients) > 0 {
 		client = clients[0]
 	}
+	if cfg.WechatAPIBase != "" && cfg.WechatAPIBase != "https://api.weixin.qq.com" {
+		return nil, errors.New("WeChat subscribe sender requires official HTTPS API base")
+	}
 	return newSubscribeSender(subscribeSenderConfig{
 		AppID:       cfg.WechatAppID,
 		AppSecret:   cfg.WechatAppSecret,
@@ -109,12 +113,17 @@ func newSubscribeSender(cfg subscribeSenderConfig) (*SubscribeSender, error) {
 		base = "https://api.weixin.qq.com"
 	}
 	parsed, err := url.Parse(base)
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+	if err != nil || parsed.User != nil || parsed.Host == "" || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" || !((parsed.Scheme == "https" && parsed.Host == "api.weixin.qq.com") || (parsed.Scheme == "http" && net.ParseIP(parsed.Hostname()) != nil && net.ParseIP(parsed.Hostname()).IsLoopback())) {
 		return nil, errors.New("invalid WeChat API base URL")
 	}
 	if cfg.HTTPClient == nil {
 		cfg.HTTPClient = &http.Client{Timeout: 8 * time.Second}
 	}
+	// Never follow redirects: the access token is carried in the query string.
+	// A redirecting provider must not receive it at another host.
+	copyClient := *cfg.HTTPClient
+	copyClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
+	cfg.HTTPClient = &copyClient
 	if cfg.Now == nil {
 		cfg.Now = func() time.Time { return time.Now().UTC() }
 	}
@@ -173,8 +182,8 @@ func (s *SubscribeSender) Send(ctx context.Context, message SubscribeMessage) (S
 		return SubscribeSendResult{Status: SendStatusUnknown, ErrorCode: "transport"}, fmt.Errorf("%w: transport", ErrSubscribeUnknown)
 	}
 	defer response.Body.Close()
-	var result wechatResponse
-	if err := decodeLimited(response.Body, &result); err != nil {
+	result, present, err := decodeWechatResponse(response.Body)
+	if err != nil || !present {
 		return SubscribeSendResult{Status: SendStatusUnknown, ErrorCode: "invalid_response"}, ErrSubscribeUnknown
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
@@ -188,74 +197,74 @@ func (s *SubscribeSender) Send(ctx context.Context, message SubscribeMessage) (S
 			s.invalidateToken(token)
 		}
 		status := SendStatusRejected
-		if mapped == "rate_limited" {
-			status = SendStatusUnknown
-		}
+
 		return SubscribeSendResult{Status: status, ErrorCode: mapped}, providerError(status, mapped)
 	}
 	return SubscribeSendResult{Status: SendStatusAccepted, ProviderMessageID: result.MsgID}, nil
 }
 
 type wechatResponse struct {
-	ErrCode int64  `json:"errcode"`
-	ErrMsg  string `json:"errmsg"`
-	MsgID   string `json:"msgid"`
+	ErrCode     int64  `json:"errcode"`
+	ErrMsg      string `json:"errmsg"`
+	MsgID       string `json:"msgid"`
+	AccessToken string `json:"access_token"`
 }
 
 func (s *SubscribeSender) token(ctx context.Context) (string, error) {
 	now := s.now().UTC()
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.accessToken != "" && now.Before(s.tokenUntil) {
 		token := s.accessToken
-		s.mu.Unlock()
 		return token, nil
 	}
-	s.mu.Unlock()
 
 	endpoint := s.apiBase + "/cgi-bin/token?grant_type=client_credential&appid=" + url.QueryEscape(s.appID) + "&secret=" + url.QueryEscape(s.appSecret)
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
-		return "", fmt.Errorf("%w: request", ErrSubscribeUnknown)
+		return "", fmt.Errorf("%w: token_request", ErrSubscribeBlocked)
 	}
 	response, err := s.client.Do(request)
 	if err != nil {
 		if isTimeout(err) || errors.Is(err, context.DeadlineExceeded) {
-			return "", fmt.Errorf("%w: timeout", ErrSubscribeUnknown)
+			return "", fmt.Errorf("%w: token_timeout", ErrSubscribeBlocked)
 		}
-		return "", fmt.Errorf("%w: transport", ErrSubscribeUnknown)
+		return "", fmt.Errorf("%w: token_transport", ErrSubscribeBlocked)
 	}
 	defer response.Body.Close()
-	var result struct {
-		wechatResponse
-		AccessToken string `json:"access_token"`
-		ExpiresIn   int64  `json:"expires_in"`
+	var raw map[string]json.RawMessage
+	if err := decodeLimited(response.Body, &raw); err != nil {
+		return "", fmt.Errorf("%w: token_invalid_response", ErrSubscribeBlocked)
 	}
-	if err := decodeLimited(response.Body, &result); err != nil {
-		return "", ErrSubscribeUnknown
+	var result wechatResponse
+	if value, ok := raw["errcode"]; ok {
+		if string(value) == "null" || json.Unmarshal(value, &result.ErrCode) != nil {
+			return "", fmt.Errorf("%w: token_invalid_response", ErrSubscribeBlocked)
+		}
+	}
+	_ = json.Unmarshal(raw["errmsg"], &result.ErrMsg)
+	_ = json.Unmarshal(raw["access_token"], &result.AccessToken)
+	var expiresIn int64
+	if value, ok := raw["expires_in"]; ok {
+		_ = json.Unmarshal(value, &expiresIn)
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices || result.ErrCode != 0 || result.AccessToken == "" {
 		if result.ErrCode != 0 {
 			mapped := mapWechatError(result.ErrCode)
-			status := SendStatusRejected
-			if mapped == "rate_limited" {
-				status = SendStatusUnknown
-			}
-			return "", providerError(status, mapped)
+			return "", fmt.Errorf("%w: %s", ErrSubscribeBlocked, mapped)
 		}
-		return "", ErrSubscribeUnknown
+		return "", fmt.Errorf("%w: token_unavailable", ErrSubscribeBlocked)
 	}
-	expires := time.Duration(result.ExpiresIn) * time.Second
-	if expires <= 0 {
-		expires = time.Hour
+	if expiresIn <= 0 || expiresIn > math.MaxInt64/int64(time.Second) || expiresIn > 7*24*60*60 {
+		return "", fmt.Errorf("%w: token_expiry_invalid", ErrSubscribeBlocked)
 	}
+	expires := time.Duration(expiresIn) * time.Second
 	until := now.Add(expires - s.refreshSkew)
 	if !until.After(now) {
 		until = now.Add(expires / 2)
 	}
-	s.mu.Lock()
 	s.accessToken = result.AccessToken
 	s.tokenUntil = until
-	s.mu.Unlock()
 	return result.AccessToken, nil
 }
 
@@ -275,18 +284,37 @@ func validateSubscribeMessage(message SubscribeMessage) error {
 	if !validField(message.TemplateID, 128) {
 		return errors.New("invalid template")
 	}
-	if utf8.RuneCountInString(message.Page) > 512 || strings.IndexByte(message.Page, '\n') >= 0 || strings.IndexByte(message.Page, '\r') >= 0 {
+	if message.Page != "" && (!strings.HasPrefix(message.Page, "/") || strings.HasPrefix(message.Page, "//") || utf8.RuneCountInString(message.Page) > 512 || strings.IndexByte(message.Page, '\n') >= 0 || strings.IndexByte(message.Page, '\r') >= 0) {
 		return errors.New("invalid page")
 	}
-	if len(message.Data) > 20 {
+	if len(message.Data) == 0 || len(message.Data) > 20 {
 		return errors.New("too many template fields")
 	}
 	for key, value := range message.Data {
-		if !validField(key, 32) || !validField(value.Value, 256) {
+		if !validField(key, 32) || !validTemplateValue(key, value.Value) {
 			return errors.New("invalid template field")
 		}
 	}
 	return nil
+}
+
+func validTemplateValue(key, value string) bool {
+	max := 32
+	switch {
+	case strings.HasPrefix(key, "thing"):
+		max = 20
+	case strings.HasPrefix(key, "name"):
+		max = 10
+	case strings.HasPrefix(key, "phrase"):
+		max = 5
+	case strings.HasPrefix(key, "time"), strings.HasPrefix(key, "date"):
+		max = 20
+	case strings.HasPrefix(key, "phone_number"):
+		max = 20
+	case strings.HasPrefix(key, "character_string"):
+		max = 32
+	}
+	return validField(value, max)
 }
 
 func validField(value string, max int) bool {
@@ -297,7 +325,31 @@ func validField(value string, max int) bool {
 func decodeLimited(reader io.Reader, target any) error {
 	decoder := json.NewDecoder(io.LimitReader(reader, 32<<10))
 	decoder.DisallowUnknownFields()
-	return decoder.Decode(target)
+	if err := decoder.Decode(target); err != nil {
+		return err
+	}
+	if err := decoder.Decode(new(any)); !errors.Is(err, io.EOF) {
+		return errors.New("invalid trailing JSON")
+	}
+	return nil
+}
+
+func decodeWechatResponse(reader io.Reader) (wechatResponse, bool, error) {
+	var raw map[string]json.RawMessage
+	if err := decodeLimited(reader, &raw); err != nil {
+		return wechatResponse{}, false, err
+	}
+	value, present := raw["errcode"]
+	if !present {
+		return wechatResponse{}, false, nil
+	}
+	var result wechatResponse
+	if err := json.Unmarshal(value, &result.ErrCode); err != nil || string(value) == "null" {
+		return wechatResponse{}, true, errors.New("invalid error code")
+	}
+	_ = json.Unmarshal(raw["errmsg"], &result.ErrMsg)
+	_ = json.Unmarshal(raw["msgid"], &result.MsgID)
+	return result, true, nil
 }
 
 func mapWechatError(code int64) string {
@@ -352,4 +404,18 @@ func errorCode(err error) string {
 		}
 	}
 	return "provider_error"
+}
+
+// ValidateTemplateSnapshot validates the immutable server template shape used
+// by workers, without recipient secrets. It accepts no extra JSON fields.
+func ValidateTemplateSnapshot(raw json.RawMessage) error {
+	var snapshot struct {
+		TemplateID string                            `json:"templateId"`
+		Page       string                            `json:"page"`
+		Data       map[string]SubscribeTemplateValue `json:"data"`
+	}
+	if err := decodeLimited(bytes.NewReader(raw), &snapshot); err != nil {
+		return ErrSubscribePayload
+	}
+	return validateSubscribeMessage(SubscribeMessage{OpenID: "validated-server-recipient", TemplateID: snapshot.TemplateID, Page: snapshot.Page, Data: snapshot.Data})
 }

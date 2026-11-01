@@ -94,6 +94,21 @@
   box-sizing: border-box;
 }
 
+.student-bottom-nav__icon-asset { position: relative; }
+.student-bottom-nav__badge {
+  position: absolute;
+  top: -5PX;
+  left: 17PX;
+  min-width: 14PX;
+  padding: 0 3PX;
+  border-radius: 12PX;
+  color: #fff;
+  background: $badge-unread;
+  font-size: 10PX;
+  line-height: 16PX;
+  text-align: center;
+}
+
 .student-bottom-nav__publish-visual {
   display: flex;
   align-items: center;

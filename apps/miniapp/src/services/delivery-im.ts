@@ -1,6 +1,6 @@
 import TencentCloudChat, { type Message } from '@tencentcloud/chat'
 import { request } from './api'
-import { ensureTencentIMReady, withTimeout, type IMCredentials, type TencentTextAttempt } from './e-im'
+import { ensureTencentIMReady, hasUnrenderedTencentMessages, listenTencentMessageEvents, withTimeout, type IMCredentials, type TencentTextAttempt } from './e-im'
 
 function readyForDeliveryIM(expectedUserId = '') {
   return ensureTencentIMReady(expectedUserId, () => request<IMCredentials>('/delivery/im-credentials', { url: '', timeout: 10000 }))
@@ -83,10 +83,6 @@ interface ConversationListEvent {
   }>
 }
 
-interface MessageEvent {
-  data?: Message[]
-}
-
 export function getDeliveryOrderConversation(orderId: string): Promise<DeliveryConversation> {
   return request<DeliveryConversation>(
     `/delivery/orders/${encodeURIComponent(orderId)}/conversation`,
@@ -134,8 +130,17 @@ export async function loadDeliveryTencentMessages(
   const result = await withTimeout(chat.getMessageList({
     conversationID: conversation.tencentConversationId
   }), 15000, '历史消息读取失败，请稍后重试') as MessageListResult
-  void withTimeout(chat.setMessageRead({ conversationID: conversation.tencentConversationId }), 5000, '更新已读状态超时').catch(() => undefined)
   return result.data?.messageList || []
+}
+
+export async function markDeliveryConversationRead(conversation: DeliveryConversation, expectedUserId: string, isVisible: () => boolean, displayedIDs: string[]): Promise<void> {
+  if (!isVisible()) return
+  const current = await getDeliveryOrderConversation(conversation.deliveryOrderPublicId)
+  if (!isVisible() || !['active', 'read_only'].includes(current.status) || current.conversationPublicId !== conversation.conversationPublicId ||
+      current.assignmentVersion !== conversation.assignmentVersion || current.tencentConversationId !== conversation.tencentConversationId) return
+  const chat = await readyForDeliveryIM(expectedUserId)
+  if (!isVisible() || hasUnrenderedTencentMessages(chat, conversation.tencentConversationId, displayedIDs)) return
+  await withTimeout(chat.setMessageRead({ conversationID: conversation.tencentConversationId }), 5000, '更新已读状态超时')
 }
 
 async function authorizeDeliverySend(conversation: DeliveryConversation) {
@@ -223,11 +228,10 @@ export async function subscribeDeliveryTencentMessages(
   expectedUserId = ''
 ): Promise<() => void> {
   const chat = await readyForDeliveryIM(expectedUserId)
-  const listener = (event: MessageEvent) => {
-    handler((event.data || []).filter((item) => item.conversationID === conversation.tencentConversationId))
-  }
-  chat.on(TencentCloudChat.EVENT.MESSAGE_RECEIVED, listener)
-  return () => chat.off(TencentCloudChat.EVENT.MESSAGE_RECEIVED, listener)
+  return listenTencentMessageEvents(chat, messages => {
+    const incoming = messages.filter((item) => item.conversationID === conversation.tencentConversationId)
+    if (incoming.length) handler(incoming)
+  })
 }
 
 export async function subscribeDeliveryConversationUnread(

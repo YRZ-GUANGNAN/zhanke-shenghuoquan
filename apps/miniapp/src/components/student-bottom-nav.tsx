@@ -4,6 +4,7 @@ import { useDidShow } from '@tarojs/taro'
 import Taro from '../services/taro'
 import { useFeatureVisibility } from '../hooks/use-feature-visibility'
 import { useBottomNavVisibility } from '../utils/bottom-nav-motion'
+import { notificationBadgeLabel, useNotificationState } from '../hooks/use-notification-runtime'
 import AppIcon from './app-icon'
 import './student-bottom-nav.scss'
 
@@ -24,6 +25,8 @@ interface StudentBottomNavProps {
 
 export default function StudentBottomNav({ active, className = '' }: StudentBottomNavProps) {
   const visibility = useFeatureVisibility()
+  const notifications = useNotificationState()
+  const unread = notificationBadgeLabel(notifications)
   const immersiveHidden = useBottomNavVisibility()
   const visualActive = active === 'market' ? 'home' : active
   const navigationLockRef = useRef<{ key: string } | null>(null)
@@ -65,6 +68,7 @@ export default function StudentBottomNav({ active, className = '' }: StudentBott
       <View className='student-bottom-nav__item-visual'>
         <View className='student-bottom-nav__icon-asset'>
           <AppIcon name={item.icon} active={item.key === visualActive} />
+          {item.key === 'messages' && unread ? <Text className='student-bottom-nav__badge'>{unread}</Text> : null}
         </View>
         <Text>{item.label}</Text>
       </View>

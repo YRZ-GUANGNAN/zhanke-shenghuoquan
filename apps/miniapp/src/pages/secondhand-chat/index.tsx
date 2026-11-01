@@ -13,6 +13,7 @@ import {
   getIMConversation,
   contactUser,
   loadTencentMessages,
+  markTencentConversationRead,
   sendTencentText,
   subscribeTencentMessages,
   type TencentMessage,
@@ -24,6 +25,7 @@ import { useSessionStore } from '../../stores/session'
 import type { Product } from '../../types'
 import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
 import { useKeyboardInset } from '../../hooks/use-keyboard-inset'
+import { useVisibleConversationRead } from '../../hooks/use-visible-conversation-read'
 import { conversationPeer } from '../../utils/conversation-presentation'
 import './index.scss'
 
@@ -115,6 +117,8 @@ function SecondhandChatPage() {
   const [params] = useState(() => Taro.getCurrentInstance().router?.params ?? {})
   const entry = parseChatEntry(params)
   const selfProfile = useSessionStore((state) => state.profile)
+  const sessionToken = useSessionStore(state => state.token)
+  const sessionRole = useSessionStore(state => state.identity?.currentIdentity)
   const sessionUserId = selfProfile.id
   const [status, setStatus] = useState<PageStatus>('loading')
   const chatOperationKey = `${sessionUserId}:${entry?.kind || ''}:${entry?.id || ''}`
@@ -138,6 +142,9 @@ function SecondhandChatPage() {
   const [errorMessage, setErrorMessage] = useState('')
   const { inset: keyboardHeight, onFocus: onKeyboardFocus, onKeyboardHeightChange, reset: resetKeyboardInset } = useKeyboardInset()
   useDidShow(() => reconnectRef.current())
+  useVisibleConversationRead(chatOperationKey, messages, isVisible => context
+    ? markTencentConversationRead(context, `campus_${sessionUserId}`, () => isVisible() && useSessionStore.getState().status === 'authenticated' && useSessionStore.getState().token === sessionToken && useSessionStore.getState().identity?.currentIdentity === sessionRole && useSessionStore.getState().profile.id === sessionUserId, messages.map(item => item.ID))
+    : Promise.resolve(), status === 'ready' && !historyLoading && messages.length > 0)
 
   useEffect(() => {
     let active = true

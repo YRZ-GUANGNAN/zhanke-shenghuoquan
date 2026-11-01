@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Text, View } from '@tarojs/components'
 import { getCurrentInstance, useDidHide, useDidShow } from '@tarojs/taro'
+import { useNotificationRefresh } from '../../hooks/use-notification-refresh'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import { AppDialog } from '../../components/ui'
 import DeliveryWorkspaceNav, { useDeliveryWorkspaceNavigation } from '../../components/delivery-workspace-nav'
@@ -492,6 +493,11 @@ export default function DeliveryRiderPage() {
     }
   }
 
+  const notificationRefresh = useNotificationRefresh(identityAllowed && hasLoadedOrders,
+    !loading && !loadingMore && claimablePage <= 1 && pickupPage <= 1 && deliveryPage <= 1 && !releaseCandidate
+      && !Object.values(busyByOrderRef.current).some(Boolean) && Object.keys(actionFeedbackByOrder).length === 0,
+    requestRefresh)
+
   useEffect(() => {
     if (identityAllowed) void load()
   }, [identityAllowed, accountId, load])
@@ -860,7 +866,7 @@ export default function DeliveryRiderPage() {
             <View className='rider-grab-refresh__symbol'>
               {loading ? <DeliveryLoadDots /> : <RiderWorkbenchIcon name='refresh' className='rider-grab-refresh__icon' />}
             </View>
-            <Text className='rider-grab-refresh__label'>{loading ? '刷新中' : '刷新'}</Text>
+            <Text className='rider-grab-refresh__label'>{loading ? '刷新中' : notificationRefresh.pending ? '有更新' : '刷新'}</Text>
           </View>
         </View>
         <View className='rider-grab-context'>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Button, Text, View } from '@tarojs/components'
 import { useDidShow } from '@tarojs/taro'
 import CapsulePageHeader from '../../components/capsule-page-header'
@@ -15,6 +15,7 @@ import { isApiError } from '../../services/api'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
+import { prepareNotificationSubscription, requestNotificationSubscription, type PreparedNotificationSubscription } from '../../services/notification'
 import './index.scss'
 
 type ToggleKey = 'orderNotice' | 'socialNotice' | 'quietHours' | 'personalized'
@@ -52,6 +53,7 @@ function currentVersion(): string {
 
 export default function SettingsPage() {
   const logout = useSessionStore((state) => state.logout)
+  const token = useSessionStore((state) => state.token)
   const identity = useSessionStore((state) => state.identity)
   const visibility = useFeatureVisibility()
   const isCampusInfo = visibility.presentationMode === 'campus_info'
@@ -64,6 +66,46 @@ export default function SettingsPage() {
   const [closing, setClosing] = useState(false)
   const [closeStage, setCloseStage] = useState<CloseStage>('idle')
   const [closeError, setCloseError] = useState('')
+  const [preparedNotifications, setPreparedNotifications] = useState<Record<string, PreparedNotificationSubscription | null>>({})
+  const [subscriptionStatus, setSubscriptionStatus] = useState<Record<string, string>>({})
+  const subscriptionBusy = useRef(new Set<string>())
+  const subscriptionEpoch = useRef(0)
+  useEffect(() => {
+    subscriptionEpoch.current += 1
+    subscriptionBusy.current.clear()
+    setPreparedNotifications({}); setSubscriptionStatus({})
+    return () => { subscriptionEpoch.current += 1 }
+  }, [token, identity?.currentIdentity])
+
+  const prepareSubscription = async (key: string) => {
+    if (subscriptionBusy.current.has(key)) return
+    subscriptionBusy.current.add(key)
+    const epoch = subscriptionEpoch.current
+    const current = () => epoch === subscriptionEpoch.current && useSessionStore.getState().token === token
+    try {
+      const prepared = await prepareNotificationSubscription(key)
+      if (!current()) return
+      setPreparedNotifications(current => ({ ...current, [key]: prepared }))
+      setSubscriptionStatus(current => ({ ...current, [key]: '已准备，请点击授权' }))
+    } catch (error) {
+      if (current()) setSubscriptionStatus(previous => ({ ...previous, [key]: error instanceof Error ? error.message : '暂不可用' }))
+    } finally {
+      if (current()) subscriptionBusy.current.delete(key)
+    }
+  }
+
+  const authorizeSubscription = async (key: string) => {
+    const prepared = preparedNotifications[key]
+    if (!prepared) return prepareSubscription(key)
+    if (subscriptionBusy.current.has(key)) return
+    subscriptionBusy.current.add(key)
+    const epoch = subscriptionEpoch.current
+    const result = await requestNotificationSubscription(prepared)
+    if (epoch !== subscriptionEpoch.current || useSessionStore.getState().token !== token) return
+    subscriptionBusy.current.delete(key)
+    setPreparedNotifications(current => ({ ...current, [key]: null }))
+    setSubscriptionStatus(current => ({ ...current, [key]: result.status === 'accept' && result.reportStatus === 'recorded' ? '已授权一次通知，不是长期订阅' : result.message || '未完成授权' }))
+  }
 
   const load = async () => {
     setLoading(true)
@@ -199,6 +241,19 @@ export default function SettingsPage() {
                 </View>
               </View>
             ))}
+            {(['order', 'private_message'] as const).map((key) => {
+              const title = key === 'order' ? '订阅订单通知' : '订阅私信提醒'
+              const statusText = subscriptionStatus[key] || '由你主动授权，不影响站内通知'
+              return <View key={key} className='student-settings-row student-settings-row--tall'>
+                <View className='student-settings-row__main'>
+                  <Text className='student-settings-row__title'>{title}</Text>
+                  <Text className='student-settings-row__subtitle'>{statusText}</Text>
+                </View>
+                <Button className='student-settings-phone' onClick={() => void authorizeSubscription(key)}>
+                  {preparedNotifications[key] ? '立即授权' : '准备授权'}
+                </Button>
+              </View>
+            })}
           </View>
         </View>}
         {(visiblePrivacyRows.length > 0 || settings.blacklistCount > 0) && <View className='student-settings-section'>

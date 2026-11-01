@@ -23,6 +23,8 @@ function equal<T>(actual: T, expected: T, message: string): void {
 export function runNotificationUnreadSnapshotTests(): void {
   const initial = createUnreadSnapshot(7)
   expect(unreadCountForDisplay(initial) === null, 'unconfirmed snapshot must not render a fake zero')
+  const partial = mergeUnreadSnapshot(initial, { generation: 7, conversationId: 'a', unreadCount: 1 })
+  expect(unreadCountForDisplay(partial) === null, 'a partial event must not confirm the global total')
 
   const confirmed = mergeUnreadSnapshot(initial, {
     generation: 7,
@@ -51,6 +53,12 @@ export function runNotificationUnreadSnapshotTests(): void {
     unreadCount: 99
   })
   equal(stale, firstEvent, 'an old account generation must not write into the current snapshot')
+
+  const replaced = mergeUnreadSnapshot(firstEvent, { generation: 7, confirmed: true, conversations: {} })
+  equal(replaced.conversations, {}, 'a full empty snapshot removes obsolete conversations')
+  equal(replaced.total, 0, 'a full empty snapshot clears the badge')
+  const invalidated = mergeUnreadSnapshot(firstEvent, { generation: 7, confirmed: false })
+  expect(unreadCountForDisplay(invalidated) === null, 'invalidation must hide stale totals')
 
   const next = nextUnreadGeneration(7)
   expect(next.generation === 8, 'generation must advance when the account changes')

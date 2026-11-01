@@ -331,6 +331,18 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	userNotifications, err := newUserNotificationRuntime(cfg, db, userService)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if userNotifications.consumer != nil {
+		notificationContext, cancelNotifications := context.WithCancel(context.Background())
+		defer cancelNotifications()
+		go func() { _ = userNotifications.consumer.Run(notificationContext) }()
+		if userNotifications.wechat != nil {
+			go func() { _ = userNotifications.wechat.Run(notificationContext) }()
+		}
+	}
 	if deliveryRuntime != nil {
 		groupAdapter, adapterErr := deliveryim.NewGroupAdapter(imService, imImporter)
 		if adapterErr != nil {
@@ -471,6 +483,7 @@ func main() {
 	navigation.NewHandler(navigationService).Register(navigationRoutes)
 	navigation.NewSearchHandler(navigationService, userService.AuthRequired(), user.CurrentUserID, navigationMetrics).Register(navigationRoutes)
 	im.NewHandler(imService, userService).Register(api.Group("/im"))
+	userNotifications.handler.Register(api.Group("", userService.AuthRequired()))
 	admin.NewHandler(adminService, reviewService, userService, communityService, tradeService, navigationService, adminAuthRequired).Register(api)
 	mediaAdminRoutes := api.Group("/admin/media", adminAuthRequired, user.AdminRequired())
 	mediaconsole.NewHandler(mediaAdminQuery).Register(mediaAdminRoutes)
@@ -614,7 +627,11 @@ func newDeliveryRuntime(cfg config.Config, db *gorm.DB, proofPorts ...delivery.M
 	if !cfg.EnableDelivery {
 		return nil, nil
 	}
-	repository := delivery.NewRepository(db)
+	notificationAppender, err := newDeliveryNotificationAppender(cfg, db)
+	if err != nil {
+		return nil, err
+	}
+	repository := delivery.NewRepository(db, delivery.WithNotificationEvents(notificationAppender))
 	orderService, err := delivery.NewService(repository, nil)
 	if err != nil {
 		return nil, fmt.Errorf("configure delivery order service: %w", err)

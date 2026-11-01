@@ -6,14 +6,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
+	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 var (
-	ErrInvalidRecord     = errors.New("invalid notification record")
-	ErrConcurrentUpdate  = errors.New("notification lease lost")
-	ErrSubscriptionEmpty = errors.New("notification subscription unavailable")
+	ErrInvalidRecord       = errors.New("invalid notification record")
+	ErrConcurrentUpdate    = errors.New("notification lease lost")
+	ErrSubscriptionEmpty   = errors.New("notification subscription unavailable")
+	ErrIdempotencyConflict = errors.New("notification idempotency conflict")
 )
 
 type EventStatus string
@@ -141,7 +145,7 @@ type Subscription struct {
 	ID                 uint64     `gorm:"column:id;primaryKey"`
 	UserID             uint64     `gorm:"column:user_id;not null"`
 	AppID              string     `gorm:"column:app_id;size:64;not null"`
-	OpenID             string     `gorm:"column:openid;size:128;not null"`
+	OpenID             string     `json:"-" gorm:"column:openid;size:128;not null"`
 	TemplateKey        string     `gorm:"column:template_key;size:64;not null"`
 	AuthorizationNonce string     `gorm:"column:authorization_nonce;size:64;not null"`
 	Status             string     `gorm:"column:status;size:24;not null"`
@@ -206,31 +210,14 @@ func newIDAt(now time.Time, source io.Reader) (string, error) {
 	if _, err := io.ReadFull(source, raw[6:]); err != nil {
 		return "", err
 	}
-	value := new(bigInt).SetBytes(raw)
+	value := new(big.Int).SetBytes(raw)
+	base, remainder := big.NewInt(32), new(big.Int)
 	encoded := make([]byte, 26)
 	for i := len(encoded) - 1; i >= 0; i-- {
-		remainder := value.mod32()
-		encoded[i] = crockfordAlphabet[remainder]
-		value.div32()
+		value.QuoRem(value, base, remainder)
+		encoded[i] = crockfordAlphabet[remainder.Int64()]
 	}
 	return string(encoded), nil
-}
-
-// small fixed-width integer helper avoids adding a ULID dependency to this domain.
-type bigInt struct{ bytes []byte }
-
-func (v *bigInt) SetBytes(raw []byte) *bigInt { v.bytes = append(v.bytes[:0], raw...); return v }
-func (v *bigInt) mod32() byte                 { return v.bytes[len(v.bytes)-1] & 31 }
-func (v *bigInt) div32() {
-	carry := byte(0)
-	for i, b := range v.bytes {
-		n := uint16(carry)*256 + uint16(b)
-		v.bytes[i] = byte(n / 32)
-		carry = byte(n % 32)
-	}
-	for len(v.bytes) > 1 && v.bytes[0] == 0 {
-		v.bytes = v.bytes[1:]
-	}
 }
 
 func validID(value string) bool {
@@ -247,10 +234,96 @@ func validID(value string) bool {
 
 func cleanError(value string) string {
 	value = strings.TrimSpace(value)
-	if len(value) > 256 {
-		return value[:256]
+	if utf8.RuneCountInString(value) > 256 {
+		return string([]rune(value)[:256])
 	}
 	return value
+}
+
+func (s Subscription) String() string {
+	return fmt.Sprintf("Subscription{ID:%d UserID:%d Status:%s RemainingQuota:%d}", s.ID, s.UserID, s.Status, s.RemainingQuota)
+}
+
+var safeIdentifier = regexp.MustCompile(`^[A-Za-z0-9_.:-]+$`)
+var callbackHashPattern = regexp.MustCompile(`^[0-9a-fA-F]{64}$`)
+
+func safeText(value string, max int, required bool) bool {
+	return utf8.ValidString(value) && utf8.RuneCountInString(value) <= max && (!required || strings.TrimSpace(value) != "")
+}
+
+// Reject invalid/ambiguous JSON and fields that could persist chat text or
+// credentials. Producers still build metadata from trusted public facts.
+func validMetadata(raw json.RawMessage) bool {
+	if len(raw) == 0 || len(raw) > 16384 || !utf8.Valid(raw) {
+		return false
+	}
+	decoder := json.NewDecoder(strings.NewReader(string(raw)))
+	decoder.UseNumber()
+	first, err := decoder.Token()
+	if err != nil || first != json.Delim('{') {
+		return false
+	}
+	if !metadataObject(decoder, 0) {
+		return false
+	}
+	_, err = decoder.Token()
+	return errors.Is(err, io.EOF)
+}
+
+func metadataObject(decoder *json.Decoder, depth int) bool {
+	if depth > 8 {
+		return false
+	}
+	keys := map[string]bool{}
+	for decoder.More() {
+		token, err := decoder.Token()
+		key, ok := token.(string)
+		if err != nil || !ok || keys[key] || len(key) > 128 {
+			return false
+		}
+		keys[key] = true
+		normalized := strings.ToLower(strings.NewReplacer("_", "", "-", "", ".", "").Replace(key))
+		for _, forbidden := range []string{"openid", "secret", "token", "password", "privatekey", "phone", "address", "messagebody", "messagecontent", "msgbody", "rawbody", "rawcallback", "content", "body"} {
+			if strings.Contains(normalized, forbidden) {
+				return false
+			}
+		}
+		if !metadataValue(decoder, depth+1) {
+			return false
+		}
+	}
+	end, err := decoder.Token()
+	return err == nil && end == json.Delim('}')
+}
+
+func metadataValue(decoder *json.Decoder, depth int) bool {
+	if depth > 8 {
+		return false
+	}
+	token, err := decoder.Token()
+	if err != nil {
+		return false
+	}
+	switch value := token.(type) {
+	case json.Delim:
+		if value == '{' {
+			return metadataObject(decoder, depth)
+		}
+		if value != '[' {
+			return false
+		}
+		for decoder.More() {
+			if !metadataValue(decoder, depth+1) {
+				return false
+			}
+		}
+		end, err := decoder.Token()
+		return err == nil && end == json.Delim(']')
+	case string:
+		return safeText(value, 512, false)
+	default:
+		return true
+	}
 }
 
 func require(value bool, format string, args ...any) error {

@@ -360,7 +360,7 @@ func (r *GormRepository) PayOrderWithWallet(
 			return err
 		}
 		ready, event, err := transitionToReadyAndEnqueueTx(
-			tx, orderPublicID, &merchantUserID, expectedRowVersion, StatusPendingFeePayment, nil, now,
+			tx, orderPublicID, &merchantUserID, expectedRowVersion, StatusPendingFeePayment, nil, now, r.notificationAppender,
 		)
 		if err != nil {
 			return err
@@ -419,7 +419,7 @@ func (r *GormRepository) PayOrderWithMock(
 		}
 		ready, event, err := transitionToReadyAndEnqueueTx(
 			tx, order.DeliveryOrderPublicID, &order.MerchantUserID, expectedRowVersion,
-			StatusPendingFeePayment, nil, now,
+			StatusPendingFeePayment, nil, now, r.notificationAppender,
 		)
 		if err != nil {
 			return err
@@ -587,7 +587,7 @@ func (r *GormRepository) ConfirmWechatPayment(ctx context.Context, input Payment
 		}
 		ready, event, err := transitionToReadyAndEnqueueTx(
 			tx, order.DeliveryOrderPublicID, &attempt.MerchantUserID, order.RowVersion,
-			StatusPendingFeePayment, nil, input.PaidAt,
+			StatusPendingFeePayment, nil, input.PaidAt, r.notificationAppender,
 		)
 		if err != nil {
 			return err
@@ -700,6 +700,7 @@ func (r *GormRepository) RequestRefund(ctx context.Context, request RefundReques
 			return err
 		}
 		if CanTransition(order.Status, StatusCancelled) {
+			before := order
 			updates, err := buildTransitionUpdates(order, order.Status, StatusCancelled, nil, request.Now)
 			if err != nil {
 				return err
@@ -717,6 +718,9 @@ func (r *GormRepository) RequestRefund(ctx context.Context, request RefundReques
 			applyTransition(&order, StatusCancelled, nil, request.Now)
 			order.RowVersion++
 			order.UpdatedAt = request.Now
+			if err := appendOrderNotificationTx(tx, r.notificationAppender, before, order, request.Now); err != nil {
+				return err
+			}
 		}
 		result.Refund, result.Settlement, result.Order = refund, settlement, order
 		return nil

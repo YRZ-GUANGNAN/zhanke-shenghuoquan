@@ -74,6 +74,7 @@ func (r *GormRepository) CreateProofAndTransition(
 		if order.Status != from || order.RowVersion != expectedRowVersion {
 			return ErrConcurrentUpdate
 		}
+		before := order
 		updates, err := buildTransitionUpdates(order, from, to, &candidate.UploaderUserID, now)
 		if err != nil {
 			return err
@@ -105,7 +106,7 @@ func (r *GormRepository) CreateProofAndTransition(
 				return err
 			}
 		}
-		return nil
+		return appendOrderNotificationTx(tx, r.notificationAppender, before, order, now)
 	})
 	return proof, order, err
 }

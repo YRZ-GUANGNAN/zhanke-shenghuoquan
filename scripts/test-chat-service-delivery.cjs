@@ -74,7 +74,8 @@ async function run() {
       sendDeliveryTencentText:async(c,t,id,attempt)=>{sendCalls++;assert.equal(id,`campus_${user}`);if(sendCalls===1)return firstSend.promise;return {ID:'sent',flow:'out',time:1,type:'TIMTextElem',payload:{text:t}}},
     },
     '../../services/media':{},'../../services/taro':{getCurrentInstance:()=>({router:{params:{orderId:'ORDER'}}})},
-    '../../stores/session':{useSessionStore:store},'../../hooks/use-keyboard-inset':{useKeyboardInset:()=>({inset:0,reset})},'./index.scss':{}
+    '../../stores/session':{useSessionStore:store},'../../hooks/use-keyboard-inset':{useKeyboardInset:()=>({inset:0,reset})},
+    '../../hooks/use-visible-conversation-read':{useVisibleConversationRead:()=>{}},'./index.scss':{}
   },dr)
   dr.render();await dr.flush()
   const one=cl=>nodes(dr.tree,n=>hasClass(n,cl))[0]

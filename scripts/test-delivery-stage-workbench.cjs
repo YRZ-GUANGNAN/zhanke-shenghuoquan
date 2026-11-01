@@ -207,6 +207,7 @@ function riderHarness(overrides = {}) {
     '../../components/ui': { AppDialog: 'AppDialog' },
     '../../hooks/use-identity-guard': { useIdentityGuard: () => identityAllowed, identityRoute: () => '' },
     '../../hooks/use-feature-visibility': { useFeatureVisibility: () => ({ delivery: true, rider: true }) },
+    '../../hooks/use-notification-refresh': { useNotificationRefresh: () => ({ pending: false }) },
     '../../services/api': {
       isApiError: (value) => value instanceof Error && typeof value.status === 'number',
       isRetryableNetworkError: (value) => value?.status === 0,
@@ -306,6 +307,7 @@ function merchantHarness(kind, overrides = {}) {
     '../../feature-flags': { deliveryPaymentEnabled: true },
     '../../hooks/use-identity-guard': { useIdentityGuard: () => identityAllowed, identityRoute: () => '' },
     '../../hooks/use-feature-visibility': { useFeatureVisibility: () => ({ delivery: true, merchant: true }) },
+    '../../hooks/use-notification-refresh': { useNotificationRefresh: () => ({ pending: false }) },
     '../../hooks/use-viewport-refresh': { useViewportRefresh: () => ({}) },
     '../../services/a-user': { getIdentityApplication: (...args) => services.getIdentityApplication(...args) },
     '../../services/delivery-merchant': {

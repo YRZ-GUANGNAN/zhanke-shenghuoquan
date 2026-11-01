@@ -2,10 +2,13 @@ package notification
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"reflect"
 	"strings"
 	"time"
 
+	mysqlDriver "github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -25,10 +28,14 @@ type GormRepository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *GormRepository { return &GormRepository{db: db} }
 
+// NewGormRepository is kept as an explicit constructor for composition roots
+// that name adapters by their persistence implementation.
+func NewGormRepository(db *gorm.DB) *GormRepository { return NewRepository(db) }
+
 var _ Repository = (*GormRepository)(nil)
 
 func (r *GormRepository) AppendEventTx(tx *gorm.DB, event Event) error {
-	if tx == nil || !validID(event.EventPublicID) || strings.TrimSpace(event.EventType) == "" || strings.TrimSpace(event.AggregateType) == "" || strings.TrimSpace(event.AggregatePublicID) == "" || event.AggregateVersion == 0 || event.PayloadVersion == 0 || len(event.Payload) == 0 || event.OccurredAt.IsZero() || event.CreatedAt.IsZero() || event.UpdatedAt.IsZero() {
+	if tx == nil || !validID(event.EventPublicID) || !safeText(event.EventType, 64, true) || !safeText(event.AggregateType, 32, true) || !safeText(event.AggregatePublicID, 128, true) || event.AggregateVersion == 0 || event.PayloadVersion == 0 || !validMetadata(event.Payload) || event.OccurredAt.IsZero() || event.CreatedAt.IsZero() || event.UpdatedAt.IsZero() {
 		return ErrInvalidRecord
 	}
 	if event.Status == "" {
@@ -37,12 +44,28 @@ func (r *GormRepository) AppendEventTx(tx *gorm.DB, event Event) error {
 	if event.RowVersion == 0 {
 		event.RowVersion = 1
 	}
-	result := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&event)
-	return result.Error
+	if event.Status != EventPending || event.RowVersion != 1 || event.AttemptCount != 0 || event.LeaseToken != nil || event.LeaseExpiresAt != nil {
+		return ErrInvalidRecord
+	}
+	err := tx.Create(&event).Error
+	if !duplicateKey(err) {
+		return err
+	}
+	var existing Event
+	if err := tx.Where("aggregate_type = ? AND aggregate_public_id = ? AND aggregate_version = ? AND event_type = ?", event.AggregateType, event.AggregatePublicID, event.AggregateVersion, event.EventType).First(&existing).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrIdempotencyConflict
+		}
+		return err
+	}
+	if existing.PayloadVersion != event.PayloadVersion || !sameJSON(existing.Payload, event.Payload) {
+		return ErrIdempotencyConflict
+	}
+	return nil
 }
 
 func (r *GormRepository) EnsureInboxTx(tx *gorm.DB, item InboxItem) error {
-	if tx == nil || !validID(item.InboxPublicID) || !validID(item.EventPublicID) || item.RecipientUserID == 0 || strings.TrimSpace(string(item.Purpose)) == "" || strings.TrimSpace(item.Title) == "" || item.AggregateVersion == 0 || item.CreatedAt.IsZero() || item.UpdatedAt.IsZero() {
+	if tx == nil || !validID(item.InboxPublicID) || !validID(item.EventPublicID) || item.RecipientUserID == 0 || !safeText(string(item.Purpose), 48, true) || !safeText(item.Title, 128, true) || !safeText(item.Summary, 256, false) || !safeText(item.TargetPath, 256, false) || !safeText(item.AggregateType, 32, true) || !safeText(item.AggregatePublicID, 128, true) || item.AggregateVersion == 0 || item.CreatedAt.IsZero() || item.UpdatedAt.IsZero() {
 		return ErrInvalidRecord
 	}
 	if item.Status == "" {
@@ -51,11 +74,28 @@ func (r *GormRepository) EnsureInboxTx(tx *gorm.DB, item InboxItem) error {
 	if item.RowVersion == 0 {
 		item.RowVersion = 1
 	}
-	return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&item).Error
+	if item.Status != DeliveryPending || item.RowVersion != 1 || item.ReadAt != nil || item.DeliveredAt != nil {
+		return ErrInvalidRecord
+	}
+	err := tx.Create(&item).Error
+	if !duplicateKey(err) {
+		return err
+	}
+	var existing InboxItem
+	if err := tx.Where("event_public_id = ? AND recipient_user_id = ? AND purpose = ?", item.EventPublicID, item.RecipientUserID, item.Purpose).First(&existing).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrIdempotencyConflict
+		}
+		return err
+	}
+	if existing.Title != item.Title || existing.Summary != item.Summary || existing.AggregateType != item.AggregateType || existing.AggregatePublicID != item.AggregatePublicID || existing.AggregateVersion != item.AggregateVersion || existing.TargetPath != item.TargetPath {
+		return ErrIdempotencyConflict
+	}
+	return nil
 }
 
 func (r *GormRepository) EnsureDeliveryTx(tx *gorm.DB, item DeliveryItem) error {
-	if tx == nil || !validID(item.DeliveryPublicID) || !validID(item.EventPublicID) || item.RecipientUserID == 0 || !validChannel(item.Channel) || strings.TrimSpace(string(item.Purpose)) == "" || len(item.TemplateSnapshot) == 0 || item.PayloadVersion == 0 || item.CreatedAt.IsZero() || item.UpdatedAt.IsZero() {
+	if tx == nil || !validID(item.DeliveryPublicID) || !validID(item.EventPublicID) || item.RecipientUserID == 0 || !validChannel(item.Channel) || !safeText(string(item.Purpose), 48, true) || !safeText(item.TemplateKey, 64, false) || !validMetadata(item.TemplateSnapshot) || item.PayloadVersion == 0 || item.CreatedAt.IsZero() || item.UpdatedAt.IsZero() {
 		return ErrInvalidRecord
 	}
 	if item.Status == "" {
@@ -64,18 +104,52 @@ func (r *GormRepository) EnsureDeliveryTx(tx *gorm.DB, item DeliveryItem) error 
 	if item.RowVersion == 0 {
 		item.RowVersion = 1
 	}
-	return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&item).Error
+	if item.Status != DeliveryPending || item.RowVersion != 1 || item.AttemptCount != 0 || item.LeaseToken != nil || item.LeaseExpiresAt != nil || item.SubscriptionID != nil || item.SubscriptionNonce != nil {
+		return ErrInvalidRecord
+	}
+	err := tx.Create(&item).Error
+	if !duplicateKey(err) {
+		return err
+	}
+	var existing DeliveryItem
+	if err := tx.Where("event_public_id = ? AND recipient_user_id = ? AND channel = ? AND purpose = ?", item.EventPublicID, item.RecipientUserID, item.Channel, item.Purpose).First(&existing).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrIdempotencyConflict
+		}
+		return err
+	}
+	if existing.TemplateKey != item.TemplateKey || existing.PayloadVersion != item.PayloadVersion || !sameJSON(existing.TemplateSnapshot, item.TemplateSnapshot) {
+		return ErrIdempotencyConflict
+	}
+	return nil
 }
 
 func (r *GormRepository) ClaimNextDelivery(ctx context.Context, now time.Time, lease time.Duration) (DeliveryLease, bool, error) {
+	return r.claimDelivery(ctx, now, lease, "")
+}
+
+func (r *GormRepository) ClaimWechatDelivery(ctx context.Context, now time.Time, lease time.Duration) (DeliveryLease, bool, error) {
+	return r.claimDelivery(ctx, now, lease, ChannelWechatSubscribe)
+}
+
+func (r *GormRepository) claimDelivery(ctx context.Context, now time.Time, lease time.Duration, channel Channel) (DeliveryLease, bool, error) {
 	if now.IsZero() || lease <= 0 {
 		return DeliveryLease{}, false, ErrInvalidRecord
 	}
 	var result DeliveryLease
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// An expired external lease may already have sent its request. Preserve
+		// that uncertainty instead of automatically sending a second message.
+		if err := expireExternalDeliveriesTx(tx, now); err != nil {
+			return err
+		}
 		var item DeliveryItem
-		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("(status IN ? AND (next_attempt_at IS NULL OR next_attempt_at <= ?)) OR (status = ? AND lease_expires_at <= ?)", []DeliveryStatus{DeliveryPending, DeliveryRetryWait}, now, DeliveryProcessing, now).
+		query := tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"})
+		if channel != "" {
+			query = query.Where("channel = ?", channel)
+		}
+		err := query.
+			Where("(status IN ? AND (next_attempt_at IS NULL OR next_attempt_at <= ?)) OR (channel = ? AND status = ? AND lease_expires_at <= ?)", []DeliveryStatus{DeliveryPending, DeliveryRetryWait}, now, ChannelInApp, DeliveryProcessing, now).
 			Order("id ASC").First(&item).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil
@@ -152,58 +226,86 @@ func (r *GormRepository) FailDelivery(ctx context.Context, lease DeliveryLease, 
 }
 
 func (r *GormRepository) ReserveSubscription(ctx context.Context, userID uint64, appID, templateKey, nonce string, now time.Time) (SubscriptionReservation, error) {
-	if userID == 0 || strings.TrimSpace(appID) == "" || strings.TrimSpace(templateKey) == "" || strings.TrimSpace(nonce) == "" || now.IsZero() {
+	if userID == 0 || !safeText(appID, 64, true) || !safeText(templateKey, 64, true) || !safeText(nonce, 64, true) || !safeIdentifier.MatchString(nonce) || now.IsZero() {
 		return SubscriptionReservation{}, ErrInvalidRecord
 	}
 	var result SubscriptionReservation
-	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var value Subscription
-		// A request retry must reuse its prior occupied quota, including when
-		// another authorization has since become available.
-		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("user_id = ? AND app_id = ? AND template_key = ? AND reservation_nonce = ?", userID, appID, templateKey, nonce).First(&value).Error
-		if err == nil {
+	var err error
+	for attempt := 0; attempt < 3; attempt++ {
+		err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			var value Subscription
+			// A request retry must reuse its prior occupied quota, including when
+			// another authorization has since become available.
+			err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("user_id = ? AND app_id = ? AND template_key = ? AND reservation_nonce = ?", userID, appID, templateKey, nonce).First(&value).Error
+			if err == nil {
+				result = SubscriptionReservation{Subscription: value, Nonce: nonce}
+				return nil
+			}
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+			err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("user_id = ? AND app_id = ? AND template_key = ? AND status = ? AND remaining_quota > 0 AND reservation_nonce IS NULL AND (expires_at IS NULL OR expires_at > ?)", userID, appID, templateKey, "accepted", now).Order("id DESC").First(&value).Error
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrSubscriptionEmpty
+			}
+			if err != nil {
+				return err
+			}
+			reserved := now
+			update := tx.Model(&Subscription{}).Where("id = ? AND row_version = ? AND remaining_quota > 0 AND reservation_nonce IS NULL", value.ID, value.RowVersion).Updates(map[string]any{"remaining_quota": gorm.Expr("remaining_quota - 1"), "reserved_quota": 1, "reservation_nonce": nonce, "reserved_at": reserved, "row_version": gorm.Expr("row_version + 1"), "updated_at": now})
+			if update.Error != nil {
+				return update.Error
+			}
+			if update.RowsAffected != 1 {
+				return ErrConcurrentUpdate
+			}
+			value.RemainingQuota--
+			value.ReservedQuota = 1
+			value.ReservationNonce = &nonce
+			value.ReservedAt = &reserved
+			value.RowVersion++
+			value.UpdatedAt = now
 			result = SubscriptionReservation{Subscription: value, Nonce: nonce}
 			return nil
+		})
+		if !retryableReservation(err) {
+			break
 		}
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
-		}
-		err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("user_id = ? AND app_id = ? AND template_key = ? AND status = ? AND remaining_quota > 0 AND reservation_nonce IS NULL AND (expires_at IS NULL OR expires_at > ?)", userID, appID, templateKey, "accepted", now).Order("id DESC").First(&value).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrSubscriptionEmpty
-		}
-		if err != nil {
-			return err
-		}
-		reserved := now
-		update := tx.Model(&Subscription{}).Where("id = ? AND row_version = ? AND remaining_quota > 0 AND reservation_nonce IS NULL", value.ID, value.RowVersion).Updates(map[string]any{"remaining_quota": gorm.Expr("remaining_quota - 1"), "reserved_quota": 1, "reservation_nonce": nonce, "reserved_at": reserved, "row_version": gorm.Expr("row_version + 1"), "updated_at": now})
-		if update.Error != nil {
-			return update.Error
-		}
-		if update.RowsAffected != 1 {
-			return ErrConcurrentUpdate
-		}
-		value.RemainingQuota--
-		value.ReservedQuota = 1
-		value.ReservationNonce = &nonce
-		value.ReservedAt = &reserved
-		value.RowVersion++
-		value.UpdatedAt = now
-		result = SubscriptionReservation{Subscription: value, Nonce: nonce}
-		return nil
-	})
+	}
 	return result, err
 }
 
 func (r *GormRepository) RecordCallbackOnce(ctx context.Context, receipt CallbackReceipt) (bool, error) {
-	if receipt.SDKAppID == 0 || strings.TrimSpace(receipt.ProviderMessageID) == "" || receipt.SenderUserID == 0 || receipt.RecipientUserID == 0 || strings.TrimSpace(receipt.SenderAccount) == "" || strings.TrimSpace(receipt.RecipientAccount) == "" || strings.TrimSpace(receipt.CallbackHash) == "" || receipt.OccurredAt.IsZero() || receipt.CreatedAt.IsZero() {
+	if receipt.SDKAppID == 0 || !safeText(receipt.ProviderMessageID, 128, true) || receipt.SenderUserID == 0 || receipt.RecipientUserID == 0 || !safeText(receipt.SenderAccount, 64, true) || !safeText(receipt.RecipientAccount, 64, true) || !callbackHashPattern.MatchString(receipt.CallbackHash) || !safeText(receipt.ConversationPublicID, 128, false) || (receipt.ConversationType != "c2c" && receipt.ConversationType != "group") || receipt.OccurredAt.IsZero() || receipt.CreatedAt.IsZero() {
 		return false, ErrInvalidRecord
 	}
 	if receipt.Status == "" {
 		receipt.Status = "received"
 	}
-	result := r.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&receipt)
-	return result.RowsAffected == 1, result.Error
+	if receipt.Status != "received" {
+		return false, ErrInvalidRecord
+	}
+	err := r.db.WithContext(ctx).Create(&receipt).Error
+	if duplicateKey(err) {
+		return false, nil
+	}
+	return err == nil, err
+}
+
+func duplicateKey(err error) bool {
+	var value *mysqlDriver.MySQLError
+	return errors.Is(err, gorm.ErrDuplicatedKey) || (errors.As(err, &value) && value.Number == 1062)
+}
+func retryableReservation(err error) bool {
+	var value *mysqlDriver.MySQLError
+	return duplicateKey(err) || (errors.As(err, &value) && (value.Number == 1213 || value.Number == 1205))
+}
+func sameJSON(left, right json.RawMessage) bool {
+	var l, r any
+	ld, rd := json.NewDecoder(strings.NewReader(string(left))), json.NewDecoder(strings.NewReader(string(right)))
+	ld.UseNumber()
+	rd.UseNumber()
+	return ld.Decode(&l) == nil && rd.Decode(&r) == nil && reflect.DeepEqual(l, r)
 }
 
 func validChannel(value Channel) bool {

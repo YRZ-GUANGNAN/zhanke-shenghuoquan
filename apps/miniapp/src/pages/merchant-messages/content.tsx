@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { ScrollView, Text, View } from '@tarojs/components'
 import { useDidHide, useDidShow } from '@tarojs/taro'
 import CapsulePageHeader from '../../components/capsule-page-header'
+import NotificationInbox from '../../components/notification-inbox'
 import { AppIconButton } from '../../components/ui'
 import DeliveryWorkspaceNav, { useDeliveryWorkspaceNavigation } from '../../components/delivery-workspace-nav'
 import { useSessionStore } from '../../stores/session'
@@ -12,6 +13,7 @@ import {
 } from '../../services/delivery-im'
 import Taro from '../../services/taro'
 import { useBottomNavScroll } from '../../utils/bottom-nav-motion'
+import { useNotificationState } from '../../hooks/use-notification-runtime'
 import './index.scss'
 
 const statusCopy: Record<DeliveryConversation['status'], string> = {
@@ -31,6 +33,7 @@ export function DeliveryMessagesContent({ role, identityAllowed }: { role: 'merc
   const workspace = useDeliveryWorkspaceNavigation({ role, active: 'messages' }, identityAllowed)
   const accountId = useSessionStore(state => state.profile.id)
   const token = useSessionStore(state => state.token)
+  const notifications = useNotificationState()
   const [items, setItems] = useState<DeliveryConversation[]>([])
   const [unreadById, setUnreadById] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(false)
@@ -84,6 +87,22 @@ export function DeliveryMessagesContent({ role, identityAllowed }: { role: 'merc
 
   useDidHide(() => { visible.current = false; epoch.current += 1; busy.current = false })
   useDidShow(() => { visible.current = true; void loadMessages() })
+  useEffect(() => {
+    if (!notifications.messageRevision || !identityAllowed || pageRef.current > 1) return
+    const timer = setTimeout(() => { void loadMessages() }, 800)
+    return () => clearTimeout(timer)
+  }, [notifications.messageRevision, identityAllowed, loadMessages])
+  useEffect(() => {
+    if (!identityAllowed || !visible.current || !notifications.unread.confirmed) return
+    setUnreadById(previous => {
+      const next = { ...previous }
+      for (const item of items) {
+        const count = notifications.unread.conversations[item.tencentConversationId]
+        next[item.conversationPublicId] = typeof count === 'number' ? count : -1
+      }
+      return next
+    })
+  }, [identityAllowed, items, notifications.unread])
 
   useEffect(() => {
     epoch.current += 1
@@ -123,6 +142,7 @@ export function DeliveryMessagesContent({ role, identityAllowed }: { role: 'merc
       <ScrollView className='merchant-messages-scroll' scrollY enhanced showScrollbar={false} lowerThreshold={100}
         onScroll={event => navScroll(Number(event.detail?.scrollTop))}
         onScrollToLower={() => { if (items.length < total) void loadMessages(true) }}>
+        <NotificationInbox enabled={identityAllowed} />
         <View className='merchant-messages-card'>
           {loading ? <Text className='merchant-messages-card__footer'>正在加载真实配送会话…</Text> : null}
           {!loading && loadError ? (

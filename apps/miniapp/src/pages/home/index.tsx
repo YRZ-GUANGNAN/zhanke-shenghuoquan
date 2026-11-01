@@ -1,7 +1,7 @@
 import ProductPrice from '../../components/product-price'
 import { FeaturePageGate } from '../../components/feature-page-gate'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useDidShow } from '@tarojs/taro'
+import { useDidHide, useDidShow } from '@tarojs/taro'
 import { Image, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import AppIcon from '../../components/app-icon'
@@ -27,6 +27,7 @@ import { listNavigationItems } from '../../services/d-navigation'
 import { requestWithSingleSessionRecovery } from '../../services/session-recovery'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import { usePageShare } from '../../hooks/use-page-share'
+import { useNotificationState } from '../../hooks/use-notification-runtime'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
 import { postBodyWithoutTitle } from '../../utils/post-presentation'
@@ -149,6 +150,9 @@ function conversationPeerLabel(context: IMConversationContext, currentUserId: st
 }
 
 function HomeContent() {
+  const notifications = useNotificationState()
+  const visibleForNotifications = useRef(true)
+  useDidHide(() => { visibleForNotifications.current = false })
   // Keep this page's entry mode when a pushed page becomes the current router.
   const [isMessagesPage] = useState(() => Taro.getCurrentInstance().router?.params.tab === 'messages')
   const [activeTab, setActiveTab] = useState<HomeTab>(isMessagesPage ? 'messages' : 'discover')
@@ -448,8 +452,16 @@ function HomeContent() {
   }, [activeTab, loadTools, toolStatus, visibility?.campus_tools])
 
   useDidShow(() => {
+    visibleForNotifications.current = true
     if (activeTab === 'messages' && visibility.messages) void loadConversations(currentSessionKey)
   })
+  useEffect(() => {
+    if (!notifications.messageRevision || activeTab !== 'messages' || !visibility.messages) return
+    const timer = setTimeout(() => {
+      if (visibleForNotifications.current) void loadConversations(currentSessionKey)
+    }, 800)
+    return () => clearTimeout(timer)
+  }, [notifications.messageRevision, activeTab, visibility.messages, loadConversations, currentSessionKey])
 
   const openSearch = () => {
     if (!channelInteraction.canActivate()) return
@@ -658,13 +670,15 @@ function HomeContent() {
                   <View className='student-message-row__main'>
                     <View className='student-message-row__top'>
                       <Text className='student-message-row__name'>{peer.name}</Text>
+                      {(notifications.unread.conversations[item.context.conversationId] || 0) > 0 ? <View className='student-message-row__dot' /> : null}
                       <AppIcon name='chevron-right' className='student-message-row__chevron' />
                     </View>
                     <Text className='student-message-row__product'>
                       {item.context.referenceType === 'user' ? '用户私信' : item.product?.title || '相关二手商品'}
                     </Text>
                     <Text className='student-message-row__preview'>
-                      {conversationPeerLabel(item.context, currentUserId)}
+                      {(notifications.unread.conversations[item.context.conversationId] || 0) > 0
+                        ? `${notifications.unread.conversations[item.context.conversationId]} 条未读消息` : conversationPeerLabel(item.context, currentUserId)}
                     </Text>
                   </View>
                   {item.context.referenceType !== 'user' && <View className='student-message-row__product-thumb'>

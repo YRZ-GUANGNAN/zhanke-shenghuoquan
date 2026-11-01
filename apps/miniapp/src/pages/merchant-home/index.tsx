@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Text, View } from '@tarojs/components'
 import { useDidShow } from '@tarojs/taro'
+import { useNotificationRefresh } from '../../hooks/use-notification-refresh'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import { useChannelInteraction } from '../../components/channel-pager'
 import DeliveryStagePager from '../../components/delivery-stage-pager'
@@ -360,6 +361,9 @@ function MerchantHomeContent() {
     return loadWorkbench()
   }
 
+  const notificationRefresh = useNotificationRefresh(identityAllowed && approvalState === 'approved',
+    !loading && !loadingMore && Object.values(ordersPageByTab).every(page => page <= 1), requestRefresh)
+
   const totalOrderCount = ordersTotalByTab.pending + ordersTotalByTab.delivering + ordersTotalByTab.completed
   const allCountsLoaded = tabCopy.every((tab) => loadedByTab[tab.key])
 
@@ -443,7 +447,7 @@ function MerchantHomeContent() {
       >
         <View className='merchant-home-orders__inner'>
           {loadedByTab[tab] || !loading ? <View className='delivery-order-toolbar'>
-            <Text>{loading ? '正在更新订单' : '下拉刷新订单'}</Text>
+            <Text>{loading ? '正在更新订单' : notificationRefresh.pending ? '订单有更新，可下拉刷新' : '下拉刷新订单'}</Text>
             <View className={`delivery-order-toolbar__refresh${loading || loadingMore ? ' delivery-order-toolbar__refresh--disabled' : ''}`}
               ariaRole='button' ariaLabel={loading ? '正在刷新配送订单' : '刷新配送订单'} hoverClass='delivery-order-control--pressed'
               onClick={() => { void requestRefresh() }}>

@@ -9,15 +9,14 @@ export interface NotificationInboxItem {
   summary: string
   aggregateType: string
   aggregatePublicId: string
+  targetPath: string
   read: boolean
   createdAt: string
 }
 
 export interface NotificationInboxPage {
   items: NotificationInboxItem[]
-  page: number
-  pageSize: number
-  total: number
+  nextCursor: string
   unread: number | null
 }
 
@@ -47,7 +46,19 @@ export interface NotificationSubscriptionResult {
   /** The server accepts this nonce for idempotent authorization reporting. */
   nonce: string
   message?: string
+  reportStatus: 'recorded' | 'failed' | 'not_sent'
 }
+
+export interface PreparedNotificationSubscription {
+  templateKey: string
+  templateId: string
+  nonce: string
+  expiresAt: number
+}
+
+// Account binding and one-shot state stay in memory, never in API payloads.
+const preparedOwners = new WeakMap<PreparedNotificationSubscription, string>()
+const consumed = new WeakSet<PreparedNotificationSubscription>()
 
 export interface NotificationUnreadSnapshot {
   /** Session/account generation that owns this snapshot. */
@@ -70,10 +81,6 @@ export interface NotificationUnreadSnapshotUpdate {
 
 interface UnknownRecord {
   [key: string]: unknown
-}
-
-interface TaroSubscribeRuntime {
-  requestSubscribeMessage?: (options: { tmplIds: string[] }) => Promise<UnknownRecord>
 }
 
 function asRecord(value: unknown): UnknownRecord {
@@ -106,22 +113,22 @@ function normalizeInboxItem(value: unknown): NotificationInboxItem {
     summary: asString(first(record, ['summary', 'preview'])),
     aggregateType: asString(first(record, ['aggregateType', 'aggregate_type'])),
     aggregatePublicId: asString(first(record, ['aggregatePublicId', 'aggregate_public_id'])),
+    targetPath: asString(record.targetPath),
     read: Boolean(first(record, ['read', 'isRead', 'read_at'])),
     createdAt: asString(first(record, ['createdAt', 'created_at']))
   }
 }
 
-function normalizeInboxPage(value: unknown, page: number, pageSize: number): NotificationInboxPage {
+function normalizeInboxPage(value: unknown): NotificationInboxPage {
   const record = asRecord(value)
   const rawItems = Array.isArray(record.items) ? record.items : Array.isArray(value) ? value : []
   const items = rawItems.map(normalizeInboxItem)
   const rawUnread = first(record, ['unread', 'unreadCount', 'unread_count'])
   return {
     items,
-    page: asNumber(first(record, ['page'])) ?? page,
-    pageSize: asNumber(first(record, ['pageSize', 'page_size'])) ?? pageSize,
-    total: asNumber(first(record, ['total'])) ?? items.length,
-    unread: asNumber(rawUnread) ?? (rawUnread === null ? null : items.filter(item => !item.read).length)
+    nextCursor: asString(record.nextCursor),
+    // The current page is not the whole inbox. Missing totals remain unknown.
+    unread: asNumber(rawUnread)
   }
 }
 
@@ -144,12 +151,6 @@ function normalizeTemplates(value: unknown): NotificationSubscriptionTemplates {
   }
 }
 
-function createNonce(): string {
-  // This is an idempotency nonce, not a credential. Keep it in memory only.
-  const random = Math.floor(Math.random() * 0x100000000).toString(16).padStart(8, '0')
-  return `${Date.now().toString(36)}-${random}`
-}
-
 function classifySubscribeResult(value: UnknownRecord, templateId: string): NotificationSubscriptionStatus {
   const result = asString(value[templateId]).toLowerCase()
   if (result === 'accept' || result === 'accepted') return 'accept'
@@ -161,11 +162,10 @@ function classifySubscribeResult(value: UnknownRecord, templateId: string): Noti
 }
 
 /** Read the independent delivery notification inbox; community notifications stay on b-community. */
-export async function loadNotificationInbox(page = 1, pageSize = 20): Promise<NotificationInboxPage> {
-  const safePage = Number.isSafeInteger(page) && page > 0 ? page : 1
-  const safePageSize = Number.isSafeInteger(pageSize) && pageSize > 0 ? Math.min(pageSize, 100) : 20
-  const value = await request<unknown>(`/notification/inbox?page=${safePage}&pageSize=${safePageSize}`)
-  return normalizeInboxPage(value, safePage, safePageSize)
+export async function loadNotificationInbox(cursor = '', limit = 20): Promise<NotificationInboxPage> {
+  const safeLimit = Number.isSafeInteger(limit) && limit > 0 ? Math.min(limit, 100) : 20
+  const value = await request<unknown>(`/notification/inbox?limit=${safeLimit}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`)
+  return normalizeInboxPage(value)
 }
 
 export async function markNotificationRead(notificationId: string): Promise<void> {
@@ -174,48 +174,64 @@ export async function markNotificationRead(notificationId: string): Promise<void
   await request(`/notification/inbox/${encodeURIComponent(id)}/read`, { url: '', method: 'POST' })
 }
 
+/** Only established protected routes may be opened from notification metadata. */
+export function notificationTargetPath(item: NotificationInboxItem): string | null {
+  const path = item.targetPath || ''
+  if (!/^\/pages\/(merchant-order-detail|delivery-order-detail|delivery-conversation|secondhand-chat|rider-wallet|merchant-wallet|delivery-rider|merchant-home)\/index(?:\?[^#\r\n]*)?$/.test(path)) return null
+  if (/[\\\u0000-\u0020]/.test(path)) return null
+  return path
+}
+
 export async function loadNotificationSubscriptionTemplates(): Promise<NotificationSubscriptionTemplates> {
   return normalizeTemplates(await request<unknown>('/notification/subscribe/templates'))
 }
 
-/**
- * Request a one-time subscription. This function is intentionally explicit: no caller
- * should invoke it from startup, lifecycle or a background refresh.
- */
-export async function requestNotificationSubscription(templateKey: string): Promise<NotificationSubscriptionResult> {
+/** Prepare before the user clicks. Network awaits must not consume the click gesture. */
+export async function prepareNotificationSubscription(templateKey: string): Promise<PreparedNotificationSubscription> {
   const key = String(templateKey || '').trim()
-  const nonce = createNonce()
-  if (!key) return { templateKey: key, status: 'unavailable', nonce, message: '模板键不能为空' }
-
-  let template: NotificationSubscriptionTemplate | undefined
-  try {
-    template = (await loadNotificationSubscriptionTemplates()).items.find(item => item.templateKey === key)
-  } catch (error) {
-    return { templateKey: key, status: 'unavailable', nonce, message: error instanceof Error ? error.message : '模板暂不可用' }
-  }
+  const owner = Taro.getStorageSync<string>('domainA.token') || ''
+  if (!key || !owner) throw new Error('请先登录后订阅通知')
+  const template = (await loadNotificationSubscriptionTemplates()).items.find(item => item.templateKey === key)
   const templateId = template?.available ? template.templateId : undefined
-  if (!templateId) return { templateKey: key, status: 'unavailable', nonce, message: '模板暂不可用' }
+  if (!templateId) throw new Error('通知模板暂不可用')
+  if (Taro.getStorageSync<string>('domainA.token') !== owner) throw new Error('登录账号已变化')
+  const grant = await request<{ nonce: string; expiresAt: string }>('/notification/subscribe/nonce', {
+    url: '', method: 'POST', data: { templateKey: key }
+  })
+  const expiresAt = Date.parse(grant.expiresAt)
+  if (!grant.nonce || !Number.isFinite(expiresAt) || expiresAt <= Date.now() ||
+    Taro.getStorageSync<string>('domainA.token') !== owner) throw new Error('订阅授权准备已失效，请重试')
+  const prepared = { templateKey: key, templateId, nonce: grant.nonce, expiresAt }
+  preparedOwners.set(prepared, owner)
+  return prepared
+}
 
-  const taroRuntime = Taro as unknown as TaroSubscribeRuntime
-  const globalRuntime = (globalThis as unknown as { wx?: TaroSubscribeRuntime }).wx
-  const runtime = typeof taroRuntime?.requestSubscribeMessage === 'function' ? taroRuntime : globalRuntime
-  const requestSubscribeMessage = runtime?.requestSubscribeMessage
-  if (typeof requestSubscribeMessage !== 'function') {
-    return { templateKey: key, status: 'unavailable', nonce, message: '当前平台不支持订阅消息' }
+/** Call directly inside a user click handler with a pre-fetched, one-shot grant. */
+export async function requestNotificationSubscription(prepared: PreparedNotificationSubscription): Promise<NotificationSubscriptionResult> {
+  const { templateKey: key, templateId, nonce, expiresAt } = prepared
+  const owner = preparedOwners.get(prepared)
+  const isCurrent = () => Boolean(owner) && Taro.getStorageSync<string>('domainA.token') === owner
+  if (!isCurrent() || consumed.has(prepared) || expiresAt <= Date.now() || typeof Taro.requestSubscribeMessage !== 'function') {
+    return { templateKey: key, status: 'unavailable', nonce, reportStatus: 'not_sent', message: '请重新准备订阅授权' }
   }
+  consumed.add(prepared)
 
   let status: NotificationSubscriptionStatus
   let message: string | undefined
   try {
-    const response = await requestSubscribeMessage({ tmplIds: [templateId] })
+    // This is the first asynchronous call: preserve the native user gesture.
+    const response = await Taro.requestSubscribeMessage({ tmplIds: [templateId] })
     status = classifySubscribeResult(response, templateId)
     message = asString(response.errMsg) || undefined
   } catch (error) {
-    status = 'exception'
-    message = error instanceof Error ? error.message : '订阅授权失败'
+    const detail = asString(asRecord(error).errMsg) || (error instanceof Error ? error.message : '')
+    status = /cancel|close/i.test(detail) ? 'close' : 'exception'
+    message = '订阅未完成，可再次尝试'
   }
 
-  // Reporting is best effort. Authorization failures must never block the main business flow.
+  // A delayed authorization response must never be reported under a new account.
+  if (!isCurrent()) return { templateKey: key, status, nonce, reportStatus: 'not_sent', message: '登录账号已变化' }
+  let reportStatus: NotificationSubscriptionResult['reportStatus'] = 'recorded'
   try {
     await request('/notification/subscribe/authorize', {
       url: '',
@@ -223,9 +239,10 @@ export async function requestNotificationSubscription(templateKey: string): Prom
       data: { templateKey: key, result: status, nonce }
     })
   } catch {
-    // The server can retry/reconcile the missing report; no credential is retained client-side.
+    reportStatus = 'failed'
+    message = '订阅结果未同步，请重新尝试'
   }
-  return { templateKey: key, status, nonce, message }
+  return { templateKey: key, status, nonce, message, reportStatus }
 }
 
 export function createUnreadSnapshot(generation = 0): NotificationUnreadSnapshot {
@@ -241,7 +258,8 @@ export function mergeUnreadSnapshot(
   update: NotificationUnreadSnapshotUpdate
 ): NotificationUnreadSnapshot {
   if (update.generation !== previous.generation) return previous
-  const conversations = { ...previous.conversations }
+  const fullSnapshot = update.confirmed === true && update.conversations !== undefined
+  const conversations = fullSnapshot ? {} as Record<string, number> : { ...previous.conversations }
   if (update.conversations) {
     for (const [id, count] of Object.entries(update.conversations)) {
       if (!id) continue
@@ -256,11 +274,10 @@ export function mergeUnreadSnapshot(
     else conversations[update.conversationId] = count
   }
   const hasConversationUpdate = Boolean(update.conversations || update.conversationId)
-  const confirmed = update.confirmed === true || (update.confirmed === undefined && (update.total !== undefined || hasConversationUpdate))
-  const total = update.total === undefined
-    ? (hasConversationUpdate ? Object.values(conversations).reduce((sum, count) => sum + count, 0) : previous.total)
-    : asNumber(update.total)
-  return { generation: previous.generation, confirmed: previous.confirmed || confirmed, total, conversations }
+  const confirmed = update.confirmed === false ? false : previous.confirmed || fullSnapshot
+  const total = !confirmed ? null : update.total !== undefined ? asNumber(update.total)
+    : (hasConversationUpdate ? Object.values(conversations).reduce((sum, count) => sum + count, 0) : previous.total)
+  return { generation: previous.generation, confirmed, total, conversations }
 }
 
 export function unreadCountForDisplay(snapshot: NotificationUnreadSnapshot): number | null {

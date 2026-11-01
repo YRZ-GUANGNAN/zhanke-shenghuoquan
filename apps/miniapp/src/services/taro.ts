@@ -84,6 +84,7 @@ interface TaroFacade {
 	setClipboardData(options: { data: string }): Promise<unknown>
 	getClipboardData(): Promise<{ data: string }>
   login(options?: { timeout?: number }): Promise<LoginResult>
+  requestSubscribeMessage(options: { tmplIds: string[] }): Promise<Record<string, unknown>>
   request<T = unknown>(options: RequestOptions): Promise<RequestResult<T>>
 	getStorageSync<T = unknown>(key: string): T
 	setStorageSync<T = unknown>(key: string, value: T): void

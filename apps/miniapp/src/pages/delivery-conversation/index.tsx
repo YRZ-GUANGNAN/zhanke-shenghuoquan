@@ -8,6 +8,7 @@ import {
   deliveryConversationCanSend,
   getDeliveryOrderConversation,
   loadDeliveryTencentMessages,
+  markDeliveryConversationRead,
   parseDeliveryImagePayload,
   resolveDeliveryConversationImage,
   sendDeliveryTencentImage,
@@ -20,6 +21,7 @@ import { chooseAndUploadImages, waitForMediaApproval } from '../../services/medi
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
 import { useKeyboardInset } from '../../hooks/use-keyboard-inset'
+import { useVisibleConversationRead } from '../../hooks/use-visible-conversation-read'
 import './index.scss'
 
 type PageStatus = 'loading' | 'ready' | 'error'
@@ -56,6 +58,7 @@ export default function DeliveryConversationPage() {
   const identity = useSessionStore((state) => state.identity?.currentIdentity)
   const [status, setStatus] = useState<PageStatus>('loading')
   const selfId = useSessionStore(state => state.profile.id)
+  const sessionToken = useSessionStore(state => state.token)
   const operationKey = `${selfId}:${identity}:${orderId}`
   const activeRef = useRef(operationKey)
   activeRef.current = operationKey
@@ -75,6 +78,9 @@ export default function DeliveryConversationPage() {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const { inset: keyboardInset, onFocus: onKeyboardFocus, onKeyboardHeightChange, reset: resetKeyboardInset } = useKeyboardInset()
+  useVisibleConversationRead(operationKey, messages, isVisible => conversation
+    ? markDeliveryConversationRead(conversation, `campus_${selfId}`, () => isVisible() && useSessionStore.getState().status === 'authenticated' && useSessionStore.getState().token === sessionToken && useSessionStore.getState().profile.id === selfId && useSessionStore.getState().identity?.currentIdentity === identity, messages.map(item => item.ID))
+    : Promise.resolve(), status === 'ready' && !historyLoading && messages.length > 0)
 
   useEffect(() => {
     let active = true

@@ -111,14 +111,18 @@ if (/internal\/module\/(takeout|user|community|trade|navigation|im)/.test(delive
   failures.push('delivery proof adapter imports a forbidden business domain')
 }
 
-const notificationSource = files(path.join(moduleRoot, 'notification'))
-  .filter((file) => file.endsWith('.go') && !file.endsWith('_test.go') &&
-    !['subscribe_sender.go', 'consumer.go', 'handler.go', 'im_callback.go'].includes(path.basename(file)))
+const notificationFiles = files(path.join(moduleRoot, 'notification'))
+  .filter((file) => file.endsWith('.go') && !file.endsWith('_test.go'))
+const notificationSource = notificationFiles
   .map((file) => fs.readFileSync(file, 'utf8'))
   .join('\n')
 if (/internal\/module\/(user|community|trade|navigation|im|admin|media|takeout|delivery)/.test(notificationSource)) {
-  failures.push('notification core imports HTTP or another business domain')
+  failures.push('notification imports another business domain')
 }
+const notificationCoreSource = notificationFiles
+  .filter(file => !['subscribe_sender.go', 'handler.go', 'im_callback.go'].includes(path.basename(file)))
+  .map(file => fs.readFileSync(file, 'utf8')).join('\n')
+if (/github\.com\/gin-gonic\/gin|"net\/http"/.test(notificationCoreSource)) failures.push('notification core imports HTTP')
 
 const deliveryIMSource = files(path.join(moduleRoot, 'admin', 'deliveryim'))
   .filter((file) => file.endsWith('.go') && !file.endsWith('_test.go'))

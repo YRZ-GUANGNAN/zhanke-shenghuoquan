@@ -15,9 +15,18 @@ type Repository interface {
 	Transition(context.Context, string, uint64, Status, Status, *uint64, time.Time) (Order, error)
 }
 
-type GormRepository struct{ db *gorm.DB }
+type GormRepository struct {
+	db                   *gorm.DB
+	notificationAppender NotificationEventAppender
+}
 
-func NewRepository(db *gorm.DB) *GormRepository { return &GormRepository{db: db} }
+func NewRepository(db *gorm.DB, options ...RepositoryOption) *GormRepository {
+	r := &GormRepository{db: db}
+	for _, option := range options {
+		option(r)
+	}
+	return r
+}
 
 var _ Repository = (*GormRepository)(nil)
 
@@ -63,6 +72,7 @@ func (r *GormRepository) Transition(
 			}
 			return nil
 		}
+		before := result
 		updates, err := buildTransitionUpdates(result, from, to, riderUserID, updatedAt)
 		if err != nil {
 			return err
@@ -83,10 +93,11 @@ func (r *GormRepository) Transition(
 		result.RowVersion++
 		result.UpdatedAt = updatedAt
 		if to == StatusDelivered {
-			_, _, _, err := settleDeliveredOrderTx(tx, result, updatedAt)
-			return err
+			if _, _, _, err := settleDeliveredOrderTx(tx, result, updatedAt); err != nil {
+				return err
+			}
 		}
-		return nil
+		return appendOrderNotificationTx(tx, r.notificationAppender, before, result, updatedAt)
 	})
 	return result, err
 }
