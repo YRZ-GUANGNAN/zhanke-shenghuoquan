@@ -63,6 +63,7 @@ function chatHarness(options = {}) {
     '../../stores/session': { useSessionStore },
     '../../hooks/use-viewport-refresh': { useViewportRefresh: () => ({}) },
     '../../hooks/use-keyboard-inset': { useKeyboardInset: () => ({ inset: 0, onFocus: focus, onKeyboardHeightChange: height, reset }) },
+    '../../hooks/use-visible-conversation-read': { useVisibleConversationRead: () => {} },
     '../../utils/conversation-presentation': presentation,
     './index.scss': {},
   }

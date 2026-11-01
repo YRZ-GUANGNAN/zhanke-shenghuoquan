@@ -484,6 +484,9 @@ func main() {
 	navigation.NewSearchHandler(navigationService, userService.AuthRequired(), user.CurrentUserID, navigationMetrics).Register(navigationRoutes)
 	im.NewHandler(imService, userService).Register(api.Group("/im"))
 	userNotifications.handler.Register(api.Group("", userService.AuthRequired()))
+	if userNotifications.imCallback != nil {
+		userNotifications.imCallback.Register(api.Group("/notification/tencent-im"))
+	}
 	admin.NewHandler(adminService, reviewService, userService, communityService, tradeService, navigationService, adminAuthRequired).Register(api)
 	mediaAdminRoutes := api.Group("/admin/media", adminAuthRequired, user.AdminRequired())
 	mediaconsole.NewHandler(mediaAdminQuery).Register(mediaAdminRoutes)
@@ -580,6 +583,7 @@ func newRouter(loggerOutput io.Writer, recoveryOutput io.Writer) *gin.Engine {
 	router.Use(gin.LoggerWithConfig(gin.LoggerConfig{
 		Output: loggerOutput,
 		SkipPaths: []string{
+			"/api/v1/notification/tencent-im/callback",
 			"/api/v1/miniapp/media/wechat/callback",
 			"/api/v1/media/wechat/callback",
 			miniappflow.WechatReviewContentPath,

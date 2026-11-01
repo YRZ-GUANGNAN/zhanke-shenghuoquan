@@ -32,6 +32,18 @@ func TestRouterLoggerSkipsOnlyExactWechatSensitivePaths(t *testing.T) {
 		wantLogged bool
 	}{
 		{
+			name:       "IM notification callback",
+			method:     http.MethodPost,
+			target:     "/api/v1/notification/tencent-im/callback?Sign=im-signature-probe",
+			wantLogged: false,
+		},
+		{
+			name:       "similar IM callback path",
+			target:     "/api/v1/notification/tencent-im/callback/near?logprobe=ordinary",
+			marker:     "logprobe=ordinary",
+			wantLogged: true,
+		},
+		{
 			name:       "miniapp callback",
 			target:     "/api/v1/miniapp/media/wechat/callback?logprobe=miniapp-secret",
 			wantLogged: false,
@@ -119,6 +131,11 @@ func TestRouterRecoverySanitizesPanicLogs(t *testing.T) {
 		wantAccessLogged bool
 	}{
 		{
+			name:             "IM notification callback panic",
+			target:           "/api/v1/notification/tencent-im/callback?Sign=im-query-secret",
+			wantAccessLogged: false,
+		},
+		{
 			name:             "miniapp callback panic",
 			target:           "/api/v1/miniapp/media/wechat/callback?signature=miniapp-query-secret",
 			wantAccessLogged: false,
@@ -167,7 +184,7 @@ func TestRouterRecoverySanitizesPanicLogs(t *testing.T) {
 			if !strings.Contains(recoveryLog, "stack:") || !strings.Contains(recoveryLog, "goroutine ") {
 				t.Fatalf("recovery log = %q, want stack", recoveryLog)
 			}
-			if strings.Contains(recoveryLog, "signature=") || strings.Contains(recoveryLog, "token=") || strings.Contains(recoveryLog, "proxy-secret") || strings.Contains(recoveryLog, "logprobe=") || strings.Contains(recoveryLog, "panic-value-secret") {
+			if strings.Contains(recoveryLog, "Sign=") || strings.Contains(recoveryLog, "signature=") || strings.Contains(recoveryLog, "token=") || strings.Contains(recoveryLog, "proxy-secret") || strings.Contains(recoveryLog, "logprobe=") || strings.Contains(recoveryLog, "panic-value-secret") {
 				t.Fatalf("recovery log leaked RawQuery or recovered value: %q", recoveryLog)
 			}
 			if strings.Contains(accessProbe.String(), "panic-value-secret") {

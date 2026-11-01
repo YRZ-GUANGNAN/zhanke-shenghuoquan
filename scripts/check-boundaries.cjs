@@ -120,7 +120,7 @@ if (/internal\/module\/(user|community|trade|navigation|im|admin|media|takeout|d
   failures.push('notification imports another business domain')
 }
 const notificationCoreSource = notificationFiles
-  .filter(file => !['subscribe_sender.go', 'handler.go', 'im_callback.go'].includes(path.basename(file)))
+  .filter(file => !['subscribe_sender.go', 'handler.go', 'im_handler.go', 'im_callback.go'].includes(path.basename(file)))
   .map(file => fs.readFileSync(file, 'utf8')).join('\n')
 if (/github\.com\/gin-gonic\/gin|"net\/http"/.test(notificationCoreSource)) failures.push('notification core imports HTTP')
 

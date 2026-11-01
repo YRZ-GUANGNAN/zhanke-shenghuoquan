@@ -4,20 +4,29 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strconv"
+	"strings"
 	"time"
 
 	"campus-circle/backend/internal/config"
 	"campus-circle/backend/internal/module/delivery"
+	"campus-circle/backend/internal/module/im"
 	"campus-circle/backend/internal/module/notification"
 	"campus-circle/backend/internal/module/user"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
+func parseNotificationIMSDKAppID(value string) uint64 {
+	id, _ := strconv.ParseUint(strings.TrimSpace(value), 10, 64)
+	return id
+}
+
 type userNotificationRuntime struct {
 	handler  *notification.Handler
 	consumer *notification.Consumer
 	wechat   *notification.SubscribeWorker
+	imCallback *notification.IMCallbackHandler
 }
 
 // A disabled rollout still has stable authenticated API shapes, but never
@@ -62,8 +71,12 @@ func deliveryNotificationFact(fact delivery.NotificationEvent) notification.Even
 		ttl = 10 * time.Minute
 	}
 	expires := fact.OccurredAt.Add(ttl)
+	aggregateType := financialAggregateType(fact.EventType)
+	if aggregateType == "" {
+		aggregateType = "delivery_order"
+	}
 	return notification.Event{EventPublicID: fact.EventPublicID, EventType: fact.EventType,
-		AggregateType: "delivery_order", AggregatePublicID: fact.AggregatePublicID,
+		AggregateType: aggregateType, AggregatePublicID: fact.AggregatePublicID,
 		AggregateVersion: fact.AggregateVersion, PayloadVersion: 1,
 		Payload: append(json.RawMessage(nil), fact.Payload...), Status: notification.EventPending,
 		RowVersion: 1, OccurredAt: fact.OccurredAt, ExpiresAt: &expires,
@@ -76,6 +89,7 @@ func newUserNotificationRuntime(cfg config.Config, db *gorm.DB, users *user.Serv
 	var lookup notification.OpenIDLookup
 	var consumer *notification.Consumer
 	var wechat *notification.SubscribeWorker
+	identity := notificationIMIdentityAdapter{im: im.NewService(im.NewRepository(db), nil, "", ""), users: users}
 	var templates = map[string]string{"order": "", "private_message": ""}
 	if cfg.EnableUserNotifications {
 		if users == nil {
@@ -104,7 +118,10 @@ func newUserNotificationRuntime(cfg config.Config, db *gorm.DB, users *user.Serv
 			templates["order"] = template.id
 		}
 		resolver := &orderNotificationRecipients{orders: delivery.NewRepository(db), users: users, now: time.Now, template: template}
-		consumer = notification.NewConsumer(notification.NewExpander(notification.NewEventRepository(db), resolver))
+		recipients := &userNotificationRecipients{orders: resolver,
+			financial: &financialNotificationRecipients{funds: delivery.NewRepository(db), users: users},
+			private: &privateNotificationRecipients{identity: identity, users: users}}
+		consumer = notification.NewConsumer(notification.NewExpander(notification.NewEventRepository(db), recipients))
 		if cfg.EnableWechatSubscribeNotifications && cfg.EnableNotificationSending {
 			sender, err := notification.NewSubscribeSender(cfg)
 			if err != nil {
@@ -119,7 +136,41 @@ func newUserNotificationRuntime(cfg config.Config, db *gorm.DB, users *user.Serv
 		Templates: templates,
 	})
 	handler := notification.NewHandler(inbox, service, func(c *gin.Context) uint64 { return uint64(user.CurrentUserID(c)) })
-	return &userNotificationRuntime{handler: handler, consumer: consumer, wechat: wechat}, nil
+	var imCallback *notification.IMCallbackHandler
+	if cfg.EnableUserNotifications && strings.TrimSpace(cfg.NotificationIMCallbackToken) != "" {
+		if parseNotificationIMSDKAppID(cfg.TencentIMSDKAppID) == 0 || len(strings.TrimSpace(cfg.NotificationIMCallbackToken)) < 16 {
+			return nil, errors.New("IM notification callback requires valid SDKAppID and a strong callback token")
+		}
+		if err := notificationSchemaReady(db); err != nil { return nil, err }
+		imCallback = notification.NewIMCallbackHandler(notification.IMCallbackConfig{
+			SDKAppID: parseNotificationIMSDKAppID(cfg.TencentIMSDKAppID), Token: cfg.NotificationIMCallbackToken,
+		}, identity, notification.NewRepository(db))
+	}
+	return &userNotificationRuntime{handler: handler, consumer: consumer, wechat: wechat, imCallback: imCallback}, nil
+}
+
+// Dispatch by producer-owned aggregate; financial facts never reach the order
+// template resolver, and a missing resolver fails closed.
+type userNotificationRecipients struct {
+	orders    notification.RecipientResolver
+	financial notification.RecipientResolver
+	private   notification.RecipientResolver
+}
+
+func (r *userNotificationRecipients) ResolveRecipients(ctx context.Context, event notification.Event) ([]notification.Recipient, error) {
+	var resolver notification.RecipientResolver
+	switch {
+	case event.AggregateType == "delivery_order":
+		resolver = r.orders
+	case financialAggregateType(event.EventType) != "" && financialAggregateType(event.EventType) == event.AggregateType:
+		resolver = r.financial
+	default:
+		resolver = r.private
+	}
+	if resolver == nil {
+		return nil, notification.ErrInvalidRecord
+	}
+	return resolver.ResolveRecipients(ctx, event)
 }
 
 type notificationOrderReader interface {
