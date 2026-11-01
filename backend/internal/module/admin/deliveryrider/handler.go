@@ -26,7 +26,11 @@ type Handler struct {
 	conversations conversationCommands
 	todayStats    delivery.RiderTodayStatsReader
 	walletReader  delivery.RiderWalletReader
-	now           func() time.Time
+	withdrawals   delivery.RiderWithdrawalRepository
+	// Fail closed until withdrawals are allocated to earnings and made mutually
+	// exclusive with per-order payouts. No production setter/config enables this.
+	withdrawalWritesReady bool
+	now                   func() time.Time
 }
 
 type proofCommands interface {
@@ -74,6 +78,11 @@ func (h *Handler) WithWalletReader(reader delivery.RiderWalletReader) *Handler {
 	return h
 }
 
+func (h *Handler) WithWithdrawals(repository delivery.RiderWithdrawalRepository) *Handler {
+	h.withdrawals = repository
+	return h
+}
+
 // WithNow exists for deterministic business-day tests. Production keeps the
 // default time.Now clock.
 func (h *Handler) WithNow(now func() time.Time) *Handler {
@@ -95,6 +104,8 @@ func (h *Handler) Register(group *gin.RouterGroup) {
 	group.GET("/wallet/earnings", h.earnings)
 	group.GET("/wallet/ledger", h.ledger)
 	group.GET("/wallet/payout-queue", h.payoutQueue)
+	group.POST("/wallet/withdrawals", h.createWithdrawal)
+	group.GET("/wallet/withdrawals", h.listWithdrawals)
 	group.GET("/orders/claimable", h.claimable)
 	group.POST("/orders/:id/claim", h.claim)
 	group.GET("/orders", h.list)
@@ -224,6 +235,64 @@ func (h *Handler) payoutQueue(c *gin.Context) {
 	response.OK(c, Page[RiderWalletQueueView]{Items: items, Page: page.Page, PageSize: page.Size, Total: total})
 }
 
+func (h *Handler) createWithdrawal(c *gin.Context) {
+	if !h.withdrawalWritesReady {
+		response.Fail(c, http.StatusForbidden, "提现功能尚未开放，请联系管理员处理结款")
+		return
+	}
+	if h.withdrawals == nil {
+		response.Fail(c, http.StatusServiceUnavailable, "delivery rider withdrawal unavailable")
+		return
+	}
+	var req struct {
+		AmountCents    uint64 `json:"amountCents"`
+		IdempotencyKey string `json:"idempotencyKey"`
+	}
+	if c.ShouldBindJSON(&req) != nil {
+		response.Fail(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+	riderID, ok := h.readableRider(c)
+	if !ok {
+		return
+	}
+	now := h.now
+	if now == nil {
+		now = time.Now
+	}
+	value, err := h.withdrawals.CreateRiderWithdrawal(c.Request.Context(), riderID, req.AmountCents, req.IdempotencyKey, now())
+	if err != nil {
+		h.write(c, nil, err)
+		return
+	}
+	response.Created(c, riderWithdrawalView(value))
+}
+
+func (h *Handler) listWithdrawals(c *gin.Context) {
+	if h.withdrawals == nil {
+		response.Fail(c, http.StatusServiceUnavailable, "delivery rider withdrawal unavailable")
+		return
+	}
+	riderID, ok := h.readableRider(c)
+	if !ok {
+		return
+	}
+	page, ok := parsePage(c)
+	if !ok {
+		return
+	}
+	values, total, err := h.withdrawals.ListRiderWithdrawalsByRider(c.Request.Context(), riderID, page)
+	if err != nil {
+		h.write(c, nil, err)
+		return
+	}
+	items := make([]RiderWithdrawalView, 0, len(values))
+	for _, value := range values {
+		items = append(items, riderWithdrawalView(value))
+	}
+	response.OK(c, Page[RiderWithdrawalView]{Items: items, Page: page.Page, PageSize: page.Size, Total: total})
+}
+
 func (h *Handler) today(c *gin.Context) {
 	if h.todayStats == nil || h.identity == nil || h.currentUserID == nil {
 		response.Fail(c, http.StatusServiceUnavailable, "delivery rider statistics unavailable")
@@ -275,6 +344,91 @@ func (h *Handler) today(c *gin.Context) {
 
 func (h *Handler) RegisterAdmin(group *gin.RouterGroup) {
 	group.POST("/riders", h.approveRider)
+	group.GET("/rider-withdrawals", h.adminListWithdrawals)
+	group.POST("/rider-withdrawals/:id/approve", h.approveWithdrawal)
+	group.POST("/rider-withdrawals/:id/reject", h.rejectWithdrawal)
+}
+
+func (h *Handler) adminListWithdrawals(c *gin.Context) {
+	if h.withdrawals == nil {
+		response.Fail(c, http.StatusServiceUnavailable, "delivery rider withdrawal unavailable")
+		return
+	}
+	page, ok := parsePage(c)
+	if !ok {
+		return
+	}
+	var riderUserID uint64
+	if raw := strings.TrimSpace(c.Query("riderUserId")); raw != "" {
+		parsed, parseErr := strconv.ParseUint(raw, 10, 64)
+		if parseErr != nil || parsed == 0 {
+			response.Fail(c, http.StatusBadRequest, "invalid rider user id")
+			return
+		}
+		riderUserID = parsed
+	}
+	values, total, err := h.withdrawals.ListRiderWithdrawals(c.Request.Context(), c.Query("status"), riderUserID, page)
+	if err != nil {
+		h.write(c, nil, err)
+		return
+	}
+	items := make([]RiderWithdrawalView, 0, len(values))
+	for _, value := range values {
+		items = append(items, riderWithdrawalView(value))
+	}
+	response.OK(c, Page[RiderWithdrawalView]{Items: items, Page: page.Page, PageSize: page.Size, Total: total})
+}
+
+func (h *Handler) approveWithdrawal(c *gin.Context) {
+	if !h.withdrawalWritesReady {
+		response.Fail(c, http.StatusForbidden, "提现处理尚未开放，请勿据此发起线下打款")
+		return
+	}
+	if h.withdrawals == nil {
+		response.Fail(c, http.StatusServiceUnavailable, "delivery rider withdrawal unavailable")
+		return
+	}
+	var req struct {
+		ExpectedRowVersion uint64 `json:"expectedRowVersion"`
+		IdempotencyKey     string `json:"idempotencyKey"`
+		PaymentReference   string `json:"paymentReference"`
+	}
+	if c.ShouldBindJSON(&req) != nil {
+		response.Fail(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+	now := h.now
+	if now == nil {
+		now = time.Now
+	}
+	value, err := h.withdrawals.ApproveRiderWithdrawal(c.Request.Context(), c.Param("id"), req.ExpectedRowVersion, h.currentUserID(c), req.IdempotencyKey, req.PaymentReference, now())
+	h.write(c, riderWithdrawalView(value), err)
+}
+
+func (h *Handler) rejectWithdrawal(c *gin.Context) {
+	if !h.withdrawalWritesReady {
+		response.Fail(c, http.StatusForbidden, "提现处理尚未开放，请勿据此调整余额")
+		return
+	}
+	if h.withdrawals == nil {
+		response.Fail(c, http.StatusServiceUnavailable, "delivery rider withdrawal unavailable")
+		return
+	}
+	var req struct {
+		ExpectedRowVersion uint64 `json:"expectedRowVersion"`
+		IdempotencyKey     string `json:"idempotencyKey"`
+		Reason             string `json:"reason"`
+	}
+	if c.ShouldBindJSON(&req) != nil {
+		response.Fail(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+	now := h.now
+	if now == nil {
+		now = time.Now
+	}
+	value, err := h.withdrawals.RejectRiderWithdrawal(c.Request.Context(), c.Param("id"), req.ExpectedRowVersion, h.currentUserID(c), req.IdempotencyKey, req.Reason, now())
+	h.write(c, riderWithdrawalView(value), err)
 }
 
 func (h *Handler) me(c *gin.Context) {
@@ -487,8 +641,15 @@ func (h *Handler) write(c *gin.Context, value any, err error) {
 		response.Fail(c, http.StatusForbidden, err.Error())
 	case errors.Is(err, delivery.ErrConcurrentUpdate), errors.Is(err, delivery.ErrRiderMismatch),
 		errors.Is(err, delivery.ErrInvalidTransition), errors.Is(err, delivery.ErrIdempotencyConflict),
-		errors.Is(err, delivery.ErrProofConflict):
+		errors.Is(err, delivery.ErrProofConflict),
+		errors.Is(err, delivery.ErrWithdrawalAlreadyProcessed):
 		response.Fail(c, http.StatusConflict, err.Error())
+	case errors.Is(err, delivery.ErrWithdrawalNotFound):
+		response.Fail(c, http.StatusNotFound, "rider withdrawal not found")
+	case errors.Is(err, delivery.ErrWalletInsufficient):
+		response.Fail(c, http.StatusUnprocessableEntity, "未占用余额不足，请刷新钱包后重试")
+	case errors.Is(err, delivery.ErrWithdrawalReasonRequired), errors.Is(err, delivery.ErrWithdrawalPaymentRequired):
+		response.Fail(c, http.StatusBadRequest, err.Error())
 	case errors.Is(err, delivery.ErrInvalidRecord), errors.Is(err, delivery.ErrInvalidULID),
 		errors.Is(err, delivery.ErrInvalidProof), errors.Is(err, delivery.ErrProofRequired):
 		response.Fail(c, http.StatusBadRequest, err.Error())

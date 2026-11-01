@@ -1,4 +1,8 @@
 @use '../styles/design-tokens.scss' as *;
+.taro-ux-refresh { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
+.taro-ux-refresh__scroll { display: block; width: 100%; height: 100%; min-height: 0; box-sizing: border-box; }
+// Navigation clearance scrolls after the last item; it must not shorten the viewport.
+.taro-ux-refresh__content { padding-bottom: var(--refresh-content-bottom, 0PX); }
 .refresh-feedback { display: flex; align-items: center; justify-content: center; gap: 12rpx; width: 100%; height: 60PX; box-sizing: border-box; color: $text-secondary; font-size: 24rpx; line-height: 1.5; }
 .refresh-feedback .status-glyph { animation: none; transition: transform 200ms $ease-standard; }
 .refresh-feedback--ready .status-glyph { transform: rotate(180deg); }

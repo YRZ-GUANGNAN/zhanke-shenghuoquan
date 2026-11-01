@@ -30,6 +30,7 @@ import (
 var (
 	ErrProviderNotConfigured     = errors.New("delivery payment provider is not configured")
 	ErrProviderRejected          = errors.New("delivery payment provider rejected request")
+	ErrRefundNotFound            = errors.New("delivery refund is not registered at provider")
 	ErrUntrustedProviderResponse = errors.New("untrusted delivery payment provider response")
 	ErrInvalidNotification       = errors.New("invalid delivery payment notification")
 )
@@ -129,6 +130,10 @@ type Provider interface {
 	ParseRefundNotification(*http.Request, []byte) (RefundNotificationResult, error)
 	QueryRefund(context.Context, RefundQueryRequest) (RefundQueryResult, error)
 }
+
+// providerResourceNotFound is only emitted after the response has passed the
+// trusted WeChat signature check. QueryRefund maps it to the refund-only error.
+var providerResourceNotFound = errors.New("verified provider resource not found")
 
 func NewProviderFromConfig(cfg config.Config) (Provider, error) {
 	switch {
@@ -482,6 +487,9 @@ func (p *WechatProvider) QueryRefund(ctx context.Context, input RefundQueryReque
 	}
 	path := "/v3/refund/domestic/refunds/" + url.PathEscape(input.OutRefundNo)
 	if err := p.doJSON(ctx, http.MethodGet, path, nil, &response); err != nil {
+		if errors.Is(err, providerResourceNotFound) {
+			return RefundQueryResult{}, ErrRefundNotFound
+		}
 		return RefundQueryResult{}, err
 	}
 	if response.RefundID == "" || response.OutTradeNo != input.OutTradeNo ||
@@ -614,6 +622,14 @@ func (p *WechatProvider) doRequest(ctx context.Context, method, path string, bod
 		return nil, ErrUntrustedProviderResponse
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		if response.StatusCode == http.StatusNotFound {
+			var rejection struct {
+				Code string `json:"code"`
+			}
+			if json.Unmarshal(raw, &rejection) == nil && rejection.Code == "RESOURCE_NOT_EXISTS" {
+				return nil, fmt.Errorf("%w: %w", ErrProviderRejected, providerResourceNotFound)
+			}
+		}
 		return nil, fmt.Errorf("%w: http=%d", ErrProviderRejected, response.StatusCode)
 	}
 	return raw, nil

@@ -1,6 +1,7 @@
 import { withFeaturePage } from '../../components/feature-page-gate'
 import React, { useEffect, useRef, useState } from 'react'
 import { Input, ScrollView, Text, Textarea, View } from '@tarojs/components'
+import { useDidHide, useDidShow } from '@tarojs/taro'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import AppIcon from '../../components/app-icon'
 import { AppIconButton } from '../../components/ui'
@@ -81,6 +82,7 @@ function MerchantPublishContent() {
   const { enabled: deliveryPaymentEnabled } = useDeliveryPayment()
   const testPublishEnabled = deliveryMockFeeEnabled && !deliveryPaymentEnabled
   const profile = useSessionStore((state) => state.profile)
+  const sessionToken = useSessionStore((state) => state.token)
   const identityAllowed = useIdentityGuard('merchant')
   const [intakeMode, setIntakeMode] = useState<'manual' | 'external'>('manual')
   const [sourcePlatform, setSourcePlatform] = useState<SourcePlatform>('local')
@@ -116,22 +118,66 @@ function MerchantPublishContent() {
   const activeRef = useRef(identityAllowed)
   const identityRef = useRef(identityAllowed)
   const accountRef = useRef(profile.id)
+  const tokenRef = useRef(sessionToken)
+  const pageVisibleRef = useRef(true)
+  const nativePaymentOpenRef = useRef(false)
+  const pageVisibleWaitersRef = useRef<Array<() => void>>([])
   const sessionAccountRef = useRef(profile.id)
   identityRef.current = identityAllowed
   accountRef.current = profile.id
+  tokenRef.current = sessionToken
   const formLocked = submitting || attemptPending || Boolean(createdOrder)
 
   const operationGuard = () => {
     const epoch = lifecycleRef.current
     const account = accountRef.current
+    const token = tokenRef.current
     return () => activeRef.current && identityRef.current
       && lifecycleRef.current === epoch && accountRef.current === account
+      && tokenRef.current === token && useSessionStore.getState().token === token
+      && useSessionStore.getState().profile.id === account
   }
+
+  const wakePageVisibleWaiters = () => {
+    const waiters = pageVisibleWaitersRef.current.splice(0)
+    waiters.forEach((wake) => wake())
+  }
+
+  const waitForPageVisible = (current: () => boolean): Promise<boolean> => {
+    if (pageVisibleRef.current && current()) return Promise.resolve(true)
+    return new Promise((resolve) => {
+      pageVisibleWaitersRef.current.push(() => resolve(pageVisibleRef.current && current()))
+    })
+  }
+
+  useDidShow(() => {
+    pageVisibleRef.current = true
+    activeRef.current = identityRef.current
+    wakePageVisibleWaiters()
+  })
+  useDidHide(() => {
+    pageVisibleRef.current = false
+    // WeChat's native payment temporarily covers this page; do not cancel the
+    // original verification merely because that native dialog is visible.
+    if (nativePaymentOpenRef.current) return
+    activeRef.current = false
+    lifecycleRef.current += 1
+    if (submittingRef.current && attemptRef.current && !attemptRef.current.order) {
+      attemptRef.current.hasUnknownCreate = true
+      setAttemptPending(true)
+    }
+    submittingRef.current = false
+    setSubmitting(false)
+    setOperation('')
+    setSheetVisible(false)
+    setClipboardSheetVisible(false)
+    wakePageVisibleWaiters()
+  })
 
   // Native payment can temporarily cover this page. Only leaving the page or
   // losing its account/identity invalidates the in-flight business operation.
   useEffect(() => {
-    activeRef.current = identityAllowed
+    activeRef.current = identityAllowed && pageVisibleRef.current
     // Authentication retry can transiently clear the profile/identity while
     // this page is preserved. Keep its idempotency key until a different actual
     // account is known; otherwise a retry can create the same delivery twice.
@@ -174,8 +220,9 @@ function MerchantPublishContent() {
     return () => {
       activeRef.current = false
       lifecycleRef.current += 1
+      wakePageVisibleWaiters()
     }
-  }, [identityAllowed, profile.id])
+  }, [identityAllowed, profile.id, sessionToken])
 
   const showToast = (title: string, success = false) => {
     // Toasts are optional feedback; an unavailable native toast cannot turn a
@@ -208,7 +255,7 @@ function MerchantPublishContent() {
     setIntake(null)
     setIntakeError('')
     if (identityAllowed) void loadIntake()
-  }, [identityAllowed, profile.id])
+  }, [identityAllowed, profile.id, sessionToken])
 
   useEffect(() => {
     if (!identityAllowed) return
@@ -228,7 +275,7 @@ function MerchantPublishContent() {
         if (current()) setBalanceCents(null)
       })
     }
-  }, [identityAllowed, profile.id, deliveryPaymentEnabled])
+  }, [identityAllowed, profile.id, sessionToken, deliveryPaymentEnabled])
 
   const currentFormValues: Record<DeliveryClipboardField, string> = {
     sourcePlatform,
@@ -383,6 +430,7 @@ function MerchantPublishContent() {
     if (result.payment.provider !== 'mock') {
       if (!result.payment.wechat) throw new Error('后端未返回微信支付参数')
       try {
+        nativePaymentOpenRef.current = true
         await Taro.requestPayment(result.payment.wechat)
       } catch (error) {
         if (!current()) return null
@@ -390,10 +438,15 @@ function MerchantPublishContent() {
           return { title: '已取消付款', message: '配送单已创建，本次未完成付款。可查看订单核对支付状态。', tone: 'pending' }
         }
         throw error
+      } finally {
+        nativePaymentOpenRef.current = false
       }
       if (!current()) return null
+      // requestPayment may resolve before the native layer has shown this page
+      // again. Wait for onShow instead of polling or navigating while hidden.
+      if (!(await waitForPageVisible(current))) return null
     }
-    const latest = await pollDeliveryPayment(result.payment.paymentPublicId)
+    const latest = await pollDeliveryPayment(result.payment.paymentPublicId, current)
     return current() ? paymentFeedback(latest.status) : null
   }
 
@@ -469,6 +522,21 @@ function MerchantPublishContent() {
       setOperation('pay')
       let result: PublishFeedback | null
       try {
+        if (attempt.method !== 'mock') {
+          // The fee does not exist until creation completes. Confirm that exact
+          // server-owned amount before debiting a wallet or opening WeChat Pay.
+          const confirmation = await Taro.showModal({
+            title: '确认配送费',
+            content: `本单配送费 ¥${(order.deliveryFeeCents / 100).toFixed(2)}，将使用${attempt.method === 'wallet' ? '钱包余额' : '微信支付'}。确认后支付并发布。`,
+            confirmText: '确认支付',
+            cancelText: '暂不支付',
+          })
+          if (!current()) return
+          if (!confirmation.confirm) {
+            setFeedback({ title: '配送单已保留', message: '尚未发起付款，可查看订单后再支付。', tone: 'pending' })
+            return
+          }
+        }
         if (attempt.method === 'mock') {
           if (!testPublishEnabled) throw new Error('测试配送费确认暂未开放')
           const confirmedOrder = await confirmMockDeliveryFee(order)

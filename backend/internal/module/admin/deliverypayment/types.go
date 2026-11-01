@@ -45,6 +45,7 @@ type PaymentView struct {
 	ProviderStatus        string                   `json:"providerStatus,omitempty"`
 	NextVerifyAt          *time.Time               `json:"nextVerifyAt,omitempty"`
 	VerifyAttemptCount    uint32                   `json:"verifyAttemptCount"`
+	CancelRequestedAt     *time.Time               `json:"cancelRequestedAt,omitempty"`
 	Wechat                *JSAPIParameter          `json:"wechat,omitempty"`
 }
 
@@ -119,6 +120,7 @@ func paymentView(value delivery.PaymentAttempt, params *JSAPIParameter) PaymentV
 		Status: value.Status, AmountCents: value.AmountCents, OutTradeNo: value.OutTradeNo,
 		RowVersion: value.RowVersion, PaidAt: value.PaidAt, ProviderStatus: value.ProviderStatus,
 		NextVerifyAt: value.NextVerifyAt, VerifyAttemptCount: value.VerifyAttemptCount, Wechat: params,
+		CancelRequestedAt: value.CancelRequestedAt,
 	}
 }
 

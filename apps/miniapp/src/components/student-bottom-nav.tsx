@@ -59,6 +59,7 @@ export default function StudentBottomNav({ active, className = '' }: StudentBott
     <View
       key={item.key}
       className={`student-bottom-nav__item ${item.key === visualActive ? 'student-bottom-nav__item--active' : ''}`}
+      hoverClass='student-bottom-nav__item--pressed'
       onClick={() => openPage(item.key, item.url)}
     >
       <View className='student-bottom-nav__item-visual'>

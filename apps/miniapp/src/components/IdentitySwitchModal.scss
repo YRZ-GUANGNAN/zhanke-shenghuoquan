@@ -4,8 +4,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8rpx;
-  margin-top: 4rpx;
+  gap: 8PX;
+  margin-top: 0;
 }
 
 .identity-switch-modal__role {
@@ -13,15 +13,16 @@
   display: flex;
   flex: 1 1 0;
   min-width: 0;
-  min-height: 84rpx;
-  padding: 12rpx;
+  min-height: 100PX;
+  padding: 12PX 8PX;
   box-sizing: border-box;
   border: 2rpx solid $border-subtle;
-  border-radius: 16rpx;
-  flex-direction: row;
+  border-radius: 12PX;
+  flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
-  gap: 10rpx;
+  justify-content: center;
+  gap: 8PX;
+  text-align: center;
   background: $bg-subtle;
 }
 
@@ -37,12 +38,12 @@
 }
 
 .identity-switch-modal__role-icon {
-  width: 44rpx;
-  height: 44rpx;
-  flex: 0 0 44rpx;
-  padding: 6rpx;
+  width: 32PX;
+  height: 32PX;
+  flex: 0 0 32PX;
+  padding: 4PX;
   box-sizing: border-box;
-  border-radius: 14rpx;
+  border-radius: 9PX;
   background: $bg-surface;
   box-shadow: 0 6rpx 16rpx rgba($text-strong-static, .06);
 }
@@ -61,17 +62,17 @@
 .identity-switch-modal__role-name {
   margin-top: 0;
   color: $text-strong;
-  font-size: 25rpx;
-  font-weight: 700;
-  line-height: 1.2;
+  font-size: 14PX;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 .identity-switch-modal__role-state {
-  margin-top: 4rpx;
+  margin-top: 3PX;
   color: $text-tertiary;
-  font-size: 20rpx;
-  font-weight: 650;
-  line-height: 1;
+  font-size: 11PX;
+  font-weight: 500;
+  line-height: 1.4;
 }
 
 .identity-switch-modal__role--active .identity-switch-modal__role-state {
@@ -79,46 +80,50 @@
 }
 
 .identity-switch-modal__arrow {
-  width: 28rpx;
-  height: 28rpx;
-  flex: 0 0 28rpx;
-  padding: 5rpx;
+  width: 20PX;
+  height: 20PX;
+  flex: 0 0 20PX;
+  padding: 3PX;
   box-sizing: border-box;
   border-radius: 999rpx;
   background: $bg-subtle;
 }
 
 .identity-switch-dialog .app-dialog {
-  max-width: 600rpx;
+  max-width: 320PX;
   padding: 20PX;
   border-radius: 20PX;
   box-sizing: border-box;
 }
 
-.identity-switch-dialog.app-dialog-layer { box-sizing: border-box; }
+.identity-switch-dialog.app-dialog-layer {
+  box-sizing: border-box;
+  padding-right: 24PX;
+  padding-left: 24PX;
+}
 
 .identity-switch-dialog .app-dialog__title,
 .identity-switch-dialog .app-dialog__description,
 .identity-switch-dialog .app-dialog__error { overflow-wrap: anywhere; word-break: break-word; }
 
 .identity-switch-dialog .app-dialog__title {
-  font-size: 19PX;
+  font-size: 18PX;
   font-weight: 600;
   line-height: 1.35;
 }
 
 .identity-switch-dialog .app-dialog__description {
-  margin-top: 8rpx;
-  font-size: 12PX;
+  margin-top: 8PX;
+  font-size: 13PX;
   line-height: 1.5;
 }
 
-.identity-switch-dialog .app-dialog__content { margin-top: 16rpx; }
+.identity-switch-dialog .app-dialog__content { margin-top: 18PX; }
 
 .identity-switch-dialog .app-dialog__actions {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 10rpx;
-  margin-top: 20rpx;
+  gap: 10PX;
+  margin-top: 18PX;
 }
 
 .identity-switch-dialog .app-dialog__actions .app-button {
@@ -143,10 +148,6 @@
 
 @media (max-width: 340px) {
   .identity-switch-dialog .app-dialog { padding: 16PX; }
-  .identity-switch-modal__roles { gap: 4rpx; }
-  .identity-switch-modal__role { min-height: 76rpx; padding: 10rpx 8rpx; gap: 6rpx; }
-  .identity-switch-modal__role-icon { width: 40rpx; height: 40rpx; flex-basis: 40rpx; padding: 5rpx; }
-  .identity-switch-modal__role-name { font-size: 23rpx; }
-  .identity-switch-modal__role-state { font-size: 18rpx; }
-  .identity-switch-modal__arrow { width: 24rpx; height: 24rpx; flex-basis: 24rpx; padding: 4rpx; }
+  .identity-switch-modal__roles { gap: 6PX; }
+  .identity-switch-modal__role { padding-right: 6PX; padding-left: 6PX; }
 }

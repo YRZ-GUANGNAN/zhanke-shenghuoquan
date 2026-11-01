@@ -47,6 +47,7 @@ export interface DeliveryPayment {
   outTradeNo: string
   rowVersion: number
   paidAt?: string
+  cancelRequestedAt?: string
   providerStatus?: string
   nextVerifyAt?: string
   verifyAttemptCount?: number
@@ -159,6 +160,26 @@ export function getDeliveryPayment(paymentPublicId: string): Promise<DeliveryPay
   )
 }
 
+export function closeDeliveryWalletRecharge(paymentPublicId: string): Promise<DeliveryPayment> {
+  return request<DeliveryPayment>(
+    `${BASE}/wallet/recharges/${encodeURIComponent(paymentPublicId)}/close`,
+    { url: '', method: 'POST', timeout: 20000 }
+  )
+}
+
+export function getDeliveryWalletRechargeByRequest(clientRequestId: string, amountCents: number): Promise<DeliveryPayment | null> {
+  return request<DeliveryPayment | null>(
+    `${BASE}/wallet/recharges/by-request/${encodeURIComponent(clientRequestId)}?amountCents=${amountCents}`,
+    { url: '', timeout: 10000 }
+  )
+}
+
+export function closeDeliveryWalletRechargeByRequest(clientRequestId: string, amountCents: number): Promise<DeliveryPayment> {
+  return request<DeliveryPayment>(`${BASE}/wallet/recharges/close`, {
+    url: '', method: 'POST', data: { clientRequestId, amountCents }, timeout: 20000
+  })
+}
+
 export function payDeliveryOrderWithWallet(
   deliveryOrderPublicId: string,
   expectedRowVersion: number,
@@ -214,13 +235,15 @@ export function getDeliveryOrderFunds(deliveryOrderPublicId: string): Promise<De
   )
 }
 
-export async function pollDeliveryPayment(paymentPublicId: string): Promise<DeliveryPayment> {
+export async function pollDeliveryPayment(paymentPublicId: string, isCurrent: () => boolean = () => true): Promise<DeliveryPayment> {
+  if (!isCurrent()) throw new Error('支付核实已中断，请返回原订单查看')
   let latest = await getDeliveryPayment(paymentPublicId)
   for (let attempt = 0; attempt < PAYMENT_POLL_ATTEMPTS; attempt += 1) {
-    if (latest.status === 'paid' || latest.status === 'failed' || latest.status === 'closed') {
+    if (!isCurrent() || latest.status === 'paid' || latest.status === 'failed' || latest.status === 'closed') {
       return latest
     }
     await delay(PAYMENT_POLL_INTERVAL_MS)
+    if (!isCurrent()) return latest
     latest = await getDeliveryPayment(paymentPublicId)
   }
   return latest

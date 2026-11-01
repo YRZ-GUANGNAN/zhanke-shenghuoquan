@@ -181,6 +181,7 @@ type PaymentAttempt struct {
 	UpdatedAt             time.Time       `gorm:"column:updated_at;not null"`
 	PaidAt                *time.Time      `gorm:"column:paid_at"`
 	ClosedAt              *time.Time      `gorm:"column:closed_at"`
+	CancelRequestedAt     *time.Time      `gorm:"column:cancel_requested_at"`
 }
 
 func (PaymentAttempt) TableName() string { return "delivery_payment_attempts" }

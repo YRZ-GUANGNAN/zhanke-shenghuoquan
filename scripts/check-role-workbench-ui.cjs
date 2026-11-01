@@ -114,9 +114,10 @@ assert.match(profileStyle, /\.delivery-profile__identity\s*\{[^}]*background:\s*
 assert.match(profileStyle, /\.delivery-profile__identity--cover\s*\{[^}]*margin-top:\s*-20PX/, 'cover and identity must overlap without a seam')
 assert.match(riderWallet, /RuntimeSessionGate/, 'rider wallet must preserve authenticated session gate')
 assert.match(riderWallet, /useIdentityGuard\('rider'\)/, 'rider wallet must guard rider identity')
-assert.match(riderWallet, /getRiderWallet|listRiderEarnings|listRiderLedger|listRiderPayoutQueue/, 'rider wallet must use read-only wallet services')
+assert.match(riderWallet, /getRiderWallet|listRiderEarnings|listRiderLedger|listRiderPayoutQueue/, 'rider wallet must use wallet services')
 assert.match(riderWallet, /availableBalanceCents|reservedCents|unverifiedCents/, 'rider wallet must show server-owned balance facts')
-assert.doesNotMatch(riderWallet, /start.*Recharge|request.*Withdraw|自动打款|提现申请|微信到账/, 'rider wallet must not expose payout mutations or fake settlement')
+assert.match(riderWallet, /createRiderWithdrawal|提现申请|提现/, 'rider wallet must expose the reviewed withdrawal entry')
+assert.doesNotMatch(riderWallet, /自动打款|微信到账/, 'rider wallet must not fake automatic or WeChat settlement')
 assert.doesNotMatch(riderWallet, /ledgerItems|128\.50|静态示意/, 'rider wallet must not present fabricated balances or ledger records')
 
 console.log('role workbench ui contract: ok')

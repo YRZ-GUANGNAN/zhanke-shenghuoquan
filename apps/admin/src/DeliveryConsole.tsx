@@ -18,11 +18,12 @@ import {
   type RiderPayout,
   type RiderPayoutResult,
   type RiderPayoutQueue,
-  type RiderWallet
+  type RiderWallet,
+  type RiderWithdrawal
 } from './services/delivery-admin'
 import { useAdminDialog } from './components'
 
-type View = 'summary' | 'funding-sources' | 'orders' | 'fee' | 'overrides' | 'merchant-wallets' | 'rider-wallets' | 'earnings' | 'payout-queue' | 'refunds'
+type View = 'summary' | 'funding-sources' | 'orders' | 'fee' | 'overrides' | 'merchant-wallets' | 'rider-wallets' | 'earnings' | 'payout-queue' | 'withdrawals' | 'refunds'
 
 const pageSize = 20
 const emptyPage = <T,>(): Page<T> => ({ items: [], page: 1, pageSize, total: 0 })
@@ -56,6 +57,7 @@ export function DeliveryConsole() {
     ['rider-wallets', '骑手钱包'],
     ['earnings', '报酬清账'],
     ['payout-queue', '待打款队列'],
+    ['withdrawals', '骑手提现'],
     ['refunds', '退款记录']
   ]
   return <div className="delivery-console">
@@ -72,6 +74,7 @@ export function DeliveryConsole() {
     {view === 'rider-wallets' && <RiderWalletsPanel />}
     {view === 'earnings' && <EarningsPanel />}
     {view === 'payout-queue' && <RiderPayoutQueuePanel />}
+    {view === 'withdrawals' && <RiderWithdrawalsPanel />}
     {view === 'refunds' && <RefundsPanel />}
   </div>
 }
@@ -79,7 +82,7 @@ export function DeliveryConsole() {
 function DeliveryCapabilityNotice() {
   return <aside className="delivery-capability-notice" role="status">
     <strong>资金能力边界</strong>
-    <span>当前管理端不提供在线支付或自动打款入口；订单管理仅供查询，不提供订单状态流转。钱包与历史记录仍可查询，退款与三端订单流程继续冻结；骑手报酬操作仅登记线下清账，不会发起真实打款。</span>
+    <span>当前管理端不提供自动打款入口；骑手提现写入仍由后端安全闸门保护。开放后只能在实际线下付款并填写凭证后登记打款，不调用微信转账；钱包与历史记录仍可查询，退款与三端订单流程继续冻结。</span>
   </aside>
 }
 
@@ -534,6 +537,70 @@ function RiderPayoutQueuePanel() {
     <ErrorNotice error={error} refresh={() => void load()} />
     <div className="table-scroll"><table><thead><tr><th>队列</th><th>收益/配送单</th><th>骑手</th><th>金额</th><th>来源/状态</th><th>占用</th><th>操作</th></tr></thead><tbody>{data.items.map(row => <tr key={row.payoutQueuePublicId}><td>{short(row.payoutQueuePublicId)}<span>v{row.rowVersion}</span></td><td>{short(row.earningPublicId)}<span>{short(row.deliveryOrderPublicId)}</span></td><td>#{row.riderUserId}</td><td>{money(row.amountCents)}</td><td><Badge value={row.status} /><span>{row.reasonCode || '已核验'}</span></td><td>{money(row.reservedCents)}</td><td>{row.status !== 'cancelled' ? <button disabled={busy === row.payoutQueuePublicId} onClick={() => void cancel(row)}>{busy === row.payoutQueuePublicId ? '取消中…' : '取消排队'}</button> : <span>已释放</span>}</td></tr>)}</tbody></table></div>
     <Pagination value={data} setPage={setPage} />
+  </Panel>
+}
+
+function RiderWithdrawalsPanel() {
+  const dialog = useAdminDialog()
+  const [data, setData] = useState<Page<RiderWithdrawal>>(emptyPage())
+  const [detail, setDetail] = useState<RiderWithdrawal | null>(null)
+  const [status, setStatus] = useState('processing')
+  const [riderUserId, setRiderUserId] = useState('')
+  const [page, setPage] = useState(1)
+  const [error, setError] = useState('')
+  const [conflict, setConflict] = useState(false)
+  const [busy, setBusy] = useState('')
+  const operationKeys = useRef(new Map<string, { key: string; action: 'approve' | 'reject'; version: number; value: string }>())
+  const operationLock = useRef(false)
+  const requestVersion = useRef(0)
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; requestVersion.current++ } }, [])
+  const load = useCallback(async () => {
+    const version = ++requestVersion.current
+    setError(''); setConflict(false)
+    try {
+      const result = await deliveryAdminAPI.riderWithdrawals({ status, riderUserId, page, pageSize })
+      if (mounted.current && version === requestVersion.current) setData(result)
+    } catch (reason) { if (mounted.current && version === requestVersion.current) setError(errorMessage(reason)) }
+  }, [status, riderUserId, page])
+  const activeLoad = useRef(load)
+  activeLoad.current = load
+  useEffect(() => { void load(); return () => { requestVersion.current++ } }, [load])
+  const run = async (row: RiderWithdrawal, action: 'approve' | 'reject') => {
+    if (operationLock.current || !mounted.current) return
+    operationLock.current = true
+    setBusy(row.withdrawPublicId); setError(''); setConflict(false)
+    try {
+      let operation = operationKeys.current.get(row.withdrawPublicId)
+      if (operation && operation.action !== action) {
+        setError('原操作结果尚未确认，请重试原操作或先核对记录，不能改为另一种处理。'); return
+      }
+      if (!operation) {
+        const value = (await dialog.prompt(action === 'reject'
+          ? { title: '拒绝提现申请', description: `退回骑手 #${row.riderUserId} 的 ${money(row.amountCents)}。仅适用于确认尚未实际打款的申请，后端将退回余额。`, inputLabel: '拒绝原因', placeholder: '请输入具体原因', requiredMessage: '拒绝原因不能为空', confirmLabel: '确认拒绝', tone: 'danger' }
+          : { title: '登记已线下打款', description: `仅在核验资金来源并已向骑手 #${row.riderUserId} 实际支付 ${money(row.amountCents)} 后登记。此操作不发起微信转账，不代表仅审核通过。`, inputLabel: '实际付款凭证编号', placeholder: '输入可追溯的付款凭证编号', requiredMessage: '必须提供实际付款凭证', confirmLabel: '确认已付款并登记' }))?.trim()
+        if (!value || !mounted.current) return
+        if (value.length > (action === 'approve' ? 128 : 256)) { setError('填写内容过长，请缩短后重试。'); return }
+        operation = { key: newIdempotencyKey(), action, version: row.rowVersion, value }
+        operationKeys.current.set(row.withdrawPublicId, operation)
+      }
+      const updated = operation.action === 'approve'
+        ? await deliveryAdminAPI.approveRiderWithdrawal(row.withdrawPublicId, operation.version, operation.key, operation.value)
+        : await deliveryAdminAPI.rejectRiderWithdrawal(row.withdrawPublicId, operation.version, operation.key, operation.value)
+      operationKeys.current.delete(row.withdrawPublicId)
+      if (mounted.current) { setDetail(updated); await activeLoad.current() }
+    } catch (cause) {
+      if (!mounted.current) return
+      if (isConflict(cause)) { setConflict(true); setError(conflictMessage) } else setError(errorMessage(cause))
+    } finally { operationLock.current = false; if (mounted.current) setBusy('') }
+  }
+  return <Panel title="骑手提现审核" actions={<button className="delivery-secondary" onClick={() => void load()}>刷新</button>}>
+    <p className="delivery-capability-notice delivery-capability-notice--inline"><strong>尚未开放资金写入</strong><span>本页为联调候选，后端尚未启用提现处理。请勿据此付款。开放前须完成提现与逐单结款互斥；开放后仅凭实际付款凭证登记打款，拒绝则退回余额，不连接微信转账。</span></p>
+    <div className="delivery-controls"><label>状态<select value={status} onChange={event => { setPage(1); setStatus(event.target.value) }}><option value="">全部</option><option value="processing">提现中</option><option value="paid">已登记打款</option><option value="rejected">已退回</option></select></label><label>骑手用户 ID<input value={riderUserId} inputMode="numeric" onChange={event => { setPage(1); setRiderUserId(event.target.value) }} /></label><button onClick={() => void load()}>刷新</button></div>
+    <ErrorNotice error={error} conflict={conflict} refresh={() => void load()} />
+    <div className="table-scroll"><table><thead><tr><th>提现申请</th><th>骑手</th><th>金额</th><th>状态</th><th>版本</th><th>创建时间</th><th>操作</th></tr></thead><tbody>{data.items.map(row => <tr key={row.withdrawPublicId}><td><button className="link-button" onClick={() => setDetail(row)}>{short(row.withdrawPublicId)}</button></td><td>#{row.riderUserId}</td><td>{money(row.amountCents)}</td><td>{row.status === 'paid' ? '已登记打款' : row.status === 'processing' ? '提现中' : '已退回余额'}</td><td>v{row.rowVersion}</td><td>{time(row.createdAt)}</td><td>{row.status === 'processing' ? <div className="takeout-row-actions"><button disabled={Boolean(busy)} onClick={() => void run(row, 'approve')}>{busy === row.withdrawPublicId ? '处理中…' : '登记已线下打款'}</button><button className="danger" disabled={Boolean(busy)} onClick={() => void run(row, 'reject')}>退回余额</button></div> : <span>{row.reason || '已处理'}</span>}</td></tr>)}</tbody></table></div>
+    <Pagination value={data} setPage={setPage} />
+    {detail && <Detail title={`提现 ${detail.withdrawPublicId}`} close={() => setDetail(null)}><div className="detail-grid"><Fact label="骑手" value={`#${detail.riderUserId}`} /><Fact label="金额" value={money(detail.amountCents)} /><Fact label="状态" value={<Badge value={detail.status} />} /><Fact label="Row Version" value={`v${detail.rowVersion}`} /><Fact label="原因" value={detail.reason || '—'} /><Fact label="处理时间" value={time(detail.processedAt)} /></div></Detail>}
   </Panel>
 }
 

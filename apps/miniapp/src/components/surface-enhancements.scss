@@ -1,6 +1,6 @@
-// Stable surface treatment shared by the existing pages. Keep the glass layer
-// translucent, but never make the navigation or sheet fully transparent: the
-// page must remain readable on devices without backdrop-filter support.
+// TabBar visual core ported from nanxiaobei/taro-ux-kits/custom-tab-bar/index.wxss
+// @ f85a5d714639006a9c3f12c67838087a30255c0b. Existing layout, icons and routing
+// stay app-owned. An opaque fallback is required only without backdrop support.
 page .student-bottom-nav,
 page .delivery-workspace-nav { background: var(--bg-surface, #FFFFFF); }
 page .refresh-feedback { background: var(--bg-surface, #FFFFFF); }
@@ -10,13 +10,16 @@ page .app-action-sheet-layer .app-action-sheet { background: var(--bg-surface, #
 @supports ((backdrop-filter: blur(1PX)) or (-webkit-backdrop-filter: blur(1PX))) {
   page .student-bottom-nav,
   page .delivery-workspace-nav {
-    background: var(--glass-nav, rgba(255, 255, 255, .94));
-    -webkit-backdrop-filter: blur(18PX);
-    backdrop-filter: blur(18PX);
+    background: transparent;
+    // Keep the prefixed declaration for WebViews accepted by the supports query.
+    /* autoprefixer: ignore next */
+    -webkit-backdrop-filter: blur(24px);
+    backdrop-filter: blur(24px);
   }
   page .app-dialog-layer .app-dialog,
   page .app-action-sheet-layer .app-action-sheet {
     background: var(--glass-sheet, rgba(255, 255, 255, .96));
+    /* autoprefixer: ignore next */
     -webkit-backdrop-filter: blur(18PX);
     backdrop-filter: blur(18PX);
   }
@@ -24,10 +27,21 @@ page .app-action-sheet-layer .app-action-sheet { background: var(--bg-surface, #
   page .refresh-feedback--ready,
   page .refresh-feedback--refreshing {
     background: var(--glass-refresh, rgba(255, 255, 255, .92));
+    /* autoprefixer: ignore next */
     -webkit-backdrop-filter: blur(10PX);
     backdrop-filter: blur(10PX);
   }
 }
+
+// Keep text readable and semantic icon colours intact (no whole-icon inversion).
+page .student-bottom-nav__icon-asset,
+page .delivery-workspace-nav__icon { opacity: .2; }
+page .student-bottom-nav__item--active .student-bottom-nav__icon-asset,
+page .student-bottom-nav__item--pressed .student-bottom-nav__icon-asset,
+page .student-bottom-nav__item:active .student-bottom-nav__icon-asset,
+page .delivery-workspace-nav__item--active .delivery-workspace-nav__icon,
+page .delivery-workspace-nav__item--pressed .delivery-workspace-nav__icon,
+page .delivery-workspace-nav__item:active .delivery-workspace-nav__icon { opacity: 1; }
 
 .refresh-feedback--pulling,
 .refresh-feedback--ready,

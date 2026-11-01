@@ -1,368 +1,88 @@
-@use 'sass:color';
 @use '../../styles/design-tokens.scss' as *;
 @use '../../styles/reference-layout.scss' as ref;
 
-$wallet-green: color.adjust($brand-primary-static, $hue: 128deg, $saturation: -8%, $lightness: -4%);
-$wallet-green-pale: color.mix($wallet-green, $bg-surface-static, 13%);
-$wallet-orange: color.adjust($like-active-static, $hue: 30deg, $saturation: -8%, $lightness: 2%);
-$wallet-orange-pale: color.mix($wallet-orange, $bg-surface-static, 12%);
-$wallet-blue-pale: color.mix($brand-primary-static, $bg-surface-static, 9%);
-$wallet-panel: color.mix($brand-tint-static, $bg-surface-static, 48%);
-
-page {
-  background: $bg-app;
-}
+page { background: $bg-app; }
 
 .merchant-wallet-page {
   @include ref.page-foundation;
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: $bg-app;
+  overflow: hidden;
   color: $text-primary;
-  overflow: hidden;
 }
 
-.merchant-wallet-hero {
-  position: relative;
-  flex: 0 0 auto;
-  height: auto;
-  padding: 0 28rpx 26rpx;
-  box-sizing: border-box;
-  overflow: hidden;
-  border-bottom: 1rpx solid $border-subtle;
-  background: $bg-surface;
-}
-
+.merchant-wallet-hero { flex: 0 0 auto; padding: 0 30rpx 30rpx; background: $bg-surface; }
 .merchant-wallet-hero__orb { display: none; }
+.merchant-wallet-nav { min-height: 92rpx; display: grid; grid-template-columns: 88rpx minmax(0, 1fr) 88rpx; align-items: center; }
+.merchant-wallet-nav__back, .merchant-wallet-nav__spacer { width: 88rpx; height: 88rpx; }
+.merchant-wallet-nav__back { color: $text-primary; }
+.merchant-wallet-nav__title { text-align: center; font-size: 30rpx; font-weight: 600; }
 
-.merchant-wallet-hero__orb--left {
-  width: 178rpx;
-  height: 178rpx;
-  right: 160rpx;
-  top: 30rpx;
+.merchant-wallet-balance { position: relative; min-height: 260rpx; padding: 34rpx 36rpx; box-sizing: border-box; overflow: hidden; border-radius: $radius-card; color: $text-on-color; background: $gradient-primary; box-shadow: $shadow-card; }
+.merchant-wallet-balance::after { content: ''; position: absolute; width: 260rpx; height: 260rpx; right: -90rpx; top: -130rpx; border-radius: 50%; background: rgba(255,255,255,.12); }
+.merchant-wallet-balance__label, .merchant-wallet-balance__hint { display: block; position: relative; z-index: 1; }
+.merchant-wallet-balance__label { color: rgba(255,255,255,.88); font-size: 25rpx; line-height: 1.5; }
+.merchant-wallet-balance__amount-row { position: relative; z-index: 1; display: flex; align-items: baseline; margin-top: 20rpx; }
+.merchant-wallet-balance__currency { margin-right: 10rpx; font-size: 34rpx; font-weight: 600; }
+.merchant-wallet-balance__amount { font-size: 70rpx; line-height: 1.05; font-weight: 600; letter-spacing: -1rpx; font-variant-numeric: tabular-nums; }
+.merchant-wallet-balance__amount--disabled { color: rgba(255,255,255,.88); font-size: 48rpx; }
+.merchant-wallet-balance__hint { margin-top: 16rpx; color: rgba(255,255,255,.82); font-size: 23rpx; line-height: 1.5; }
+.merchant-wallet-balance__button { position: absolute; z-index: 2; right: 30rpx; bottom: 28rpx; min-width: 128rpx; height: 60rpx; padding: 0 24rpx; border-radius: 30rpx; color: $brand-primary-strong; background: $bg-surface; }
+.merchant-wallet-hero--disabled .merchant-wallet-balance { color: $text-primary; background: $bg-muted; box-shadow: none; }
+.merchant-wallet-hero--disabled .merchant-wallet-balance__label, .merchant-wallet-hero--disabled .merchant-wallet-balance__hint { color: $text-secondary; }
+.merchant-wallet-hero--disabled .merchant-wallet-balance__amount { color: $text-primary; }
+
+.merchant-wallet-scroll { flex: 1 1 auto; min-height: 0; background: $bg-app; }
+.merchant-wallet-recovery, .merchant-wallet-ledger-card, .merchant-wallet-unavailable { margin: 24rpx 30rpx 0; padding: 30rpx; border-radius: $radius-card; background: $bg-surface; box-shadow: $shadow-card; }
+.merchant-wallet-recovery__title { display: block; color: $text-primary; font-size: 28rpx; font-weight: 600; line-height: 1.5; }
+.merchant-wallet-recovery__description { display: block; margin-top: 12rpx; color: $text-secondary; font-size: 24rpx; line-height: 1.6; }
+.merchant-wallet-recovery__actions { display: flex; gap: 16rpx; margin-top: 20rpx; }
+.merchant-wallet-ledger-card { margin-bottom: 48rpx; }
+.merchant-wallet-ledger-card__header { display: flex; align-items: center; justify-content: space-between; min-height: 54rpx; }
+.merchant-wallet-ledger-card__title { font-size: 32rpx; font-weight: 600; color: $text-primary; }
+.merchant-wallet-ledger-card__range { min-width: 80rpx; color: $brand-primary-strong; font-size: 24rpx; }
+.merchant-wallet-ledger-card__end { display: block; padding: 42rpx 0 20rpx; text-align: center; color: $text-secondary; font-size: 24rpx; line-height: 1.6; }
+
+.merchant-wallet-ledger-item { display: flex; align-items: center; gap: 18rpx; min-height: 104rpx; border-bottom: 1rpx solid $divider-nav; }
+.merchant-wallet-ledger-item:last-of-type { border-bottom: 0; }
+.merchant-wallet-ledger-item__icon { width: 58rpx; height: 58rpx; flex: 0 0 58rpx; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: $brand-primary-strong; background: $brand-tint; font-size: 25rpx; font-weight: 700; }
+.merchant-wallet-ledger-item__icon--refund { color: $success; background: $success-tint; }
+.merchant-wallet-ledger-item__main { min-width: 0; flex: 1; }
+.merchant-wallet-ledger-item__title { display: block; color: $text-primary; font-size: 27rpx; line-height: 1.45; }
+.merchant-wallet-ledger-item__time { display: block; margin-top: 8rpx; color: $text-tertiary; font-size: 22rpx; line-height: 1.4; }
+.merchant-wallet-ledger-item__amount { flex: 0 0 auto; color: $text-primary; font-size: 28rpx; font-weight: 600; font-variant-numeric: tabular-nums; }
+.merchant-wallet-ledger-item__amount--positive { color: $success !important; }
+
+.merchant-wallet-amount-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16rpx; margin: 20rpx 0 24rpx; }
+.merchant-wallet-amount { height: 76rpx; display: flex; align-items: center; justify-content: center; border: 1rpx solid $border-default; border-radius: $radius-control; color: $text-primary; background: $bg-surface; font-size: 28rpx; }
+.merchant-wallet-amount--active { border-color: $brand-primary; color: $brand-primary-strong; background: $brand-tint; }
+.merchant-wallet-custom-row { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; min-height: 76rpx; margin: 0 0 8rpx; }
+.merchant-wallet-custom-row__label { flex: 0 0 auto; color: $text-primary; font-size: 28rpx; }
+.merchant-wallet-custom-field { display: flex; align-items: center; min-width: 0; width: 300rpx; height: 76rpx; padding: 0 20rpx; border: 1rpx solid $border-default; border-radius: $radius-control; box-sizing: border-box; background: $bg-surface; }
+.merchant-wallet-custom-field:focus-within { border-color: $brand-primary; box-shadow: 0 0 0 2rpx rgba($brand-primary-static, .1); }
+.merchant-wallet-custom-field__prefix { flex: 0 0 auto; margin-right: 8rpx; color: $text-secondary; font-size: 28rpx; }
+.merchant-wallet-custom-field__input { flex: 1 1 auto; min-width: 0; height: 74rpx; color: $text-primary; font-size: 28rpx; text-align: right; }
+.merchant-wallet-custom-hint { display: block; margin: -2rpx 0 4rpx; color: $text-tertiary; font-size: 22rpx; line-height: 1.4; }
+.merchant-wallet-sheet__content { padding: 0 4rpx 12rpx; }
+.merchant-wallet-sheet__content > .app-button { margin-top: 22rpx; }
+
+.merchant-wallet-unavailable { margin-top: 24rpx; }
+.merchant-wallet-unavailable__title { display: block; color: $text-primary; font-size: 30rpx; font-weight: 600; }
+.merchant-wallet-unavailable__description { display: block; margin-top: 14rpx; color: $text-secondary; font-size: 25rpx; line-height: 1.65; }
+.merchant-wallet-unavailable__back { display: inline-flex; margin-top: 24rpx; min-height: 64rpx; align-items: center; color: $brand-primary-strong; font-size: 26rpx; }
+.merchant-wallet-toast { position: fixed; left: 50%; bottom: 70rpx; transform: translateX(-50%); z-index: 100; display: flex; align-items: center; padding: 18rpx 24rpx; border-radius: 16rpx; color: $text-on-color; background: rgba(30,40,55,.92); }
+.merchant-wallet-toast__check { width: 38rpx; height: 38rpx; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: $success; }
+.merchant-wallet-toast__text { margin-left: 12rpx; font-size: 24rpx; }
+
+@media (prefers-color-scheme: dark) {
+  .merchant-wallet-hero { background: $bg-surface; }
+  .merchant-wallet-scroll { background: $bg-app; }
+  .merchant-wallet-recovery, .merchant-wallet-ledger-card, .merchant-wallet-unavailable, .merchant-wallet-amount { background: $bg-surface; }
+  .merchant-wallet-ledger-item { border-color: $border-subtle; }
 }
 
-.merchant-wallet-hero__orb--right {
-  width: 248rpx;
-  height: 248rpx;
-  right: -10rpx;
-  top: 16rpx;
-}
-
-.merchant-wallet-nav {
-  position: relative;
-  z-index: 1;
-  min-height: 48px;
-  height: auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.merchant-wallet-nav__back,
-.merchant-wallet-nav__spacer {
-  width: 44PX;
-  height: 44PX;
-  display: flex;
-  align-items: center;
-}
-
-.merchant-wallet-nav__back {
-  color: $text-primary;
-}
-
-.merchant-wallet-nav__title {
-  @include ref.type(label);
-  color: $text-primary;
-}
-
-.merchant-wallet-balance {
-  margin-top: 12rpx;
-  padding: 30rpx 28rpx;
-  border: 1rpx solid $border-subtle;
-  border-radius: $radius-card;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  background: $bg-subtle;
-  color: $text-primary;
-}
-
-.merchant-wallet-balance__label {
-  @include ref.type(meta);
-  color: $text-tertiary;
-}
-
-.merchant-wallet-balance__amount-row {
-  margin-top: 18rpx;
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-}
-
-.merchant-wallet-balance__currency {
-  margin-right: 12rpx;
-  color: $text-secondary;
-  font-size: 34rpx;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.merchant-wallet-balance__amount {
-  color: $text-primary;
-  font-size: 68rpx;
-  font-weight: 760;
-  letter-spacing: 1rpx;
-  line-height: .95;
-  font-variant-numeric: tabular-nums;
-}
-
-.merchant-wallet-balance__amount--disabled {
-  margin-top: 22rpx;
-  font-size: 48rpx;
-  letter-spacing: 0;
-}
-
-.merchant-wallet-balance__hint {
-  @include ref.type(meta);
-  @include ref.wrap;
-  text-align: center;
-  margin-top: 22rpx;
-  color: $text-tertiary;
-}
-
-.merchant-wallet-balance__button {
-  @include ref.touch;
-  margin-top: 28rpx;
-  width: 284rpx;
-  border-radius: $radius-control;
-  background: $brand-primary;
-  color: $text-on-color;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 26rpx;
-  font-weight: 650;
-  box-shadow: 0 10rpx 24rpx rgba($brand-primary-strong-static, .16);
-}
-
-.merchant-wallet-scroll {
-  flex: 1 1 auto;
-  min-height: 0;
-  height: auto;
-  margin-top: 0;
-  box-sizing: border-box;
-}
-
-.merchant-wallet-unavailable {
-  margin: 34rpx 30rpx;
-  padding: 42rpx 36rpx;
-  border: 1rpx solid $divider-nav;
-  border-radius: 26rpx;
-  background: $bg-surface;
-  box-shadow: 0 8rpx 24rpx rgba(42, 73, 108, .055);
-  text-align: center;
-}
-
-.merchant-wallet-unavailable__title {
-  display: block;
-  color: $text-strong;
-  font-size: 30rpx;
-  font-weight: 850;
-  line-height: 1.2;
-}
-
-.merchant-wallet-unavailable__description {
-  @include ref.type(meta);
-  @include ref.wrap;
-  display: block;
-  margin-top: 20rpx;
-  color: $text-secondary;
-}
-
-.merchant-wallet-unavailable__back {
-  @include ref.touch;
-  margin-top: 32rpx;
-  border-radius: 20rpx;
-  background: $brand-primary;
-  color: $text-on-color;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 25rpx;
-  font-weight: 750;
-}
-
-.merchant-wallet-ledger-card {
-  margin: 24rpx 24rpx calc(48rpx + env(safe-area-inset-bottom));
-  padding: 26rpx 28rpx 28rpx;
-  border-radius: 24rpx;
-  background: $bg-surface;
-  border: 1rpx solid $border-subtle;
-  box-shadow: 0 8rpx 24rpx rgba(42, 73, 108, .055);
-  box-sizing: border-box;
-}
-
-.merchant-wallet-ledger-card__header {
-  min-height: 72rpx;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12rpx;
-  border-bottom: 1rpx solid $divider-hairline;
-}
-
-.merchant-wallet-ledger-card__title {
-  color: $text-strong;
-  font-size: 27rpx;
-  font-weight: 850;
-  line-height: 1;
-}
-
-.merchant-wallet-ledger-card__range {
-  @include ref.type(meta);
-  color: $text-muted;
-}
-
-.merchant-wallet-ledger-item {
-  min-height: 112rpx;
-  padding: 16rpx 0;
-  gap: 12rpx;
-  border-bottom: 1rpx solid $divider-hairline;
-  display: flex;
-  align-items: center;
-}
-
-.merchant-wallet-ledger-item__icon {
-  width: 56rpx;
-  height: 56rpx;
-  flex: 0 0 56rpx;
-  border-radius: 999rpx;
-  background: $wallet-blue-pale;
-  color: $brand-primary;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 25rpx;
-  font-weight: 800;
-}
-
-.merchant-wallet-ledger-item__icon--recharge {
-  background: $wallet-green-pale;
-  color: $wallet-green;
-}
-
-.merchant-wallet-ledger-item__icon--refund {
-  background: $wallet-orange-pale;
-  color: $wallet-orange;
-}
-
-.merchant-wallet-ledger-item__main {
-  min-width: 0;
-  flex: 1;
-  margin-left: 8rpx;
-  display: flex;
-  flex-direction: column;
-}
-
-.merchant-wallet-ledger-item__title {
-  @include ref.type(author);
-  @include ref.wrap;
-  color: $text-primary;
-}
-
-.merchant-wallet-ledger-item__time {
-  @include ref.type(meta);
-  margin-top: 9rpx;
-  color: $text-muted;
-}
-
-.merchant-wallet-ledger-item__amount {
-  flex: 0 0 auto;
-  color: $text-primary;
-  font-size: 28rpx;
-  font-weight: 850;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-
-.merchant-wallet-ledger-item__amount--positive {
-  color: $wallet-green;
-}
-
-.merchant-wallet-ledger-card__end {
-  @include ref.type(meta);
-  display: block;
-  padding-top: 28rpx;
-  color: $text-faint;
-  text-align: center;
-}
-
-.merchant-wallet-sheet__content { display: grid; gap: 24rpx; }
-
-.merchant-wallet-amount-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 18rpx;
-}
-
-.merchant-wallet-amount {
-  @include ref.touch;
-  border: 2rpx solid $divider-nav;
-  border-radius: 18rpx;
-  background: $bg-screen;
-  color: $text-primary;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 28rpx;
-  font-weight: 800;
-  box-sizing: border-box;
-}
-
-.merchant-wallet-amount--active {
-  border-color: $brand-primary;
-  background: color.mix($brand-tint-static, $bg-surface-static, 62%);
-  color: $brand-primary-strong;
-}
-
-
-.merchant-wallet-toast {
-  position: fixed;
-  left: 50%;
-  bottom: 164rpx;
-  z-index: 30;
-  transform: translateX(-50%);
-  min-width: 360rpx;
-  padding: 24rpx 32rpx;
-  border-radius: 20rpx;
-  background: color.mix($text-strong-static, $brand-primary-strong-static, 72%);
-  box-shadow: 0 18rpx 48rpx -18rpx rgba($text-strong-static, .58);
-  display: flex;
-  align-items: center;
-  box-sizing: border-box;
-}
-
-.merchant-wallet-toast__check {
-  width: 42rpx;
-  height: 42rpx;
-  flex: 0 0 42rpx;
-  border-radius: 999rpx;
-  background: $wallet-green;
-  color: $text-on-color;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24rpx;
-  font-weight: 800;
-}
-
-.merchant-wallet-toast__text {
-  margin-left: 18rpx;
-  color: $text-on-color;
-  font-size: 25rpx;
-  font-weight: 700;
-  line-height: 1.25;
+@media (prefers-reduced-motion: reduce) {
+  .merchant-wallet-page .app-button { transition: none; }
+  .merchant-wallet-page .app-button:active { transform: none; }
 }

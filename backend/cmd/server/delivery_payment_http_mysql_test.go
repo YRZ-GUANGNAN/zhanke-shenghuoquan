@@ -137,6 +137,9 @@ func ensureD3ServerSchema(t *testing.T, db *gorm.DB) {
 	if !db.Migrator().HasTable(&delivery.FundingLot{}) {
 		applyD3ServerSQLFile(t, db, "../../migrations/049_delivery_funding_sources.sql")
 	}
+	if !db.Migrator().HasColumn(&delivery.PaymentAttempt{}, "cancel_requested_at") {
+		applyD3ServerSQLFile(t, db, "../../migrations/052_delivery_recharge_cancellation.sql")
+	}
 }
 
 func applyD3ServerSQLFile(t *testing.T, db *gorm.DB, relativePath string) {

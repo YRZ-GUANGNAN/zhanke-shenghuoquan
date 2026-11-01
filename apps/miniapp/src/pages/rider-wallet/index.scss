@@ -1,34 +1,78 @@
 @use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
+
 page { background: $bg-app; }
-.rider-wallet-page { min-height: 100vh; background: $bg-app; color: $text-primary; }
-.rider-wallet-header { padding: 0 28rpx; border-bottom: 1rpx solid $border-subtle; background: $bg-surface; }
-.rider-wallet-nav { min-height: 92rpx; display: grid; grid-template-columns: 88rpx minmax(0,1fr) 88rpx; align-items: center; }
-.rider-wallet-nav__back,.rider-wallet-nav__ghost { width: 88rpx; height: 88rpx; }
-.rider-wallet-nav__title { text-align: center; font-size: 30rpx; font-weight: 700; }
-.rider-wallet-scroll { height: calc(100vh - 92rpx); }
-.rider-wallet-content { padding: 28rpx 24rpx calc(54rpx + env(safe-area-inset-bottom)); }
-.rider-wallet-balance-card { padding: 34rpx 32rpx 30rpx; border-radius: $radius-card; background: linear-gradient(135deg, $brand-primary-strong, $brand-primary); color: $text-on-color; box-shadow: 0 14rpx 34rpx rgba(30,112,208,.18); }
-.rider-wallet-eyebrow { display: block; opacity: .82; font-size: 24rpx; }
-.rider-wallet-balance { display: block; margin-top: 12rpx; font-size: 64rpx; line-height: 1.1; font-weight: 750; letter-spacing: -1rpx; }
-.rider-wallet-muted { display: block; margin-top: 14rpx; color: rgba(255,255,255,.8); font-size: 22rpx; }
-.rider-wallet-stats,.rider-wallet-summary-row { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1rpx; margin-top: 20rpx; border-radius: $radius-card; overflow: hidden; background: $border-subtle; }
-.rider-wallet-stats > view,.rider-wallet-summary-row > view { padding: 24rpx 26rpx; background: $bg-surface; }
-.rider-wallet-stat-label,.rider-wallet-summary-row view > text:first-child { display:block; color:$text-secondary; font-size:23rpx; }
-.rider-wallet-stat-value,.rider-wallet-summary-value { display:block; margin-top:8rpx; color:$text-primary; font-size:34rpx; font-weight:700; }
-.rider-wallet-stat-unit { margin-left: 4rpx; font-size: 22rpx; font-weight: 500; }
-.rider-wallet-summary-value { font-size: 28rpx; }
-.rider-wallet-section { margin-top: 20rpx; padding: 24rpx; border: 1rpx solid $border-subtle; border-radius: $radius-card; background: $bg-surface; }
-.rider-wallet-section-head { display:flex; align-items:center; justify-content:space-between; }
-.rider-wallet-section-title { font-size:28rpx; font-weight:700; }
-.rider-wallet-list-item { min-height: 92rpx; padding: 18rpx 0; display:flex; align-items:center; justify-content:space-between; border-bottom:1rpx solid $border-subtle; }
-.rider-wallet-list-item:last-child { border-bottom:0; }
-.rider-wallet-item-title,.rider-wallet-item-time,.rider-wallet-item-amount,.rider-wallet-chip { display:block; }
-.rider-wallet-item-title { font-size:25rpx; font-weight:600; }
-.rider-wallet-item-time { margin-top:6rpx; color:$text-tertiary; font-size:21rpx; }
-.rider-wallet-item-end { text-align:right; }
-.rider-wallet-item-amount { font-size:26rpx; font-weight:650; }
-.rider-wallet-item-amount--positive { color:$success; }
-.rider-wallet-chip { display:inline-block; margin-top:6rpx; padding:4rpx 10rpx; border-radius:999rpx; color:$brand-primary-strong; background:$brand-tint; font-size:20rpx; }
-.rider-wallet-empty,.rider-wallet-error { display:block; padding:26rpx 0 8rpx; color:$text-secondary; font-size:23rpx; line-height:1.5; }
-.rider-wallet-error { color:$danger; }
-.rider-wallet-refresh { display:block; margin:26rpx auto 0; padding:18rpx; color:$brand-primary-strong; text-align:center; font-size:24rpx; }
+
+.rider-wallet-page { @include ref.page-foundation; display: flex; flex-direction: column; height: 100vh; overflow: hidden; color: $text-primary; }
+.rider-wallet-header { flex: 0 0 auto; padding: 0 30rpx 24rpx; background: $bg-surface; }
+.rider-wallet-nav { min-height: 92rpx; display: grid; grid-template-columns: 88rpx minmax(0, 1fr) 88rpx; align-items: center; }
+.rider-wallet-nav__back, .rider-wallet-nav__ghost { width: 88rpx; height: 88rpx; }
+.rider-wallet-nav__title { text-align: center; font-size: 30rpx; font-weight: 600; }
+.rider-wallet-scroll { flex: 1 1 auto; min-height: 0; background: $bg-app; }
+.rider-wallet-content { padding: 24rpx 30rpx calc(54rpx + env(safe-area-inset-bottom)); }
+
+.rider-wallet-balance-card { position: relative; min-height: 250rpx; padding: 34rpx 36rpx; overflow: hidden; border-radius: $radius-card; color: $text-on-color; background: $gradient-primary; box-shadow: $shadow-card; }
+.rider-wallet-balance-card::after { content: ''; position: absolute; width: 240rpx; height: 240rpx; right: -80rpx; top: -110rpx; border-radius: 50%; background: rgba(255,255,255,.12); }
+.rider-wallet-eyebrow, .rider-wallet-balance, .rider-wallet-muted { position: relative; z-index: 1; display: block; }
+.rider-wallet-eyebrow { color: rgba(255,255,255,.88); font-size: 25rpx; line-height: 1.5; }
+.rider-wallet-balance { margin-top: 18rpx; font-size: 68rpx; line-height: 1.1; font-weight: 600; font-variant-numeric: tabular-nums; }
+.rider-wallet-muted { margin-top: 16rpx; color: rgba(255,255,255,.82); font-size: 23rpx; line-height: 1.55; }
+.rider-wallet-withdraw { position: relative; z-index: 1; margin-top: 22rpx; min-width: 150rpx; }
+// Native disabled text plus group opacity becomes unreadable on the blue card.
+.rider-wallet-page .rider-wallet-withdraw.app-button--disabled,
+.rider-wallet-page .rider-wallet-withdraw[disabled] {
+  opacity: 1;
+  color: $text-primary;
+  background: $bg-surface-subtle;
+  border-color: $border-default;
+}
+.rider-wallet-withdraw-sheet { display: flex; flex-direction: column; gap: 20rpx; }
+.rider-wallet-withdraw-input { box-sizing: border-box; width: 100%; min-height: 88rpx; padding: 0 24rpx; border: 1rpx solid $border-subtle; border-radius: $radius-control; color: $text-primary; background: $bg-app; font-size: 28rpx; }
+
+.rider-wallet-stats, .rider-wallet-summary-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 20rpx; overflow: hidden; border-radius: $radius-card; background: $bg-surface; box-shadow: $shadow-card; }
+.rider-wallet-stats > view, .rider-wallet-summary-row > view { min-width: 0; padding: 26rpx; }
+.rider-wallet-stats > view + view, .rider-wallet-summary-row > view + view { border-left: 1rpx solid $divider-nav; }
+.rider-wallet-stat-label, .rider-wallet-summary-row view > text:first-child { display: block; color: $text-secondary; font-size: 24rpx; line-height: 1.5; }
+.rider-wallet-stat-value, .rider-wallet-summary-value { display: block; margin-top: 10rpx; color: $text-primary; font-size: 36rpx; font-weight: 600; line-height: 1.25; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.rider-wallet-stat-unit { margin-left: 6rpx; font-size: 23rpx; font-weight: 400; }
+.rider-wallet-summary-value { font-size: 30rpx; }
+.rider-wallet-explanation { margin-top: 20rpx; padding: 22rpx 26rpx; border-radius: $radius-control; background: $brand-tint; }
+.rider-wallet-explanation .app-notice { margin: 0; background: transparent; box-shadow: none; }
+.rider-wallet-explanation .app-notice__content { color: $text-secondary; }
+.rider-wallet-explanation .app-notice__title { color: $text-primary; }
+
+.rider-wallet-section { margin-top: 20rpx; padding: 28rpx; border-radius: $radius-card; background: $bg-surface; box-shadow: $shadow-card; }
+.rider-wallet-section-head { display: flex; align-items: center; justify-content: space-between; }
+.rider-wallet-section-title { font-size: 30rpx; font-weight: 600; line-height: 1.5; }
+.rider-wallet-list-item { min-height: 92rpx; display: flex; align-items: center; justify-content: space-between; gap: 20rpx; padding: 20rpx 0; border-bottom: 1rpx solid $divider-nav; }
+.rider-wallet-list-item:last-child { border-bottom: 0; }
+.rider-wallet-list-item > view { min-width: 0; }
+.rider-wallet-item-title, .rider-wallet-item-time, .rider-wallet-item-amount, .rider-wallet-chip { display: block; }
+.rider-wallet-item-title { color: $text-primary; font-size: 27rpx; line-height: 1.5; overflow-wrap: anywhere; }
+.rider-wallet-item-time { margin-top: 8rpx; color: $text-tertiary; font-size: 22rpx; line-height: 1.45; }
+.rider-wallet-item-end { flex-shrink: 0; text-align: right; }
+.rider-wallet-item-amount { color: $text-primary; font-size: 28rpx; font-weight: 600; font-variant-numeric: tabular-nums; }
+.rider-wallet-item-amount--positive { color: $success !important; }
+.rider-wallet-chip { display: inline-block; margin-top: 8rpx; padding: 4rpx 12rpx; border-radius: 999rpx; color: $brand-primary-strong; background: $brand-tint; font-size: 21rpx; line-height: 1.5; }
+.rider-wallet-chip--paid { color: $success; background: rgba(30, 150, 93, .12); }
+.rider-wallet-chip--rejected { color: $danger; background: rgba(210, 63, 63, .12); }
+.rider-wallet-empty, .rider-wallet-error { display: block; padding: 30rpx 0 8rpx; color: $text-secondary; font-size: 24rpx; line-height: 1.6; }
+.rider-wallet-error { color: $danger; }
+.rider-wallet-balance-card .rider-wallet-error { color: $text-on-color; text-decoration: underline; }
+
+@media (max-width: 350PX) {
+  .rider-wallet-stats > view, .rider-wallet-summary-row > view { padding: 24rpx 20rpx; }
+  .rider-wallet-balance { font-size: 60rpx; }
+}
+
+@media (prefers-color-scheme: dark) {
+  .rider-wallet-header { background: $bg-surface; }
+  .rider-wallet-stats, .rider-wallet-summary-row, .rider-wallet-section { background: $bg-surface; }
+  .rider-wallet-list-item { border-color: $border-subtle; }
+  .rider-wallet-chip { color: $text-primary; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rider-wallet-page .app-button { transition: none; }
+  .rider-wallet-page .app-button:active { transform: none; }
+}

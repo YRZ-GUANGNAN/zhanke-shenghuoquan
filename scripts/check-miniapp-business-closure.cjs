@@ -5,7 +5,11 @@ const { assertSyntheticStaticToolsRejected, homeToolsDataFlowViolations } = requ
 const root = path.resolve(__dirname, '..')
 const src = path.join(root, 'apps', 'miniapp', 'src')
 const config = fs.readFileSync(path.join(src, 'app.config.ts'), 'utf8')
-const routes = [...config.matchAll(/'((?:pages\/)[^']+\/index)'/g)].map((match) => match[1])
+const mainRoutes = [...config.matchAll(/'((?:pages\/)[^']+\/index)'/g)].map((match) => match[1])
+const subpackageRoutes = [...config.matchAll(/root:\s*'([^']+)'[\s\S]*?pages:\s*\[([\s\S]*?)\]/g)]
+  .flatMap(([, packageRoot, packagePages]) => [...packagePages.matchAll(/'([^']+)'/g)]
+    .map((match) => `${packageRoot}/${match[1]}`))
+const routes = [...new Set([...mainRoutes, ...subpackageRoutes])]
 
 const forbiddenCopy = /静态(?:预览|占位|示意)|后续接入|下一阶段接入|TODO|128\.50|86\.50/
 const violations = []
@@ -135,7 +139,8 @@ const riderWalletSource = fs.readFileSync(path.join(src, 'pages/rider-wallet/ind
 for (const token of ["useIdentityGuard('rider')", 'getRiderWallet', 'listRiderEarnings', 'listRiderLedger', 'listRiderPayoutQueue']) {
   if (!riderWalletSource.includes(token)) violations.push(`pages/rider-wallet/index.tsx: missing ${token}`)
 }
-if (/提现|充值|自动打款|requestPayment/.test(riderWalletSource)) violations.push('pages/rider-wallet/index.tsx: rider self page must remain read-only')
+if (/自动打款|微信到账|requestPayment/.test(riderWalletSource)) violations.push('pages/rider-wallet/index.tsx: rider withdrawal must not fake automatic settlement')
+if (!riderWalletSource.includes('createRiderWithdrawal')) violations.push('pages/rider-wallet/index.tsx: missing reviewed withdrawal request')
 
 const merchantPublish = fs.readFileSync(path.join(src, 'pages/merchant-publish/index.tsx'), 'utf8')
 if (!/const\s+testPublishEnabled\s*=\s*deliveryMockFeeEnabled\s*&&\s*!deliveryPaymentEnabled/.test(merchantPublish)) {

@@ -728,6 +728,9 @@ func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, user
 	if walletReader, ok := runtime.riderWallets.(delivery.RiderWalletReader); ok {
 		riderHandler.WithWalletReader(walletReader)
 	}
+	if withdrawals, ok := runtime.riderWallets.(delivery.RiderWithdrawalRepository); ok {
+		riderHandler.WithWithdrawals(withdrawals)
+	}
 	if runtime.conversationLifecycle != nil {
 		riderHandler.WithConversationCommands(runtime.conversationLifecycle)
 	}

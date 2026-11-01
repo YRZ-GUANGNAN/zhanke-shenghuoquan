@@ -57,3 +57,21 @@ func TestIssuePrepayRejectsTerminalPaymentAttempts(t *testing.T) {
 		})
 	}
 }
+
+func TestIssuePrepayReturnsTerminalRechargeWithoutProviderCall(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, status := range []delivery.PaymentStatus{delivery.PaymentPaid, delivery.PaymentClosed, delivery.PaymentFailed} {
+		t.Run(string(status), func(t *testing.T) {
+			provider := &terminalGuardProvider{}
+			handler := &Handler{provider: provider}
+			value := delivery.PaymentStartResult{Attempt: delivery.PaymentAttempt{
+				Provider: delivery.PaymentWechat, Purpose: delivery.PaymentWalletRecharge, Status: status,
+			}}
+			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+			params, err := handler.issuePrepay(ctx, &value, "校园配送钱包充值")
+			if err != nil || params != nil || value.Attempt.Status != status || provider.prepayCalls != 0 {
+				t.Fatalf("terminal recharge status=%s params=%v err=%v provider_calls=%d", status, params, err, provider.prepayCalls)
+			}
+		})
+	}
+}

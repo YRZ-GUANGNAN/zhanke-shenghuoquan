@@ -68,11 +68,13 @@ func (r *GormRepository) ReadRiderPayoutSummary(ctx context.Context, riderUserID
 	if !r.db.Migrator().HasTable(&RiderPayoutQueue{}) {
 		return RiderPayoutSummary{}, ErrPayoutQueueUnavailable
 	}
+	var blocked struct{ UnverifiedCents uint64 }
 	if err := r.db.WithContext(ctx).Model(&RiderPayoutQueue{}).
 		Where("rider_user_id = ? AND status = ? AND amount_cents > 0", riderUserID, RiderPayoutQueueBlocked).
-		Select("COALESCE(SUM(amount_cents), 0) AS unverified_cents").Scan(&result).Error; err != nil {
+		Select("COALESCE(SUM(amount_cents), 0) AS unverified_cents").Scan(&blocked).Error; err != nil {
 		return RiderPayoutSummary{}, err
 	}
+	result.UnverifiedCents = blocked.UnverifiedCents
 	return result, nil
 }
 

@@ -11,15 +11,18 @@ const inputValues = ['取货人', '13800138000', '一号食堂', '收货人', '1
 
 function publishHarness(options = {}) {
   const renderer = hookRenderer()
-  let identityAllowed = true, requestSequence = 0
+  let identityAllowed = true, requestSequence = 0, token = 'TOKEN-A', show, hide
   const profile = { id: 'MERCHANT-A', nickname: '测试商家', campus: '', school: '' }
-  const calls = { create: [], wallet: [], wechat: [], mock: [], poll: [], navigate: [], toasts: [] }
+  const store = select => select({ profile, token })
+  store.getState = () => ({ profile, token })
+  const calls = { create: [], wallet: [], wechat: [], mock: [], poll: [], navigate: [], toasts: [], confirm: [] }
   const invoke = (name, fallback) => async (...args) => {
     calls[name].push(args)
     return (options[name] || fallback)(...args)
   }
   const imports = {
     '@tarojs/components': { View: 'View', Text: 'Text', ScrollView: 'ScrollView', Input: 'Input', Textarea: 'Textarea' },
+    '@tarojs/taro': { useDidShow: fn => { show = fn }, useDidHide: fn => { hide = fn } },
     '../../components/feature-page-gate': { withFeaturePage: (value) => value },
     '../../components/capsule-page-header': 'Header',
     '../../components/app-icon': 'AppIcon',
@@ -44,12 +47,13 @@ function publishHarness(options = {}) {
     },
     '../../services/taro': {
       showToast: async (value) => { calls.toasts.push(value); await options.toast?.(value) },
+      showModal: invoke('confirm', async () => ({ confirm: true, cancel: false })),
       requestPayment: options.requestPayment || (async () => {}),
       redirectTo: invoke('navigate', async () => {}),
       navigateBack: async () => {},
       setClipboardData: async () => {}, getClipboardData: options.getClipboard || (async () => ({ data: options.clipboard || '' })),
     },
-    '../../stores/session': { useSessionStore: (select) => select({ profile }) },
+    '../../stores/session': { useSessionStore: store },
     '../../utils/delivery-order-clipboard': { deliveryClipboardTemplate: '', parseDeliveryOrderClipboard: options.parseClipboard || (() => ({ values: {}, recognizedFields: [] })) },
     '../../utils/delivery-order-source': { deliverySourceLabel: (platform) => ({ local: '校内配送', taobao: '淘宝闪购', jd: '京东外卖', meituan: '美团外卖' }[platform] || '校内配送') },
     './index.scss': {},
@@ -84,11 +88,80 @@ function publishHarness(options = {}) {
     async primary() { one('merchant-publish-footer__button').props.onClick(); await renderer.flush() },
     async identity(value) { identityAllowed = value; renderer.render(); await renderer.flush() },
     async account(value) { profile.id = value; renderer.render(); await renderer.flush() },
+    async token(value) { token = value; renderer.render(); await renderer.flush() },
+    async hide() { hide?.(); await renderer.flush() },
+    async show() { show?.(); await renderer.flush() },
     async unmount() { renderer.unmount(); await renderer.flush() },
   }
 }
 
 async function run() {
+  {
+    for (const method of ['wallet', 'wechat']) {
+      const approval = deferred()
+      const app = publishHarness({ create: async () => ({ ...deliveryOrder, deliveryFeeCents: 98765 }), confirm: () => approval.promise })
+      await app.mount(); await app.method(method); await app.submit()
+      assert.equal(app.calls.create.length, 1)
+      assert.equal(app.calls[method].length, 0, '取得金额后仍必须等待用户确认，不立即扣款')
+      assert.match(app.calls.confirm[0][0].content, /987\.65/)
+      assert.match(app.calls.confirm[0][0].content, method === 'wallet' ? /钱包余额/ : /微信支付/)
+      approval.resolve({ confirm: true }); await app.flush()
+      assert.equal(app.calls[method].length, 1)
+      await app.unmount()
+    }
+    console.log('PASS 服务端实际配送费及支付方式二次确认后才扣余额或发起微信支付')
+  }
+  {
+    const app = publishHarness({ confirm: async () => ({ confirm: false, cancel: true }) })
+    await app.mount(); await app.submit()
+    assert.equal(app.calls.wallet.length, 0)
+    assert.equal(app.calls.wechat.length, 0)
+    assert.match(text(app.tree), /尚未发起付款/)
+    await app.primary()
+    assert.equal(app.calls.create.length, 1)
+    assert.equal(app.calls.navigate.length, 1)
+    await app.unmount()
+    console.log('PASS 取消金额确认保留原配送单，查看不重复创建或付款')
+  }
+  for (const interrupt of ['token', 'hide']) {
+    const approval = deferred()
+    const app = publishHarness({ confirm: () => approval.promise })
+    await app.mount(); await app.submit()
+    if (interrupt === 'token') await app.token('TOKEN-REPLACED')
+    else await app.hide()
+    approval.resolve({ confirm: true }); await app.flush()
+    assert.equal(app.calls.wallet.length, 0)
+    assert.equal(app.calls.wechat.length, 0)
+    await app.unmount()
+    console.log(`PASS 金额确认期间 ${interrupt} 阻断迟到的付款确认`)
+  }
+  {
+    const polling = deferred()
+    const app = publishHarness({ poll: () => polling.promise })
+    await app.mount(); await app.method('wechat'); await app.submit()
+    const isCurrent = app.calls.poll[0][1]
+    assert.equal(typeof isCurrent, 'function')
+    assert.equal(isCurrent(), true)
+    await app.token('TOKEN-REPLACED')
+    assert.equal(isCurrent(), false)
+    polling.resolve({ status: 'paid' }); await app.flush()
+    assert.equal(app.calls.navigate.length, 0)
+    await app.unmount()
+    console.log('PASS 微信轮询绑定完整会话，失效后不继续核验或展示旧付款成功')
+  }
+  {
+    const native = deferred()
+    const app = publishHarness({ requestPayment: () => native.promise })
+    await app.mount(); await app.method('wechat'); await app.submit()
+    await app.hide(); native.resolve(); await app.flush()
+    assert.equal(app.calls.poll.length, 0, '原生支付回调早于页面恢复时不得在 hidden 页面回查')
+    await app.show(); await app.flush()
+    assert.equal(app.calls.wechat.length, 1)
+    assert.equal(app.calls.poll.length, 1)
+    assert.equal(app.calls.navigate.length, 1)
+    await app.unmount()
+    console.log('PASS 原生微信支付遮盖不误中断回查，不重新发起付款')
+  }
   {
     const app = publishHarness()
     await app.mount(); await app.submit()

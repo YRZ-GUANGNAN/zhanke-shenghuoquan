@@ -2,18 +2,20 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Image, ScrollView, Text, View } from '@tarojs/components'
 import { useDidHide, useDidShow } from '@tarojs/taro'
 import CapsulePageHeader from '../../components/capsule-page-header'
-import { AppIconButton } from '../../components/ui'
+import { AppActionSheet, AppButton, AppIconButton } from '../../components/ui'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import { useDeliveryPayment } from '../../hooks/use-delivery-payment'
 import { useIdentityGuard } from '../../hooks/use-identity-guard'
 import {
   centsToYuan,
+  createDeliveryClientRequestId,
   getMerchantDeliveryOrder,
   type DeliveryStatus,
   type MerchantDeliveryOrder,
   type StageTimestamps,
 } from '../../services/delivery-merchant'
 import { deliveryPaymentStatusLabel, deliveryRefundStatusLabel, getDeliveryOrderFunds, type DeliveryOrderFunds } from '../../services/delivery-payment'
+import { executeManualDeliveryPayment, manualDeliveryPaymentActions, type ManualDeliveryPaymentAction } from '../../services/delivery-order-payment'
 import { loadPrivateDeliveryProofs, type DeliveryProofImage } from '../../services/delivery-proof'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
@@ -42,7 +44,7 @@ interface ProgressStep {
 
 const statusCopy: Record<DeliveryStatus, { label: string; sub: string }> = {
   pending_fee_payment: { label: '待支付', sub: '配送单已创建，等待支付配送费' },
-  payment_failed: { label: '支付失败', sub: '支付未完成，可返回商家工作台重试' },
+  payment_failed: { label: '支付失败', sub: '支付未完成，请核对下方配送费用状态' },
   ready_for_claim: { label: '待接单', sub: '配送费已支付，正在等待骑手接单' },
   claimed: { label: '已接单', sub: '骑手已接单，准备前往取货点' },
   to_pickup: { label: '前往取货', sub: '骑手正在前往取货点' },
@@ -149,12 +151,20 @@ function MerchantOrderDetailContent() {
   const [progressExpanded, setProgressExpanded] = useState(false)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewError, setPreviewError] = useState('')
+  const [fundsAction, setFundsAction] = useState<ManualDeliveryPaymentAction | ''>('')
+  const [fundsBusy, setFundsBusy] = useState(false)
+  const [fundsNotice, setFundsNotice] = useState('')
+  const fundsLock = useRef(false)
+  const nativePaymentOpen = useRef(false)
+  const fundsEpoch = useRef(0)
+  const fundsRequestIds = useRef<Partial<Record<ManualDeliveryPaymentAction, string>>>({})
+  const mounted = useRef(true)
   const requestVersion = useRef(0)
   const loadingOrderId = useRef('')
   const previewVersion = useRef(0)
   const previewLock = useRef(false)
   const pageActive = useRef(true)
-  const context = `${accountId}:${token}:${identityAllowed}:${orderId}`
+  const context = `${accountId}:${token}:${identityAllowed}:${orderId}:${deliveryPaymentEnabled}`
   const contextRef = useRef(context)
   contextRef.current = context
   const isSessionCurrent = () => {
@@ -165,13 +175,14 @@ function MerchantOrderDetailContent() {
   useDidShow(() => { pageActive.current = true })
   useDidHide(() => {
     pageActive.current = false
+    if (!nativePaymentOpen.current) { fundsEpoch.current += 1; fundsLock.current = false; setFundsBusy(false); setFundsAction('') }
     previewVersion.current += 1
     previewLock.current = false
     setPreviewLoading(false)
   })
 
   const loadDetail = useCallback(async () => {
-    if (!identityAllowed || !orderId || contextRef.current !== context || !isSessionCurrent() || loadingOrderId.current === orderId || previewLock.current) return
+    if (!identityAllowed || !orderId || contextRef.current !== context || !isSessionCurrent() || loadingOrderId.current === orderId || previewLock.current || fundsLock.current) return
     loadingOrderId.current = orderId
     const version = ++requestVersion.current
     const isCurrent = () => requestVersion.current === version && contextRef.current === context && isSessionCurrent()
@@ -191,6 +202,7 @@ function MerchantOrderDetailContent() {
       if (fundsResult?.ok) {
         setFunds(fundsResult.value)
         setFundsLoaded(true)
+        if (fundsResult.value.payment && ['closed', 'failed'].includes(fundsResult.value.payment.status)) delete fundsRequestIds.current.wechat
       } else if (fundsResult && !fundsResult.ok) {
         setFundsError(errorMessage(fundsResult.error, '支付状态加载失败'))
       }
@@ -211,6 +223,17 @@ function MerchantOrderDetailContent() {
       }
     }
   }, [deliveryPaymentEnabled, identityAllowed, orderId, context])
+
+  useEffect(() => {
+    fundsEpoch.current += 1
+    fundsLock.current = false
+    fundsRequestIds.current = {}
+    setFundsBusy(false); setFundsAction(''); setFundsNotice('')
+  }, [context])
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false; fundsEpoch.current += 1 }
+  }, [])
 
   useEffect(() => {
     setOrder(null)
@@ -239,9 +262,45 @@ function MerchantOrderDetailContent() {
   const currentStep = progressSteps.find((step) => step.state === 'current') || progressSteps[progressSteps.length - 1]
   const visibleSteps = progressExpanded ? progressSteps : currentStep ? [currentStep] : []
   const availableProofs = proofs.filter((proof) => proof.status === 'active' && proof.url)
+  const availableFundsActions = order && deliveryPaymentEnabled && fundsLoaded && !fundsError && !loadError && !loading
+    ? manualDeliveryPaymentActions(order, funds) : []
+
+  const confirmFundsAction = async () => {
+    if (!order || !fundsAction || !deliveryPaymentEnabled || !identityAllowed || !pageActive.current || fundsLock.current || loadingOrderId.current || previewLock.current || !isSessionCurrent()) return
+    const action = fundsAction
+    const version = ++fundsEpoch.current
+    const current = () => mounted.current && fundsEpoch.current === version && contextRef.current === context && isSessionCurrent()
+    if (!current()) return
+    fundsLock.current = true
+    setFundsBusy(true); setFundsNotice('')
+    try {
+      const requestId = fundsRequestIds.current[action] || createDeliveryClientRequestId()
+      fundsRequestIds.current[action] = requestId
+      const result = await executeManualDeliveryPayment({ action, order, requestId, isCurrent: current, requestPayment: async parameters => {
+        nativePaymentOpen.current = true
+        try { return await Taro.requestPayment(parameters) } finally { nativePaymentOpen.current = false }
+      } })
+      if (!current()) return
+      setOrder(result.order); setFunds(result.funds); setFundsLoaded(true); setFundsError('')
+      if (result.funds.payment && ['closed', 'failed'].includes(result.funds.payment.status)) delete fundsRequestIds.current.wechat
+      setFundsAction('')
+      setFundsNotice(result.nativeCancelled ? '已取消本次微信付款，原配送单已保留，可继续支付。'
+        : action === 'refund' ? result.funds.refund?.status === 'succeeded' ? '配送单已取消，配送费已退还。' : '退款已申请，到账结果请刷新核实。'
+          : result.funds.settlement?.status === 'paid' ? '配送费已确认支付，可查看最新配送进度。' : '支付结果待核实，请刷新原订单，不要重复付款。')
+    } catch (error) {
+      if (!current()) return
+      setFundsAction('')
+      setFundsNotice(`${errorMessage(error, '本次操作结果暂未确认')}。请刷新核实原订单。`)
+      // A write may have succeeded despite a failed response. Do not keep stale
+      // actionable payment buttons visible until the next authoritative read.
+      setFundsError('请刷新核实最新资金状态')
+    } finally {
+      if (current()) { fundsLock.current = false; setFundsBusy(false) }
+    }
+  }
 
   const previewProofs = async (proofId?: string) => {
-    if (!identityAllowed || !order || contextRef.current !== context || !isSessionCurrent() || !pageActive.current || previewLock.current || loadingOrderId.current) return
+    if (!identityAllowed || !order || contextRef.current !== context || !isSessionCurrent() || !pageActive.current || previewLock.current || loadingOrderId.current || fundsLock.current) return
     const version = ++previewVersion.current
     const activeContext = contextRef.current
     const isCurrent = () => pageActive.current && previewVersion.current === version && contextRef.current === activeContext && isSessionCurrent()
@@ -432,6 +491,14 @@ function MerchantOrderDetailContent() {
                   <Text className='merchant-detail-status-card__amount'>¥{centsToYuan(order.deliveryFeeCents)}</Text>
                 </View>
                 <Text className='merchant-detail-status-card__pay'>{paymentLabel}</Text>
+                {fundsNotice ? <Text className='merchant-detail-funds-notice'>{fundsNotice}</Text> : null}
+                {availableFundsActions.length ? <View className='merchant-detail-funds-actions'>
+                  {availableFundsActions.map(action => <AppButton key={action} size='small'
+                    variant={action === 'wechat' ? 'primary' : 'secondary'} disabled={fundsBusy}
+                    onClick={() => { if (!fundsLock.current) setFundsAction(action) }}>
+                    {action === 'refund' ? '取消订单并退配送费' : action === 'wallet' ? '余额支付' : funds?.payment && !['closed', 'failed'].includes(funds.payment.status) ? '继续微信支付' : '微信支付'}
+                  </AppButton>)}
+                </View> : null}
                 {!loading && fundsError ? (
                   <View className='merchant-detail-status-card__funds-error' ariaRole='button' ariaLabel='重新加载支付状态' hoverClass='merchant-detail-control--pressed' onClick={() => void loadDetail()}>
                     <Text>{fundsError}{fundsLoaded ? `，上次状态：${deliveryFundsLabel(funds)}` : ''}</Text>
@@ -451,6 +518,17 @@ function MerchantOrderDetailContent() {
           ) : null}
         </View>
       </ScrollView>
+      <AppActionSheet visible={Boolean(fundsAction)} title={fundsAction === 'refund' ? '取消订单并退款' : '支付配送费'}
+        loading={fundsBusy} onClose={() => { if (!fundsLock.current) setFundsAction('') }}>
+        <View className='merchant-detail-funds-confirm'>
+          <Text className='merchant-detail-funds-confirm__amount'>¥{order ? centsToYuan(order.deliveryFeeCents) : '—'}</Text>
+          <Text className='merchant-detail-funds-confirm__hint'>{fundsAction === 'refund'
+            ? '仅未被骑手接单的订单可以取消。配送费退回原支付渠道，微信退款到账以核实结果为准。'
+            : fundsAction === 'wallet' ? '从商家配送钱包扣除本单配送费，支付确认后进入待接单列表。'
+              : '继续支付当前配送单，不会重新创建配送单。微信付款成功后由服务端核实结果。'}</Text>
+          <AppButton block loading={fundsBusy} onClick={() => void confirmFundsAction()}>{fundsAction === 'refund' ? '确认取消并退款' : '确认支付'}</AppButton>
+        </View>
+      </AppActionSheet>
       {order?.riderUserId ? <View className='merchant-detail-action-bar'>
         <View className='merchant-detail-action-bar__identity'>
           <Text className='merchant-detail-action-bar__name'>骑手 #{order.riderUserId}</Text>

@@ -1,9 +1,11 @@
 import { request } from './api'
 import type { Page } from './delivery-merchant'
+import { createDeliveryClientRequestId } from './delivery-merchant'
 
 export type RiderWalletState = 'ready' | 'not_created'
 export type RiderEarningStatus = 'pending' | 'settled' | 'paid_offline'
 export type RiderPayoutQueueStatus = 'blocked' | 'queued' | 'cancelled'
+export type RiderWithdrawalStatus = 'processing' | 'paid' | 'rejected'
 
 export interface RiderWalletSummary {
   walletState: RiderWalletState
@@ -45,6 +47,18 @@ export interface RiderPayoutQueueView {
   updatedAt: string
 }
 
+export interface RiderWithdrawalView {
+  withdrawPublicId: string
+  riderUserId: number
+  amountCents: number
+  status: RiderWithdrawalStatus
+  reason?: string
+  rowVersion: number
+  processedAt?: string
+  createdAt: string
+  updatedAt: string
+}
+
 const BASE = '/delivery/rider/wallet'
 
 export function getRiderWallet(): Promise<RiderWalletSummary> {
@@ -61,4 +75,15 @@ export function listRiderLedger(page = 1, pageSize = 20): Promise<Page<RiderLedg
 
 export function listRiderPayoutQueue(page = 1, pageSize = 20): Promise<Page<RiderPayoutQueueView>> {
   return request<Page<RiderPayoutQueueView>>(`${BASE}/payout-queue?page=${page}&pageSize=${pageSize}`, { url: '', timeout: 10000 })
+}
+
+export function listRiderWithdrawals(page = 1, pageSize = 20): Promise<Page<RiderWithdrawalView>> {
+  return request<Page<RiderWithdrawalView>>(`${BASE}/withdrawals?page=${page}&pageSize=${pageSize}`, { url: '', timeout: 10000 })
+}
+
+export function createRiderWithdrawal(amountCents: number, idempotencyKey = createDeliveryClientRequestId()): Promise<RiderWithdrawalView> {
+  return request<RiderWithdrawalView>(`${BASE}/withdrawals`, {
+    url: '', method: 'POST', timeout: 10000,
+    data: { amountCents, idempotencyKey }, header: { 'Idempotency-Key': idempotencyKey },
+  })
 }

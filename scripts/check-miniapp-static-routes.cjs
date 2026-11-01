@@ -40,7 +40,11 @@ const expectedRoutes = [
 ]
 
 const config = fs.readFileSync(configPath, 'utf8')
-const registeredRoutes = [...config.matchAll(/'((?:pages\/)[^']+\/index)'/g)].map((match) => match[1])
+const mainRoutes = [...config.matchAll(/'((?:pages\/)[^']+\/index)'/g)].map((match) => match[1])
+const subpackageRoutes = [...config.matchAll(/root:\s*'([^']+)'[\s\S]*?pages:\s*\[([\s\S]*?)\]/g)]
+  .flatMap(([, packageRoot, packagePages]) => [...packagePages.matchAll(/'([^']+)'/g)]
+    .map((match) => `${packageRoot}/${match[1]}`))
+const registeredRoutes = [...new Set([...mainRoutes, ...subpackageRoutes])]
 const registered = new Set(registeredRoutes)
 const expected = new Set(expectedRoutes)
 const forbiddenLegacyRoutes = [

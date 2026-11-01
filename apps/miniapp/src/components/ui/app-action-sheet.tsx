@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { Text, View } from '@tarojs/components'
 import { useLayerPresence } from '../../hooks/use-layer-presence'
-import { useSheetDismiss } from '../../hooks/use-sheet-dismiss'
+import { useTaroUxSheetDismiss } from '../../hooks/use-taro-ux-sheet-dismiss'
 import { AppIconButton } from './app-icon-button'
 import './app-action-sheet.scss'
 
@@ -25,14 +25,16 @@ export function AppActionSheet({ visible, title, description, children, loading 
       onClose()
     }
   }
-  const drag = useSheetDismiss(visible && phase === 'open' && !loading, handleClose)
+  const drag = useTaroUxSheetDismiss(visible && phase === 'open' && !loading, handleClose)
   if (!mounted) return null
   return (
     <View className={`app-action-sheet-layer app-action-sheet-layer--${phase}`} onClick={(event) => event.stopPropagation()}>
       <View className='app-action-sheet-layer__mask' onClick={handleClose} />
       <View
-        className={`app-action-sheet app-action-sheet--${phase}${drag.dragging ? ' app-action-sheet--dragging' : ''}`}
-        style={drag.dragging ? { transform: `translateY(${drag.offset}px)` } : undefined}
+        className={`app-action-sheet app-action-sheet--${phase}${phase === 'open' && drag.dragging ? ' app-action-sheet--dragging' : ''}`}
+        // Do not let the gesture's inline transform override the presence
+        // layer's exit transition after a drag has requested dismissal.
+        style={phase === 'open' && drag.dragging ? { transform: `translateY(${drag.offset}px)` } : undefined}
         role='dialog' aria-modal
       >
         <View className='app-action-sheet__drag-handle' {...drag.handlers} catchMove ariaLabel='向下拖动关闭面板'>

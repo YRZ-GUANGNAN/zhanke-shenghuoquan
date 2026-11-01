@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { ScrollView, Text, View } from '@tarojs/components'
+import { Input, ScrollView, Text, View } from '@tarojs/components'
 import { useDidHide, useDidShow } from '@tarojs/taro'
 import { CapsuleSystemRow } from '../../components/capsule-page-header'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
@@ -9,19 +9,26 @@ import { useIdentityGuard } from '../../hooks/use-identity-guard'
 import {
   getDeliveryWallet,
   listDeliveryWalletLedger,
-  pollDeliveryPayment,
-  startDeliveryWalletRecharge,
   type DeliveryLedgerEntryType,
-  type DeliveryPayment,
   type DeliveryWallet,
   type DeliveryWalletLedger,
 } from '../../services/delivery-payment'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
-import { clearPendingWalletRecharge, readPendingWalletRecharge, savePendingWalletRecharge } from './wallet-state'
+import { createDeliveryClientRequestId } from '../../services/delivery-merchant'
+import { clearPendingWalletRecharge, readPendingWalletRecharge, savePendingWalletRecharge, type PendingWalletRecharge } from './wallet-state'
+import { runWalletRecharge } from './wallet-recharge'
 import './index.scss'
 
 const rechargeOptions = [50, 100, 200, 300, 500, 1000]
+
+function parseYuanToCents(value: string): number | null {
+  const normalized = value.trim()
+  if (!/^(?:0|[1-9]\d{0,5})(?:\.\d{1,2})?$/.test(normalized)) return null
+  const [yuan, fraction = ''] = normalized.split('.')
+  const cents = Number(yuan) * 100 + Number(fraction.padEnd(2, '0'))
+  return cents > 0 && cents <= 10_000_000 ? cents : null
+}
 
 function formatBalance(value?: number) {
   return value == null ? '--' : (value / 100).toFixed(2)
@@ -49,88 +56,170 @@ function MerchantWalletContent() {
   const [wallet, setWallet] = useState<DeliveryWallet | null>(null)
   const [ledger, setLedger] = useState<DeliveryWalletLedger[]>([])
   const [selectedAmount, setSelectedAmount] = useState(100)
+  const [customAmount, setCustomAmount] = useState('')
+  const rechargeAmountCents = customAmount !== '' ? parseYuanToCents(customAmount) : selectedAmount * 100
   const [sheetVisible, setSheetVisible] = useState(false)
+  const sheetOpen = useRef(false)
+  const showRechargeSheet = (open: boolean) => { sheetOpen.current = open; setSheetVisible(open) }
   const [loading, setLoading] = useState(false)
   const [paying, setPaying] = useState(false)
   const [loadError, setLoadError] = useState('')
+  const [rechargeNotice, setRechargeNotice] = useState('')
+  const [pendingRecharge, setPendingRecharge] = useState<PendingWalletRecharge | null>(null)
+  const [ledgerPage, setLedgerPage] = useState(1)
+  const [ledgerTotal, setLedgerTotal] = useState(0)
+  const [moreLoading, setMoreLoading] = useState(false)
   const accountId = useSessionStore(state => state.profile.id)
   const sessionToken = useSessionStore(state => state.token)
   const sessionKey = `${accountId}:${sessionToken}`
   const rechargeLock = useRef(false)
+  const cancellationLock = useRef(false)
+  const cancellationRequested = useRef(false)
+  const nativePaymentOpen = useRef(false)
+  const rechargeEpoch = useRef(0)
+  const mounted = useRef(true)
   const activeSessionKey = useRef(sessionKey)
   const visible = useRef(true)
   const loadEpoch = useRef(0)
   const loadingRef = useRef(false)
+  const paymentContext = `${sessionKey}:${identityAllowed}:${deliveryPaymentEnabled}`
+  const activePaymentContext = useRef(paymentContext)
+  activePaymentContext.current = paymentContext
   activeSessionKey.current = sessionKey
 
-  const loadWallet = useCallback(async () => {
-    if (!identityAllowed || !deliveryPaymentEnabled || loadingRef.current) return
+  const loadWallet = useCallback(async (more = false) => {
+    if (!identityAllowed || !deliveryPaymentEnabled || !mounted.current || !visible.current || loadingRef.current
+      || activeSessionKey.current !== sessionKey || useSessionStore.getState().profile.id !== accountId || useSessionStore.getState().token !== sessionToken) return
     const version = ++loadEpoch.current
     const current = () => visible.current && loadEpoch.current === version && activeSessionKey.current === sessionKey
     loadingRef.current = true
-    setLoading(true)
+    if (more) setMoreLoading(true)
+    else setLoading(true)
     setLoadError('')
     try {
-      const walletValue = await getDeliveryWallet()
-      if (!current()) return
-      setWallet(walletValue)
-      try { const ledgerValue = await listDeliveryWalletLedger(1, 30); if (current()) setLedger(ledgerValue.items) } catch (error) { if (current()) setLoadError(error instanceof Error ? error.message : '账单加载失败') }
+      if (!more) {
+        const walletValue = await getDeliveryWallet()
+        if (!current()) return
+        setWallet(walletValue)
+      }
+      const nextPage = more ? ledgerPage + 1 : 1
+      const ledgerValue = await listDeliveryWalletLedger(nextPage, 30)
+      if (current()) {
+        setLedger(previous => more ? Array.from(new Map([...previous, ...ledgerValue.items].map(item => [item.ledgerPublicId, item])).values()) : ledgerValue.items)
+        setLedgerPage(nextPage); setLedgerTotal(ledgerValue.total)
+      }
     } catch (error) {
       if (current()) setLoadError(error instanceof Error ? error.message : '钱包加载失败')
     } finally {
-      if (current()) setLoading(false)
+      if (current()) { setLoading(false); setMoreLoading(false) }
       if (loadEpoch.current === version) loadingRef.current = false
     }
-  }, [identityAllowed, deliveryPaymentEnabled, sessionKey])
+  }, [identityAllowed, deliveryPaymentEnabled, sessionKey, ledgerPage])
 
-  useDidHide(() => { visible.current = false; loadEpoch.current += 1; loadingRef.current = false })
-  useDidShow(() => { visible.current = true; void loadWallet() })
+  useDidHide(() => {
+    visible.current = false; loadEpoch.current += 1; loadingRef.current = false
+    if (!nativePaymentOpen.current) { rechargeEpoch.current += 1; rechargeLock.current = false; cancellationLock.current = false; setPaying(false); showRechargeSheet(false) }
+  })
+  useDidShow(() => {
+    visible.current = true
+    void loadWallet()
+    if (readPendingWalletRecharge(accountId)?.cancelRequested) void confirmRecharge(true, true)
+  })
 
   useEffect(() => {
     loadEpoch.current += 1
     loadingRef.current = false
-    setWallet(null); setLedger([]); setLoadError('')
-    if (identityAllowed && deliveryPaymentEnabled) void loadWallet()
-  }, [identityAllowed, deliveryPaymentEnabled, sessionKey, loadWallet])
+    rechargeEpoch.current += 1; rechargeLock.current = false; cancellationLock.current = false; cancellationRequested.current = false
+    setWallet(null); setLedger([]); setLoadError(''); setLedgerPage(1); setLedgerTotal(0)
+    setPaying(false); showRechargeSheet(false); setRechargeNotice('')
+    setPendingRecharge(readPendingWalletRecharge(accountId))
+    if (identityAllowed && deliveryPaymentEnabled) {
+      void loadWallet()
+      if (readPendingWalletRecharge(accountId)?.cancelRequested) void confirmRecharge(true, true)
+    }
+  }, [identityAllowed, deliveryPaymentEnabled, sessionKey])
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false; loadEpoch.current += 1; rechargeEpoch.current += 1 }
+  }, [])
 
-  const confirmRecharge = async () => {
-    if (!deliveryPaymentEnabled || paying || rechargeLock.current || !accountId) return
+  const confirmRecharge = async (verifyOnly = false, cancelOnly = false) => {
+    if (!identityAllowed || !deliveryPaymentEnabled || !visible.current || !accountId) return
+    if (cancelOnly ? cancellationLock.current : paying || rechargeLock.current) return
+    const version = ++rechargeEpoch.current
+    const current = () => mounted.current && rechargeEpoch.current === version && activeSessionKey.current === sessionKey
+      && activePaymentContext.current === paymentContext
+      && useSessionStore.getState().profile.id === accountId && useSessionStore.getState().token === sessionToken
+    if (!current()) return
     rechargeLock.current = true
+    cancellationLock.current = cancelOnly
+    cancellationRequested.current = cancelOnly
     setPaying(true)
+    setRechargeNotice('')
     try {
       const existing = readPendingWalletRecharge(accountId)
-      if (existing && existing.amountCents !== selectedAmount * 100) throw new Error('已有充值订单待核实，请先恢复原订单')
-      const pending = existing || { accountId, amountCents: selectedAmount * 100, clientRequestId: (await import('../../services/delivery-merchant')).createDeliveryClientRequestId(), createdAt: Date.now() }
-      savePendingWalletRecharge(pending)
-      let payment: DeliveryPayment | null = null
-      let paymentPublicId = pending.paymentPublicId
-      if (!pending.paymentPublicId) {
-        const result = await startDeliveryWalletRecharge(pending.amountCents, pending.clientRequestId)
-        if (!result.payment) throw new Error('后端未返回充值支付记录')
-        payment = result.payment
-        paymentPublicId = result.payment.paymentPublicId
-        savePendingWalletRecharge({ ...pending, paymentPublicId: result.payment.paymentPublicId })
-        if (result.payment.provider === 'wechat' && result.payment.status !== 'paid') {
-          if (!result.payment.wechat) throw new Error('后端未返回微信支付参数')
-          await Taro.requestPayment(result.payment.wechat)
-        }
+      if (verifyOnly && !existing) return
+      if (!existing && !sheetOpen.current) return
+      const amountCents = existing?.amountCents ?? rechargeAmountCents
+      if (amountCents === null) {
+        await Taro.showToast({ title: '请输入 0.01 至 100000 元的有效金额', icon: 'none' })
+        return
       }
-      const latest = await pollDeliveryPayment(paymentPublicId!)
-      if (latest.status === 'failed' || latest.status === 'closed') { clearPendingWalletRecharge(accountId); throw new Error(latest.status === 'failed' ? '充值支付失败' : '充值订单已关闭，请重新发起') }
-      if (latest.status !== 'paid') throw new Error('充值支付尚未完成，可稍后继续核实原单')
-      clearPendingWalletRecharge(accountId)
-      setSheetVisible(false)
-      await loadWallet()
-      await Taro.showToast({ title: '充值已到账', icon: 'success' })
+      const pending = existing || { accountId, amountCents, clientRequestId: createDeliveryClientRequestId(), createdAt: Date.now() }
+      savePendingWalletRecharge(pending)
+      setPendingRecharge(pending)
+      const latest = await runWalletRecharge({ pending, verifyOnly, cancelOnly, isCurrent: current,
+        shouldCancel: () => cancellationRequested.current,
+        onCancelRequested: cancelledPending => {
+          if (!current()) return
+          cancellationRequested.current = true
+          cancellationLock.current = true
+          showRechargeSheet(false)
+          setPendingRecharge(cancelledPending)
+          setRechargeNotice('已退出付款，正在确认充值订单的取消结果。')
+        }, requestPayment: async parameters => {
+        nativePaymentOpen.current = true
+        try { return await Taro.requestPayment(parameters) } finally { nativePaymentOpen.current = false }
+      } })
+      if (!current()) return
+      if (['paid', 'failed', 'closed'].includes(latest.status)) {
+        clearPendingWalletRecharge(accountId); setPendingRecharge(null); showRechargeSheet(false)
+        setRechargeNotice(latest.status === 'paid' ? '充值已确认到账，余额与流水正在更新。' : latest.status === 'closed' ? '原充值订单已关闭，可以重新选择金额充值。' : '原充值订单支付失败，可以重新选择金额充值。')
+        if (latest.status === 'paid') await loadWallet()
+      } else {
+        setPendingRecharge(readPendingWalletRecharge(accountId))
+        showRechargeSheet(false)
+        setRechargeNotice(cancellationRequested.current || pending.cancelRequested || latest.cancelRequestedAt
+          ? '已退出付款，取消结果待核实。可查询状态，余额以后端确认为准。'
+          : '充值结果待核实。请查询状态，或取消这笔充值。')
+      }
     } catch (error) {
-      void Taro.showToast({
-        title: error instanceof Error ? error.message : '充值失败',
-        icon: 'none',
-        duration: 2200,
-      })
+      if (!current()) return
+      setPendingRecharge(readPendingWalletRecharge(accountId))
+      const message = error instanceof Error ? error.message : String((error as { errMsg?: string })?.errMsg || '充值结果暂未确认')
+      showRechargeSheet(false)
+      setRechargeNotice(cancellationRequested.current || readPendingWalletRecharge(accountId)?.cancelRequested
+        ? '已退出付款，取消结果待核实。网络恢复后可查询状态。'
+        : `${message}。充值结果待核实，可查询状态或取消充值。`)
     } finally {
-      setPaying(false); rechargeLock.current = false
+      if (current()) { setPaying(false); rechargeLock.current = false; cancellationLock.current = false }
     }
+  }
+
+  const closeRechargeSheet = () => {
+    if (!mounted.current || activeSessionKey.current !== sessionKey
+      || useSessionStore.getState().profile.id !== accountId || useSessionStore.getState().token !== sessionToken) return
+    showRechargeSheet(false)
+    const pending = readPendingWalletRecharge(accountId)
+    if (!pending) return
+    cancellationRequested.current = true
+    const cancelledPending = { ...pending, cancelRequested: true }
+    savePendingWalletRecharge(cancelledPending)
+    setPendingRecharge(cancelledPending)
+    setRechargeNotice('已退出付款，正在确认充值订单的取消结果。')
+    // Supersede any in-flight creation/query immediately. The backend serializes
+    // this cancellation with that attempt using the same client request ID.
+    void confirmRecharge(true, true)
   }
 
   if (!identityAllowed) return <View className='merchant-wallet-page' />
@@ -180,18 +269,24 @@ function MerchantWalletContent() {
             {wallet ? <Text className='merchant-wallet-balance__currency'>¥</Text> : null}
             <Text className='merchant-wallet-balance__amount'>{formatBalance(wallet?.availableBalanceCents)}</Text>
           </View>
-          <Text className='merchant-wallet-balance__hint'>余额与流水均来自服务端资金账本</Text>
-          <View className='merchant-wallet-balance__button' onClick={() => setSheetVisible(true)}>
-            <Text>＋ 充值</Text>
-          </View>
+          <Text className='merchant-wallet-balance__hint'>用于手动发单的配送费支付</Text>
+          <AppButton className='merchant-wallet-balance__button' disabled={paying} onClick={() => pendingRecharge ? void confirmRecharge(true) : showRechargeSheet(true)}>{pendingRecharge ? '查询充值状态' : '充值'}</AppButton>
         </View>
       </View>
 
       <ScrollView scrollY className='merchant-wallet-scroll' enhanced showScrollbar={false}>
+        {pendingRecharge || rechargeNotice ? <View className='merchant-wallet-recovery'>
+          <Text className='merchant-wallet-recovery__title'>{pendingRecharge ? `充值待核实 ¥${formatBalance(pendingRecharge.amountCents)}` : '充值状态'}</Text>
+          <Text className='merchant-wallet-recovery__description'>{rechargeNotice || (pendingRecharge?.cancelRequested ? '已退出付款，取消结果待核实，可查询状态。' : '上次充值结果待核实，可查询状态或取消充值。')}</Text>
+          {pendingRecharge ? <View className='merchant-wallet-recovery__actions'>
+            <AppButton size='small' variant='secondary' loading={paying} onClick={() => void confirmRecharge(true)}>查询状态</AppButton>
+            {!pendingRecharge.cancelRequested ? <AppButton size='small' variant='text' onClick={closeRechargeSheet}>取消充值</AppButton> : null}
+          </View> : null}
+        </View> : null}
         <View className='merchant-wallet-ledger-card'>
           <View className='merchant-wallet-ledger-card__header'>
             <Text className='merchant-wallet-ledger-card__title'>账单流水</Text>
-            <Text className='merchant-wallet-ledger-card__range' onClick={() => void loadWallet()}>刷新</Text>
+            <AppButton className='merchant-wallet-ledger-card__range' size='small' variant='text' disabled={loading || moreLoading} onClick={() => void loadWallet()}>刷新</AppButton>
           </View>
           {loading ? <Text className='merchant-wallet-ledger-card__end'>正在加载真实账本…</Text> : null}
           {!loading && loadError ? (
@@ -219,24 +314,51 @@ function MerchantWalletContent() {
               </View>
             )
           })}
+          {ledger.length < ledgerTotal ? <AppButton block variant='text' loading={moreLoading} disabled={loading} onClick={() => void loadWallet(true)}>加载更多账单</AppButton> : null}
         </View>
       </ScrollView>
 
-      <AppActionSheet visible={sheetVisible} title='选择充值金额' loading={paying} onClose={() => setSheetVisible(false)}>
+      <AppActionSheet visible={sheetVisible} title={pendingRecharge ? '确认充值结果' : '选择充值金额'} onClose={closeRechargeSheet}>
         <View className='merchant-wallet-sheet__content'>
-            <View className='merchant-wallet-amount-grid'>
-              {rechargeOptions.map((amount) => (
-                <View
-                  key={amount}
-                  className={`merchant-wallet-amount ${selectedAmount === amount ? 'merchant-wallet-amount--active' : ''}`}
-                  onClick={() => !paying && setSelectedAmount(amount)}
-                >
-                  <Text>¥{amount}</Text>
+            {pendingRecharge ? <Text className='merchant-wallet-recovery__title'>原充值金额 ¥{formatBalance(pendingRecharge.amountCents)}</Text> : <>
+              <View className='merchant-wallet-amount-grid'>
+                {rechargeOptions.map((amount) => (
+                  <View
+                    key={amount}
+                    className={`merchant-wallet-amount ${!customAmount && selectedAmount === amount ? 'merchant-wallet-amount--active' : ''}`}
+                    onClick={() => {
+                      if (paying) return
+                      setSelectedAmount(amount)
+                      setCustomAmount('')
+                    }}
+                  >
+                    <Text>¥{amount}</Text>
+                  </View>
+                ))}
+              </View>
+              <View className='merchant-wallet-custom-row'>
+                <Text className='merchant-wallet-custom-row__label'>其他金额</Text>
+                <View className='merchant-wallet-custom-field'>
+                  <Text className='merchant-wallet-custom-field__prefix'>¥</Text>
+                  <Input
+                    className='merchant-wallet-custom-field__input'
+                    type='digit'
+                    disabled={paying}
+                    value={customAmount}
+                    placeholder='输入金额'
+                    maxlength={9}
+                    onInput={(event) => {
+                      if (paying) return
+                      setCustomAmount(String(event.detail.value ?? ''))
+                    }}
+                  />
                 </View>
-              ))}
-            </View>
+              </View>
+              <Text className='merchant-wallet-custom-hint'>支持 0.01 至 100000 元</Text>
+            </>}
           <AppNotice title='支付说明'>充值会创建真实微信支付订单，支付结果和余额以后端为准。</AppNotice>
-          <AppButton block loading={paying} onClick={() => void confirmRecharge()}>微信支付 ¥{selectedAmount}</AppButton>
+          {rechargeNotice ? <Text className='merchant-wallet-recovery__description'>{rechargeNotice}</Text> : null}
+          <AppButton block loading={paying} onClick={() => void confirmRecharge(Boolean(pendingRecharge))}>{pendingRecharge ? '查询状态' : rechargeAmountCents === null ? '微信支付' : `微信支付 ¥${customAmount !== '' ? formatBalance(rechargeAmountCents) : selectedAmount}`}</AppButton>
         </View>
       </AppActionSheet>
     </View>

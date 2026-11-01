@@ -9,8 +9,8 @@
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   align-items: end;
-  min-height: 124rpx;
-  padding: 16rpx 12rpx calc(48rpx + env(safe-area-inset-bottom));
+  min-height: 96rpx;
+  padding: 8rpx 10rpx calc(12rpx + env(safe-area-inset-bottom));
   border-top: 1rpx solid $divider-nav;
   background: rgba($bg-surface-static, .98);
   box-shadow: 0 -10rpx 28rpx rgba(15, 42, 68, .045);
@@ -21,6 +21,21 @@
 }
 
 .student-bottom-nav--hidden { transform: translateY(calc(100% - 12PX)); }
+.student-bottom-nav::before {
+  position: absolute;
+  top: 6PX;
+  left: 50%;
+  width: 38PX;
+  height: 3PX;
+  border-radius: 99PX;
+  background: $text-secondary;
+  content: '';
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition: opacity 120ms ease;
+}
+.student-bottom-nav--hidden::before { opacity: .28; }
 
 .student-bottom-nav__item {
   display: flex;
@@ -29,7 +44,7 @@
   justify-content: flex-end;
   // Preserve the responsive layout while enforcing a physical touch minimum.
   min-width: max(88rpx, 44PX);
-  min-height: max(88rpx, 44PX);
+  min-height: max(80rpx, 44PX);
   padding: 0 8rpx;
   color: $text-tertiary;
   font-size: 20rpx;
@@ -45,7 +60,7 @@
   justify-content: flex-end;
   gap: 6rpx;
   min-width: 72rpx;
-  min-height: 72rpx;
+  min-height: 64rpx;
   transition: transform 120ms $ease-standard,
     opacity 120ms $ease-standard;
 }
@@ -118,6 +133,7 @@
 @media (prefers-reduced-motion: reduce) {
   .student-bottom-nav__item-visual,
   .student-bottom-nav__publish-visual,
+  .student-bottom-nav::before,
   .student-bottom-nav {
     transition: none;
   }
@@ -129,4 +145,5 @@
   }
 
   .student-bottom-nav--hidden { transform: none; }
+  .student-bottom-nav--hidden::before { opacity: 0; }
 }

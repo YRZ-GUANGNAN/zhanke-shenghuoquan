@@ -76,6 +76,18 @@ type RiderWalletQueueView struct {
 	UpdatedAt             time.Time `json:"updatedAt"`
 }
 
+type RiderWithdrawalView struct {
+	WithdrawPublicID string                         `json:"withdrawPublicId"`
+	RiderUserID      uint64                         `json:"riderUserId"`
+	AmountCents      uint64                         `json:"amountCents"`
+	Status           delivery.RiderWithdrawalStatus `json:"status"`
+	Reason           string                         `json:"reason,omitempty"`
+	RowVersion       uint64                         `json:"rowVersion"`
+	ProcessedAt      *time.Time                     `json:"processedAt,omitempty"`
+	CreatedAt        time.Time                      `json:"createdAt"`
+	UpdatedAt        time.Time                      `json:"updatedAt"`
+}
+
 func riderWalletView(value delivery.RiderWalletSnapshot) RiderWalletView {
 	return RiderWalletView{
 		WalletState: value.WalletState, WalletPublicID: value.WalletPublicID,
@@ -106,6 +118,20 @@ func riderWalletQueueView(value delivery.RiderPayoutQueueReadItem) RiderWalletQu
 		PayoutQueuePublicID: value.PayoutQueuePublicID, EarningPublicID: value.EarningPublicID,
 		DeliveryOrderPublicID: value.DeliveryOrderPublicID, AmountCents: value.AmountCents,
 		Status: value.Status, ReasonCode: value.ReasonCode, CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt,
+	}
+}
+
+func riderWithdrawalView(value delivery.RiderWithdrawal) RiderWithdrawalView {
+	return RiderWithdrawalView{
+		WithdrawPublicID: value.WithdrawPublicID,
+		RiderUserID:      value.RiderUserID,
+		AmountCents:      value.AmountCents,
+		Status:           value.Status,
+		Reason:           value.Reason,
+		RowVersion:       value.RowVersion,
+		ProcessedAt:      value.ProcessedAt,
+		CreatedAt:        value.CreatedAt,
+		UpdatedAt:        value.UpdatedAt,
 	}
 }
 

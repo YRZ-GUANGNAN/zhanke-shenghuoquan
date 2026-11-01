@@ -17,6 +17,9 @@ type FundsRepository interface {
 	ListLedger(context.Context, uint64, Page) ([]WalletLedger, int64, error)
 	CreatePaymentAttempt(context.Context, *PaymentAttempt) (PaymentAttempt, error)
 	FindPaymentAttemptOwned(context.Context, string, uint64) (PaymentAttempt, error)
+	RequestRechargeCancellation(context.Context, string, uint64, time.Time) (PaymentAttempt, error)
+	RequestRechargeCancellationByRequest(context.Context, *PaymentAttempt, time.Time) (PaymentAttempt, error)
+	FindRechargeByRequestOwned(context.Context, uint64, string, uint64) (*PaymentAttempt, error)
 	MarkPaymentPrepayRequested(context.Context, string, uint64, string, time.Time) (PaymentAttempt, error)
 	MarkPaymentPrepayIssued(context.Context, string, uint64, string, string, time.Time) (PaymentAttempt, error)
 	PayOrderWithWallet(context.Context, uint64, string, uint64, string, time.Time) (FundsResult, error)
@@ -193,7 +196,7 @@ func (r *GormRepository) MarkPaymentPrepayRequested(
 			Where("payment_public_id = ?", publicID).First(&result).Error; err != nil {
 			return normalizeNotFound(err)
 		}
-		if result.Status != PaymentCreated {
+		if result.Status != PaymentCreated || result.CancelRequestedAt != nil {
 			return ErrPaymentNotPending
 		}
 		if result.PayerOpenID != nil && *result.PayerOpenID != payerOpenID {
@@ -242,6 +245,9 @@ func (r *GormRepository) MarkPaymentPrepayIssued(
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("payment_public_id = ?", publicID).First(&result).Error; err != nil {
 			return normalizeNotFound(err)
+		}
+		if result.CancelRequestedAt != nil {
+			return ErrPaymentNotPending
 		}
 		if result.Status == PaymentPrepayIssued && result.PrepayID != nil && *result.PrepayID == prepayID {
 			if result.PayerOpenID == nil || *result.PayerOpenID != payerOpenID {
@@ -306,6 +312,17 @@ func (r *GormRepository) PayOrderWithWallet(
 		if order.Status != StatusPendingFeePayment || order.RowVersion != expectedRowVersion {
 			return ErrConcurrentUpdate
 		}
+		// An issued WeChat payment may still succeed after the client cancels or
+		// loses connectivity. Do not charge the wallet while that original
+		// provider order is unresolved. The order row lock also serializes this
+		// check against CreatePaymentAttempt and payment confirmation.
+		var unresolved int64
+		if err := unresolvedOrderWechatPayments(tx, orderPublicID, merchantUserID).Count(&unresolved).Error; err != nil {
+			return err
+		}
+		if unresolved > 0 {
+			return ErrPaymentNotPending
+		}
 		wallet, err := lockOrCreateWalletTx(tx, merchantUserID, now)
 		if err != nil {
 			return err
@@ -355,6 +372,12 @@ func (r *GormRepository) PayOrderWithWallet(
 		return nil
 	})
 	return result, err
+}
+
+func unresolvedOrderWechatPayments(tx *gorm.DB, orderPublicID string, merchantUserID uint64) *gorm.DB {
+	return tx.Model(&PaymentAttempt{}).
+		Where("delivery_order_public_id = ? AND merchant_user_id = ? AND provider = ? AND status IN ?",
+			orderPublicID, merchantUserID, PaymentWechat, []PaymentStatus{PaymentCreated, PaymentPrepayIssued})
 }
 
 func (r *GormRepository) PayOrderWithMock(
@@ -1279,7 +1302,11 @@ func newRefund(settlement FeeSettlement, idempotencyKey string, now time.Time) (
 
 func findSettlementByOrderTx(tx *gorm.DB, orderPublicID string) (FeeSettlement, bool, error) {
 	var result FeeSettlement
-	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("delivery_order_public_id = ?", orderPublicID).First(&result).Error
+	// Both callers lock the owning order before their first consistent read.
+	// That serializes settlement creation for this order; locking a missing
+	// settlement would hold an InnoDB gap while waiting for the merchant wallet,
+	// which can deadlock payments for different orders of the same merchant.
+	err := tx.Where("delivery_order_public_id = ?", orderPublicID).First(&result).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return FeeSettlement{}, false, nil
 	}

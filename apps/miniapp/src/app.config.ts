@@ -24,15 +24,23 @@ export default defineAppConfig({
     'pages/legal/index',
     'pages/merchant-home/index',
     'pages/merchant-publish/index',
-    'pages/merchant-wallet/index',
     'pages/merchant-messages/index',
     'pages/merchant-order-detail/index',
     'pages/delivery-rider/index',
-    'pages/rider-wallet/index',
     'pages/rider-messages/index',
     'pages/delivery-profile/index',
     'pages/delivery-conversation/index',
     'pages/post-detail/index'
+  ],
+  subPackages: [
+    {
+      root: 'pages/merchant-wallet',
+      pages: ['index']
+    },
+    {
+      root: 'pages/rider-wallet',
+      pages: ['index']
+    }
   ],
   window: {
     backgroundTextStyle: '@backgroundHint',

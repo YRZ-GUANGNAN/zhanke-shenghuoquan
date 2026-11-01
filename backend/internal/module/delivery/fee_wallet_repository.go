@@ -281,6 +281,18 @@ func (r *GormRepository) MarkRiderEarningPaidOffline(
 		if earning.RowVersion != expectedRowVersion {
 			return ErrConcurrentUpdate
 		}
+		// The wallet lock also serializes reservations for other earnings. An
+		// offline payout must not spend any of those held funds.
+		if tx.Migrator().HasTable(&RiderPayoutReservation{}) {
+			reserved, err := activeRiderPayoutReservationAmountTx(tx, earning.RiderUserID)
+			if err != nil {
+				return err
+			}
+			if reserved > wallet.AvailableBalanceCents ||
+				(reserved > 0 && earning.RiderFeeCents > wallet.AvailableBalanceCents-reserved) {
+				return ErrRiderPayoutReserved
+			}
+		}
 		payoutID, err := NewULID()
 		if err != nil {
 			return err

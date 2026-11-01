@@ -1,5 +1,7 @@
 .delivery-stage-pager {
   display: flex;
+  // The nested native Swiper uses height: 0 as its vertical flex basis.
+  flex-direction: column;
   flex: 1 1 auto;
   width: 100%;
   height: 0;

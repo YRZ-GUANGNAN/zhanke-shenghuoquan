@@ -54,6 +54,31 @@ func (s *FundsService) Payment(ctx context.Context, merchantUserID uint64, payme
 	return s.repository.FindPaymentAttemptOwned(ctx, strings.TrimSpace(paymentPublicID), merchantUserID)
 }
 
+func (s *FundsService) RequestRechargeCancellation(ctx context.Context, merchantUserID uint64, paymentPublicID string) (PaymentAttempt, error) {
+	if merchantUserID == 0 || !ValidULID(strings.TrimSpace(paymentPublicID)) {
+		return PaymentAttempt{}, ErrInvalidRecord
+	}
+	return s.repository.RequestRechargeCancellation(ctx, strings.TrimSpace(paymentPublicID), merchantUserID, s.now().UTC())
+}
+
+func (s *FundsService) FindRechargeByRequest(ctx context.Context, merchantUserID uint64, clientRequestID string, amountCents uint64) (*PaymentAttempt, error) {
+	if merchantUserID == 0 || !ValidULID(strings.TrimSpace(clientRequestID)) || amountCents == 0 || amountCents > maxRechargeCents {
+		return nil, ErrInvalidRecord
+	}
+	return s.repository.FindRechargeByRequestOwned(ctx, merchantUserID, strings.TrimSpace(clientRequestID), amountCents)
+}
+
+func (s *FundsService) RequestRechargeCancellationByRequest(ctx context.Context, merchantUserID uint64, clientRequestID string, amountCents uint64) (PaymentAttempt, error) {
+	if merchantUserID == 0 || !ValidULID(strings.TrimSpace(clientRequestID)) || amountCents == 0 || amountCents > maxRechargeCents {
+		return PaymentAttempt{}, ErrInvalidRecord
+	}
+	candidate, err := s.newAttempt(merchantUserID, PaymentWalletRecharge, nil, PaymentWechat, amountCents, strings.TrimSpace(clientRequestID))
+	if err != nil {
+		return PaymentAttempt{}, err
+	}
+	return s.repository.RequestRechargeCancellationByRequest(ctx, &candidate, s.now().UTC())
+}
+
 func (s *FundsService) OrderFunds(
 	ctx context.Context,
 	merchantUserID uint64,

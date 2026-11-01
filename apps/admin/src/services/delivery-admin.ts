@@ -278,6 +278,18 @@ export interface RiderPayoutResult {
   payout: RiderPayout
 }
 
+export interface RiderWithdrawal {
+  withdrawPublicId: string
+  riderUserId: number
+  amountCents: number
+  status: 'processing' | 'paid' | 'rejected'
+  reason?: string
+  rowVersion: number
+  processedAt?: string
+  createdAt: string
+  updatedAt: string
+}
+
 async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   return adminRequest<T>(`${base}${path}`, init, (status, message) => new DeliveryAPIError(status, message))
 }
@@ -336,6 +348,15 @@ export const deliveryAdminAPI = {
   riderPayoutQueueEvents: (id: string, query: DeliveryQuery = {}) => api<Page<RiderPayoutQueueEvent>>(`/rider-payout-queue/${encodeURIComponent(id)}/events${queryString(query)}`),
   cancelRiderPayoutQueue: (id: string, expectedRowVersion: number, idempotencyKey: string, reason: string) =>
     api<RiderPayoutQueue>(`/rider-payout-queue/${encodeURIComponent(id)}/cancel`, {
+      ...body({ expectedRowVersion, idempotencyKey, reason }), method: 'POST'
+    }),
+  riderWithdrawals: (query: DeliveryQuery = {}) => api<Page<RiderWithdrawal>>(`/rider-withdrawals${queryString(query)}`),
+  approveRiderWithdrawal: (id: string, expectedRowVersion: number, idempotencyKey: string, paymentReference: string) =>
+    api<RiderWithdrawal>(`/rider-withdrawals/${encodeURIComponent(id)}/approve`, {
+      ...body({ expectedRowVersion, idempotencyKey, paymentReference }), method: 'POST'
+    }),
+  rejectRiderWithdrawal: (id: string, expectedRowVersion: number, idempotencyKey: string, reason: string) =>
+    api<RiderWithdrawal>(`/rider-withdrawals/${encodeURIComponent(id)}/reject`, {
       ...body({ expectedRowVersion, idempotencyKey, reason }), method: 'POST'
     }),
   refunds: (query: DeliveryQuery = {}) => api<Page<Refund>>(`/refunds${queryString(query)}`),

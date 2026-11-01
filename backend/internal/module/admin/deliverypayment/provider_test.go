@@ -362,6 +362,92 @@ func TestWechatProviderRejectsMismatchedQueriedPaymentAndRefund(t *testing.T) {
 	}
 }
 
+func TestWechatProviderClassifiesMissingRefundResource(t *testing.T) {
+	privatePath, publicPath, signingKey := writeProviderKeys(t)
+	now := time.Date(2027, time.January, 15, 0, 0, 0, 0, time.UTC)
+	body := []byte(`{"code":"RESOURCE_NOT_EXISTS","message":"refund not found"}`)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/v3/refund/domestic/refunds/D3RTEST" {
+			t.Fatalf("path=%s", request.URL.Path)
+		}
+		setWechatSignatureHeaders(t, w.Header(), body, signingKey, now, "trusted-platform-key")
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write(body)
+	}))
+	defer server.Close()
+	provider, err := NewWechatProvider(WechatProviderConfig{
+		AppID: "wx-test", MchID: "1900000001", APIv3Key: "12345678901234567890123456789012",
+		MerchantSerialNo: "merchant-serial", PrivateKeyPath: privatePath,
+		PaymentNotifyURL: "https://api.example.com/payment-notify", RefundNotifyURL: "https://api.example.com/refund-notify",
+		APIBase: server.URL, PlatformPublicKeyPath: publicPath, PlatformKeyID: "trusted-platform-key",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider.now = func() time.Time { return now }
+	provider.httpClient = server.Client()
+	_, err = provider.QueryRefund(context.Background(), RefundQueryRequest{
+		OutRefundNo: "D3RTEST", OutTradeNo: "D3TEST", AmountCents: 150,
+	})
+	if !errors.Is(err, ErrRefundNotFound) {
+		t.Fatalf("missing refund error=%v", err)
+	}
+}
+
+func TestWechatProviderDoesNotTreatUntrustedOrUnrelatedErrorsAsMissingRefund(t *testing.T) {
+	privatePath, publicPath, signingKey := writeProviderKeys(t)
+	now := time.Date(2027, time.January, 15, 0, 0, 0, 0, time.UTC)
+	for _, test := range []struct {
+		name      string
+		status    int
+		body      string
+		unsigned  bool
+		payment   bool
+		wantError error
+	}{
+		{name: "unsigned not found", status: http.StatusNotFound, body: `{"code":"RESOURCE_NOT_EXISTS"}`, unsigned: true, wantError: ErrUntrustedProviderResponse},
+		{name: "wrong code", status: http.StatusNotFound, body: `{"code":"ORDER_NOT_EXIST"}`, wantError: ErrProviderRejected},
+		{name: "wrong status", status: http.StatusBadRequest, body: `{"code":"RESOURCE_NOT_EXISTS"}`, wantError: ErrProviderRejected},
+		{name: "malformed body", status: http.StatusNotFound, body: `{"code":`, wantError: ErrProviderRejected},
+		{name: "payment query", status: http.StatusNotFound, body: `{"code":"RESOURCE_NOT_EXISTS"}`, payment: true, wantError: ErrProviderRejected},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				body := []byte(test.body)
+				if !test.unsigned {
+					setWechatSignatureHeaders(t, w.Header(), body, signingKey, now, "trusted-platform-key")
+				}
+				w.WriteHeader(test.status)
+				_, _ = w.Write(body)
+			}))
+			defer server.Close()
+			provider, err := NewWechatProvider(WechatProviderConfig{
+				AppID: "wx-test", MchID: "1900000001", APIv3Key: "12345678901234567890123456789012",
+				MerchantSerialNo: "merchant-serial", PrivateKeyPath: privatePath,
+				PaymentNotifyURL: "https://api.example.com/payment-notify", RefundNotifyURL: "https://api.example.com/refund-notify",
+				APIBase: server.URL, PlatformPublicKeyPath: publicPath, PlatformKeyID: "trusted-platform-key",
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			provider.now = func() time.Time { return now }
+			provider.httpClient = server.Client()
+			if test.payment {
+				_, err = provider.QueryPayment(context.Background(), PaymentQueryRequest{
+					OutTradeNo: "D3TEST", AmountCents: 150, PayerOpenID: "openid-test",
+				})
+			} else {
+				_, err = provider.QueryRefund(context.Background(), RefundQueryRequest{
+					OutRefundNo: "D3RTEST", OutTradeNo: "D3TEST", AmountCents: 150,
+				})
+			}
+			if !errors.Is(err, test.wantError) || errors.Is(err, ErrRefundNotFound) {
+				t.Fatalf("error=%v want=%v and not refund-not-found", err, test.wantError)
+			}
+		})
+	}
+}
+
 func TestDecryptResourceRejectsMalformedNonceWithoutPanic(t *testing.T) {
 	defer func() {
 		if recovered := recover(); recovered != nil {

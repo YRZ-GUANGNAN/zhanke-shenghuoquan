@@ -34,6 +34,7 @@ func Test02FundsMigrationRollbackApplyAgainstRealMySQL84(t *testing.T) {
 	applyD1SQLFile(t, db, "../../../migrations/025_delivery_payment_wallet.sql")
 	applyD1SQLFile(t, db, "../../../migrations/048_delivery_payment_recovery.sql")
 	applyD1SQLFile(t, db, "../../../migrations/049_delivery_funding_sources.sql")
+	applyD1SQLFile(t, db, "../../../migrations/052_delivery_recharge_cancellation.sql")
 	assertD3Schema(t, db)
 	t.Log("migration_025_048_049_apply_rollback_apply=PASS tables=8 foreign_keys=0 money_checks=PASS")
 }
@@ -154,6 +155,62 @@ func TestFundsWalletPaymentAtomicityIdempotencyAndRefundAgainstRealMySQL84(t *te
 	assertD3Count(t, db, (&Refund{}).TableName(), "delivery_order_public_id = ?", 1, order.DeliveryOrderPublicID)
 	assertD3Count(t, db, (&WalletLedger{}).TableName(), "merchant_user_id = ? AND entry_type = ?", 1, fundsMerchantOne, LedgerRefund)
 	t.Log("wallet_funds=PASS recharge+atomic_debit+insufficient_rollback+owner_fence+idempotent_refund")
+}
+
+func TestUnresolvedWechatBlocksWalletAndRiderPoolAgainstRealMySQL84(t *testing.T) {
+	db := openD3MySQL(t)
+	cleanupD3(t, db)
+	t.Cleanup(func() { cleanupD3(t, db) })
+	ctx := context.Background()
+	now := time.Date(2026, 10, 26, 8, 0, 0, 0, time.UTC)
+	repository := NewRepository(db)
+	base, _ := NewService(repository, func() time.Time { return now })
+	dispatch, _ := NewDispatchService(repository, base, activeEligibility{},
+		FeePolicy{DeliveryFeeCents: 150, RiderFeeCents: 100, PlatformCutCents: 50}, func() time.Time { return now })
+	funds, _ := NewFundsService(repository, repository, func() time.Time { return now })
+	if _, err := funds.StartRecharge(ctx, fundsMerchantOne, 500, mustFundsULID(t), PaymentMock); err != nil {
+		t.Fatal(err)
+	}
+	order := createFundsOrder(t, ctx, dispatch, fundsMerchantOne)
+	attempt, err := funds.StartOrderPayment(ctx, fundsMerchantOne, order.DeliveryOrderPublicID, order.RowVersion, mustFundsULID(t), PaymentWechat)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, status := range []PaymentStatus{PaymentCreated, PaymentPrepayIssued} {
+		if err := db.Model(&PaymentAttempt{}).Where("payment_public_id = ?", attempt.Attempt.PaymentPublicID).Update("status", status).Error; err != nil {
+			t.Fatal(err)
+		}
+		if _, err := funds.PayOrderWithWallet(ctx, fundsMerchantOne, order.DeliveryOrderPublicID, order.RowVersion, mustFundsULID(t)); !errors.Is(err, ErrPaymentNotPending) {
+			t.Fatalf("unresolved %s allowed wallet debit: %v", status, err)
+		}
+		if _, err := base.AssignRider(ctx, order.DeliveryOrderPublicID, order.RowVersion, fundsRider); !errors.Is(err, ErrConcurrentUpdate) {
+			t.Fatalf("unpaid claim: %v", err)
+		}
+		values, _, err := repository.ListClaimable(ctx, Page{Page: 1, Size: 100})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, value := range values {
+			if value.DeliveryOrderPublicID == order.DeliveryOrderPublicID {
+				t.Fatal("unpaid order visible to rider")
+			}
+		}
+	}
+	wallet, err := repository.Wallet(ctx, fundsMerchantOne, now)
+	if err != nil || wallet.AvailableBalanceCents != 500 {
+		t.Fatalf("blocked payment changed balance: %#v %v", wallet, err)
+	}
+	assertD3Count(t, db, (&FeeSettlement{}).TableName(), "delivery_order_public_id = ?", 0, order.DeliveryOrderPublicID)
+	if err := db.Model(&PaymentAttempt{}).Where("payment_public_id = ?", attempt.Attempt.PaymentPublicID).Update("status", PaymentClosed).Error; err != nil {
+		t.Fatal(err)
+	}
+	paid, err := funds.PayOrderWithWallet(ctx, fundsMerchantOne, order.DeliveryOrderPublicID, order.RowVersion, mustFundsULID(t))
+	if err != nil || paid.Order == nil || paid.Order.Status != StatusReadyForClaim {
+		t.Fatalf("closed original cannot switch to wallet: %#v %v", paid, err)
+	}
+	if _, err := base.AssignRider(ctx, order.DeliveryOrderPublicID, paid.Order.RowVersion, fundsRider); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestFundingSourcesFIFOConservationRefundAndHistoricalIsolationAgainstRealMySQL84(t *testing.T) {
@@ -765,6 +822,9 @@ func ensureD3Schema(t *testing.T, db *gorm.DB) {
 	if !db.Migrator().HasTable(&FundingLot{}) {
 		applyD1SQLFile(t, db, "../../../migrations/049_delivery_funding_sources.sql")
 	}
+	if !db.Migrator().HasColumn(&PaymentAttempt{}, "cancel_requested_at") {
+		applyD1SQLFile(t, db, "../../../migrations/052_delivery_recharge_cancellation.sql")
+	}
 }
 
 func assertD3Schema(t *testing.T, db *gorm.DB) {
@@ -806,6 +866,7 @@ func assertD3Schema(t *testing.T, db *gorm.DB) {
 	for _, column := range []struct{ table, name string }{
 		{table: "delivery_payment_attempts", name: "payer_openid"},
 		{table: "delivery_payment_attempts", name: "next_verify_at"},
+		{table: "delivery_payment_attempts", name: "cancel_requested_at"},
 		{table: "delivery_refunds", name: "out_trade_no"},
 		{table: "delivery_refunds", name: "next_verify_at"},
 	} {

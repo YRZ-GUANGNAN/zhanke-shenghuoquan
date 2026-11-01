@@ -39,6 +39,9 @@ func (h *Handler) RegisterMerchant(group *gin.RouterGroup) {
 	group.GET("/wallet", h.wallet)
 	group.GET("/wallet/ledger", h.ledger)
 	group.POST("/wallet/recharges", h.recharge)
+	group.POST("/wallet/recharges/:id/close", h.closeRecharge)
+	group.POST("/wallet/recharges/close", h.closeRechargeByRequest)
+	group.GET("/wallet/recharges/by-request/:clientRequestId", h.rechargeByRequest)
 	group.GET("/payments/:id", h.payment)
 	group.GET("/orders/:id/funds", h.orderFunds)
 	group.POST("/orders/:id/pay-with-wallet", h.payWithWallet)
@@ -156,6 +159,68 @@ func (h *Handler) recharge(c *gin.Context) {
 	response.OK(c, result)
 }
 
+func (h *Handler) closeRecharge(c *gin.Context) {
+	ctx := c.Request.Context()
+	merchantUserID := h.currentUserID(c)
+	value, err := h.funds.RequestRechargeCancellation(ctx, merchantUserID, c.Param("id"))
+	if err != nil {
+		h.write(c, nil, err)
+		return
+	}
+	h.respondCancelledRecharge(c, value)
+}
+
+func (h *Handler) closeRechargeByRequest(c *gin.Context) {
+	var req struct {
+		ClientRequestID string `json:"clientRequestId"`
+		AmountCents     uint64 `json:"amountCents"`
+	}
+	if c.ShouldBindJSON(&req) != nil {
+		response.Fail(c, http.StatusBadRequest, "invalid request")
+		return
+	}
+	value, err := h.funds.RequestRechargeCancellationByRequest(c.Request.Context(), h.currentUserID(c), req.ClientRequestID, req.AmountCents)
+	if err != nil {
+		h.write(c, nil, err)
+		return
+	}
+	h.respondCancelledRecharge(c, value)
+}
+
+func (h *Handler) rechargeByRequest(c *gin.Context) {
+	amount, err := strconv.ParseUint(c.Query("amountCents"), 10, 64)
+	if err != nil {
+		response.Fail(c, http.StatusBadRequest, "invalid amount")
+		return
+	}
+	value, err := h.funds.FindRechargeByRequest(c.Request.Context(), h.currentUserID(c), c.Param("clientRequestId"), amount)
+	if err != nil {
+		h.write(c, nil, err)
+		return
+	}
+	if value == nil {
+		response.OK(c, nil)
+		return
+	}
+	response.OK(c, paymentView(*value, nil))
+}
+
+func (h *Handler) respondCancelledRecharge(c *gin.Context, value delivery.PaymentAttempt) {
+	ctx := c.Request.Context()
+	if h.reconciler != nil {
+		// Intent is already durable. Provider/network failures leave the original
+		// payment pending for the background verifier, never falsely closed.
+		_ = h.reconciler.ReconcilePayment(ctx, value.PaymentPublicID)
+		var err error
+		value, err = h.funds.Payment(ctx, h.currentUserID(c), value.PaymentPublicID)
+		if err != nil {
+			h.write(c, nil, err)
+			return
+		}
+	}
+	response.OK(c, paymentView(value, nil))
+}
+
 func (h *Handler) payWithWallet(c *gin.Context) {
 	var req struct {
 		ExpectedRowVersion uint64 `json:"expectedRowVersion"`
@@ -206,10 +271,20 @@ func (h *Handler) payWithWechat(c *gin.Context) {
 }
 
 func (h *Handler) issuePrepay(c *gin.Context, value *delivery.PaymentStartResult, description string) (*JSAPIParameter, error) {
+	if value.Attempt.Purpose == delivery.PaymentWalletRecharge && value.Attempt.CancelRequestedAt != nil {
+		return nil, nil
+	}
 	if value.Attempt.Provider == delivery.PaymentMock {
 		return nil, nil
 	}
 	switch value.Attempt.Status {
+	case delivery.PaymentPaid, delivery.PaymentFailed, delivery.PaymentClosed:
+		if value.Attempt.Purpose == delivery.PaymentWalletRecharge {
+			// Recovery of the same recharge returns its terminal result, never
+			// another prepay. Order-fee attempts retain their existing guard.
+			return nil, nil
+		}
+		return nil, delivery.ErrPaymentNotPending
 	case delivery.PaymentPrepayIssued:
 		if value.Attempt.PrepayID == nil {
 			return nil, delivery.ErrPaymentNotPending

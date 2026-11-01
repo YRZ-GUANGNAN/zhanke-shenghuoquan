@@ -6,12 +6,14 @@ import { AppState } from '../../components/ui'
 import StudentBottomNav from '../../components/student-bottom-nav'
 import { listCampusGuides, type CampusGuide } from '../../services/campus-info'
 import { usePageShare } from '../../hooks/use-page-share'
+import { useBottomNavScroll } from '../../utils/bottom-nav-motion'
 import Taro from '../../services/taro'
 import './index.scss'
 
 export default function CampusInfoHome() {
   const [guides, setGuides] = useState<CampusGuide[]>([])
   const [category, setCategory] = useState('全部')
+  const onGuideScroll = useBottomNavScroll(true, category)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
@@ -40,7 +42,7 @@ export default function CampusInfoHome() {
   return (
     <View className='campus-info-page'>
       <CapsulePageHeader title='校园指南' divider={false} />
-      <ScrollView scrollY className='campus-info-scroll' key={category}>
+      <ScrollView scrollY className='campus-info-scroll' key={category} onScroll={event => onGuideScroll(event.detail.scrollTop)}>
         <View className='campus-info-intro'>
           <Text className='campus-info-eyebrow'>在校园，把日常理清楚</Text>
           <Text className='campus-info-heading'>找得到，也看得明白。</Text>

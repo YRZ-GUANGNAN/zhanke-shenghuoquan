@@ -172,8 +172,21 @@ func (r *Reconciler) reconcilePaymentLease(ctx context.Context, lease delivery.P
 		})
 		return ignoreVerificationRace(err)
 	case "NOTPAY":
-		if !attempt.CreatedAt.IsZero() && now.Sub(attempt.CreatedAt) >= r.config.CloseAfter {
-			closeCtx, closeCancel := context.WithTimeout(ctx, r.config.RequestTimeout)
+		cancelRequested := attempt.Purpose == delivery.PaymentWalletRecharge && attempt.CancelRequestedAt != nil
+		if cancelRequested || (!attempt.CreatedAt.IsZero() && now.Sub(attempt.CreatedAt) >= r.config.CloseAfter) {
+			// Querying may consume the lease. Never issue a close using an expired
+			// lease, nor let it outlive that lease and overlap a recovery worker.
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			if attempt.VerifyLeaseUntil == nil || !attempt.VerifyLeaseUntil.After(now) {
+				return nil
+			}
+			timeout := r.config.RequestTimeout
+			if remaining := attempt.VerifyLeaseUntil.Sub(now); remaining < timeout {
+				timeout = remaining
+			}
+			closeCtx, closeCancel := context.WithTimeout(ctx, timeout)
 			closeErr := r.provider.ClosePayment(closeCtx, attempt.OutTradeNo)
 			closeCancel()
 			if closeErr != nil {
@@ -183,7 +196,7 @@ func (r *Reconciler) reconcilePaymentLease(ctx context.Context, lease delivery.P
 				return r.updatePaymentAfterProviderError(ctx, lease, closeErr)
 			}
 			return ignoreVerificationRace(r.funds.UpdatePaymentVerification(ctx, lease, delivery.PaymentVerificationUpdate{
-				Status: delivery.PaymentClosed, ProviderStatus: "CLOSED", UpdatedAt: now,
+				Status: delivery.PaymentClosed, ProviderStatus: "CLOSED", UpdatedAt: r.config.Now().UTC(),
 			}))
 		}
 		fallthrough
@@ -227,6 +240,35 @@ func (r *Reconciler) reconcileRefundLease(ctx context.Context, lease delivery.Re
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
+		if errors.Is(err, ErrRefundNotFound) && canResubmitMissingRefund(refund) {
+			now := r.config.Now().UTC()
+			if refund.VerifyLeaseUntil == nil || !refund.VerifyLeaseUntil.After(now) {
+				// The expired claim must be reclaimed by the scheduler. Do not
+				// submit externally or overwrite another worker's verification.
+				return nil
+			}
+			timeout := r.config.RequestTimeout
+			if remaining := refund.VerifyLeaseUntil.Sub(now); remaining < timeout {
+				timeout = remaining
+			}
+			createCtx, createCancel := context.WithTimeout(ctx, timeout)
+			created, createErr := r.provider.CreateRefund(createCtx, RefundRequest{
+				OutTradeNo: *refund.OutTradeNo, OutRefundNo: refund.OutRefundNo,
+				AmountCents: refund.AmountCents, Reason: "配送服务取消退款",
+			})
+			createCancel()
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			if createErr == nil {
+				if strings.TrimSpace(created.WechatRefundID) == "" || !supportedRefundStatus(created.Status) {
+					return r.updateRefundAfterProviderError(ctx, lease, ErrUntrustedProviderResponse)
+				}
+				observedAt := r.config.Now().UTC()
+				return ignoreVerificationRace(r.observeRefund(ctx, refund, created, observedAt))
+			}
+			return r.updateRefundAfterProviderError(ctx, lease, createErr)
+		}
 		return r.updateRefundAfterProviderError(ctx, lease, err)
 	}
 	observedAt := r.config.Now().UTC()
@@ -244,6 +286,37 @@ func (r *Reconciler) reconcileRefundLease(ctx context.Context, lease delivery.Re
 		ObservedAt: observedAt, SucceededAt: result.SuccessAt, ExpectedRowVersion: refund.RowVersion,
 	})
 	return ignoreVerificationRace(err)
+}
+
+func canResubmitMissingRefund(refund delivery.Refund) bool {
+	// Every claim increments this persisted counter before the external call,
+	// so restarts and unknown outcomes cannot reset the three-attempt budget.
+	return refund.Source == delivery.SettlementWechat && refund.Status == delivery.RefundPending &&
+		refund.WechatRefundID == nil && refund.ProviderStatus == "" &&
+		refund.VerifyAttemptCount > 0 && refund.VerifyAttemptCount <= 3 &&
+		refund.OutRefundNo != "" && refund.AmountCents > 0
+}
+
+func (r *Reconciler) observeRefund(
+	ctx context.Context,
+	refund delivery.Refund,
+	provider RefundProviderResult,
+	observedAt time.Time,
+) error {
+	providerStatus := delivery.RefundProviderStatus(provider.Status)
+	reason := ""
+	if provider.Status == "ABNORMAL" {
+		reason = "wechat refund abnormal"
+	} else if provider.Status == "CLOSED" {
+		reason = "wechat refund closed"
+	}
+	_, err := r.funds.ObserveRefund(ctx, delivery.RefundObservation{
+		OutRefundNo: refund.OutRefundNo, OutTradeNo: *refund.OutTradeNo,
+		WechatRefundID: provider.WechatRefundID, AmountCents: refund.AmountCents,
+		ProviderStatus: providerStatus, FailureReason: reason,
+		ObservedAt: observedAt, ExpectedRowVersion: refund.RowVersion,
+	})
+	return err
 }
 
 func (r *Reconciler) updatePaymentAfterProviderError(
@@ -299,6 +372,8 @@ func reconciliationError(err error) (string, bool) {
 	switch {
 	case errors.Is(err, ErrProviderNotConfigured):
 		return "provider_not_configured", false
+	case errors.Is(err, ErrRefundNotFound):
+		return "provider_not_found", false
 	case errors.Is(err, ErrUntrustedProviderResponse), errors.Is(err, ErrInvalidNotification):
 		return "untrusted_provider_response", true
 	case errors.Is(err, ErrProviderRejected):

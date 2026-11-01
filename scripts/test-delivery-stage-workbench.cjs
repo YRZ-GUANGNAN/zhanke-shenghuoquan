@@ -285,14 +285,14 @@ function merchantHarness(kind, overrides = {}) {
     ...overrides,
   }
   const imports = {
-    '@tarojs/components': { View: 'View', Text: 'Text', ScrollView: 'ScrollView', Image: 'Image' },
+    '@tarojs/components': { View: 'View', Text: 'Text', ScrollView: 'ScrollView', Image: 'Image', Input: 'Input' },
     '@tarojs/taro': { useDidShow: (fn) => { show = fn }, useDidHide: (fn) => { hide = fn } },
     '../../components/capsule-page-header': {
       __esModule: true,
       default: ({ left, right }) => ({ type: 'Header', props: { children: [left, right] } }),
       CapsuleSystemRow: 'CapsuleSystemRow',
     },
-    '../../components/ui': { AppIconButton: 'AppIconButton' },
+    '../../components/ui': { AppIconButton: 'AppIconButton', AppButton: 'AppButton', AppActionSheet: 'AppActionSheet', AppNotice: 'AppNotice' },
     '../../components/ui/status-glyph': { StatusGlyph: 'StatusGlyph' },
     '../../components/IdentitySwitchModal': 'IdentitySwitchModal',
     '../../components/delivery-workspace-nav': { __esModule: true, default: 'DeliveryWorkspaceNav', useDeliveryWorkspaceNavigation: () => ({ step: () => {}, swipe: { handlers: {}, canActivate: () => true } }) },
@@ -309,6 +309,7 @@ function merchantHarness(kind, overrides = {}) {
     '../../hooks/use-viewport-refresh': { useViewportRefresh: () => ({}) },
     '../../services/a-user': { getIdentityApplication: (...args) => services.getIdentityApplication(...args) },
     '../../services/delivery-merchant': {
+      createDeliveryClientRequestId: () => 'TEST-REQUEST',
       centsToYuan: (value) => String(value / 100),
       getMerchantOrderIntake: (...args) => services.getMerchantOrderIntake(...args),
       listMerchantDeliveryOrders: (...args) => services.listMerchantDeliveryOrders(...args),
@@ -321,19 +322,25 @@ function merchantHarness(kind, overrides = {}) {
       deliveryPaymentStatusLabel: paymentLabels.deliveryPaymentStatusLabel,
       deliveryRefundStatusLabel: paymentLabels.deliveryRefundStatusLabel,
     },
+    '../../services/delivery-order-payment': loadSource('services/delivery-order-payment.ts', {
+      './delivery-merchant': services,
+      './delivery-payment': services,
+    }, renderer),
     '../../services/delivery-proof': { loadPrivateDeliveryProofs: (...args) => { proofRequests.push(args); return services.loadPrivateDeliveryProofs(...args) } },
     '../../services/taro': {
       getCurrentInstance: () => ({ router: { params: { orderId: routeOrderId } } }),
+      requestPayment: async (value) => overrides.requestPayment?.(value),
       previewImage: async (value) => { previews.push(value); await overrides.previewImage?.(value) },
       showToast: async (value) => { toasts.push(value) },
       navigateTo: async (value) => { navigations.push(value); await overrides.navigateTo?.(value) },
       navigateBack: async () => {}, reLaunch: async () => { relaunches++ },
     },
-    './wallet-state': {
+    './wallet-state': overrides.walletState || {
       readPendingWalletRecharge: () => null,
       savePendingWalletRecharge: () => {},
       clearPendingWalletRecharge: () => {},
     },
+    './wallet-recharge': { runWalletRecharge: overrides.runWalletRecharge || (() => { throw new Error('该测试不能发起真实充值') }) },
     '../../stores/session': { useSessionStore: sessionStore },
     '../../utils/delivery-order-source': { deliverySourceLabel: () => '校内配送', deliveryPickupLabel: (value) => value.pickupCode ? `${value.pickupCode}号` : '配送单' },
     './merchant-home-icon': 'Icon',

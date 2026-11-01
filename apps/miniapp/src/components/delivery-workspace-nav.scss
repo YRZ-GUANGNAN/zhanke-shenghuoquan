@@ -1,24 +1,40 @@
 @use '../styles/design-tokens.scss' as *;
 
 .delivery-workspace-nav {
+  position: relative;
   flex: 0 0 auto;
   display: flex;
   align-items: stretch;
   width: calc(100% - 16PX);
   box-sizing: border-box;
-  padding: 6PX 12PX calc(6PX + env(safe-area-inset-bottom));
+  padding: 4PX 10PX calc(4PX + env(safe-area-inset-bottom));
   background: $bg-surface;
   border-top: 1PX solid $border-default;
   margin: 0 8PX 8PX;
-  border-radius: 24PX;
+  border-radius: 18PX;
   overflow: hidden;
   transition: transform 180ms $ease-standard, border-radius 180ms $ease-standard;
 }
 .delivery-workspace-nav--hidden { transform: translateY(calc(100% - 12PX)); }
+.delivery-workspace-nav::before {
+  position: absolute;
+  top: 6PX;
+  left: 50%;
+  width: 38PX;
+  height: 3PX;
+  border-radius: 99PX;
+  background: $text-secondary;
+  content: '';
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition: opacity 120ms ease;
+}
+.delivery-workspace-nav--hidden::before { opacity: .28; }
 .delivery-workspace-nav__item {
   flex: 1;
   min-width: 0;
-  min-height: 52PX;
+  min-height: 44PX;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -31,10 +47,11 @@
   transition: background 120ms, opacity 120ms;
 }
 .delivery-workspace-nav .delivery-workspace-nav__icon { width: 24PX; height: 24PX; }
-.delivery-workspace-nav__item:not(.delivery-workspace-nav__item--active) .delivery-workspace-nav__icon { filter: grayscale(1); opacity: .72; }
+.delivery-workspace-nav__item:not(.delivery-workspace-nav__item--active) .delivery-workspace-nav__icon { filter: grayscale(1); }
 .delivery-workspace-nav__item--active { color: $brand-primary-strong; background: $brand-tint; font-weight: 650; }
-.delivery-workspace-nav__item--pressed { opacity: .7; }
+.delivery-workspace-nav__item--pressed { opacity: 1; }
 @media (prefers-reduced-motion: reduce) {
-  .delivery-workspace-nav, .delivery-workspace-nav__item { transition: none; }
+  .delivery-workspace-nav, .delivery-workspace-nav__item, .delivery-workspace-nav::before { transition: none; }
   .delivery-workspace-nav--hidden { transform: none; }
+  .delivery-workspace-nav--hidden::before { opacity: 0; }
 }

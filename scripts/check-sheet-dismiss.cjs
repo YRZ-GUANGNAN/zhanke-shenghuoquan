@@ -13,6 +13,9 @@ async function run() {
   const names = ['window', 'document', 'requestAnimationFrame', 'cancelAnimationFrame', 'IS_REACT_ACT_ENVIRONMENT']
   const originals = names.map(name => Object.getOwnPropertyDescriptor(globalThis, name))
   const frames = new Map()
+  const originalNow = Date.now
+  let gestureTime = 1000
+  Date.now = () => gestureTime
   let frameId = 0
   Object.assign(globalThis, {
     window: dom.window, document: dom.window.document, IS_REACT_ACT_ENVIRONMENT: true,
@@ -74,7 +77,7 @@ async function run() {
     const render = async patch => React.act(async () => root.render(React.createElement(AppActionSheet, { ...props, ...patch })))
     const handle = () => container.querySelector('.app-action-sheet__drag-handle').taroProps
     const send = async (name, touches, changedTouches) => React.act(async () => handle()[name](event(touches, changedTouches)))
-    const start = async () => send('onTouchStart', [point(100, 100)])
+    const start = async () => { gestureTime = 1000; await send('onTouchStart', [point(100, 100)]) }
     const move = async (y, x = 100) => send('onTouchMove', [point(x, y)])
     const end = async (y, x = 100) => send('onTouchEnd', [], [point(x, y)])
     const transform = () => container.querySelector('.app-action-sheet').style.transform
@@ -86,8 +89,8 @@ async function run() {
     assert.equal(handle().catchMove, true, '只有把手应阻止滚动穿透')
     await start(); await move(130)
     const draggedOffset = Number(transform().match(/translateY\((.+)px\)/)?.[1])
-    assert.ok(Math.abs(draggedOffset - 21.6) < 0.001, '稳定面板保留阻尼位移')
-    await React.act(() => new Promise(resolve => setTimeout(resolve, 210)))
+    assert.equal(draggedOffset, 30, '真实操作面板沿用上游无阻尼位移')
+    gestureTime += 210
     await end(130)
     assert.equal(closes, 0, '慢速短拖不能关闭')
     assert.equal(transform(), '', '短拖释放位移以允许CSS回弹')
@@ -116,6 +119,8 @@ async function run() {
     assert.equal(closes, 1, '关闭请求与其他关闭入口不应重复调用')
     await render({ visible: false })
     assert.ok(container.querySelector('.app-action-sheet-layer--exit'), '关闭必须复用原退出生命周期')
+    assert.equal(transform(), '', '关闭后的inline位移不能覆盖退出translateY(100%)')
+    assert.equal(container.querySelector('.app-action-sheet--dragging'), null, '退出时不能残留transition:none拖动类')
     await render({ visible: true })
     await frame(); await frame()
     assert.equal(transform(), '', '退出中快速重开无残留位移')
@@ -132,6 +137,21 @@ async function run() {
     await end(301)
     assert.equal(closes, 2, '回前台不能复用旧手势')
 
+    await start(); await move(110); gestureTime += 199; await end(110)
+    assert.equal(closes, 2, '恰好10px不触发上游快速关闭阈值')
+    await start(); await move(111); gestureTime += 200; await end(111)
+    assert.equal(closes, 2, '恰好200ms不触发上游快速关闭阈值')
+    await start(); await move(300); gestureTime += 500; await end(300)
+    assert.equal(closes, 2, '恰好200px慢拖不触发关闭')
+    await start(); await move(111); gestureTime += 199; await end(111)
+    assert.equal(closes, 3, '11px且199ms快速手势应采用上游关闭规则')
+    await render({ visible: false }); await render({ visible: true })
+    await frame(); await frame()
+    await start(); await move(301); gestureTime += 500; await end(301)
+    assert.equal(closes, 4, '慢速超过200px仍可关闭')
+    await render({ visible: false }); await render({ visible: true })
+    await frame(); await frame()
+
     const tracker = createSheetDrag()
     tracker.start([point(0, 0)])
     assert.equal(tracker.move([point(0, 30)]).offset, 21.599999999999998, '评论面板的旧阻尼保持不变')
@@ -146,17 +166,18 @@ async function run() {
     }).css
     assert.match(css, /min-height: 44PX/, '把手触控区至少44物理像素')
     assert.match(css, /prefers-reduced-motion/, '保留减少动态效果支持')
-    assert.match(css, /transition: transform 220ms/, '稳定面板使用transform进入退出')
+    assert.match(css, /transition: transform 200ms ease-out/, '面板沿用上游200ms ease-out进入退出')
     assert.match(css, /translateY\(100%\)/, '关闭面板完整退场')
-    assert.doesNotMatch(css, /--taro-ux-sheet-bottom|blur\(64px\)/, '钱包不再依赖实验面板覆盖')
+    assert.doesNotMatch(css, /--taro-ux-sheet-bottom/, '位移只用transform，不引入改变布局的bottom覆盖')
     await start(); await move(301)
     const detachedHandle = handle()
     await React.act(async () => root.unmount())
     await React.act(async () => detachedHandle.onTouchEnd(event([], [point(100, 301)])))
-    assert.equal(closes, 2, '卸载后抬手不得关闭面板')
+    assert.equal(closes, 4, '卸载后抬手不得关闭面板')
   } finally {
     await React.act(async () => root.unmount())
     dom.window.close()
+    Date.now = originalNow
     names.forEach((name, i) => originals[i] ? Object.defineProperty(globalThis, name, originals[i]) : delete globalThis[name])
   }
   console.log('sheet dismiss: PASS (real sheet, handle-only drag, rebound, cancel, multitouch, loading, close deduplication, fast reopen)')

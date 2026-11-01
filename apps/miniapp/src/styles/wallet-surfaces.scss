@@ -1,0 +1,52 @@
+@use './design-tokens.scss' as *;
+
+// Local to the two wallets. Keep the app's blue, typography and navigation.
+// Frost is progressive enhancement: older WeChat WebViews retain solid cards.
+@mixin canvas {
+  --wallet-glass: rgba(255, 255, 255, .72);
+  --wallet-edge: rgba(255, 255, 255, .86);
+  --wallet-shadow: rgba(36, 72, 112, .06);
+  background: $bg-app;
+  background-image: radial-gradient(ellipse at 6% 12%, rgba(91, 164, 235, .14), transparent 56%);
+  @media (prefers-color-scheme: dark) {
+    --wallet-glass: rgba(29, 41, 55, .76);
+    --wallet-edge: rgba(152, 185, 219, .14);
+    --wallet-shadow: rgba(0, 8, 18, .18);
+  }
+}
+
+@mixin glass {
+  background: $bg-surface;
+  border: 1rpx solid $border-subtle;
+  border-radius: 28rpx;
+  box-shadow: 0 8rpx 28rpx var(--wallet-shadow), inset 0 1rpx 0 var(--wallet-edge);
+  @supports ((backdrop-filter: blur(1PX)) or (-webkit-backdrop-filter: blur(1PX))) {
+    background: var(--wallet-glass);
+    border-color: var(--wallet-edge);
+    -webkit-backdrop-filter: blur(18PX);
+    backdrop-filter: blur(18PX);
+  }
+}
+
+@mixin balance {
+  position: relative;
+  box-sizing: border-box;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 30rpx;
+  border: 1rpx solid rgba(255, 255, 255, .35);
+  color: #fff;
+  background: #286fbd;
+  background-image: linear-gradient(115deg, rgba(255, 255, 255, .2), transparent 62%), linear-gradient(165deg, rgba(71, 149, 224, .88), rgba(35, 102, 180, .94));
+  box-shadow: inset 0 2rpx 0 rgba(255, 255, 255, .22), 0 16rpx 36rpx -16rpx rgba(28, 88, 154, .32);
+  @supports ((backdrop-filter: blur(1PX)) or (-webkit-backdrop-filter: blur(1PX))) {
+    background-color: rgba(37, 110, 190, .88);
+    -webkit-backdrop-filter: blur(24PX);
+    backdrop-filter: blur(24PX);
+  }
+  @media (prefers-color-scheme: dark) {
+    background-color: rgba(30, 82, 139, .94);
+    background-image: linear-gradient(115deg, rgba(127, 188, 244, .12), transparent 62%), linear-gradient(165deg, rgba(40, 110, 180, .8), rgba(25, 66, 116, .92));
+    border-color: rgba(168, 207, 245, .22);
+  }
+}
