@@ -29,6 +29,7 @@ type eventSQLState struct {
 	failDeliveryInsert     bool
 	failDeliveryUpdate     bool
 	failSubscriptionUpdate bool
+	failInsertTable        string
 	queries                []string
 }
 type eventSQLConnector struct{ state *eventSQLState }
@@ -58,7 +59,7 @@ func (c *eventSQLConn) BeginTx(context.Context, driver.TxOptions) (driver.Tx, er
 	if c.working != nil {
 		return nil, errors.New("nested transaction")
 	}
-	c.working = &eventSQLState{tables: map[string][]map[string]driver.Value{}, now: c.state.now, failDeliveryInsert: c.state.failDeliveryInsert, failDeliveryUpdate: c.state.failDeliveryUpdate, failSubscriptionUpdate: c.state.failSubscriptionUpdate}
+	c.working = &eventSQLState{tables: map[string][]map[string]driver.Value{}, now: c.state.now, failDeliveryInsert: c.state.failDeliveryInsert, failDeliveryUpdate: c.state.failDeliveryUpdate, failSubscriptionUpdate: c.state.failSubscriptionUpdate, failInsertTable: c.state.failInsertTable}
 	for table, rows := range c.state.tables {
 		for _, row := range rows {
 			copyRow := map[string]driver.Value{}
@@ -102,6 +103,9 @@ func (c *eventSQLConn) ExecContext(_ context.Context, query string, args []drive
 	c.state.queries = append(c.state.queries, query)
 	if match := eventInsertPattern.FindStringSubmatch(query); len(match) > 0 {
 		table := match[1]
+		if table == s.failInsertTable {
+			return nil, errors.New("simulated insert failure")
+		}
 		if table == "delivery_notification_deliveries" && s.failDeliveryInsert {
 			return nil, errors.New("simulated delivery insert failure")
 		}
@@ -114,6 +118,12 @@ func (c *eventSQLConn) ExecContext(_ context.Context, query string, args []drive
 			keys := []string{"event_public_id", "recipient_user_id", "purpose"}
 			if table == "delivery_notification_deliveries" {
 				keys = append(keys, "channel")
+			}
+			if table == "im_notification_receipts" {
+				keys = []string{"sdk_app_id", "provider_message_id", "sender_account", "recipient_account"}
+			}
+			if table == "delivery_notification_events" {
+				keys = []string{"aggregate_type", "aggregate_public_id", "aggregate_version", "event_type"}
 			}
 			match := true
 			for _, key := range keys {

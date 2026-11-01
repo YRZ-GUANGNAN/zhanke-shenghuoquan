@@ -82,3 +82,20 @@ func TestIMCallbackDistinguishesGroupCoordinates(t *testing.T) {
 		t.Fatal("oversized group accepted")
 	}
 }
+
+func TestIMCallbackMetadataDecoderRetainsOnlyWhitelistedScalars(t *testing.T) {
+	fields, err := decodeCallbackMetadata([]byte(c2cFixture))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, raw := range fields {
+		if name == "MsgBody" || strings.Contains(string(raw), "private-message-never-retained") {
+			t.Fatal("decoder retained private content")
+		}
+	}
+	for _, raw := range []string{`{"MsgKey":{"body":"private","body":"duplicate"}}`, `{"MsgSeq":[1,2]}`, `{"Extra":{"nested":{"a":1,"a":2}}}`} {
+		if _, err := decodeCallbackMetadata([]byte(raw)); err == nil {
+			t.Fatal("nested metadata or duplicate unknown key accepted")
+		}
+	}
+}

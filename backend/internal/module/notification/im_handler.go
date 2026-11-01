@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -77,7 +78,10 @@ func (h *IMCallbackHandler) Register(group *gin.RouterGroup) {
 func (h *IMCallbackHandler) Handle(c *gin.Context) { h.handle(c) }
 
 func (h *IMCallbackHandler) handle(c *gin.Context) {
-	if h == nil || c == nil || h.Identity == nil || h.Events == nil {
+	if c == nil {
+		return
+	}
+	if h == nil || h.Identity == nil || h.Events == nil {
 		c.Status(http.StatusServiceUnavailable)
 		return
 	}
@@ -199,22 +203,26 @@ func (h *IMCallbackHandler) clock(fallback time.Time) time.Time {
 }
 
 func validIMNotificationRelation(value IMNotificationRelation, senderID, recipientID uint64) bool {
-	return value.SenderUserID == senderID && value.RecipientUserID == recipientID &&
+	return senderID > 0 && recipientID > 0 && senderID != recipientID &&
+		value.SenderUserID == senderID && value.RecipientUserID == recipientID &&
 		value.SenderActive && value.RecipientActive && value.Allowed && !value.Blocked &&
-		value.ConversationPublicID != "" && validTargetPath(value.TargetPath)
+		safeText(value.ConversationPublicID, 128, true) && validTargetPath(value.TargetPath)
 }
 
 func validTargetPath(value string) bool {
-	value = strings.TrimSpace(value)
-	return value != "" && len(value) <= 256 && strings.HasPrefix(value, "/") &&
-		!strings.ContainsAny(value, "\r\n\x00")
+	if value != strings.TrimSpace(value) || len(value) > 256 || !strings.HasPrefix(value, "/pages/") || strings.ContainsAny(value, "\r\n\x00\\") {
+		return false
+	}
+	parsed, err := url.Parse(value)
+	return err == nil && parsed.Scheme == "" && parsed.Host == "" && parsed.Fragment == "" &&
+		!strings.Contains(parsed.Path, "..") && !strings.Contains(parsed.Path, "//")
 }
 
 // BuildPrivateMessageEvent creates a metadata-only notification event. The
 // event payload intentionally excludes provider accounts and all message
 // content; the local relation and user IDs are sufficient for expansion.
 func BuildPrivateMessageEvent(callback IMCallback, relation IMNotificationRelation) (Event, error) {
-	if callback.ConversationType != IMCallbackC2C || callback.SDKAppID == 0 || callback.ProviderMessageID == "" || callback.OccurredAt.IsZero() || !validIMNotificationRelation(relation, relation.SenderUserID, relation.RecipientUserID) {
+	if callback.ConversationType != IMCallbackC2C || callback.SDKAppID == 0 || !safeText(callback.ProviderMessageID, 128, true) || callback.UnreadMessageCount < 0 || callback.OccurredAt.IsZero() || !validIMNotificationRelation(relation, relation.SenderUserID, relation.RecipientUserID) {
 		return Event{}, ErrInvalidRecord
 	}
 	version := privateMessageVersion(callback)

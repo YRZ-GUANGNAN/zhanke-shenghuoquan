@@ -24,14 +24,6 @@ type Repository interface {
 	RecordCallbackOnce(ctx context.Context, receipt CallbackReceipt) (bool, error)
 }
 
-// CallbackEventSink is the atomic persistence boundary used by the Tencent IM
-// callback bridge. A receipt and its corresponding notification event are
-// either both recorded or neither is recorded. Repeated provider callbacks
-// return inserted=false without creating another event.
-type CallbackEventSink interface {
-	RecordCallbackAndEvent(ctx context.Context, receipt CallbackReceipt, event Event) (bool, error)
-}
-
 type GormRepository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *GormRepository { return &GormRepository{db: db} }
@@ -330,28 +322,33 @@ func (r *GormRepository) RecordCallbackAndEvent(ctx context.Context, receipt Cal
 		inserted = true
 		return nil
 	})
-	return inserted, err
+	return inserted && err == nil, err
 }
 
 func validCallbackReceipt(receipt CallbackReceipt) bool {
 	return receipt.SDKAppID > 0 && safeText(receipt.ProviderMessageID, 128, true) &&
-		receipt.SenderUserID > 0 && receipt.RecipientUserID > 0 &&
+		receipt.SenderUserID > 0 && receipt.RecipientUserID > 0 && receipt.SenderUserID != receipt.RecipientUserID &&
 		safeText(receipt.SenderAccount, 64, true) && safeText(receipt.RecipientAccount, 64, true) &&
+		receipt.SenderAccount != receipt.RecipientAccount &&
 		callbackHashPattern.MatchString(receipt.CallbackHash) && safeText(receipt.ConversationPublicID, 128, false) &&
-		(receipt.ConversationType == "c2c" || receipt.ConversationType == "group") && !receipt.OccurredAt.IsZero() && !receipt.CreatedAt.IsZero()
+		(receipt.ConversationType == "c2c" || receipt.ConversationType == "group") && !receipt.OccurredAt.IsZero() && !receipt.CreatedAt.IsZero() &&
+		(receipt.Status == "" || receipt.Status == "received")
 }
 
 func validPrivateMessageEventCoordinate(receipt CallbackReceipt, event Event) bool {
-	if event.EventPublicID == "" || event.EventType != EventPrivateMessageReceived ||
-		event.AggregateType != "im_conversation" || event.AggregatePublicID != receipt.ConversationPublicID ||
-		event.AggregateVersion == 0 || event.PayloadVersion == 0 || event.OccurredAt.IsZero() || event.CreatedAt.IsZero() || event.UpdatedAt.IsZero() {
+	if !validID(event.EventPublicID) || event.EventType != EventPrivateMessageReceived ||
+		event.AggregateType != "im_conversation" || event.AggregatePublicID == "" || event.AggregatePublicID != receipt.ConversationPublicID ||
+		event.AggregateVersion != privateMessageVersion(IMCallback{SDKAppID: receipt.SDKAppID, ProviderMessageID: receipt.ProviderMessageID, SenderAccount: receipt.SenderAccount, RecipientAccount: receipt.RecipientAccount}) ||
+		event.PayloadVersion != 1 || !event.OccurredAt.Equal(receipt.OccurredAt) || event.CreatedAt.IsZero() || event.UpdatedAt.IsZero() || !validMetadata(event.Payload) {
 		return false
 	}
 	var payload struct {
-		SenderUserID    uint64 `json:"senderUserId"`
-		RecipientUserID uint64 `json:"recipientUserId"`
+		SenderUserID      uint64 `json:"senderUserId"`
+		RecipientUserID   uint64 `json:"recipientUserId"`
+		ProviderMessageID string `json:"providerMessageId"`
+		TargetPath        string `json:"targetPath"`
 	}
-	if json.Unmarshal(event.Payload, &payload) != nil || payload.SenderUserID != receipt.SenderUserID || payload.RecipientUserID != receipt.RecipientUserID {
+	if json.Unmarshal(event.Payload, &payload) != nil || payload.SenderUserID != receipt.SenderUserID || payload.RecipientUserID != receipt.RecipientUserID || payload.ProviderMessageID != receipt.ProviderMessageID || !validTargetPath(payload.TargetPath) {
 		return false
 	}
 	return true

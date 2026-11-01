@@ -261,8 +261,17 @@ func decodeCallbackMetadata(body []byte) (map[string]json.RawMessage, error) {
 		}
 		seen[key] = struct{}{}
 		if known[key] {
-			var raw json.RawMessage
-			if err := decoder.Decode(&raw); err != nil || len(raw) == 0 {
+			value, err := decoder.Token()
+			if err != nil {
+				return nil, ErrIMCallbackPayload
+			}
+			// Every whitelisted field is a scalar. Never retain an attacker-
+			// supplied nested body hidden behind an otherwise known key.
+			if _, nested := value.(json.Delim); nested {
+				return nil, ErrIMCallbackPayload
+			}
+			raw, err := json.Marshal(value)
+			if err != nil {
 				return nil, ErrIMCallbackPayload
 			}
 			fields[key] = raw

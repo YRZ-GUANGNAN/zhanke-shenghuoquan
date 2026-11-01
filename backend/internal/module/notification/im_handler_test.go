@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -17,9 +18,10 @@ import (
 )
 
 type callbackIdentityFake struct {
-	accounts map[string]uint64
-	relation IMNotificationRelation
-	err      error
+	accounts    map[string]uint64
+	relation    IMNotificationRelation
+	err         error
+	relationErr error
 }
 
 func (f callbackIdentityFake) ResolveIMAccount(_ context.Context, account string) (uint64, error) {
@@ -29,6 +31,9 @@ func (f callbackIdentityFake) ResolveIMAccount(_ context.Context, account string
 	return f.accounts[account], nil
 }
 func (f callbackIdentityFake) ResolveC2CRelation(_ context.Context, sender, recipient uint64) (IMNotificationRelation, error) {
+	if f.relationErr != nil {
+		return IMNotificationRelation{}, f.relationErr
+	}
 	if f.err != nil {
 		return IMNotificationRelation{}, f.err
 	}
@@ -167,5 +172,58 @@ func TestBuildPrivateMessageEventRequiresTrustedRelation(t *testing.T) {
 		if _, err := BuildPrivateMessageEvent(callback, copy); err == nil {
 			t.Fatalf("untrusted relation accepted: %+v", copy)
 		}
+	}
+}
+
+func TestIMCallbackHandlerRetriesOnlyTransientFailures(t *testing.T) {
+	now := time.Unix(1793500000, 0).UTC()
+	cfg := IMCallbackConfig{SDKAppID: 1400000000, Token: "local-callback-test-token", Now: func() time.Time { return now }}
+	for _, test := range []struct {
+		name                             string
+		mappingErr, relationErr, sinkErr error
+		want                             int
+	}{
+		{"unknown mapping", ErrIMCallbackRelation, nil, nil, http.StatusOK},
+		{"mapping outage", errors.New("db private data"), nil, nil, http.StatusServiceUnavailable},
+		{"relation rejected", nil, ErrIMCallbackRelation, nil, http.StatusOK},
+		{"relation outage", nil, errors.New("storage private data"), nil, http.StatusServiceUnavailable},
+		{"persistence outage", nil, nil, errors.New("database private data"), http.StatusServiceUnavailable},
+		{"valid", nil, nil, nil, http.StatusOK},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			sink := &callbackEventSinkFake{err: test.sinkErr}
+			identity := callbackIdentityFake{accounts: map[string]uint64{"sender": 11, "recipient": 12},
+				relation: IMNotificationRelation{SenderActive: true, RecipientActive: true, Allowed: true, ConversationPublicID: "im-pair:11:12", TargetPath: "/pages/secondhand-chat/index?relationId=4"}, err: test.mappingErr, relationErr: test.relationErr}
+			router := gin.New()
+			NewIMCallbackHandler(cfg, identity, sink).Register(router.Group("/notification/tencent-im"))
+			out := httptest.NewRecorder()
+			router.ServeHTTP(out, signedCallbackRequest(now, cfg, c2cFixture))
+			if out.Code != test.want || strings.Contains(out.Body.String(), "private data") || strings.Contains(out.Body.String(), "sender") {
+				t.Fatalf("status=%d body=%s", out.Code, out.Body.String())
+			}
+			if test.want == http.StatusOK && out.Body.String() != `{"ActionStatus":"OK","ErrorCode":0,"ErrorInfo":""}` {
+				t.Fatalf("invalid ACK: %s", out.Body.String())
+			}
+		})
+	}
+}
+
+func TestPrivateMessageVersionUsesFullProviderCoordinate(t *testing.T) {
+	base := IMCallback{SDKAppID: 1400000000, SenderAccount: "a", RecipientAccount: "b", ProviderMessageID: "key", MsgSequence: 3}
+	version := privateMessageVersion(base)
+	for _, mutate := range []func(*IMCallback){
+		func(c *IMCallback) { c.SDKAppID++ },
+		func(c *IMCallback) { c.ProviderMessageID = "next" },
+		func(c *IMCallback) { c.SenderAccount, c.RecipientAccount = c.RecipientAccount, c.SenderAccount },
+	} {
+		copy := base
+		mutate(&copy)
+		if privateMessageVersion(copy) == version {
+			t.Fatal("distinct callback coordinate collided")
+		}
+	}
+	base.MsgSequence++
+	if privateMessageVersion(base) != version {
+		t.Fatal("non-global sequence entered callback idempotency")
 	}
 }

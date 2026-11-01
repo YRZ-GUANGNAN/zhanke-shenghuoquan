@@ -24,7 +24,10 @@ func (s *Service) ResolveIMAccount(ctx context.Context, imUserID string) (uint64
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return 0, ErrNotificationIdentityUnavailable
 	}
-	if err != nil || mapping.UserID == 0 {
+	if err != nil {
+		return 0, err
+	}
+	if mapping.UserID == 0 || mapping.IMUserID != imUserID {
 		return 0, ErrNotificationIdentityUnavailable
 	}
 	return uint64(mapping.UserID), nil
@@ -44,6 +47,6 @@ func (s *Service) FindUserConversation(ctx context.Context, senderID, recipientI
 	if err != nil || !found {
 		return ConversationContext{}, found, err
 	}
-	result, err := s.contextForParticipant(ctx, value, senderID)
+	result, err := s.contextForParticipant(ctx, value, recipientID)
 	return result, true, err
 }
