@@ -67,7 +67,7 @@ func (r *GormRepository) Transition(
 				return err
 			}
 			if to == StatusDelivered {
-				_, _, _, err := settleDeliveredOrderTx(tx, result, updatedAt)
+				_, _, _, err := settleDeliveredOrderTx(tx, result, updatedAt, r.notificationAppender)
 				return err
 			}
 			return nil
@@ -93,7 +93,7 @@ func (r *GormRepository) Transition(
 		result.RowVersion++
 		result.UpdatedAt = updatedAt
 		if to == StatusDelivered {
-			if _, _, _, err := settleDeliveredOrderTx(tx, result, updatedAt); err != nil {
+			if _, _, _, err := settleDeliveredOrderTx(tx, result, updatedAt, r.notificationAppender); err != nil {
 				return err
 			}
 		}

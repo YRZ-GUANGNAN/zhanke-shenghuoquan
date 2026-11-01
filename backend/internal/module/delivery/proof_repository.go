@@ -61,7 +61,7 @@ func (r *GormRepository) CreateProofAndTransition(
 				return ErrConcurrentUpdate
 			}
 			if to == StatusDelivered {
-				if _, _, _, err := settleDeliveredOrderTx(tx, order, now); err != nil {
+				if _, _, _, err := settleDeliveredOrderTx(tx, order, now, r.notificationAppender); err != nil {
 					return err
 				}
 			}
@@ -102,7 +102,7 @@ func (r *GormRepository) CreateProofAndTransition(
 		order.RowVersion++
 		order.UpdatedAt = now
 		if to == StatusDelivered {
-			if _, _, _, err := settleDeliveredOrderTx(tx, order, now); err != nil {
+			if _, _, _, err := settleDeliveredOrderTx(tx, order, now, r.notificationAppender); err != nil {
 				return err
 			}
 		}

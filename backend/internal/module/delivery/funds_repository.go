@@ -38,6 +38,12 @@ type FundsRepository interface {
 	FindOrderFundsOwned(context.Context, string, uint64) (OrderFundsSnapshot, error)
 }
 
+func (r *GormRepository) FindRefund(ctx context.Context, refundPublicID string) (Refund, error) {
+	var result Refund
+	err := r.db.WithContext(ctx).Where("refund_public_id = ?", refundPublicID).First(&result).Error
+	return result, normalizeNotFound(err)
+}
+
 var _ FundsRepository = (*GormRepository)(nil)
 
 type FundsResult struct {
@@ -474,6 +480,11 @@ func (r *GormRepository) CreditMockRecharge(ctx context.Context, attempt *Paymen
 		if _, err := createRechargeFundingLotTx(tx, wallet, *attempt, now); err != nil {
 			return err
 		}
+		if err := appendFinancialNotificationTx(tx, r.notificationAppender, EventMerchantWalletRecharged, attempt.PaymentPublicID, attempt.RowVersion,
+			MerchantWalletNotificationPayload{PaymentPublicID: attempt.PaymentPublicID, MerchantUserID: attempt.MerchantUserID,
+				AmountCents: attempt.AmountCents, Status: string(attempt.Status)}, now); err != nil {
+			return err
+		}
 		result = FundsResult{Wallet: &wallet, Ledger: &ledger, Attempt: attempt}
 		return nil
 	})
@@ -566,6 +577,11 @@ func (r *GormRepository) ConfirmWechatPayment(ctx context.Context, input Payment
 				return err
 			}
 			if _, err := createRechargeFundingLotTx(tx, wallet, attempt, input.PaidAt); err != nil {
+				return err
+			}
+			if err := appendFinancialNotificationTx(tx, r.notificationAppender, EventMerchantWalletRecharged, attempt.PaymentPublicID, attempt.RowVersion,
+				MerchantWalletNotificationPayload{PaymentPublicID: attempt.PaymentPublicID, MerchantUserID: attempt.MerchantUserID,
+					AmountCents: attempt.AmountCents, Status: string(attempt.Status)}, input.PaidAt); err != nil {
 				return err
 			}
 			result.Wallet, result.Ledger = &wallet, &ledger
@@ -699,6 +715,9 @@ func (r *GormRepository) RequestRefund(ctx context.Context, request RefundReques
 		if err := tx.Create(&refund).Error; err != nil {
 			return err
 		}
+		if err := appendRefundNotificationTx(tx, r.notificationAppender, nil, refund, request.Now); err != nil {
+			return err
+		}
 		if CanTransition(order.Status, StatusCancelled) {
 			before := order
 			updates, err := buildTransitionUpdates(order, order.Status, StatusCancelled, nil, request.Now)
@@ -763,6 +782,7 @@ func (r *GormRepository) ObserveRefund(ctx context.Context, input RefundObservat
 			result = RefundResult{Refund: refund, Settlement: settlement}
 			return nil
 		}
+		before := refund
 		refundID := strings.TrimSpace(input.WechatRefundID)
 		status := RefundRetryPending
 		settlementStatus := SettlementRefundPending
@@ -844,6 +864,9 @@ func (r *GormRepository) ObserveRefund(ctx context.Context, input RefundObservat
 			refund.NextVerifyAt = nil
 		}
 		result = RefundResult{Refund: refund, Settlement: settlement}
+		if err := appendRefundNotificationTx(tx, r.notificationAppender, &before, refund, input.ObservedAt); err != nil {
+			return err
+		}
 		return nil
 	})
 	return result, err

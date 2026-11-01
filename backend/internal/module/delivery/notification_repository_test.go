@@ -83,3 +83,74 @@ func TestOrderNotificationRetainsFormerRiderOnRelease(t *testing.T) {
 		t.Fatal("release recipient lost")
 	}
 }
+
+func TestFinancialNotificationPayloadIsMetadataOnlyAndVersioned(t *testing.T) {
+	now := time.Now().UTC()
+	event, err := newMetadataNotificationEvent(EventRiderIncomeRecorded,
+		"01J00000000000000000000811", 3, RiderIncomeNotificationPayload{
+			EarningPublicID: "01J00000000000000000000812", OrderPublicID: "01J00000000000000000000813",
+			RiderUserID: 61, AmountCents: 120, SettlementStatus: string(RiderEarningPending)}, now)
+	if err != nil || event.AggregateVersion != 3 || event.EventType != EventRiderIncomeRecorded {
+		t.Fatalf("invalid financial event: %#v %v", event, err)
+	}
+	for _, forbidden := range []string{"openid", "phone", "address", "secret", "paymentReference", "note"} {
+		if strings.Contains(strings.ToLower(string(event.Payload)), strings.ToLower(forbidden)) {
+			t.Fatalf("sensitive key leaked: %s", forbidden)
+		}
+	}
+}
+
+func TestFinancialNotificationPortPreservesTransactionAndDisabledPath(t *testing.T) {
+	tx := &gorm.DB{}
+	want := errors.New("event persistence failed")
+	event, err := newMetadataNotificationEvent(EventRiderWithdrawalChanged,
+		"01J00000000000000000000811", 1, RiderWithdrawalNotificationPayload{
+			WithdrawPublicID: "01J00000000000000000000812", RiderUserID: 61, AmountCents: 100, Status: string(RiderWithdrawalProcessing)}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	appendEvent := func(got *gorm.DB, _ NotificationEvent) error {
+		calls++
+		if got != tx {
+			t.Fatal("appender received a different transaction")
+		}
+		return want
+	}
+	if !errors.Is(appendMetadataNotificationTx(tx, appendEvent, event), want) || calls != 1 {
+		t.Fatal("financial event failure must abort caller transaction")
+	}
+	if appendMetadataNotificationTx(nil, nil, NotificationEvent{}) != nil {
+		t.Fatal("disabled rollout changed legacy behavior")
+	}
+	if appendFinancialNotificationTx(nil, nil, "", "", 0, nil, time.Time{}) != nil {
+		t.Fatal("disabled rollout must skip financial event generation")
+	}
+}
+
+func TestRefundNotificationOnlyAppendsOnVisibleStatusChange(t *testing.T) {
+	before := Refund{RefundPublicID: "01J00000000000000000000811", DeliveryOrderPublicID: "01J00000000000000000000812",
+		MerchantUserID: 42, AmountCents: 150, Status: RefundRetryPending, RowVersion: 3}
+	after := before
+	after.RowVersion++
+	calls := 0
+	appendEvent := func(_ *gorm.DB, event NotificationEvent) error {
+		calls++
+		if event.AggregateVersion != after.RowVersion || event.AggregatePublicID != before.RefundPublicID {
+			t.Fatal("notification is not bound to business version")
+		}
+		return nil
+	}
+	tx := &gorm.DB{}
+	if err := appendRefundNotificationTx(tx, appendEvent, &before, after, time.Now()); err != nil || calls != 0 {
+		t.Fatalf("repeated processing generated notification: calls=%d err=%v", calls, err)
+	}
+	after.Status = RefundSucceeded
+	if err := appendRefundNotificationTx(tx, appendEvent, &before, after, time.Now()); err != nil || calls != 1 {
+		t.Fatalf("success event missing: calls=%d err=%v", calls, err)
+	}
+	after.RowVersion++
+	if err := appendRefundNotificationTx(tx, appendEvent, &before, after, time.Now()); !errors.Is(err, ErrInvalidRecord) || calls != 1 {
+		t.Fatal("unbound version accepted")
+	}
+}

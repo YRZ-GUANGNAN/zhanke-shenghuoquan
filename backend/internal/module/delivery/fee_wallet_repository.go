@@ -226,6 +226,12 @@ func (r *GormRepository) FindRiderEarning(ctx context.Context, earningPublicID s
 	return result, normalizeNotFound(err)
 }
 
+func (r *GormRepository) FindRiderPayout(ctx context.Context, payoutPublicID string) (RiderPayoutRecord, error) {
+	var result RiderPayoutRecord
+	err := r.db.WithContext(ctx).Where("payout_public_id = ?", payoutPublicID).First(&result).Error
+	return result, normalizeNotFound(err)
+}
+
 func (r *GormRepository) MarkRiderEarningPaidOffline(
 	ctx context.Context,
 	earningPublicID string,
@@ -339,13 +345,18 @@ func (r *GormRepository) MarkRiderEarningPaidOffline(
 		earning.PaidOfflineAt = timePointer(now)
 		earning.RowVersion++
 		earning.UpdatedAt = now
+		if err := appendFinancialNotificationTx(tx, r.notificationAppender, EventRiderPayoutCompleted, payout.PayoutPublicID, payout.RowVersion,
+			RiderPayoutNotificationPayload{PayoutPublicID: payout.PayoutPublicID, EarningPublicID: payout.EarningPublicID,
+				RiderUserID: payout.RiderUserID, AmountCents: payout.AmountCents, Status: string(earning.SettlementStatus)}, now); err != nil {
+			return err
+		}
 		result = RiderPayoutResult{Wallet: wallet, Earning: earning, Ledger: ledger, Payout: payout}
 		return nil
 	})
 	return result, err
 }
 
-func settleDeliveredOrderTx(tx *gorm.DB, order Order, now time.Time) (RiderEarningRecord, RiderWallet, RiderLedger, error) {
+func settleDeliveredOrderTx(tx *gorm.DB, order Order, now time.Time, appenders ...NotificationEventAppender) (RiderEarningRecord, RiderWallet, RiderLedger, error) {
 	if order.Status != StatusDelivered || order.RiderUserID == nil || *order.RiderUserID == 0 {
 		return RiderEarningRecord{}, RiderWallet{}, RiderLedger{}, ErrInvalidRecord
 	}
@@ -405,6 +416,13 @@ func settleDeliveredOrderTx(tx *gorm.DB, order Order, now time.Time) (RiderEarni
 	}
 	if err := tx.Create(&ledger).Error; err != nil {
 		return RiderEarningRecord{}, RiderWallet{}, RiderLedger{}, err
+	}
+	if len(appenders) > 0 && appenders[0] != nil {
+		if err := appendFinancialNotificationTx(tx, appenders[0], EventRiderIncomeRecorded, earning.EarningPublicID, earning.RowVersion,
+			RiderIncomeNotificationPayload{EarningPublicID: earning.EarningPublicID, OrderPublicID: earning.DeliveryOrderPublicID,
+				RiderUserID: earning.RiderUserID, AmountCents: earning.RiderFeeCents, SettlementStatus: string(earning.SettlementStatus)}, now); err != nil {
+			return RiderEarningRecord{}, RiderWallet{}, RiderLedger{}, err
+		}
 	}
 	return earning, wallet, ledger, nil
 }

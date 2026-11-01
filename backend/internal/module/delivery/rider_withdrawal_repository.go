@@ -20,6 +20,12 @@ type RiderWithdrawalRepository interface {
 
 var _ RiderWithdrawalRepository = (*GormRepository)(nil)
 
+func (r *GormRepository) FindRiderWithdrawal(ctx context.Context, withdrawPublicID string) (RiderWithdrawal, error) {
+	var result RiderWithdrawal
+	err := r.db.WithContext(ctx).Where("withdraw_public_id = ?", withdrawPublicID).First(&result).Error
+	return result, normalizeNotFound(err)
+}
+
 func (r *GormRepository) CreateRiderWithdrawal(
 	ctx context.Context,
 	riderUserID, amountCents uint64,
@@ -33,11 +39,15 @@ func (r *GormRepository) CreateRiderWithdrawal(
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Wallet first serializes new requests and retries from the same rider.
 		wallet, err := lockOrCreateRiderWalletTx(tx, riderUserID, now)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		var existing RiderWithdrawal
 		err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("idempotency_key = ?", idempotencyKey).First(&existing).Error
 		if err == nil {
-			if err := withdrawalReplay(existing, riderUserID, amountCents); err != nil { return err }
+			if err := withdrawalReplay(existing, riderUserID, amountCents); err != nil {
+				return err
+			}
 			result = existing
 			return nil
 		}
@@ -47,8 +57,12 @@ func (r *GormRepository) CreateRiderWithdrawal(
 		// Reservations are not subtracted from the stored wallet balance. Never
 		// allow the new request to spend funds held by the existing settlement queue.
 		reserved, err := activeRiderPayoutReservationAmountTx(tx, riderUserID)
-		if err != nil { return err }
-		if reserved > wallet.AvailableBalanceCents || amountCents > wallet.AvailableBalanceCents-reserved { return ErrWalletInsufficient }
+		if err != nil {
+			return err
+		}
+		if reserved > wallet.AvailableBalanceCents || amountCents > wallet.AvailableBalanceCents-reserved {
+			return ErrWalletInsufficient
+		}
 		withdrawID, err := NewULID()
 		if err != nil {
 			return err
@@ -75,10 +89,17 @@ func (r *GormRepository) CreateRiderWithdrawal(
 			UpdatedAt:        now,
 		}
 		if err := tx.Create(&result).Error; err != nil {
-			if isDuplicateKey(err) { return ErrIdempotencyConflict }
+			if isDuplicateKey(err) {
+				return ErrIdempotencyConflict
+			}
 			return err
 		}
-		return tx.Create(&ledger).Error
+		if err := tx.Create(&ledger).Error; err != nil {
+			return err
+		}
+		return appendFinancialNotificationTx(tx, r.notificationAppender, EventRiderWithdrawalChanged, result.WithdrawPublicID, result.RowVersion,
+			RiderWithdrawalNotificationPayload{WithdrawPublicID: result.WithdrawPublicID, RiderUserID: result.RiderUserID,
+				AmountCents: result.AmountCents, Status: string(result.Status)}, now)
 	})
 	return result, err
 }
@@ -125,14 +146,20 @@ func (r *GormRepository) ApproveRiderWithdrawal(
 		return RiderWithdrawal{}, ErrInvalidRecord
 	}
 	paymentReference = strings.TrimSpace(paymentReference)
-	if paymentReference == "" { return RiderWithdrawal{}, ErrWithdrawalPaymentRequired }
-	if len([]rune(paymentReference)) > 128 { return RiderWithdrawal{}, ErrInvalidRecord }
+	if paymentReference == "" {
+		return RiderWithdrawal{}, ErrWithdrawalPaymentRequired
+	}
+	if len([]rune(paymentReference)) > 128 {
+		return RiderWithdrawal{}, ErrInvalidRecord
+	}
 	var result RiderWithdrawal
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("withdraw_public_id = ?", withdrawPublicID).First(&result).Error; err != nil {
 			return normalizeWithdrawalNotFound(err)
 		}
-		if replay, err := withdrawalDecision(result, RiderWithdrawalPaid, expectedRowVersion, operatorUserID, idempotencyKey, "", paymentReference); err != nil || replay { return err }
+		if replay, err := withdrawalDecision(result, RiderWithdrawalPaid, expectedRowVersion, operatorUserID, idempotencyKey, "", paymentReference); err != nil || replay {
+			return err
+		}
 		processedAt := now
 		updates := map[string]any{
 			"status": RiderWithdrawalPaid, "processed_by": operatorUserID,
@@ -140,7 +167,9 @@ func (r *GormRepository) ApproveRiderWithdrawal(
 			"processed_at": processedAt, "row_version": gorm.Expr("row_version + 1"), "updated_at": now,
 		}
 		if update := tx.Model(&RiderWithdrawal{}).Where("id = ? AND row_version = ?", result.ID, expectedRowVersion).Updates(updates); update.Error != nil {
-			if isDuplicateKey(update.Error) { return ErrIdempotencyConflict }
+			if isDuplicateKey(update.Error) {
+				return ErrIdempotencyConflict
+			}
 			return update.Error
 		} else if update.RowsAffected != 1 {
 			return ErrConcurrentUpdate
@@ -153,7 +182,9 @@ func (r *GormRepository) ApproveRiderWithdrawal(
 		result.ProcessedAt = &processedAt
 		result.RowVersion++
 		result.UpdatedAt = now
-		return nil
+		return appendFinancialNotificationTx(tx, r.notificationAppender, EventRiderWithdrawalChanged, result.WithdrawPublicID, result.RowVersion,
+			RiderWithdrawalNotificationPayload{WithdrawPublicID: result.WithdrawPublicID, RiderUserID: result.RiderUserID,
+				AmountCents: result.AmountCents, Status: string(result.Status)}, now)
 	})
 	return result, err
 }
@@ -190,7 +221,9 @@ func (r *GormRepository) RejectRiderWithdrawal(
 		if result.RiderUserID != candidate.RiderUserID {
 			return ErrConcurrentUpdate
 		}
-		if replay, err := withdrawalDecision(result, RiderWithdrawalRejected, expectedRowVersion, operatorUserID, idempotencyKey, reason, ""); err != nil || replay { return err }
+		if replay, err := withdrawalDecision(result, RiderWithdrawalRejected, expectedRowVersion, operatorUserID, idempotencyKey, reason, ""); err != nil || replay {
+			return err
+		}
 		ledger, err := newRiderLedger(wallet, RiderLedgerCredit, RiderLedgerAdjustment, result.AmountCents,
 			"rider_withdrawal", result.WithdrawPublicID, idempotencyKey, now)
 		if err != nil {
@@ -200,7 +233,9 @@ func (r *GormRepository) RejectRiderWithdrawal(
 			return err
 		}
 		if err := tx.Create(&ledger).Error; err != nil {
-			if isDuplicateKey(err) { return ErrIdempotencyConflict }
+			if isDuplicateKey(err) {
+				return ErrIdempotencyConflict
+			}
 			return err
 		}
 		processedAt := now
@@ -209,7 +244,9 @@ func (r *GormRepository) RejectRiderWithdrawal(
 			"process_key": idempotencyKey, "process_version": expectedRowVersion,
 			"processed_at": processedAt, "row_version": gorm.Expr("row_version + 1"), "updated_at": now,
 		}); update.Error != nil {
-			if isDuplicateKey(update.Error) { return ErrIdempotencyConflict }
+			if isDuplicateKey(update.Error) {
+				return ErrIdempotencyConflict
+			}
 			return update.Error
 		} else if update.RowsAffected != 1 {
 			return ErrConcurrentUpdate
@@ -222,7 +259,9 @@ func (r *GormRepository) RejectRiderWithdrawal(
 		result.ProcessedAt = &processedAt
 		result.RowVersion++
 		result.UpdatedAt = now
-		return nil
+		return appendFinancialNotificationTx(tx, r.notificationAppender, EventRiderWithdrawalChanged, result.WithdrawPublicID, result.RowVersion,
+			RiderWithdrawalNotificationPayload{WithdrawPublicID: result.WithdrawPublicID, RiderUserID: result.RiderUserID,
+				AmountCents: result.AmountCents, Status: string(result.Status)}, now)
 	})
 	return result, err
 }
