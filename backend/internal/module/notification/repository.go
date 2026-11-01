@@ -111,7 +111,7 @@ func (r *GormRepository) CompleteDelivery(ctx context.Context, lease DeliveryLea
 	if lease.Item.ID == 0 || strings.TrimSpace(lease.LeaseToken) == "" || now.IsZero() || !terminalDeliveryStatus(status) {
 		return ErrInvalidRecord
 	}
-	result := r.db.WithContext(ctx).Model(&DeliveryItem{}).Where("id = ? AND status = ? AND row_version = ? AND lease_token = ?", lease.Item.ID, DeliveryProcessing, lease.Item.RowVersion, lease.LeaseToken).Updates(map[string]any{
+	result := r.db.WithContext(ctx).Model(&DeliveryItem{}).Where("id = ? AND status = ? AND row_version = ? AND lease_token = ? AND lease_expires_at > ?", lease.Item.ID, DeliveryProcessing, lease.Item.RowVersion, lease.LeaseToken, now).Updates(map[string]any{
 		"status": status, "lease_token": nil, "lease_expires_at": nil, "processed_at": now, "row_version": gorm.Expr("row_version + 1"), "updated_at": now,
 	})
 	if result.Error != nil {
@@ -141,7 +141,7 @@ func (r *GormRepository) FailDelivery(ctx context.Context, lease DeliveryLease, 
 		updates["next_attempt_at"] = nil
 		updates["processed_at"] = now
 	}
-	result := r.db.WithContext(ctx).Model(&DeliveryItem{}).Where("id = ? AND status = ? AND row_version = ? AND lease_token = ?", lease.Item.ID, DeliveryProcessing, lease.Item.RowVersion, lease.LeaseToken).Updates(updates)
+	result := r.db.WithContext(ctx).Model(&DeliveryItem{}).Where("id = ? AND status = ? AND row_version = ? AND lease_token = ? AND lease_expires_at > ?", lease.Item.ID, DeliveryProcessing, lease.Item.RowVersion, lease.LeaseToken, now).Updates(updates)
 	if result.Error != nil {
 		return "", result.Error
 	}
@@ -158,7 +158,17 @@ func (r *GormRepository) ReserveSubscription(ctx context.Context, userID uint64,
 	var result SubscriptionReservation
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var value Subscription
-		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("user_id = ? AND app_id = ? AND template_key = ? AND status = ? AND remaining_quota > 0 AND reservation_nonce IS NULL", userID, appID, templateKey, "accepted").Order("id DESC").First(&value).Error
+		// A request retry must reuse its prior occupied quota, including when
+		// another authorization has since become available.
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("user_id = ? AND app_id = ? AND template_key = ? AND reservation_nonce = ?", userID, appID, templateKey, nonce).First(&value).Error
+		if err == nil {
+			result = SubscriptionReservation{Subscription: value, Nonce: nonce}
+			return nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		err = tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("user_id = ? AND app_id = ? AND template_key = ? AND status = ? AND remaining_quota > 0 AND reservation_nonce IS NULL AND (expires_at IS NULL OR expires_at > ?)", userID, appID, templateKey, "accepted", now).Order("id DESC").First(&value).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrSubscriptionEmpty
 		}
