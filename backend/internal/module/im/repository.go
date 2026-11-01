@@ -17,6 +17,10 @@ type Repository interface {
 	EnsureConversationStable(context.Context, *Conversation) error
 	ListConversations(context.Context, uint, int, int, ...bool) ([]Conversation, int64, error)
 }
+
+type accountMappingLookup interface {
+	FindMappingByIMUserID(context.Context, string) (UserMapping, error)
+}
 type GormRepository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *GormRepository { return &GormRepository{db: db} }
@@ -31,6 +35,12 @@ func (r *GormRepository) EnsureMapping(ctx context.Context, value *UserMapping) 
 func (r *GormRepository) FindMapping(ctx context.Context, userID uint) (UserMapping, error) {
 	var value UserMapping
 	err := r.db.WithContext(ctx).Where("user_id = ?", userID).First(&value).Error
+	return value, err
+}
+
+func (r *GormRepository) FindMappingByIMUserID(ctx context.Context, imUserID string) (UserMapping, error) {
+	var value UserMapping
+	err := r.db.WithContext(ctx).Where("im_user_id = ?", imUserID).First(&value).Error
 	return value, err
 }
 func (r *GormRepository) EnsureConversation(ctx context.Context, value *Conversation) error {
