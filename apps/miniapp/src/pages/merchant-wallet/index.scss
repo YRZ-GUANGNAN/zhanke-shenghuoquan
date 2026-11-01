@@ -5,6 +5,7 @@ page { background: $bg-app; }
 
 .merchant-wallet-page {
   @include ref.page-foundation;
+  @include ref.wrap;
   display: flex;
   flex-direction: column;
   height: 100vh;

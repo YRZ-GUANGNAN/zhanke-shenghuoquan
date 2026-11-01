@@ -8,10 +8,17 @@ const pxtransform = require('postcss-pxtransform')
 const root = path.resolve(__dirname, '..')
 const src = path.join(root, 'apps/miniapp/src')
 const read = (name) => fs.readFileSync(path.join(src, name), 'utf8')
-const routes = [...read('app.config.ts').matchAll(/'pages\/([^']+)\/index'/g)].map(match => match[1])
+const appConfig = read('app.config.ts')
+const routes = [...appConfig.matchAll(/'pages\/([^']+)\/index'/g)].map(match => match[1])
+// Wallet pages are deliberately kept in subPackages to control the main
+// bundle. They are still production routes and must receive the same layout
+// review as top-level pages; do not let package extraction hide them.
+for (const match of appConfig.matchAll(/root:\s*'pages\/([^']+)'[\s\S]*?pages:\s*\[['"]index['"]\]/g)) {
+  if (!routes.includes(match[1])) routes.push(match[1])
+}
 const excluded = ['campus-guide']
 const compiled = new Map()
-assert.equal(routes.length, 30, '路由变化需要显式复审覆盖表，不得顺带开启历史页面')
+assert.equal(routes.length, 31, '路由变化需要显式复审覆盖表，不得顺带开启历史页面')
 for (const route of routes) {
   let styleRoute = route
   if (route === 'rider-messages') {

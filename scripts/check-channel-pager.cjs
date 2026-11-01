@@ -50,6 +50,16 @@ async function run() {
       if (id.endsWith('/refresh-scroll-view')) return { default: component('ScrollView') }
       if (id.endsWith('/tool-directory')) return { default: component('ToolDirectory') }
       if (id.endsWith('/mini-program-jump')) return load(path.join(root, 'apps/miniapp/src/utils/mini-program-jump.ts'))
+      if (id.endsWith('/hooks/use-notification-runtime')) {
+        return {
+          notificationBadgeLabel: () => '',
+          useNotificationState: () => ({
+            inboxUnread: 0,
+            chatUnread: 0,
+            unread: { conversations: {} },
+          }),
+        }
+      }
       if (Object.prototype.hasOwnProperty.call(dependencies, id)) return dependencies[id]
       if (id.endsWith('/utils/navigation')) return load(path.join(root, 'apps/miniapp/src/utils/navigation.ts'), { '../services/taro': dependencies['../../services/taro'] })
       throw new Error(`Unexpected channel test dependency: ${id}`)

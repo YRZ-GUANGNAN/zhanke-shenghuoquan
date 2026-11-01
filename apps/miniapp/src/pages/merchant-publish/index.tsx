@@ -6,7 +6,7 @@ import CapsulePageHeader from '../../components/capsule-page-header'
 import AppIcon from '../../components/app-icon'
 import { AppIconButton } from '../../components/ui'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
-import { AppActionSheet, AppButton } from '../../components/ui'
+import { AppActionSheet, AppButton, AppDialog } from '../../components/ui'
 import { deliveryMockFeeEnabled } from '../../feature-flags'
 import { useDeliveryPayment } from '../../hooks/use-delivery-payment'
 import { useIdentityGuard } from '../../hooks/use-identity-guard'
@@ -42,6 +42,7 @@ type PaymentMethod = 'wallet' | 'wechat'
 type PublishMethod = PaymentMethod | 'mock'
 type PublishFeedback = { title: string; message: string; tone: 'pending' | 'success' | 'error' }
 type PublishAttempt = { input: CreateMerchantDeliveryInput; method: PublishMethod; order?: MerchantDeliveryOrder; hasUnknownCreate?: boolean }
+type PaymentConfirmation = { order: MerchantDeliveryOrder; method: PaymentMethod }
 
 function errorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) return error.message
@@ -112,7 +113,9 @@ function MerchantPublishContent() {
   const [createdOrder, setCreatedOrder] = useState<MerchantDeliveryOrder | null>(null)
   const [feedback, setFeedback] = useState<PublishFeedback | null>(null)
   const [navigationError, setNavigationError] = useState('')
+  const [paymentConfirmation, setPaymentConfirmation] = useState<PaymentConfirmation | null>(null)
   const attemptRef = useRef<PublishAttempt | null>(null)
+  const paymentConfirmationResolverRef = useRef<((confirmed: boolean) => void) | null>(null)
   const submittingRef = useRef(false)
   const lifecycleRef = useRef(0)
   const activeRef = useRef(identityAllowed)
@@ -127,6 +130,18 @@ function MerchantPublishContent() {
   accountRef.current = profile.id
   tokenRef.current = sessionToken
   const formLocked = submitting || attemptPending || Boolean(createdOrder)
+
+  const settlePaymentConfirmation = (confirmed: boolean) => {
+    const resolve = paymentConfirmationResolverRef.current
+    paymentConfirmationResolverRef.current = null
+    setPaymentConfirmation(null)
+    resolve?.(confirmed)
+  }
+
+  const askPaymentConfirmation = (order: MerchantDeliveryOrder, method: PaymentMethod) => new Promise<boolean>((resolve) => {
+    paymentConfirmationResolverRef.current = resolve
+    setPaymentConfirmation({ order, method })
+  })
 
   const operationGuard = () => {
     const epoch = lifecycleRef.current
@@ -160,6 +175,7 @@ function MerchantPublishContent() {
     // WeChat's native payment temporarily covers this page; do not cancel the
     // original verification merely because that native dialog is visible.
     if (nativePaymentOpenRef.current) return
+    settlePaymentConfirmation(false)
     activeRef.current = false
     lifecycleRef.current += 1
     if (submittingRef.current && attemptRef.current && !attemptRef.current.order) {
@@ -184,6 +200,7 @@ function MerchantPublishContent() {
     const accountChanged = Boolean(profile.id && profile.id !== sessionAccountRef.current)
     if (accountChanged) {
       sessionAccountRef.current = profile.id
+      settlePaymentConfirmation(false)
       attemptRef.current = null
       setAttemptPending(false)
       setCreatedOrder(null)
@@ -218,6 +235,7 @@ function MerchantPublishContent() {
     setSubmitting(false)
     setOperation('')
     return () => {
+      settlePaymentConfirmation(false)
       activeRef.current = false
       lifecycleRef.current += 1
       wakePageVisibleWaiters()
@@ -525,14 +543,9 @@ function MerchantPublishContent() {
         if (attempt.method !== 'mock') {
           // The fee does not exist until creation completes. Confirm that exact
           // server-owned amount before debiting a wallet or opening WeChat Pay.
-          const confirmation = await Taro.showModal({
-            title: '确认配送费',
-            content: `本单配送费 ¥${(order.deliveryFeeCents / 100).toFixed(2)}，将使用${attempt.method === 'wallet' ? '钱包余额' : '微信支付'}。确认后支付并发布。`,
-            confirmText: '确认支付',
-            cancelText: '暂不支付',
-          })
+          const confirmed = await askPaymentConfirmation(order, attempt.method)
           if (!current()) return
-          if (!confirmation.confirm) {
+          if (!confirmed) {
             setFeedback({ title: '配送单已保留', message: '尚未发起付款，可查看订单后再支付。', tone: 'pending' })
             return
           }
@@ -877,6 +890,18 @@ function MerchantPublishContent() {
           <AppButton block loading={submitting} onClick={() => void confirmPayment()}>确认发布并支付</AppButton>
         </View>
       </AppActionSheet>
+
+      <AppDialog
+        visible={Boolean(paymentConfirmation)}
+        title='确认配送费'
+        description={paymentConfirmation
+          ? `本单配送费 ¥${(paymentConfirmation.order.deliveryFeeCents / 100).toFixed(2)}，将使用${paymentConfirmation.method === 'wallet' ? '钱包余额' : '微信支付'}。确认后支付并发布。`
+          : undefined}
+        confirmText='确认支付'
+        cancelText='暂不支付'
+        onConfirm={() => settlePaymentConfirmation(true)}
+        onCancel={() => settlePaymentConfirmation(false)}
+      />
     </View>
   )
 }

@@ -49,6 +49,10 @@ function navHarness(options = {}) {
     '../services/taro': { navigateTo: invoke('navigate'), redirectTo: invoke('redirect'), showToast: invoke('toast') },
     '../hooks/use-feature-visibility': { useFeatureVisibility: () => visibility },
     '../utils/bottom-nav-motion': { useBottomNavVisibility: () => false },
+    '../hooks/use-notification-runtime': {
+      notificationBadgeLabel: () => '',
+      useNotificationState: () => ({ inboxUnread: 0, unread: { confirmed: false, total: 0, conversations: {} } }),
+    },
     './delivery-workspace-nav.scss': {},
   }, renderer)
   const props = { role: options.role || 'merchant', active: options.active || 'orders', onSelect: options.localSelect ? (key) => calls.select.push(key) : undefined, gestureGuard: options.gestureGuard }
@@ -88,7 +92,16 @@ function profileHarness(options = {}) {
     '../../components/capsule-page-header': header,
     '../../components/delivery-workspace-nav': { __esModule: true, default: 'DeliveryWorkspaceNav', useDeliveryWorkspaceNavigation: (...args) => { calls.workspaceNavigation.push(args); return { swipe } } },
     '../../components/chat-avatar': 'ChatAvatar',
+    '../../components/notification-inbox': 'NotificationInbox',
     '../../hooks/use-delivery-payment': { useDeliveryPayment: () => ({ enabled: options.paymentEnabled ?? true }) },
+    '../../hooks/use-notification-runtime': {
+      notificationBadgeLabel: () => '',
+      useNotificationState: () => ({
+        inboxUnread: 0,
+        messageRevision: 0,
+        unread: { confirmed: false, total: 0, conversations: {} },
+      }),
+    },
     '../../components/app-icon': 'AppIcon',
     '../../components/ui': { AppButton: 'AppButton', AppDialog: 'AppDialog' },
     '../../components/runtime-session-gate': 'RuntimeSessionGate',
@@ -142,7 +155,12 @@ function messagesHarness(options = {}) {
     '../../components/runtime-session-gate': 'RuntimeSessionGate',
     '../../components/delivery-workspace-nav': { __esModule: true, default: 'DeliveryWorkspaceNav', useDeliveryWorkspaceNavigation: () => ({ swipe: { handlers: {}, canActivate: () => true } }) },
     '../../components/chat-avatar': 'ChatAvatar',
+    '../../components/notification-inbox': 'NotificationInbox',
     '../../hooks/use-delivery-payment': { useDeliveryPayment: () => ({ enabled: options.paymentEnabled ?? true }) },
+    '../../hooks/use-notification-runtime': {
+      notificationBadgeLabel: () => '',
+      useNotificationState: () => ({ inboxUnread: 0, messageRevision: 0, unread: { confirmed: false, total: 0, conversations: {} } }),
+    },
     '../../hooks/use-identity-guard': { useIdentityGuard: (role) => { calls.guards.push(role); return allowed } },
     '../../stores/session': { useSessionStore: session.useSessionStore },
     '../../utils/bottom-nav-motion': { useBottomNavScroll: () => () => {} },

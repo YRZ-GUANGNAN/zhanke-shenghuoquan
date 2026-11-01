@@ -26,7 +26,7 @@ function publishHarness(options = {}) {
     '../../components/feature-page-gate': { withFeaturePage: (value) => value },
     '../../components/capsule-page-header': 'Header',
     '../../components/app-icon': 'AppIcon',
-    '../../components/ui': { AppIconButton: 'AppIconButton', AppActionSheet: 'AppActionSheet', AppButton: 'AppButton' },
+    '../../components/ui': { AppIconButton: 'AppIconButton', AppActionSheet: 'AppActionSheet', AppButton: 'AppButton', AppDialog: 'AppDialog' },
     '../../components/runtime-session-gate': 'RuntimeSessionGate',
     '../../feature-flags': { deliveryPaymentEnabled: true, deliveryMockFeeEnabled: false, ...options.flags },
     '../../hooks/use-delivery-payment': { useDeliveryPayment: () => ({ enabled: options.flags?.deliveryPaymentEnabled ?? true }) },
@@ -61,59 +61,73 @@ function publishHarness(options = {}) {
   loadPage('merchant-publish', imports, renderer)
   const one = (className) => nodes(renderer.tree, (node) => hasClass(node, className))[0]
   const confirm = () => nodes(renderer.tree, (node) => node.type === 'AppButton' && text(node) === '确认发布并支付')[0]
+  const dialog = () => nodes(renderer.tree, (node) => node.type === 'AppDialog' && node.props.visible)[0]
+  let autoConfirming = false
+  const flush = async () => {
+    await renderer.flush()
+    if (options.autoConfirm !== false && !autoConfirming) {
+      const current = dialog()
+      if (current) {
+        autoConfirming = true
+        current.props.onConfirm()
+        await renderer.flush()
+        autoConfirming = false
+      }
+    }
+  }
   return {
-    calls, one, confirm, flush: renderer.flush,
+    calls, one, confirm, dialog, flush,
     get tree() { return renderer.tree },
     async mount() {
-      renderer.render(); await renderer.flush()
+      renderer.render(); await flush()
       nodes(renderer.tree, (node) => hasClass(node, 'merchant-publish-field__input')).forEach((node, index) => node.props.onInput({ detail: { value: inputValues[index] } }))
-      await renderer.flush()
+      await flush()
     },
     async method(value) {
       const option = nodes(renderer.tree, (node) => hasClass(node, 'merchant-publish-payment') && text(node).includes(value === 'wechat' ? '微信支付' : '钱包余额'))[0]
-      option.props.onClick(); await renderer.flush()
+      option.props.onClick(); await flush()
     },
     async source(label) {
       nodes(renderer.tree, (node) => hasClass(node, 'merchant-publish-source__option') && text(node) === label)[0].props.onClick()
-      await renderer.flush()
+      await flush()
     },
     async pickupCode(value) {
-      one('merchant-publish-source__code').props.onInput({ detail: { value } }); await renderer.flush()
+      one('merchant-publish-source__code').props.onInput({ detail: { value } }); await flush()
     },
     async mode(label) {
       nodes(renderer.tree, (node) => hasClass(node, 'merchant-publish-intake-tab') && text(node) === label)[0].props.onClick()
-      await renderer.flush()
+      await flush()
     },
-    async submit() { confirm().props.onClick(); await renderer.flush() },
-    async primary() { one('merchant-publish-footer__button').props.onClick(); await renderer.flush() },
-    async identity(value) { identityAllowed = value; renderer.render(); await renderer.flush() },
-    async account(value) { profile.id = value; renderer.render(); await renderer.flush() },
-    async token(value) { token = value; renderer.render(); await renderer.flush() },
-    async hide() { hide?.(); await renderer.flush() },
-    async show() { show?.(); await renderer.flush() },
-    async unmount() { renderer.unmount(); await renderer.flush() },
+    async submit() { confirm().props.onClick(); await flush() },
+    async primary() { one('merchant-publish-footer__button').props.onClick(); await flush() },
+    async identity(value) { identityAllowed = value; renderer.render(); await flush() },
+    async account(value) { profile.id = value; renderer.render(); await flush() },
+    async token(value) { token = value; renderer.render(); await flush() },
+    async hide() { hide?.(); await flush() },
+    async show() { show?.(); await flush() },
+    async unmount() { renderer.unmount(); await flush() },
   }
 }
 
 async function run() {
   {
     for (const method of ['wallet', 'wechat']) {
-      const approval = deferred()
-      const app = publishHarness({ create: async () => ({ ...deliveryOrder, deliveryFeeCents: 98765 }), confirm: () => approval.promise })
+      const app = publishHarness({ autoConfirm: false, create: async () => ({ ...deliveryOrder, deliveryFeeCents: 98765 }) })
       await app.mount(); await app.method(method); await app.submit()
       assert.equal(app.calls.create.length, 1)
       assert.equal(app.calls[method].length, 0, '取得金额后仍必须等待用户确认，不立即扣款')
-      assert.match(app.calls.confirm[0][0].content, /987\.65/)
-      assert.match(app.calls.confirm[0][0].content, method === 'wallet' ? /钱包余额/ : /微信支付/)
-      approval.resolve({ confirm: true }); await app.flush()
+      assert.match(app.dialog().props.description, /987\.65/)
+      assert.match(app.dialog().props.description, method === 'wallet' ? /钱包余额/ : /微信支付/)
+      app.dialog().props.onConfirm(); await app.flush()
       assert.equal(app.calls[method].length, 1)
       await app.unmount()
     }
     console.log('PASS 服务端实际配送费及支付方式二次确认后才扣余额或发起微信支付')
   }
   {
-    const app = publishHarness({ confirm: async () => ({ confirm: false, cancel: true }) })
+    const app = publishHarness({ autoConfirm: false })
     await app.mount(); await app.submit()
+    app.dialog().props.onCancel(); await app.flush()
     assert.equal(app.calls.wallet.length, 0)
     assert.equal(app.calls.wechat.length, 0)
     assert.match(text(app.tree), /尚未发起付款/)
@@ -124,12 +138,11 @@ async function run() {
     console.log('PASS 取消金额确认保留原配送单，查看不重复创建或付款')
   }
   for (const interrupt of ['token', 'hide']) {
-    const approval = deferred()
-    const app = publishHarness({ confirm: () => approval.promise })
+    const app = publishHarness({ autoConfirm: false })
     await app.mount(); await app.submit()
     if (interrupt === 'token') await app.token('TOKEN-REPLACED')
     else await app.hide()
-    approval.resolve({ confirm: true }); await app.flush()
+    await app.flush()
     assert.equal(app.calls.wallet.length, 0)
     assert.equal(app.calls.wechat.length, 0)
     await app.unmount()

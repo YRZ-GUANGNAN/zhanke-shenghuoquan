@@ -3,7 +3,7 @@
 
 page { background: $bg-app; }
 
-.rider-wallet-page { @include ref.page-foundation; display: flex; flex-direction: column; height: 100vh; overflow: hidden; color: $text-primary; }
+.rider-wallet-page { @include ref.page-foundation; @include ref.wrap; display: flex; flex-direction: column; height: 100vh; overflow: hidden; color: $text-primary; }
 .rider-wallet-header { flex: 0 0 auto; padding: 0 30rpx 24rpx; background: $bg-surface; }
 .rider-wallet-nav { min-height: 92rpx; display: grid; grid-template-columns: 88rpx minmax(0, 1fr) 88rpx; align-items: center; }
 .rider-wallet-nav__back, .rider-wallet-nav__ghost { width: 88rpx; height: 88rpx; }

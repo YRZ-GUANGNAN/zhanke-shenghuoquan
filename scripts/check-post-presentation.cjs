@@ -58,6 +58,16 @@ async function pageBehavior() {
       if (id.endsWith('/feature-page-gate')) return { withFeaturePage: (pageComponent) => pageComponent, FeaturePageGate: View }
       if (id.endsWith('/use-feature-visibility')) return { useFeatureVisibility: () => options.visibility }
       if (id.endsWith('/use-identity-guard')) return { useIdentityGuard: () => true }
+      if (id.endsWith('/hooks/use-notification-runtime')) return {
+        useNotificationRuntime: () => {},
+        useNotificationState: () => ({
+          inboxUnread: 0,
+          chatUnread: 0,
+          messageRevision: 0,
+          unread: { confirmed: false, total: 0, conversations: {} },
+        }),
+        notificationBadgeLabel: () => '',
+      }
       if (id.endsWith('/stores/session')) return { useSessionStore: (selector) => selector({ token: options.token || 'test-token', profile: { id: 'test-user' } }) }
       if (id.endsWith('/session-recovery')) return { requestWithSingleSessionRecovery: (run) => run() }
       if (id.endsWith('/use-page-share')) return { usePageShare: () => {} }

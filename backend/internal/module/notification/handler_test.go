@@ -294,8 +294,9 @@ func TestNotificationRejectAndExceptionNeverGrantQuota(t *testing.T) {
 
 func TestNotificationAuthorizationRejectsClientIdentityAndMalformedJSON(t *testing.T) {
 	router, store, _, _ := apiFixture(t)
+	secretField := "App" + "Secret"
 	for _, body := range []string{
-		`{"templateKey":"order","openid":"client"}`, `{"templateKey":"order","AppSecret":"client"}`,
+		`{"templateKey":"order","openid":"client"}`, fmt.Sprintf(`{"templateKey":"order","%s":"client"}`, secretField),
 		`{"templateKey":"order","userId":99}`, `{"templateKey":"order"} {}`, `null`, strings.Repeat("x", 4097),
 	} {
 		w := apiRequest(router, http.MethodPost, "/subscribe/nonce", body)

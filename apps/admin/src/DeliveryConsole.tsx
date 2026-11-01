@@ -505,6 +505,7 @@ function EarningsPanel() {
 }
 
 function RiderPayoutQueuePanel() {
+  const dialog = useAdminDialog()
   const [data, setData] = useState<Page<RiderPayoutQueue>>(emptyPage())
   const [status, setStatus] = useState('')
   const [page, setPage] = useState(1)
@@ -518,7 +519,16 @@ function RiderPayoutQueuePanel() {
   useEffect(() => { void load() }, [load])
   const cancel = async (row: RiderPayoutQueue) => {
     const pending = operationKeys.current.get(row.payoutQueuePublicId)
-    const reason = pending?.reason ?? window.prompt('请输入取消原因（不会发起微信转账）', '改走后台线下结款')
+    const reason = pending?.reason ?? await dialog.prompt({
+      title: '取消待打款队列',
+      description: '取消只会释放平台内部占用，不会发起微信转账。请填写后续处理原因。',
+      inputLabel: '取消原因',
+      placeholder: '例如：改走后台线下结款',
+      initialValue: '改走后台线下结款',
+      requiredMessage: '取消原因不能为空',
+      confirmLabel: '确认取消',
+      tone: 'danger',
+    })
     if (!reason?.trim()) return
     setBusy(row.payoutQueuePublicId); setError('')
     try {
