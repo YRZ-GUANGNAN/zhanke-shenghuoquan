@@ -24,6 +24,14 @@ type Repository interface {
 	RecordCallbackOnce(ctx context.Context, receipt CallbackReceipt) (bool, error)
 }
 
+// CallbackEventSink is the atomic persistence boundary used by the Tencent IM
+// callback bridge. A receipt and its corresponding notification event are
+// either both recorded or neither is recorded. Repeated provider callbacks
+// return inserted=false without creating another event.
+type CallbackEventSink interface {
+	RecordCallbackAndEvent(ctx context.Context, receipt CallbackReceipt, event Event) (bool, error)
+}
+
 type GormRepository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *GormRepository { return &GormRepository{db: db} }
@@ -276,7 +284,7 @@ func (r *GormRepository) ReserveSubscription(ctx context.Context, userID uint64,
 }
 
 func (r *GormRepository) RecordCallbackOnce(ctx context.Context, receipt CallbackReceipt) (bool, error) {
-	if receipt.SDKAppID == 0 || !safeText(receipt.ProviderMessageID, 128, true) || receipt.SenderUserID == 0 || receipt.RecipientUserID == 0 || !safeText(receipt.SenderAccount, 64, true) || !safeText(receipt.RecipientAccount, 64, true) || !callbackHashPattern.MatchString(receipt.CallbackHash) || !safeText(receipt.ConversationPublicID, 128, false) || (receipt.ConversationType != "c2c" && receipt.ConversationType != "group") || receipt.OccurredAt.IsZero() || receipt.CreatedAt.IsZero() {
+	if !validCallbackReceipt(receipt) {
 		return false, ErrInvalidRecord
 	}
 	if receipt.Status == "" {
@@ -290,6 +298,63 @@ func (r *GormRepository) RecordCallbackOnce(ctx context.Context, receipt Callbac
 		return false, nil
 	}
 	return err == nil, err
+}
+
+// RecordCallbackAndEvent atomically records the provider receipt and the
+// metadata-only notification event. The duplicate receipt path is treated as
+// an idempotent success; it intentionally does not attempt to append the event
+// again, because the first transaction either committed both rows or rolled
+// back both rows.
+func (r *GormRepository) RecordCallbackAndEvent(ctx context.Context, receipt CallbackReceipt, event Event) (bool, error) {
+	if r == nil || r.db == nil || !validCallbackReceipt(receipt) || receipt.ConversationType != "c2c" || !validPrivateMessageEventCoordinate(receipt, event) {
+		return false, ErrInvalidRecord
+	}
+	inserted := false
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if receipt.Status == "" {
+			receipt.Status = "received"
+		}
+		if receipt.Status != "received" {
+			return ErrInvalidRecord
+		}
+		result := tx.Create(&receipt)
+		if duplicateKey(result.Error) {
+			return nil
+		}
+		if result.Error != nil {
+			return result.Error
+		}
+		if err := r.AppendEventTx(tx, event); err != nil {
+			return err
+		}
+		inserted = true
+		return nil
+	})
+	return inserted, err
+}
+
+func validCallbackReceipt(receipt CallbackReceipt) bool {
+	return receipt.SDKAppID > 0 && safeText(receipt.ProviderMessageID, 128, true) &&
+		receipt.SenderUserID > 0 && receipt.RecipientUserID > 0 &&
+		safeText(receipt.SenderAccount, 64, true) && safeText(receipt.RecipientAccount, 64, true) &&
+		callbackHashPattern.MatchString(receipt.CallbackHash) && safeText(receipt.ConversationPublicID, 128, false) &&
+		(receipt.ConversationType == "c2c" || receipt.ConversationType == "group") && !receipt.OccurredAt.IsZero() && !receipt.CreatedAt.IsZero()
+}
+
+func validPrivateMessageEventCoordinate(receipt CallbackReceipt, event Event) bool {
+	if event.EventPublicID == "" || event.EventType != EventPrivateMessageReceived ||
+		event.AggregateType != "im_conversation" || event.AggregatePublicID != receipt.ConversationPublicID ||
+		event.AggregateVersion == 0 || event.PayloadVersion == 0 || event.OccurredAt.IsZero() || event.CreatedAt.IsZero() || event.UpdatedAt.IsZero() {
+		return false
+	}
+	var payload struct {
+		SenderUserID    uint64 `json:"senderUserId"`
+		RecipientUserID uint64 `json:"recipientUserId"`
+	}
+	if json.Unmarshal(event.Payload, &payload) != nil || payload.SenderUserID != receipt.SenderUserID || payload.RecipientUserID != receipt.RecipientUserID {
+		return false
+	}
+	return true
 }
 
 func duplicateKey(err error) bool {

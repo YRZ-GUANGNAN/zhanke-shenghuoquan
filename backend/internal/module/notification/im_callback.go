@@ -238,81 +238,99 @@ func hashCallback(body []byte) string {
 func decodeCallbackMetadata(body []byte) (map[string]json.RawMessage, error) {
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.UseNumber()
-	value, err := callbackJSONValue(decoder, 0)
-	if err != nil {
-		return nil, err
+	fields := make(map[string]json.RawMessage)
+	token, err := decoder.Token()
+	if err != nil || token != json.Delim('{') {
+		return nil, ErrIMCallbackPayload
+	}
+	known := map[string]bool{
+		"CallbackCommand": true, "SDKAppID": true, "From_Account": true,
+		"To_Account": true, "GroupId": true, "SendMsgResult": true,
+		"MsgKey": true, "MsgId": true, "MsgSeq": true, "UnreadMsgNum": true,
+		"MsgTime": true, "EventTime": true,
+	}
+	seen := make(map[string]struct{})
+	for decoder.More() {
+		keyToken, err := decoder.Token()
+		key, ok := keyToken.(string)
+		if err != nil || !ok || key == "" || len(key) > 128 {
+			return nil, ErrIMCallbackPayload
+		}
+		if _, exists := seen[key]; exists {
+			return nil, ErrIMCallbackPayload
+		}
+		seen[key] = struct{}{}
+		if known[key] {
+			var raw json.RawMessage
+			if err := decoder.Decode(&raw); err != nil || len(raw) == 0 {
+				return nil, ErrIMCallbackPayload
+			}
+			fields[key] = raw
+			continue
+		}
+		// Unknown fields include MsgBody and custom message content. Consume and
+		// validate them without constructing a retained in-memory object.
+		if err := discardCallbackValue(decoder, 0); err != nil {
+			return nil, err
+		}
+	}
+	end, err := decoder.Token()
+	if err != nil || end != json.Delim('}') {
+		return nil, ErrIMCallbackPayload
 	}
 	if _, err := decoder.Token(); !errors.Is(err, io.EOF) {
 		return nil, ErrIMCallbackPayload
 	}
-	object, ok := value.(map[string]any)
-	if !ok {
-		return nil, ErrIMCallbackPayload
-	}
-	fields := make(map[string]json.RawMessage)
-	for _, key := range []string{"CallbackCommand", "SDKAppID", "From_Account", "To_Account", "GroupId", "SendMsgResult", "MsgKey", "MsgId", "MsgSeq", "UnreadMsgNum", "MsgTime", "EventTime"} {
-		if value, ok := object[key]; ok {
-			raw, err := json.Marshal(value)
-			if err != nil {
-				return nil, ErrIMCallbackPayload
-			}
-			fields[key] = raw
-		}
-	}
 	return fields, nil
 }
 
-func callbackJSONValue(decoder *json.Decoder, depth int) (any, error) {
+func discardCallbackValue(decoder *json.Decoder, depth int) error {
 	if depth > 12 {
-		return nil, ErrIMCallbackPayload
+		return ErrIMCallbackPayload
 	}
 	token, err := decoder.Token()
 	if err != nil {
-		return nil, ErrIMCallbackPayload
+		return ErrIMCallbackPayload
 	}
 	delim, isDelim := token.(json.Delim)
 	if !isDelim {
-		return token, nil
+		return nil
 	}
 	switch delim {
 	case '{':
-		object := map[string]any{}
+		seen := make(map[string]struct{})
 		for decoder.More() {
 			keyToken, err := decoder.Token()
 			key, ok := keyToken.(string)
 			if err != nil || !ok || key == "" || len(key) > 128 {
-				return nil, ErrIMCallbackPayload
+				return ErrIMCallbackPayload
 			}
-			if _, exists := object[key]; exists {
-				return nil, ErrIMCallbackPayload
+			if _, exists := seen[key]; exists {
+				return ErrIMCallbackPayload
 			}
-			value, err := callbackJSONValue(decoder, depth+1)
-			if err != nil {
-				return nil, err
+			seen[key] = struct{}{}
+			if err := discardCallbackValue(decoder, depth+1); err != nil {
+				return err
 			}
-			object[key] = value
 		}
 		end, err := decoder.Token()
 		if err != nil || end != json.Delim('}') {
-			return nil, ErrIMCallbackPayload
+			return ErrIMCallbackPayload
 		}
-		return object, nil
+		return nil
 	case '[':
-		array := []any{}
 		for decoder.More() {
-			value, err := callbackJSONValue(decoder, depth+1)
-			if err != nil {
-				return nil, err
+			if err := discardCallbackValue(decoder, depth+1); err != nil {
+				return err
 			}
-			array = append(array, value)
 		}
 		end, err := decoder.Token()
 		if err != nil || end != json.Delim(']') {
-			return nil, ErrIMCallbackPayload
+			return ErrIMCallbackPayload
 		}
-		return array, nil
+		return nil
 	default:
-		return nil, ErrIMCallbackPayload
+		return ErrIMCallbackPayload
 	}
 }
 

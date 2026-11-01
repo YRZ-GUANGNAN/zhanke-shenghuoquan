@@ -65,6 +65,12 @@ const (
 	PurposeWithdrawal     NotificationPurpose = "withdrawal"
 )
 
+// EventPrivateMessageReceived is emitted only after a trusted Tencent IM C2C
+// callback has been mapped to two active, mutually contactable application
+// users. The event payload contains metadata only; message text is never
+// persisted.
+const EventPrivateMessageReceived = "PrivateMessageReceived"
+
 type Event struct {
 	ID                uint64          `gorm:"column:id;primaryKey"`
 	EventPublicID     string          `gorm:"column:event_public_id;size:26;not null;uniqueIndex:uq_delivery_notification_event_public_id"`
