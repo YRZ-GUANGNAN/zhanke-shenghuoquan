@@ -26,6 +26,7 @@ func TestDeliveryCapabilitiesDoNotAdvertiseMockOrUnavailablePayments(t *testing.
 		{"unconfigured", &deliveryRuntime{funds: &delivery.FundsService{}, paymentProvider: deliverypayment.UnconfiguredProvider{}}, false},
 		{"typed nil", &deliveryRuntime{funds: &delivery.FundsService{}, paymentProvider: absentProvider}, false},
 		{"no funds", &deliveryRuntime{paymentProvider: &deliverypayment.WechatProvider{}}, false},
+		{"intake boundary only", &deliveryRuntime{externalIntake: &delivery.ExternalIntake{}}, false},
 		{"wechat runtime", &deliveryRuntime{funds: &delivery.FundsService{}, paymentProvider: &deliverypayment.WechatProvider{}}, true},
 	} {
 		t.Run(test.name, func(t *testing.T) {

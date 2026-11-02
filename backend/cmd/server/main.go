@@ -634,7 +634,11 @@ func newSanitizedRecovery(recoveryOutput io.Writer) gin.HandlerFunc {
 }
 
 type deliveryRuntime struct {
-	externalIntake                 *delivery.ExternalIntake
+	externalIntake *delivery.ExternalIntake
+	// externalOrdersReady is deliberately separate from externalIntake:
+	// accepting a callback boundary is not proof that an official provider,
+	// authoritative requery worker and merchant binding are production-ready.
+	externalOrdersReady            bool
 	orders                         *delivery.Service
 	dispatch                       *delivery.DispatchService
 	funds                          *delivery.FundsService
@@ -838,7 +842,7 @@ func registerDeliveryCapabilities(api *gin.RouterGroup, runtime *deliveryRuntime
 			provider, configured := runtime.paymentProvider.(*deliverypayment.WechatProvider)
 			ready = configured && provider != nil
 		}
-		response.OK(c, gin.H{"wechatPayment": ready, "externalOrders": runtime != nil && runtime.externalIntake != nil})
+		response.OK(c, gin.H{"wechatPayment": ready, "externalOrders": runtime != nil && runtime.externalOrdersReady})
 	})
 }
 
