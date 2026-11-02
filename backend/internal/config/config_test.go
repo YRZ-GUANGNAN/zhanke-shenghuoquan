@@ -248,6 +248,16 @@ func TestWechatSubscribeNotificationConfigurationIsFailClosed(t *testing.T) {
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("complete notification configuration was rejected: %v", err)
 	}
+
+	cfg.WechatMessageTemplateID = "private-template-id"
+	cfg.WechatMessageTemplateFields = `{"thing1":"status"}`
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("complete private notification configuration was rejected: %v", err)
+	}
+	cfg.WechatMessageTemplateFields = ""
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "private message template") {
+		t.Fatalf("partial private notification configuration was accepted: %v", err)
+	}
 }
 
 func TestWechatSubscribeNotificationEnvironmentDefaults(t *testing.T) {
