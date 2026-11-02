@@ -2,15 +2,47 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
+	"campus-circle/backend/internal/config"
 	"campus-circle/backend/internal/module/featureflags"
 	"campus-circle/backend/internal/module/im"
 	"campus-circle/backend/internal/module/notification"
 	"campus-circle/backend/internal/module/user"
 )
+
+func TestPrivateMessageSubscribeTemplateIsMetadataOnly(t *testing.T) {
+	cfg := config.Config{EnableWechatSubscribeNotifications: true, WechatMessageTemplateID: "reviewed-message-template", WechatMessageTemplateFields: `{"thing1":"status","time2":"time"}`, NotificationTestUserIDs: "12"}
+	template, err := configuredPrivateMessageNotificationTemplate(cfg)
+	if err != nil || template == nil {
+		t.Fatalf("template=%+v err=%v", template, err)
+	}
+	a := privateNotificationIdentityFixture()
+	relation, err := a.ResolveC2CRelation(context.Background(), 11, 12)
+	if err != nil {
+		t.Fatal(err)
+	}
+	event, err := notification.BuildPrivateMessageEvent(notification.IMCallback{SDKAppID: 1400000000, ConversationType: notification.IMCallbackC2C, ProviderMessageID: "provider", SenderAccount: "sender", RecipientAccount: "recipient", OccurredAt: time.Date(2026, 11, 2, 8, 0, 0, 0, time.UTC)}, relation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recipients, err := (&privateNotificationRecipients{identity: a, users: privateNotificationUsersFake{}, template: template, now: func() time.Time { return time.Date(2026, 11, 2, 8, 0, 0, 0, time.UTC) }}).ResolveRecipients(context.Background(), event)
+	if err != nil || len(recipients) != 1 || !recipients[0].AllowWechat || recipients[0].WechatTemplateKey != "private_message" {
+		t.Fatalf("recipients=%+v err=%v", recipients, err)
+	}
+	var snapshot map[string]any
+	if err := json.Unmarshal(recipients[0].WechatTemplateSnapshot, &snapshot); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := json.Marshal(snapshot)
+	if strings.Contains(string(raw), "provider") || strings.Contains(string(raw), "sender") || strings.Contains(string(raw), "recipient") || strings.Contains(string(raw), "content") {
+		t.Fatalf("private message metadata leaked: %s", raw)
+	}
+}
 
 type imNotificationReaderFake struct {
 	mappingErr, relationErr error

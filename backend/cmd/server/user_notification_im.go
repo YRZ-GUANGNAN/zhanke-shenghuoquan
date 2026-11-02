@@ -7,6 +7,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"time"
 
 	"campus-circle/backend/internal/module/featureflags"
 	"campus-circle/backend/internal/module/im"
@@ -115,6 +116,8 @@ func notificationIMPair(senderID, recipientID uint64) string {
 type privateNotificationRecipients struct {
 	identity notification.IMCallbackIdentityResolver
 	users    notificationPrivateUserReader
+	template *privateMessageNotificationTemplate
+	now      func() time.Time
 }
 
 // ResolveRecipients re-checks current account, contact/block, relationship,
@@ -158,10 +161,27 @@ func (r *privateNotificationRecipients) ResolveRecipients(ctx context.Context, e
 	if !settings.SocialNotice {
 		return nil, nil
 	}
-	return []notification.Recipient{{UserID: fact.RecipientUserID, Purpose: notification.PurposePrivateMessage,
+	recipient := notification.Recipient{UserID: fact.RecipientUserID, Purpose: notification.PurposePrivateMessage,
 		Title: "收到新私信", Summary: "请进入会话查看消息", AggregateType: event.AggregateType,
 		AggregatePublicID: event.AggregatePublicID, AggregateVersion: event.AggregateVersion,
-		TargetPath: relation.TargetPath, AllowWechat: false}}, nil
+		TargetPath: relation.TargetPath, AllowWechat: false}
+	if r.template != nil && r.template.users[fact.RecipientUserID] {
+		now := time.Now()
+		if r.now != nil {
+			now = r.now()
+		}
+		hour := now.In(time.FixedZone("Asia/Shanghai", 8*60*60)).Hour()
+		if !settings.QuietHours || (hour >= 7 && hour < 23) {
+			snapshot, snapshotErr := r.template.snapshot(event, recipient)
+			if snapshotErr != nil {
+				return nil, snapshotErr
+			}
+			recipient.AllowWechat = true
+			recipient.WechatTemplateKey = "private_message"
+			recipient.WechatTemplateSnapshot = snapshot
+		}
+	}
+	return []notification.Recipient{recipient}, nil
 }
 
 func validPrivateNotificationTarget(path string) bool {

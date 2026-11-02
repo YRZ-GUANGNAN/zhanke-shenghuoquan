@@ -56,6 +56,7 @@ type Config struct {
 	WechatOrderTemplateID              string
 	WechatMessageTemplateID            string
 	WechatOrderTemplateFields          string
+	WechatMessageTemplateFields        string
 	NotificationTestUserIDs            string
 	NotificationIMCallbackToken        string
 
@@ -195,6 +196,7 @@ func Load() (Config, error) {
 		WechatOrderTemplateID:              env("WECHAT_ORDER_TEMPLATE_ID", ""),
 		WechatMessageTemplateID:            env("WECHAT_MESSAGE_TEMPLATE_ID", ""),
 		WechatOrderTemplateFields:          env("WECHAT_ORDER_TEMPLATE_FIELDS", ""),
+		WechatMessageTemplateFields:        env("WECHAT_MESSAGE_TEMPLATE_FIELDS", ""),
 		NotificationTestUserIDs:            env("NOTIFICATION_TEST_USER_IDS", ""),
 		NotificationIMCallbackToken:        env("NOTIFICATION_IM_CALLBACK_TOKEN", ""),
 
@@ -259,6 +261,11 @@ func (c Config) Validate() error {
 		}
 		if strings.TrimSpace(c.WechatOrderTemplateID) == "" || strings.TrimSpace(c.WechatOrderTemplateFields) == "" {
 			return errors.New("enabled WeChat subscribe notifications require actual order template ID and reviewed fields")
+		}
+		messageIDSet := strings.TrimSpace(c.WechatMessageTemplateID) != ""
+		messageFieldsSet := strings.TrimSpace(c.WechatMessageTemplateFields) != ""
+		if messageIDSet != messageFieldsSet {
+			return errors.New("private message template ID and reviewed fields must be configured together")
 		}
 	}
 	if c.EnableNotificationSending && (!c.EnableWechatSubscribeNotifications || strings.TrimSpace(c.NotificationTestUserIDs) == "") {

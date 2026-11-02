@@ -23,9 +23,9 @@ func parseNotificationIMSDKAppID(value string) uint64 {
 }
 
 type userNotificationRuntime struct {
-	handler  *notification.Handler
-	consumer *notification.Consumer
-	wechat   *notification.SubscribeWorker
+	handler    *notification.Handler
+	consumer   *notification.Consumer
+	wechat     *notification.SubscribeWorker
 	imCallback *notification.IMCallbackHandler
 }
 
@@ -114,20 +114,27 @@ func newUserNotificationRuntime(cfg config.Config, db *gorm.DB, users *user.Serv
 		if err != nil {
 			return nil, err
 		}
+		privateTemplate, err := configuredPrivateMessageNotificationTemplate(cfg)
+		if err != nil {
+			return nil, err
+		}
 		if template != nil {
 			templates["order"] = template.id
+		}
+		if privateTemplate != nil {
+			templates["private_message"] = privateTemplate.id
 		}
 		resolver := &orderNotificationRecipients{orders: delivery.NewRepository(db), users: users, now: time.Now, template: template}
 		recipients := &userNotificationRecipients{orders: resolver,
 			financial: &financialNotificationRecipients{funds: delivery.NewRepository(db), users: users},
-			private: &privateNotificationRecipients{identity: identity, users: users}}
+			private:   &privateNotificationRecipients{identity: identity, users: users, template: privateTemplate, now: time.Now}}
 		consumer = notification.NewConsumer(notification.NewExpander(notification.NewEventRepository(db), recipients))
 		if cfg.EnableWechatSubscribeNotifications && cfg.EnableNotificationSending {
 			sender, err := notification.NewSubscribeSender(cfg)
 			if err != nil {
 				return nil, err
 			}
-			wechat = notification.NewSubscribeWorker(repo, sender, orderSubscribeGuard(repo, resolver, lookup, cfg.WechatAppID), cfg.WechatAppID)
+			wechat = notification.NewSubscribeWorker(repo, sender, userSubscribeGuard(repo, resolver, recipients.private.(*privateNotificationRecipients), lookup, cfg.WechatAppID), cfg.WechatAppID)
 		}
 	}
 	service := notification.NewSubscriptionService(authorization, lookup, notification.SubscriptionConfig{
@@ -141,7 +148,9 @@ func newUserNotificationRuntime(cfg config.Config, db *gorm.DB, users *user.Serv
 		if parseNotificationIMSDKAppID(cfg.TencentIMSDKAppID) == 0 || len(strings.TrimSpace(cfg.NotificationIMCallbackToken)) < 16 {
 			return nil, errors.New("IM notification callback requires valid SDKAppID and a strong callback token")
 		}
-		if err := notificationSchemaReady(db); err != nil { return nil, err }
+		if err := notificationSchemaReady(db); err != nil {
+			return nil, err
+		}
 		imCallback = notification.NewIMCallbackHandler(notification.IMCallbackConfig{
 			SDKAppID: parseNotificationIMSDKAppID(cfg.TencentIMSDKAppID), Token: cfg.NotificationIMCallbackToken,
 		}, identity, notification.NewRepository(db))
