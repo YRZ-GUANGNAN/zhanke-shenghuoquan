@@ -370,7 +370,27 @@ func main() {
 		deliveryRuntime.conversationImagesEnabled = localMockWechatMode(cfg)
 		deliveryRuntime.conversationReadReceiptEnabled = cfg.EnableDeliveryIMReadReceipt
 	}
+	var stopRiderSettlement func()
 	if deliveryRuntime != nil {
+		if deliveryRuntime.riderSettlement != nil {
+			settlementContext, cancelSettlement := context.WithCancel(context.Background())
+			stopRiderSettlement = cancelSettlement
+			defer cancelSettlement()
+			go func() {
+				for {
+					if _, err := deliveryRuntime.riderSettlement.ReconcileBatch(settlementContext); err != nil && settlementContext.Err() == nil {
+						log.Printf("delivery rider daily settlement stopped; retrying in 5s: %v", err)
+					}
+					timer := time.NewTimer(5 * time.Second)
+					select {
+					case <-settlementContext.Done():
+						timer.Stop()
+						return
+					case <-timer.C:
+					}
+				}
+			}()
+		}
 		if deliveryRuntime.payoutQueue != nil {
 			payoutQueueContext, cancelPayoutQueue := context.WithCancel(context.Background())
 			defer cancelPayoutQueue()
@@ -535,11 +555,17 @@ func main() {
 	defer stopSignals()
 	select {
 	case err := <-serverErrors:
+		if stopRiderSettlement != nil {
+			stopRiderSettlement()
+		}
 		stopPaymentReconciler()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("run server: %v", err)
 		}
 	case <-shutdownSignal.Done():
+		if stopRiderSettlement != nil {
+			stopRiderSettlement()
+		}
 		stopPaymentReconciler()
 		shutdownContext, cancelShutdown := context.WithTimeout(context.Background(), 10*time.Second)
 		shutdownErr := server.Shutdown(shutdownContext)
@@ -615,6 +641,7 @@ type deliveryRuntime struct {
 	paymentProvider                deliverypayment.Provider
 	paymentReconciler              *deliverypayment.Reconciler
 	payoutQueue                    *delivery.RiderPayoutQueueService
+	riderSettlement                *delivery.RiderDailySettlementService
 	identity                       *deliveryrider.IdentityAdapter
 	notificationConsumer           *deliverynotify.Consumer
 	proofs                         *delivery.ProofService
@@ -703,6 +730,16 @@ func newDeliveryRuntime(cfg config.Config, db *gorm.DB, proofPorts ...delivery.M
 			return nil, fmt.Errorf("configure rider payout queue: migration 050 is required")
 		}
 		runtime.payoutQueue = delivery.NewRiderPayoutQueueService(queueRepository, time.Now)
+	}
+	// Do not start settlement until migration 054 exists; older environments
+	// remain read-only rather than writing against a missing schema.
+	if db.Migrator().HasColumn(&delivery.RiderEarningRecord{}, "settle_at") &&
+		db.Migrator().HasColumn(&delivery.RiderEarningRecord{}, "settled_at") {
+		settlementRepository, ok := any(repository).(delivery.RiderDailySettlementRepository)
+		if !ok {
+			return nil, fmt.Errorf("configure rider daily settlement: repository does not support migration 054")
+		}
+		runtime.riderSettlement = delivery.NewRiderDailySettlementService(settlementRepository, time.Now)
 	}
 	return runtime, nil
 }

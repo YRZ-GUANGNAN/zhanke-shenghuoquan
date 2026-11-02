@@ -309,7 +309,7 @@ func riderMoneySchema(t *testing.T) *gorm.DB {
 		"028_delivery_fee_and_rider_wallet.sql", "045_delivery_order_source.sql",
 		"048_delivery_payment_recovery.sql", "049_delivery_funding_sources.sql",
 		"050_delivery_rider_payout_queue.sql", "051_delivery_rider_withdrawals.sql",
-		"052_delivery_recharge_cancellation.sql",
+		"052_delivery_recharge_cancellation.sql", "054_delivery_rider_daily_settlement.sql",
 	} {
 		applyD1SQLFile(t, db, "../../../migrations/"+name)
 	}
@@ -354,7 +354,8 @@ func seedRiderMoneyEarning(t *testing.T, db *gorm.DB, riderID, amount uint64, no
 	}
 	earning := RiderEarningRecord{EarningPublicID: mustRiderMoneyULID(t), DeliveryOrderPublicID: orderID,
 		RiderUserID: riderID, DeliveryFeeCents: order.DeliveryFeeCents, RiderFeeCents: amount,
-		PlatformCutCents: 50, SettlementStatus: RiderEarningPending, RowVersion: 1, CreatedAt: now, UpdatedAt: now}
+		PlatformCutCents: 50, SettlementStatus: RiderEarningSettled, SettleAt: now, SettledAt: &now,
+		RowVersion: 1, CreatedAt: now, UpdatedAt: now}
 	if err := db.Create(&earning).Error; err != nil {
 		t.Fatal(err)
 	}

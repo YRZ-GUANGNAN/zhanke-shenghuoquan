@@ -37,12 +37,14 @@ type TodayStatsView struct {
 }
 
 type RiderWalletView struct {
-	WalletState           delivery.RiderWalletState `json:"walletState"`
-	WalletPublicID        string                    `json:"walletPublicId,omitempty"`
-	AvailableBalanceCents uint64                    `json:"availableBalanceCents"`
-	ReservedCents         uint64                    `json:"reservedCents"`
-	UnverifiedCents       uint64                    `json:"unverifiedCents"`
-	UpdatedAt             *time.Time                `json:"updatedAt,omitempty"`
+	WalletState            delivery.RiderWalletState `json:"walletState"`
+	WalletPublicID         string                    `json:"walletPublicId,omitempty"`
+	AvailableBalanceCents  uint64                    `json:"availableBalanceCents"`
+	ReservedCents          uint64                    `json:"reservedCents"`
+	UnverifiedCents        uint64                    `json:"unverifiedCents"`
+	PendingSettlementCents uint64                    `json:"pendingSettlementCents"`
+	NextSettlementAt       *time.Time                `json:"nextSettlementAt,omitempty"`
+	UpdatedAt              *time.Time                `json:"updatedAt,omitempty"`
 }
 
 type RiderWalletEarningView struct {
@@ -50,6 +52,8 @@ type RiderWalletEarningView struct {
 	DeliveryOrderPublicID string                      `json:"deliveryOrderPublicId"`
 	AmountCents           uint64                      `json:"amountCents"`
 	SettlementStatus      delivery.RiderEarningStatus `json:"settlementStatus"`
+	SettleAt              *time.Time                  `json:"settleAt,omitempty"`
+	SettledAt             *time.Time                  `json:"settledAt,omitempty"`
 	CreatedAt             time.Time                   `json:"createdAt"`
 	PaidOfflineAt         *time.Time                  `json:"paidOfflineAt,omitempty"`
 }
@@ -93,13 +97,20 @@ func riderWalletView(value delivery.RiderWalletSnapshot) RiderWalletView {
 		WalletState: value.WalletState, WalletPublicID: value.WalletPublicID,
 		AvailableBalanceCents: value.AvailableBalanceCents, ReservedCents: value.ReservedCents,
 		UnverifiedCents: value.UnverifiedCents, UpdatedAt: value.UpdatedAt,
+		PendingSettlementCents: value.PendingSettlementCents,
+		NextSettlementAt: value.NextSettlementAt,
 	}
 }
 
 func riderWalletEarningView(value delivery.RiderEarningRecord) RiderWalletEarningView {
+	var settleAt *time.Time
+	if !value.SettleAt.IsZero() {
+		settleAt = &value.SettleAt
+	}
 	return RiderWalletEarningView{
 		EarningPublicID: value.EarningPublicID, DeliveryOrderPublicID: value.DeliveryOrderPublicID,
 		AmountCents: value.RiderFeeCents, SettlementStatus: value.SettlementStatus,
+		SettleAt: settleAt, SettledAt: value.SettledAt,
 		CreatedAt: value.CreatedAt, PaidOfflineAt: value.PaidOfflineAt,
 	}
 }

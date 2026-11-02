@@ -19,7 +19,22 @@ import './index.scss'
 
 function money(cents: number) { return `¥${(cents / 100).toFixed(2)}` }
 function time(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? value.replace('T', ' ').slice(0, 16) : date.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) }
-function statusLabel(value: RiderEarningView['settlementStatus']) { return value === 'paid_offline' ? '已登记线下结款' : '待结算' }
+function statusLabel(value: RiderEarningView['settlementStatus']) { return value === 'paid_offline' ? '后台已登记' : value === 'settled' ? '已结算' : '待结算' }
+function settlementTime(value?: string) {
+  if (!value) return '结算时间待同步'
+  const instant = Date.parse(value)
+  if (!Number.isFinite(instant)) return '结算时间待同步'
+  // Beijing has a fixed UTC+08 offset. Do not use the phone's timezone or
+  // require Intl timezone support in older Mini Program runtimes.
+  const beijing = new Date(instant + 8 * 60 * 60 * 1000)
+  const pad = (part: number) => String(part).padStart(2, '0')
+  return `${beijing.getUTCMonth() + 1}月${beijing.getUTCDate()}日 ${pad(beijing.getUTCHours())}:${pad(beijing.getUTCMinutes())}（北京时间）`
+}
+function earningSettlementNote(item: RiderEarningView) {
+  if (item.settlementStatus === 'settled') return '已计入平台余额，不代表外部账户到账'
+  if (item.settlementStatus === 'paid_offline') return '后台已登记打款，以收款记录为准'
+  return item.settleAt ? `预计 ${settlementTime(item.settleAt)}结算` : '预计次日北京时间 00:00 结算，具体时间待同步'
+}
 function queueLabel(value: RiderPayoutQueueView) { return value.status === 'queued' ? '待结算' : value.status === 'cancelled' ? '已释放占用' : '来源待核实' }
 function withdrawalLabel(value: RiderWithdrawalView) { return value.status === 'processing' ? '提现中' : value.status === 'paid' ? '已登记打款' : '已退回余额' }
 type RecordKind = 'earnings' | 'ledger' | 'queue' | 'withdrawals'
@@ -187,9 +202,9 @@ function RiderWalletContent() {
     <ScrollView scrollY enhanced showScrollbar={false} className='rider-wallet-scroll'>
       <View className='rider-wallet-content'>
         <View className='rider-wallet-balance-card'>
-          <Text className='rider-wallet-eyebrow'>账面余额（元）</Text>
+          <Text className='rider-wallet-eyebrow'>已结算余额（元）</Text>
           <Text className='rider-wallet-balance'>{wallet ? money(wallet.availableBalanceCents) : '—'}</Text>
-          <Text className='rider-wallet-muted'>已完成配送的账面收入 · 提现由后台审核处理</Text>
+          <Text className='rider-wallet-muted'>次日北京时间 00:00 结算后计入余额 · 提现由后台审核处理</Text>
           <AppButton className='rider-wallet-withdraw' size='small' variant='secondary' disabled={loading || withdrawSubmitting || (!pendingWithdrawal && (!wallet || Boolean(errors.wallet) || wallet.availableBalanceCents <= wallet.reservedCents))} onClick={() => setWithdrawVisible(true)}>{pendingWithdrawal ? '继续原提现申请' : '提现'}</AppButton>
           {errors.wallet ? <Text className='rider-wallet-error' onClick={() => void load()}>{errors.wallet} · 点击重试</Text> : null}
         </View>
@@ -199,12 +214,16 @@ function RiderWalletContent() {
         </View>
         {errors.today ? <Text className='rider-wallet-error' onClick={() => void load()}>{errors.today} · 点击重试今日统计</Text> : null}
         <View className='rider-wallet-summary-row'>
+          <View><Text>预计待结算收入</Text><Text className='rider-wallet-summary-value'>{wallet?.pendingSettlementCents !== undefined ? money(wallet.pendingSettlementCents) : '—'}</Text></View>
+          <View><Text>最近结算时间</Text><Text className='rider-wallet-item-time'>{wallet?.nextSettlementAt ? settlementTime(wallet.nextSettlementAt) : wallet?.pendingSettlementCents === 0 ? '暂无待结算收入' : '结算时间待同步'}</Text></View>
+        </View>
+        <View className='rider-wallet-summary-row'>
           <View><Text>结算占用</Text><Text className='rider-wallet-summary-value'>{wallet ? money(wallet.reservedCents) : '—'}</Text></View>
           <View><Text>待核实收入</Text><Text className='rider-wallet-summary-value'>{wallet ? money(wallet.unverifiedCents) : '—'}</Text></View>
         </View>
-        <View className='rider-wallet-explanation'><AppNotice title='收入与到账分开查看'>今日预计收入统计今天已完成并产生收入的配送单。提现提交后显示“提现中”，由后台审核后更新状态。</AppNotice></View>
+        <View className='rider-wallet-explanation'><AppNotice title='收入与到账分开查看'>今日预计收入统计今天已完成并产生收入的配送单，预计次日北京时间 00:00 统一结算。已结算仅表示计入平台余额，不代表外部账户到账；待核实收入不计入可提现余额。提现提交后显示“提现中”，由后台审核后更新状态。</AppNotice></View>
         <Section title='收入记录' error={errors.earnings} retry={load} empty={earnings.length === 0} loading={loading && earnings.length === 0}>
-          {earnings.map(item => <View key={item.earningPublicId} className='rider-wallet-list-item'><View><Text className='rider-wallet-item-title'>{item.deliveryOrderPublicId.slice(-8)}</Text><Text className='rider-wallet-item-time'>{time(item.createdAt)}</Text></View><View className='rider-wallet-item-end'><Text className='rider-wallet-item-amount'>{money(item.amountCents)}</Text><Text className='rider-wallet-chip'>{statusLabel(item.settlementStatus)}</Text></View></View>)}
+          {earnings.map(item => <View key={item.earningPublicId} className='rider-wallet-list-item'><View><Text className='rider-wallet-item-title'>{item.deliveryOrderPublicId.slice(-8)}</Text><Text className='rider-wallet-item-time'>{time(item.createdAt)}</Text><Text className='rider-wallet-item-time'>{earningSettlementNote(item)}</Text></View><View className='rider-wallet-item-end'><Text className='rider-wallet-item-amount'>{money(item.amountCents)}</Text><Text className='rider-wallet-chip'>{statusLabel(item.settlementStatus)}</Text></View></View>)}
           {moreButton('earnings', earnings.length)}
         </Section>
         <Section title='账本流水' error={errors.ledger} retry={load} empty={ledger.length === 0} loading={loading && ledger.length === 0}>

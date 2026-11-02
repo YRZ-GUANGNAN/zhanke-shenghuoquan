@@ -281,11 +281,14 @@ func (r *GormRepository) MarkRiderEarningPaidOffline(
 			result = RiderPayoutResult{Wallet: wallet, Earning: earning, Ledger: ledger, Payout: payout}
 			return nil
 		}
-		if earning.SettlementStatus != RiderEarningPending && earning.SettlementStatus != RiderEarningSettled {
+		if earning.SettlementStatus != RiderEarningSettled {
 			return ErrEarningSettled
 		}
 		if earning.RowVersion != expectedRowVersion {
 			return ErrConcurrentUpdate
+		}
+		if _, err := verifyRiderEarningFundingTx(tx, earning); err != nil {
+			return err
 		}
 		// The wallet lock also serializes reservations for other earnings. An
 		// offline payout must not spend any of those held funds.
@@ -328,7 +331,7 @@ func (r *GormRepository) MarkRiderEarningPaidOffline(
 		}
 		update := tx.Model(&RiderEarningRecord{}).
 			Where("id = ? AND row_version = ? AND settlement_status IN ?", earning.ID, expectedRowVersion,
-				[]RiderEarningStatus{RiderEarningPending, RiderEarningSettled}).
+				[]RiderEarningStatus{RiderEarningSettled}).
 			Updates(map[string]any{
 				"settlement_status": RiderEarningPaidOffline,
 				"paid_offline_at":   now,
@@ -363,8 +366,17 @@ func settleDeliveredOrderTx(tx *gorm.DB, order Order, now time.Time, appenders .
 	if err := validateRiderEarningAmount(order.DeliveryFeeCents, order.PlatformCutCents, order.RiderFeeCents); err != nil {
 		return RiderEarningRecord{}, RiderWallet{}, RiderLedger{}, err
 	}
-	// Keep the rider money lock order consistent with payout queue mutations:
-	// wallet -> earning. The delivery order is already locked by the caller.
+	// T+1 is fail-closed: never write a new earning through the legacy
+	// immediate-credit schema after the feature has been deployed.
+	if !tx.Migrator().HasColumn(&RiderEarningRecord{}, "settle_at") ||
+		!tx.Migrator().HasColumn(&RiderEarningRecord{}, "settled_at") {
+		return RiderEarningRecord{}, RiderWallet{}, RiderLedger{}, ErrPayoutQueueUnavailable
+	}
+	// The delivery order is already locked by the caller. Keep a wallet row for
+	// every rider as soon as an earning is recorded, but do not credit it here;
+	// the daily settlement worker performs wallet -> earning locking and credits
+	// the balance after the next Beijing midnight.
+	settleAt := nextRiderSettlementAt(now)
 	wallet, err := lockOrCreateRiderWalletTx(tx, *order.RiderUserID, now)
 	if err != nil {
 		return RiderEarningRecord{}, RiderWallet{}, RiderLedger{}, err
@@ -379,11 +391,7 @@ func settleDeliveredOrderTx(tx *gorm.DB, order Order, now time.Time, appenders .
 			existing.RiderFeeCents != order.RiderFeeCents {
 			return RiderEarningRecord{}, RiderWallet{}, RiderLedger{}, ErrIdempotencyConflict
 		}
-		var ledger RiderLedger
-		if ledgerErr := tx.Where("idempotency_key = ?", order.DeliveryOrderPublicID).First(&ledger).Error; ledgerErr != nil {
-			return existing, wallet, ledger, normalizeNotFound(ledgerErr)
-		}
-		return existing, wallet, ledger, nil
+		return existing, wallet, RiderLedger{}, nil
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return RiderEarningRecord{}, RiderWallet{}, RiderLedger{}, err
@@ -396,25 +404,13 @@ func settleDeliveredOrderTx(tx *gorm.DB, order Order, now time.Time, appenders .
 		EarningPublicID: earningID, DeliveryOrderPublicID: order.DeliveryOrderPublicID,
 		RiderUserID: *order.RiderUserID, DeliveryFeeCents: order.DeliveryFeeCents,
 		PlatformCutCents: order.PlatformCutCents, RiderFeeCents: order.RiderFeeCents,
+		SettleAt:         settleAt,
 		SettlementStatus: RiderEarningPending, RowVersion: 1, CreatedAt: now, UpdatedAt: now,
-	}
-	ledger, err := newRiderLedger(
-		wallet, RiderLedgerCredit, RiderLedgerIncome, order.RiderFeeCents,
-		"delivery_order", order.DeliveryOrderPublicID, order.DeliveryOrderPublicID, now,
-	)
-	if err != nil {
-		return RiderEarningRecord{}, RiderWallet{}, RiderLedger{}, err
-	}
-	if err := creditRiderWalletTx(tx, &wallet, order.RiderFeeCents, now); err != nil {
-		return RiderEarningRecord{}, RiderWallet{}, RiderLedger{}, err
 	}
 	if err := tx.Create(&earning).Error; err != nil {
 		if isDuplicateKey(err) {
 			return RiderEarningRecord{}, RiderWallet{}, RiderLedger{}, ErrIdempotencyConflict
 		}
-		return RiderEarningRecord{}, RiderWallet{}, RiderLedger{}, err
-	}
-	if err := tx.Create(&ledger).Error; err != nil {
 		return RiderEarningRecord{}, RiderWallet{}, RiderLedger{}, err
 	}
 	if len(appenders) > 0 && appenders[0] != nil {
@@ -424,7 +420,20 @@ func settleDeliveredOrderTx(tx *gorm.DB, order Order, now time.Time, appenders .
 			return RiderEarningRecord{}, RiderWallet{}, RiderLedger{}, err
 		}
 	}
-	return earning, wallet, ledger, nil
+	return earning, wallet, RiderLedger{}, nil
+}
+
+// nextRiderSettlementAt returns the next 00:00 in Asia/Shanghai, represented
+// as a UTC time. The repository stores all timestamps in UTC; using the
+// location here keeps the business boundary independent of the server zone.
+func nextRiderSettlementAt(now time.Time) time.Time {
+	loc, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		loc = time.FixedZone("CST", 8*60*60)
+	}
+	beijing := now.In(loc)
+	next := time.Date(beijing.Year(), beijing.Month(), beijing.Day()+1, 0, 0, 0, 0, loc)
+	return next.UTC()
 }
 
 func lockOrCreateRiderWalletTx(tx *gorm.DB, riderUserID uint64, now time.Time) (RiderWallet, error) {

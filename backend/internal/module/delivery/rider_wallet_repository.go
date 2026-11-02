@@ -2,6 +2,7 @@ package delivery
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"time"
 
@@ -16,12 +17,14 @@ const (
 )
 
 type RiderWalletSnapshot struct {
-	WalletState           RiderWalletState
-	WalletPublicID        string
-	AvailableBalanceCents uint64
-	ReservedCents         uint64
-	UnverifiedCents       uint64
-	UpdatedAt             *time.Time
+	WalletState            RiderWalletState
+	WalletPublicID         string
+	AvailableBalanceCents  uint64
+	ReservedCents          uint64
+	UnverifiedCents        uint64
+	PendingSettlementCents uint64
+	NextSettlementAt       *time.Time
+	UpdatedAt              *time.Time
 }
 
 type RiderPayoutQueueReadItem struct {
@@ -51,7 +54,18 @@ func (r *GormRepository) ReadRiderWalletSnapshot(ctx context.Context, riderUserI
 	if !r.db.Migrator().HasTable(&RiderPayoutQueue{}) || !r.db.Migrator().HasTable(&RiderPayoutReservation{}) {
 		return RiderWalletSnapshot{}, ErrPayoutQueueUnavailable
 	}
-	db := r.db.WithContext(ctx)
+	var result RiderWalletSnapshot
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var err error
+		result, err = readRiderWalletSnapshotTx(tx, riderUserID)
+		return err
+	}, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+	return result, err
+}
+
+// Use one consistent snapshot so a midnight credit or withdrawal cannot appear
+// as both pending and available, or as a reservation against a stale balance.
+func readRiderWalletSnapshotTx(db *gorm.DB, riderUserID uint64) (RiderWalletSnapshot, error) {
 	var wallet RiderWallet
 	err := db.Where("rider_user_id = ?", riderUserID).First(&wallet).Error
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -74,19 +88,17 @@ func (r *GormRepository) ReadRiderWalletSnapshot(ctx context.Context, riderUserI
 		"ON r.payout_queue_public_id = q.payout_queue_public_id WHERE q.rider_user_id = ?", riderUserID).Scan(&summary).Error; queryErr != nil {
 		return RiderWalletSnapshot{}, queryErr
 	}
-	var unqueued struct{ Amount uint64 }
-	if queryErr := db.Raw("SELECT COALESCE(SUM(e.rider_fee_cents), 0) AS amount FROM delivery_rider_earning_records e "+
-		"LEFT JOIN delivery_rider_payout_queue q ON q.earning_public_id = e.earning_public_id "+
-		"WHERE e.rider_user_id = ? AND e.settlement_status IN ('pending', 'settled') AND q.id IS NULL", riderUserID).Scan(&unqueued).Error; queryErr != nil {
+	var pending struct {
+		Amount           uint64
+		NextSettlementAt *time.Time
+	}
+	if queryErr := db.Raw("SELECT COALESCE(SUM(e.rider_fee_cents), 0) AS amount, MIN(e.settle_at) AS next_settlement_at FROM delivery_rider_earning_records e "+
+		"WHERE e.rider_user_id = ? AND e.settlement_status = 'pending'", riderUserID).Scan(&pending).Error; queryErr != nil {
 		return RiderWalletSnapshot{}, queryErr
 	}
-	var ok bool
-	summary.UnverifiedCents, ok = checkedAddAmount(summary.UnverifiedCents, unqueued.Amount)
-	if !ok {
-		return RiderWalletSnapshot{}, ErrAmountOverflow
-	}
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return RiderWalletSnapshot{WalletState: RiderWalletNotCreated, UnverifiedCents: summary.UnverifiedCents}, nil
+		return RiderWalletSnapshot{WalletState: RiderWalletNotCreated, UnverifiedCents: summary.UnverifiedCents,
+			PendingSettlementCents: pending.Amount, NextSettlementAt: pending.NextSettlementAt}, nil
 	}
 	if summary.ReservedCents > wallet.AvailableBalanceCents {
 		return RiderWalletSnapshot{}, ErrFundingSourceMismatch
@@ -96,7 +108,9 @@ func (r *GormRepository) ReadRiderWalletSnapshot(ctx context.Context, riderUserI
 		WalletState: RiderWalletReady, WalletPublicID: wallet.WalletPublicID,
 		AvailableBalanceCents: wallet.AvailableBalanceCents,
 		ReservedCents:         summary.ReservedCents, UnverifiedCents: summary.UnverifiedCents,
-		UpdatedAt: &updatedAt,
+		PendingSettlementCents: pending.Amount,
+		NextSettlementAt:       pending.NextSettlementAt,
+		UpdatedAt:              &updatedAt,
 	}, nil
 }
 

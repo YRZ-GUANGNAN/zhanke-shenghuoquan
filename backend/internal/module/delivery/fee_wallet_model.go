@@ -97,6 +97,8 @@ type RiderEarningRecord struct {
 	PlatformCutCents      uint64             `gorm:"column:platform_cut_cents;not null"`
 	RiderFeeCents         uint64             `gorm:"column:rider_fee_cents;not null"`
 	SettlementStatus      RiderEarningStatus `gorm:"column:settlement_status;size:24;not null;index:idx_delivery_rider_earning_rider_status,priority:2;index:idx_delivery_rider_earning_status"`
+	SettleAt              time.Time          `gorm:"column:settle_at;not null;index:idx_delivery_rider_earning_due,priority:2"`
+	SettledAt             *time.Time         `gorm:"column:settled_at"`
 	PaidOfflineAt         *time.Time         `gorm:"column:paid_offline_at"`
 	RowVersion            uint64             `gorm:"column:row_version;not null"`
 	CreatedAt             time.Time          `gorm:"column:created_at;not null"`

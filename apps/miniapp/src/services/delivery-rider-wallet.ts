@@ -13,6 +13,9 @@ export interface RiderWalletSummary {
   availableBalanceCents: number
   reservedCents: number
   unverifiedCents: number
+  // Missing on older servers: do not substitute unverified funds or invent 0.
+  pendingSettlementCents?: number
+  nextSettlementAt?: string
   updatedAt?: string
 }
 
@@ -21,6 +24,8 @@ export interface RiderEarningView {
   deliveryOrderPublicId: string
   amountCents: number
   settlementStatus: RiderEarningStatus
+  settleAt?: string
+  settledAt?: string
   createdAt: string
   paidOfflineAt?: string
 }
@@ -61,12 +66,67 @@ export interface RiderWithdrawalView {
 
 const BASE = '/delivery/rider/wallet'
 
+function walletResponseError(): Error { return new Error('资金记录格式异常，请稍后重试') }
+function record(value: unknown): Record<string, unknown> {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) throw walletResponseError()
+  return value as Record<string, unknown>
+}
+function cents(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) throw walletResponseError()
+  return value
+}
+function optionalTimestamp(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined
+  // Explicit timezone prevents device-local interpretation of UTC timestamps.
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value) || !Number.isFinite(Date.parse(value))) throw walletResponseError()
+  return value
+}
+function requiredText(value: unknown): string {
+  if (typeof value !== 'string' || !value.trim()) throw walletResponseError()
+  return value
+}
+function normalizeWallet(value: unknown): RiderWalletSummary {
+  const data = record(value)
+  if (data.walletState !== 'ready' && data.walletState !== 'not_created') throw walletResponseError()
+  const availableBalanceCents = cents(data.availableBalanceCents)
+  const reservedCents = cents(data.reservedCents)
+  if (reservedCents > availableBalanceCents) throw walletResponseError()
+  return {
+    walletState: data.walletState,
+    walletPublicId: data.walletPublicId === undefined ? undefined : requiredText(data.walletPublicId),
+    availableBalanceCents, reservedCents, unverifiedCents: cents(data.unverifiedCents),
+    pendingSettlementCents: data.pendingSettlementCents === undefined || data.pendingSettlementCents === null
+      ? undefined : cents(data.pendingSettlementCents),
+    nextSettlementAt: optionalTimestamp(data.nextSettlementAt), updatedAt: optionalTimestamp(data.updatedAt),
+  }
+}
+function normalizeEarning(value: unknown): RiderEarningView {
+  const data = record(value)
+  if (data.settlementStatus !== 'pending' && data.settlementStatus !== 'settled' && data.settlementStatus !== 'paid_offline') throw walletResponseError()
+  const createdAt = optionalTimestamp(data.createdAt)
+  if (!createdAt) throw walletResponseError()
+  return {
+    earningPublicId: requiredText(data.earningPublicId), deliveryOrderPublicId: requiredText(data.deliveryOrderPublicId),
+    amountCents: cents(data.amountCents), settlementStatus: data.settlementStatus,
+    settleAt: optionalTimestamp(data.settleAt), settledAt: optionalTimestamp(data.settledAt),
+    createdAt, paidOfflineAt: optionalTimestamp(data.paidOfflineAt),
+  }
+}
+
 export function getRiderWallet(): Promise<RiderWalletSummary> {
-  return request<RiderWalletSummary>(BASE, { url: '', timeout: 10000 })
+  return request<unknown>(BASE, { url: '', timeout: 10000 }).then(normalizeWallet)
 }
 
 export function listRiderEarnings(page = 1, pageSize = 20): Promise<Page<RiderEarningView>> {
-  return request<Page<RiderEarningView>>(`${BASE}/earnings?page=${page}&pageSize=${pageSize}`, { url: '', timeout: 10000 })
+  return request<unknown>(`${BASE}/earnings?page=${page}&pageSize=${pageSize}`, { url: '', timeout: 10000 }).then(value => {
+    const data = record(value)
+    if (!Array.isArray(data.items)) throw walletResponseError()
+    const currentPage = data.page === undefined ? 1 : cents(data.page)
+    const size = data.pageSize === undefined ? 20 : cents(data.pageSize)
+    const total = data.total === undefined ? data.items.length : cents(data.total)
+    if (currentPage < 1 || size < 1) throw walletResponseError()
+    return { items: data.items.map(normalizeEarning), page: currentPage, pageSize: size, total }
+  })
 }
 
 export function listRiderLedger(page = 1, pageSize = 20): Promise<Page<RiderLedgerView>> {

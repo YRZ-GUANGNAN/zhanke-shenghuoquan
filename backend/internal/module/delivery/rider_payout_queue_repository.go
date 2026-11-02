@@ -37,9 +37,8 @@ func (r *GormRepository) ListRiderPayoutCandidates(ctx context.Context, cursor R
 	if limit <= 0 || limit > 500 {
 		limit = 100
 	}
-	query := r.db.WithContext(ctx).Where("settlement_status IN ? AND rider_fee_cents > ?", []RiderEarningStatus{
-		RiderEarningPending, RiderEarningSettled,
-	}, 0).Order("id ASC").Limit(limit)
+	query := r.db.WithContext(ctx).Where("settlement_status = ? AND rider_fee_cents > ?", RiderEarningSettled, 0).
+		Order("id ASC").Limit(limit)
 	if cursor.AfterID > 0 {
 		query = query.Where("id > ?", cursor.AfterID)
 	}
@@ -140,7 +139,7 @@ func (r *GormRepository) ReconcileRiderPayoutQueue(ctx context.Context, earningP
 		if verifyErr != nil && !isRiderPayoutSourceBlockError(verifyErr) {
 			return verifyErr
 		}
-		canQueue := verifyErr == nil && source.State == RiderPayoutSourceVerified && earning.SettlementStatus != RiderEarningPaidOffline
+		canQueue := verifyErr == nil && source.State == RiderPayoutSourceVerified && earning.SettlementStatus == RiderEarningSettled
 		balanceBlocked := false
 		if canQueue {
 			reserved, reserveErr := activeRiderPayoutReservationAmountTx(tx, wallet.RiderUserID)
@@ -240,7 +239,7 @@ func reconcileExistingRiderPayoutQueueTx(
 		return RiderPayoutQueueResult{}, verifyErr
 	}
 	canQueue := verifyErr == nil && source.State == RiderPayoutSourceVerified &&
-		(earning.SettlementStatus == RiderEarningPending || earning.SettlementStatus == RiderEarningSettled)
+		earning.SettlementStatus == RiderEarningSettled
 	reasonCode := ""
 	if !canQueue {
 		if verifyErr != nil {
@@ -606,7 +605,7 @@ func verifyRiderEarningFundingTx(tx *gorm.DB, earning RiderEarningRecord) (Rider
 		}
 		return snapshot, err
 	}
-	if settlement.Status != SettlementPaid || settlement.AmountCents != earning.DeliveryFeeCents || settlement.MerchantUserID == 0 {
+	if settlement.Status != SettlementPaid || settlement.AmountCents != earning.DeliveryFeeCents || settlement.MerchantUserID == 0 || settlement.MerchantUserID != order.MerchantUserID {
 		return snapshot, ErrFundingSourceMismatch
 	}
 	if settlement.RefundedAt != nil || settlement.Status == SettlementRefunded || settlement.Status == SettlementRefundPending {
