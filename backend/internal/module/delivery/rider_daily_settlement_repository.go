@@ -38,11 +38,13 @@ func (r *GormRepository) SettleRiderEarning(ctx context.Context, earningPublicID
 	now = now.UTC()
 	var result RiderEarningRecord
 	var ledger RiderLedger
+	// This owner lookup must not establish a transaction snapshot before we
+	// wait for the wallet lock. Re-read and validate ownership under lock below.
+	var candidate RiderEarningRecord
+	if err := r.db.WithContext(ctx).Where("earning_public_id = ?", earningPublicID).First(&candidate).Error; err != nil {
+		return result, ledger, normalizeNotFound(err)
+	}
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var candidate RiderEarningRecord
-		if err := tx.Where("earning_public_id = ?", earningPublicID).First(&candidate).Error; err != nil {
-			return normalizeNotFound(err)
-		}
 		wallet, err := lockOrCreateRiderWalletTx(tx, candidate.RiderUserID, now)
 		if err != nil {
 			return err
@@ -56,7 +58,7 @@ func (r *GormRepository) SettleRiderEarning(ctx context.Context, earningPublicID
 		}
 		if earning.SettlementStatus == RiderEarningSettled || earning.SettlementStatus == RiderEarningPaidOffline {
 			result = earning
-			if err := tx.Where("idempotency_key = ?", earning.DeliveryOrderPublicID).First(&ledger).Error; err != nil {
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("idempotency_key = ?", earning.DeliveryOrderPublicID).First(&ledger).Error; err != nil {
 				return normalizeNotFound(err)
 			}
 			if ledger.WalletPublicID != wallet.WalletPublicID || ledger.RiderUserID != earning.RiderUserID ||

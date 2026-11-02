@@ -69,17 +69,18 @@ type Config struct {
 	WechatPayPlatformKeyID    string
 	AllowMockPayment          bool
 
-	EnableLegacyTakeout              bool
-	EnableDelivery                   bool
-	EnableDeliveryPayment            bool
-	EnableDeliveryRiderPayoutQueue   bool
-	AllowMockDeliveryFeeConfirmation bool
-	AllowMockDeliveryPayment         bool
-	EnableDeliveryIMReadReceipt      bool
-	EnableFeaturePolicy              bool
-	DeliveryWechatPayNotifyURL       string
-	DeliveryWechatRefundNotifyURL    string
-	WeComRiderWebhookURL             string
+	EnableLegacyTakeout                bool
+	EnableDelivery                     bool
+	EnableDeliveryPayment              bool
+	EnableDeliveryRiderPayoutQueue     bool
+	EnableDeliveryRiderDailySettlement bool
+	AllowMockDeliveryFeeConfirmation   bool
+	AllowMockDeliveryPayment           bool
+	EnableDeliveryIMReadReceipt        bool
+	EnableFeaturePolicy                bool
+	DeliveryWechatPayNotifyURL         string
+	DeliveryWechatRefundNotifyURL      string
+	WeComRiderWebhookURL               string
 }
 
 func Load() (Config, error) {
@@ -127,6 +128,10 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	enableDeliveryRiderPayoutQueue, err := envBool("ENABLE_DELIVERY_RIDER_PAYOUT_QUEUE", false)
+	if err != nil {
+		return Config{}, err
+	}
+	enableDeliveryRiderDailySettlement, err := envBool("ENABLE_DELIVERY_RIDER_DAILY_SETTLEMENT", false)
 	if err != nil {
 		return Config{}, err
 	}
@@ -203,17 +208,18 @@ func Load() (Config, error) {
 		WechatPayPlatformKeyID:    env("WECHAT_PAY_PLATFORM_KEY_ID", ""),
 		AllowMockPayment:          allowMockPayment,
 
-		EnableLegacyTakeout:              enableLegacyTakeout,
-		EnableDelivery:                   enableDelivery,
-		EnableDeliveryPayment:            enableDeliveryPayment,
-		EnableDeliveryRiderPayoutQueue:   enableDeliveryRiderPayoutQueue,
-		AllowMockDeliveryFeeConfirmation: allowMockDeliveryFeeConfirmation,
-		AllowMockDeliveryPayment:         allowMockDeliveryPayment,
-		EnableDeliveryIMReadReceipt:      enableDeliveryIMReadReceipt,
-		EnableFeaturePolicy:              enableFeaturePolicy,
-		DeliveryWechatPayNotifyURL:       env("DELIVERY_WECHAT_PAY_NOTIFY_URL", ""),
-		DeliveryWechatRefundNotifyURL:    env("DELIVERY_WECHAT_REFUND_NOTIFY_URL", ""),
-		WeComRiderWebhookURL:             env("WECOM_RIDER_WEBHOOK_URL", ""),
+		EnableLegacyTakeout:                enableLegacyTakeout,
+		EnableDelivery:                     enableDelivery,
+		EnableDeliveryPayment:              enableDeliveryPayment,
+		EnableDeliveryRiderPayoutQueue:     enableDeliveryRiderPayoutQueue,
+		EnableDeliveryRiderDailySettlement: enableDeliveryRiderDailySettlement,
+		AllowMockDeliveryFeeConfirmation:   allowMockDeliveryFeeConfirmation,
+		AllowMockDeliveryPayment:           allowMockDeliveryPayment,
+		EnableDeliveryIMReadReceipt:        enableDeliveryIMReadReceipt,
+		EnableFeaturePolicy:                enableFeaturePolicy,
+		DeliveryWechatPayNotifyURL:         env("DELIVERY_WECHAT_PAY_NOTIFY_URL", ""),
+		DeliveryWechatRefundNotifyURL:      env("DELIVERY_WECHAT_REFUND_NOTIFY_URL", ""),
+		WeComRiderWebhookURL:               env("WECOM_RIDER_WEBHOOK_URL", ""),
 	}
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err

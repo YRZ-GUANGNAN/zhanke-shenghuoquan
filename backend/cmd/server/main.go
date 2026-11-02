@@ -374,9 +374,12 @@ func main() {
 	if deliveryRuntime != nil {
 		if deliveryRuntime.riderSettlement != nil {
 			settlementContext, cancelSettlement := context.WithCancel(context.Background())
-			stopRiderSettlement = cancelSettlement
-			defer cancelSettlement()
+			var settlementWait sync.WaitGroup
+			settlementWait.Add(1)
+			stopRiderSettlement = func() { cancelSettlement(); settlementWait.Wait() }
+			defer stopRiderSettlement()
 			go func() {
+				defer settlementWait.Done()
 				for {
 					if _, err := deliveryRuntime.riderSettlement.ReconcileBatch(settlementContext); err != nil && settlementContext.Err() == nil {
 						log.Printf("delivery rider daily settlement stopped; retrying in 5s: %v", err)
@@ -658,6 +661,11 @@ func newDeliveryRuntime(cfg config.Config, db *gorm.DB, proofPorts ...delivery.M
 	if !cfg.EnableDelivery {
 		return nil, nil
 	}
+	// This build writes pending earnings with the T+1 schema even while its
+	// worker is disabled. Reject an incomplete deployment before serving orders.
+	if err := requireRiderSettlementSchema(db); err != nil {
+		return nil, err
+	}
 	notificationAppender, err := newDeliveryNotificationAppender(cfg, db)
 	if err != nil {
 		return nil, err
@@ -731,17 +739,19 @@ func newDeliveryRuntime(cfg config.Config, db *gorm.DB, proofPorts ...delivery.M
 		}
 		runtime.payoutQueue = delivery.NewRiderPayoutQueueService(queueRepository, time.Now)
 	}
-	// Do not start settlement until migration 054 exists; older environments
-	// remain read-only rather than writing against a missing schema.
-	if db.Migrator().HasColumn(&delivery.RiderEarningRecord{}, "settle_at") &&
-		db.Migrator().HasColumn(&delivery.RiderEarningRecord{}, "settled_at") {
-		settlementRepository, ok := any(repository).(delivery.RiderDailySettlementRepository)
-		if !ok {
-			return nil, fmt.Errorf("configure rider daily settlement: repository does not support migration 054")
-		}
-		runtime.riderSettlement = delivery.NewRiderDailySettlementService(settlementRepository, time.Now)
+	if cfg.EnableDeliveryRiderDailySettlement {
+		runtime.riderSettlement = delivery.NewRiderDailySettlementService(repository, time.Now)
 	}
 	return runtime, nil
+}
+
+func requireRiderSettlementSchema(db *gorm.DB) error {
+	if db == nil || !db.Migrator().HasColumn(&delivery.RiderEarningRecord{}, "settle_at") ||
+		!db.Migrator().HasColumn(&delivery.RiderEarningRecord{}, "settled_at") ||
+		!db.Migrator().HasIndex(&delivery.RiderEarningRecord{}, "idx_delivery_rider_earning_due") {
+		return errors.New("delivery requires completed migration 054 before startup; keep money writers stopped during migration")
+	}
+	return nil
 }
 
 func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, userService *user.Service, adminAuth ...gin.HandlerFunc) {

@@ -360,7 +360,8 @@ func (r *GormRepository) MarkRiderEarningPaidOffline(
 }
 
 func settleDeliveredOrderTx(tx *gorm.DB, order Order, now time.Time, appenders ...NotificationEventAppender) (RiderEarningRecord, RiderWallet, RiderLedger, error) {
-	if order.Status != StatusDelivered || order.RiderUserID == nil || *order.RiderUserID == 0 {
+	if order.Status != StatusDelivered || order.RiderUserID == nil || *order.RiderUserID == 0 ||
+		order.DeliveredAt == nil || order.DeliveredAt.IsZero() || now.IsZero() {
 		return RiderEarningRecord{}, RiderWallet{}, RiderLedger{}, ErrInvalidRecord
 	}
 	if err := validateRiderEarningAmount(order.DeliveryFeeCents, order.PlatformCutCents, order.RiderFeeCents); err != nil {
@@ -376,7 +377,8 @@ func settleDeliveredOrderTx(tx *gorm.DB, order Order, now time.Time, appenders .
 	// every rider as soon as an earning is recorded, but do not credit it here;
 	// the daily settlement worker performs wallet -> earning locking and credits
 	// the balance after the next Beijing midnight.
-	settleAt := nextRiderSettlementAt(now)
+	earnedAt := order.DeliveredAt.UTC()
+	settleAt := nextRiderSettlementAt(earnedAt)
 	wallet, err := lockOrCreateRiderWalletTx(tx, *order.RiderUserID, now)
 	if err != nil {
 		return RiderEarningRecord{}, RiderWallet{}, RiderLedger{}, err
@@ -405,7 +407,7 @@ func settleDeliveredOrderTx(tx *gorm.DB, order Order, now time.Time, appenders .
 		RiderUserID: *order.RiderUserID, DeliveryFeeCents: order.DeliveryFeeCents,
 		PlatformCutCents: order.PlatformCutCents, RiderFeeCents: order.RiderFeeCents,
 		SettleAt:         settleAt,
-		SettlementStatus: RiderEarningPending, RowVersion: 1, CreatedAt: now, UpdatedAt: now,
+		SettlementStatus: RiderEarningPending, RowVersion: 1, CreatedAt: earnedAt, UpdatedAt: now.UTC(),
 	}
 	if err := tx.Create(&earning).Error; err != nil {
 		if isDuplicateKey(err) {

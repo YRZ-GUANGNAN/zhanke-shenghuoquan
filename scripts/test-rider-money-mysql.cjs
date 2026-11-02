@@ -63,15 +63,19 @@ async function main() {
         const shutdown = runSync(admin, connection.filter(arg => arg !== '--batch' && arg !== '--skip-column-names').concat('shutdown'), { timeout: 15000 })
         if (shutdown.status !== 0) throw new Error('Isolated shutdown failed; temporary data retained: ' + shutdown.stderr)
       }
+      let socketClosed = false
       for (let attempt = 0; attempt < 60; attempt++) {
-        const socketClosed = await new Promise(resolve => { const socket = net.connect({ host: '127.0.0.1', port }); socket.once('connect', () => { socket.destroy(); resolve(false) }); socket.once('error', () => { socket.destroy(); resolve(true) }) })
+        socketClosed = await new Promise(resolve => { const socket = net.connect({ host: '127.0.0.1', port }); socket.once('connect', () => { socket.destroy(); resolve(false) }); socket.once('error', () => { socket.destroy(); resolve(true) }) })
         if (socketClosed) break
         await wait(250)
       }
-      await wait(1000)
+      if (!socketClosed) throw new Error('Isolated MySQL port remains open; temporary data retained.')
+      for (let attempt = 0; attempt < 40 && !stopped; attempt++) await wait(250)
+      if (!stopped) throw new Error('Isolated MySQL process remains alive; temporary data retained.')
     } else if (server && !stopped) {
       server.kill()
       for (let attempt = 0; attempt < 40 && !stopped; attempt++) await wait(250)
+      if (!stopped) throw new Error('Unready MySQL process remains alive; temporary data retained.')
     }
     const resolved = fs.realpathSync(directory)
     if (path.dirname(resolved) !== temporaryRoot || !path.basename(resolved).startsWith('campus-rider-money-mysql-')) throw new Error('Refusing unexpected cleanup path.')

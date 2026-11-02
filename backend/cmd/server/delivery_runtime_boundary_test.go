@@ -34,3 +34,21 @@ func TestDeliveryRuntimeDoesNotConstructLegacyTakeoutServices(t *testing.T) {
 		t.Fatal("delivery runtime lacks identity-only adapter or fail-closed gate")
 	}
 }
+
+func TestRiderDailySettlementRuntimeIsFailClosed(t *testing.T) {
+	if err := requireRiderSettlementSchema(nil); err == nil {
+		t.Fatal("missing schema accepted")
+	}
+	body, err := os.ReadFile("main.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{
+		"requireRiderSettlementSchema(db)", "idx_delivery_rider_earning_due",
+		"if cfg.EnableDeliveryRiderDailySettlement", "settlementWait.Wait()", "defer settlementWait.Done()",
+	} {
+		if !strings.Contains(string(body), required) {
+			t.Fatalf("runtime missing %s", required)
+		}
+	}
+}

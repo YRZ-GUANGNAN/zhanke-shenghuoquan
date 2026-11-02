@@ -181,6 +181,7 @@ func TestFeatureGateDefaults(t *testing.T) {
 	t.Setenv("ALLOW_MOCK_DELIVERY_PAYMENT", "")
 	t.Setenv("ENABLE_DELIVERY_IM_READ_RECEIPT", "")
 	t.Setenv("ENABLE_DELIVERY_RIDER_PAYOUT_QUEUE", "")
+	t.Setenv("ENABLE_DELIVERY_RIDER_DAILY_SETTLEMENT", "")
 	legacy, err := envBool("ENABLE_LEGACY_TAKEOUT", false)
 	if err != nil || legacy {
 		t.Fatal("legacy takeout default must be fail-closed")
@@ -212,6 +213,10 @@ func TestFeatureGateDefaults(t *testing.T) {
 	var cfg Config
 	if cfg.EnableDeliveryRiderPayoutQueue {
 		t.Fatal("zero-value delivery rider payout queue gate must be disabled")
+	}
+	settlement, err := envBool("ENABLE_DELIVERY_RIDER_DAILY_SETTLEMENT", false)
+	if err != nil || settlement || cfg.EnableDeliveryRiderDailySettlement {
+		t.Fatal("daily settlement must remain opt-in until migration and money acceptance")
 	}
 	if cfg.EnableWechatSubscribeNotifications || cfg.EnableNotificationSending {
 		t.Fatal("notification delivery switches must default to disabled")

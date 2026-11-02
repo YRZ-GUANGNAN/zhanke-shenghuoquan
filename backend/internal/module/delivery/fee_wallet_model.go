@@ -89,14 +89,14 @@ type RiderWallet struct {
 func (RiderWallet) TableName() string { return "delivery_rider_wallets" }
 
 type RiderEarningRecord struct {
-	ID                    uint64             `gorm:"column:id;primaryKey"`
+	ID                    uint64             `gorm:"column:id;primaryKey;index:idx_delivery_rider_earning_due,priority:3"`
 	EarningPublicID       string             `gorm:"column:earning_public_id;size:26;not null;uniqueIndex:uq_delivery_rider_earning_public_id"`
 	DeliveryOrderPublicID string             `gorm:"column:delivery_order_public_id;size:26;not null;uniqueIndex:uq_delivery_rider_earning_order"`
 	RiderUserID           uint64             `gorm:"column:rider_user_id;not null;index:idx_delivery_rider_earning_rider_status,priority:1"`
 	DeliveryFeeCents      uint64             `gorm:"column:delivery_fee_cents;not null"`
 	PlatformCutCents      uint64             `gorm:"column:platform_cut_cents;not null"`
 	RiderFeeCents         uint64             `gorm:"column:rider_fee_cents;not null"`
-	SettlementStatus      RiderEarningStatus `gorm:"column:settlement_status;size:24;not null;index:idx_delivery_rider_earning_rider_status,priority:2;index:idx_delivery_rider_earning_status"`
+	SettlementStatus      RiderEarningStatus `gorm:"column:settlement_status;size:24;not null;index:idx_delivery_rider_earning_rider_status,priority:2;index:idx_delivery_rider_earning_status;index:idx_delivery_rider_earning_due,priority:1"`
 	SettleAt              time.Time          `gorm:"column:settle_at;not null;index:idx_delivery_rider_earning_due,priority:2"`
 	SettledAt             *time.Time         `gorm:"column:settled_at"`
 	PaidOfflineAt         *time.Time         `gorm:"column:paid_offline_at"`

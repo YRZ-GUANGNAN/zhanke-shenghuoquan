@@ -3,6 +3,7 @@ package delivery
 import (
 	"bufio"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -82,7 +83,7 @@ func TestD6AFeePolicyGlobalOverrideAndSnapshotAgainstRealMySQL84(t *testing.T) {
 	t.Log("d6a_fee_policy=PASS global+merchant_override+snapshot_immutability")
 }
 
-func TestD6ARiderEarningSettlementNormalProofIdempotencyAndPayoutAgainstRealMySQL84(t *testing.T) {
+func TestD6ARiderEarningNormalProofIdempotencyAndPendingPayoutGuardAgainstRealMySQL84(t *testing.T) {
 	db := openD6AMySQL(t)
 	if !db.Migrator().HasTable(&Proof{}) {
 		t.Fatal("required D-4 proof migration 026 is missing")
@@ -97,12 +98,12 @@ func TestD6ARiderEarningSettlementNormalProofIdempotencyAndPayoutAgainstRealMySQ
 
 	normal := createD6AOrder(t, ctx, dispatch, d6aMerchantGlobal, "01J0000000000000000000A011")
 	normal = readyAndDeliverD6AOrder(t, ctx, dispatch, normal, d6aRiderNormal, &now)
-	assertD6AEarningAndWallet(t, db, normal, d6aRiderNormal, 120)
+	assertD6AEarningAndWallet(t, db, normal, d6aRiderNormal, 0)
 	repeated, err := dispatch.MarkDelivered(ctx, d6aRiderNormal, normal.DeliveryOrderPublicID, normal.RowVersion-1)
 	if err != nil || repeated.RowVersion != normal.RowVersion {
 		t.Fatalf("idempotent delivered=%#v err=%v", repeated, err)
 	}
-	assertD6AEarningAndWallet(t, db, normal, d6aRiderNormal, 120)
+	assertD6AEarningAndWallet(t, db, normal, d6aRiderNormal, 0)
 
 	proofOrder := createD6AOrder(t, ctx, dispatch, d6aMerchantProof, "01J0000000000000000000A012")
 	proofOrder = readyClaimAndStartProofDelivery(t, ctx, dispatch, proofOrder, d6aRiderProof, &now)
@@ -121,28 +122,24 @@ func TestD6ARiderEarningSettlementNormalProofIdempotencyAndPayoutAgainstRealMySQ
 	if err != nil || proofOrder.Status != StatusDelivered {
 		t.Fatalf("proof delivered order=%#v err=%v", proofOrder, err)
 	}
-	assertD6AEarningAndWallet(t, db, proofOrder, d6aRiderProof, 120)
+	assertD6AEarningAndWallet(t, db, proofOrder, d6aRiderProof, 0)
 
 	earning, err := repository.FindRiderEarningByOrder(ctx, normal.DeliveryOrderPublicID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	payout, err := repository.MarkRiderEarningPaidOffline(
+	_, err = repository.MarkRiderEarningPaidOffline(
 		ctx, earning.EarningPublicID, earning.RowVersion, d6aOperator,
 		"01J0000000000000000000A021", "wechat paid offline", now.Add(time.Minute),
 	)
-	if err != nil || payout.Earning.SettlementStatus != RiderEarningPaidOffline ||
-		payout.Wallet.AvailableBalanceCents != 0 || payout.Ledger.Direction != RiderLedgerDebit {
-		t.Fatalf("payout=%#v err=%v", payout, err)
+	if !errors.Is(err, ErrEarningSettled) {
+		t.Fatalf("pending earning allowed payout: %v", err)
 	}
-	repeatedPayout, err := repository.MarkRiderEarningPaidOffline(
-		ctx, earning.EarningPublicID, earning.RowVersion, d6aOperator,
-		"01J0000000000000000000A022", "repeated", now.Add(2*time.Minute),
-	)
-	if err != nil || repeatedPayout.Payout.PayoutPublicID != payout.Payout.PayoutPublicID {
-		t.Fatalf("idempotent payout=%#v err=%v", repeatedPayout, err)
+	if _, _, err := repository.SettleRiderEarning(ctx, earning.EarningPublicID, earning.SettleAt); !isRiderPayoutSourceBlockError(err) {
+		t.Fatalf("mock-confirmed delivery became spendable: %v", err)
 	}
-	t.Log("d6a_rider_settlement=PASS normal_delivered+proof_delivered+idempotent+wallet_CAS+ledger+payout")
+	assertD6AEarningAndWallet(t, db, normal, d6aRiderNormal, 0)
+	t.Log("d6a_rider_pending=PASS normal+proof+idempotent+no_credit+mock_funding_rejected")
 }
 
 func openD6AMySQL(t *testing.T) *gorm.DB {
@@ -150,6 +147,10 @@ func openD6AMySQL(t *testing.T) *gorm.DB {
 	db := openD3MySQL(t)
 	if !hasD6ATables(db) {
 		applyD1SQLFile(t, db, "../../../migrations/028_delivery_fee_and_rider_wallet.sql")
+	}
+	if !db.Migrator().HasColumn(&RiderEarningRecord{}, "settle_at") {
+		assertD6ARiderMoneyEmpty(t, db)
+		applyD1SQLFile(t, db, "../../../migrations/054_delivery_rider_daily_settlement.sql")
 	}
 	assertD6ASchema(t, db)
 	return db
@@ -308,7 +309,7 @@ func assertD6AEarningAndWallet(t *testing.T, db *gorm.DB, order Order, riderID u
 	if err := db.Model(&RiderLedger{}).
 		Where("rider_user_id = ? AND reference_public_id = ? AND entry_type = ?",
 			riderID, order.DeliveryOrderPublicID, RiderLedgerIncome).
-		Count(&ledgerCount).Error; err != nil || ledgerCount != 1 {
+		Count(&ledgerCount).Error; err != nil || ledgerCount != 0 {
 		t.Fatalf("ledger count=%d err=%v", ledgerCount, err)
 	}
 }
