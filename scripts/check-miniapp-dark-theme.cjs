@@ -4,12 +4,13 @@ const path = require('node:path')
 const { execFileSync } = require('node:child_process')
 const sass = require('sass')
 const postcss = require('postcss')
+const { readMiniappRoutes } = require('./miniapp-routes.cjs')
 
 const root = path.resolve(__dirname, '..')
 const src = path.join(root, 'apps/miniapp/src')
 const read = file => fs.readFileSync(path.join(src, file), 'utf8')
 const appConfig = read('app.config.ts')
-const pages = [...appConfig.matchAll(/'(pages\/[^']+)'/g)].map(match => match[1])
+const pages = readMiniappRoutes(appConfig)
 const themes = JSON.parse(read('theme.json'))
 assert.match(appConfig, /darkmode:\s*true/)
 assert.match(appConfig, /themeLocation:\s*'theme.json'/)
@@ -19,6 +20,8 @@ assert.equal(themes.light.navigationText, 'black')
 assert.equal(themes.light.navigationOnCover, 'white')
 assert.equal(themes.dark.navigationText, 'white')
 assert.match(fs.readFileSync(path.join(root, 'apps/miniapp/config/index.ts'), 'utf8'), /from:\s*'src\/theme.json',\s*to:\s*'dist\/theme.json'/)
+assert.match(read('pages/rider-wallet/index.config.ts'), /backgroundColor:\s*'@backgroundDefault'/)
+assert.match(read('pages/rider-wallet/index.config.ts'), /navigationBarTextStyle:\s*'@navigationText'/)
 for (const source of [appConfig, ...pages.map(page => read(`${page}.config.ts`))]) {
   for (const match of source.matchAll(/['"]@([a-zA-Z]+)['"]/g)) {
     assert.ok(themes.light[match[1]] && themes.dark[match[1]], `unresolved native theme key: ${match[1]}`)
@@ -27,6 +30,10 @@ for (const source of [appConfig, ...pages.map(page => read(`${page}.config.ts`))
 
 const generated = read('styles/system-dark-colors.generated.scss')
 assert.ok(generated.includes(`${pages.length} registered pages;`))
+for (const route of ['pages/merchant-wallet/index', 'pages/rider-wallet/index']) {
+  assert.ok(pages.includes(route), `missing wallet route: ${route}`)
+  assert.ok(generated.includes(`/* ${route}.scss */`), `missing wallet dark styles: ${route}`)
+}
 const ast = postcss.parse(sass.compileString(generated, { logger: sass.Logger.silent }).css)
 const allowed = /^(?:color|background(?:-color|-image)?|border(?:-(?:top|right|bottom|left))?(?:-color)?|outline(?:-color)?|box-shadow|text-shadow|fill|stroke|caret-color|--guide-[\w-]+)$/
 const rules = new Map()

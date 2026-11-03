@@ -551,6 +551,9 @@ function RiderPayoutQueuePanel() {
 }
 
 function RiderWithdrawalsPanel() {
+  // Matches the backend's hard gate. Enabling needs earning allocations and
+  // per-order payout exclusion; this page must not invite a payment meanwhile.
+  const withdrawalWritesReady = false
   const dialog = useAdminDialog()
   const [data, setData] = useState<Page<RiderWithdrawal>>(emptyPage())
   const [detail, setDetail] = useState<RiderWithdrawal | null>(null)
@@ -577,6 +580,7 @@ function RiderWithdrawalsPanel() {
   activeLoad.current = load
   useEffect(() => { void load(); return () => { requestVersion.current++ } }, [load])
   const run = async (row: RiderWithdrawal, action: 'approve' | 'reject') => {
+    if (!withdrawalWritesReady) { setError('提现处理尚未开放，请勿据此付款或调整余额。'); return }
     if (operationLock.current || !mounted.current) return
     operationLock.current = true
     setBusy(row.withdrawPublicId); setError(''); setConflict(false)
@@ -608,7 +612,7 @@ function RiderWithdrawalsPanel() {
     <p className="delivery-capability-notice delivery-capability-notice--inline"><strong>尚未开放资金写入</strong><span>本页为联调候选，后端尚未启用提现处理。请勿据此付款。开放前须完成提现与逐单结款互斥；开放后仅凭实际付款凭证登记打款，拒绝则退回余额，不连接微信转账。</span></p>
     <div className="delivery-controls"><label>状态<select value={status} onChange={event => { setPage(1); setStatus(event.target.value) }}><option value="">全部</option><option value="processing">提现中</option><option value="paid">已登记打款</option><option value="rejected">已退回</option></select></label><label>骑手用户 ID<input value={riderUserId} inputMode="numeric" onChange={event => { setPage(1); setRiderUserId(event.target.value) }} /></label><button onClick={() => void load()}>刷新</button></div>
     <ErrorNotice error={error} conflict={conflict} refresh={() => void load()} />
-    <div className="table-scroll"><table><thead><tr><th>提现申请</th><th>骑手</th><th>金额</th><th>状态</th><th>版本</th><th>创建时间</th><th>操作</th></tr></thead><tbody>{data.items.map(row => <tr key={row.withdrawPublicId}><td><button className="link-button" onClick={() => setDetail(row)}>{short(row.withdrawPublicId)}</button></td><td>#{row.riderUserId}</td><td>{money(row.amountCents)}</td><td>{row.status === 'paid' ? '已登记打款' : row.status === 'processing' ? '提现中' : '已退回余额'}</td><td>v{row.rowVersion}</td><td>{time(row.createdAt)}</td><td>{row.status === 'processing' ? <div className="takeout-row-actions"><button disabled={Boolean(busy)} onClick={() => void run(row, 'approve')}>{busy === row.withdrawPublicId ? '处理中…' : '登记已线下打款'}</button><button className="danger" disabled={Boolean(busy)} onClick={() => void run(row, 'reject')}>退回余额</button></div> : <span>{row.reason || '已处理'}</span>}</td></tr>)}</tbody></table></div>
+    <div className="table-scroll"><table><thead><tr><th>提现申请</th><th>骑手</th><th>金额</th><th>状态</th><th>版本</th><th>创建时间</th><th>操作</th></tr></thead><tbody>{data.items.map(row => <tr key={row.withdrawPublicId}><td><button className="link-button" onClick={() => setDetail(row)}>{short(row.withdrawPublicId)}</button></td><td>#{row.riderUserId}</td><td>{money(row.amountCents)}</td><td>{row.status === 'paid' ? '已登记打款' : row.status === 'processing' ? '提现中' : '已退回余额'}</td><td>v{row.rowVersion}</td><td>{time(row.createdAt)}</td><td>{row.status === 'processing' ? <div className="takeout-row-actions"><button disabled={!withdrawalWritesReady || Boolean(busy)} title="提现处理尚未开放" onClick={() => void run(row, 'approve')}>{busy === row.withdrawPublicId ? '处理中…' : '登记已线下打款'}</button><button className="danger" disabled={!withdrawalWritesReady || Boolean(busy)} title="提现处理尚未开放" onClick={() => void run(row, 'reject')}>退回余额</button></div> : <span>{row.reason || '已处理'}</span>}</td></tr>)}</tbody></table></div>
     <Pagination value={data} setPage={setPage} />
     {detail && <Detail title={`提现 ${detail.withdrawPublicId}`} close={() => setDetail(null)}><div className="detail-grid"><Fact label="骑手" value={`#${detail.riderUserId}`} /><Fact label="金额" value={money(detail.amountCents)} /><Fact label="状态" value={<Badge value={detail.status} />} /><Fact label="Row Version" value={`v${detail.rowVersion}`} /><Fact label="原因" value={detail.reason || '—'} /><Fact label="处理时间" value={time(detail.processedAt)} /></div></Detail>}
   </Panel>

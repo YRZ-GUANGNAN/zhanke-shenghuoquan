@@ -85,7 +85,8 @@ const statusCopy: Record<DeliveryStatus, string> = {
   cancelled: '已取消',
 }
 
-function orderTone(status: DeliveryStatus): 'waiting' | 'pickup' | 'delivering' | 'completed' {
+function orderTone(status: DeliveryStatus): 'waiting' | 'pickup' | 'delivering' | 'completed' | 'danger' {
+  if (status === 'payment_failed') return 'danger'
   if (status === 'delivered' || status === 'cancelled') return 'completed'
   if (status === 'picked_up' || status === 'delivering') return 'delivering'
   if (status === 'claimed' || status === 'to_pickup') return 'pickup'
@@ -120,7 +121,7 @@ function OrderCard({ order, canActivate }: { order: MerchantDeliveryOrder; canAc
     <View className='merchant-order-card'>
       <View className='merchant-order-card__identity'>
         <Text className='merchant-order-card__source'>{deliverySourceLabel(order.sourcePlatform)}</Text>
-        <Text className={`merchant-order-card__pickup-code${order.pickupCode ? '' : ' merchant-order-card__pickup-code--fallback'}${(order.pickupCode?.length ?? 0) > 8 ? ' merchant-order-card__pickup-code--long' : ''}`}>
+        <Text className={`merchant-order-card__pickup-code${order.pickupCode?.trim() ? '' : ' merchant-order-card__pickup-code--fallback'}${(order.pickupCode?.trim().length ?? 0) > 8 ? ' merchant-order-card__pickup-code--long' : ''}`}>
           {order.pickupCode?.trim() ? <>{deliveryPickupLabel(order).slice(0, -1)}<Text className='merchant-order-card__pickup-unit'>号</Text></> : deliveryPickupLabel(order)}
         </Text>
       </View>
@@ -420,7 +421,7 @@ function MerchantHomeContent() {
             ariaRole='button'
             ariaLabel={`${tab.label}${activeTab === tab.key ? '，已选中' : ''}`}
             hoverClass='merchant-home-control--pressed'
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => { if (canActivateWorkspace()) setActiveTab(tab.key) }}
           >
             <Text className='merchant-home-tab__label'>{tab.label}</Text>
             <Text className={`merchant-home-tab__count merchant-home-tab__count--${tab.key}${!loadedByTab[tab.key] ? ' merchant-home-tab__count--pending' : ''}`}>

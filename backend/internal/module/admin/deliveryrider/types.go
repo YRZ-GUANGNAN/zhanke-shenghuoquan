@@ -37,6 +37,7 @@ type TodayStatsView struct {
 }
 
 type RiderWalletView struct {
+	WithdrawalEnabled      bool                      `json:"withdrawalEnabled"`
 	WalletState            delivery.RiderWalletState `json:"walletState"`
 	WalletPublicID         string                    `json:"walletPublicId,omitempty"`
 	AvailableBalanceCents  uint64                    `json:"availableBalanceCents"`
@@ -98,7 +99,7 @@ func riderWalletView(value delivery.RiderWalletSnapshot) RiderWalletView {
 		AvailableBalanceCents: value.AvailableBalanceCents, ReservedCents: value.ReservedCents,
 		UnverifiedCents: value.UnverifiedCents, UpdatedAt: value.UpdatedAt,
 		PendingSettlementCents: value.PendingSettlementCents,
-		NextSettlementAt: value.NextSettlementAt,
+		NextSettlementAt:       value.NextSettlementAt,
 	}
 }
 

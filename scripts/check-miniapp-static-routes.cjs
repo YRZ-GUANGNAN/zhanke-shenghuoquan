@@ -22,6 +22,7 @@ const expectedRoutes = [
   'pages/my-content/index',
   'pages/edit-profile/index',
   'pages/settings/index',
+  'pages/notifications/index',
   'pages/blacklist/index',
   'pages/feedback/index',
   'pages/about/index',

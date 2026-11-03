@@ -8,6 +8,7 @@ export type RiderPayoutQueueStatus = 'blocked' | 'queued' | 'cancelled'
 export type RiderWithdrawalStatus = 'processing' | 'paid' | 'rejected'
 
 export interface RiderWalletSummary {
+  withdrawalEnabled: boolean
   walletState: RiderWalletState
   walletPublicId?: string
   availableBalanceCents: number
@@ -92,6 +93,8 @@ function normalizeWallet(value: unknown): RiderWalletSummary {
   const reservedCents = cents(data.reservedCents)
   if (reservedCents > availableBalanceCents) throw walletResponseError()
   return {
+    // Older servers and malformed capability values must never open money writes.
+    withdrawalEnabled: data.withdrawalEnabled === true,
     walletState: data.walletState,
     walletPublicId: data.walletPublicId === undefined ? undefined : requiredText(data.walletPublicId),
     availableBalanceCents, reservedCents, unverifiedCents: cents(data.unverifiedCents),

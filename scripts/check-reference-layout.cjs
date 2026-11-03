@@ -17,8 +17,17 @@ for (const match of appConfig.matchAll(/root:\s*'pages\/([^']+)'[\s\S]*?pages:\s
   if (!routes.includes(match[1])) routes.push(match[1])
 }
 const excluded = ['campus-guide']
+// Every registered page must be present in this review pass.  The notification
+// center was previously implemented but not registered, so keep its explicit
+// route in the reviewed set instead of silently accepting a route-count drift.
+const reviewedRoutes = new Set([
+  'notifications',
+])
 const compiled = new Map()
-assert.equal(routes.length, 31, '路由变化需要显式复审覆盖表，不得顺带开启历史页面')
+assert.equal(routes.length, 32, '路由变化需要显式复审覆盖表，不得顺带开启历史页面')
+for (const route of reviewedRoutes) {
+  assert.ok(routes.includes(route), `${route} 必须纳入显式复审覆盖表`)
+}
 for (const route of routes) {
   let styleRoute = route
   if (route === 'rider-messages') {

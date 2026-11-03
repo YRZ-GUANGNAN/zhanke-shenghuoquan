@@ -135,8 +135,6 @@ export default function DeliveryRiderPage() {
   const accountId = useSessionStore((state) => state.profile.id)
   const [activeTab, setActiveTab] = useState<RiderTab>(() => getCurrentInstance().router?.params.tab === 'tasks' ? 'pickup' : 'grab')
   const channelInteraction = useChannelInteraction()
-  const workspace = useDeliveryWorkspaceNavigation({ role: 'rider', active: activeTab === 'grab' ? 'grab' : 'tasks', onSelect: key => setActiveTab(key === 'grab' ? 'grab' : 'pickup') }, identityAllowed)
-  const canActivateWorkspace = () => workspace.swipe.canActivate() && channelInteraction.canActivate()
   const [me, setMe] = useState<DeliveryRiderMe | null>(null)
   const [claimable, setClaimable] = useState<ClaimableDeliveryOrder[]>([])
   const [pickupOrders, setPickupOrders] = useState<AssignedDeliveryOrder[]>([])
@@ -160,6 +158,9 @@ export default function DeliveryRiderPage() {
   const [loadMoreError, setLoadMoreError] = useState<{ tab: RiderTab; message: string } | null>(null)
   const [releaseCandidate, setReleaseCandidate] = useState<AssignedDeliveryOrder | null>(null)
   const [releaseReviewOnly, setReleaseReviewOnly] = useState(false)
+  const workspaceEnabled = identityAllowed && releaseCandidate === null && !Object.values(busyByOrder).some(Boolean)
+  const workspace = useDeliveryWorkspaceNavigation({ role: 'rider', active: activeTab === 'grab' ? 'grab' : 'tasks', onSelect: key => setActiveTab(key === 'grab' ? 'grab' : 'pickup') }, workspaceEnabled)
+  const canActivateWorkspace = () => workspaceEnabled && workspace.swipe.canActivate() && channelInteraction.canActivate()
   const releaseCandidateRef = useRef<AssignedDeliveryOrder | null>(null)
   const requestVersion = useRef(0)
   const busyByOrderRef = useRef<BusyByOrder>({})
@@ -894,7 +895,7 @@ export default function DeliveryRiderPage() {
             key={item.key}
             className={`rider-grab-tabs__item ${activeTab === item.key ? 'rider-grab-tabs__item--active' : ''}`}
             ariaRole='button' ariaLabel={`${item.label}${activeTab === item.key ? '，已选中' : ''}`}
-            onClick={() => setActiveTab(item.key)}
+            onClick={() => { if (canActivateWorkspace()) setActiveTab(item.key) }}
           >
             <Text>{item.label}</Text>
             <Text className={`rider-grab-tabs__count rider-grab-tabs__count--${item.key}`}>{hasLoadedOrders ? item.count : '—'}</Text>
@@ -903,8 +904,8 @@ export default function DeliveryRiderPage() {
       </View> : <View className='rider-grab-pool-heading'><Text>可接订单</Text><Text>下拉刷新 · 接单后查看完整信息</Text></View>}
 
       <DeliveryStagePager<RiderTab> keys={canClaim ? ['grab', 'pickup', 'delivery'] : ['pickup', 'delivery']} activeKey={activeTab}
-        scopeKey={`rider:${accountId}:${canClaim}`} enabled={identityAllowed && releaseCandidate === null} onBoundarySwipe={workspace.step}
-        onChange={key => { if (identityAllowed && releaseCandidate === null) setActiveTab(key) }} interaction={channelInteraction}
+        scopeKey={`rider:${accountId}:${canClaim}`} enabled={workspaceEnabled} onBoundarySwipe={workspace.step}
+        onChange={key => { if (workspaceEnabled) setActiveTab(key) }} interaction={channelInteraction}
         renderPage={tab => (
       <RefreshScrollView
         scrollY
@@ -979,7 +980,7 @@ export default function DeliveryRiderPage() {
               <View className='rider-order-card__top'>
                 <View className='rider-order-card__heading'>
                   <Text className='rider-order-card__source'>{deliverySourceLabel(order.sourcePlatform)}</Text>
-                  <Text className={`rider-order-card__pickup-code${order.pickupCode ? '' : ' rider-order-card__pickup-code--fallback'}`}>{order.pickupCode?.trim() ? <>{deliveryPickupLabel(order).slice(0, -1)}<Text className='rider-order-card__pickup-unit'>号</Text></> : deliveryPickupLabel(order)}</Text>
+                  <Text className={`rider-order-card__pickup-code${order.pickupCode?.trim() ? '' : ' rider-order-card__pickup-code--fallback'}${(order.pickupCode?.trim().length ?? 0) > 8 ? ' rider-order-card__pickup-code--long' : ''}`}>{order.pickupCode?.trim() ? <>{deliveryPickupLabel(order).slice(0, -1)}<Text className='rider-order-card__pickup-unit'>号</Text></> : deliveryPickupLabel(order)}</Text>
                 </View>
                 <View className='rider-order-card__fee'>
                   <Text>配送费 </Text>
@@ -1060,7 +1061,7 @@ export default function DeliveryRiderPage() {
         <View className='rider-order-card__top'>
           <View className='rider-order-card__heading'>
             <Text className='rider-order-card__source'>{deliverySourceLabel(order.sourcePlatform)}</Text>
-            <Text className={`rider-order-card__pickup-code${order.pickupCode ? '' : ' rider-order-card__pickup-code--fallback'}`}>{order.pickupCode?.trim() ? <>{deliveryPickupLabel(order).slice(0, -1)}<Text className='rider-order-card__pickup-unit'>号</Text></> : deliveryPickupLabel(order)}</Text>
+            <Text className={`rider-order-card__pickup-code${order.pickupCode?.trim() ? '' : ' rider-order-card__pickup-code--fallback'}${(order.pickupCode?.trim().length ?? 0) > 8 ? ' rider-order-card__pickup-code--long' : ''}`}>{order.pickupCode?.trim() ? <>{deliveryPickupLabel(order).slice(0, -1)}<Text className='rider-order-card__pickup-unit'>号</Text></> : deliveryPickupLabel(order)}</Text>
           </View>
           <View className='rider-order-card__fee'>
             <Text>配送费 </Text>

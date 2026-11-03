@@ -2,6 +2,7 @@ package deliveryrider
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,6 +13,30 @@ import (
 	"campus-circle/backend/internal/module/takeout"
 	"github.com/gin-gonic/gin"
 )
+
+func TestWalletWithdrawalCapabilityMatchesServerWriteGate(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, enabled := range []bool{false, true} {
+		handler := NewHandler(nil, nil, nil, func(*gin.Context) uint64 { return 77 }).WithWalletReader(walletReaderStub{}).WithWithdrawals(&withdrawalRepositoryStub{})
+		// Test-only opt-in; production still has no setter for the write gate.
+		handler.withdrawalWritesReady = enabled
+		handler.identity = todayStatsIdentityStub{rider: takeout.Rider{RiderUserID: 77, Status: takeout.RiderActive}}
+		router := gin.New()
+		handler.Register(router.Group("/rider"))
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/rider/wallet", nil))
+		var response struct {
+			Data map[string]any `json:"data"`
+		}
+		if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+			t.Fatal(err)
+		}
+		value, exists := response.Data["withdrawalEnabled"]
+		if recorder.Code != http.StatusOK || !exists || value != enabled {
+			t.Fatalf("gate=%t capability=%v exists=%t body=%s", enabled, value, exists, recorder.Body.String())
+		}
+	}
+}
 
 type walletReaderStub struct{}
 
@@ -44,7 +69,9 @@ func TestWalletQueriesUseSessionRiderAndWhitelistDTO(t *testing.T) {
 	for _, path := range []string{"/rider/wallet", "/rider/wallet/earnings?page=1&pageSize=20", "/rider/wallet/ledger?page=1&pageSize=20", "/rider/wallet/payout-queue?page=1&pageSize=20"} {
 		recorder := httptest.NewRecorder()
 		separator := "?"
-		if strings.Contains(path, "?") { separator = "&" }
+		if strings.Contains(path, "?") {
+			separator = "&"
+		}
 		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path+separator+"riderUserId=999", nil))
 		if recorder.Code != http.StatusOK {
 			t.Fatalf("%s status=%d body=%s", path, recorder.Code, recorder.Body.String())

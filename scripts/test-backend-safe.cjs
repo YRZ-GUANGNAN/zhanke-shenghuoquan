@@ -28,7 +28,9 @@ for (const key of mysqlEnvironmentKeys) {
 }
 
 const executable = process.platform === 'win32' ? 'go.exe' : 'go'
-const result = spawnSync(executable, ['test', './...'], {
+const args = ['test', './...']
+if (process.argv.includes('--uncached')) args.push('-count=1')
+const result = spawnSync(executable, args, {
   cwd: backendRoot,
   env: environment,
   stdio: 'inherit',

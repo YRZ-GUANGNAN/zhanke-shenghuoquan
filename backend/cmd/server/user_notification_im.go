@@ -122,7 +122,8 @@ type privateNotificationRecipients struct {
 
 // ResolveRecipients re-checks current account, contact/block, relationship,
 // feature and preference facts when the event is expanded, not just when the
-// callback was accepted. No private-message WeChat tasks are produced.
+// callback was accepted. WeChat tasks require a reviewed metadata-only
+// template, the explicit test-recipient allowlist, and current preferences.
 func (r *privateNotificationRecipients) ResolveRecipients(ctx context.Context, event notification.Event) ([]notification.Recipient, error) {
 	if r == nil || r.identity == nil || r.users == nil || event.EventType != notification.EventPrivateMessageReceived || event.AggregateType != "im_conversation" || event.PayloadVersion != 1 || event.AggregateVersion == 0 {
 		return nil, notification.ErrInvalidRecord

@@ -157,7 +157,10 @@ func (h *Handler) wallet(c *gin.Context) {
 		h.write(c, nil, err)
 		return
 	}
-	response.OK(c, riderWalletView(value))
+	view := riderWalletView(value)
+	// Expose the actual write gate, not a promise inferred from a positive balance.
+	view.WithdrawalEnabled = h.withdrawalWritesReady && h.withdrawals != nil
+	response.OK(c, view)
 }
 
 func (h *Handler) earnings(c *gin.Context) {

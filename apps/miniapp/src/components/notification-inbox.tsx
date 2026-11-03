@@ -16,8 +16,12 @@ export default function NotificationInbox({ enabled }: { enabled: boolean }) {
   const [cursor, setCursor] = useState('')
   const [error, setError] = useState('')
   const busy = useRef(false)
+  const opened = useRef(new Map<string, string>())
   const visible = useRef(true)
   const epoch = useRef(0)
+  const mounted = useRef(true)
+  const enabledRef = useRef(enabled)
+  enabledRef.current = enabled
   const pages = useRef(1)
   const load = useCallback(async (next = '') => {
     if (!enabled || !visible.current || busy.current) return
@@ -33,23 +37,32 @@ export default function NotificationInbox({ enabled }: { enabled: boolean }) {
     finally { if (current()) busy.current = false }
   }, [enabled, token, role])
   useEffect(() => {
+    mounted.current = true
     epoch.current += 1; busy.current = false; pages.current = 1
     setItems([]); setCursor(''); setError(''); void load()
-    return () => { epoch.current += 1; busy.current = false }
+    return () => { mounted.current = false; epoch.current += 1; busy.current = false; opened.current.clear() }
   }, [load])
   useEffect(() => { if (pages.current === 1) void load() }, [notifications.inboxRevision, load])
-  useDidHide(() => { visible.current = false; epoch.current += 1; busy.current = false })
+  useDidHide(() => { visible.current = false; epoch.current += 1; busy.current = false; opened.current.clear() })
   useDidShow(() => { visible.current = true; void load() })
   const open = async (item: NotificationInboxItem) => {
+    const operationEpoch = epoch.current
+    const owner = `${token}:${role}:${operationEpoch}`
+    const operationKey = `${owner}:${item.id}`
+    if (!mounted.current || !enabledRef.current || !visible.current || opened.current.has(item.id)) return
+    opened.current.set(item.id, operationKey)
+    const current = () => mounted.current && enabledRef.current && visible.current && epoch.current === operationEpoch
+      && token === useSessionStore.getState().token && role === useSessionStore.getState().identity?.currentIdentity
     try {
       const path = notificationTargetPath(item)
       if (!path) throw new Error('通知入口已失效，请返回工作台查看')
       if (!item.read) await markNotificationRead(item.id)
-      if (token !== useSessionStore.getState().token || role !== useSessionStore.getState().identity?.currentIdentity) return
+      if (!current()) return
       setItems(previous => previous.map(row => row.id === item.id ? { ...row, read: true } : row))
       void notificationRuntime.refresh()
       await Taro.navigateTo({ url: path })
-    } catch (value) { void Taro.showToast({ title: value instanceof Error ? value.message : '通知打开失败', icon: 'none' }) }
+    } catch (value) { if (current()) void Taro.showToast({ title: value instanceof Error ? value.message : '通知打开失败', icon: 'none' }) }
+    finally { if (opened.current.get(item.id) === operationKey) opened.current.delete(item.id) }
   }
   if (!enabled || (!items.length && !error)) return null
   return <View className='merchant-messages-card'>

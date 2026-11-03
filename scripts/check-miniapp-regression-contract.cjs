@@ -27,10 +27,13 @@ requireMatch(home, /key=\{channel\}/, '每个首页频道保留独立 ScrollView
 requireMatch(home, /scrollTop=\{tabScrollPositions\.current\[channel\]\}/, '首页标签切换时必须独立保存滚动位置')
 
 const chatPage = read('apps/miniapp/src/pages/secondhand-chat/index.tsx')
+const notificationInbox = read('apps/miniapp/src/components/notification-inbox.tsx')
 requireMatch(chatPage, /onClick=\{openPeerProfile\}[\s\S]{0,100}<Text>主页<\/Text>/, '聊天页必须保留明确的对方主页入口')
 requireMatch(chatPage, /`campus_\$\{currentUserId\}`/, '聊天页必须绑定当前后端用户对应的 Tencent IM 账号')
 requireMatch(chatPage, /const isCurrent = \(\) => activeChatKeyRef\.current === operationKey && useSessionStore.getState\(\).profile.id === sendingUserId/, '聊天发送完成后必须拒绝旧账号结果写回')
 requireMatch(chatPage, /await sendTencentText[\s\S]{0,180}if \(!isCurrent\(\)\) return/, '聊天发送完成必须先检查当前上下文')
+requireMatch(notificationInbox, /opened\.current\.has\(item\.id\)/, '通知连点必须共享同一进行中锁')
+requireMatch(notificationInbox, /mounted\.current && enabledRef\.current && visible\.current && epoch\.current === operationEpoch/, '通知已读回执必须隔离卸载、隐藏、禁用与代次变化')
 
 forbidMatch(
   chatPage,

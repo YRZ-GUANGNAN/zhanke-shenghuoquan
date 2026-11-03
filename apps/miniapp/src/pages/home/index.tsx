@@ -589,7 +589,20 @@ function HomeContent() {
             ))}
           </View>
         }
-        right={!isMessagesPage && visibility.search && (visibility.forum || visibility.secondhand) ? (
+        right={isMessagesPage && visibility.messages ? (
+          <View
+            className='student-home-header__search student-home-header__notifications'
+            onClick={() => {
+              if (!channelInteraction.canActivate()) return
+              void Taro.navigateTo({ url: '/pages/notifications/index' })
+            }}
+            hoverClass='student-home-header__search--pressed'
+            ariaRole='button'
+            ariaLabel='通知中心'
+          >
+            <Text>通知</Text>
+          </View>
+        ) : !isMessagesPage && visibility.search && (visibility.forum || visibility.secondhand) ? (
           <View
             className='student-home-header__search'
             onClick={openSearch}

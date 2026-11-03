@@ -122,7 +122,7 @@ for (const fragment of [
   }
 }
 
-if (!notifications.includes("/pages/secondhand-detail/index?id=${encodeURIComponent(item.productId)}&commentId=${encodeURIComponent(item.productCommentId||'')}")) {
+if (!notifications.replace(/\s+/g, '').includes("/pages/secondhand-detail/index?id=${encodeURIComponent(item.productId)}&commentId=${encodeURIComponent(item.productCommentId||'')}")) {
   throw new Error('product notification must navigate to its product and comment coordinate')
 }
 

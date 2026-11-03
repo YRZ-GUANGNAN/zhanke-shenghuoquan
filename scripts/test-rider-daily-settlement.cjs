@@ -46,8 +46,14 @@ async function runServiceAssertions() {
     assert.equal(value.pendingSettlementCents, undefined)
     assert.equal(value.nextSettlementAt, undefined)
     assert.equal(value.unverifiedCents, 300)
+    assert.equal(value.withdrawalEnabled, false, '旧服务端缺失提现能力必须关闭')
     console.log('PASS 旧服务端缺失结算字段时保持 undefined，不以待核实收入补值')
   }
+  for (const withdrawalEnabled of [false, true, undefined, null, 'true', 1]) {
+    const { service } = requestHarness({ '/delivery/rider/wallet': { ...wallet, withdrawalEnabled } })
+    assert.equal((await service.getRiderWallet()).withdrawalEnabled, withdrawalEnabled === true)
+  }
+  console.log('PASS 提现能力只接受明确 true，缺失或非布尔值均关闭')
   for (const invalid of [
     { ...wallet, availableBalanceCents: -1 },
     { ...wallet, availableBalanceCents: 1.2 },

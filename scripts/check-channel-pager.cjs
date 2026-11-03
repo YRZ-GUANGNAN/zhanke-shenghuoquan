@@ -298,6 +298,8 @@ async function run() {
     const messagePage = await mount(() => React.createElement(Home))
     assert.equal(requests.messages.length, 1, '底栏私信入口加载会话')
     assert.equal(shareOptions.at(-1).enabled, false, '私信视图不提供公开分享')
+    await messagePage.event(() => messagePage.props('.student-home-header__notifications').onClick())
+    assert.equal(navigate.at(-1), '/pages/notifications/index', '消息页必须提供真实注册通知中心入口')
     const messageRequest = requests.messages[0]
     const discoverRequestsBefore = requests.posts.length
     routeParams = { id: 'chat-child' }
@@ -321,6 +323,7 @@ async function run() {
       messageSwiper().onTransition({ detail: { dx: 20, dy: 0 } })
       messageSwiper().onTouchEnd()
       messagePage.props('.student-message-row').onClick()
+      messagePage.props('.student-home-header__notifications').onClick()
     })
     assert.equal(navigate.length, navigationCount, '滑动松手不能误开聊天')
     await messagePage.event(() => { for (const ref of shown) ref.current() })
@@ -329,6 +332,7 @@ async function run() {
     await messagePage.render()
     await messagePage.event(() => requests.messages[3].resolve([{ relationId: 9, productId: 9, sellerId: 'test-user-c', buyerId: 'test-peer' }]))
     assert.equal(messagePage.container.querySelector('[data-component="Swiper"]'), null, '私信开关关闭后不展示残留会话')
+    assert.equal(messagePage.container.querySelector('.student-home-header__notifications'), null, '消息关闭后不留下通知入口')
     assert.equal(requests.posts.length, discoverRequestsBefore)
     console.log('channel pager and home behavior: PASS (swipe guard, hide/show/unmount, stale events, preserved channels, owner and source changes)')
   } finally {

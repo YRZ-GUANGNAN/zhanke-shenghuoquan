@@ -1,8 +1,90 @@
-.notifications-page { padding-bottom: 40rpx; }
-.notifications-head { display:flex; justify-content:space-between; margin-bottom:20rpx; color:#667085; }
-.notification { margin-bottom:16rpx; padding:24rpx; }
-.notification--unread { border-left:8rpx solid #2563eb; }
-.notification__title, .notification__time { display:block; }
-.notification__title { color:#172033; font-weight:700; }
-.notification__time { margin-top:10rpx; color:#8791a2; font-size:23rpx; }
-.notifications-empty { padding:40rpx; text-align:center; color:#8791a2; }
+@use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
+
+.notifications-page {
+  @include ref.page-foundation;
+  min-height: 100vh;
+  padding: 28rpx 28rpx calc(48rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  background: $bg-app;
+  color: $text-primary;
+}
+
+.notifications-head {
+  @include ref.type(label);
+  @include ref.wrap;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  min-height: 44PX;
+  margin: 0 4rpx 16rpx;
+  color: $text-secondary;
+}
+
+.notifications-head__count {
+  @include ref.type(meta);
+  flex: 0 0 auto;
+  color: $text-muted;
+  text-align: right;
+}
+
+.notification {
+  @include ref.touch;
+  @include ref.wrap;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 92rpx;
+  margin-bottom: 16rpx;
+  padding: 20rpx 24rpx;
+  box-sizing: border-box;
+  border: 1rpx solid $border-subtle;
+  border-radius: $radius-card;
+  background: $bg-surface;
+  box-shadow: $shadow-card;
+}
+
+.notification--unread {
+  border-left: 8rpx solid $brand-primary;
+  padding-left: 17rpx;
+}
+
+.notification__title,
+.notification__time {
+  @include ref.wrap;
+  display: block;
+}
+
+.notification__title {
+  @include ref.type(label);
+  color: $text-strong;
+}
+
+.notification__time {
+  @include ref.type(meta);
+  margin-top: 8rpx;
+  color: $text-muted;
+}
+
+.notifications-empty {
+  @include ref.touch;
+  @include ref.wrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 92rpx;
+  margin-bottom: 24rpx;
+  padding: 24rpx;
+  box-sizing: border-box;
+  border: 1rpx solid $border-subtle;
+  border-radius: $radius-card;
+  background: $bg-surface;
+  color: $text-muted;
+  text-align: center;
+}
+
+.notifications-empty:active,
+.notification:active {
+  background: $bg-surface-subtle;
+}

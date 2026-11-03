@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -27,19 +30,68 @@ type privateMessageNotificationTemplate struct {
 	users  map[uint64]bool
 }
 
+var notificationTemplateField = regexp.MustCompile(`^(thing|phrase|time|character_string)[1-9][0-9]*$`)
+
+// Only map fields whose reviewed WeChat type can represent the value we
+// actually generate. In particular unreadCount is a metadata-only label, not
+// an authoritative numeric unread count. Reject duplicate JSON keys instead
+// of silently replacing one reviewed mapping with another.
+func decodeNotificationTemplateFields(raw string, private bool) (map[string]string, error) {
+	invalid := errors.New("unsupported or ambiguous notification template field mapping")
+	if len(raw) > 16384 {
+		return nil, invalid
+	}
+	decoder := json.NewDecoder(strings.NewReader(raw))
+	if start, err := decoder.Token(); err != nil || start != json.Delim('{') {
+		return nil, invalid
+	}
+	fields := map[string]string{}
+	for decoder.More() {
+		token, err := decoder.Token()
+		key, ok := token.(string)
+		if err != nil || !ok || len(key) > 32 || fields[key] != "" {
+			return nil, invalid
+		}
+		match := notificationTemplateField.FindStringSubmatch(key)
+		var semantic string
+		if len(match) != 2 || decoder.Decode(&semantic) != nil {
+			return nil, invalid
+		}
+		compatible := false
+		switch semantic {
+		case "status":
+			compatible = match[1] == "thing" || match[1] == "phrase"
+		case "time":
+			compatible = match[1] == "time" || match[1] == "thing"
+		case "orderId":
+			compatible = !private && match[1] == "character_string"
+		case "unreadCount":
+			compatible = private && (match[1] == "thing" || match[1] == "phrase")
+		}
+		if !compatible || len(fields) >= 20 {
+			return nil, invalid
+		}
+		fields[key] = semantic
+	}
+	if end, err := decoder.Token(); err != nil || end != json.Delim('}') || len(fields) == 0 {
+		return nil, invalid
+	}
+	if _, err := decoder.Token(); !errors.Is(err, io.EOF) {
+		return nil, invalid
+	}
+	return fields, nil
+}
+
 func configuredPrivateMessageNotificationTemplate(cfg config.Config) (*privateMessageNotificationTemplate, error) {
 	if !cfg.EnableWechatSubscribeNotifications || strings.TrimSpace(cfg.WechatMessageTemplateID) == "" && strings.TrimSpace(cfg.WechatMessageTemplateFields) == "" {
 		return nil, nil
 	}
 	template := &privateMessageNotificationTemplate{id: strings.TrimSpace(cfg.WechatMessageTemplateID), users: map[uint64]bool{}}
-	if template.id == "" || json.Unmarshal([]byte(cfg.WechatMessageTemplateFields), &template.fields) != nil || len(template.fields) == 0 {
+	fields, err := decodeNotificationTemplateFields(cfg.WechatMessageTemplateFields, true)
+	if template.id == "" || err != nil {
 		return nil, errors.New("private message template requires approved ID and field mapping")
 	}
-	for _, semantic := range template.fields {
-		if semantic != "status" && semantic != "time" && semantic != "unreadCount" {
-			return nil, errors.New("unsupported private message template field mapping")
-		}
-	}
+	template.fields = fields
 	for _, raw := range strings.Split(cfg.NotificationTestUserIDs, ",") {
 		if strings.TrimSpace(raw) == "" {
 			continue
@@ -53,7 +105,7 @@ func configuredPrivateMessageNotificationTemplate(cfg config.Config) (*privateMe
 	if cfg.EnableNotificationSending && len(template.users) == 0 {
 		return nil, errors.New("external notification test allowlist is empty")
 	}
-	_, err := template.snapshot(notification.Event{AggregatePublicID: "im-pair:1:2", OccurredAt: time.Now()}, notification.Recipient{Title: "收到新私信", TargetPath: "/pages/secondhand-chat/index?relationId=1"})
+	_, err = template.snapshot(notification.Event{AggregatePublicID: "im-pair:1:2", OccurredAt: time.Now()}, notification.Recipient{Title: "收到新私信", TargetPath: "/pages/secondhand-chat/index?relationId=1"})
 	if err != nil {
 		return nil, errors.New("private message template fields do not fit approved field types")
 	}
@@ -92,14 +144,11 @@ func configuredOrderNotificationTemplate(cfg config.Config) (*orderNotificationT
 		return nil, nil
 	}
 	template := &orderNotificationTemplate{id: strings.TrimSpace(cfg.WechatOrderTemplateID), users: map[uint64]bool{}}
-	if template.id == "" || json.Unmarshal([]byte(cfg.WechatOrderTemplateFields), &template.fields) != nil || len(template.fields) == 0 {
+	fields, err := decodeNotificationTemplateFields(cfg.WechatOrderTemplateFields, false)
+	if template.id == "" || err != nil {
 		return nil, errors.New("notification order template requires approved ID and field mapping")
 	}
-	for _, semantic := range template.fields {
-		if semantic != "orderId" && semantic != "status" && semantic != "time" {
-			return nil, errors.New("unsupported notification template field mapping")
-		}
-	}
+	template.fields = fields
 	for _, raw := range strings.Split(cfg.NotificationTestUserIDs, ",") {
 		if strings.TrimSpace(raw) == "" {
 			continue
@@ -115,7 +164,7 @@ func configuredOrderNotificationTemplate(cfg config.Config) (*orderNotificationT
 	}
 	// Validate the longest currently supported state label and public ID, not
 	// invented field keys or truncated notification text.
-	_, err := template.snapshot(notification.Event{AggregatePublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAV", OccurredAt: time.Now()}, notification.Recipient{Title: "骑手正在前往取货", TargetPath: "/pages/delivery-rider/index"})
+	_, err = template.snapshot(notification.Event{AggregatePublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAV", OccurredAt: time.Now()}, notification.Recipient{Title: "骑手正在前往取货", TargetPath: "/pages/delivery-rider/index"})
 	if err != nil {
 		return nil, errors.New("notification template fields do not fit approved field types")
 	}
@@ -155,14 +204,14 @@ type notificationEventReader interface {
 
 func orderSubscribeGuard(events notificationEventReader, resolver *orderNotificationRecipients, lookup notification.OpenIDLookup, appID string) notification.SubscribeGuard {
 	return func(ctx context.Context, item notification.DeliveryItem, snapshot notification.TemplateSnapshot) (string, error) {
-		if resolver == nil || resolver.template == nil || !resolver.template.users[item.RecipientUserID] || item.TemplateKey != "order" || snapshot.TemplateID != resolver.template.id {
+		if events == nil || lookup == nil || appID == "" || resolver == nil || resolver.orders == nil || resolver.users == nil || resolver.template == nil || !resolver.template.users[item.RecipientUserID] || item.TemplateKey != "order" || snapshot.TemplateID != resolver.template.id {
 			return "", notification.ErrNotificationIneligible
 		}
 		event, err := events.FindEvent(ctx, item.EventPublicID)
 		if err != nil {
 			return "", errors.New("notification event lookup failed")
 		}
-		if event.ExpiresAt != nil && !event.ExpiresAt.After(resolver.now()) {
+		if event.EventPublicID != item.EventPublicID || notificationEventExpired(event, resolver.now) {
 			return "", notification.ErrNotificationIneligible
 		}
 		recipients, err := resolver.ResolveRecipients(ctx, event)
@@ -174,13 +223,7 @@ func orderSubscribeGuard(events notificationEventReader, resolver *orderNotifica
 				continue
 			}
 			// Immutable snapshot must still match the reviewed live mapping.
-			var expected, actual any
-			if json.Unmarshal(recipient.WechatTemplateSnapshot, &expected) != nil || json.Unmarshal(item.TemplateSnapshot, &actual) != nil {
-				return "", notification.ErrNotificationIneligible
-			}
-			expectedJSON, _ := json.Marshal(expected)
-			actualJSON, _ := json.Marshal(actual)
-			if string(expectedJSON) != string(actualJSON) {
+			if !notificationSnapshotMatches(recipient.WechatTemplateSnapshot, item.TemplateSnapshot, snapshot) {
 				return "", notification.ErrNotificationIneligible
 			}
 			return lookup(ctx, item.RecipientUserID, appID)
@@ -191,14 +234,14 @@ func orderSubscribeGuard(events notificationEventReader, resolver *orderNotifica
 
 func privateMessageSubscribeGuard(events notificationEventReader, resolver *privateNotificationRecipients, lookup notification.OpenIDLookup, appID string) notification.SubscribeGuard {
 	return func(ctx context.Context, item notification.DeliveryItem, snapshot notification.TemplateSnapshot) (string, error) {
-		if resolver == nil || resolver.template == nil || !resolver.template.users[item.RecipientUserID] || item.TemplateKey != "private_message" || snapshot.TemplateID != resolver.template.id {
+		if events == nil || lookup == nil || appID == "" || resolver == nil || resolver.identity == nil || resolver.users == nil || resolver.template == nil || !resolver.template.users[item.RecipientUserID] || item.Purpose != notification.PurposePrivateMessage || item.TemplateKey != "private_message" || snapshot.TemplateID != resolver.template.id {
 			return "", notification.ErrNotificationIneligible
 		}
 		event, err := events.FindEvent(ctx, item.EventPublicID)
 		if err != nil {
 			return "", errors.New("notification event lookup failed")
 		}
-		if event.ExpiresAt != nil && !event.ExpiresAt.After(resolver.now()) {
+		if event.EventPublicID != item.EventPublicID || notificationEventExpired(event, resolver.now) {
 			return "", notification.ErrNotificationIneligible
 		}
 		recipients, err := resolver.ResolveRecipients(ctx, event)
@@ -209,19 +252,30 @@ func privateMessageSubscribeGuard(events notificationEventReader, resolver *priv
 			if recipient.UserID != item.RecipientUserID || recipient.Purpose != notification.PurposePrivateMessage || !recipient.AllowWechat {
 				continue
 			}
-			var expected, actual any
-			if json.Unmarshal(recipient.WechatTemplateSnapshot, &expected) != nil || json.Unmarshal(item.TemplateSnapshot, &actual) != nil {
-				return "", notification.ErrNotificationIneligible
-			}
-			expectedJSON, _ := json.Marshal(expected)
-			actualJSON, _ := json.Marshal(actual)
-			if string(expectedJSON) != string(actualJSON) {
+			if !notificationSnapshotMatches(recipient.WechatTemplateSnapshot, item.TemplateSnapshot, snapshot) {
 				return "", notification.ErrNotificationIneligible
 			}
 			return lookup(ctx, item.RecipientUserID, appID)
 		}
 		return "", notification.ErrNotificationIneligible
 	}
+}
+
+func notificationEventExpired(event notification.Event, clock func() time.Time) bool {
+	now := time.Now()
+	if clock != nil {
+		now = clock()
+	}
+	return event.ExpiresAt != nil && !event.ExpiresAt.After(now)
+}
+
+func notificationSnapshotMatches(expectedRaw, persistedRaw json.RawMessage, decoded notification.TemplateSnapshot) bool {
+	if notification.ValidateTemplateSnapshot(expectedRaw) != nil || notification.ValidateTemplateSnapshot(persistedRaw) != nil {
+		return false
+	}
+	expected, expectedErr := notification.DecodeSubscribeSnapshot(expectedRaw)
+	persisted, persistedErr := notification.DecodeSubscribeSnapshot(persistedRaw)
+	return expectedErr == nil && persistedErr == nil && reflect.DeepEqual(expected, persisted) && reflect.DeepEqual(expected, decoded)
 }
 
 func userSubscribeGuard(events notificationEventReader, orders *orderNotificationRecipients, private *privateNotificationRecipients, lookup notification.OpenIDLookup, appID string) notification.SubscribeGuard {

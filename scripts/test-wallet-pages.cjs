@@ -1,5 +1,9 @@
 // Render the actual TSX with isolated hooks. No network, account or payment writes.
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+const Module = require('node:module')
+const ts = require('typescript')
 const { loadPage, loadSource, hookRenderer, deferred, nodes, text, hasClass, merchantHarness, order } = require('./test-delivery-stage-workbench.cjs')
 const button = (tree, label) => {
   const value = nodes(tree, node => node.type === 'AppButton' && text(node) === label)[0]
@@ -29,7 +33,7 @@ function riderWalletHarness(services = {}, storage = new Map()) {
     '../../hooks/use-identity-guard': { useIdentityGuard: () => true },
     '../../services/delivery-rider': { getDeliveryRiderTodayStats: async () => ({ todayOrders: 3, todayIncomeCents: 360 }) },
     '../../services/delivery-rider-wallet': {
-      getRiderWallet: async () => ({ availableBalanceCents: 360, reservedCents: 120, unverifiedCents: 0 }),
+      getRiderWallet: async () => ({ availableBalanceCents: 360, reservedCents: 120, unverifiedCents: 0, withdrawalEnabled: true }),
       listRiderEarnings: async () => ({ items: [], total: 0 }),
       listRiderLedger: async () => ({ items: [], total: 0 }),
       listRiderPayoutQueue: async () => ({ items: [], total: 0 }),
@@ -50,6 +54,30 @@ function riderWalletHarness(services = {}, storage = new Map()) {
     async hide() { hide?.(); await renderer.flush() },
     async show() { show?.(); await renderer.flush() },
   }
+}
+
+function adminWithdrawalsHarness() {
+  const renderer = hookRenderer()
+  const filename = path.resolve(__dirname, '../apps/admin/src/DeliveryConsole.tsx')
+  const source = `import React from 'react'\n${fs.readFileSync(filename, 'utf8')}\nexport { RiderWithdrawalsPanel }`
+  const compiled = ts.transpileModule(source, { fileName: filename, compilerOptions: {
+    module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React, target: ts.ScriptTarget.ES2020, esModuleInterop: true,
+  } }).outputText
+  let reads = 0, writes = 0, prompts = 0
+  const loaded = new Module(filename, module)
+  const imports = {
+    react: renderer.React,
+    './components': { useAdminDialog: () => ({ prompt: async () => { prompts++; return '凭证' } }) },
+    './services/delivery-admin': { DeliveryAPIError: Error, deliveryAdminAPI: {
+      riderWithdrawals: async () => { reads++; return { items: [{ withdrawPublicId: 'WITHDRAWAL', riderUserId: 1, amountCents: 120, status: 'processing', rowVersion: 1 }], page: 1, pageSize: 20, total: 1 } },
+      approveRiderWithdrawal: async () => { writes++; throw new Error('关闭门禁不得写入') },
+      rejectRiderWithdrawal: async () => { writes++; throw new Error('关闭门禁不得写入') },
+    } },
+  }
+  loaded.require = id => { assert.ok(id in imports, `后台测试必须隔离依赖：${id}`); return imports[id] }
+  loaded._compile(compiled, filename)
+  renderer.setComponent(loaded.exports.RiderWithdrawalsPanel)
+  return { renderer, calls: () => ({ reads, writes, prompts }) }
 }
 
 function rechargeHarness(options = {}) {
@@ -78,6 +106,18 @@ function rechargeHarness(options = {}) {
 }
 async function run() {
   {
+    const { renderer, calls } = adminWithdrawalsHarness()
+    renderer.render(); await renderer.flush()
+    const operations = nodes(renderer.tree, node => node.type === 'button' && ['登记已线下打款', '退回余额'].includes(text(node)))
+    assert.equal(operations.length, 2)
+    for (const operation of operations) { assert.equal(operation.props.disabled, true); operation.props.onClick() }
+    await renderer.flush()
+    assert.deepEqual(calls(), { reads: 1, writes: 0, prompts: 0 })
+    assert.match(text(renderer.tree), /提现处理尚未开放/)
+    renderer.unmount()
+    console.log('PASS 后台提现记录可查，硬门禁禁用登记及退回操作，旧事件不弹付款提示或写入')
+  }
+  {
     const state = withdrawalState()
     for (const value of ['0', '-1', '+1', '1e2', '0.001', '01', '1.', '', 'NaN', '1000000']) assert.equal(state.parseWithdrawalCents(value), null, value)
     for (const [value, cents] of [['0.01', 1], ['1.1', 110], [' 2.34 ', 234], ['999999.99', 99999999]]) assert.equal(state.parseWithdrawalCents(value), cents)
@@ -94,9 +134,47 @@ async function run() {
   }
   const withdrawal = { withdrawPublicId: 'WITHDRAWAL', amountCents: 120, status: 'processing', rowVersion: 1, createdAt: '2026-10-26T02:00:00Z' }
   {
+    for (const capability of [false, undefined]) {
+      let writes = 0
+      const storage = new Map(), state = withdrawalState(storage)
+      state.savePendingRiderWithdrawal({ accountId: 'A', amountCents: 120, idempotencyKey: '01ARZ3NDEKTSV4RRFFQ69G5FAV' })
+      const app = riderWalletHarness({
+        getRiderWallet: async () => ({ availableBalanceCents: 360, reservedCents: 120, unverifiedCents: 0, withdrawalEnabled: capability }),
+        listRiderWithdrawals: async () => ({ items: [withdrawal], total: 1 }),
+        createRiderWithdrawal: async () => { writes++; return withdrawal },
+      }, storage)
+      await app.mount()
+      const entry = nodes(app.tree, node => hasClass(node, 'rider-wallet-withdraw'))[0]
+      assert.equal(entry.props.disabled, true, '关闭或旧后端缺能力时不能提交提现')
+      assert.match(text(app.tree), /提现暂未开放/)
+      assert.match(text(section(app.tree, '提现记录')), /提现中/, '原记录仍能查询')
+      entry.props.onClick(); await app.flush()
+      button(app.tree, '重试原提现申请')(); await app.flush()
+      assert.equal(writes, 0, '旧按钮或恢复记录不得绕过能力门禁创建请求')
+      assert.ok(state.readPendingRiderWithdrawal('A'), '不得把未确认原申请当作取消并删除')
+      app.unmount()
+    }
+    console.log('PASS 提现能力关闭或缺失时禁用写入，保留原申请及历史记录查询')
+  }
+  {
+    let writes = 0, failed = false
+    const app = riderWalletHarness({
+      getRiderWallet: async () => { if (failed) throw new Error('能力读取失败'); return { availableBalanceCents: 360, reservedCents: 120, unverifiedCents: 0, withdrawalEnabled: true } },
+      createRiderWithdrawal: async () => { writes++; return withdrawal },
+    })
+    await app.mount(); const oldSubmit = await fillWithdrawal(app)
+    failed = true; await app.show()
+    oldSubmit(); await app.flush()
+    assert.equal(writes, 0, '读取失败后旧闭包不得复用之前开放的能力')
+    assert.equal(nodes(app.tree, node => hasClass(node, 'rider-wallet-withdraw'))[0].props.disabled, true)
+    assert.match(text(app.tree), /提现状态暂时无法确认/)
+    app.unmount()
+    console.log('PASS 钱包能力刷新失败关闭写入，旧提交闭包也不能绕过')
+  }
+  {
     const pending = deferred(); let calls = 0, balance = 360
     const app = riderWalletHarness({
-      getRiderWallet: async () => ({ availableBalanceCents: balance, reservedCents: 120, unverifiedCents: 0 }),
+      getRiderWallet: async () => ({ availableBalanceCents: balance, reservedCents: 120, unverifiedCents: 0, withdrawalEnabled: true }),
       createRiderWithdrawal: () => { calls++; return pending.promise },
       listRiderWithdrawals: async () => ({ items: balance === 240 ? [withdrawal] : [], total: balance === 240 ? 1 : 0 }),
     })
