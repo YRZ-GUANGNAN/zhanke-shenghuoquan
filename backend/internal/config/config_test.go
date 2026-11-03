@@ -273,6 +273,52 @@ func TestWechatSubscribeNotificationEnvironmentDefaults(t *testing.T) {
 	}
 }
 
+func TestWechatSubscribeMiniprogramStateValidation(t *testing.T) {
+	for _, state := range []string{"", "developer", "trial", "formal"} {
+		cfg := validConfig()
+		cfg.WechatSubscribeMiniprogramState = state
+		if err := cfg.Validate(); err != nil {
+			t.Fatalf("supported subscribe state %q rejected: %v", state, err)
+		}
+	}
+	for _, state := range []string{"release", "Trial", " formal", "trial ", " "} {
+		cfg := validConfig()
+		cfg.WechatSubscribeMiniprogramState = state
+		if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "WECHAT_SUBSCRIBE_MINIPROGRAM_STATE") {
+			t.Fatalf("invalid subscribe state %q returned %v", state, err)
+		}
+	}
+}
+
+func TestWechatSubscribeMiniprogramStateLoad(t *testing.T) {
+	t.Setenv("APP_ENV", "dev")
+	t.Setenv("JWT_SECRET", strings.Repeat("s", 32))
+	t.Setenv("WECHAT_APP_ID", "wx-test")
+	t.Setenv("WECHAT_APP_SECRET", "test-secret")
+	t.Setenv("ALLOW_MOCK_WECHAT_LOGIN", "false")
+	t.Setenv("ENABLE_WECHAT_SUBSCRIBE_NOTIFICATIONS", "false")
+	t.Setenv("ENABLE_NOTIFICATION_SENDING", "false")
+	for _, state := range []string{"", "developer", "trial", "formal", "invalid"} {
+		t.Run("state-"+state, func(t *testing.T) {
+			t.Setenv("WECHAT_SUBSCRIBE_MINIPROGRAM_STATE", state)
+			cfg, err := Load()
+			if state == "invalid" {
+				if err == nil || !strings.Contains(err.Error(), "WECHAT_SUBSCRIBE_MINIPROGRAM_STATE") {
+					t.Fatalf("invalid state was not rejected: %v", err)
+				}
+				return
+			}
+			want := state
+			if want == "" {
+				want = "formal"
+			}
+			if err != nil || cfg.WechatSubscribeMiniprogramState != want {
+				t.Fatalf("state=%q want=%q err=%v", cfg.WechatSubscribeMiniprogramState, want, err)
+			}
+		})
+	}
+}
+
 func TestBooleanEnvironmentRejectsAmbiguousValues(t *testing.T) {
 	for _, value := range []string{"yes", "enabled", "TRUE ", "t"} {
 		t.Run(value, func(t *testing.T) {

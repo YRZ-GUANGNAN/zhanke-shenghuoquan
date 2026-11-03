@@ -123,9 +123,9 @@ func (r *GormEventRepository) ExpandAndComplete(ctx context.Context, lease Event
 			"status": status, "lease_token": nil, "lease_expires_at": nil,
 			"processed_at": now, "row_version": gorm.Expr("row_version + 1"), "updated_at": now,
 		}
-		query := tx.Model(&Event{}).Where("id = ? AND status = ? AND row_version = ? AND lease_token = ? AND lease_expires_at > ? AND lease_expires_at > UTC_TIMESTAMP(3)", lease.Event.ID, EventProcessing, lease.Event.RowVersion, lease.LeaseToken, now)
+		query := tx.Model(&Event{}).Where("id = ? AND status = ? AND row_version = ? AND lease_token = ? AND lease_expires_at > ? AND lease_expires_at > CURRENT_TIMESTAMP(3)", lease.Event.ID, EventProcessing, lease.Event.RowVersion, lease.LeaseToken, now)
 		if status == EventExpanded {
-			query = query.Where("expires_at IS NULL OR expires_at > UTC_TIMESTAMP(3)")
+			query = query.Where("expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP(3)")
 		}
 		result := query.Updates(updates)
 		if result.Error != nil {
@@ -152,7 +152,7 @@ func (r *GormEventRepository) FailEvent(ctx context.Context, lease EventLease, c
 	// Event schema intentionally stores only the fixed error code. Never persist
 	// the resolver/driver message, which can contain private provider information.
 	_ = safeMessage
-	result := r.db.WithContext(ctx).Model(&Event{}).Where("id = ? AND status = ? AND row_version = ? AND lease_token = ? AND lease_expires_at > ? AND lease_expires_at > UTC_TIMESTAMP(3)", lease.Event.ID, EventProcessing, lease.Event.RowVersion, lease.LeaseToken, now).Updates(updates)
+	result := r.db.WithContext(ctx).Model(&Event{}).Where("id = ? AND status = ? AND row_version = ? AND lease_token = ? AND lease_expires_at > ? AND lease_expires_at > CURRENT_TIMESTAMP(3)", lease.Event.ID, EventProcessing, lease.Event.RowVersion, lease.LeaseToken, now).Updates(updates)
 	if result.Error != nil {
 		return "", result.Error
 	}

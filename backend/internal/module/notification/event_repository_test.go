@@ -215,13 +215,13 @@ func eventSQLMatches(row map[string]driver.Value, where string, args []driver.Na
 	if strings.Contains(where, "reservation_nonce IS NULL") && row["reservation_nonce"] != nil {
 		return false
 	}
-	if strings.Contains(where, "lease_expires_at > UTC_TIMESTAMP(3)") {
+	if strings.Contains(where, "lease_expires_at > CURRENT_TIMESTAMP(3)") {
 		at, ok := row["lease_expires_at"].(time.Time)
 		if !ok || !at.After(now) {
 			return false
 		}
 	}
-	if strings.Contains(where, "expires_at IS NULL OR expires_at > UTC_TIMESTAMP(3)") && row["expires_at"] != nil {
+	if strings.Contains(where, "expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP(3)") && row["expires_at"] != nil {
 		at, ok := row["expires_at"].(time.Time)
 		if !ok || !at.After(now) {
 			return false

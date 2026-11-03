@@ -53,7 +53,7 @@ async function main() {
     const result = runSync('go.exe', ['test', './internal/module/notification', '-run', 'TestNotification.*AgainstIsolatedMySQL', '-count=1', '-timeout=180s', '-v'], { cwd: path.join(root, 'backend'), env: testEnv, timeout: 240000 })
     process.stdout.write(result.stdout || '')
     process.stderr.write(result.stderr || '')
-    if (/--- SKIP:/.test(result.stdout || '') || (result.stdout.match(/^--- PASS:/gm) || []).length < 6) throw new Error('Notification integration suite must run all six tests without skips.')
+    if (/--- SKIP:/.test(result.stdout || '') || (result.stdout.match(/^--- PASS:/gm) || []).length < 7 || !/--- PASS: TestNotificationStorageClockAgainstIsolatedMySQL\/UTC /.test(result.stdout || '') || !/--- PASS: TestNotificationStorageClockAgainstIsolatedMySQL\/Shanghai /.test(result.stdout || '')) throw new Error('Notification integration suite must run all seven tests including UTC/Shanghai storage clocks without skips.')
     if (result.error || result.status !== 0) throw new Error('Isolated notification integration suite failed.')
     const residual = sql("SELECT schema_name FROM information_schema.schemata WHERE schema_name LIKE 'notification_isolated_%'")
     if (residual.status !== 0 || residual.stdout.trim() !== '') throw new Error('Test database cleanup verification failed.')

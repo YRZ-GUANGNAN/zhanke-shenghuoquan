@@ -27,7 +27,7 @@ func (r *GormRepository) FindEvent(ctx context.Context, id string) (Event, error
 }
 
 func liveSubscribeLease(tx *gorm.DB, lease DeliveryLease, now time.Time) *gorm.DB {
-	return tx.Model(&DeliveryItem{}).Where("id = ? AND channel = ? AND status = ? AND row_version = ? AND lease_token = ? AND lease_expires_at > ? AND lease_expires_at > UTC_TIMESTAMP(3)", lease.Item.ID, ChannelWechatSubscribe, DeliveryProcessing, lease.Item.RowVersion, lease.LeaseToken, now)
+	return tx.Model(&DeliveryItem{}).Where("id = ? AND channel = ? AND status = ? AND row_version = ? AND lease_token = ? AND lease_expires_at > ? AND lease_expires_at > CURRENT_TIMESTAMP(3)", lease.Item.ID, ChannelWechatSubscribe, DeliveryProcessing, lease.Item.RowVersion, lease.LeaseToken, now)
 }
 
 // Recovery never releases consent after an unobserved external request. The

@@ -2,7 +2,9 @@ package notification
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -12,6 +14,73 @@ import (
 
 	"campus-circle/backend/internal/config"
 )
+
+type subscribeStateTransport func(*http.Request) (*http.Response, error)
+
+func (f subscribeStateTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	return f(request)
+}
+
+func TestSubscribeSenderMiniprogramStateWirePayload(t *testing.T) {
+	for _, state := range []string{"", "developer", "trial", "formal"} {
+		t.Run("state-"+state, func(t *testing.T) {
+			want := state
+			if want == "" {
+				want = "formal"
+			}
+			sent := 0
+			client := &http.Client{Transport: subscribeStateTransport(func(request *http.Request) (*http.Response, error) {
+				body := `{"access_token":"test-token","expires_in":7200}`
+				if request.URL.Path == "/cgi-bin/message/subscribe/send" {
+					sent++
+					var payload struct {
+						State      string                            `json:"miniprogram_state"`
+						Lang       string                            `json:"lang"`
+						Page       string                            `json:"page"`
+						TemplateID string                            `json:"template_id"`
+						Data       map[string]SubscribeTemplateValue `json:"data"`
+					}
+					if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+						t.Fatal(err)
+					}
+					if payload.State != want || payload.Lang != "zh_CN" {
+						t.Fatalf("state=%q lang=%q want=%q/zh_CN", payload.State, payload.Lang, want)
+					}
+					if payload.Page != "/pages/delivery-rider/index" || payload.TemplateID != "test-template" || payload.Data["thing1"].Value != "配送中" {
+						t.Fatal("existing subscription payload was changed")
+					}
+					body = `{"errcode":0,"errmsg":"ok"}`
+				} else if request.URL.Path != "/cgi-bin/token" {
+					t.Fatalf("unexpected request path: %s", request.URL.Path)
+				}
+				return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body)), Request: request}, nil
+			})}
+			sender, err := NewSubscribeSender(config.Config{
+				WechatAppID: "test-app", WechatAppSecret: "test-secret",
+				EnableWechatSubscribeNotifications: true, EnableNotificationSending: true,
+				WechatSubscribeMiniprogramState: state,
+			}, client)
+			if err != nil {
+				t.Fatal(err)
+			}
+			result, err := sender.Send(context.Background(), SubscribeMessage{
+				OpenID: "test-openid", TemplateID: "test-template", Page: "/pages/delivery-rider/index",
+				Data: map[string]SubscribeTemplateValue{"thing1": {Value: "配送中"}},
+			})
+			if err != nil || result.Status != SendStatusAccepted || sent != 1 {
+				t.Fatalf("result=%+v sent=%d err=%v", result, sent, err)
+			}
+		})
+	}
+}
+
+func TestSubscribeSenderMiniprogramStateRejectsInvalid(t *testing.T) {
+	for _, state := range []string{"release", "Trial", " formal", "trial ", " "} {
+		if _, err := NewSubscribeSender(config.Config{WechatSubscribeMiniprogramState: state}); err == nil {
+			t.Fatalf("invalid subscribe state %q accepted", state)
+		}
+	}
+}
 
 func TestSubscribeSenderDefaultsToBlocked(t *testing.T) {
 	sender, err := NewSubscribeSender(config.Config{

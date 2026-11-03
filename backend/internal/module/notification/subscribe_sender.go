@@ -66,13 +66,14 @@ type Sender interface {
 }
 
 type SubscribeSender struct {
-	appID       string
-	appSecret   string
-	apiBase     string
-	enabled     bool
-	client      *http.Client
-	now         func() time.Time
-	refreshSkew time.Duration
+	appID            string
+	appSecret        string
+	apiBase          string
+	miniprogramState string
+	enabled          bool
+	client           *http.Client
+	now              func() time.Time
+	refreshSkew      time.Duration
 
 	mu          sync.Mutex
 	accessToken string
@@ -80,13 +81,14 @@ type SubscribeSender struct {
 }
 
 type subscribeSenderConfig struct {
-	AppID       string
-	AppSecret   string
-	APIBase     string
-	Enabled     bool
-	HTTPClient  *http.Client
-	Now         func() time.Time
-	RefreshSkew time.Duration
+	AppID            string
+	AppSecret        string
+	APIBase          string
+	MiniprogramState string
+	Enabled          bool
+	HTTPClient       *http.Client
+	Now              func() time.Time
+	RefreshSkew      time.Duration
 }
 
 func NewSubscribeSender(cfg config.Config, clients ...*http.Client) (*SubscribeSender, error) {
@@ -98,16 +100,25 @@ func NewSubscribeSender(cfg config.Config, clients ...*http.Client) (*SubscribeS
 		return nil, errors.New("WeChat subscribe sender requires official HTTPS API base")
 	}
 	return newSubscribeSender(subscribeSenderConfig{
-		AppID:       cfg.WechatAppID,
-		AppSecret:   cfg.WechatAppSecret,
-		APIBase:     cfg.WechatAPIBase,
-		Enabled:     cfg.EnableWechatSubscribeNotifications && cfg.EnableNotificationSending,
-		HTTPClient:  client,
-		RefreshSkew: 5 * time.Minute,
+		AppID:            cfg.WechatAppID,
+		AppSecret:        cfg.WechatAppSecret,
+		APIBase:          cfg.WechatAPIBase,
+		MiniprogramState: cfg.WechatSubscribeMiniprogramState,
+		Enabled:          cfg.EnableWechatSubscribeNotifications && cfg.EnableNotificationSending,
+		HTTPClient:       client,
+		RefreshSkew:      5 * time.Minute,
 	})
 }
 
 func newSubscribeSender(cfg subscribeSenderConfig) (*SubscribeSender, error) {
+	if cfg.MiniprogramState == "" {
+		cfg.MiniprogramState = "formal"
+	}
+	switch cfg.MiniprogramState {
+	case "developer", "trial", "formal":
+	default:
+		return nil, errors.New("WeChat subscribe miniprogram state must be developer, trial or formal")
+	}
 	base := strings.TrimRight(strings.TrimSpace(cfg.APIBase), "/")
 	if base == "" {
 		base = "https://api.weixin.qq.com"
@@ -132,8 +143,9 @@ func newSubscribeSender(cfg subscribeSenderConfig) (*SubscribeSender, error) {
 	}
 	return &SubscribeSender{
 		appID: cfg.AppID, appSecret: cfg.AppSecret, apiBase: base,
-		enabled: cfg.Enabled,
-		client:  cfg.HTTPClient, now: cfg.Now, refreshSkew: cfg.RefreshSkew,
+		miniprogramState: cfg.MiniprogramState,
+		enabled:          cfg.Enabled,
+		client:           cfg.HTTPClient, now: cfg.Now, refreshSkew: cfg.RefreshSkew,
 		// A sender with incomplete credentials is intentionally constructed but
 		// disabled, so workers can record a blocked task without sending.
 		accessToken: "",
@@ -161,7 +173,13 @@ func (s *SubscribeSender) Send(ctx context.Context, message SubscribeMessage) (S
 	if err != nil {
 		return SubscribeSendResult{Status: errStatus(err), ErrorCode: errorCode(err)}, err
 	}
-	body, err := json.Marshal(message)
+	// The server owns release targeting; callers and persisted templates cannot
+	// override it. Explicit formal preserves the previous WeChat default.
+	body, err := json.Marshal(struct {
+		SubscribeMessage
+		MiniprogramState string `json:"miniprogram_state"`
+		Lang             string `json:"lang"`
+	}{SubscribeMessage: message, MiniprogramState: s.miniprogramState, Lang: "zh_CN"})
 	if err != nil {
 		return SubscribeSendResult{Status: SendStatusBlocked, ErrorCode: "invalid_payload"}, ErrSubscribePayload
 	}

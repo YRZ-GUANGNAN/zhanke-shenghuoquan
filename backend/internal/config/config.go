@@ -51,6 +51,7 @@ type Config struct {
 	EnableWechatSubscribeNotifications bool
 	EnableUserNotifications            bool
 	EnableNotificationSending          bool
+	WechatSubscribeMiniprogramState    string
 	WechatOrderTemplateKey             string
 	WechatMessageTemplateKey           string
 	WechatOrderTemplateID              string
@@ -191,6 +192,7 @@ func Load() (Config, error) {
 		EnableWechatSubscribeNotifications: enableWechatSubscribeNotifications,
 		EnableNotificationSending:          enableNotificationSending,
 		EnableUserNotifications:            enableUserNotifications,
+		WechatSubscribeMiniprogramState:    env("WECHAT_SUBSCRIBE_MINIPROGRAM_STATE", "formal"),
 		WechatOrderTemplateKey:             env("WECHAT_ORDER_TEMPLATE_KEY", ""),
 		WechatMessageTemplateKey:           env("WECHAT_MESSAGE_TEMPLATE_KEY", ""),
 		WechatOrderTemplateID:              env("WECHAT_ORDER_TEMPLATE_ID", ""),
@@ -251,6 +253,11 @@ func (c Config) Validate() error {
 	}
 	if c.AllowMockWechat && (c.WechatAppID != "" || c.WechatAppSecret != "") {
 		return errors.New("mock WeChat login cannot be enabled with real WeChat credentials")
+	}
+	switch c.WechatSubscribeMiniprogramState {
+	case "", "developer", "trial", "formal":
+	default:
+		return errors.New("WECHAT_SUBSCRIBE_MINIPROGRAM_STATE must be developer, trial or formal")
 	}
 	if c.EnableWechatSubscribeNotifications {
 		if c.WechatAppID == "" || c.WechatAppSecret == "" {

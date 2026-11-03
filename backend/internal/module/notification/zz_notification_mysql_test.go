@@ -15,8 +15,10 @@ import (
 	"testing"
 	"time"
 
+	"campus-circle/backend/internal/config"
+	appdatabase "campus-circle/backend/internal/database"
+
 	mysqlDriver "github.com/go-sql-driver/mysql"
-	gormMySQL "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -26,6 +28,11 @@ var isolatedNotificationSequence atomic.Uint64
 // Never accept a normal application DSN. Both runner coordinates and the
 // freshly spawned server's data directory must match before creating a DB.
 func openIsolatedNotificationMySQL(t *testing.T) *gorm.DB {
+	t.Helper()
+	return openIsolatedNotificationMySQLWithTimezone(t, time.UTC, "+00:00")
+}
+
+func openIsolatedNotificationMySQLWithTimezone(t *testing.T, loc *time.Location, sessionTimezone string) *gorm.DB {
 	t.Helper()
 	dsn := strings.TrimSpace(os.Getenv("NOTIFICATION_MYSQL_DSN"))
 	if dsn == "" {
@@ -41,9 +48,9 @@ func openIsolatedNotificationMySQL(t *testing.T) *gorm.DB {
 	if err != nil || rootErr != nil || !strings.EqualFold(filepath.Dir(resolvedDir), temporaryRoot) || !strings.HasPrefix(filepath.Base(resolvedDir), "campus-notification-mysql-") {
 		t.Fatal("invalid isolated notification data directory")
 	}
-	cfg.DBName, cfg.MultiStatements, cfg.ParseTime, cfg.Loc = "", false, true, time.UTC
+	cfg.DBName, cfg.MultiStatements, cfg.ParseTime, cfg.Loc = "", false, true, loc
 	cfg.Timeout, cfg.ReadTimeout, cfg.WriteTimeout = 3*time.Second, 15*time.Second, 15*time.Second
-	cfg.Params = map[string]string{"time_zone": "'+00:00'"}
+	cfg.Params = map[string]string{"time_zone": "'" + sessionTimezone + "'"}
 	server, err := sql.Open("mysql", cfg.FormatDSN())
 	if err != nil {
 		t.Fatal(err)
@@ -66,16 +73,17 @@ func openIsolatedNotificationMySQL(t *testing.T) *gorm.DB {
 		}
 	})
 	cfg.DBName = databaseName
-	database, err := sql.Open("mysql", cfg.FormatDSN())
+	db, err := appdatabase.Open(config.Config{MySQLDSN: cfg.FormatDSN(), EnableUserNotifications: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.Logger = logger.Discard
+	database, err := db.DB()
 	if err != nil {
 		t.Fatal(err)
 	}
 	database.SetMaxOpenConns(16)
 	t.Cleanup(func() { _ = database.Close() })
-	db, err := gorm.Open(gormMySQL.New(gormMySQL.Config{Conn: database, SkipInitializeWithVersion: true}), &gorm.Config{Logger: logger.Discard})
-	if err != nil {
-		t.Fatal(err)
-	}
 	contents, err := os.ReadFile(filepath.Join("..", "..", "..", "migrations", "053_delivery_notifications.sql"))
 	if err != nil {
 		t.Fatal(err)
@@ -112,7 +120,7 @@ func isolatedNotificationEvent(t *testing.T) Event {
 func isolatedNotificationSubscription(t *testing.T, db *gorm.DB) Subscription {
 	t.Helper()
 	now := time.Now().UTC().Truncate(time.Millisecond)
-	item := Subscription{UserID: 12, AppID: "isolated-app", OpenID: "isolated-openid", TemplateKey: "order", AuthorizationNonce: "isolated:" + authorizationTemplateTag("isolated-app", "order", "isolated-template"),
+	item := Subscription{UserID: 12, AppID: "isolated-app", OpenID: "isolated-openid", TemplateKey: "order", AuthorizationNonce: isolatedNotificationID(t) + ":" + authorizationTemplateTag("isolated-app", "order", "isolated-template"),
 		Status: "accepted", RemainingQuota: 1, RowVersion: 1, AuthorizedAt: now, CreatedAt: now, UpdatedAt: now}
 	if err := db.Create(&item).Error; err != nil {
 		t.Fatal(err)
