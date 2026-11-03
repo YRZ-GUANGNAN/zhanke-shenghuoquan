@@ -101,10 +101,13 @@ def snapshot(db, schema=None):
     digests = {}
     for table, cols in schema.items():
         require(all(re.fullmatch('[A-Za-z0-9_]+', c) for c in cols), 'Invalid column identifier')
+        pk_rows = sql(db, "SELECT COLUMN_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='" + table + "' AND INDEX_NAME='PRIMARY' ORDER BY SEQ_IN_INDEX").splitlines()
+        require(pk_rows, 'Cannot create stable digest without a primary key: ' + table)
         # HEX preserves binary values, NULL marker differs from an empty string.
         parts = ["IF(`" + c + "` IS NULL,'N',CONCAT('V',HEX(`" + c + "`)))" for c in cols]
+        order_by = ','.join('`' + c + '`' for c in pk_rows)
         rows = run(['mysql', *MYSQL, '--default-character-set=utf8mb4', '--batch',
-                    '--skip-column-names', db, '-e', 'SELECT CONCAT_WS(\'|\',' + ','.join(parts) + ') AS r FROM `' + table + '` ORDER BY r'])
+                    '--skip-column-names', db, '-e', 'SELECT CONCAT_WS(\'|\',' + ','.join(parts) + ') AS r FROM `' + table + '` ORDER BY ' + order_by])
         digests[table] = hashlib.sha256(rows).hexdigest()
     return schema, digests
 
@@ -118,9 +121,10 @@ def schema_before(db):
 
 def schema_after(db):
     require('cancel_requested_at' in columns(db, 'delivery_payment_attempts'), '052 incomplete')
+    require(sql(db, "SELECT DATA_TYPE,IS_NULLABLE,DATETIME_PRECISION FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='delivery_payment_attempts' AND COLUMN_NAME='cancel_requested_at'") == 'datetime\tYES\t3', '052 cancel_requested_at definition mismatch')
     require(NEW_TABLES.issubset(sql(db, 'SHOW TABLES').splitlines()), '053 incomplete')
-    require(sql(db, "SELECT IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='delivery_rider_earning_records' AND COLUMN_NAME='settle_at'") == 'NO', '054 settle_at incomplete')
-    require('settled_at' in columns(db, 'delivery_rider_earning_records'), '054 settled_at missing')
+    for column, nullable in [('settle_at', 'NO'), ('settled_at', 'YES')]:
+        require(sql(db, "SELECT DATA_TYPE,IS_NULLABLE,DATETIME_PRECISION FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='delivery_rider_earning_records' AND COLUMN_NAME='" + column + "'") == 'datetime\t' + nullable + '\t3', '054 ' + column + ' definition mismatch')
     require(sql(db, "SELECT GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='delivery_rider_earning_records' AND INDEX_NAME='idx_delivery_rider_earning_due'") == 'settlement_status,settle_at,id', '054 index incomplete')
 
 
@@ -201,6 +205,8 @@ def main():
         require(receipt.get('deployed') is True and not receipt.get('settlementEnabled'), 'Invalid enable phase')
         schema_after(db)
         assert_empty_money(db)
+        flags_before = process_flags()
+        require(flags_before['ENABLE_DELIVERY_RIDER_DAILY_SETTLEMENT'] == 'false' and flags_before['ENABLE_USER_NOTIFICATIONS'] == 'true' and flags_before['ENABLE_NOTIFICATION_SENDING'] == 'false', 'Enable phase runtime flags are not the verified pre-settlement state')
         before = snapshot(db, {t: columns(db, t) for t in EMPTY_MONEY})
         patch_env({'ENABLE_DELIVERY_RIDER_DAILY_SETTLEMENT': 'true'})
         run(['systemctl', 'restart', 'campus-api'])
