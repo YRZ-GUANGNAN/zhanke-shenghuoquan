@@ -91,12 +91,11 @@ try {
     assert.ok(matchingRules('.taro-ux-refresh__content').some(rule => /var\(--refresh-content-bottom/.test(declarations(rule)['padding-bottom'] || '')))
     assert.ok(matchingRules('.student-home-content').some(rule => !declarations(rule)['padding-bottom'] && /136rpx/.test(declarations(rule)['--refresh-content-bottom'] || '')), 'home clearance must scroll with content rather than shorten the viewport')
   })
-  check('real WXSS retains rounded nav, handle, exit and reduced-motion states', () => {
+  check('real WXSS retains fixed rounded nav and sheet exit states', () => {
     for (const [selector, radius] of [['.student-bottom-nav', '24PX'], ['.delivery-workspace-nav', '18PX']]) {
       assert.ok(matchingRules(selector).some(rule => declarations(rule)['border-radius'] === radius))
-      assert.ok(matchingRules(`${selector}--hidden`).some(rule => /translateY/.test(declarations(rule).transform || '')))
-      assert.ok(matchingRules(`${selector}--hidden::before`).some(rule => Number(declarations(rule).opacity) > 0))
-      assert.ok(matchingRules(`${selector}--hidden`, reduced).some(rule => declarations(rule).transform === 'none'))
+      assert.equal(matchingRules(`${selector}--hidden`).length, 0, `${selector} must not ship a scroll-collapse state`)
+      assert.equal(matchingRules(`${selector}--hidden::before`).length, 0, `${selector} must not ship a collapsed handle`)
     }
     assert.ok(matchingRules('.app-action-sheet-layer--exit .app-action-sheet').some(rule => declarations(rule).transform === 'translateY(100%)'))
   })

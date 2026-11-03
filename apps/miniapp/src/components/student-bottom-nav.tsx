@@ -3,7 +3,6 @@ import { Text, View } from '@tarojs/components'
 import { useDidShow } from '@tarojs/taro'
 import Taro from '../services/taro'
 import { useFeatureVisibility } from '../hooks/use-feature-visibility'
-import { useBottomNavVisibility } from '../utils/bottom-nav-motion'
 import { notificationBadgeLabel, useNotificationState } from '../hooks/use-notification-runtime'
 import AppIcon from './app-icon'
 import './student-bottom-nav.scss'
@@ -27,7 +26,6 @@ export default function StudentBottomNav({ active, className = '' }: StudentBott
   const visibility = useFeatureVisibility()
   const notifications = useNotificationState()
   const unread = notificationBadgeLabel(notifications)
-  const immersiveHidden = useBottomNavVisibility()
   const visualActive = active === 'market' ? 'home' : active
   const navigationLockRef = useRef<{ key: string } | null>(null)
 
@@ -76,7 +74,7 @@ export default function StudentBottomNav({ active, className = '' }: StudentBott
   )
 
   return (
-    <View className={`student-bottom-nav${immersiveHidden ? ' student-bottom-nav--hidden' : ''} ${className}`.trim()} style={{ gridTemplateColumns: `repeat(${visibleItems.length + (canPublish ? 1 : 0)}, 1fr)` }}>
+    <View className={`student-bottom-nav ${className}`.trim()} style={{ gridTemplateColumns: `repeat(${visibleItems.length + (canPublish ? 1 : 0)}, 1fr)` }}>
       {visibleItems.filter((item) => item.key === 'home' || item.key === 'takeout').map(renderItem)}
       {canPublish && <View
           className='student-bottom-nav__publish'
