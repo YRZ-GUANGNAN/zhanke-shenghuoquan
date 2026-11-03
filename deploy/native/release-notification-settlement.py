@@ -104,7 +104,7 @@ def snapshot(db, schema=None):
         pk_rows = sql(db, "SELECT COLUMN_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='" + table + "' AND INDEX_NAME='PRIMARY' ORDER BY SEQ_IN_INDEX").splitlines()
         require(pk_rows, 'Cannot create stable digest without a primary key: ' + table)
         # HEX preserves binary values, NULL marker differs from an empty string.
-        parts = ["IF(`" + c + "` IS NULL,'N',CONCAT('V',HEX(`" + c + "`)))" for c in cols]
+        parts = ["CONCAT('" + c + "=',IF(`" + c + "` IS NULL,'N',CONCAT('V',HEX(`" + c + "`))))" for c in cols]
         order_by = ','.join('`' + c + '`' for c in pk_rows)
         rows = run(['mysql', *MYSQL, '--default-character-set=utf8mb4', '--batch',
                     '--skip-column-names', db, '-e', 'SELECT CONCAT_WS(\'|\',' + ','.join(parts) + ') AS r FROM `' + table + '` ORDER BY ' + order_by])
@@ -123,6 +123,16 @@ def schema_after(db):
     require('cancel_requested_at' in columns(db, 'delivery_payment_attempts'), '052 incomplete')
     require(sql(db, "SELECT DATA_TYPE,IS_NULLABLE,DATETIME_PRECISION FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='delivery_payment_attempts' AND COLUMN_NAME='cancel_requested_at'") == 'datetime\tYES\t3', '052 cancel_requested_at definition mismatch')
     require(NEW_TABLES.issubset(sql(db, 'SHOW TABLES').splitlines()), '053 incomplete')
+    required_053 = {
+        'delivery_notification_events': ['event_public_id', 'event_type', 'aggregate_public_id', 'payload', 'status', 'occurred_at'],
+        'delivery_notification_inbox': ['inbox_public_id', 'event_public_id', 'recipient_user_id', 'purpose', 'status', 'created_at'],
+        'delivery_notification_deliveries': ['delivery_public_id', 'event_public_id', 'recipient_user_id', 'channel', 'template_snapshot', 'status'],
+        'notification_subscriptions': ['user_id', 'app_id', 'openid', 'template_key', 'remaining_quota', 'status'],
+        'im_notification_receipts': ['sdk_app_id', 'provider_message_id', 'recipient_user_id', 'callback_hash', 'status'],
+    }
+    for table, required in required_053.items():
+        present = set(columns(db, table))
+        require(set(required).issubset(present), '053 columns incomplete: ' + table)
     for column, nullable in [('settle_at', 'NO'), ('settled_at', 'YES')]:
         require(sql(db, "SELECT DATA_TYPE,IS_NULLABLE,DATETIME_PRECISION FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='delivery_rider_earning_records' AND COLUMN_NAME='" + column + "'") == 'datetime\t' + nullable + '\t3', '054 ' + column + ' definition mismatch')
     require(sql(db, "SELECT GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='delivery_rider_earning_records' AND INDEX_NAME='idx_delivery_rider_earning_due'") == 'settlement_status,settle_at,id', '054 index incomplete')

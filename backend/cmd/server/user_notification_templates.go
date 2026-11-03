@@ -162,8 +162,8 @@ func configuredOrderNotificationTemplate(cfg config.Config) (*orderNotificationT
 	if cfg.EnableNotificationSending && len(template.users) == 0 {
 		return nil, errors.New("external notification test allowlist is empty")
 	}
-	// Validate the longest currently supported state label and public ID, not
-	// invented field keys or truncated notification text.
+	// Validate the longest in-app title and public ID against the reviewed
+	// mapping. Phrase fields use explicit short status labels, never truncation.
 	_, err = template.snapshot(notification.Event{AggregatePublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAV", OccurredAt: time.Now()}, notification.Recipient{Title: "骑手正在前往取货", TargetPath: "/pages/delivery-rider/index"})
 	if err != nil {
 		return nil, errors.New("notification template fields do not fit approved field types")
@@ -183,6 +183,13 @@ func (t *orderNotificationTemplate) snapshot(event notification.Event, recipient
 			value = event.AggregatePublicID
 		case "status":
 			value = recipient.Title
+			if strings.HasPrefix(field, "phrase") {
+				var err error
+				value, err = orderNotificationStatusPhrase(recipient.Title)
+				if err != nil {
+					return nil, err
+				}
+			}
 		case "time":
 			value = event.OccurredAt.In(time.FixedZone("Asia/Shanghai", 8*60*60)).Format("2006-01-02 15:04")
 		}
@@ -196,6 +203,33 @@ func (t *orderNotificationTemplate) snapshot(event notification.Event, recipient
 		return nil, err
 	}
 	return raw, nil
+}
+
+// The order resolver owns the validated state and its in-app title. Only the
+// reviewed WeChat phrase field needs shorter wording; keep thing fields and
+// private-message templates unchanged. Unknown titles fail closed even when
+// they would fit, so a future status cannot silently become an external notice.
+func orderNotificationStatusPhrase(title string) (string, error) {
+	switch title {
+	case "配送费支付失败":
+		return "支付失败", nil
+	case "配送单等待接单":
+		return "待接单", nil
+	case "骑手已接单":
+		return "已接单", nil
+	case "骑手正在前往取货":
+		return "取货中", nil
+	case "骑手已取货":
+		return "已取货", nil
+	case "配送中":
+		return "配送中", nil
+	case "配送已完成":
+		return "已送达", nil
+	case "配送单已取消":
+		return "已取消", nil
+	default:
+		return "", notification.ErrSubscribePayload
+	}
 }
 
 type notificationEventReader interface {

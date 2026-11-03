@@ -74,8 +74,8 @@ func TestNotificationTemplateMappingPreservesSupportedReviewedTypes(t *testing.T
 		t.Fatal(err)
 	}
 	cfg.WechatOrderTemplateFields = `{"phrase1":"status"}`
-	if _, err := configuredOrderNotificationTemplate(cfg); err == nil {
-		t.Fatal("longest order status must still fit the approved field length")
+	if _, err := configuredOrderNotificationTemplate(cfg); err != nil {
+		t.Fatalf("reviewed short order status must fit the phrase field: %v", err)
 	}
 }
 
