@@ -24,9 +24,7 @@ export default defineAppConfig({
     'pages/about/index',
     'pages/legal/index',
     'pages/merchant-home/index',
-    'pages/merchant-publish/index',
     'pages/merchant-messages/index',
-    'pages/merchant-order-detail/index',
     'pages/delivery-rider/index',
     'pages/rider-messages/index',
     'pages/delivery-profile/index',
@@ -34,6 +32,16 @@ export default defineAppConfig({
     'pages/post-detail/index'
   ],
   subPackages: [
+    // Keep public URLs unchanged. Ordinary subpackages retain access to shared
+    // runtime/styles while leaving room for WeChat's own source compilation.
+    {
+      root: 'pages/merchant-publish',
+      pages: ['index']
+    },
+    {
+      root: 'pages/merchant-order-detail',
+      pages: ['index']
+    },
     {
       root: 'pages/merchant-wallet',
       pages: ['index']

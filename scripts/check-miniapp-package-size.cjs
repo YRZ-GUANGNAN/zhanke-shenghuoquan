@@ -4,6 +4,10 @@ const path = require('node:path')
 const root = path.resolve(__dirname, '..')
 const defaultDist = path.join(root, 'apps/miniapp/dist')
 const packageLimit = 2 * 1024 * 1024
+// WeChat compiles and wraps sources again: a locally sub-2MiB main package
+// was rejected at 2052KiB by the official CLI. Keep a conservative buffer;
+// only an actual successful WeChat preview/upload proves platform acceptance.
+const mainCompileHeadroom = 64 * 1024
 const totalLimit = 20 * 1024 * 1024
 
 function asPosix(value) { return String(value).replaceAll('\\', '/') }
@@ -77,6 +81,8 @@ function formatReport(report) {
   const failures = report.packages.filter(pkg => pkg.bytes > report.packageLimit)
   if (report.totalBytes > report.totalLimit) failures.push({ name: 'total', bytes: report.totalBytes })
   if (failures.length) throw new Error(`package size exceeds limit: ${failures.map(pkg => `${pkg.name}=${pkg.bytes} bytes`).join(', ')}`)
+  const main = report.packages.find(pkg => pkg.name === 'main')
+  if (main && main.bytes > report.packageLimit - mainCompileHeadroom) throw new Error(`main=${main.bytes} bytes leaves insufficient WeChat compile headroom (reserve=${mainCompileHeadroom} bytes)`)
   return `miniapp package: PASS (${report.packages.map(pkg => `${pkg.name}=${pkg.bytes}`).join(', ')}; total=${report.totalBytes})`
 }
 function main() { try { console.log(formatReport(analyzePackage())) } catch (error) { console.error(`miniapp package: FAIL (${error instanceof Error ? error.message : String(error)})`); process.exitCode = 1 } }

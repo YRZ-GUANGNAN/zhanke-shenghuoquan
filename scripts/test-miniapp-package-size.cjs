@@ -46,6 +46,17 @@ dir = fixture({ pages: ['pages/home/index'] }, { ...files, 'large.js': Buffer.al
 try { expectFailure(() => formatReport(analyzePackage(dir)), /main=/); console.log('PASS 主包超过 2MiB 拒绝') } finally { cleanup(dir) }
 
 dir = fixture({ pages: ['pages/home/index'] }, files)
+try {
+  const report = analyzePackage(dir)
+  const main = report.packages.find(pkg => pkg.name === 'main')
+  main.bytes = 2 * 1024 * 1024 - 64 * 1024
+  assert.match(formatReport(report), /main=/)
+  main.bytes++
+  expectFailure(() => formatReport(report), /main=.*headroom/)
+  console.log('PASS 主包保留64KiB微信编译空间，临界值通过，超出即拒绝')
+} finally { cleanup(dir) }
+
+dir = fixture({ pages: ['pages/home/index'] }, files)
 try { const report = analyzePackage(dir); report.totalBytes = 20 * 1024 * 1024 + 1; expectFailure(() => formatReport(report), /total=/); console.log('PASS 总包上限拒绝') } finally { cleanup(dir) }
 
 for (const manifest of [

@@ -45,7 +45,10 @@ const privacyRows: Array<{ key: ToggleKey; title: string; subtitle: string }> = 
 function currentVersion(): string {
   try {
     const info = Taro.getAccountInfoSync().miniProgram
-    return info.version || (info.envVersion === 'release' ? '正式版' : info.envVersion || '体验版')
+    if (info.version) return info.version
+    if (info.envVersion === 'release') return '正式版'
+    if (info.envVersion === 'trial' || info.envVersion === 'develop') return '体验版'
+    return '体验版'
   } catch {
     return '体验版'
   }
@@ -243,14 +246,14 @@ export default function SettingsPage() {
             ))}
             {(['order', 'private_message'] as const).map((key) => {
               const title = key === 'order' ? '订阅订单通知' : '订阅私信提醒'
-              const statusText = subscriptionStatus[key] || '由你主动授权，不影响站内通知'
+              const statusText = subscriptionStatus[key] || '一次授权一次送达，不影响站内通知'
               return <View key={key} className='student-settings-row student-settings-row--tall'>
                 <View className='student-settings-row__main'>
                   <Text className='student-settings-row__title'>{title}</Text>
                   <Text className='student-settings-row__subtitle'>{statusText}</Text>
                 </View>
                 <Button className='student-settings-phone' onClick={() => void authorizeSubscription(key)}>
-                  {preparedNotifications[key] ? '立即授权' : '准备授权'}
+                  {preparedNotifications[key] ? '立即授权' : '订阅一次'}
                 </Button>
               </View>
             })}
