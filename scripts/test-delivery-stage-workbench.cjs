@@ -207,6 +207,9 @@ function riderHarness(overrides = {}) {
     '../../components/ui': { AppDialog: 'AppDialog' },
     '../../hooks/use-identity-guard': { useIdentityGuard: () => identityAllowed, identityRoute: () => '' },
     '../../hooks/use-feature-visibility': { useFeatureVisibility: () => ({ delivery: true, rider: true }) },
+    '../../hooks/use-rider-availability': {
+      useRiderAvailability: () => ({ value: { enabled: true, riderUserId: 101, state: 'on_duty', scope: 'campus', inFlight: 0, maxInFlight: 3, rowVersion: 1 }, busy: false, message: '', refresh: async () => true, change: async () => true, canClaim: true }),
+    },
     '../../hooks/use-notification-refresh': { useNotificationRefresh: () => ({ pending: false }) },
     '../../services/api': {
       isApiError: (value) => value instanceof Error && typeof value.status === 'number',

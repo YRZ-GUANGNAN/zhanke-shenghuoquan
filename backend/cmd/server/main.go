@@ -55,6 +55,7 @@ import (
 	"campus-circle/backend/internal/pkg/response"
 	"campus-circle/backend/internal/pkg/searchmetrics"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func main() {
@@ -331,7 +332,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	userNotifications, err := newUserNotificationRuntime(cfg, db, userService)
+	var riderAvailability delivery.RiderAvailabilityRepository
+	if deliveryRuntime != nil && deliveryRuntime.availability != nil {
+		riderAvailability = deliveryRuntime.availability
+	}
+	userNotifications, err := newUserNotificationRuntime(cfg, db, userService, riderAvailability)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -649,6 +654,7 @@ type deliveryRuntime struct {
 	paymentReconciler              *deliverypayment.Reconciler
 	payoutQueue                    *delivery.RiderPayoutQueueService
 	riderSettlement                *delivery.RiderDailySettlementService
+	availability                   *delivery.RiderAvailabilityStore
 	identity                       *deliveryrider.IdentityAdapter
 	notificationConsumer           *deliverynotify.Consumer
 	proofs                         *delivery.ProofService
@@ -693,6 +699,10 @@ func newDeliveryRuntime(cfg config.Config, db *gorm.DB, proofPorts ...delivery.M
 	if err != nil {
 		return nil, fmt.Errorf("configure delivery dispatch service: %w", err)
 	}
+	availability, err := configureDeliveryRiderAvailability(cfg, db, dispatchService, notificationAppender)
+	if err != nil {
+		return nil, err
+	}
 	sender, err := deliverynotify.NewWeComSender(cfg.WeComRiderWebhookURL)
 	if err != nil {
 		return nil, fmt.Errorf("configure delivery rider notification: %w", err)
@@ -703,6 +713,7 @@ func newDeliveryRuntime(cfg config.Config, db *gorm.DB, proofPorts ...delivery.M
 	}
 	runtime := &deliveryRuntime{
 		orders: orderService, dispatch: dispatchService, identity: identityAdapter,
+		availability:         availability,
 		notificationConsumer: consumer,
 		fees:                 repository, riderWallets: repository, consoleQueries: deliveryconsole.NewQueryRepository(db),
 		allowMockConfirm: cfg.AppEnv != "prod" && cfg.EnableDelivery &&
@@ -749,6 +760,27 @@ func newDeliveryRuntime(cfg config.Config, db *gorm.DB, proofPorts ...delivery.M
 	return runtime, nil
 }
 
+func configureDeliveryRiderAvailability(cfg config.Config, db *gorm.DB, dispatch *delivery.DispatchService, appender delivery.NotificationEventAppender) (*delivery.RiderAvailabilityStore, error) {
+	if dispatch == nil {
+		return nil, errors.New("delivery rider availability requires dispatch service")
+	}
+	// Install the closed gate before schema checks so failed construction can
+	// never leave a dispatch service using its legacy, unbounded claim path.
+	dispatch.WithRiderAvailability(delivery.UnavailableRiderAvailabilityClaim{})
+	if !cfg.EnableDeliveryRiderBroadcast {
+		return nil, nil
+	}
+	if db == nil || !db.Migrator().HasTable(&delivery.RiderAvailability{}) || !db.Migrator().HasTable(&delivery.RiderBroadcastConfig{}) {
+		return nil, errors.New("delivery rider broadcast requires migration 055 before startup")
+	}
+	availability := delivery.NewRiderAvailabilityStore(db, appender, deliveryRiderEligibility)
+	if _, err := availability.ReadRiderBroadcastConfig(context.Background()); err != nil {
+		return nil, fmt.Errorf("configure delivery rider broadcast: %w", err)
+	}
+	dispatch.WithRiderAvailability(availability)
+	return availability, nil
+}
+
 func requireRiderSettlementSchema(db *gorm.DB) error {
 	if db == nil || !db.Migrator().HasColumn(&delivery.RiderEarningRecord{}, "settle_at") ||
 		!db.Migrator().HasColumn(&delivery.RiderEarningRecord{}, "settled_at") ||
@@ -756,6 +788,37 @@ func requireRiderSettlementSchema(db *gorm.DB) error {
 		return errors.New("delivery requires completed migration 054 before startup; keep money writers stopped during migration")
 	}
 	return nil
+}
+
+// deliveryRiderEligibility is the composition-root adapter for the delivery
+// availability store. It locks the account before the approved rider row and
+// returns a stable revision. A changed token/rider row forces a manual
+// off-duty transition instead of silently resuming broadcasts.
+func deliveryRiderEligibility(ctx context.Context, tx *gorm.DB, riderID uint64) (string, error) {
+	if tx == nil || riderID == 0 {
+		return "", delivery.ErrInvalidRecord
+	}
+	var account user.User
+	if err := tx.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", riderID).First(&account).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", delivery.ErrRiderNotRegistered
+		}
+		return "", err
+	}
+	if account.Status != user.StatusActive || account.ClosedAt != nil || account.DeletedAt.Valid {
+		return "", delivery.ErrRiderUnavailable
+	}
+	var rider takeout.Rider
+	if err := tx.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).Where("rider_user_id = ?", riderID).First(&rider).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", delivery.ErrRiderNotRegistered
+		}
+		return "", err
+	}
+	if rider.RiderUserID != riderID || rider.Status != takeout.RiderActive || rider.RowVersion == 0 || account.TokenVersion == 0 {
+		return "", delivery.ErrRiderUnavailable
+	}
+	return fmt.Sprintf("u:%d:r:%d", account.TokenVersion, rider.RowVersion), nil
 }
 
 func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, userService *user.Service, adminAuth ...gin.HandlerFunc) {
@@ -805,6 +868,9 @@ func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, user
 	}
 	if runtime.conversationLifecycle != nil {
 		riderHandler.WithConversationCommands(runtime.conversationLifecycle)
+	}
+	if runtime.availability != nil {
+		riderHandler.WithAvailability(runtime.availability)
 	}
 	riderHandler.Register(riderRoutes)
 	if runtime.proofs != nil {

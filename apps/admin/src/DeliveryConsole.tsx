@@ -19,7 +19,8 @@ import {
   type RiderPayoutResult,
   type RiderPayoutQueue,
   type RiderWallet,
-  type RiderWithdrawal
+  type RiderWithdrawal,
+  type RiderAvailabilityConfig
 } from './services/delivery-admin'
 import { useAdminDialog } from './components'
 
@@ -308,7 +309,8 @@ function FeeConfigPanel() {
       if (isConflict(reason)) { setConflict(true); setError(conflictMessage) } else setError(errorMessage(reason))
     } finally { setLoading(false) }
   }
-  return <Panel title="全局配送费配置">
+  return <>
+  <Panel title="全局配送费配置">
     <ErrorNotice error={error} conflict={conflict} refresh={() => void load()} />
     {value ? <div className="delivery-form">
       <label>配送费（分）<input type="number" min="1" value={deliveryFee} onChange={event => setDeliveryFee(event.target.value)} /></label>
@@ -318,6 +320,88 @@ function FeeConfigPanel() {
       <button disabled={loading} onClick={() => void submit()}>{loading ? '保存中…' : '保存配置'}</button>
       <button className="delivery-secondary" disabled={loading} onClick={() => void load()}>刷新</button>
     </div> : <p>加载中…</p>}
+  </Panel>
+  <RiderAvailabilityConfigPanel />
+  </>
+}
+
+function RiderAvailabilityConfigPanel() {
+  // The admin API owns the authenticated session. Keep this panel isolated to
+  // its mount lifecycle so the wallet test harness and account logout cannot
+  // inject a second store dependency into the delivery console.
+  const authKey = 'delivery-rider-capacity'
+  const currentAuth = useRef(authKey)
+  currentAuth.current = authKey
+  const [value, setValue] = useState<RiderAvailabilityConfig | null>(null)
+  const [limit, setLimit] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const epoch = useRef(0)
+  const mounted = useRef(true)
+  const locked = useRef(false)
+  const load = useCallback(async () => {
+    if (locked.current) return
+    const owner = currentAuth.current
+    const version = ++epoch.current
+    const current = () => mounted.current && currentAuth.current === owner && epoch.current === version
+    setError('')
+    setBusy(true)
+    setValue(null)
+    try {
+      const next = await deliveryAdminAPI.riderAvailabilityConfig()
+      if (current()) {
+        setValue(next)
+        if (next.enabled) setLimit(String(next.maxInFlightPerRider))
+      }
+    } catch (reason) { if (current()) setError(errorMessage(reason)) }
+    finally { if (current()) setBusy(false) }
+  }, [])
+  useEffect(() => {
+    mounted.current = true
+    locked.current = false
+    void load()
+    return () => { mounted.current = false; epoch.current++ }
+  }, [load, authKey])
+  const save = async () => {
+    if (!value || !value.enabled || locked.current || busy) return
+    const next = Number(limit)
+    if (!Number.isSafeInteger(next) || next < 1 || next > 100) { setError('接单容量必须是 1–100 的整数'); return }
+    const owner = currentAuth.current
+    const version = ++epoch.current
+    const current = () => mounted.current && currentAuth.current === owner && epoch.current === version
+    locked.current = true
+    setBusy(true); setError('')
+    try {
+      const result = await deliveryAdminAPI.updateRiderAvailabilityConfig(next, value.rowVersion)
+      if (current()) {
+        setValue(result)
+        if (result.enabled) setLimit(String(result.maxInFlightPerRider))
+      }
+    } catch {
+      if (!current()) return
+      // Refresh authoritative state after conflict or an unknown PATCH result.
+      // Never replay a write with a freshly fetched version automatically.
+      setValue(null)
+      try {
+        const result = await deliveryAdminAPI.riderAvailabilityConfig()
+        if (current()) {
+          setValue(result)
+          if (result.enabled) setLimit(String(result.maxInFlightPerRider))
+          setError('已同步最新配置，请核对；本次不会自动重试保存')
+        }
+      } catch { if (current()) setError('保存结果待核实，请刷新配置后再操作') }
+    } finally { if (current()) { locked.current = false; setBusy(false) } }
+  }
+  return <Panel title="骑手接单容量">
+    <p className="delivery-description">只影响主动“开始接单”的骑手；停止接单不会清除已有配送。范围固定为校园，容量由服务端在抢单时复核。</p>
+    <ErrorNotice error={error} refresh={() => void load()} />
+    {value ? value.enabled ? <div className="delivery-form">
+      <label>每位骑手最多进行中订单<input type="number" min="1" max="100" disabled={busy} value={limit} onChange={event => setLimit(event.target.value)} /></label>
+      <Fact label="新单广播" value={value.enabled ? '已启用' : '已关闭'} />
+      <Fact label="当前版本" value={`v${value.rowVersion}`} />
+      <button disabled={busy} onClick={() => void save()}>{busy ? '保存中…' : '保存容量'}</button>
+      <button className="delivery-secondary" disabled={busy} onClick={() => void load()}>刷新</button>
+    </div> : <p>新单广播已关闭；开启服务端功能后这里可调整容量。</p> : <p>{busy ? '加载中…' : '容量配置暂未读取'}<button disabled={busy} onClick={() => void load()}>重新加载</button></p>}
   </Panel>
 }
 

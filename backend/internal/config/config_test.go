@@ -177,6 +177,7 @@ func TestFeatureGateDefaults(t *testing.T) {
 	t.Setenv("ENABLE_LEGACY_TAKEOUT", "")
 	t.Setenv("ENABLE_DELIVERY", "")
 	t.Setenv("ENABLE_DELIVERY_PAYMENT", "")
+	t.Setenv("ENABLE_DELIVERY_RIDER_BROADCAST", "")
 	t.Setenv("ALLOW_MOCK_DELIVERY_FEE_CONFIRMATION", "")
 	t.Setenv("ALLOW_MOCK_DELIVERY_PAYMENT", "")
 	t.Setenv("ENABLE_DELIVERY_IM_READ_RECEIPT", "")
@@ -198,6 +199,10 @@ func TestFeatureGateDefaults(t *testing.T) {
 	if err != nil || deliveryPayment {
 		t.Fatal("delivery payment gate must be fail-closed")
 	}
+	riderBroadcast, err := envBool("ENABLE_DELIVERY_RIDER_BROADCAST", false)
+	if err != nil || riderBroadcast {
+		t.Fatal("delivery rider broadcast gate must be fail-closed")
+	}
 	mockDeliveryPayment, err := envBool("ALLOW_MOCK_DELIVERY_PAYMENT", false)
 	if err != nil || mockDeliveryPayment {
 		t.Fatal("mock delivery payment must be fail-closed")
@@ -211,6 +216,9 @@ func TestFeatureGateDefaults(t *testing.T) {
 		t.Fatal("delivery rider payout queue must be fail-closed")
 	}
 	var cfg Config
+	if cfg.EnableDeliveryRiderBroadcast {
+		t.Fatal("zero-value delivery rider broadcast gate must be disabled")
+	}
 	if cfg.EnableDeliveryRiderPayoutQueue {
 		t.Fatal("zero-value delivery rider payout queue gate must be disabled")
 	}

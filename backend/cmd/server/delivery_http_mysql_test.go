@@ -108,7 +108,8 @@ func TestD2DeliveryRealHTTPMySQLAuthConcurrencyOutboxAndGates(t *testing.T) {
 
 	cfg := config.Config{
 		AppEnv: "dev", EnableDelivery: true, AllowMockDeliveryFeeConfirmation: true,
-		WeComRiderWebhookURL: "",
+		EnableDeliveryRiderBroadcast: true,
+		WeComRiderWebhookURL:         "",
 	}
 	runtime, err := newDeliveryRuntime(cfg, db, d2ApprovedProofPort{})
 	if err != nil {
@@ -293,6 +294,21 @@ func TestD2DeliveryRealHTTPMySQLAuthConcurrencyOutboxAndGates(t *testing.T) {
 	for _, forbidden := range []string{`"proof`, `"asset`, `"url"`} {
 		if strings.Contains(strings.ToLower(string(body.Data)), forbidden) {
 			t.Fatalf("claim pool leaked D-4 media field %q: %s", forbidden, body.Data)
+		}
+	}
+
+	status, _ = d2HTTPJSON(t, server.Client(), http.MethodPost,
+		server.URL+"/api/v1/delivery/rider/orders/"+created.DeliveryOrderPublicID+"/claim",
+		riderA.Token, map[string]any{"expectedRowVersion": ready.RowVersion})
+	if status != http.StatusConflict {
+		t.Fatalf("off-duty rider must be able to read the pool but not claim: status=%d", status)
+	}
+	for _, rider := range []user.LoginResult{riderA, riderB} {
+		status, body = d2HTTPJSON(t, server.Client(), http.MethodPost,
+			server.URL+"/api/v1/delivery/rider/availability/start", rider.Token,
+			map[string]any{"expectedRowVersion": 0})
+		if status != http.StatusOK || !strings.Contains(string(body.Data), `"state":"on_duty"`) {
+			t.Fatalf("start duty status=%d body=%s", status, body.Data)
 		}
 	}
 
@@ -595,6 +611,11 @@ func cleanupD2Server(t *testing.T, db *gorm.DB) {
 		}
 	}
 	if len(userIDs) > 0 {
+		if db.Migrator().HasTable(&delivery.RiderAvailability{}) {
+			if err := db.Where("rider_user_id IN ?", userIDs).Delete(&delivery.RiderAvailability{}).Error; err != nil {
+				t.Errorf("cleanup D-2 rider availability: %v", err)
+			}
+		}
 		if db.Migrator().HasTable(&delivery.Order{}) {
 			if err := db.Where("merchant_user_id IN ?", userIDs).Delete(&delivery.Order{}).Error; err != nil {
 				t.Errorf("cleanup D-2 orders: %v", err)

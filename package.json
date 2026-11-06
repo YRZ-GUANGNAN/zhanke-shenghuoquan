@@ -56,6 +56,7 @@
     "check:miniapp-capsule-layout": "node scripts/check-miniapp-capsule-layout.cjs",
     "check:merchant-home-clarity": "node scripts/check-merchant-home-clarity.cjs",
     "check:rider-workbench-clarity": "node scripts/check-rider-workbench-clarity.cjs",
+    "check:delivery-rider-availability": "node scripts/check-delivery-rider-availability.cjs",
     "check:home-real-tools-contract": "node scripts/check-home-real-tools-contract.cjs",
     "check:native-deployment": "node scripts/check-native-deployment.cjs",
     "check:real-wechat-secret-hygiene": "node scripts/check-real-wechat-secret-hygiene.cjs",

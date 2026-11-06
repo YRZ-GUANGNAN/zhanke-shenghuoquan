@@ -27,6 +27,7 @@ type Handler struct {
 	todayStats    delivery.RiderTodayStatsReader
 	walletReader  delivery.RiderWalletReader
 	withdrawals   delivery.RiderWithdrawalRepository
+	availability  delivery.RiderAvailabilityRepository
 	// Fail closed until withdrawals are allocated to earnings and made mutually
 	// exclusive with per-order payouts. No production setter/config enables this.
 	withdrawalWritesReady bool
@@ -83,6 +84,13 @@ func (h *Handler) WithWithdrawals(repository delivery.RiderWithdrawalRepository)
 	return h
 }
 
+// WithAvailability installs the authoritative duty and capacity store. A nil
+// store deliberately leaves the feature disabled and all write routes closed.
+func (h *Handler) WithAvailability(repository delivery.RiderAvailabilityRepository) *Handler {
+	h.availability = repository
+	return h
+}
+
 // WithNow exists for deterministic business-day tests. Production keeps the
 // default time.Now clock.
 func (h *Handler) WithNow(now func() time.Time) *Handler {
@@ -99,6 +107,9 @@ func (h *Handler) WithConversationCommands(commands conversationCommands) *Handl
 
 func (h *Handler) Register(group *gin.RouterGroup) {
 	group.GET("/me", h.me)
+	group.GET("/availability", h.riderAvailability)
+	group.POST("/availability/start", h.startRiderAvailability)
+	group.POST("/availability/stop", h.stopRiderAvailability)
 	group.GET("/stats/today", h.today)
 	group.GET("/wallet", h.wallet)
 	group.GET("/wallet/earnings", h.earnings)
@@ -347,6 +358,8 @@ func (h *Handler) today(c *gin.Context) {
 
 func (h *Handler) RegisterAdmin(group *gin.RouterGroup) {
 	group.POST("/riders", h.approveRider)
+	group.GET("/rider-config", h.riderBroadcastConfig)
+	group.PATCH("/rider-config", h.updateRiderBroadcastConfig)
 	group.GET("/rider-withdrawals", h.adminListWithdrawals)
 	group.POST("/rider-withdrawals/:id/approve", h.approveWithdrawal)
 	group.POST("/rider-withdrawals/:id/reject", h.rejectWithdrawal)
@@ -642,6 +655,12 @@ func (h *Handler) write(c *gin.Context, value any, err error) {
 		response.Fail(c, http.StatusForbidden, "请联系管理员开通骑手权限")
 	case errors.Is(err, delivery.ErrRiderUnavailable):
 		response.Fail(c, http.StatusForbidden, err.Error())
+	case errors.Is(err, delivery.ErrRiderAvailabilityConflict):
+		response.Fail(c, http.StatusConflict, "接单状态已变化，请刷新后重试")
+	case errors.Is(err, delivery.ErrRiderAtCapacity):
+		response.Fail(c, http.StatusConflict, "已达到同时接单上限")
+	case errors.Is(err, delivery.ErrRiderOffDuty):
+		response.Fail(c, http.StatusConflict, "请先开始接单")
 	case errors.Is(err, delivery.ErrConcurrentUpdate), errors.Is(err, delivery.ErrRiderMismatch),
 		errors.Is(err, delivery.ErrInvalidTransition), errors.Is(err, delivery.ErrIdempotencyConflict),
 		errors.Is(err, delivery.ErrProofConflict),
@@ -664,6 +683,8 @@ func (h *Handler) write(c *gin.Context, value any, err error) {
 		response.Fail(c, http.StatusServiceUnavailable, "delivery conversation unavailable")
 	case errors.Is(err, delivery.ErrPayoutQueueUnavailable):
 		response.Fail(c, http.StatusServiceUnavailable, "骑手排队结算暂不可用，请稍后重试")
+	case errors.Is(err, delivery.ErrRiderAvailabilityUnavailable):
+		response.Fail(c, http.StatusServiceUnavailable, "接单状态暂不可用，请稍后重试")
 	default:
 		response.Fail(c, http.StatusInternalServerError, "delivery rider operation failed")
 	}

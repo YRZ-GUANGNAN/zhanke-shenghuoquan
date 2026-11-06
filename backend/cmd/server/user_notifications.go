@@ -83,7 +83,14 @@ func deliveryNotificationFact(fact delivery.NotificationEvent) notification.Even
 		CreatedAt: fact.OccurredAt, UpdatedAt: fact.OccurredAt}
 }
 
-func newUserNotificationRuntime(cfg config.Config, db *gorm.DB, users *user.Service) (*userNotificationRuntime, error) {
+func newUserNotificationRuntime(cfg config.Config, db *gorm.DB, users *user.Service, availability ...delivery.RiderAvailabilityRepository) (*userNotificationRuntime, error) {
+	if len(availability) > 1 {
+		return nil, errors.New("notification rider availability requires a single authoritative store")
+	}
+	var riderAvailability delivery.RiderAvailabilityRepository
+	if len(availability) == 1 {
+		riderAvailability = availability[0]
+	}
 	var inbox notification.InboxRepository = disabledNotificationInbox{}
 	var authorization notification.SubscriptionAuthorizationRepository
 	var lookup notification.OpenIDLookup
@@ -124,7 +131,7 @@ func newUserNotificationRuntime(cfg config.Config, db *gorm.DB, users *user.Serv
 		if privateTemplate != nil {
 			templates["private_message"] = privateTemplate.id
 		}
-		resolver := &orderNotificationRecipients{orders: delivery.NewRepository(db), users: users, now: time.Now, template: template}
+		resolver := &orderNotificationRecipients{orders: delivery.NewRepository(db), users: users, now: time.Now, template: template, availability: riderAvailability}
 		recipients := &userNotificationRecipients{orders: resolver,
 			financial: &financialNotificationRecipients{funds: delivery.NewRepository(db), users: users},
 			private:   &privateNotificationRecipients{identity: identity, users: users, template: privateTemplate, now: time.Now}}
@@ -190,20 +197,25 @@ type notificationUserReader interface {
 	Settings(context.Context, uint) (user.SettingsView, error)
 }
 type orderNotificationRecipients struct {
-	orders   notificationOrderReader
-	users    notificationUserReader
-	now      func() time.Time
-	template *orderNotificationTemplate
+	orders       notificationOrderReader
+	users        notificationUserReader
+	now          func() time.Time
+	template     *orderNotificationTemplate
+	availability delivery.RiderAvailabilityRepository
 }
 
 func (r *orderNotificationRecipients) ResolveRecipients(ctx context.Context, event notification.Event) ([]notification.Recipient, error) {
+	return r.resolveRecipients(ctx, event, 0)
+}
+
+// A zero recipient expands an event for the whole candidate pool. A nonzero
+// recipient is a send-time recheck of just that task's owner, not another scan.
+func (r *orderNotificationRecipients) resolveRecipients(ctx context.Context, event notification.Event, recipientID uint64) ([]notification.Recipient, error) {
 	if event.AggregateType != "delivery_order" || event.PayloadVersion != 1 {
 		return nil, notification.ErrInvalidRecord
 	}
-	// There is no reliable on-duty/service-range/capacity fact in the current
-	// rider model. Never reinterpret an approved identity as an available rider.
 	if event.EventType == delivery.EventRiderPoolOpened {
-		return nil, nil
+		return r.resolveRiderPoolRecipients(ctx, event, recipientID)
 	}
 	if event.EventType != delivery.EventOrderStatusChanged {
 		return nil, notification.ErrInvalidRecord

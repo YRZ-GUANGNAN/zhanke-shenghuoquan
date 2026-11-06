@@ -18,11 +18,19 @@ func (p FeePolicy) Valid() bool {
 }
 
 type DispatchService struct {
-	repository  DispatchRepository
-	orders      *Service
-	eligibility RiderEligibility
-	feeProvider FeePolicyProvider
-	now         func() time.Time
+	repository   DispatchRepository
+	orders       *Service
+	eligibility  RiderEligibility
+	feeProvider  FeePolicyProvider
+	availability RiderAvailabilityClaimRepository
+	now          func() time.Time
+}
+
+// WithRiderAvailability installs the authoritative duty/capacity transaction.
+// Production must explicitly inject this port before exposing claim commands.
+func (s *DispatchService) WithRiderAvailability(repository RiderAvailabilityClaimRepository) *DispatchService {
+	s.availability = repository
+	return s
 }
 
 type FeePolicyProvider interface {
@@ -183,6 +191,9 @@ func (s *DispatchService) ClaimOrder(
 ) (Order, error) {
 	if err := s.requireActive(ctx, riderUserID); err != nil {
 		return Order{}, err
+	}
+	if s.availability != nil {
+		return s.availability.ClaimOrderWithAvailability(ctx, riderUserID, strings.TrimSpace(publicID), expectedRowVersion, s.now().UTC())
 	}
 	return s.orders.AssignRider(ctx, strings.TrimSpace(publicID), expectedRowVersion, riderUserID)
 }

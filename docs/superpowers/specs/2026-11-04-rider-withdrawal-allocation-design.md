@@ -73,7 +73,7 @@
 
 ## 主要改动位置
 
-- 新迁移：`backend/migrations/055_delivery_rider_withdrawal_allocations.sql`（实施前再次确认编号未被占用）。
+- 新迁移：提现实现时使用尚未占用的后续迁移编号（055 已用于骑手接单广播；实施前重新核对编号），不得与本设计并行复用。
 - 新分配模型/存储与测试，置于 `backend/internal/module/delivery/`。
 - `backend/internal/module/delivery/rider_withdrawal_repository.go`：创建、确认、拒绝原子关联收益。
 - `backend/internal/module/delivery/fee_wallet_repository.go`：旧整单支付互斥。

@@ -213,7 +213,7 @@ func orderNotificationStatusPhrase(title string) (string, error) {
 	switch title {
 	case "配送费支付失败":
 		return "支付失败", nil
-	case "配送单等待接单":
+	case "配送单等待接单", "有新的校园配送单":
 		return "待接单", nil
 	case "骑手已接单":
 		return "已接单", nil
@@ -248,7 +248,7 @@ func orderSubscribeGuard(events notificationEventReader, resolver *orderNotifica
 		if event.EventPublicID != item.EventPublicID || notificationEventExpired(event, resolver.now) {
 			return "", notification.ErrNotificationIneligible
 		}
-		recipients, err := resolver.ResolveRecipients(ctx, event)
+		recipients, err := resolver.resolveRecipients(ctx, event, item.RecipientUserID)
 		if err != nil {
 			return "", err
 		}

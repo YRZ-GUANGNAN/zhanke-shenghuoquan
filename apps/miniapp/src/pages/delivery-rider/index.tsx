@@ -36,6 +36,7 @@ import { deliveryPickupLabel, deliverySourceLabel } from '../../utils/delivery-o
 import RiderWorkbenchIcon from './rider-workbench-icon'
 import './index.scss'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
+import { useRiderAvailability } from '../../hooks/use-rider-availability'
 
 type RiderTab = 'grab' | 'pickup' | 'delivery'
 
@@ -122,17 +123,12 @@ function parseRouteSummary(value: string): { pickup: string; delivery: string } 
   return { pickup: summary, delivery: '抢单后显示详细地址' }
 }
 
-function riderStatusLabel(status: NonNullable<DeliveryRiderMe['rider']>['status']): string {
-  if (status === 'active') return '可接单'
-  if (status === 'resting') return '休息中'
-  return '已停用'
-}
-
 export default function DeliveryRiderPage() {
   const visibility = useFeatureVisibility()
   const canClaim = visibility.delivery && visibility.rider
   const identityAllowed = useIdentityGuard('rider')
   const accountId = useSessionStore((state) => state.profile.id)
+  const sessionToken = useSessionStore((state) => state.token)
   const [activeTab, setActiveTab] = useState<RiderTab>(() => getCurrentInstance().router?.params.tab === 'tasks' ? 'pickup' : 'grab')
   const channelInteraction = useChannelInteraction()
   const [me, setMe] = useState<DeliveryRiderMe | null>(null)
@@ -148,6 +144,8 @@ export default function DeliveryRiderPage() {
   const [completedTotal, setCompletedTotal] = useState(0)
   const [todayStats, setTodayStats] = useState<DeliveryRiderTodayStats | null>(null)
   const [todayStatsLoaded, setTodayStatsLoaded] = useState(false)
+  const availability = useRiderAvailability(accountId, Boolean(identityAllowed && canClaim), sessionToken)
+  const dutyCanClaim = canClaim && availability.canClaim
   const [loadingMore, setLoadingMore] = useState(false)
   const [loading, setLoading] = useState(false)
   const [hasLoadedOrders, setHasLoadedOrders] = useState(false)
@@ -406,6 +404,7 @@ export default function DeliveryRiderPage() {
   const refreshAfterAction = async (orderId: string, actionSucceeded: boolean): Promise<boolean> => {
     const shouldContinue = createOperationGuard()
     if (!shouldContinue()) return false
+    void availability.refresh()
     try {
       return await refreshOrders()
     } catch (value) {
@@ -489,7 +488,7 @@ export default function DeliveryRiderPage() {
       || releaseCandidateRef.current || Object.values(busyByOrderRef.current).some(Boolean)) return false
     const lock = {}
     userRefreshLock.current = lock
-    try { return await load() } finally {
+    try { const [, result] = await Promise.all([availability.refresh(), load()]); return result } finally {
       if (userRefreshLock.current === lock) userRefreshLock.current = null
     }
   }
@@ -594,7 +593,7 @@ export default function DeliveryRiderPage() {
       await synchronizeOrder(orderId, 'claim')
       return
     }
-    if (!canClaim || me?.rider?.status !== 'active') return
+    if (!dutyCanClaim || me?.rider?.status !== 'active') return
     markBusy(orderId, 'claim')
     updateActionFeedback(orderId)
     try {
@@ -871,9 +870,19 @@ export default function DeliveryRiderPage() {
           </View>
         </View>
         <View className='rider-grab-context'>
-          <Text className={`rider-grab-status rider-grab-status--${rider.status}`}>{riderStatusLabel(rider.status)}</Text>
+          <Text className={`rider-grab-status rider-grab-status--${availability.value?.enabled && availability.value.state === 'on_duty' ? 'active' : 'resting'}`}>{availability.busy ? '同步接单状态' : availability.value?.enabled ? availability.value.state === 'on_duty' ? '接单中' : '未开工' : availability.value?.enabled === false ? '新接单暂未开放' : '接单状态待同步'}</Text>
           <Text>已结束 {hasLoadedOrders ? completedTotal : '—'} 单</Text>
         </View>
+        {availability.value?.enabled && <View className='rider-grab-duty-card'>
+          <View className='rider-grab-duty-card__copy'>
+            <Text className='rider-grab-duty-card__title'>{availability.value.state === 'on_duty' ? '正在接单' : '暂未开工'}</Text>
+            <Text className='rider-grab-duty-card__meta'>校园范围 · {availability.value.inFlight}/{availability.value.maxInFlight} 单进行中</Text>
+          </View>
+          <View className='rider-grab-duty-card__action' ariaRole='button' ariaLabel={availability.busy ? '正在同步接单状态' : availability.value.state === 'on_duty' ? '停止接单' : '开始接单'} onClick={() => { if (!availability.busy && channelInteraction.canActivate()) void availability.change().then(changed => { if (changed) void load() }) }}>
+            <Text>{availability.busy ? '同步中…' : availability.value.state === 'on_duty' ? '停止接单' : '开始接单'}</Text>
+          </View>
+        </View>}
+        {availability.message && <DeliveryOrderState kind='error' compact title='接单状态需要同步' description={availability.message} actionLabel='刷新接单状态' onAction={() => void availability.refresh()} />}
         <View className={`rider-grab-daily-stats ${todayStatsLoaded && todayStats ? 'rider-grab-daily-stats--ready' : ''}`} ariaLabel='今日配送统计'>
           <View className='rider-grab-daily-stats__item'>
             <Text className='rider-grab-daily-stats__label'>今日单量</Text>
@@ -1017,12 +1026,12 @@ export default function DeliveryRiderPage() {
               <View className='rider-order-card__bottom'>
                 <Text className='rider-order-card__privacy'>隐私保护 · 接单后可联系</Text>
                 <View
-                  className={`rider-order-card__grab ${disabled || !needsRefresh && rider.status !== 'active' ? 'rider-order-card__grab--disabled' : ''}`}
+                  className={`rider-order-card__grab ${disabled || !needsRefresh && (!dutyCanClaim || rider.status !== 'active') ? 'rider-order-card__grab--disabled' : ''}`}
                   onClick={() => {
-                    if (!disabled && (needsRefresh || rider.status === 'active')) void claim(order)
+                    if (!disabled && (needsRefresh || dutyCanClaim && rider.status === 'active')) void claim(order)
                   }}
                 >
-                  <Text>{busy ? '接单中…' : refreshing ? '同步中…' : needsRefresh ? '刷新状态' : rider.status === 'active' ? '抢单' : '当前不可接单'}</Text>
+                  <Text>{busy ? '接单中…' : refreshing ? '同步中…' : needsRefresh ? '刷新状态' : dutyCanClaim && rider.status === 'active' ? '抢单' : '当前不可接单'}</Text>
                 </View>
               </View>
               {renderOrderFeedback(orderId)}

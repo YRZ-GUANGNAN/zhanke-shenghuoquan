@@ -30,7 +30,8 @@ func TestDeliveryRuntimeDoesNotConstructLegacyTakeoutServices(t *testing.T) {
 		}
 	}
 	if !strings.Contains(block, "NewRiderIdentityService") ||
-		!strings.Contains(block, "if !cfg.EnableDelivery") {
+		!strings.Contains(block, "if !cfg.EnableDelivery") ||
+		!strings.Contains(block, "configureDeliveryRiderAvailability(cfg, db, dispatchService, notificationAppender)") {
 		t.Fatal("delivery runtime lacks identity-only adapter or fail-closed gate")
 	}
 }

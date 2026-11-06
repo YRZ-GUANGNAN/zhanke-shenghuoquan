@@ -19,6 +19,34 @@ export interface DeliveryRiderMe {
   rider?: DeliveryRider
 }
 
+export type RiderAvailability = { enabled: false } | {
+  enabled: true
+  riderUserId: number
+  state: 'off_duty' | 'on_duty'
+  scope: 'campus'
+  inFlight: number
+  maxInFlight: number
+  rowVersion: number
+  updatedAt?: string
+}
+
+export function parseRiderAvailability(value: unknown): RiderAvailability {
+  if (!value || typeof value !== 'object') throw new Error('接单状态暂不可用')
+  const row = value as Record<string, unknown>
+  if (row.enabled === false) return { enabled: false }
+  const integer = (v: unknown, min: number) => typeof v === 'number' && Number.isSafeInteger(v) && v >= min
+  if (row.enabled !== true || !integer(row.riderUserId, 1) || !integer(row.inFlight, 0)
+    || !integer(row.maxInFlight, 1) || Number(row.maxInFlight) > 100 || !integer(row.rowVersion, 0)
+    || (row.state !== 'off_duty' && row.state !== 'on_duty') || row.scope !== 'campus'
+    || (row.rowVersion === 0 && row.state !== 'off_duty')
+    || (row.updatedAt !== undefined && typeof row.updatedAt !== 'string')) throw new Error('接单状态数据无效，请刷新')
+  return row as unknown as RiderAvailability
+}
+
+export function riderAvailabilityCanClaim(value: RiderAvailability | null): boolean {
+  return Boolean(value?.enabled && value.state === 'on_duty' && value.inFlight < value.maxInFlight)
+}
+
 export interface DeliveryRiderTodayStats {
   /** 服务端按业务时区计算的统计日期，便于跨午夜时避免旧结果误标为今天。 */
   date: string
@@ -62,6 +90,19 @@ export interface AssignedDeliveryOrder extends StageTimestamps {
 }
 
 const BASE = '/delivery/rider'
+
+export async function getRiderAvailability(): Promise<RiderAvailability> {
+  return parseRiderAvailability(await request<unknown>(`${BASE}/availability`, { url: '', timeout: 10000 }))
+}
+
+export async function changeRiderAvailability(action: 'start' | 'stop', expectedRowVersion: number): Promise<RiderAvailability> {
+  if ((action !== 'start' && action !== 'stop') || !Number.isSafeInteger(expectedRowVersion) || expectedRowVersion < 0) {
+    throw new Error('接单操作参数无效')
+  }
+  return parseRiderAvailability(await request<unknown>(`${BASE}/availability/${action}`, {
+    url: '', method: 'POST', data: { expectedRowVersion }, timeout: 10000
+  }))
+}
 
 export function getDeliveryRiderMe(): Promise<DeliveryRiderMe> {
   return request<DeliveryRiderMe>(`${BASE}/me`, { url: '', timeout: 10000 })

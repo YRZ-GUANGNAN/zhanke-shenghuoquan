@@ -264,6 +264,27 @@
   color: $text-tertiary;
 }
 
+.rider-grab-duty-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  margin-top: 20rpx;
+  padding: 18rpx 20rpx;
+  border: 1PX solid $border-subtle;
+  border-radius: 16rpx;
+  background: $bg-surface-subtle;
+}
+
+.rider-grab-duty-card__copy { display: flex; flex: 1; flex-direction: column; gap: 4rpx; min-width: 0; }
+.rider-grab-duty-card__title { color: $text-strong; font-size: 28rpx; font-weight: 600; line-height: 40rpx; }
+.rider-grab-duty-card__meta { color: $text-tertiary; font-size: 23rpx; line-height: 32rpx; }
+.rider-grab-duty-card__action {
+  min-width: 138rpx; height: 64rpx; padding: 0 18rpx; display: flex; align-items: center; justify-content: center;
+  border-radius: 12rpx; background: $brand-tint; color: $brand-primary-strong; font-size: 24rpx; line-height: 34rpx;
+}
+.rider-grab-duty-card__action:active { transform: scale(.98); }
+
 .rider-grab-status {
   padding: 2rpx 14rpx;
   border-radius: 6rpx;

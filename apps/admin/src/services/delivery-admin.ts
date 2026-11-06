@@ -29,6 +29,24 @@ export interface DeliveryQuery {
   to?: string
 }
 
+export type RiderAvailabilityConfig = { enabled: false } | {
+  enabled: true
+  maxInFlightPerRider: number
+  rowVersion: number
+  updatedAt: string
+}
+
+export function parseRiderAvailabilityConfig(value: unknown): RiderAvailabilityConfig {
+  if (!value || typeof value !== 'object') throw new Error('骑手容量配置暂不可用')
+  const row = value as Record<string, unknown>
+  if (row.enabled === false) return { enabled: false }
+  if (typeof row.enabled !== 'boolean' || typeof row.maxInFlightPerRider !== 'number'
+    || !Number.isSafeInteger(row.maxInFlightPerRider) || row.maxInFlightPerRider < 1 || row.maxInFlightPerRider > 100
+    || typeof row.rowVersion !== 'number' || !Number.isSafeInteger(row.rowVersion) || row.rowVersion < 1
+    || typeof row.updatedAt !== 'string') throw new Error('骑手容量配置数据无效，请刷新')
+  return row as unknown as RiderAvailabilityConfig
+}
+
 export interface RiderPayoutQueue {
   payoutQueuePublicId: string
   earningPublicId: string
@@ -315,6 +333,14 @@ export const deliveryAdminAPI = {
   order: (id: string) => api<DeliveryOrder>(`/orders/${encodeURIComponent(id)}`),
   orderFunds: (id: string) => api<OrderFunds>(`/orders/${encodeURIComponent(id)}/funds`),
   feeConfig: () => api<FeeConfig>('/fee-config'),
+  riderAvailabilityConfig: async () => parseRiderAvailabilityConfig(await api<unknown>('/rider-config')),
+  updateRiderAvailabilityConfig: async (maxInFlightPerRider: number, expectedRowVersion: number) => {
+    if (!Number.isSafeInteger(maxInFlightPerRider) || maxInFlightPerRider < 1 || maxInFlightPerRider > 100
+      || !Number.isSafeInteger(expectedRowVersion) || expectedRowVersion < 1) throw new Error('骑手容量参数无效')
+    return parseRiderAvailabilityConfig(await api<unknown>('/rider-config', {
+      ...body({ maxInFlightPerRider, expectedRowVersion }), method: 'PATCH'
+    }))
+  },
   updateFeeConfig: (deliveryFeeCents: number, platformCutCents: number, expectedRowVersion: number) =>
     api<FeeConfig>('/fee-config', { ...body({ deliveryFeeCents, platformCutCents, expectedRowVersion }), method: 'PUT' }),
   merchantFeeOverrides: (query: DeliveryQuery = {}) => api<Page<MerchantFeeOverride>>(`/merchant-fee-overrides${queryString(query)}`),

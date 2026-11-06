@@ -66,9 +66,13 @@
 - 微信 `accepted` 只代表 API 受理；手机收到且点击到正确页面后才完成收件/跳转验收。
 - 私信暂无线下/当前会话可见性权威信号，不能宣称全量离线提醒完成。
 
-### 3. 骑手新单广播尚未实现
+### 3. 骑手新单广播已形成代码候选，尚未部署
 
-`RiderPoolOpened` 当前跳过收件人解析。不能以账号审批通过代替在岗、服务范围、接单意愿及容量资格。广播需先确定并实现权威可接单状态及发送前复核，不能只打开通知开关。
+- 本工作树已实现全校园骑手池、骑手主动开始/停止接单、后台 `1..100` 容量配置、通知候选及发送前复核；默认容量为 3。
+- 迁移 `055_delivery_rider_availability.sql` 新增权威在岗状态和全局容量配置。资格 revision 变化会持久停工，资格恢复后必须由骑手重新开始接单。
+- 抢单事务按 availability→全局配置→用户/骑手资格→进行中订单→目标订单稳定锁序复核。功能开关关闭、迁移缺失、未开工、已满载、资格撤销、订单被抢或过期均 fail-closed；停止接单不影响已有配送推进。
+- 隔离 MySQL 8.4 验证：8 个并发抢单在容量 1 下只成功 1 个；双骑手抢同单只成功 1 个；通知写入失败回滚订单；撤销再恢复资格不会自动复工；修改过的配置和已有在岗事实阻止回滚。临时数据库、MySQL 进程和数据目录均已清理。
+- 本地 `npm run verify`、Go 全量测试、前端 typecheck 和通知定向测试通过。2026-11-06 收口与提交记录见文末；本实现未部署，未打开 `ENABLE_DELIVERY_RIDER_BROADCAST`，不能宣称生产已有广播或真实送达。
 
 ### 4. 真实支付与次日结算尚未验收
 
@@ -93,3 +97,38 @@
 - 本轮 `git diff --check` 通过；只新增本验收记录与提现安全补充设计，未修改已上传候选的业务源码或构建产物。
 
 本轮未产生真实资金动作、通知发送、生产数据库写入或开关变更。
+
+## 2026-11-06 本地代码收口（未发布）
+
+本节只记录本次工作树的实现和本地测试，不刷新或推断上文 2026-11-04 的生产、公众平台状态。
+
+完成项：
+
+- 全校园配送池；骑手主动开始/停止接单，后台容量 `1..100`、默认 3，停工仍可只读看池。
+- 迁移 055、资格 revision、稳定锁序与原子抢单，资格撤销后必须显式重新开工。
+- `RiderPoolOpened` 首次展开扫描候选池；微信发送前仅复核当前收件人，101 个候选的回归测试确认 guard 不再调用全池扫描。
+- 默认关闭开关直接禁止新抢单；组合根和 HTTP 测试确认返回 `ErrRiderAvailabilityUnavailable` / 503，缺迁移也不留旧抢单回退入口。
+- 前端真实 parser/hook 隔离行为测试覆盖首次零值、容量边界、开始/停止、重复点击、未知写入结果只查询，以及切号/令牌变化/页面隐藏/卸载后的迟到响应；纳入 `postverify`，上线回归由 24 项增至 25 项。
+- 更新旧 D-2 HTTP/MySQL 用例，适配必须主动开工的契约；未使用其外部数据库 DSN，本轮不宣称该旧整套真实 HTTP/MySQL 验收已执行。
+
+本地验收命令（成功项均保存执行器 exit 0 结果）：
+
+| 命令 | 结果 |
+| --- | --- |
+| `npm run test:backend:fresh` | PASS；安全包装器清空数据库 DSN 后执行 `go test ./... -count=1`，依赖外部 DSN 的旧测试跳过 |
+| `go vet ./...`（backend） | PASS |
+| `go test ./cmd/server -run 'TestDeliveryRuntime.*Broadcast\|TestRiderPool' -count=1`（backend） | PASS |
+| `go test ./migrations -run 'TestMigration055' -count=1`（backend） | PASS |
+| `npm --workspace apps/miniapp run typecheck` | PASS |
+| `npm --workspace apps/admin run typecheck` | PASS |
+| `node scripts/check-delivery-rider-availability.cjs` | PASS；契约及真实 TS/hook 行为检查 |
+| `npm run verify` | PASS；含 25 项上线回归 |
+| `npm run test:rider-money:mysql` | PASS；隔离 MySQL 8.4，容量 1 的 8 个并发请求仅 1 次抢单成功，同一单仅 1 位骑手成功，资格变化停工、事件写失败回滚与迁移回滚保护通过 |
+| `npm run test:notification:mysql` | PASS；隔离 MySQL 8.4 的 7 项测试及 UTC/Shanghai 子项通过 |
+| `npm run build:miniapp` | PASS；含产物和包体检查，仅既有 CSS 顺序、webpack 体积警告 |
+| `npm run build:admin` | PASS |
+| `git diff --check` | PASS |
+
+小程序本地构建主包 **1,976,170 bytes**，总包 **2,135,658 bytes**；这不是微信官方上传回执。测试脚本已验证两套隔离实例关闭、临时数据目录删除、遗留测试数据库为 0，既有 MySQL 服务未受影响。
+
+发布边界：本次仅代码提交，不 push、不上传、不部署、不发送通知、不执行付款或打款。后续发布须先应用迁移 055，并协调包含主动开工入口的小程序版本，再启用 `ENABLE_DELIVERY_RIDER_BROADCAST`；不能只部署默认关闭后端，否则新抢单会按设计被禁止。微信通知发送开关、白名单、模板和授权仍需单独检查。真实收件与跳转、真机支付、真实配送后的次日 00:00 到账均仍未验收；本地测试不得代替这些证据。

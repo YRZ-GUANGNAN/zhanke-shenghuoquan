@@ -12,6 +12,7 @@ const checks = [
   'check-sheet-dismiss',
   'check-taro-ux-sheet-drag',
   'check-delivery-pager-layout',
+  'check-delivery-rider-availability',
   'check-rider-wallet-disabled-style',
   'test-post-media-picker',
   'test-session-welcome',
