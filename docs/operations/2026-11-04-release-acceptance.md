@@ -149,3 +149,25 @@
 - MiniApp 构建产物检查通过：主包 **1,977,014 bytes**、总包 **2,138,594 bytes**；Admin 生产构建通过。Webpack 仅报告既有 CSS order 与体积建议警告，不影响 exit 0。
 - 本轮清理了验收脚本生成的 `deploy/native/__pycache__/` 与 `scripts/__pycache__/`；工作区未包含这些缓存。
 - 本地候选仍未等同于上线：056 生产迁移、提现开关、055 广播开关、微信支付真实交易、微信订阅/私信真实送达、腾讯 IM 回调、体验版设置、审核/正式发布、真机验收和次日实际到账仍需在外部系统逐项完成并留证。当前不执行生产写入、真实付款或发布操作。
+
+## 2026-11-08 追加：补齐商家数据库验收与候选身份门禁
+
+此前 `test:backend:fresh` 会清除共享数据库 DSN，商家资金的旧数据库用例因此跳过；骑手隔离测试不能替代这些用例。本轮增加专用商家隔离 runner，并纳入 `verify:release`，不修改支付业务或调用微信真实资金接口。
+
+| 命令/检查 | 本轮结果 |
+| --- | --- |
+| 扩充后的 `npm run verify:release` | 顶层 exit 0；包含前端/契约回归、fresh Go、vet、三套隔离数据库验收、预检、MiniApp/Admin 构建及 diff |
+| `npm run test:merchant-money:mysql` | exit 0；15 个顶层测试实际执行，充值/扣费/退款/取消充值/支付恢复/迁移均通过，SKIP=0 |
+| `npm run test:rider-money:mysql` | exit 0；35 个数据库顶层测试及其子测试，另有 CHECK 支持测试；使用 37 个隔离临时数据库，无 SKIP |
+| `npm run test:notification:mysql` | exit 0；7 个顶层测试（含 UTC/Shanghai 子测试），使用 8 个隔离临时数据库，无 SKIP |
+| `npm run check:rider-release-preflight` | 完整回归中 28/28；追加损坏/缺失 fixture 非零退出与脱敏断言后，单独复验 29/29，exit 0 |
+| 两个资金 runner 的跳过检测 | 最终脚本重新执行 exit 0；顶层/空格/Tab 缩进 SKIP 合成断言通过，SQL `SKIP LOCKED` 不误报 |
+| MiniApp/Admin 构建 | exit 0；小程序主包 1,977,014 bytes、总包 2,138,594 bytes；只含既有 warning |
+
+以上测试的临时数据库剩余均为 0，独立实例与临时目录清理通过。这里更正数量口径：此前“37 个骑手场景/8 个通知场景”是隔离数据库数量，不能当作顶层测试数量。真实微信支付/收件不包含在这些本地测试中。
+
+预检新增 `--expected-commit` 与 `--require-ready`，阻止旧自洽版本冒充指定候选；默认关闭候选还要求广播、提现、内部队列、通知发送都关闭。门禁不通过或检查器自身失败均非零退出。操作顺序与限制见 `docs/operations/2026-11-08-rider-release-preparation.md`，旧 052–054 迁移执行器不可直接复用到 055/056。
+
+本轮公网只读复查：`/healthz` HTTP 200，`/version` HTTP 200 且仍为 `2026.11.03.candidate.3` / `972d3f343745`；公网 `/readyz` 为 HTTP 403，未复查服务端回环 readyz，不把公网拒绝解读为内部健康失败。本轮没有复读生产进程环境或数据库，前述开关/余额/授权额度仍是旧现场记录，不可据此推断最新值。
+
+通知只读代码审查未发现新的 P0/P1；外部 IM 控制台、模板、授权额度、发送白名单、真实双账号收件/跳转继续 PENDING。设置页“开发预览”和一次性授权文案已在 `203af31` 修正，但服务端授权余额回显仍未实现，不宣称该缺口已解决。商家商品收益仍按已确认边界 `external_order_source_unavailable` 保持关闭，不把配送充值余额当成商品收益；骑手独立保证金充值也未实现，不能混入已实现的收入提现功能。

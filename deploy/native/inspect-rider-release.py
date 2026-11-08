@@ -5,6 +5,11 @@ The script never mutates the database, environment file, release symlink or
 service. By default it inspects the live host. ``--fixture`` evaluates a
 sanitised JSON snapshot and exists only so the fail-closed rules can be tested
 without production access.
+
+An inventory without arguments is not a release acceptance. Use
+``--expected-commit`` to bind the runtime to the frozen candidate, and
+``--require-ready`` to require a specific preflight gate with a nonzero exit
+status on failure. These options remain read-only and never activate a feature.
 """
 import argparse
 import json
@@ -405,10 +410,28 @@ def has_constraints(snapshot, table, expected):
         return False
 
 
-def evaluate(snapshot):
+def expected_commit_matches(snapshot, expected_commit):
+    if expected_commit is None:
+        return None
+    if not isinstance(expected_commit, str) or not re.fullmatch('[a-f0-9]{12,40}', expected_commit):
+        return False
+    version = snapshot.get('version', {})
+    data = version.get('data', {}) if isinstance(version, dict) else {}
+    runtime_commit = data.get('commit') if isinstance(data, dict) else None
+    return (isinstance(runtime_commit, str)
+            and re.fullmatch('[a-f0-9]{12,40}', runtime_commit) is not None
+            and len(runtime_commit) >= len(expected_commit)
+            and runtime_commit.startswith(expected_commit))
+
+
+def evaluate(snapshot, expected_commit=None):
     flags = snapshot.get('flags', {})
     counts = snapshot.get('counts', {})
     release = snapshot.get('releaseMetadata', {})
+    candidate_matches = expected_commit_matches(snapshot, expected_commit)
+    expected_valid = (expected_commit is None or
+                      isinstance(expected_commit, str) and
+                      re.fullmatch('[a-f0-9]{12,40}', expected_commit) is not None)
     try:
         parsed_flags = {name: bool_flag(flags.get(name, ''), BOOLEAN_DEFAULTS.get(name, False))
                         for name in BOOLEAN_FLAG_NAMES}
@@ -422,6 +445,7 @@ def evaluate(snapshot):
             'releaseIdentityReady': False, 'flagConflicts': ['invalid_configuration_flag'],
             'defaultOffCandidateReady': False, 'broadcastActivationReady': False,
             'withdrawalActivationPreflightReady': False,
+            'expectedCommitMatches': candidate_matches,
         }
     earnings, earning_indexes, _ = parsed_shape(snapshot, 'delivery_rider_earning_records')
     migration_054 = (
@@ -496,6 +520,10 @@ def evaluate(snapshot):
     payout_queue = parsed_flags['ENABLE_DELIVERY_RIDER_PAYOUT_QUEUE']
     daily = parsed_flags['ENABLE_DELIVERY_RIDER_DAILY_SETTLEMENT']
     conflicts = []
+    if not expected_valid:
+        conflicts.append('invalid_expected_commit')
+    elif candidate_matches is False:
+        conflicts.append('expected_candidate_commit_mismatch')
     if withdrawal and payout_queue:
         conflicts.append('withdrawal_and_payout_queue_both_enabled')
     if withdrawal and not delivery:
@@ -512,16 +540,19 @@ def evaluate(snapshot):
         release.get('currentIsSafeReleaseSymlink') is True
         and release.get('identityMatchesRuntime') is True
         and snapshot.get('readyHTTP') == 200
+        and candidate_matches is not False
     )
     return {
         'readOnly': True,
+        'expectedCommitMatches': candidate_matches,
         'migration054Ready': migration_054,
         'migration055Ready': migration_055,
         'migration056Ready': migration_056,
         'releaseIdentityReady': identity_ready,
         'flagConflicts': conflicts,
         'defaultOffCandidateReady': identity_ready and migration_054 and not conflicts
-        and not broadcast and not withdrawal,
+        and not broadcast and not withdrawal and not payout_queue
+        and not parsed_flags['ENABLE_NOTIFICATION_SENDING'],
         'broadcastActivationReady': identity_ready and delivery and migration_054 and migration_055
         and not conflicts,
         # Full source consistency is rechecked by CheckWithdrawalReadiness at
@@ -534,17 +565,37 @@ def evaluate(snapshot):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--fixture', help='evaluate a sanitised JSON snapshot instead of the live host')
+    parser.add_argument('--expected-commit', help='frozen candidate commit, 12..40 lowercase hexadecimal characters')
+    parser.add_argument('--require-ready', choices=('candidate', 'broadcast', 'withdrawal'),
+                        help='require the selected preflight gate; needs --expected-commit and never activates it')
     args = parser.parse_args()
+    if args.require_ready and args.expected_commit is None:
+        parser.error('--require-ready requires --expected-commit')
+    if args.expected_commit is not None and not re.fullmatch('[a-f0-9]{12,40}', args.expected_commit):
+        parser.error('--expected-commit must contain 12..40 lowercase hexadecimal characters')
     snapshot = json.loads(Path(args.fixture).read_text(encoding='utf-8')) if args.fixture else collect_live_snapshot()
     result = dict(snapshot)
     result['readOnly'] = True
-    result['preflight'] = evaluate(snapshot)
+    result['preflight'] = evaluate(snapshot, args.expected_commit)
+    if args.require_ready:
+        gate = {
+            'candidate': 'defaultOffCandidateReady',
+            'broadcast': 'broadcastActivationReady',
+            'withdrawal': 'withdrawalActivationPreflightReady',
+        }[args.require_ready]
+        result['requiredGate'] = {'name': args.require_ready,
+                                  'passed': result['preflight'][gate] is True}
     print(json.dumps(result, ensure_ascii=False))
+    if result['preflight']['expectedCommitMatches'] is False:
+        return 1
+    if args.require_ready and not result['requiredGate']['passed']:
+        return 1
+    return 0
 
 
 if __name__ == '__main__':
     try:
-        main()
+        raise SystemExit(main())
     except Exception as error:
         print(json.dumps({'readOnly': True, 'failed': True, 'errorType': type(error).__name__,
                           'reason': str(error) if isinstance(error, RuntimeError) else 'details withheld'}))

@@ -67,7 +67,7 @@ async function main() {
     process.stdout.write(result.stdout || '')
     process.stderr.write(result.stderr || '')
     const output = (result.stdout || '') + (result.stderr || '')
-    if (/^--- SKIP:/m.test(output)) throw new Error('Rider-money integration suite contains a skipped test.')
+    if (/^[ \t]*--- SKIP:/m.test(output)) throw new Error('Rider-money integration suite contains a skipped test.')
     const expectedTests = collectRiderMoneyTests(path.join(root, 'backend', 'internal', 'module', 'delivery'))
     const missingTests = expectedTests.filter(name => !new RegExp(`^--- PASS: ${name}(?:\\s|$)`, 'm').test(output))
     if (missingTests.length) throw new Error('Rider-money integration suite did not run required tests: ' + missingTests.join(', '))
