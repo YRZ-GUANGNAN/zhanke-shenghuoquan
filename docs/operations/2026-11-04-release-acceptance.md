@@ -50,11 +50,11 @@
 
 ## 尚未完成的硬门槛
 
-### 1. 人工提现尚未可用
+### 1. 人工提现尚未在生产开启
 
-不是“已经能申请，只差人工打款”。当前 `deliveryrider.Handler.withdrawalWritesReady=false`，申请、后台确认、拒绝回充全部禁用，且没有生产开启配置。
+本工作树已补齐“已结算收益 → 来源分配 → 后台领取/登记已打款/拒绝回充”的人工提现闭环，包含 056 迁移、处理权、不可变审计、幂等/CAS、来源证据和与旧逐单结款/待打款队列的互斥。默认 `ENABLE_DELIVERY_RIDER_WITHDRAWAL=false`，生产仍未应用 056、未开放申请或后台资金写入。
 
-缺少提现金额到具体已结算、来源核验通过收益的分配记录，与旧逐单线下结款/内部待打款队列没有完整互斥。直接开放可能重复登记同笔收益。须补分配与并发测试后才可另行部署启用；不接入自动微信转账、不执行真实打款。
+本实现不调用微信自动转账；只有完成停写备份、迁移演练、启动 `CheckWithdrawalReadiness` 和独立生产验收后，才能在明确授权下开启人工处理。实际线下打款及凭证登记仍需后台人员执行，结果未知时保持占用，不回充、不重复转账。
 
 ### 2. 通知尚未真实送达
 
@@ -92,9 +92,9 @@
 
 - 上轮 `npm run verify`（含24项postverify）通过；设置二级修改后 miniapp typecheck、设置契约、build/postbuild、包体边界、diff检查通过。
 - 本轮重新生成官方预览通过，大小与已上传回执一致。
-- 本轮独立提现审查运行 `go test ./internal/module/delivery ./internal/module/admin/deliveryrider -run TestWithdrawal -count=1` 通过。该测试验证已有硬门禁和校验，不代表提现闭环安全。
+- 本轮提现专项审查运行 `go test ./internal/module/delivery ./internal/module/admin/deliveryrider -run TestWithdrawal -count=1` 通过；隔离 MySQL 覆盖来源部分分配、claim/release/exception、claim/reject 竞争、通知失败回滚、午夜结算竞争、共享充值退款竞争和回滚审计保护。
 - 本轮独立复验 `npm run verify` 已结束，完整走完 preverify、verify 与 postverify；Admin/MiniApp typecheck、安全 Go 测试及24项上线回归均报告通过，24项结果逐项为 `exit 0`。执行器最终顶层 `exit_code` 字段未保留，会话已关闭，不能补记为已留存的顶层退出码证据；未为此重复运行。
-- 本轮 `git diff --check` 通过；只新增本验收记录与提现安全补充设计，未修改已上传候选的业务源码或构建产物。
+- 本轮 `git diff --check` 通过；新增 056 迁移契约测试及只读 054/055/056 发布预检，未执行生产写入、真实支付、真实通知或打款。
 
 本轮未产生真实资金动作、通知发送、生产数据库写入或开关变更。
 
@@ -132,3 +132,20 @@
 小程序本地构建主包 **1,976,170 bytes**，总包 **2,135,658 bytes**；这不是微信官方上传回执。测试脚本已验证两套隔离实例关闭、临时数据目录删除、遗留测试数据库为 0，既有 MySQL 服务未受影响。
 
 发布边界：本次仅代码提交，不 push、不上传、不部署、不发送通知、不执行付款或打款。后续发布须先应用迁移 055，并协调包含主动开工入口的小程序版本，再启用 `ENABLE_DELIVERY_RIDER_BROADCAST`；不能只部署默认关闭后端，否则新抢单会按设计被禁止。微信通知发送开关、白名单、模板和授权仍需单独检查。真实收件与跳转、真机支付、真实配送后的次日 00:00 到账均仍未验收；本地测试不得代替这些证据。
+
+## 2026-11-06 资金收口与发布预检补充
+
+- 新增 `056_delivery_rider_withdrawal_allocations.sql` 及受事实保护的回滚脚本；迁移契约测试 `go test ./migrations -run 'TestMigration05(4|5|6)' -count=1` 通过。
+- 新增只读 `deploy/native/inspect-rider-release.py`：核验 054/055/056 表结构、唯一索引/检查约束、release 与 `/version` 对齐及广播/提现/队列开关冲突；不会写库、改环境或启停服务。`npm run check:rider-release-preflight`（6 个 fixture 场景）通过。
+- 最新本地候选 `npm run verify:release` 已通过：25 项上线回归、Go fresh/vet、隔离 MySQL 资金与通知、只读预检、MiniApp/Admin 构建和 `git diff --check`；构建仅有既有 CSS order/webpack 体积警告。Mini Program 产物主包 **1,977,014 bytes**、总包 **2,138,594 bytes**。
+- 这仍是未发布候选：没有生产迁移、体验版设置、真实微信支付、真实订阅/私信送达、真机验收或次日实际到账证据；所有外部开关继续按 fail-closed 处理。
+
+## 2026-11-08 本地候选最终复核
+
+- `npm run verify:release` 已取得顶层 `exit 0`。该命令串行完成 `verify`、fresh backend tests、`go vet ./...`、骑手资金隔离 MySQL、通知隔离 MySQL、骑手发布预检、MiniApp/Admin 构建及 `git diff --check`。
+- `npm run test:rider-money:mysql`：PASS；所有隔离 MySQL 场景实际执行并通过，脚本拒绝 `SKIP`。
+- `npm run test:notification:mysql`：PASS；8 个通知隔离场景实际执行并通过，脚本拒绝 `SKIP`。
+- `npm run check:rider-release-preflight`：PASS；18 项预检通过，覆盖布尔开关、订阅状态、054/055/056 表结构/索引/检查约束、通知投递状态和 IM 回执状态。
+- MiniApp 构建产物检查通过：主包 **1,977,014 bytes**、总包 **2,138,594 bytes**；Admin 生产构建通过。Webpack 仅报告既有 CSS order 与体积建议警告，不影响 exit 0。
+- 本轮清理了验收脚本生成的 `deploy/native/__pycache__/` 与 `scripts/__pycache__/`；工作区未包含这些缓存。
+- 本地候选仍未等同于上线：056 生产迁移、提现开关、055 广播开关、微信支付真实交易、微信订阅/私信真实送达、腾讯 IM 回调、体验版设置、审核/正式发布、真机验收和次日实际到账仍需在外部系统逐项完成并留证。当前不执行生产写入、真实付款或发布操作。

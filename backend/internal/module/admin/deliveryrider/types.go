@@ -37,15 +37,16 @@ type TodayStatsView struct {
 }
 
 type RiderWalletView struct {
-	WithdrawalEnabled      bool                      `json:"withdrawalEnabled"`
-	WalletState            delivery.RiderWalletState `json:"walletState"`
-	WalletPublicID         string                    `json:"walletPublicId,omitempty"`
-	AvailableBalanceCents  uint64                    `json:"availableBalanceCents"`
-	ReservedCents          uint64                    `json:"reservedCents"`
-	UnverifiedCents        uint64                    `json:"unverifiedCents"`
-	PendingSettlementCents uint64                    `json:"pendingSettlementCents"`
-	NextSettlementAt       *time.Time                `json:"nextSettlementAt,omitempty"`
-	UpdatedAt              *time.Time                `json:"updatedAt,omitempty"`
+	WithdrawableBalanceCents *uint64                   `json:"withdrawableBalanceCents,omitempty"`
+	WithdrawalEnabled        bool                      `json:"withdrawalEnabled"`
+	WalletState              delivery.RiderWalletState `json:"walletState"`
+	WalletPublicID           string                    `json:"walletPublicId,omitempty"`
+	AvailableBalanceCents    uint64                    `json:"availableBalanceCents"`
+	ReservedCents            uint64                    `json:"reservedCents"`
+	UnverifiedCents          uint64                    `json:"unverifiedCents"`
+	PendingSettlementCents   uint64                    `json:"pendingSettlementCents"`
+	NextSettlementAt         *time.Time                `json:"nextSettlementAt,omitempty"`
+	UpdatedAt                *time.Time                `json:"updatedAt,omitempty"`
 }
 
 type RiderWalletEarningView struct {

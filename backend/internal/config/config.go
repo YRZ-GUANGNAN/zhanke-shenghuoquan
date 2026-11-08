@@ -76,6 +76,7 @@ type Config struct {
 	EnableDeliveryPayment              bool
 	EnableDeliveryRiderBroadcast       bool
 	EnableDeliveryRiderPayoutQueue     bool
+	EnableDeliveryRiderWithdrawal      bool
 	EnableDeliveryRiderDailySettlement bool
 	AllowMockDeliveryFeeConfirmation   bool
 	AllowMockDeliveryPayment           bool
@@ -135,6 +136,10 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	enableDeliveryRiderPayoutQueue, err := envBool("ENABLE_DELIVERY_RIDER_PAYOUT_QUEUE", false)
+	if err != nil {
+		return Config{}, err
+	}
+	enableDeliveryRiderWithdrawal, err := envBool("ENABLE_DELIVERY_RIDER_WITHDRAWAL", false)
 	if err != nil {
 		return Config{}, err
 	}
@@ -222,6 +227,7 @@ func Load() (Config, error) {
 		EnableDeliveryPayment:              enableDeliveryPayment,
 		EnableDeliveryRiderBroadcast:       enableDeliveryRiderBroadcast,
 		EnableDeliveryRiderPayoutQueue:     enableDeliveryRiderPayoutQueue,
+		EnableDeliveryRiderWithdrawal:      enableDeliveryRiderWithdrawal,
 		EnableDeliveryRiderDailySettlement: enableDeliveryRiderDailySettlement,
 		AllowMockDeliveryFeeConfirmation:   allowMockDeliveryFeeConfirmation,
 		AllowMockDeliveryPayment:           allowMockDeliveryPayment,
@@ -238,6 +244,9 @@ func Load() (Config, error) {
 }
 
 func (c Config) Validate() error {
+	if c.EnableDeliveryRiderWithdrawal && (!c.EnableDelivery || c.EnableDeliveryRiderPayoutQueue) {
+		return fmt.Errorf("ENABLE_DELIVERY_RIDER_WITHDRAWAL requires delivery enabled and ENABLE_DELIVERY_RIDER_PAYOUT_QUEUE disabled")
+	}
 	if c.AppEnv != "dev" && c.AppEnv != "prod" {
 		return errors.New("APP_ENV must be either dev or prod")
 	}
@@ -283,6 +292,22 @@ func (c Config) Validate() error {
 	}
 	if c.EnableNotificationSending && (!c.EnableWechatSubscribeNotifications || strings.TrimSpace(c.NotificationTestUserIDs) == "") {
 		return errors.New("notification sending requires subscribe feature and explicit NOTIFICATION_TEST_USER_IDS")
+	}
+	if c.EnableNotificationSending {
+		// A send-enabled rollout must be complete for both notification classes.
+		// Otherwise order notices could appear healthy while private-message
+		// callbacks are silently dropped because the IM callback route or its
+		// reviewed template was never configured. Keep this a startup gate rather
+		// than allowing a partial external-notification deployment.
+		if strings.TrimSpace(c.WechatMessageTemplateID) == "" || strings.TrimSpace(c.WechatMessageTemplateFields) == "" {
+			return errors.New("notification sending requires actual private message template ID and reviewed fields")
+		}
+		if strings.TrimSpace(c.NotificationIMCallbackToken) == "" || len(strings.TrimSpace(c.NotificationIMCallbackToken)) < 16 {
+			return errors.New("notification sending requires a non-trivial Tencent IM callback token")
+		}
+		if sdkAppID, err := strconv.ParseUint(strings.TrimSpace(c.TencentIMSDKAppID), 10, 64); err != nil || sdkAppID == 0 {
+			return errors.New("notification sending requires a numeric Tencent IM SDKAppID")
+		}
 	}
 	if c.WechatPayAnyCoreCredentialSet() && !c.WechatPayCoreConfigured() {
 		return errors.New("WeChat Pay core credentials must be configured together")

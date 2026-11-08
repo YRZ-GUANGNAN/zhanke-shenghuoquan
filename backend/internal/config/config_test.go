@@ -268,6 +268,34 @@ func TestWechatSubscribeNotificationConfigurationIsFailClosed(t *testing.T) {
 	}
 }
 
+func TestNotificationSendingRequiresBothExternalChannels(t *testing.T) {
+	base := validConfig()
+	base.EnableWechatSubscribeNotifications = true
+	base.EnableUserNotifications = true
+	base.EnableNotificationSending = true
+	base.WechatOrderTemplateID = "order-template-id"
+	base.WechatOrderTemplateFields = `{"thing1":"status"}`
+	base.NotificationTestUserIDs = "12"
+
+	if err := base.Validate(); err == nil || !strings.Contains(err.Error(), "private message template") {
+		t.Fatalf("send-enabled config without private template was accepted: %v", err)
+	}
+	base.WechatMessageTemplateID = "private-template-id"
+	base.WechatMessageTemplateFields = `{"thing1":"status"}`
+	if err := base.Validate(); err == nil || !strings.Contains(err.Error(), "callback token") {
+		t.Fatalf("send-enabled config without IM callback token was accepted: %v", err)
+	}
+	base.NotificationIMCallbackToken = "callback-token-that-is-long-enough"
+	if err := base.Validate(); err != nil {
+		t.Fatalf("complete dual-channel notification config was rejected: %v", err)
+	}
+
+	base.TencentIMSDKAppID = "not-a-number"
+	if err := base.Validate(); err == nil || !strings.Contains(err.Error(), "numeric Tencent IM SDKAppID") {
+		t.Fatalf("invalid IM SDKAppID was accepted: %v", err)
+	}
+}
+
 func TestWechatSubscribeNotificationEnvironmentDefaults(t *testing.T) {
 	t.Setenv("ENABLE_WECHAT_SUBSCRIBE_NOTIFICATIONS", "")
 	t.Setenv("ENABLE_NOTIFICATION_SENDING", "")

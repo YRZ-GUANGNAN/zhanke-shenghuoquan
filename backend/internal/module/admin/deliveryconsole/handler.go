@@ -16,12 +16,13 @@ import (
 )
 
 type Handler struct {
-	queries       QueryRepository
-	fees          delivery.FeeConfigRepository
-	riderWallets  delivery.RiderWalletRepository
-	currentUserID func(*gin.Context) uint64
-	now           func() time.Time
-	payoutQueue   delivery.RiderPayoutQueueRepository
+	queries              QueryRepository
+	fees                 delivery.FeeConfigRepository
+	riderWallets         delivery.RiderWalletRepository
+	currentUserID        func(*gin.Context) uint64
+	now                  func() time.Time
+	payoutQueue          delivery.RiderPayoutQueueRepository
+	manualWithdrawalMode bool
 }
 
 func NewHandler(
@@ -72,6 +73,11 @@ func (h *Handler) Register(group *gin.RouterGroup) {
 
 func (h *Handler) WithPayoutQueue(value delivery.RiderPayoutQueueRepository) *Handler {
 	h.payoutQueue = value
+	return h
+}
+
+func (h *Handler) WithManualWithdrawalMode(enabled bool) *Handler {
+	h.manualWithdrawalMode = enabled
 	return h
 }
 
@@ -344,6 +350,10 @@ func (h *Handler) riderEarning(c *gin.Context) {
 }
 
 func (h *Handler) payOffline(c *gin.Context) {
+	if h.manualWithdrawalMode {
+		response.Fail(c, http.StatusForbidden, "已启用提现申请处理，请从提现记录领取处理，禁止逐单打款")
+		return
+	}
 	if !delivery.ValidULID(c.Param("id")) {
 		response.Fail(c, http.StatusBadRequest, "invalid earning id")
 		return

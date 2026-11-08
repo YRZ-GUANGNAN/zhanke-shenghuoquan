@@ -49,10 +49,7 @@ func TestRiderPayoutQueueAndWithdrawalMigrationsAgainstIsolatedMySQL(t *testing.
 }
 
 func TestRiderWithdrawalConcurrentReservationAndSingleReleaseAgainstIsolatedMySQL(t *testing.T) {
-	db := openIsolatedRiderMoneyMySQL(t)
-	applyD1SQLFile(t, db, "../../../migrations/028_delivery_fee_and_rider_wallet.sql")
-	applyD1SQLFile(t, db, "../../../migrations/050_delivery_rider_payout_queue.sql")
-	applyD1SQLFile(t, db, "../../../migrations/051_delivery_rider_withdrawals.sql")
+	db := riderMoneySchema(t)
 
 	now := time.Date(2026, 10, 29, 8, 0, 0, 0, time.UTC)
 	walletID, err := NewULID()
@@ -66,6 +63,7 @@ func TestRiderWithdrawalConcurrentReservationAndSingleReleaseAgainstIsolatedMySQ
 	}).Error; err != nil {
 		t.Fatal(err)
 	}
+	seedRiderWithdrawableEarning(t, db, riderID, 1000, now)
 
 	keys := []string{mustRiderMoneyULID(t), mustRiderMoneyULID(t)}
 	repository := NewRepository(db)
@@ -108,7 +106,7 @@ func TestRiderWithdrawalConcurrentReservationAndSingleReleaseAgainstIsolatedMySQ
 	}
 	assertRiderMoneyBalance(t, db, riderID, 300)
 	assertRiderMoneyCount(t, db, "delivery_rider_withdrawals", 1)
-	assertRiderMoneyCount(t, db, "delivery_rider_ledger", 1)
+	assertRiderMoneyCount(t, db, "delivery_rider_ledger", 2)
 
 	operatorID := uint64(995901)
 	decisionKey := mustRiderMoneyULID(t)
@@ -123,7 +121,7 @@ func TestRiderWithdrawalConcurrentReservationAndSingleReleaseAgainstIsolatedMySQ
 		t.Fatalf("rejected status=%s", rejected.Status)
 	}
 	assertRiderMoneyBalance(t, db, riderID, 1000)
-	assertRiderMoneyCount(t, db, "delivery_rider_ledger", 2)
+	assertRiderMoneyCount(t, db, "delivery_rider_ledger", 3)
 
 	if _, err := repository.RejectRiderWithdrawal(
 		context.Background(), created.WithdrawPublicID, created.RowVersion,
@@ -132,7 +130,7 @@ func TestRiderWithdrawalConcurrentReservationAndSingleReleaseAgainstIsolatedMySQ
 		t.Fatalf("exact rejection replay failed: %v", err)
 	}
 	assertRiderMoneyBalance(t, db, riderID, 1000)
-	assertRiderMoneyCount(t, db, "delivery_rider_ledger", 2)
+	assertRiderMoneyCount(t, db, "delivery_rider_ledger", 3)
 	t.Log("rider_withdrawal_concurrency=PASS balance_reservation=true single_release=true")
 }
 
@@ -310,6 +308,7 @@ func riderMoneySchema(t *testing.T) *gorm.DB {
 		"048_delivery_payment_recovery.sql", "049_delivery_funding_sources.sql",
 		"050_delivery_rider_payout_queue.sql", "051_delivery_rider_withdrawals.sql",
 		"052_delivery_recharge_cancellation.sql", "054_delivery_rider_daily_settlement.sql",
+		"056_delivery_rider_withdrawal_allocations.sql",
 	} {
 		applyD1SQLFile(t, db, "../../../migrations/"+name)
 	}
@@ -368,6 +367,7 @@ func TestRiderQueueConcurrentDedupCancelAndWithdrawalReservationAgainstIsolatedM
 	const riderID = uint64(995102)
 	seedRiderMoneyWallet(t, db, riderID, 1000, now)
 	earning := seedRiderMoneyEarning(t, db, riderID, 800, now)
+	seedRiderWithdrawableEarning(t, db, riderID, 200, now)
 	repository := NewRepository(db)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -426,7 +426,7 @@ func TestRiderQueueConcurrentDedupCancelAndWithdrawalReservationAgainstIsolatedM
 	if _, err := repository.CreateRiderWithdrawal(ctx, riderID, 199, withdrawKey, now); !errors.Is(err, ErrIdempotencyConflict) {
 		t.Fatalf("changed withdrawal accepted: %v", err)
 	}
-	assertRiderMoneyCount(t, db, "delivery_rider_ledger", 1)
+	assertRiderMoneyCount(t, db, "delivery_rider_ledger", 2)
 	assertRiderMoneyBalance(t, db, riderID, 800)
 
 	cancelKey := mustRiderMoneyULID(t)
@@ -509,6 +509,7 @@ func TestRiderMoneyEmptyRollbackAndFactGuardsAgainstIsolatedMySQL(t *testing.T) 
 	const riderID = uint64(995105)
 	seedRiderMoneyWallet(t, db, riderID, 1000, now)
 	earning := seedRiderMoneyEarning(t, db, riderID, 800, now)
+	seedRiderWithdrawableEarning(t, db, riderID, 200, now)
 	repository := NewRepository(db)
 	if _, err := repository.ReconcileRiderPayoutQueue(context.Background(), earning.EarningPublicID, now); err != nil {
 		t.Fatal(err)
@@ -538,7 +539,7 @@ func TestRiderQueueAndWithdrawalRaceConservesBalanceAgainstIsolatedMySQL(t *test
 	for i := uint64(0); i < 5; i++ {
 		riderID := uint64(995110) + i
 		seedRiderMoneyWallet(t, db, riderID, 1000, now)
-		earning := seedRiderMoneyEarning(t, db, riderID, 700, now)
+		earning := seedRiderWithdrawableEarning(t, db, riderID, 700, now)
 		withdrawKey := mustRiderMoneyULID(t)
 		start := make(chan struct{})
 		var queued RiderPayoutQueueResult
@@ -571,7 +572,7 @@ func TestRiderQueueAndWithdrawalRaceConservesBalanceAgainstIsolatedMySQL(t *test
 			}
 			assertRiderMoneyBalance(t, db, riderID, 1000)
 		case RiderPayoutQueueBlocked:
-			if withdrawErr != nil || queued.Queue.ReasonCode != "balance_insufficient" || summary.ReservedCents != 0 {
+			if withdrawErr != nil || queued.Queue.ReasonCode != "withdrawal_allocated" || summary.ReservedCents != 0 {
 				t.Fatalf("withdrawal winner inconsistent: err=%v queue=%+v summary=%+v", withdrawErr, queued.Queue, summary)
 			}
 			assertRiderMoneyBalance(t, db, riderID, 300)
@@ -587,6 +588,7 @@ func TestRiderWithdrawalSameKeyAndConcurrentRejectionAgainstIsolatedMySQL(t *tes
 	now := time.Date(2026, 10, 29, 8, 0, 0, 0, time.UTC)
 	const riderID = uint64(995120)
 	seedRiderMoneyWallet(t, db, riderID, 1000, now)
+	seedRiderWithdrawableEarning(t, db, riderID, 1000, now)
 	repository := NewRepository(db)
 	key := mustRiderMoneyULID(t)
 	start := make(chan struct{})
@@ -619,7 +621,7 @@ func TestRiderWithdrawalSameKeyAndConcurrentRejectionAgainstIsolatedMySQL(t *tes
 		withdrawal = result.value
 	}
 	assertRiderMoneyBalance(t, db, riderID, 300)
-	assertRiderMoneyCount(t, db, "delivery_rider_ledger", 1)
+	assertRiderMoneyCount(t, db, "delivery_rider_ledger", 2)
 	assertRiderMoneyCount(t, db, "delivery_rider_withdrawals", 1)
 	decisionKey := mustRiderMoneyULID(t)
 	start = make(chan struct{})
@@ -642,7 +644,7 @@ func TestRiderWithdrawalSameKeyAndConcurrentRejectionAgainstIsolatedMySQL(t *tes
 		}
 	}
 	assertRiderMoneyBalance(t, db, riderID, 1000)
-	assertRiderMoneyCount(t, db, "delivery_rider_ledger", 2)
+	assertRiderMoneyCount(t, db, "delivery_rider_ledger", 3)
 	t.Log("withdrawal_same_key_8_workers=PASS rejection_same_key_8_workers=PASS balance_released_once=true")
 }
 

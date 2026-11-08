@@ -9,6 +9,7 @@ export type RiderWithdrawalStatus = 'processing' | 'paid' | 'rejected'
 
 export interface RiderWalletSummary {
   withdrawalEnabled: boolean
+  withdrawableBalanceCents?: number
   walletState: RiderWalletState
   walletPublicId?: string
   availableBalanceCents: number
@@ -92,9 +93,13 @@ function normalizeWallet(value: unknown): RiderWalletSummary {
   const availableBalanceCents = cents(data.availableBalanceCents)
   const reservedCents = cents(data.reservedCents)
   if (reservedCents > availableBalanceCents) throw walletResponseError()
+  const withdrawableBalanceCents = data.withdrawableBalanceCents === undefined || data.withdrawableBalanceCents === null
+    ? undefined : cents(data.withdrawableBalanceCents)
+  if (withdrawableBalanceCents !== undefined && withdrawableBalanceCents > availableBalanceCents - reservedCents) throw walletResponseError()
   return {
     // Older servers and malformed capability values must never open money writes.
-    withdrawalEnabled: data.withdrawalEnabled === true,
+    withdrawalEnabled: data.withdrawalEnabled === true && withdrawableBalanceCents !== undefined,
+    withdrawableBalanceCents,
     walletState: data.walletState,
     walletPublicId: data.walletPublicId === undefined ? undefined : requiredText(data.walletPublicId),
     availableBalanceCents, reservedCents, unverifiedCents: cents(data.unverifiedCents),

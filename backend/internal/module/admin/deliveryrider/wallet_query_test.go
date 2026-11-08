@@ -18,8 +18,7 @@ func TestWalletWithdrawalCapabilityMatchesServerWriteGate(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	for _, enabled := range []bool{false, true} {
 		handler := NewHandler(nil, nil, nil, func(*gin.Context) uint64 { return 77 }).WithWalletReader(walletReaderStub{}).WithWithdrawals(&withdrawalRepositoryStub{})
-		// Test-only opt-in; production still has no setter for the write gate.
-		handler.withdrawalWritesReady = enabled
+		handler.WithWithdrawalWrites(enabled)
 		handler.identity = todayStatsIdentityStub{rider: takeout.Rider{RiderUserID: 77, Status: takeout.RiderActive}}
 		router := gin.New()
 		handler.Register(router.Group("/rider"))
@@ -34,6 +33,9 @@ func TestWalletWithdrawalCapabilityMatchesServerWriteGate(t *testing.T) {
 		value, exists := response.Data["withdrawalEnabled"]
 		if recorder.Code != http.StatusOK || !exists || value != enabled {
 			t.Fatalf("gate=%t capability=%v exists=%t body=%s", enabled, value, exists, recorder.Body.String())
+		}
+		if enabled && response.Data["withdrawableBalanceCents"] != float64(120) {
+			t.Fatal("missing authoritative amount", response.Data)
 		}
 	}
 }

@@ -28,8 +28,7 @@ type Handler struct {
 	walletReader  delivery.RiderWalletReader
 	withdrawals   delivery.RiderWithdrawalRepository
 	availability  delivery.RiderAvailabilityRepository
-	// Fail closed until withdrawals are allocated to earnings and made mutually
-	// exclusive with per-order payouts. No production setter/config enables this.
+	// Default closed; composition enables only after schema and ledger preflight.
 	withdrawalWritesReady bool
 	now                   func() time.Time
 }
@@ -81,6 +80,12 @@ func (h *Handler) WithWalletReader(reader delivery.RiderWalletReader) *Handler {
 
 func (h *Handler) WithWithdrawals(repository delivery.RiderWithdrawalRepository) *Handler {
 	h.withdrawals = repository
+	return h
+}
+
+func (h *Handler) WithWithdrawalWrites(enabled bool) *Handler {
+	_, available := h.withdrawals.(delivery.RiderWithdrawalProcessingRepository)
+	h.withdrawalWritesReady = enabled && available
 	return h
 }
 
@@ -171,6 +176,19 @@ func (h *Handler) wallet(c *gin.Context) {
 	view := riderWalletView(value)
 	// Expose the actual write gate, not a promise inferred from a positive balance.
 	view.WithdrawalEnabled = h.withdrawalWritesReady && h.withdrawals != nil
+	if view.WithdrawalEnabled {
+		processor, ok := h.withdrawals.(delivery.RiderWithdrawalProcessingRepository)
+		if !ok {
+			response.Fail(c, http.StatusServiceUnavailable, "提现能力暂不可用")
+			return
+		}
+		amount, err := processor.ReadRiderWithdrawable(c.Request.Context(), riderID)
+		if err != nil {
+			h.write(c, nil, err)
+			return
+		}
+		view.WithdrawableBalanceCents = &amount
+	}
 	response.OK(c, view)
 }
 
@@ -361,6 +379,13 @@ func (h *Handler) RegisterAdmin(group *gin.RouterGroup) {
 	group.GET("/rider-config", h.riderBroadcastConfig)
 	group.PATCH("/rider-config", h.updateRiderBroadcastConfig)
 	group.GET("/rider-withdrawals", h.adminListWithdrawals)
+	group.GET("/rider-withdrawal-capabilities", h.withdrawalCapabilities)
+	group.GET("/rider-withdrawals/:id/processing", h.withdrawalProcessing)
+	group.POST("/rider-withdrawals/:id/claim", func(c *gin.Context) { h.processWithdrawal(c, "claim") })
+	group.POST("/rider-withdrawals/:id/release", func(c *gin.Context) { h.processWithdrawal(c, "release") })
+	group.POST("/rider-withdrawals/:id/exception", func(c *gin.Context) { h.processWithdrawal(c, "exception") })
+	group.POST("/rider-withdrawals/:id/resolve-paid", func(c *gin.Context) { h.processWithdrawal(c, "resolve_paid") })
+	group.POST("/rider-withdrawals/:id/resolve-unpaid", func(c *gin.Context) { h.processWithdrawal(c, "resolve_unpaid") })
 	group.POST("/rider-withdrawals/:id/approve", h.approveWithdrawal)
 	group.POST("/rider-withdrawals/:id/reject", h.rejectWithdrawal)
 }
@@ -396,55 +421,11 @@ func (h *Handler) adminListWithdrawals(c *gin.Context) {
 }
 
 func (h *Handler) approveWithdrawal(c *gin.Context) {
-	if !h.withdrawalWritesReady {
-		response.Fail(c, http.StatusForbidden, "提现处理尚未开放，请勿据此发起线下打款")
-		return
-	}
-	if h.withdrawals == nil {
-		response.Fail(c, http.StatusServiceUnavailable, "delivery rider withdrawal unavailable")
-		return
-	}
-	var req struct {
-		ExpectedRowVersion uint64 `json:"expectedRowVersion"`
-		IdempotencyKey     string `json:"idempotencyKey"`
-		PaymentReference   string `json:"paymentReference"`
-	}
-	if c.ShouldBindJSON(&req) != nil {
-		response.Fail(c, http.StatusBadRequest, "invalid request")
-		return
-	}
-	now := h.now
-	if now == nil {
-		now = time.Now
-	}
-	value, err := h.withdrawals.ApproveRiderWithdrawal(c.Request.Context(), c.Param("id"), req.ExpectedRowVersion, h.currentUserID(c), req.IdempotencyKey, req.PaymentReference, now())
-	h.write(c, riderWithdrawalView(value), err)
+	h.processWithdrawal(c, "paid")
 }
 
 func (h *Handler) rejectWithdrawal(c *gin.Context) {
-	if !h.withdrawalWritesReady {
-		response.Fail(c, http.StatusForbidden, "提现处理尚未开放，请勿据此调整余额")
-		return
-	}
-	if h.withdrawals == nil {
-		response.Fail(c, http.StatusServiceUnavailable, "delivery rider withdrawal unavailable")
-		return
-	}
-	var req struct {
-		ExpectedRowVersion uint64 `json:"expectedRowVersion"`
-		IdempotencyKey     string `json:"idempotencyKey"`
-		Reason             string `json:"reason"`
-	}
-	if c.ShouldBindJSON(&req) != nil {
-		response.Fail(c, http.StatusBadRequest, "invalid request")
-		return
-	}
-	now := h.now
-	if now == nil {
-		now = time.Now
-	}
-	value, err := h.withdrawals.RejectRiderWithdrawal(c.Request.Context(), c.Param("id"), req.ExpectedRowVersion, h.currentUserID(c), req.IdempotencyKey, req.Reason, now())
-	h.write(c, riderWithdrawalView(value), err)
+	h.processWithdrawal(c, "reject")
 }
 
 func (h *Handler) me(c *gin.Context) {
@@ -664,12 +645,18 @@ func (h *Handler) write(c *gin.Context, value any, err error) {
 	case errors.Is(err, delivery.ErrConcurrentUpdate), errors.Is(err, delivery.ErrRiderMismatch),
 		errors.Is(err, delivery.ErrInvalidTransition), errors.Is(err, delivery.ErrIdempotencyConflict),
 		errors.Is(err, delivery.ErrProofConflict),
+		errors.Is(err, delivery.ErrWithdrawalPaymentReferenceConflict),
+		errors.Is(err, delivery.ErrWithdrawalClaimConflict), errors.Is(err, delivery.ErrWithdrawalNotClaimed),
 		errors.Is(err, delivery.ErrWithdrawalAlreadyProcessed):
 		response.Fail(c, http.StatusConflict, err.Error())
 	case errors.Is(err, delivery.ErrWithdrawalNotFound):
 		response.Fail(c, http.StatusNotFound, "rider withdrawal not found")
 	case errors.Is(err, delivery.ErrWalletInsufficient):
-		response.Fail(c, http.StatusUnprocessableEntity, "未占用余额不足，请刷新钱包后重试")
+		response.Fail(c, http.StatusUnprocessableEntity, "可提现收益不足，请刷新钱包后重试")
+	case errors.Is(err, delivery.ErrWithdrawalSourceMismatch), errors.Is(err, delivery.ErrFundingSourceMismatch), errors.Is(err, delivery.ErrPayoutQueueSourceBlocked):
+		response.Fail(c, http.StatusConflict, "资金来源需核实；如已付款或结果未知，请保存异常凭证，不要重复转账或退回余额")
+	case errors.Is(err, delivery.ErrWithdrawalAllocationUnavailable):
+		response.Fail(c, http.StatusServiceUnavailable, "提现能力暂不可用")
 	case errors.Is(err, delivery.ErrWithdrawalReasonRequired), errors.Is(err, delivery.ErrWithdrawalPaymentRequired):
 		response.Fail(c, http.StatusBadRequest, err.Error())
 	case errors.Is(err, delivery.ErrInvalidRecord), errors.Is(err, delivery.ErrInvalidULID),

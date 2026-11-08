@@ -51,14 +51,16 @@ func TestDeliveryCapabilitiesDoNotAdvertiseMockOrUnavailablePayments(t *testing.
 				}
 				var value struct {
 					Data struct {
-						WechatPayment  bool `json:"wechatPayment"`
-						ExternalOrders bool `json:"externalOrders"`
+						WechatPayment          bool   `json:"wechatPayment"`
+						ExternalOrders         bool   `json:"externalOrders"`
+						MerchantEarnings       bool   `json:"merchantEarnings"`
+						MerchantEarningsReason string `json:"merchantEarningsReason"`
 					} `json:"data"`
 				}
 				if response.Code != http.StatusOK || json.Unmarshal(response.Body.Bytes(), &value) != nil {
 					t.Fatalf("invalid response: %s", response.Body.String())
 				}
-				if value.Data.WechatPayment != test.payment || value.Data.ExternalOrders {
+				if value.Data.WechatPayment != test.payment || value.Data.ExternalOrders || value.Data.MerchantEarnings || value.Data.MerchantEarningsReason != "external_order_source_unavailable" {
 					t.Fatalf("wrong advertised capabilities: %s", response.Body.String())
 				}
 			}

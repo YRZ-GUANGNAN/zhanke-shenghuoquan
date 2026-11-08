@@ -308,6 +308,26 @@ export interface RiderWithdrawal {
   updatedAt: string
 }
 
+export interface RiderWithdrawalProcessing {
+  withdrawal: RiderWithdrawal
+  status: 'unclaimed' | 'active' | 'released' | 'completed' | 'exception'
+  ownedByMe: boolean
+  claimKey: string
+  operatorUserId: number
+  reason: string
+  paymentReference: string
+}
+
+export type RiderWithdrawalAction = 'claim' | 'release' | 'approve' | 'reject' | 'exception' | 'resolve_paid' | 'resolve_unpaid'
+export interface RiderWithdrawalCommand {
+  expectedRowVersion: number
+  idempotencyKey: string
+  claimKey?: string
+  reason?: string
+  paymentReference?: string
+  confirmedUnpaid?: boolean
+}
+
 async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   return adminRequest<T>(`${base}${path}`, init, (status, message) => new DeliveryAPIError(status, message))
 }
@@ -377,9 +397,15 @@ export const deliveryAdminAPI = {
       ...body({ expectedRowVersion, idempotencyKey, reason }), method: 'POST'
     }),
   riderWithdrawals: (query: DeliveryQuery = {}) => api<Page<RiderWithdrawal>>(`/rider-withdrawals${queryString(query)}`),
-  approveRiderWithdrawal: (id: string, expectedRowVersion: number, idempotencyKey: string, paymentReference: string) =>
+  riderWithdrawalCapabilities: () => api<{ withdrawalEnabled: boolean; mode: 'manual'; claimRequired: boolean }>('/rider-withdrawal-capabilities'),
+  riderWithdrawalProcessing: (id: string) => api<RiderWithdrawalProcessing>(`/rider-withdrawals/${encodeURIComponent(id)}/processing`),
+  processRiderWithdrawal: (id: string, action: RiderWithdrawalAction, command: RiderWithdrawalCommand) => {
+    const route = action === 'resolve_paid' ? 'resolve-paid' : action === 'resolve_unpaid' ? 'resolve-unpaid' : action
+    return api<RiderWithdrawal>(`/rider-withdrawals/${encodeURIComponent(id)}/${route}`, { ...body(command), method: 'POST' })
+  },
+  approveRiderWithdrawal: (id: string, expectedRowVersion: number, idempotencyKey: string, paymentReference: string, claimKey: string) =>
     api<RiderWithdrawal>(`/rider-withdrawals/${encodeURIComponent(id)}/approve`, {
-      ...body({ expectedRowVersion, idempotencyKey, paymentReference }), method: 'POST'
+      ...body({ expectedRowVersion, idempotencyKey, paymentReference, claimKey }), method: 'POST'
     }),
   rejectRiderWithdrawal: (id: string, expectedRowVersion: number, idempotencyKey: string, reason: string) =>
     api<RiderWithdrawal>(`/rider-withdrawals/${encodeURIComponent(id)}/reject`, {

@@ -33,7 +33,7 @@ function riderWalletHarness(services = {}, storage = new Map()) {
     '../../hooks/use-identity-guard': { useIdentityGuard: () => true },
     '../../services/delivery-rider': { getDeliveryRiderTodayStats: async () => ({ todayOrders: 3, todayIncomeCents: 360 }) },
     '../../services/delivery-rider-wallet': {
-      getRiderWallet: async () => ({ availableBalanceCents: 360, reservedCents: 120, unverifiedCents: 0, withdrawalEnabled: true }),
+      getRiderWallet: async () => ({ availableBalanceCents: 360, reservedCents: 120, unverifiedCents: 0, withdrawableBalanceCents: 240, withdrawalEnabled: true }),
       listRiderEarnings: async () => ({ items: [], total: 0 }),
       listRiderLedger: async () => ({ items: [], total: 0 }),
       listRiderPayoutQueue: async () => ({ items: [], total: 0 }),
@@ -56,7 +56,7 @@ function riderWalletHarness(services = {}, storage = new Map()) {
   }
 }
 
-function adminWithdrawalsHarness() {
+function adminWithdrawalsHarness(enabled = false) {
   const renderer = hookRenderer()
   const filename = path.resolve(__dirname, '../apps/admin/src/DeliveryConsole.tsx')
   const source = `import React from 'react'\n${fs.readFileSync(filename, 'utf8')}\nexport { RiderWithdrawalsPanel }`
@@ -67,9 +67,12 @@ function adminWithdrawalsHarness() {
   const loaded = new Module(filename, module)
   const imports = {
     react: renderer.React,
-    './components': { useAdminDialog: () => ({ prompt: async () => { prompts++; return '凭证' } }) },
+    './components': { useAdminDialog: () => ({ prompt: async () => { prompts++; return '凭证' }, confirm: async () => { prompts++; return true } }) },
     './services/delivery-admin': { DeliveryAPIError: Error, deliveryAdminAPI: {
       riderWithdrawals: async () => { reads++; return { items: [{ withdrawPublicId: 'WITHDRAWAL', riderUserId: 1, amountCents: 120, status: 'processing', rowVersion: 1 }], page: 1, pageSize: 20, total: 1 } },
+      riderWithdrawalCapabilities: async () => ({ withdrawalEnabled: enabled, mode: 'manual', claimRequired: true }),
+      riderWithdrawalProcessing: async () => ({ withdrawal: { withdrawPublicId: 'WITHDRAWAL', riderUserId: 1, amountCents: 120, status: 'processing', rowVersion: 1 }, status: 'unclaimed', ownedByMe: false, claimKey: '', operatorUserId: 0, reason: '', paymentReference: '' }),
+      processRiderWithdrawal: async () => { writes++; return {} },
       approveRiderWithdrawal: async () => { writes++; throw new Error('关闭门禁不得写入') },
       rejectRiderWithdrawal: async () => { writes++; throw new Error('关闭门禁不得写入') },
     } },
@@ -104,18 +107,108 @@ function rechargeHarness(options = {}) {
   })
   return { app, cache, calls, payment }
 }
+
+function merchantEarningsBoundaryHarness(paymentEnabled) {
+  const renderer = hookRenderer()
+  const filename = path.resolve(__dirname, '../apps/miniapp/src/pages/merchant-wallet/index.tsx')
+  const pageSource = fs.readFileSync(filename, 'utf8')
+  const source = `${pageSource}\nexport { MerchantWalletContent }`
+  const compiled = ts.transpileModule(source, { fileName: filename, compilerOptions: {
+    module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React, target: ts.ScriptTarget.ES2020, esModuleInterop: true,
+  } }).outputText
+  const reads = [], writes = []
+  let show, hide
+  const session = () => ({ profile: { id: 101 }, token: 'TOKEN-101' })
+  const store = select => select(session()); store.getState = session
+  const loaded = new Module(filename, module)
+  const imports = {
+    react: renderer.React,
+    '@tarojs/components': { View: 'View', Text: 'Text', ScrollView: 'ScrollView', Input: 'Input' },
+    '@tarojs/taro': { useDidShow: fn => { show = fn }, useDidHide: fn => { hide = fn } },
+    '../../components/capsule-page-header': { CapsuleSystemRow: 'CapsuleSystemRow' },
+    '../../components/runtime-session-gate': 'RuntimeSessionGate',
+    '../../components/ui': { AppActionSheet: 'AppActionSheet', AppButton: 'AppButton', AppIconButton: 'AppIconButton', AppNotice: 'AppNotice' },
+    '../../hooks/use-delivery-payment': { useDeliveryPayment: () => ({
+      enabled: paymentEnabled,
+      merchantEarningsEnabled: false,
+      merchantEarningsReason: 'external_order_source_unavailable',
+      checking: false,
+      error: '',
+      refresh: async () => {},
+    }) },
+    '../../hooks/use-identity-guard': { useIdentityGuard: () => true },
+    '../../services/delivery-payment': {
+      getDeliveryWallet: async () => { reads.push('wallet'); return { availableBalanceCents: 1000 } },
+      listDeliveryWalletLedger: async () => { reads.push('ledger'); return { items: [], total: 0 } },
+    },
+    '../../services/taro': { navigateBack: async () => {}, showToast: async () => {} },
+    '../../stores/session': { useSessionStore: store },
+    '../../services/delivery-merchant': { createDeliveryClientRequestId: () => 'TEST-REQUEST' },
+    './wallet-state': {
+      readPendingWalletRecharge: () => null,
+      savePendingWalletRecharge: () => { writes.push('save-recharge') },
+      clearPendingWalletRecharge: () => { writes.push('clear-recharge') },
+    },
+    './wallet-recharge': { runWalletRecharge: async () => { writes.push('recharge'); throw new Error('挂载钱包不得发起资金写入') } },
+    './index.scss': {},
+  }
+  loaded.require = id => { assert.ok(id in imports, `商家收益测试必须隔离依赖：${id}`); return imports[id] }
+  loaded._compile(compiled, filename)
+  renderer.setComponent(loaded.exports.MerchantWalletContent)
+  return {
+    renderer, pageSource, reads, writes,
+    async mount() { renderer.render(); show?.(); await renderer.flush() },
+    async unmount() { hide?.(); renderer.unmount(); await renderer.flush() },
+  }
+}
+
 async function run() {
+  {
+    for (const paymentEnabled of [false, true]) {
+      const app = merchantEarningsBoundaryHarness(paymentEnabled)
+      await app.mount()
+      const cards = nodes(app.renderer.tree, node => hasClass(node, 'merchant-wallet-earnings-card'))
+      assert.equal(cards.length, 1, `支付${paymentEnabled ? '开启' : '关闭'}时都必须显示独立收益账户边界`)
+      const copy = text(cards[0])
+      assert.match(copy, /收益账户.*待接入/)
+      assert.match(copy, /外部订单官方接口尚未提供真实应收凭证/)
+      assert.match(copy, /当前不入账、不开放收益提现/)
+      assert.match(copy, /配送充值余额不会被当作商品收益/)
+      assert.doesNotMatch(copy, /(?:¥|￥)\s*\d|收益\s*\d+(?:\.\d+)?/, '收益账户不得展示虚构金额')
+      assert.deepEqual(app.writes, [], '页面挂载不得调用充值、收益入账或收益提现写操作')
+      if (paymentEnabled) assert.deepEqual(app.reads.sort(), ['ledger', 'wallet'])
+      else assert.deepEqual(app.reads, [])
+      const paymentImports = app.pageSource.match(/import\s*\{([\s\S]*?)\}\s*from\s*'\.\.\/\.\.\/services\/delivery-payment'/)?.[1] || ''
+      assert.doesNotMatch(paymentImports, /earning|withdraw/i, '商家钱包不得接入尚不存在的收益入账或提现服务')
+      assert.doesNotMatch(app.pageSource, /\/delivery\/merchant\/(?:earnings|wallet\/withdraw)/, '商家钱包不得直连收益写接口')
+      await app.unmount()
+    }
+    console.log('PASS 商家支付开关两态均显示真实收益边界，不调用收益写接口且不展示虚构金额')
+  }
   {
     const { renderer, calls } = adminWithdrawalsHarness()
     renderer.render(); await renderer.flush()
-    const operations = nodes(renderer.tree, node => node.type === 'button' && ['登记已线下打款', '退回余额'].includes(text(node)))
+    nodes(renderer.tree, node => node.type === 'button' && text(node) === '查看与处理')[0].props.onClick(); await renderer.flush()
+    const operations = nodes(renderer.tree, node => node.type === 'button' && ['领取处理', '拒绝并退回余额'].includes(text(node)))
     assert.equal(operations.length, 2)
     for (const operation of operations) { assert.equal(operation.props.disabled, true); operation.props.onClick() }
     await renderer.flush()
     assert.deepEqual(calls(), { reads: 1, writes: 0, prompts: 0 })
-    assert.match(text(renderer.tree), /提现处理尚未开放/)
+    assert.match(text(renderer.tree), /资金写入未开放或状态未确认/)
     renderer.unmount()
     console.log('PASS 后台提现记录可查，硬门禁禁用登记及退回操作，旧事件不弹付款提示或写入')
+  }
+  {
+    const { renderer, calls } = adminWithdrawalsHarness(true)
+    renderer.render(); await renderer.flush()
+    nodes(renderer.tree, node => node.type === 'button' && text(node) === '查看与处理')[0].props.onClick(); await renderer.flush()
+    assert.equal(nodes(renderer.tree, node => node.type === 'button' && text(node) === '登记已实际打款').length, 0, '未领取不能直接付款登记')
+    const claim = nodes(renderer.tree, node => node.type === 'button' && text(node) === '领取处理')[0]
+    claim.props.onClick(); claim.props.onClick(); await renderer.flush()
+    assert.equal(calls().writes, 1, '同帧领取只能提交一次')
+    assert.equal(calls().prompts, 1)
+    renderer.unmount()
+    console.log('PASS 后台使用真实能力开关，先领取且同帧防重，未领取无付款登记入口')
   }
   {
     const state = withdrawalState()
@@ -139,7 +232,7 @@ async function run() {
       const storage = new Map(), state = withdrawalState(storage)
       state.savePendingRiderWithdrawal({ accountId: 'A', amountCents: 120, idempotencyKey: '01ARZ3NDEKTSV4RRFFQ69G5FAV' })
       const app = riderWalletHarness({
-        getRiderWallet: async () => ({ availableBalanceCents: 360, reservedCents: 120, unverifiedCents: 0, withdrawalEnabled: capability }),
+        getRiderWallet: async () => ({ availableBalanceCents: 360, reservedCents: 120, unverifiedCents: 0, withdrawableBalanceCents: 240, withdrawalEnabled: capability }),
         listRiderWithdrawals: async () => ({ items: [withdrawal], total: 1 }),
         createRiderWithdrawal: async () => { writes++; return withdrawal },
       }, storage)
@@ -159,7 +252,7 @@ async function run() {
   {
     let writes = 0, failed = false
     const app = riderWalletHarness({
-      getRiderWallet: async () => { if (failed) throw new Error('能力读取失败'); return { availableBalanceCents: 360, reservedCents: 120, unverifiedCents: 0, withdrawalEnabled: true } },
+      getRiderWallet: async () => { if (failed) throw new Error('能力读取失败'); return { availableBalanceCents: 360, reservedCents: 120, unverifiedCents: 0, withdrawableBalanceCents: 240, withdrawalEnabled: true } },
       createRiderWithdrawal: async () => { writes++; return withdrawal },
     })
     await app.mount(); const oldSubmit = await fillWithdrawal(app)
@@ -174,7 +267,7 @@ async function run() {
   {
     const pending = deferred(); let calls = 0, balance = 360
     const app = riderWalletHarness({
-      getRiderWallet: async () => ({ availableBalanceCents: balance, reservedCents: 120, unverifiedCents: 0, withdrawalEnabled: true }),
+      getRiderWallet: async () => ({ availableBalanceCents: balance, reservedCents: 120, unverifiedCents: 0, withdrawableBalanceCents: Math.max(0, balance - 120), withdrawalEnabled: true }),
       createRiderWithdrawal: () => { calls++; return pending.promise },
       listRiderWithdrawals: async () => ({ items: balance === 240 ? [withdrawal] : [], total: balance === 240 ? 1 : 0 }),
     })

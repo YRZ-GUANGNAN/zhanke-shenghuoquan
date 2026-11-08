@@ -50,8 +50,34 @@ function entrySymbol(entryType: DeliveryLedgerEntryType) {
   return '账'
 }
 
+function MerchantEarningsStatus({ checking, error, enabled, reason }: { checking?: boolean; error?: string; enabled?: boolean; reason?: string }) {
+  const unavailable = reason === 'external_order_source_unavailable'
+  return <View className='merchant-wallet-earnings-card'>
+    <View className='merchant-wallet-earnings-card__header'>
+      <Text className='merchant-wallet-earnings-card__title'>收益账户</Text>
+      <Text className={`merchant-wallet-earnings-card__chip ${enabled ? 'merchant-wallet-earnings-card__chip--ready' : ''}`}>
+        {checking ? '核实中' : enabled ? '已接通' : unavailable ? '待接入' : '状态待确认'}
+      </Text>
+    </View>
+    <Text className='merchant-wallet-earnings-card__description'>
+      {enabled
+        ? '仅展示已由官方外部订单接口核验的真实应收，配送充值余额与商品收益始终分账。'
+        : unavailable
+          ? '外部订单官方接口尚未提供真实应收凭证，当前不入账、不开放收益提现；配送充值余额不会被当作商品收益。'
+          : error || '收益能力尚未由服务端确认，当前不入账、不开放提现。'}
+    </Text>
+  </View>
+}
+
 function MerchantWalletContent() {
-  const { enabled: deliveryPaymentEnabled, checking: paymentChecking, error: paymentError, refresh: refreshPayment } = useDeliveryPayment()
+  const {
+    enabled: deliveryPaymentEnabled,
+    merchantEarningsEnabled,
+    merchantEarningsReason,
+    checking: paymentChecking,
+    error: paymentError,
+    refresh: refreshPayment
+  } = useDeliveryPayment()
   const identityAllowed = useIdentityGuard('merchant')
   const [wallet, setWallet] = useState<DeliveryWallet | null>(null)
   const [ledger, setLedger] = useState<DeliveryWalletLedger[]>([])
@@ -239,6 +265,7 @@ function MerchantWalletContent() {
             <Text className='merchant-wallet-balance__hint'>{paymentChecking ? '正在检查支付能力…' : paymentError ? paymentError : '平台尚未配置微信商户支付'}</Text>
           </View>
         </View>
+        <MerchantEarningsStatus checking={paymentChecking} error={paymentError} enabled={merchantEarningsEnabled} reason={merchantEarningsReason} />
         <View className='merchant-wallet-unavailable'>
           <Text className='merchant-wallet-unavailable__title'>{paymentChecking ? '正在检查商家钱包' : paymentError ? '商家钱包暂时不可用' : '商家钱包暂未开通'}</Text>
           <Text className='merchant-wallet-unavailable__description'>
@@ -275,6 +302,7 @@ function MerchantWalletContent() {
       </View>
 
       <ScrollView scrollY className='merchant-wallet-scroll' enhanced showScrollbar={false}>
+        <MerchantEarningsStatus checking={paymentChecking} error={paymentError} enabled={merchantEarningsEnabled} reason={merchantEarningsReason} />
         {pendingRecharge || rechargeNotice ? <View className='merchant-wallet-recovery'>
           <Text className='merchant-wallet-recovery__title'>{pendingRecharge ? `充值待核实 ¥${formatBalance(pendingRecharge.amountCents)}` : '充值状态'}</Text>
           <Text className='merchant-wallet-recovery__description'>{rechargeNotice || (pendingRecharge?.cancelRequested ? '已退出付款，取消结果待核实，可查询状态。' : '上次充值结果待核实，可查询状态或取消充值。')}</Text>

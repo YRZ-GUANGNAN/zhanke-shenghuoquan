@@ -35,7 +35,12 @@ page { background: $bg-app; }
 .merchant-wallet-hero--disabled .merchant-wallet-balance__amount { color: $text-primary; }
 
 .merchant-wallet-scroll { flex: 1 1 auto; min-height: 0; background: $bg-app; }
-.merchant-wallet-recovery, .merchant-wallet-ledger-card, .merchant-wallet-unavailable { margin: 24rpx 30rpx 0; padding: 30rpx; border-radius: $radius-card; background: $bg-surface; box-shadow: $shadow-card; }
+.merchant-wallet-recovery, .merchant-wallet-ledger-card, .merchant-wallet-unavailable, .merchant-wallet-earnings-card { margin: 24rpx 30rpx 0; padding: 30rpx; border-radius: $radius-card; background: $bg-surface; box-shadow: $shadow-card; }
+.merchant-wallet-earnings-card__header { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; }
+.merchant-wallet-earnings-card__title { color: $text-primary; font-size: 30rpx; font-weight: 600; line-height: 1.5; }
+.merchant-wallet-earnings-card__chip { flex: 0 0 auto; padding: 7rpx 16rpx; border-radius: 999rpx; color: $text-secondary; background: $bg-muted; font-size: 21rpx; line-height: 1.4; }
+.merchant-wallet-earnings-card__chip--ready { color: $success; background: $success-tint; }
+.merchant-wallet-earnings-card__description { display: block; margin-top: 14rpx; color: $text-secondary; font-size: 24rpx; line-height: 1.65; }
 .merchant-wallet-recovery__title { display: block; color: $text-primary; font-size: 28rpx; font-weight: 600; line-height: 1.5; }
 .merchant-wallet-recovery__description { display: block; margin-top: 12rpx; color: $text-secondary; font-size: 24rpx; line-height: 1.6; }
 .merchant-wallet-recovery__actions { display: flex; gap: 16rpx; margin-top: 20rpx; }
@@ -79,7 +84,7 @@ page { background: $bg-app; }
 @media (prefers-color-scheme: dark) {
   .merchant-wallet-hero { background: $bg-surface; }
   .merchant-wallet-scroll { background: $bg-app; }
-  .merchant-wallet-recovery, .merchant-wallet-ledger-card, .merchant-wallet-unavailable, .merchant-wallet-amount { background: $bg-surface; }
+  .merchant-wallet-recovery, .merchant-wallet-ledger-card, .merchant-wallet-unavailable, .merchant-wallet-earnings-card, .merchant-wallet-amount { background: $bg-surface; }
   .merchant-wallet-ledger-item { border-color: $border-subtle; }
 }
 

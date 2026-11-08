@@ -72,7 +72,7 @@ function RiderWalletContent() {
   activeSessionKey.current = sessionKey
   const activeAllowed = useRef(allowed)
   activeAllowed.current = allowed
-  const withdrawalReady = wallet?.withdrawalEnabled === true && !loading && !errors.wallet
+  const withdrawalReady = wallet?.withdrawalEnabled === true && wallet.withdrawableBalanceCents !== undefined && !loading && !errors.wallet
   const activeWithdrawalReady = useRef(false)
   activeWithdrawalReady.current = Boolean(withdrawalReady)
   const withdrawalAvailability = loading ? '正在核实提现状态'
@@ -117,8 +117,8 @@ function RiderWalletContent() {
     if (amountCents === null) {
       await Taro.showToast({ title: '请输入有效提现金额', icon: 'none' }); return
     }
-    if (!pendingWithdrawal && (!wallet || errors.wallet || amountCents > Math.max(0, wallet.availableBalanceCents - wallet.reservedCents))) {
-      await Taro.showToast({ title: '金额超过未占用余额，请刷新核实', icon: 'none' }); return
+    if (!pendingWithdrawal && (!wallet || errors.wallet || wallet.withdrawableBalanceCents === undefined || amountCents > wallet.withdrawableBalanceCents)) {
+      await Taro.showToast({ title: '金额超过可提现收益，请刷新核实', icon: 'none' }); return
     }
     withdrawLock.current = true
     const version = ++withdrawEpoch.current
@@ -218,7 +218,7 @@ function RiderWalletContent() {
           <Text className='rider-wallet-eyebrow'>已结算余额（元）</Text>
           <Text className='rider-wallet-balance'>{wallet ? money(wallet.availableBalanceCents) : '—'}</Text>
           <Text className='rider-wallet-muted'>次日北京时间 00:00 结算后计入余额 · {withdrawalAvailability}</Text>
-          <AppButton className='rider-wallet-withdraw' size='small' variant='secondary' disabled={!withdrawalReady || withdrawSubmitting || (!pendingWithdrawal && (!wallet || wallet.availableBalanceCents <= wallet.reservedCents))} onClick={() => { if (activeWithdrawalReady.current) setWithdrawVisible(true) }}>{pendingWithdrawal ? '继续原提现申请' : '提现'}</AppButton>
+          <AppButton className='rider-wallet-withdraw' size='small' variant='secondary' disabled={!withdrawalReady || withdrawSubmitting || (!pendingWithdrawal && !(wallet?.withdrawableBalanceCents && wallet.withdrawableBalanceCents > 0))} onClick={() => { if (activeWithdrawalReady.current) setWithdrawVisible(true) }}>{pendingWithdrawal ? '继续原提现申请' : '提现'}</AppButton>
           {errors.wallet ? <Text className='rider-wallet-error' onClick={() => void load()}>{errors.wallet} · 点击重试</Text> : null}
         </View>
         <View className='rider-wallet-stats'>
@@ -255,7 +255,7 @@ function RiderWalletContent() {
     </ScrollView>
     <AppActionSheet visible={withdrawVisible} title='申请提现' description={withdrawalReady ? '提现申请提交后由后台处理，余额会先行扣减' : withdrawalAvailability} loading={withdrawSubmitting} onClose={() => setWithdrawVisible(false)}>
       <View className='rider-wallet-withdraw-sheet'>
-        <Text className='rider-wallet-stat-label'>未占用余额 {wallet ? money(Math.max(0, wallet.availableBalanceCents - wallet.reservedCents)) : '—'}，以后端核验为准</Text>
+        <Text className='rider-wallet-stat-label'>可提现收益 {wallet?.withdrawableBalanceCents !== undefined ? money(wallet.withdrawableBalanceCents) : '—'}，由服务端核验</Text>
         {pendingWithdrawal ? <Text>原申请金额 {money(pendingWithdrawal.amountCents)}</Text> : <Input className='rider-wallet-withdraw-input' type='digit' maxlength={9} disabled={withdrawSubmitting || !withdrawalReady} value={withdrawAmount} placeholder='请输入提现金额（元）' onInput={event => { if (!withdrawLock.current) setWithdrawAmount(String(event.detail.value ?? '')) }} />}
         {withdrawError ? <Text className='rider-wallet-error'>{withdrawError}</Text> : null}
         <AppButton block loading={withdrawSubmitting} disabled={!withdrawalReady} onClick={() => void submitWithdrawal()}>{pendingWithdrawal ? '重试原提现申请' : '提交提现申请'}</AppButton>

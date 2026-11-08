@@ -19,7 +19,7 @@ const withdrawalTestID = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
 type withdrawalRepositoryStub struct {
 	rider, amount, version, operator uint64
 	writes                           int
-	reference, key                   string
+	reference, key, kind             string
 	err                              error
 }
 
@@ -50,11 +50,43 @@ func (s *withdrawalRepositoryStub) RejectRiderWithdrawal(_ context.Context, _ st
 	return s.value(), s.err
 }
 
+func (s *withdrawalRepositoryStub) FindRiderWithdrawal(context.Context, string) (delivery.RiderWithdrawal, error) {
+	return s.value(), s.err
+}
+func (s *withdrawalRepositoryStub) ReadRiderWithdrawalClaim(context.Context, string) (delivery.RiderWithdrawalClaim, error) {
+	return delivery.RiderWithdrawalClaim{ID: 1, OperatorUserID: 77, ClaimKey: withdrawalTestID, Status: delivery.RiderWithdrawalClaimActive}, s.err
+}
+func (s *withdrawalRepositoryStub) ReadRiderWithdrawable(context.Context, uint64) (uint64, error) {
+	return 120, s.err
+}
+func (s *withdrawalRepositoryStub) ProcessRiderWithdrawal(_ context.Context, kind string, a delivery.RiderWithdrawalAction, _ time.Time) (delivery.RiderWithdrawal, error) {
+	s.kind = kind
+	s.version, s.operator, s.key, s.reference = a.ExpectedRowVersion, a.OperatorUserID, a.IdempotencyKey, a.PaymentReference
+	s.writes++
+	return s.value(), s.err
+}
+
+func TestWithdrawalExceptionResolutionRoutesUseDistinctCommands(t *testing.T) {
+	for _, test := range []struct {
+		path, kind string
+		body       string
+	}{
+		{"/admin/rider-withdrawals/" + withdrawalTestID + "/resolve-paid", "resolve_paid", `{"expectedRowVersion":1,"idempotencyKey":"` + withdrawalTestID + `","claimKey":"` + withdrawalTestID + `","paymentReference":"ORIGINAL-BANK-REF"}`},
+		{"/admin/rider-withdrawals/" + withdrawalTestID + "/resolve-unpaid", "resolve_unpaid", `{"expectedRowVersion":1,"idempotencyKey":"` + withdrawalTestID + `","claimKey":"` + withdrawalTestID + `","confirmedUnpaid":true,"reason":"核实未转账"}`},
+	} {
+		stub := &withdrawalRepositoryStub{}
+		router := withdrawalTestRouter(stub, true, takeout.RiderActive)
+		result := withdrawalRequest(router, http.MethodPost, test.path, test.body)
+		if result.Code != http.StatusOK || stub.kind != test.kind || stub.operator != 77 {
+			t.Fatalf("%s route=%s status=%d body=%s", test.path, stub.kind, result.Code, result.Body.String())
+		}
+	}
+}
+
 func withdrawalTestRouter(stub *withdrawalRepositoryStub, enabled bool, status takeout.RiderStatus) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	handler := NewHandler(nil, nil, nil, func(*gin.Context) uint64 { return 77 }).WithWithdrawals(stub)
-	// Test-only opt-in. No production setter or environment flag can bypass the gate.
-	handler.withdrawalWritesReady = enabled
+	handler.WithWithdrawalWrites(enabled)
 	handler.identity = todayStatsIdentityStub{rider: takeout.Rider{RiderUserID: 77, Status: status}}
 	router := gin.New()
 	handler.Register(router.Group("/rider"))
@@ -71,7 +103,7 @@ func withdrawalRequest(router *gin.Engine, method, path, body string) *httptest.
 func TestWithdrawalProductionWritesFailClosed(t *testing.T) {
 	stub := &withdrawalRepositoryStub{}
 	router := withdrawalTestRouter(stub, false, takeout.RiderActive)
-	for _, path := range []string{"/rider/wallet/withdrawals", "/admin/rider-withdrawals/" + withdrawalTestID + "/approve", "/admin/rider-withdrawals/" + withdrawalTestID + "/reject"} {
+	for _, path := range []string{"/rider/wallet/withdrawals", "/admin/rider-withdrawals/" + withdrawalTestID + "/approve", "/admin/rider-withdrawals/" + withdrawalTestID + "/reject", "/admin/rider-withdrawals/" + withdrawalTestID + "/claim", "/admin/rider-withdrawals/" + withdrawalTestID + "/release", "/admin/rider-withdrawals/" + withdrawalTestID + "/exception", "/admin/rider-withdrawals/" + withdrawalTestID + "/resolve-paid", "/admin/rider-withdrawals/" + withdrawalTestID + "/resolve-unpaid"} {
 		if result := withdrawalRequest(router, http.MethodPost, path, `{}`); result.Code != http.StatusForbidden {
 			t.Fatalf("%s: %d", path, result.Code)
 		}
@@ -106,7 +138,7 @@ func TestWithdrawalErrorMappingAndOperator(t *testing.T) {
 		err    error
 		status int
 	}{
-		{delivery.ErrWalletInsufficient, 422}, {delivery.ErrIdempotencyConflict, 409}, {delivery.ErrConcurrentUpdate, 409}, {delivery.ErrWithdrawalNotFound, 404}, {delivery.ErrInvalidRecord, 400}, {delivery.ErrWithdrawalPaymentRequired, 400},
+		{delivery.ErrWalletInsufficient, 422}, {delivery.ErrIdempotencyConflict, 409}, {delivery.ErrWithdrawalPaymentReferenceConflict, 409}, {delivery.ErrConcurrentUpdate, 409}, {delivery.ErrWithdrawalNotFound, 404}, {delivery.ErrInvalidRecord, 400}, {delivery.ErrWithdrawalPaymentRequired, 400},
 	} {
 		stub.err = test.err
 		result := withdrawalRequest(router, http.MethodPost, "/rider/wallet/withdrawals", `{"amountCents":120,"idempotencyKey":"`+withdrawalTestID+`"}`)

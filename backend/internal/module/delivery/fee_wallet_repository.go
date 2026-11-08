@@ -264,6 +264,11 @@ func (r *GormRepository) MarkRiderEarningPaidOffline(
 		if earning.RiderUserID != candidate.RiderUserID {
 			return ErrConcurrentUpdate
 		}
+		if allocated, err := hasWithdrawalAllocationTx(tx, earning.EarningPublicID); err != nil {
+			return err
+		} else if allocated {
+			return ErrRiderPayoutReserved
+		}
 		if _, active, err := activeRiderPayoutReservationTx(tx, earning.EarningPublicID); err != nil {
 			return err
 		} else if active {

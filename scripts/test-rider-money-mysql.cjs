@@ -16,6 +16,19 @@ const env = { ...process.env }
 for (const name of Object.keys(env)) if (/MYSQL|DSN|DATABASE_URL/i.test(name)) delete env[name]
 const runSync = (exe, args, options = {}) => spawnSync(exe, args, { encoding: 'utf8', windowsHide: true, env, timeout: 120000, ...options })
 
+function collectRiderMoneyTests(directory) {
+  const names = []
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const absolute = path.join(directory, entry.name)
+    if (entry.isDirectory()) names.push(...collectRiderMoneyTests(absolute))
+    else if (entry.isFile() && entry.name.endsWith('_test.go')) {
+      const source = fs.readFileSync(absolute, 'utf8')
+      for (const match of source.matchAll(/^func (Test[A-Za-z0-9_]+AgainstIsolatedMySQL)\(/gm)) names.push(match[1])
+    }
+  }
+  return [...new Set(names)].sort()
+}
+
 async function main() {
   if (!fs.existsSync(engine) || !fs.existsSync(client) || !fs.existsSync(admin)) throw new Error('Installed MySQL 8.4 engine/client are required.')
   const probe = net.createServer()
@@ -50,7 +63,14 @@ async function main() {
     console.log('ISOLATED_READY port=' + port + ' datadir_match=true version=' + sql('SELECT VERSION()').stdout.trim())
     const sentinel = 'campus_rider_money_runner_' + process.pid
     const testEnv = { ...env, DELIVERY_PAYOUT_QUEUE_MYSQL_DSN: 'root@tcp(127.0.0.1:' + port + ')/' + sentinel + '?charset=utf8mb4&parseTime=True&loc=UTC', DELIVERY_RIDER_MONEY_TEST_DATADIR: directory }
-    const result = runSync('go.exe', ['test', './internal/module/delivery', '-run', 'TestRider.*AgainstIsolatedMySQL|TestSupportsEnforcedCheckConstraints', '-count=1', '-timeout=180s', '-v'], { cwd: path.join(root, 'backend'), env: testEnv, stdio: 'inherit', timeout: 240000 })
+    const result = runSync('go.exe', ['test', './internal/module/delivery', '-run', 'TestRider.*AgainstIsolatedMySQL|TestSupportsEnforcedCheckConstraints', '-count=1', '-timeout=180s', '-v'], { cwd: path.join(root, 'backend'), env: testEnv, stdio: 'pipe', timeout: 240000 })
+    process.stdout.write(result.stdout || '')
+    process.stderr.write(result.stderr || '')
+    const output = (result.stdout || '') + (result.stderr || '')
+    if (/^--- SKIP:/m.test(output)) throw new Error('Rider-money integration suite contains a skipped test.')
+    const expectedTests = collectRiderMoneyTests(path.join(root, 'backend', 'internal', 'module', 'delivery'))
+    const missingTests = expectedTests.filter(name => !new RegExp(`^--- PASS: ${name}(?:\\s|$)`, 'm').test(output))
+    if (missingTests.length) throw new Error('Rider-money integration suite did not run required tests: ' + missingTests.join(', '))
     if (result.error || result.status !== 0) throw new Error('Isolated rider-money integration suite failed.')
     const residual = sql("SELECT schema_name FROM information_schema.schemata WHERE schema_name LIKE 'delivery_rider_money_%'")
     if (residual.status !== 0 || residual.stdout.trim() !== '') throw new Error('Test database cleanup verification failed.')

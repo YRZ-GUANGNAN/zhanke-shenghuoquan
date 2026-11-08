@@ -50,8 +50,12 @@ async function runServiceAssertions() {
     console.log('PASS 旧服务端缺失结算字段时保持 undefined，不以待核实收入补值')
   }
   for (const withdrawalEnabled of [false, true, undefined, null, 'true', 1]) {
-    const { service } = requestHarness({ '/delivery/rider/wallet': { ...wallet, withdrawalEnabled } })
+    const { service } = requestHarness({ '/delivery/rider/wallet': { ...wallet, withdrawalEnabled, withdrawableBalanceCents: 800 } })
     assert.equal((await service.getRiderWallet()).withdrawalEnabled, withdrawalEnabled === true)
+  }
+  for (const withdrawableBalanceCents of [undefined, null]) {
+    const { service } = requestHarness({ '/delivery/rider/wallet': { ...wallet, withdrawalEnabled: true, withdrawableBalanceCents } })
+    assert.equal((await service.getRiderWallet()).withdrawalEnabled, false, '缺少服务端额度不能用余额兜底')
   }
   console.log('PASS 提现能力只接受明确 true，缺失或非布尔值均关闭')
   for (const invalid of [
@@ -59,6 +63,9 @@ async function runServiceAssertions() {
     { ...wallet, availableBalanceCents: 1.2 },
     { ...wallet, reservedCents: 1300 },
     { ...wallet, pendingSettlementCents: -1 },
+    { ...wallet, withdrawableBalanceCents: 1001 },
+    { ...wallet, withdrawableBalanceCents: -1 },
+    { ...wallet, withdrawableBalanceCents: 1.5 },
   ]) {
     const { service } = requestHarness({ '/delivery/rider/wallet': invalid })
     await expectReject(service.getRiderWallet())

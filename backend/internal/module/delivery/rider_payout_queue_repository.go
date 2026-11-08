@@ -42,6 +42,9 @@ func (r *GormRepository) ListRiderPayoutCandidates(ctx context.Context, cursor R
 	if cursor.AfterID > 0 {
 		query = query.Where("id > ?", cursor.AfterID)
 	}
+	if r.db.Migrator().HasTable(&RiderWithdrawalAllocation{}) {
+		query = query.Where("NOT EXISTS (SELECT 1 FROM delivery_rider_withdrawal_allocations a WHERE a.earning_public_id = delivery_rider_earning_records.earning_public_id AND a.status IN ?)", []string{"in_flight", "paid"})
+	}
 	var values []RiderEarningRecord
 	if err := query.Find(&values).Error; err != nil {
 		return nil, err
@@ -140,6 +143,13 @@ func (r *GormRepository) ReconcileRiderPayoutQueue(ctx context.Context, earningP
 			return verifyErr
 		}
 		canQueue := verifyErr == nil && source.State == RiderPayoutSourceVerified && earning.SettlementStatus == RiderEarningSettled
+		allocated, err := hasWithdrawalAllocationTx(tx, earning.EarningPublicID)
+		if err != nil {
+			return err
+		}
+		if allocated {
+			canQueue = false
+		}
 		balanceBlocked := false
 		if canQueue {
 			reserved, reserveErr := activeRiderPayoutReservationAmountTx(tx, wallet.RiderUserID)
@@ -163,7 +173,9 @@ func (r *GormRepository) ReconcileRiderPayoutQueue(ctx context.Context, earningP
 			queue.ReasonCode = ""
 		} else {
 			queue.Status = RiderPayoutQueueBlocked
-			if balanceBlocked {
+			if allocated {
+				queue.ReasonCode = "withdrawal_allocated"
+			} else if balanceBlocked {
 				queue.ReasonCode = "balance_insufficient"
 			} else if verifyErr != nil {
 				queue.ReasonCode = reasonCodeForPayoutError(verifyErr)
@@ -247,6 +259,13 @@ func reconcileExistingRiderPayoutQueueTx(
 		} else {
 			reasonCode = "earning_not_payable"
 		}
+	}
+	allocated, allocationErr := hasWithdrawalAllocationTx(tx, earning.EarningPublicID)
+	if allocationErr != nil {
+		return RiderPayoutQueueResult{}, allocationErr
+	}
+	if allocated {
+		canQueue, reasonCode = false, "withdrawal_allocated"
 	}
 	reserved, err := activeRiderPayoutReservationAmountTx(tx, wallet.RiderUserID)
 	if err != nil {

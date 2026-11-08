@@ -47,10 +47,11 @@ function currentVersion(): string {
     const info = Taro.getAccountInfoSync().miniProgram
     if (info.version) return info.version
     if (info.envVersion === 'release') return '正式版'
-    if (info.envVersion === 'trial' || info.envVersion === 'develop') return '体验版'
-    return '体验版'
+    if (info.envVersion === 'trial') return '体验版'
+    if (info.envVersion === 'develop') return '开发预览'
+    return '版本待确认'
   } catch {
-    return '体验版'
+    return '版本待确认'
   }
 }
 
@@ -246,7 +247,7 @@ export default function SettingsPage() {
             ))}
             {(['order', 'private_message'] as const).map((key) => {
               const title = key === 'order' ? '订阅订单通知' : '订阅私信提醒'
-              const statusText = subscriptionStatus[key] || '一次授权一次送达，不影响站内通知'
+              const statusText = subscriptionStatus[key] || '一次授权增加一次通知额度，实际送达以微信为准'
               return <View key={key} className='student-settings-row student-settings-row--tall'>
                 <View className='student-settings-row__main'>
                   <Text className='student-settings-row__title'>{title}</Text>

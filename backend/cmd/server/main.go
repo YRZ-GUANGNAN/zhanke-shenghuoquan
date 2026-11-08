@@ -653,6 +653,7 @@ type deliveryRuntime struct {
 	paymentProvider                deliverypayment.Provider
 	paymentReconciler              *deliverypayment.Reconciler
 	payoutQueue                    *delivery.RiderPayoutQueueService
+	withdrawalReady                bool
 	riderSettlement                *delivery.RiderDailySettlementService
 	availability                   *delivery.RiderAvailabilityStore
 	identity                       *deliveryrider.IdentityAdapter
@@ -753,6 +754,17 @@ func newDeliveryRuntime(cfg config.Config, db *gorm.DB, proofPorts ...delivery.M
 			return nil, fmt.Errorf("configure rider payout queue: migration 050 is required")
 		}
 		runtime.payoutQueue = delivery.NewRiderPayoutQueueService(queueRepository, time.Now)
+	}
+	if cfg.EnableDeliveryRiderWithdrawal {
+		if cfg.EnableDeliveryRiderPayoutQueue {
+			return nil, fmt.Errorf("rider withdrawal and payout queue cannot both be enabled")
+		}
+		checkContext, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := repository.CheckWithdrawalReadiness(checkContext); err != nil {
+			return nil, fmt.Errorf("configure rider withdrawal: migration 056 and consistent source allocations required: %w", err)
+		}
+		runtime.withdrawalReady = true
 	}
 	if cfg.EnableDeliveryRiderDailySettlement {
 		runtime.riderSettlement = delivery.NewRiderDailySettlementService(repository, time.Now)
@@ -866,6 +878,7 @@ func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, user
 	if withdrawals, ok := runtime.riderWallets.(delivery.RiderWithdrawalRepository); ok {
 		riderHandler.WithWithdrawals(withdrawals)
 	}
+	riderHandler.WithWithdrawalWrites(runtime.withdrawalReady)
 	if runtime.conversationLifecycle != nil {
 		riderHandler.WithConversationCommands(runtime.conversationLifecycle)
 	}
@@ -898,7 +911,7 @@ func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, user
 	).WithPayoutQueue(func() delivery.RiderPayoutQueueRepository {
 		value, _ := any(runtime.riderWallets).(delivery.RiderPayoutQueueRepository)
 		return value
-	}()).Register(adminRoutes)
+	}()).WithManualWithdrawalMode(runtime.withdrawalReady).Register(adminRoutes)
 }
 
 func registerDeliveryCapabilities(api *gin.RouterGroup, runtime *deliveryRuntime, authentication gin.HandlerFunc) {
@@ -908,7 +921,8 @@ func registerDeliveryCapabilities(api *gin.RouterGroup, runtime *deliveryRuntime
 			provider, configured := runtime.paymentProvider.(*deliverypayment.WechatProvider)
 			ready = configured && provider != nil
 		}
-		response.OK(c, gin.H{"wechatPayment": ready, "externalOrders": runtime != nil && runtime.externalOrdersReady})
+		response.OK(c, gin.H{"wechatPayment": ready, "externalOrders": runtime != nil && runtime.externalOrdersReady,
+			"merchantEarnings": false, "merchantEarningsReason": "external_order_source_unavailable"})
 	})
 }
 
