@@ -2,6 +2,7 @@ import React from 'react'
 import { DeliveryMessagesContent } from './content'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import { useIdentityGuard } from '../../hooks/use-identity-guard'
+import './index.scss'
 
 function MerchantMessagesContent() {
   const allowed = useIdentityGuard('merchant')

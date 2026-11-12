@@ -15,7 +15,6 @@ import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
 import { useSessionStore } from '../../stores/session'
 import { navigateToPublicProfile } from '../../utils/navigation'
-import './index.scss'
 
 type CategoryKey = '全部' | '数码' | '书籍资料' | '生活用品' | '代步'
 const categories: CategoryKey[] = ['全部', '数码', '书籍资料', '生活用品', '代步']

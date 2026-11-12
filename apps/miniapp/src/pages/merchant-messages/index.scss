@@ -24,6 +24,10 @@ page {
   flex-direction: column;
 }
 
+// Keep a concrete page style entry for the WeChat upload compiler even when
+// the shared message shell is hoisted into common.wxss.
+.merchant-messages-page--merchant { background: $bg-app; }
+
 .merchant-messages-nav {
   box-shadow: $shadow-header;
 }

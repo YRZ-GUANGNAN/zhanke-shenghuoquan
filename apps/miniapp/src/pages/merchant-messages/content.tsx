@@ -14,7 +14,6 @@ import {
 import Taro from '../../services/taro'
 import { useBottomNavScroll } from '../../utils/bottom-nav-motion'
 import { useNotificationState } from '../../hooks/use-notification-runtime'
-import './index.scss'
 
 const statusCopy: Record<DeliveryConversation['status'], string> = {
   provisioning: '会话准备中',
@@ -124,10 +123,10 @@ export function DeliveryMessagesContent({ role, identityAllowed }: { role: 'merc
     }).catch(() => Taro.showToast({ title: '会话打开失败，请重试', icon: 'none' }))
   }
 
-  if (!identityAllowed) return <View className='merchant-messages-page' />
+  if (!identityAllowed) return <View className={`merchant-messages-page merchant-messages-page--${role}`} />
 
   return (
-    <View className='merchant-messages-page' {...workspace.swipe.handlers}>
+    <View className={`merchant-messages-page merchant-messages-page--${role}`} {...workspace.swipe.handlers}>
       <CapsulePageHeader
         className='merchant-messages-nav'
         title='消息'

@@ -1,5 +1,6 @@
 // Keep shared price styles ahead of page styles, including the direct route.
 import '../../components/product-price.scss'
+import './index.scss'
 import { withFeaturePage } from '../../components/feature-page-gate'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import { usePageShare } from '../../hooks/use-page-share'

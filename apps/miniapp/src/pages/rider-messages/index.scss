@@ -1,0 +1,6 @@
+@use '../../styles/design-tokens.scss' as *;
+@use '../merchant-messages/index.scss';
+
+// Keep a concrete page style entry for the WeChat upload compiler even when
+// the shared message shell is hoisted into common.wxss.
+.merchant-messages-page--rider { background: $bg-app; }
