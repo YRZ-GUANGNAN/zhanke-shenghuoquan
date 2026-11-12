@@ -694,15 +694,58 @@ def activate_features(stage, inspector, values, db):
     print(json.dumps(result))
 
 
+def set_notification_allowlist(db, user_id):
+    require(user_id > 0, 'invalid notification allowlist user')
+    require(scalar(
+        db,
+        'SELECT COUNT(*) FROM users WHERE id=' + str(user_id) + " AND status='active'",
+    ) == 1, 'notification test user is not active')
+    for template_key in ('order', 'private_message'):
+        require(scalar(
+            db,
+            'SELECT COUNT(*) FROM notification_subscriptions '
+            "WHERE user_id=" + str(user_id) + " AND template_key='" + template_key +
+            "' AND status='accepted' AND remaining_quota=1 AND reserved_quota=0 "
+            'AND (expires_at IS NULL OR expires_at>UTC_TIMESTAMP())',
+        ) >= 1, 'notification test user lacks an accepted authorization: ' + template_key)
+    backup_dir = Path('/var/backups/campus-circle') / RELEASE_ID
+    backup_dir.mkdir(mode=0o700, exist_ok=True)
+    backup_dir.chmod(0o700)
+    attempt = time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())
+    env_backup = backup_dir / ('campus-api.env-notification-' + attempt)
+    shutil.copy2(ENV_FILE, env_backup)
+    env_backup.chmod(0o600)
+    patch_env({'NOTIFICATION_TEST_USER_IDS': str(user_id)})
+    release = ROOT / 'releases' / RELEASE_ID
+    receipt = release / 'notification-allowlist-receipt.json'
+    result = {
+        'notificationSendingEnabled': False,
+        'allowlistCount': 1,
+        'testUserAuthorizedOrder': True,
+        'testUserAuthorizedPrivateMessage': True,
+        'envBackup': str(env_backup),
+        'restartRequired': True,
+    }
+    receipt.write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')
+    receipt.chmod(0o644)
+    print(json.dumps(result))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--stage', required=True)
     parser.add_argument('--deploy', action='store_true')
     parser.add_argument('--finish-activated', action='store_true')
     parser.add_argument('--activate-features', action='store_true')
+    parser.add_argument('--set-notification-allowlist', type=int)
     args = parser.parse_args()
     require(os.geteuid() == 0, 'sudo required')
-    require(sum((args.deploy, args.finish_activated, args.activate_features)) <= 1,
+    require(sum((
+        args.deploy,
+        args.finish_activated,
+        args.activate_features,
+        args.set_notification_allowlist is not None,
+    )) <= 1,
             'choose one mutation phase')
     lock = open('/run/campus-rider-055-056-release.lock', 'a', encoding='utf-8')
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -720,6 +763,9 @@ def main():
         return
     if args.activate_features:
         activate_features(stage, inspector, values, db)
+        return
+    if args.set_notification_allowlist is not None:
+        set_notification_allowlist(db, args.set_notification_allowlist)
         return
     require(run(['pgrep', '-c', '-x', 'campus-api'], text=True).strip() == '1',
             'unexpected API process count')
