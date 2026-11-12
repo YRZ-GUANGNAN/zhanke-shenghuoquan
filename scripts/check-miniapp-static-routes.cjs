@@ -40,14 +40,41 @@ const expectedRoutes = [
   'pages/post-detail/index'
 ]
 
+const expectedLazyRoutes = [
+  'pages/search/index',
+  'pages/post-detail/index',
+  'pages/secondhand-detail/index',
+  'pages/user-profile/index',
+  'pages/identity-application/index',
+  'pages/my-content/index',
+  'pages/edit-profile/index',
+  'pages/settings/index',
+  'pages/notifications/index',
+  'pages/merchant-home/index',
+  'pages/delivery-rider/index',
+  'pages/delivery-conversation/index'
+]
+
+const expectedExistingSubpackageRoutes = [
+  'pages/merchant-publish/index',
+  'pages/merchant-order-detail/index',
+  'pages/merchant-wallet/index',
+  'pages/rider-wallet/index'
+]
+
+const expectedSubpackageRoutes = [...new Set([...expectedExistingSubpackageRoutes, ...expectedLazyRoutes])]
+
 const config = fs.readFileSync(configPath, 'utf8')
-const mainRoutes = [...config.matchAll(/'((?:pages\/)[^']+\/index)'/g)].map((match) => match[1])
+const mainPagesBlock = config.match(/pages:\s*\[([\s\S]*?)\],\s*subPackages:/)?.[1] || ''
+const mainRoutes = [...mainPagesBlock.matchAll(/'([^']+)'/g)].map((match) => match[1])
 const subpackageRoutes = [...config.matchAll(/root:\s*'([^']+)'[\s\S]*?pages:\s*\[([\s\S]*?)\]/g)]
   .flatMap(([, packageRoot, packagePages]) => [...packagePages.matchAll(/'([^']+)'/g)]
     .map((match) => `${packageRoot}/${match[1]}`))
 const registeredRoutes = [...new Set([...mainRoutes, ...subpackageRoutes])]
 const registered = new Set(registeredRoutes)
 const expected = new Set(expectedRoutes)
+const mainSet = new Set(mainRoutes)
+const subpackageSet = new Set(subpackageRoutes)
 const forbiddenLegacyRoutes = [
   'pages/chat/index',
   'pages/conversations/index',
@@ -59,6 +86,27 @@ const forbiddenLegacyRoutes = [
   'pages/takeout-order-detail/index',
 ]
 const registeredLegacyRoutes = forbiddenLegacyRoutes.filter((route) => registered.has(route))
+
+for (const route of expectedSubpackageRoutes) {
+  if (mainSet.has(route)) {
+    throw new Error(`subpackage route must not stay in main package: ${route}`)
+  }
+  if (!subpackageSet.has(route)) {
+    throw new Error(`subpackage route must be registered in a subpackage: ${route}`)
+  }
+}
+
+for (const route of expectedRoutes) {
+  if (!expectedSubpackageRoutes.includes(route) && !mainSet.has(route)) {
+    throw new Error(`primary route must stay in main package: ${route}`)
+  }
+}
+
+for (const route of expectedSubpackageRoutes) {
+  if (mainSet.has(route) && subpackageSet.has(route)) {
+    throw new Error(`route cannot belong to both main package and subpackage: ${route}`)
+  }
+}
 
 if (registeredLegacyRoutes.length > 0) {
   throw new Error(`legacy chat routes must stay unregistered: ${registeredLegacyRoutes.join(', ')}`)
