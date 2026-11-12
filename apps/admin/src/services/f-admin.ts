@@ -1,5 +1,5 @@
 // Domain F client: management and the unified review workflow only.
-import type { ExternalTakeoutMerchant, ExternalTakeoutMerchantDirectory, ExternalTakeoutMerchantInput, ExternalTakeoutOperatingStatus, FeaturePolicy, FeaturePolicyKey, FeedbackRow, IdentityApplicationAdminList, IdentityApplicationDetail, IdentityApplicationQuery, IdentityApplicationRow, MediaAssetDetail, MediaAssetRow, MediaDeadletters, MediaDecisionRow, MediaEventRow, MediaGCJobRow, MediaQuery, MediaSummary, NavigationCategory, NavigationCategoryInput, NavigationItem, NavigationItemInput, Page, PageQuery, PostRow, ProductRow, ReportRow, ReviewTask, Stats, UserRow } from '../types'
+import type { ExternalTakeoutMerchant, ExternalTakeoutMerchantDirectory, ExternalTakeoutMerchantInput, FeaturePolicy, FeaturePolicyKey, FeedbackRow, IdentityApplicationAdminList, IdentityApplicationDetail, IdentityApplicationQuery, IdentityApplicationRow, MediaAssetDetail, MediaAssetRow, MediaDeadletters, MediaDecisionRow, MediaEventRow, MediaGCJobRow, MediaQuery, MediaSummary, NavigationCategory, NavigationCategoryInput, NavigationItem, NavigationItemInput, Page, PageQuery, PostRow, ProductRow, ReportRow, ReviewTask, Stats, UserRow } from '../types'
 import { adminRequest } from './http'
 type ReviewQuery={status?:ReviewTask['status']|'';page?:number;pageSize?:number}
 export class AdminAPIError extends Error {
@@ -42,7 +42,6 @@ export const adminAPI={
 	createExternalTakeoutMerchant:(input:ExternalTakeoutMerchantInput)=>api<ExternalTakeoutMerchant>('/admin/navigation/external-takeout-merchants',{method:'POST',body:JSON.stringify(input)}),
 	updateExternalTakeoutMerchant:(id:number,input:ExternalTakeoutMerchantInput)=>api<ExternalTakeoutMerchant>(`/admin/navigation/external-takeout-merchants/${id}`,{method:'PUT',body:JSON.stringify(input)}),
 	deleteExternalTakeoutMerchant:(id:number)=>api<{deleted:boolean}>(`/admin/navigation/external-takeout-merchants/${id}`,{method:'DELETE'}),
-	setExternalTakeoutOperatingStatus:(id:number,operatingStatus:ExternalTakeoutOperatingStatus)=>api<{updated:boolean}>(`/admin/navigation/external-takeout-merchants/${id}/operating-status`,{method:'PATCH',body:JSON.stringify({operatingStatus})}),
 	setExternalTakeoutVisibility:(id:number,enabled:boolean)=>api<{updated:boolean}>(`/admin/navigation/external-takeout-merchants/${id}/visibility`,{method:'PATCH',body:JSON.stringify({enabled})}),
 	setExternalTakeoutCategoryVisibility:(enabled:boolean)=>api<{updated:boolean}>('/admin/navigation/external-takeout-merchants/category-visibility',{method:'PATCH',body:JSON.stringify({enabled})}),
 	featurePolicy:()=>api<FeaturePolicy>('/admin/feature-policy'),

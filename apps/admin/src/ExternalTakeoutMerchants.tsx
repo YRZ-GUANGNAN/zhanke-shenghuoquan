@@ -186,7 +186,7 @@ export function ExternalTakeoutMerchants() {
       ) : (
         <div className='table-scroll'>
           <table className='external-merchant-table'>
-            <thead><tr><th>商家</th><th>跳转目标</th><th>排序</th><th>展示</th><th>营业</th><th>操作</th></tr></thead>
+            <thead><tr><th>商家</th><th>跳转目标</th><th>排序</th><th>展示</th><th>操作</th></tr></thead>
             <tbody>
               {(directory?.items ?? []).map((item) => (
                 <tr key={item.id}>
@@ -199,18 +199,16 @@ export function ExternalTakeoutMerchants() {
                   <td><code>{item.appId}</code><small>{item.path}</small></td>
                   <td>{item.sort}</td>
                   <td><span className={`external-merchant-badge external-merchant-badge--${item.enabled ? 'open' : 'off'}`}>{item.enabled ? '显示' : '隐藏'}</span></td>
-                  <td><span className={`external-merchant-badge external-merchant-badge--${item.operatingStatus}`}>{item.operatingStatus === 'open' ? '营业中' : '休息中'}</span></td>
                   <td>
                     <div className='external-merchant-row-actions'>
                       <button type='button' disabled={Boolean(busyAction)} onClick={() => { setEditingId(item.id); setDraft(toDraft(item)); setError('') }}>编辑</button>
-                      <button type='button' disabled={Boolean(busyAction)} onClick={() => void mutate(`status-${item.id}`, () => adminAPI.setExternalTakeoutOperatingStatus(item.id, item.operatingStatus === 'open' ? 'resting' : 'open'))}>{item.operatingStatus === 'open' ? '暂停营业' : '开始营业'}</button>
                       <button type='button' disabled={Boolean(busyAction)} onClick={() => void mutate(`visibility-${item.id}`, () => adminAPI.setExternalTakeoutVisibility(item.id, !item.enabled))}>{item.enabled ? '隐藏' : '恢复显示'}</button>
                       <button type='button' className='external-merchant-danger' disabled={Boolean(busyAction)} onClick={() => void remove(item)}>删除</button>
                     </div>
                   </td>
                 </tr>
               ))}
-              {(directory?.items.length ?? 0) === 0 && <tr><td colSpan={6}><div className='external-merchant-empty'>暂无商家，请先新增一个入口。</div></td></tr>}
+              {(directory?.items.length ?? 0) === 0 && <tr><td colSpan={5}><div className='external-merchant-empty'>暂无商家，请先新增一个入口。</div></td></tr>}
             </tbody>
           </table>
         </div>

@@ -569,22 +569,6 @@
   flex: 0 0 auto;
 }
 
-.student-search-result__status {
-  padding: 5rpx 12rpx;
-  border-radius: 999rpx;
-  font-size: 21rpx;
-}
-
-.student-search-result__status--open {
-  background: #e8f7ef;
-  color: #16834f;
-}
-
-.student-search-result__status--resting {
-  background: #f0f1f3;
-  color: $text-muted;
-}
-
 .student-search-state--error {
   color: #c74848;
 }

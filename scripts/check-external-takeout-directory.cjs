@@ -20,14 +20,13 @@ function assertExcludes(source, value) {
 for (const required of [
   'listExternalTakeoutMerchants',
   'navigateToMiniProgram',
-  "merchant.operatingStatus === 'resting'",
   '/pages/search/index?scope=takeout',
   '商家加载失败',
 ]) assertIncludes(takeoutPage, required)
 
 for (const forbidden of [
   'const merchants', '茶知味', '华莱士', '正新鸡排', '一点点', '塔斯汀', '蜜雪冰城',
-  'g-takeout', 'stores/cart', 'pages/takeout/',
+  'g-takeout', 'stores/cart', 'pages/takeout/', 'operatingStatus', 'MerchantFilter', '营业中', '休息中', '暂停营业', '开始营业',
 ]) assertExcludes(takeoutPage, forbidden)
 
 for (const forbidden of ['ServiceMerchantCatalog', 'g-takeout-buyer', 'merchantId', 'stores/cart', 'pages/takeout/']) {
@@ -38,22 +37,18 @@ for (const required of [
   'external_takeout_merchants', 'listNavigationItems',
   'category.systemKey!==externalTakeoutSystemKey', 'value.systemKey===externalTakeoutSystemKey',
 ]) assertIncludes(navigationClient, required)
-for (const forbidden of ['g-takeout', 'delivery', 'payment', 'a-user']) assertExcludes(navigationClient, forbidden)
+for (const forbidden of ['g-takeout', 'delivery', 'payment', 'a-user', 'operatingStatus']) assertExcludes(navigationClient, forbidden)
 
 for (const required of [
-  '/admin/navigation/external-takeout-merchants', '/operating-status', '/visibility', '/category-visibility',
+  '/admin/navigation/external-takeout-merchants', '/visibility', '/category-visibility',
 ]) assertIncludes(adminClient, required)
 for (const forbidden of ['TakeoutConsole', 'takeout-admin']) assertExcludes(adminPanel, forbidden)
 for (const required of [
-  'setExternalTakeoutCategoryVisibility', 'setExternalTakeoutOperatingStatus',
-  'setExternalTakeoutVisibility', 'directory.categoryEnabled', 'await load()',
+  'setExternalTakeoutCategoryVisibility', 'setExternalTakeoutVisibility',
+  'directory.categoryEnabled', 'await load()',
 ]) assertIncludes(adminPanel, required)
-
-const guardIndex = takeoutPage.indexOf("merchant.operatingStatus === 'resting'")
-const jumpIndex = takeoutPage.indexOf('navigateToMiniProgram')
-if (guardIndex < 0 || jumpIndex < 0 || guardIndex > jumpIndex) {
-  throw new Error('resting guard must run before navigateToMiniProgram')
-}
+for (const forbidden of ['operatingStatus', '暂停营业', '开始营业', '营业中', '休息中']) assertExcludes(adminPanel, forbidden)
+assertExcludes(adminClient, '/operating-status')
 
 for (const required of ['<ExternalTakeoutMerchants', 'legacyTakeoutEnabled', '<TakeoutConsole']) {
   assertIncludes(appSource, required)

@@ -301,10 +301,6 @@ function SearchContent() {
       return
     }
     const merchant = item as ExternalTakeoutMerchantLink
-    if (merchant.operatingStatus === 'resting') {
-      await Taro.showToast({ title: '商家当前休息中', icon: 'none' })
-      return
-    }
     try {
       await Taro.navigateToMiniProgram({ appId: merchant.appId, path: merchant.path })
     } catch (jumpError) {
@@ -366,12 +362,7 @@ function SearchContent() {
     const merchant = item as ExternalTakeoutMerchantLink
     return (
       <View className='student-search-result' key={merchant.id} onClick={() => void openResult(merchant)}>
-        <View className='student-search-result__row'>
-          <Text className='student-search-result__title'>{merchant.title}</Text>
-          <Text className={`student-search-result__status student-search-result__status--${merchant.operatingStatus}`}>
-            {merchant.operatingStatus === 'open' ? '营业中' : '休息中'}
-          </Text>
-        </View>
+        <Text className='student-search-result__title'>{merchant.title}</Text>
         <Text className='student-search-result__summary'>{merchant.subtitle || '点击进入商家小程序'}</Text>
       </View>
     )

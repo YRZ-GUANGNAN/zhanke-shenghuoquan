@@ -274,7 +274,7 @@ function Feedbacks(){
 }
 
 type NavigationItemDraft=NavigationItemInput&{id?:number}
-const emptyNavigationItem=(categoryId:number):NavigationItemDraft=>({categoryId,title:'',subtitle:'',iconText:'',appId:'',path:'',color:'',sort:0,enabled:true,operatingStatus:'open'})
+const emptyNavigationItem=(categoryId:number):NavigationItemDraft=>({categoryId,title:'',subtitle:'',iconText:'',appId:'',path:'',color:'',sort:0,enabled:true})
 
 function Navigation(){
 	const dialog=useAdminDialog()
@@ -307,7 +307,7 @@ function Navigation(){
 		setBusy(`category-${category.id}`);setError('');setNotice('')
 		try{await adminAPI.deleteNavigationCategory(category.id);setNotice(`分类“${category.name}”已删除。`);await load()}catch(e){setError(String(e))}finally{setBusy('')}
 	}
-	const editItem=(item:NavigationItem)=>setItemDraft({id:item.id,categoryId:item.categoryId,title:item.title,subtitle:item.subtitle||'',iconText:item.iconText||'',appId:item.appId,path:item.path,color:item.color||'',sort:item.sort,enabled:item.enabled,operatingStatus:item.operatingStatus||'open'})
+	const editItem=(item:NavigationItem)=>setItemDraft({id:item.id,categoryId:item.categoryId,title:item.title,subtitle:item.subtitle||'',iconText:item.iconText||'',appId:item.appId,path:item.path,color:item.color||'',sort:item.sort,enabled:item.enabled})
 	const saveItem=async()=>{
 		if(!itemDraft)return
 		if(busy)return

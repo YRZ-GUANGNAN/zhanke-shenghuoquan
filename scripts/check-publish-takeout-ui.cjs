@@ -51,13 +51,9 @@ for (const required of [
 ]) assertIncludes(publishStyle, required)
 
 for (const required of [
-  "type MerchantFilter = 'all' | 'open' | 'resting'",
   'listExternalTakeoutMerchants',
   'navigateToMiniProgram',
-  '全部',
-  '营业中',
-  '休息中',
-  'filteredMerchants',
+  'student-takeout-list',
   '进入商家',
 ]) assertIncludes(takeoutSource, required)
 
@@ -68,6 +64,13 @@ for (const forbidden of [
   '预计送达',
   '起送价',
   '优惠券',
+  'MerchantFilter',
+  'operatingStatus',
+  'filteredMerchants',
+  '营业中',
+  '休息中',
+  '暂停营业',
+  '开始营业',
 ]) assertExcludes(takeoutSource, forbidden)
 
 assertExcludes(takeoutStyle, '.student-bottom-nav')

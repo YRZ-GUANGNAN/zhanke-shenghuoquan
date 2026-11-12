@@ -5,7 +5,7 @@
   @include ref.page-foundation;
   min-height: 100vh;
   padding: calc(var(--capsule-total-header-height) + 44PX + 40rpx) 0 calc(168rpx + env(safe-area-inset-bottom));
-  background: $bg-surface;
+  background: $bg-screen;
   color: $text-strong;
   box-sizing: border-box;
 }
@@ -47,11 +47,13 @@
   min-height: 44PX;
   margin: 4rpx 32rpx 0;
   padding: 0 22rpx;
+  border: 1rpx solid $divider-nav;
   border-radius: 16rpx;
-  background: $bg-surface-subtle;
+  background: $bg-surface;
   color: $text-secondary;
   @include ref.type(author);
   box-sizing: border-box;
+  box-shadow: $shadow-header;
   transition: background-color $duration-fast $ease-standard,
     transform $duration-fast $ease-standard;
 }
@@ -69,6 +71,9 @@
 .student-takeout-scroll {
   display: flex;
   flex-direction: column;
+  min-height: 100vh;
+  padding-bottom: 24rpx;
+  background: $bg-screen;
 }
 .student-takeout-page--catalog { padding-top: 0; }
 .student-takeout-catalog-back { width: 44PX; min-height: 44PX; display: flex; align-items: center; }
@@ -96,7 +101,7 @@
 .student-takeout-section-heading__title,
 .student-takeout-directory__title {
   color: $text-strong;
-  font-size: 31rpx;
+  font-size: 34rpx;
   font-weight: 850;
   letter-spacing: -.3rpx;
   line-height: 1.25;
@@ -194,84 +199,24 @@
   min-width: 0;
 }
 
-.student-takeout-directory__status {
-  flex: 0 0 auto;
-  padding-bottom: 2rpx;
-  color: $success;
-  font-size: 22rpx;
-  font-weight: 700;
-  line-height: 1.4;
-}
-
-.student-takeout-filters {
-  display: flex;
-  gap: 24rpx;
-  flex-wrap: wrap;
-  min-height: 64rpx;
-  margin: 0 32rpx;
-  border-bottom: 1rpx solid $divider-nav;
-}
-
-.student-takeout-filter {
-  @include ref.touch;
-  @include ref.type(meta);
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 7rpx;
-  min-width: max(44PX, 88rpx);
-  color: $text-tertiary;
-  font-weight: 650;
-  transition: color $duration-fast $ease-standard,
-    opacity $duration-fast $ease-standard;
-}
-
-.student-takeout-filter--pressed {
-  opacity: .65;
-}
-
-.student-takeout-filter--active {
-  color: $text-strong;
-  font-weight: 800;
-}
-
-.student-takeout-filter--active::after {
-  position: absolute;
-  right: 4rpx;
-  bottom: -1rpx;
-  left: 4rpx;
-  height: 4rpx;
-  border-radius: 4rpx 4rpx 0 0;
-  background: $brand-primary;
-  content: '';
-}
-
-.student-takeout-filter__count {
-  color: $text-faint;
-  font-size: 19rpx;
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-}
-
-.student-takeout-filter--active .student-takeout-filter__count {
-  color: $brand-primary;
-}
-
 .student-takeout-tip {
   display: flex;
   align-items: flex-start;
   gap: 12rpx;
-  margin: 18rpx 32rpx 6rpx;
-  padding: 14rpx 16rpx;
-  border-radius: 12rpx;
-  background: $bg-surface-subtle;
+  margin: 18rpx 24rpx 0;
+  padding: 18rpx 20rpx;
+  border: 1rpx solid rgba($brand-primary-static, .08);
+  border-radius: 16rpx;
+  background: $info-tint;
+  box-sizing: border-box;
 }
 
 .student-takeout-tip__icon {
   flex: 0 0 auto;
-  width: 28rpx;
-  height: 28rpx;
+  width: 30rpx;
+  height: 30rpx;
   margin-top: 1rpx;
+  color: $brand-primary;
 }
 
 .student-takeout-tip__text {
@@ -282,15 +227,22 @@
 }
 
 .student-takeout-list {
-  margin: 0 32rpx;
+  margin: 20rpx 24rpx 0;
+  overflow: hidden;
+  border: 1rpx solid $divider-nav;
+  border-radius: 24rpx;
+  background: $bg-surface;
+  box-shadow: $shadow-card;
 }
 
 .student-takeout-merchant {
   display: flex;
   align-items: center;
-  min-height: 150rpx;
+  min-height: 152rpx;
+  padding: 0 24rpx;
   border-bottom: 1rpx solid $divider-nav;
   background: $bg-surface;
+  box-sizing: border-box;
   transition: background-color $duration-fast $ease-standard,
     opacity $duration-fast $ease-standard;
 }
@@ -299,8 +251,8 @@
   background: $bg-surface-subtle;
 }
 
-.student-takeout-merchant--resting {
-  opacity: .7;
+.student-takeout-merchant:last-child {
+  border-bottom: 0;
 }
 
 .student-takeout-merchant__avatar {
@@ -308,12 +260,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 72rpx;
-  height: 72rpx;
+  width: 76rpx;
+  height: 76rpx;
   border: 1rpx solid $divider-nav;
-  border-radius: 18rpx;
-  background: $bg-surface-subtle;
-  font-size: 28rpx;
+  border-radius: 22rpx;
+  background: $brand-tint;
+  font-size: 29rpx;
   font-weight: 850;
   line-height: 1;
   box-sizing: border-box;
@@ -322,8 +274,8 @@
 .student-takeout-merchant__main {
   flex: 1;
   min-width: 0;
-  margin-left: 20rpx;
-  padding: 22rpx 0;
+  margin-left: 22rpx;
+  padding: 24rpx 0;
 }
 
 .student-takeout-merchant__headline {
@@ -338,7 +290,7 @@
   display: block;
   overflow: hidden;
   color: $text-strong;
-  font-size: 28rpx;
+  font-size: 29rpx;
   font-weight: 800;
   line-height: 1.3;
   text-overflow: ellipsis;
@@ -355,56 +307,36 @@
   white-space: nowrap;
 }
 
-.student-takeout-status {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 6rpx;
-  font-size: 19rpx;
-  font-weight: 700;
-  line-height: 1.3;
-}
-
-.student-takeout-status--open {
-  color: $success;
-}
-
-.student-takeout-status--closed {
-  color: $text-tertiary;
-}
-
-.student-takeout-status__dot {
-  width: 7rpx;
-  height: 7rpx;
-  border-radius: 50%;
-  background: currentColor;
-}
-
 .student-takeout-merchant__action {
   @include ref.type(meta);
   display: block;
-  margin-top: 10rpx;
+  margin-top: 12rpx;
   color: $brand-primary;
   font-weight: 700;
 }
 
-.student-takeout-merchant__action--disabled {
-  color: $text-tertiary;
-}
-
 .student-takeout-merchant__arrow {
   flex: 0 0 auto;
-  width: 30rpx;
-  height: 30rpx;
-  margin-left: 12rpx;
+  width: 32rpx;
+  height: 32rpx;
+  margin-left: 16rpx;
   color: $text-faint;
+}
+
+.student-takeout-scroll .app-state {
+  min-height: 480rpx;
+  margin: 24rpx;
+  border: 1rpx solid $divider-nav;
+  border-radius: 24rpx;
+  background: $bg-surface;
+  box-shadow: $shadow-card;
 }
 
 .student-takeout-footer {
   @include ref.type(meta);
   @include ref.wrap;
   display: block;
-  padding: 30rpx 32rpx 8rpx;
+  padding: 30rpx 32rpx 12rpx;
   color: $text-faint;
   text-align: center;
 }

@@ -1,5 +1,5 @@
 import { withFeaturePage } from '../../components/feature-page-gate'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDidShow } from '@tarojs/taro'
 import { Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
@@ -18,34 +18,16 @@ import { usePageShare } from '../../hooks/use-page-share'
 import './index.scss'
 
 type DirectoryStatus = 'loading' | 'empty' | 'ready' | 'error'
-type MerchantFilter = 'all' | 'open' | 'resting'
-
-const filters: Array<{ key: MerchantFilter; label: string }> = [
-  { key: 'all', label: '全部' },
-  { key: 'open', label: '营业中' },
-  { key: 'resting', label: '休息中' },
-]
 
 function StudentTakeoutPage() {
   const capsuleStyle = useViewportRefresh()
   const [merchants, setMerchants] = useState<ExternalTakeoutMerchantLink[]>([])
   const [status, setStatus] = useState<DirectoryStatus>('loading')
-  const [filter, setFilter] = useState<MerchantFilter>('all')
   const [jumpingTarget, setJumpingTarget] = useState<string | null>(null)
   const visibility = useFeatureVisibility()
   usePageShare({ kind: 'services', enabled: visibility.takeout })
   const merchantRequestVersion = useRef(0)
   const jumpingRef = useRef<string | null>(null)
-
-  const openCount = useMemo(
-    () => merchants.filter((merchant) => merchant.operatingStatus === 'open').length,
-    [merchants],
-  )
-  const restingCount = merchants.length - openCount
-  const filteredMerchants = useMemo(() => {
-    if (filter === 'all') return merchants
-    return merchants.filter((merchant) => merchant.operatingStatus === filter)
-  }, [filter, merchants])
 
   const load = useCallback(async () => {
     const version = merchantRequestVersion.current + 1
@@ -78,10 +60,6 @@ function StudentTakeoutPage() {
   }, [])
 
   const openMerchant = async (merchant: ExternalTakeoutMerchantLink) => {
-    if (merchant.operatingStatus === 'resting') {
-      await Taro.showToast({ title: '商家休息中', icon: 'none' })
-      return
-    }
     await openMiniProgram(
       `merchant:${merchant.id}`,
       merchant.appId,
@@ -104,12 +82,6 @@ function StudentTakeoutPage() {
       jumpingRef.current = null
       setJumpingTarget(null)
     }
-  }
-
-  const filterCount = (key: MerchantFilter) => {
-    if (key === 'open') return openCount
-    if (key === 'resting') return restingCount
-    return merchants.length
   }
 
   return (
@@ -137,26 +109,7 @@ function StudentTakeoutPage() {
             <Text className='student-takeout-directory__title'>合作商家</Text>
             <Text className='student-takeout-directory__desc'>商品、订单与售后由商家小程序提供</Text>
           </View>
-          {status === 'ready' && (
-            <Text className='student-takeout-directory__status'>{openCount} 家营业中</Text>
-          )}
         </View>}
-
-        {visibility?.takeout && status === 'ready' && (
-          <View className='student-takeout-filters'>
-            {filters.map((item) => (
-              <View
-                key={item.key}
-                className={`student-takeout-filter${filter === item.key ? ' student-takeout-filter--active' : ''}`}
-                hoverClass='student-takeout-filter--pressed'
-                onClick={() => setFilter(item.key)}
-              >
-                <Text>{item.label}</Text>
-                <Text className='student-takeout-filter__count'>{filterCount(item.key)}</Text>
-              </View>
-            ))}
-          </View>
-        )}
 
         {visibility?.takeout && <View className='student-takeout-tip'>
           <AppIcon name='info' className='student-takeout-tip__icon' />
@@ -172,19 +125,15 @@ function StudentTakeoutPage() {
         {visibility?.takeout && status === 'error' && (
           <AppState kind='error' title='商家加载失败' description='请检查网络连接后重试。' actionText='重新加载' onAction={() => void load()} />
         )}
-        {visibility?.takeout && status === 'ready' && filteredMerchants.length === 0 && (
-          <AppState kind='empty' title='当前分类暂无商家' description='可以切换其他营业状态查看。' />
-        )}
-        {visibility?.takeout && status === 'ready' && filteredMerchants.length > 0 && (
+        {visibility?.takeout && status === 'ready' && merchants.length > 0 && (
           <View className='student-takeout-list'>
-            {filteredMerchants.map((merchant) => {
-              const resting = merchant.operatingStatus === 'resting'
+            {merchants.map((merchant) => {
               const jumping = jumpingTarget === `merchant:${merchant.id}`
               return (
                 <View
                   key={merchant.id}
-                  className={`student-takeout-merchant${resting ? ' student-takeout-merchant--resting' : ''}`}
-                  hoverClass={resting ? 'none' : 'student-takeout-merchant--pressed'}
+                  className='student-takeout-merchant'
+                  hoverClass='student-takeout-merchant--pressed'
                   onClick={() => void openMerchant(merchant)}
                 >
                   <View className='student-takeout-merchant__avatar' style={{ color: merchant.color }}>
@@ -193,19 +142,13 @@ function StudentTakeoutPage() {
                   <View className='student-takeout-merchant__main'>
                     <View className='student-takeout-merchant__headline'>
                       <Text className='student-takeout-merchant__name'>{merchant.title}</Text>
-                      <View className={`student-takeout-status ${resting ? 'student-takeout-status--closed' : 'student-takeout-status--open'}`}>
-                        <View className='student-takeout-status__dot' />
-                        <Text>{resting ? '休息中' : '营业中'}</Text>
-                      </View>
                     </View>
                     <Text className='student-takeout-merchant__desc'>{merchant.subtitle}</Text>
-                    <Text className={`student-takeout-merchant__action${resting ? ' student-takeout-merchant__action--disabled' : ''}`}>
-                      {jumping ? '打开中' : resting ? '暂未营业' : '进入商家'}
+                    <Text className='student-takeout-merchant__action'>
+                      {jumping ? '打开中' : '进入商家'}
                     </Text>
                   </View>
-                  {!resting && (
-                    <AppIcon name='chevron-right' className='student-takeout-merchant__arrow app-icon--chevron' />
-                  )}
+                  <AppIcon name='chevron-right' className='student-takeout-merchant__arrow app-icon--chevron' />
                 </View>
               )
             })}
