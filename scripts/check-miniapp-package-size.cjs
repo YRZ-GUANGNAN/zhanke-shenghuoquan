@@ -8,6 +8,9 @@ const packageLimit = 2 * 1024 * 1024
 // was rejected at 2052KiB by the official CLI. Keep a conservative buffer;
 // only an actual successful WeChat preview/upload proves platform acceptance.
 const mainCompileHeadroom = 64 * 1024
+// The low-frequency route split in 2026-11-12 deliberately restores a large
+// main-package buffer. Keep future feature work from silently filling it again.
+const mainSlimBudget = 1750000
 const totalLimit = 20 * 1024 * 1024
 
 function asPosix(value) { return String(value).replaceAll('\\', '/') }
@@ -83,6 +86,7 @@ function formatReport(report) {
   if (failures.length) throw new Error(`package size exceeds limit: ${failures.map(pkg => `${pkg.name}=${pkg.bytes} bytes`).join(', ')}`)
   const main = report.packages.find(pkg => pkg.name === 'main')
   if (main && main.bytes > report.packageLimit - mainCompileHeadroom) throw new Error(`main=${main.bytes} bytes leaves insufficient WeChat compile headroom (reserve=${mainCompileHeadroom} bytes)`)
+  if (main && main.bytes > mainSlimBudget) throw new Error(`main=${main.bytes} bytes exceeds the post-split slim budget (${mainSlimBudget} bytes)`)
   return `miniapp package: PASS (${report.packages.map(pkg => `${pkg.name}=${pkg.bytes}`).join(', ')}; total=${report.totalBytes})`
 }
 function main() { try { console.log(formatReport(analyzePackage())) } catch (error) { console.error(`miniapp package: FAIL (${error instanceof Error ? error.message : String(error)})`); process.exitCode = 1 } }
