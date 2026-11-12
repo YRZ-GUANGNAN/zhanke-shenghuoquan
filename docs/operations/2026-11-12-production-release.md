@@ -61,6 +61,6 @@
 - 修复 Taro 将商家/骑手消息页样式提升到 `common.wxss` 后不再生成页面 `.wxss` 的问题。商家消息、骑手消息与二手市场现在各自保留真实页面级样式入口，干净构建后 32 个页面均具备 `index.wxss`。
 - 上传构建显式使用 `TARO_APP_ENABLE_DELIVERY_PAYMENT=true`、`TARO_APP_ENABLE_DELIVERY_PAYMENT_MOCK=false`。`npm --workspace apps/miniapp run typecheck`、`npm run check:release-regression`（25/25）、`check-private-messaging`、静态路由、`npm run build:miniapp` 与 `git diff --check` 均通过。
 - 官方 CLI 成功上传 `2026.11.12.3`，说明“液态玻璃底栏比例与页面样式修复”。上传总包 `2,187,683` bytes，主包 `2,021,075` bytes；回执 `.codex-tmp/upload-2026.11.12.3-glass-proportion.json` SHA256 `44f35f8044d487f20bae133fa0374aa34e5b95df54d3abfb5d8818e97a9baf84`。
-- 冻结候选为 `.release/20261112-1c0ba1d-upload`，来源 commit `1c0ba1d3435bdb288ff9b1f5d81d1f954213d0b9`。复制目录与 `apps/miniapp/dist` 完全一致：150 个文件、2,147,082 bytes、树摘要 `a9ccd44c7f5caeff1daec7c972edd7871ecc3be0d2adb3c2fc68a6114f679f77`。
+- 冻结候选为 `.release/20261112-1c0ba1d-upload`，最终来源 commit `6561ec13d6dcf0529d23bcbdd685155ec3bf7f95`。复制目录与 `apps/miniapp/dist` 完全一致：150 个文件、2,147,082 bytes、树摘要 `a9ccd44c7f5caeff1daec7c972edd7871ecc3be0d2adb3c2fc68a6114f679f77`。最终夜间主题清单修正后重新构建的目录摘要与该上传产物保持一致，因此 `2026.11.12.3` 仍对应当前候选内容。
 - 上传成功不等于已设为体验版。公众平台当前仍停在登录页，需账号本人扫码后在“版本管理”选择 `2026.11.12.3` 为体验版。
 - 生产后端只读复核仍为 `2026.11.12.candidate.2` / `1b919e5ce501`，`/healthz` 与 `/readyz` 均 200。通知发送仍为 `false`；`NOTIFICATION_IM_CALLBACK_TOKEN` 缺失，腾讯云控制台也停在登录页，因此私信真实回调、手机通知收件及点击跳转仍未验收。
