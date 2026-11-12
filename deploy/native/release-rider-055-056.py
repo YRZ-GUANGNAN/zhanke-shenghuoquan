@@ -411,19 +411,22 @@ def patch_env(changes):
     os.replace(temporary, ENV_FILE)
 
 
+def commit_matches(expected, actual):
+    return (
+        isinstance(actual, str)
+        and len(actual) >= 12
+        and (actual.startswith(expected) or expected.startswith(actual))
+    )
+
+
 def await_ready(commit):
     last_error = None
     for _ in range(20):
         try:
             probe('/readyz')
             version = probe('/version')['data']
-            actual = version.get('commit', '')
-            require(
-                isinstance(actual, str)
-                and len(actual) >= 12
-                and (actual.startswith(commit) or commit.startswith(actual)),
-                'unexpected running commit',
-            )
+            require(commit_matches(commit, version.get('commit', '')),
+                    'unexpected running commit')
             return version
         except Exception as error:
             last_error = error
@@ -486,7 +489,11 @@ def finish_activated(stage, inspector, values, db):
     require(run(['pgrep', '-c', '-x', 'campus-api'], text=True).strip() == '1',
             'unexpected API process count')
     running = probe('/version')['data']
-    await_ready(CANDIDATE_COMMIT)
+    require(
+        commit_matches(CANDIDATE_COMMIT, running.get('commit', ''))
+        or commit_matches(OLD_COMMIT, running.get('commit', '')),
+        'unexpected running commit before resume',
+    )
     assert_default_off(values)
     validate_new_schema(db, inspector, flag_values(values))
 
@@ -545,11 +552,17 @@ def finish_activated(stage, inspector, values, db):
         require(after_preflight.get('defaultOffCandidateReady') is True,
                 'finish default-off gate failed')
         require(not after_preflight.get('flagConflicts'), 'finish flag conflict')
-    except Exception:
+    except Exception as original:
         if switched and current.resolve(strict=False) == release:
-            switch_current(current, old, 'rider-finish-rollback')
-            run(['systemctl', 'restart', 'campus-api'])
-            await_ready(OLD_COMMIT)
+            try:
+                switch_current(current, old, 'rider-finish-rollback')
+                run(['systemctl', 'restart', 'campus-api'])
+                await_ready(OLD_COMMIT)
+            except Exception as rollback_error:
+                raise RuntimeError(
+                    'resume failed and old-release rollback failed: ' +
+                    type(rollback_error).__name__
+                ) from original
         raise
 
     result = {
@@ -744,7 +757,7 @@ def main():
         })
         switch_current(current, release, 'rider-next')
         stage_switched = True
-        run(['systemctl', 'start', 'campus-api'])
+        run(['systemctl', 'restart', 'campus-api'])
         version = await_ready(CANDIDATE_COMMIT)
         require(probe('/api/v1/features')['data'] == previous_features,
                 'public feature policy changed')
@@ -786,11 +799,17 @@ def main():
         receipt.write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')
         receipt.chmod(0o644)
         print(json.dumps(result))
-    except Exception:
+    except Exception as original:
         if stage_switched and current.resolve(strict=False) == release:
-            switch_current(current, old, 'rider-rollback')
-            run(['systemctl', 'start', 'campus-api'])
-            await_ready(OLD_COMMIT)
+            try:
+                switch_current(current, old, 'rider-rollback')
+                run(['systemctl', 'restart', 'campus-api'])
+                await_ready(OLD_COMMIT)
+            except Exception as rollback_error:
+                raise RuntimeError(
+                    'deployment failed and old-release rollback failed: ' +
+                    type(rollback_error).__name__
+                ) from original
         elif api_stopped and not production_mutated:
             run(['systemctl', 'start', 'campus-api'])
             await_ready(OLD_COMMIT)
