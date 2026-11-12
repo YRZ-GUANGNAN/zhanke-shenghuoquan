@@ -316,6 +316,9 @@ def check_expression(expression):
     syntax trees, not stripped strings: removing all parentheses would accept
     a different expression such as a > (0 AND b) <= 100. Unknown SQL fails closed.
     """
+    # MySQL 8.0.46 can escape the quote after a charset introducer with one or
+    # more backslashes, while 8.4 returns the same expression unescaped.
+    expression = re.sub(r"\\+'", "'", expression)
     token_pattern = re.compile(r"\s+|`[A-Za-z_][A-Za-z_0-9]*`|'(?:''|[^'])*'|[A-Za-z_][A-Za-z_0-9]*|[0-9]+|<=|>=|<>|[(),=<>]")
     tokens = []
     cursor = 0

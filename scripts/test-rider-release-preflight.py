@@ -384,6 +384,10 @@ class RiderReleasePreflightTest(unittest.TestCase):
         pairs = [
             ("((`state` in (_ascii'off_duty',_ascii'on_duty')))", "state IN ('off_duty', 'on_duty')"),
             ("((`currency` = _utf8mb4'CNY'))", "currency = 'CNY'"),
+            ("((`state` in (_utf8mb4\\'off_duty\\',_utf8mb4\\'on_duty')))",
+             "state IN ('off_duty', 'on_duty')"),
+            ("((`state` in (_utf8mb4\\\\'off_duty\\\\',_utf8mb4\\\\'on_duty')))",
+             "state IN ('off_duty', 'on_duty')"),
             ('((`amount_cents` > 0) and (`amount_cents` <= 9007199254740991))',
              'amount_cents > 0 AND amount_cents <= 9007199254740991'),
             ('((char_length(trim(`source_policy_version`)) > 0) and (char_length(`source_evidence_hash`) = 64))',
