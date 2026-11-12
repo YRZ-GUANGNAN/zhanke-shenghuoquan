@@ -167,6 +167,16 @@ def table_shape(sql, table):
     return {'columns': columns, 'indexes': indexes, 'constraints': constraints}
 
 
+def commit_prefix_matches(left, right):
+    return (
+        isinstance(left, str)
+        and isinstance(right, str)
+        and len(left) >= 12
+        and len(right) >= 12
+        and (left.startswith(right) or right.startswith(left))
+    )
+
+
 def release_metadata(current, version_commit):
     target = current.resolve()
     safe_target = current.is_symlink() and target.parent == ROOT / 'releases'
@@ -193,7 +203,7 @@ def release_metadata(current, version_commit):
     match = next((item for item in candidates
                   if item['release'] == target.name
                   and len(item['commit']) >= 12
-                  and version_commit.startswith(item['commit'])), None)
+                  and commit_prefix_matches(version_commit, item['commit'])), None)
     return {
         'currentIsSafeReleaseSymlink': safe_target,
         'targetName': target.name if safe_target else '',
@@ -421,10 +431,11 @@ def expected_commit_matches(snapshot, expected_commit):
     version = snapshot.get('version', {})
     data = version.get('data', {}) if isinstance(version, dict) else {}
     runtime_commit = data.get('commit') if isinstance(data, dict) else None
-    return (isinstance(runtime_commit, str)
-            and re.fullmatch('[a-f0-9]{12,40}', runtime_commit) is not None
-            and len(runtime_commit) >= len(expected_commit)
-            and runtime_commit.startswith(expected_commit))
+    return (
+        isinstance(runtime_commit, str)
+        and re.fullmatch('[a-f0-9]{12,40}', runtime_commit) is not None
+        and commit_prefix_matches(runtime_commit, expected_commit)
+    )
 
 
 def evaluate(snapshot, expected_commit=None):

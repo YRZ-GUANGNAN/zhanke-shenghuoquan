@@ -32,7 +32,7 @@ RELEASE_ID = '20261112-rider-wallet-1b919e5'
 RELEASE_VERSION = '2026.11.12.candidate.2'
 CANDIDATE_COMMIT = '1b919e5ce5017373cdf10a22da1f503f5e1f5c50'
 CANDIDATE_BINARY_SHA256 = 'ec5c8695db133cc3c98b78e5ba2cbf8aef82cb3fde1b843e04190e3fd2b2eb61'
-MANIFEST_SHA256 = '060d018e05640359685b21b5620f635f5da6383ffd09549e5f9850fda7d1a1f1'
+MANIFEST_SHA256 = '63fec141d4216de5c39c7afb4bd64a2ddaa0c3d8aec6ce37a6afff61f1fcb65c'
 MIGRATIONS = [
     '055_delivery_rider_availability.sql',
     '056_delivery_rider_withdrawal_allocations.sql',
@@ -41,7 +41,7 @@ MIGRATION_SHA256 = {
     MIGRATIONS[0]: 'cc0bc1f59a5c230d14a9f81bca1b17d302a25539809380fe05a53e38f186b5ab',
     MIGRATIONS[1]: '97eeb45cc4a8fe4e1fa6a17f05f4a3e188b3b7313dba14ecb07bb070a56af6a6',
 }
-INSPECTOR_SHA256 = 'a0e0392b2ebb050cb8d6d53ba2a94932d2a37cc6fe3fa19baf5bb89958e24811'
+INSPECTOR_SHA256 = 'd1d39b52a1426addcabe07269788ad3303594bb1c1be739a70785d9a7d11d475'
 OFF_FLAGS = (
     'ENABLE_DELIVERY_RIDER_BROADCAST',
     'ENABLE_DELIVERY_RIDER_WITHDRAWAL',
@@ -516,6 +516,11 @@ def finish_activated(stage, inspector, values, db):
             verification_db + "'",
         ) == 1:
             sql(db, 'DROP DATABASE `' + verification_db + '`')
+
+    shutil.copy2(stage / 'manifest.json', release / 'candidate-manifest.json')
+    shutil.copy2(stage / 'inspect-rider-release.py', release / 'inspect-rider-release.py')
+    (release / 'candidate-manifest.json').chmod(0o644)
+    (release / 'inspect-rider-release.py').chmod(0o644)
 
     current, _ = current_release()
     old = ROOT / 'releases' / OLD_RELEASE

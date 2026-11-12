@@ -109,9 +109,34 @@ class RiderReleasePreflightTest(unittest.TestCase):
                 self.assertTrue(result['expectedCommitMatches'])
                 self.assertTrue(result['defaultOffCandidateReady'])
 
+    def test_short_runtime_commit_matches_full_expected_commit(self):
+        snapshot = ready_snapshot()
+        snapshot['version'] = {'data': {'commit': '203af3154df3'}}
+        result = MODULE.evaluate(
+            snapshot,
+            expected_commit='203af3154df3526579410f5506fea89c5cec1152',
+        )
+        self.assertTrue(result['expectedCommitMatches'])
+        self.assertTrue(result['defaultOffCandidateReady'])
+
+    def test_commit_prefix_matching_rejects_short_or_ambiguous_values(self):
+        for left, right in (
+            ('203af3154df3', '203af3154df3'),
+            ('203af3154df3526579410f5506fea89c5cec1152', '203af3154df3'),
+        ):
+            with self.subTest(left=left, right=right):
+                self.assertTrue(MODULE.commit_prefix_matches(left, right))
+        for left, right in (
+            ('203af31', '203af3154df3'),
+            ('203af3154df3', '203af31'),
+            ('203af3154df3', 'a' * 12),
+            (None, '203af3154df3'),
+        ):
+            with self.subTest(left=left, right=right):
+                self.assertFalse(MODULE.commit_prefix_matches(left, right))
+
     def test_wrong_missing_or_ambiguous_runtime_commit_blocks_all_gates(self):
         for version in ({}, {'data': {}}, {'data': {'commit': '203af31'}},
-                        {'data': {'commit': '203af3154df3'}},
                         {'data': {'commit': 'a' * 40}}):
             with self.subTest(version=version):
                 snapshot = ready_snapshot()
