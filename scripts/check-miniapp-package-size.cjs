@@ -42,6 +42,7 @@ function pageArtifact(files, page, label) {
   if (!files.has(`${page}.js`) || !files.has(`${page}.json`) || !files.has(`${page}.wxml`)) throw new Error(`${label} is missing page output: ${page}`)
 }
 function analyzePackage(distDir = defaultDist) {
+  const isDefaultDist = path.resolve(distDir) === defaultDist
   const appJSONPath = path.join(distDir, 'app.json')
   if (!fs.existsSync(appJSONPath)) throw new Error('dist is missing app.json')
   const manifest = readJSON(appJSONPath, 'app.json')
@@ -78,7 +79,15 @@ function analyzePackage(distDir = defaultDist) {
   for (const pkg of packages.slice(1)) packageFiles.set(pkg.name, files.filter(file => isWithin(file, pkg.root)))
   const sizes = [...packageFiles.entries()].map(([name, packageFilesForName]) => ({ name, bytes: packageFilesForName.reduce((sum, file) => sum + fs.statSync(path.join(distDir, file)).size, 0) }))
   const totalBytes = files.reduce((sum, file) => sum + fs.statSync(path.join(distDir, file)).size, 0)
-  return { files, packages: sizes, totalBytes, packageLimit, totalLimit, manifest }
+  return {
+    files,
+    packages: sizes,
+    totalBytes,
+    packageLimit,
+    totalLimit,
+    manifest,
+    mainSlimBudget: isDefaultDist ? mainSlimBudget : undefined,
+  }
 }
 function formatReport(report) {
   const failures = report.packages.filter(pkg => pkg.bytes > report.packageLimit)
@@ -86,7 +95,9 @@ function formatReport(report) {
   if (failures.length) throw new Error(`package size exceeds limit: ${failures.map(pkg => `${pkg.name}=${pkg.bytes} bytes`).join(', ')}`)
   const main = report.packages.find(pkg => pkg.name === 'main')
   if (main && main.bytes > report.packageLimit - mainCompileHeadroom) throw new Error(`main=${main.bytes} bytes leaves insufficient WeChat compile headroom (reserve=${mainCompileHeadroom} bytes)`)
-  if (main && main.bytes > mainSlimBudget) throw new Error(`main=${main.bytes} bytes exceeds the post-split slim budget (${mainSlimBudget} bytes)`)
+  if (main && report.mainSlimBudget && main.bytes > report.mainSlimBudget) {
+    throw new Error(`main=${main.bytes} bytes exceeds the post-split slim budget (${report.mainSlimBudget} bytes)`)
+  }
   return `miniapp package: PASS (${report.packages.map(pkg => `${pkg.name}=${pkg.bytes}`).join(', ')}; total=${report.totalBytes})`
 }
 function main() { try { console.log(formatReport(analyzePackage())) } catch (error) { console.error(`miniapp package: FAIL (${error instanceof Error ? error.message : String(error)})`); process.exitCode = 1 } }
