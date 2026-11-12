@@ -290,9 +290,9 @@ Run with a new version:
 ```powershell
 & 'D:\3314\微信web开发者工具\cli.bat' upload `
   --project 'C:\Users\33141\.codex\worktrees\experience-ui-wallet-20261101\New project\apps\miniapp' `
-  --version '2026.11.12.5' `
-  --desc '主包分包瘦身与路由回归' `
-  --info-output 'C:\Users\33141\.codex\worktrees\experience-ui-wallet-20261101\New project\.codex-tmp\upload-2026.11.12.5-subpackages.json'
+  --version '2026.11.12.6' `
+  --desc '恢复原底栏比例并保留分包瘦身' `
+  --info-output 'C:\Users\33141\.codex\worktrees\experience-ui-wallet-20261101\New project\.codex-tmp\upload-2026.11.12.6-original-bottom.json'
 ```
 
 Expected: `√ upload`，记录总包、主包和分包字节。
@@ -305,7 +305,7 @@ Run:
 & 'D:\3314\微信web开发者工具\cli.bat' preview `
   --project 'C:\Users\33141\.codex\worktrees\experience-ui-wallet-20261101\New project\apps\miniapp' `
   --qr-format image `
-  --qr-output 'C:\Users\33141\.codex\worktrees\experience-ui-wallet-20261101\New project\.codex-tmp\preview-2026.11.12.5-subpackages.png'
+  --qr-output 'C:\Users\33141\.codex\worktrees\experience-ui-wallet-20261101\New project\.codex-tmp\preview-2026.11.12.6-original-bottom.png'
 ```
 
 Expected: 生成可扫描二维码，页面包体与上传回执一致。

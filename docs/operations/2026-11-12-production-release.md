@@ -85,3 +85,13 @@
 - 官方 CLI 成功上传 `2026.11.12.5`，说明“主包分包瘦身与完整路由回归”；回执 `.codex-tmp/upload-2026.11.12.5-subpackages.json` SHA256 `bb6018e658146db29d0312b6355bbf913d46d7c382ea4256ab4a1be275717549`。
 - 冻结候选 `.release/20261112-60d8f7b-subpackages` 对应源码 commit `60d8f7bd2b88712e677a2072abae27e5316bc370`：188 个文件、2,185,538 bytes、目录树摘要 `8f21ec51eda9254fa0873071e4f872da60e169859f3aa240daca97f57971f5ae`。
 - 最新开发预览二维码 `.codex-tmp/preview-2026.11.12.5-subpackages.png` SHA256 `6fd94cddc3e2b670e6d0be418c3fc624af2289af2acfb39654bc57c2def92544`。公众平台登录后需选择 `2026.11.12.5` 为体验版；上传成功本身不等于体验版已切换。
+
+### 最终底栏恢复 `2026.11.12.6`
+
+- 用户指出 `.5` 的底栏比例仍是重排版本。已撤回底栏比例重做，`student-bottom-nav.scss` 和 `delivery-workspace-nav.scss` 恢复为 `3e8fa3e` 中用户认可的原始尺寸、内边距、图标、发布键和激活背景，仅继续保留液态玻璃。
+- 分包结构、预下载、URL、业务组件和页面内容均未回退；仍为 16 个主包页面与 16 个分包页面，共 32 个路由。
+- 本地主包 `1,569,442` bytes、总包 `2,185,007` bytes；官方上传主包 `1,585,201` bytes、总包 `2,227,375` bytes。主包比 `.4` 的官方主包减少 `435,874` bytes。
+- 最终底栏恢复后重新执行 `check:release-regression`，25/25 通过；`check-miniapp-package-size`、底栏玻璃、触控几何、UI 系统和类型检查均通过。
+- 官方 CLI 成功上传 `2026.11.12.6`，说明“恢复原底栏比例并保留分包瘦身”；回执 `.codex-tmp/upload-2026.11.12.6-original-bottom.json` SHA256 `ffe3c4f6ef452b43b5614b68deb8834d4d97af779d4767c27fbd38ec5c5fb00a`。
+- 冻结候选 `.release/20261112-ea90d7f-original-bottom` 对应源码 commit `ea90d7f0f21afd49c7abb9a560d4b5b541ca4141`：188 个文件、2,185,007 bytes、目录树摘要 `e8e811d3599b84d80d24e321ca9fa132c821dbd65804f9e3030227c2a694848f`。
+- 最新开发预览二维码 `.codex-tmp/preview-2026.11.12.6-original-bottom.png` SHA256 `1fee050621c93b136e761ac56c4aac9de9769d470b0c8e38422cfa62b04ddfbe`。应只扫码使用 `.6`，`.5` 不再作为当前候选。
