@@ -3,6 +3,8 @@
 @use './components/surface-enhancements.scss';
 
 page {
+  --glass-nav: rgba(255, 255, 255, .72);
+  --glass-nav-border: rgba(255, 255, 255, .62);
   min-height: 100%;
   background: var(--bg-app, #f2f5f9);
   color: var(--text-primary, #2a3a4a);

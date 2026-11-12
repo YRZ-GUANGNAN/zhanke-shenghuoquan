@@ -55,10 +55,11 @@ try {
   loadStyles('pages/home/index.wxss')
   const supported = rule => inCondition(rule, 'supports', /-webkit-backdrop-filter/)
   const reduced = rule => inCondition(rule, 'media', /prefers-reduced-motion\s*:\s*reduce/)
-  check('bottom nav keeps real glass and an opaque unsupported fallback', () => {
+  check('bottom nav keeps real glass with a translucent no-blur fallback', () => {
     for (const selector of ['page .student-bottom-nav', 'page .delivery-workspace-nav']) {
-      assert.ok(matchingRules(selector, rule => rule.parent.type === 'root').some(rule => /var\(--bg-surface/.test(declarations(rule).background || '')), `${selector}: opaque fallback missing`)
-      assert.ok(matchingRules(selector, supported).some(rule => declarations(rule).background === 'transparent' && hasBothFilters(rule, 'blur(24rpx)')), `${selector}: prefix-only support would make the nav transparent without blur`)
+      assert.ok(matchingRules(selector, rule => rule.parent.type === 'root').some(rule => /var\(--glass-nav/.test(declarations(rule).background || '')), `${selector}: translucent fallback missing`)
+      assert.ok(matchingRules(selector, rule => rule.parent.type === 'root').some(rule => declarations(rule)['backdrop-filter'] === 'blur(24rpx)'), `${selector}: blur enhancement missing`)
+      assert.ok(matchingRules(selector, supported).some(rule => /var\(--glass-nav/.test(declarations(rule).background || '') && hasBothFilters(rule, 'blur(24rpx)')), `${selector}: supported glass rule incomplete`)
     }
   })
   check('sheet and native refresh glass retain both filter declarations', () => {

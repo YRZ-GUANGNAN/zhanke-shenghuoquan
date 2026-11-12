@@ -19,9 +19,9 @@ function checkTransparentFixedSurface() {
       .filter(node => node.type === 'decl')
       .map(node => [node.prop, node.value]))
     if (rule.selector.split(',').map(selector => selector.trim()).join(',') === 'page .student-bottom-nav,page .delivery-workspace-nav') {
-      fallback ||= rule.parent.type === 'root' && declarations.background.includes('--bg-surface')
+      fallback ||= rule.parent.type === 'root' && declarations.background.includes('--glass-nav')
       glass ||= rule.parent.name === 'supports'
-        && declarations.background === 'transparent'
+        && declarations.background.includes('--glass-nav')
         && declarations['backdrop-filter'] === 'blur(24px)'
     }
     if (rule.selector.includes('page .student-bottom-nav__icon-asset') && !rule.selector.includes('--active')) {
@@ -31,8 +31,8 @@ function checkTransparentFixedSurface() {
       activeIcon ||= declarations.opacity === '1'
     }
   })
-  assert.ok(fallback, '不支持 backdrop-filter 时必须保留可读实色底')
-  assert.ok(glass, '学生、商家与骑手底栏必须保留透明底和 24px 毛玻璃')
+  assert.ok(fallback, '不支持 backdrop-filter 时必须保留半透明可读回退')
+  assert.ok(glass, '学生、商家与骑手底栏必须保留半透明底和 24px 毛玻璃')
   assert.ok(icon && activeIcon, '底栏图标透明度与激活态必须保持现有契约')
 
   for (const [component, style, radius] of [

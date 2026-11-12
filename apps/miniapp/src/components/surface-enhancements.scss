@@ -1,8 +1,13 @@
 // TabBar visual core ported from nanxiaobei/taro-ux-kits/custom-tab-bar/index.wxss
 // @ f85a5d714639006a9c3f12c67838087a30255c0b. Existing layout, icons and routing
-// stay app-owned. An opaque fallback is required only without backdrop support.
+// stay app-owned. A translucent fallback remains readable without blur support.
 page .student-bottom-nav,
-page .delivery-workspace-nav { background: var(--bg-surface, #FFFFFF); }
+page .delivery-workspace-nav {
+  border: 1rpx solid var(--glass-nav-border, rgba(255, 255, 255, .62));
+  background: var(--glass-nav, rgba(255, 255, 255, .72));
+  -webkit-backdrop-filter: blur(24rpx);
+  backdrop-filter: blur(24rpx);
+}
 page .refresh-feedback { background: var(--bg-surface, #FFFFFF); }
 page .app-dialog-layer .app-dialog,
 page .app-action-sheet-layer .app-action-sheet { background: var(--bg-surface, #FFFFFF); }
@@ -10,7 +15,7 @@ page .app-action-sheet-layer .app-action-sheet { background: var(--bg-surface, #
 @supports ((backdrop-filter: blur(1PX)) or (-webkit-backdrop-filter: blur(1PX))) {
   page .student-bottom-nav,
   page .delivery-workspace-nav {
-    background: transparent;
+    background: var(--glass-nav, rgba(255, 255, 255, .72));
     // Keep the prefixed declaration for WebViews accepted by the supports query.
     /* autoprefixer: ignore next */
     -webkit-backdrop-filter: blur(24px);

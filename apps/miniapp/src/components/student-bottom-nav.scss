@@ -11,8 +11,10 @@
   align-items: end;
   min-height: 96rpx;
   padding: 8rpx 10rpx calc(12rpx + env(safe-area-inset-bottom));
-  border-top: 1rpx solid $divider-nav;
-  background: rgba($bg-surface-static, .98);
+  border: 1rpx solid var(--glass-nav-border, rgba(255, 255, 255, .62));
+  background: var(--glass-nav, rgba(255, 255, 255, .72));
+  -webkit-backdrop-filter: blur(24rpx);
+  backdrop-filter: blur(24rpx);
   box-shadow: 0 -10rpx 28rpx rgba(15, 42, 68, .045);
   box-sizing: border-box;
   border-radius: 24PX;
