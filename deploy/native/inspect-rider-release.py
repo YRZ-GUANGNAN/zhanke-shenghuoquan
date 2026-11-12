@@ -253,11 +253,17 @@ def collect_live_snapshot():
         "FROM im_notification_receipts GROUP BY status,conversation_type "
         "ORDER BY status,conversation_type"
     ) if 'im_notification_receipts' in tables else '')
-    template_keys = [name for name in values if 'SUBSCRIBE' in name and 'TEMPLATE' in name]
+    template_keys = [
+        'WECHAT_ORDER_TEMPLATE_ID',
+        'WECHAT_ORDER_TEMPLATE_FIELDS',
+        'WECHAT_MESSAGE_TEMPLATE_ID',
+        'WECHAT_MESSAGE_TEMPLATE_FIELDS',
+    ]
     allowlist_count = 0
-    for name in values:
-        if 'NOTIFICATION' in name and ('ALLOWLIST' in name or 'WHITELIST' in name):
-            allowlist_count += len([item for item in values[name].split(',') if item.strip()])
+    allowlist_count = len([
+        item for item in values.get('NOTIFICATION_TEST_USER_IDS', '').split(',')
+        if item.strip()
+    ])
     return {
         'version': version, 'readyHTTP': ready, 'releaseMetadata': metadata,
         # Preserve absent values; evaluate applies the backend defaults
