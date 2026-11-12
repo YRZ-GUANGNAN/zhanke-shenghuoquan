@@ -57,7 +57,7 @@ const touchCases = {
   'edit-profile': ['.edit-profile-gender'],
   blacklist: ['.student-blacklist-user__remove'],
   about: ['.about-row'],
-  'merchant-messages': ['.merchant-messages-nav__read'],
+  'merchant-messages': ['.merchant-message-item'],
   'merchant-order-detail': ['.merchant-detail-nav__refresh']
 }
 function pixels(value, viewport) {

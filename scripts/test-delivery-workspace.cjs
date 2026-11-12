@@ -152,6 +152,7 @@ function messagesHarness(options = {}) {
     '@tarojs/taro': { useDidShow: (fn) => { show = fn }, useDidHide: (fn) => { hide = fn } },
     '../../components/capsule-page-header': header,
     '../../components/ui': { AppIconButton: 'AppIconButton' },
+    '../../components/refresh-scroll-view': 'RefreshScrollView',
     '../../components/runtime-session-gate': 'RuntimeSessionGate',
     '../../components/delivery-workspace-nav': { __esModule: true, default: 'DeliveryWorkspaceNav', useDeliveryWorkspaceNavigation: () => ({ swipe: { handlers: {}, canActivate: () => true } }) },
     '../../components/chat-avatar': 'ChatAvatar',
@@ -183,7 +184,8 @@ function messagesHarness(options = {}) {
     calls, session, one, items, flush: renderer.flush,
     get tree() { return renderer.tree },
     async mount() { renderer.render(); await renderer.flush() },
-    async refresh() { one('merchant-messages-nav__read').props.onClick(); await renderer.flush() },
+    async refresh() { void one('merchant-messages-scroll').props.onRefresh(); await renderer.flush() },
+    async pullRefresh() { await one('merchant-messages-scroll').props.onRefresh(); await renderer.flush() },
     async more() { one('merchant-messages-scroll').props.onScrollToLower(); await renderer.flush() },
     async state(patch) { session.update(patch); renderer.render(); await renderer.flush() },
     async allowed(value) { allowed = value; renderer.render(); await renderer.flush() },
@@ -620,6 +622,21 @@ async function run() {
     check.equal(app.calls.redirect[0].url, role === 'merchant' ? '/pages/merchant-home/index' : '/pages/delivery-rider/index')
     check.equal(nodes(app.tree, (node) => node.type === 'DeliveryWorkspaceNav')[0].props.role, role)
     passed(`${role} 消息守卫、完整订单号路由、返回入口与导航身份一致`)
+  }
+  {
+    const merchant = messagesHarness({ role: 'merchant' })
+    await merchant.mount()
+    check.equal(merchant.one('merchant-messages-nav__read'), undefined, '商家消息不显示顶部刷新文字')
+    check.equal(typeof merchant.one('merchant-messages-scroll').props.onRefresh, 'function', '商家消息使用共享下拉刷新组件')
+    await merchant.pullRefresh()
+    check.equal(merchant.calls.lists.length, 2)
+    const rider = messagesHarness({ role: 'rider' })
+    await rider.mount()
+    check.equal(rider.one('merchant-messages-nav__read'), undefined, '骑手消息不显示顶部刷新文字')
+    check.equal(typeof rider.one('merchant-messages-scroll').props.onRefresh, 'function', '骑手消息使用共享下拉刷新组件')
+    await rider.pullRefresh()
+    check.equal(rider.calls.lists.length, 2)
+    passed('骑手与商家消息都移除顶部刷新并保留下拉刷新')
   }
   await profilePresentationScenarios()
   console.log(`PASS 配送多页工作区 ${scenarios} 组场景，${assertions} 项行为断言`)

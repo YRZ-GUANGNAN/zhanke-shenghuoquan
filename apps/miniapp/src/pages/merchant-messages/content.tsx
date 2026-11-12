@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { ScrollView, Text, View } from '@tarojs/components'
+import { Text, View } from '@tarojs/components'
 import { useDidHide, useDidShow } from '@tarojs/taro'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import NotificationInbox from '../../components/notification-inbox'
+import RefreshScrollView from '../../components/refresh-scroll-view'
 import { AppIconButton } from '../../components/ui'
 import DeliveryWorkspaceNav, { useDeliveryWorkspaceNavigation } from '../../components/delivery-workspace-nav'
 import { useSessionStore } from '../../stores/session'
@@ -12,7 +13,6 @@ import {
   type DeliveryConversation,
 } from '../../services/delivery-im'
 import Taro from '../../services/taro'
-import { useBottomNavScroll } from '../../utils/bottom-nav-motion'
 import { useNotificationState } from '../../hooks/use-notification-runtime'
 
 const statusCopy: Record<DeliveryConversation['status'], string> = {
@@ -28,7 +28,6 @@ function formatTime(value: string) {
 }
 
 export function DeliveryMessagesContent({ role, identityAllowed }: { role: 'merchant' | 'rider'; identityAllowed: boolean }) {
-  const navScroll = useBottomNavScroll(identityAllowed, role)
   const workspace = useDeliveryWorkspaceNavigation({ role, active: 'messages' }, identityAllowed)
   const accountId = useSessionStore(state => state.profile.id)
   const token = useSessionStore(state => state.token)
@@ -45,9 +44,10 @@ export function DeliveryMessagesContent({ role, identityAllowed }: { role: 'merc
   const allowedRef = useRef(identityAllowed)
   allowedRef.current = identityAllowed
 
-  const loadMessages = useCallback(async (append = false) => {
-    if (!allowedRef.current || !visible.current || busy.current) return
+  const loadMessages = useCallback(async (append = false): Promise<boolean> => {
+    if (!allowedRef.current || !visible.current || busy.current) return false
     busy.current = true
+    let succeeded = false
     const version = epoch.current
     const session = useSessionStore.getState()
     const current = () => version === epoch.current && allowedRef.current && visible.current
@@ -57,7 +57,7 @@ export function DeliveryMessagesContent({ role, identityAllowed }: { role: 'merc
     setLoadError('')
     try {
       const result = await listDeliveryConversations(nextPage, 30)
-      if (!current()) return
+      if (!current()) return false
       setItems(previous => append ? Array.from(new Map([...previous, ...result.items].map(item => [item.conversationPublicId, item])).values()) : result.items)
       if (!append) setUnreadById({})
       pageRef.current = nextPage
@@ -70,18 +70,20 @@ export function DeliveryMessagesContent({ role, identityAllowed }: { role: 'merc
           return [item.conversationPublicId, -1] as const
         }
       }))
-      if (!current()) return
+      if (!current()) return false
       const unread = unreadEntries.reduce<Record<string, number>>((result, [id, count]) => {
         result[id] = count
         return result
       }, {})
       setUnreadById(previous => append ? { ...previous, ...unread } : unread)
+      succeeded = true
     } catch (error) {
-      if (!current()) return
+      if (!current()) return false
       setLoadError(error instanceof Error ? error.message : '消息加载失败')
     } finally {
       if (current()) { busy.current = false; setLoading(false) }
     }
+    return succeeded
   }, [])
 
   useDidHide(() => { visible.current = false; epoch.current += 1; busy.current = false })
@@ -131,15 +133,12 @@ export function DeliveryMessagesContent({ role, identityAllowed }: { role: 'merc
         className='merchant-messages-nav'
         title='消息'
         left={<AppIconButton name='back' label='返回工作台' className='merchant-messages-nav__back' onClick={() => void Taro.redirectTo({ url: role === 'merchant' ? '/pages/merchant-home/index' : '/pages/delivery-rider/index' })} />}
-        right={(
-          <Text className='merchant-messages-nav__read' onClick={() => void loadMessages()}>
-            刷新
-          </Text>
-        )}
       />
 
-      <ScrollView className='merchant-messages-scroll' scrollY enhanced showScrollbar={false} lowerThreshold={100}
-        onScroll={event => navScroll(Number(event.detail?.scrollTop))}
+      <RefreshScrollView className='merchant-messages-scroll' enabled={identityAllowed}
+        busy={loading} refreshKey={`delivery-messages:${role}:${accountId}:${token}`}
+        onRefresh={() => loadMessages()}
+        scrollY enhanced showScrollbar={false} lowerThreshold={100}
         onScrollToLower={() => { if (items.length < total) void loadMessages(true) }}>
         <NotificationInbox enabled={identityAllowed} />
         <View className='merchant-messages-card'>
@@ -176,7 +175,7 @@ export function DeliveryMessagesContent({ role, identityAllowed }: { role: 'merc
           })}
           {!loading && items.length < total ? <Text className='merchant-messages-card__footer' onClick={() => void loadMessages(true)}>加载更多会话</Text> : null}
         </View>
-      </ScrollView>
+      </RefreshScrollView>
       <DeliveryWorkspaceNav role={role} active='messages' gestureGuard={workspace.swipe.canActivate} />
     </View>
   )

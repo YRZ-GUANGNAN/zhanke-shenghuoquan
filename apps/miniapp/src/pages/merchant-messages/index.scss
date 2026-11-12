@@ -44,23 +44,6 @@ page {
   font-weight: 300;
 }
 
-.merchant-messages-nav__read {
-  @include ref.touch;
-  padding-left: 20rpx;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  box-sizing: border-box;
-  color: $brand-primary;
-  font-size: 24rpx;
-  line-height: 1;
-  font-weight: 700;
-}
-
-.merchant-messages-nav__read--muted {
-  color: $text-muted;
-}
-
 .merchant-messages-scroll {
   min-height: 0;
   flex: 1 1 auto;
