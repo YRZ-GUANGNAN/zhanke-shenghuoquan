@@ -5,14 +5,12 @@
   flex: 0 0 auto;
   display: flex;
   align-items: stretch;
-  width: calc(100% - 20PX);
-  height: calc(44PX + env(safe-area-inset-bottom));
-  min-height: 0;
+  width: calc(100% - 16PX);
   box-sizing: border-box;
-  padding: 0 10PX env(safe-area-inset-bottom);
+  padding: 4PX 10PX calc(4PX + env(safe-area-inset-bottom));
   background: $bg-surface;
   border-top: 1PX solid $border-default;
-  margin: 0 10PX 10PX;
+  margin: 0 8PX 8PX;
   border-radius: 18PX;
   overflow: hidden;
 }
@@ -25,35 +23,17 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3PX;
+  gap: 4PX;
   color: $text-secondary;
-  border-radius: 14PX;
-  font-size: 11PX;
-  line-height: 15PX;
-  transition: background-color 120ms, opacity 120ms;
+  border-radius: 10PX;
+  font-size: 12PX;
+  line-height: 16PX;
+  transition: background 120ms, opacity 120ms;
 }
-.delivery-workspace-nav__item::before {
-  position: absolute;
-  top: 2PX;
-  bottom: 2PX;
-  left: 50%;
-  width: calc(100% - 12PX);
-  max-width: 76PX;
-  border-radius: 14PX;
-  background: transparent;
-  content: '';
-  transition: background-color 120ms;
-  transform: translateX(-50%);
-}
-.delivery-workspace-nav__icon,
-.delivery-workspace-nav__item text {
-  position: relative;
-  z-index: 1;
-}
-.delivery-workspace-nav .delivery-workspace-nav__icon { width: 22PX; height: 22PX; }
+.delivery-workspace-nav .delivery-workspace-nav__icon { width: 24PX; height: 24PX; }
 .delivery-workspace-nav__badge {
   position: absolute;
-  top: 2PX;
+  top: 0;
   left: 55%;
   min-width: 14PX;
   padding: 0 3PX;
@@ -65,10 +45,8 @@
   text-align: center;
 }
 .delivery-workspace-nav__item:not(.delivery-workspace-nav__item--active) .delivery-workspace-nav__icon { filter: grayscale(1); }
-.delivery-workspace-nav__item--active { color: $brand-primary-strong; background: transparent; font-weight: 650; }
-.delivery-workspace-nav__item--active::before { background: $brand-tint; }
+.delivery-workspace-nav__item--active { color: $brand-primary-strong; background: $brand-tint; font-weight: 650; }
 .delivery-workspace-nav__item--pressed { opacity: 1; }
 @media (prefers-reduced-motion: reduce) {
-  .delivery-workspace-nav__item,
-  .delivery-workspace-nav__item::before { transition: none; }
+  .delivery-workspace-nav__item { transition: none; }
 }
