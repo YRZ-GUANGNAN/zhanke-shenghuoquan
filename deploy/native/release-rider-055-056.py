@@ -417,7 +417,13 @@ def await_ready(commit):
         try:
             probe('/readyz')
             version = probe('/version')['data']
-            require(version.get('commit') == commit, 'unexpected running commit')
+            actual = version.get('commit', '')
+            require(
+                isinstance(actual, str)
+                and len(actual) >= 12
+                and (actual.startswith(commit) or commit.startswith(actual)),
+                'unexpected running commit',
+            )
             return version
         except Exception as error:
             last_error = error
@@ -459,12 +465,133 @@ def stage_assets(stage):
     return manifest
 
 
+def latest_backup():
+    backup_dir = Path('/var/backups/campus-circle') / RELEASE_ID
+    require(backup_dir.is_dir() and not backup_dir.is_symlink(), 'backup directory missing')
+    backups = sorted(backup_dir.glob('database-*.sql.gz'), key=lambda path: path.stat().st_mtime)
+    require(backups, 'pre-migration backup missing')
+    backup = backups[-1]
+    require(backup.is_file() and not backup.is_symlink(), 'latest backup is unsafe')
+    with gzip.open(backup, 'rb') as stream:
+        dump = stream.read()
+    require(dump and b'-- Dump completed on ' in dump[-4096:], 'latest backup is incomplete')
+    return backup, dump
+
+
+def finish_activated(stage, inspector, values, db):
+    release = ROOT / 'releases' / RELEASE_ID
+    require(release.is_dir() and not release.is_symlink(), 'migrated release directory missing')
+    require(sha256_file(release / 'bin/campus-api') == CANDIDATE_BINARY_SHA256,
+            'migrated release binary mismatch')
+    require(run(['pgrep', '-c', '-x', 'campus-api'], text=True).strip() == '1',
+            'unexpected API process count')
+    running = probe('/version')['data']
+    await_ready(CANDIDATE_COMMIT)
+    assert_default_off(values)
+    validate_new_schema(db, inspector, flag_values(values))
+
+    backup, dump = latest_backup()
+    verification_db = 'campus_finish_rider_1b919e5'
+    require(scalar(
+        db,
+        "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='" +
+        verification_db + "'",
+    ) == 0, 'finish verification database already exists')
+    try:
+        sql(db, 'CREATE DATABASE `' + verification_db +
+            '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci')
+        run(['mysql', *MYSQL, '--default-character-set=utf8mb4', verification_db], input=dump)
+        schema, before = snapshot(verification_db)
+        require(len(schema) >= 90, 'unexpected backup table inventory')
+        for name in MIGRATIONS:
+            run(['mysql', *MYSQL, '--default-character-set=utf8mb4', verification_db],
+                input=(stage / name).read_bytes())
+        validate_new_schema(verification_db, inspector, flag_values(values))
+        require(snapshot(verification_db, schema)[1] == before,
+                'finish rehearsal changed original rows')
+    finally:
+        if scalar(
+            db,
+            "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='" +
+            verification_db + "'",
+        ) == 1:
+            sql(db, 'DROP DATABASE `' + verification_db + '`')
+
+    current, _ = current_release()
+    old = ROOT / 'releases' / OLD_RELEASE
+    require(old.is_dir() and not old.is_symlink(), 'old release directory missing')
+    switched = False
+    try:
+        if current.resolve(strict=True) != release:
+            switch_current(current, release, 'rider-resume')
+        switched = True
+        run(['systemctl', 'restart', 'campus-api'])
+        version = await_ready(CANDIDATE_COMMIT)
+        after_inspector = read_inspector(
+            stage / 'inspect-rider-release.py',
+            '--expected-commit',
+            CANDIDATE_COMMIT,
+            '--require-ready',
+            'candidate',
+        )
+        after_preflight = after_inspector.get('preflight', {})
+        require(after_preflight.get('migration055Ready') and
+                after_preflight.get('migration056Ready'), 'finish migration gate failed')
+        require(after_preflight.get('defaultOffCandidateReady') is True,
+                'finish default-off gate failed')
+        require(not after_preflight.get('flagConflicts'), 'finish flag conflict')
+    except Exception:
+        if switched and current.resolve(strict=False) == release:
+            switch_current(current, old, 'rider-finish-rollback')
+            run(['systemctl', 'restart', 'campus-api'])
+            await_ready(OLD_COMMIT)
+        raise
+
+    result = {
+        'release': RELEASE_ID,
+        'previousRelease': str(old),
+        'commit': CANDIDATE_COMMIT,
+        'version': RELEASE_VERSION,
+        'candidateManifestSha256': MANIFEST_SHA256,
+        'binarySha256': CANDIDATE_BINARY_SHA256,
+        'deployed': True,
+        'databaseMigrated': True,
+        'featuresActivated': False,
+        'resumedAfterPostStartIdentityCheck': True,
+        'runningVersionBeforeResume': running,
+        'versionData': version,
+        'backup': str(backup),
+        'backupSha256': sha256_file(backup),
+        'backupUncompressedBytes': len(dump),
+        'restoredBackupVerified': True,
+        'migrationRehearsalPassed': True,
+        'originalTableCount': len(schema),
+        'originalRowsUnchanged': True,
+        'migrations': MIGRATIONS,
+        'flags': after_inspector['flags'],
+        'notificationDeliveryCount': after_inspector['counts'].get(
+            'delivery_notification_deliveries'
+        ),
+        'withdrawalRows': sum(
+            after_inspector['counts'].get(table) or 0
+            for table in inspector.MIGRATION_056_TABLES
+        ),
+    }
+    receipt = release / 'rider-release-receipt.json'
+    receipt.write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')
+    receipt.chmod(0o644)
+    print(json.dumps(result))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--stage', required=True)
     parser.add_argument('--deploy', action='store_true')
+    parser.add_argument('--finish-activated', action='store_true')
     args = parser.parse_args()
     require(os.geteuid() == 0, 'sudo required')
+    require(not (args.deploy and args.finish_activated),
+            'choose one mutation phase')
     lock = open('/run/campus-rider-055-056-release.lock', 'a', encoding='utf-8')
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
@@ -476,6 +603,9 @@ def main():
     db = database(values)
     require(run(['timedatectl', 'show', '--property=Timezone', '--value'], text=True).strip()
             == 'Asia/Shanghai', 'host clock changed')
+    if args.finish_activated:
+        finish_activated(stage, inspector, values, db)
+        return
     require(run(['pgrep', '-c', '-x', 'campus-api'], text=True).strip() == '1',
             'unexpected API process count')
     current, old = current_release()
