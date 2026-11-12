@@ -8,6 +8,33 @@
 
 当前 `deploy/native/inspect-rider-release.py` 只读，不执行 DDL、环境变更、服务重启、通知发送或付款。055/056 的受保护执行器尚未实现并验收，正式迁移前仍需经批准的独立执行步骤或执行器；不能用只读预检通过替代备份恢复及停写演练。
 
+## 本地安全演练工具（不是生产执行器）
+
+`deploy/native/rehearse-rider-release.py` 是纯离线证据包校验器：只读本地文件，无 DSN、网络、服务管理、环境写入或 SQL 执行入口。必须显式提供 stage、evidence、两个输入 SHA256、旧 commit 和完整 40 位候选 commit。它校验冻结包身份和资产 hash、Linux ELF 文件头、055→056 顺序、停写证据输入、默认关闭及支付/日结开关保持、备份 gzip CRC/完成标记、全体原表目录与恢复/演练前后 digest，以及迁移后预检。
+
+证据 JSON 的 `mode` 只允许 `fixture` 或 `isolated_mysql`，`production`/`live` 明确拒绝。成功回执始终为 `productionReady=false`、`deployed=false`、`featuresActivated=false`、`externalEvidenceAuthenticated=false`；fixture 另为 `simulationOnly=true`。本工具只能证明输入证据包内部一致，不认证输入的现场真实性；ELF 文件头和文件 hash 也不证明 binary 可运行。不得把手工构造的零写者数字或相等 digest 当成真实生产停写/恢复证据。
+
+输入契约：
+
+- `manifest.json`：`schemaVersion=1`，`previousCommit`，`candidateCommit`，`assets`（仅 `campus-api` 与两份准确 SQL 文件名各自的 64 位 SHA256），`migrations`（严格 055、056 顺序），`originalTables`（冻结基线中全部原表的去重排序目录，不能仅列资金表子集）。
+- evidence JSON：相同 schema/commit 和 `manifestSha256`；`stoppedWriters` 的 `scope` 必须匹配 mode，`apiProcesses`、`workerProcesses`、`applicationConnections`、`uninspectedWriters` 必须显式整数 0；`flagsBefore/flagsAfter`、`backup`、三个原表快照、`afterPreflight`。
+- `backup`：stage 内不含路径跳转的 `file`、文件 `sha256`、`completed=true`；工具通读 gzip 校验 CRC，解压上限 256MiB，要求 SQL 建表内容和 mysqldump 完成标记。
+- `beforeMigration`、`restoredOriginalTables`、`afterMigrationOriginalTables`：以全部原表名为键，值为 `{rows: 非负整数, sha256: 64位小写摘要}`；目录和逐表值必须完全一致，不允许预先含 055/056 表。
+- `afterPreflight`：与 `inspect-rider-release.py` 相同的脱敏快照，绑定候选 commit，055/056 结构与默认关闭 candidate 门禁通过；初始 availability 和 056 四表为 0 行，global config 为 1 行。
+
+CLI 参数全部必填，错身份/hash、残留写者、默认开关非关闭、备份损坏/缺完成标记、目录/金额摘要漂移、部分迁移或不完整结构均 exit 1。错误输出只返回固定原因码，不打印输入行、密钥或备份内容。
+
+本地可重复验证：
+
+```powershell
+npm run check:rider-release-rehearsal
+npm run test:rider-money:mysql
+```
+
+2026-11-08 本轮证据：离线 fixture/CLI **17/17，exit 0**；隔离 MySQL 8.4 的 `TestRiderReleaseBackupRestore055056AgainstIsolatedMySQL` **PASS**。该用例经既有专用 runner 的固定 loopback/端口及真实 datadir 双重核验，创建 054 基线与测试资金来源，真实 mysqldump→gzip 完整性→另一新库恢复→055/056，检查 **20 张原表** digest 和来源库不变、默认新表初始状态及 `CheckWithdrawalReadiness`；全套资金 runner **exit 0**，遗留测试数据库 0、临时进程/目录清理 PASS。测试仅使用明确隔离的测试数据，不使用生产导出，不证明生产数据恢复成功，也没有部署 candidate binary。
+
+2026-11-12 最终本地复核：完整 `npm run verify:release` 顶层 `exit 0`，离线演练仍为 17/17，发布预检 29/29，骑手备份恢复用例再次实跑 PASS；证据计数和清理边界同上。该回执仍不能替代生产停写、生产全库备份恢复、055/056 正式迁移或运行时身份核验。
+
 ## 只读候选身份门禁
 
 冻结候选必须包含：完整 Git commit、后端 Linux binary SHA256、055/056 SQL SHA256、小程序与 Admin 资产 SHA256、构建参数、测试命令退出码。构建期间工作树必须干净；不能在旧 dist 上仅改版本说明上传。

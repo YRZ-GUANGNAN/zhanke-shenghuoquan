@@ -9,6 +9,7 @@ const profile = read('apps/miniapp/src/pages/profile/index.tsx')
 const appConfig = read('apps/miniapp/src/app.config.ts')
 const userClient = read('apps/miniapp/src/services/a-user.ts')
 const mediaClient = read('apps/miniapp/src/services/media.ts')
+const notificationClient = read('apps/miniapp/src/services/notification.ts')
 const userHandler = read('backend/internal/module/user/handler.go')
 
 const requirements = [
@@ -18,6 +19,11 @@ const requirements = [
   [settings, "openType='getPhoneNumber'"],
   [settings, 'getUpdateManager'],
   [settings, 'closeAccount'],
+  [settings, 'loadNotificationSubscriptionTemplates'],
+  [settings, 'subscriptionRefreshSequence'],
+  [settings, '当前可用 ${template.remainingQuota} 次'],
+  [notificationClient, 'remainingQuota'],
+  [notificationClient, 'reservedQuota'],
   [blacklist, 'listBlockedUsers'],
   [blacklist, 'removeBlockedUser'],
   [profile, '/pages/about/index'],

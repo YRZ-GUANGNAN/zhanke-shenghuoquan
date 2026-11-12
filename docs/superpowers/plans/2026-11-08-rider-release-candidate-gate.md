@@ -26,6 +26,16 @@ File: `docs/operations/2026-11-08-rider-release-preparation.md`。
 - [x] 将微信平台配置、真实通知/支付、真机、次日结算保留 PENDING，不用本地 fixture 代替。
 - [x] 执行 `git diff --check`，exit 0，提交权保留给主代理统一处理。
 
+## Task 4：主代理批准的本地安全演练扩展
+
+Files: `deploy/native/rehearse-rider-release.py`、`scripts/test-rider-release-rehearsal.py`、`backend/internal/module/delivery/zz_rider_release_rehearsal_mysql_test.go`、`package.json`、上述操作准备文档。
+
+- [x] 纯离线校验 stage/manifest/evidence 的显式 hash 和候选/旧提交身份；只接受 fixture/isolated_mysql，拒绝 production，成功也永不设置 productionReady/deployed/featuresActivated。
+- [x] 校验停写计数、默认关闭、支付/日结保持、真实备份 gzip/hash/完成标记、完整原表目录与恢复/迁移前后摘要、迁移后 055/056 结构；错误只返回固定原因码。
+- [x] 将 `npm run check:rider-release-rehearsal` 加入 `verify:release`；17 项离线 fixture/CLI 测试通过，exit 0。
+- [x] 在现有固定 loopback/端口/datadir 受保护 runner 中真实 mysqldump→gzip→另一新库恢复→055/056；20 张原表与来源库 digest 不变、初始新表和来源一致性检查通过。
+- [x] 完整 `npm run test:rider-money:mysql` exit 0，遗留测试数据库 0、临时目录及进程清理通过。未连接生产、未执行实际部署或开关变更。
+
 ## Task 3：补齐商家资金数据库验收
 
 Files: `scripts/test-merchant-money-mysql.cjs`、`package.json`。

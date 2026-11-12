@@ -24,6 +24,19 @@ type apiTestStore struct {
 	issueErr error
 }
 
+func (s *apiTestStore) ReadSubscriptionAuthorizationState(_ context.Context, userID uint64, appID, templateKey, _ string, _ time.Time) (SubscriptionAuthorizationState, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	state := SubscriptionAuthorizationState{}
+	for nonce, item := range s.issued {
+		if item.UserID != userID || item.AppID != appID || item.TemplateKey != templateKey || s.results[nonce] != "accepted" {
+			continue
+		}
+		state.RemainingQuota++
+	}
+	return state, nil
+}
+
 func (s *apiTestStore) ListInbox(_ context.Context, userID uint64, before string, limit int) ([]InboxItem, int64, error) {
 	items := []InboxItem{}
 	var unread int64
@@ -159,11 +172,28 @@ func TestNotificationHTTPRequiresAuthenticationForEveryRoute(t *testing.T) {
 func TestNotificationTemplatesDoNotIssueNonceOrExposeIdentity(t *testing.T) {
 	router, store, _, _ := apiFixture(t)
 	w := apiRequest(router, http.MethodGet, "/subscribe/templates", "")
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"items"`) || !strings.Contains(w.Body.String(), `"templateKey":"order"`) || !strings.Contains(w.Body.String(), `"templateId":"public-template"`) || !strings.Contains(w.Body.String(), `"available":false`) {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"items"`) || !strings.Contains(w.Body.String(), `"templateKey":"order"`) || !strings.Contains(w.Body.String(), `"templateId":"public-template"`) || !strings.Contains(w.Body.String(), `"remainingQuota":0`) || !strings.Contains(w.Body.String(), `"available":false`) {
 		t.Fatalf("templates: %d %s", w.Code, w.Body.String())
 	}
 	if len(store.issued) != 0 || strings.Contains(w.Body.String(), "openid") || strings.Contains(w.Body.String(), "test-app") {
 		t.Fatal("template read persisted authorization or exposed identity")
+	}
+}
+
+func TestNotificationTemplatesReturnCurrentUserQuotaWithoutIdentity(t *testing.T) {
+	router, store, _, userID := apiFixture(t)
+	nonce := challengeNonce(t, router)
+	if w := apiRequest(router, http.MethodPost, "/subscribe/authorize", authorizationBody(nonce, "accept")); w.Code != http.StatusOK {
+		t.Fatalf("authorize: %d %s", w.Code, w.Body.String())
+	}
+	w := apiRequest(router, http.MethodGet, "/subscribe/templates", "")
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"remainingQuota":1`) || strings.Contains(w.Body.String(), "openid") || strings.Contains(w.Body.String(), "test-app") {
+		t.Fatalf("quota: %d %s", w.Code, w.Body.String())
+	}
+	*userID = 8
+	w = apiRequest(router, http.MethodGet, "/subscribe/templates", "")
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"remainingQuota":0`) || store.credits != 1 {
+		t.Fatalf("cross-user quota: %d %s", w.Code, w.Body.String())
 	}
 }
 

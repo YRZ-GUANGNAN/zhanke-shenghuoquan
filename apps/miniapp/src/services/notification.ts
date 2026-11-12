@@ -26,6 +26,10 @@ export interface NotificationSubscriptionTemplate {
   /** Runtime-only template ID returned by the server when configured. */
   templateId?: string
   available: boolean
+  /** Server-authoritative unused one-shot grants for this account/template. */
+  remainingQuota: number | null
+  /** Grants currently occupied by an in-flight delivery. */
+  reservedQuota: number | null
 }
 
 export interface NotificationSubscriptionTemplates {
@@ -146,7 +150,13 @@ function normalizeTemplates(value: unknown): NotificationSubscriptionTemplates {
       const row = asRecord(item)
       const templateKey = asString(first(row, ['templateKey', 'template_key', 'key']))
       const templateId = asString(first(row, ['templateId', 'template_id', 'id'])) || undefined
-      return { templateKey, templateId, available: row.available !== false && Boolean(templateId) }
+      return {
+        templateKey,
+        templateId,
+        available: row.available !== false && Boolean(templateId),
+        remainingQuota: asNumber(first(row, ['remainingQuota', 'remaining_quota'])),
+        reservedQuota: asNumber(first(row, ['reservedQuota', 'reserved_quota']))
+      }
     }).filter(item => Boolean(item.templateKey))
   }
 }

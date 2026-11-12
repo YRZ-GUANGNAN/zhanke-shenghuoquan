@@ -28,6 +28,12 @@ type OpenIDLookup func(context.Context, uint64, string) (string, error)
 type SubscriptionAuthorizationRepository interface {
 	IssueSubscriptionAuthorization(context.Context, Subscription, time.Time) error
 	ReportSubscriptionAuthorization(context.Context, AuthorizationReport) (bool, error)
+	ReadSubscriptionAuthorizationState(context.Context, uint64, string, string, string, time.Time) (SubscriptionAuthorizationState, error)
+}
+
+type SubscriptionAuthorizationState struct {
+	RemainingQuota uint32
+	ReservedQuota  uint32
 }
 
 type AuthorizationReport struct {
@@ -51,9 +57,11 @@ type SubscriptionConfig struct {
 }
 
 type SubscriptionTemplate struct {
-	Key        string `json:"templateKey"`
-	TemplateID string `json:"templateId,omitempty"`
-	Available  bool   `json:"available"`
+	Key            string `json:"templateKey"`
+	TemplateID     string `json:"templateId,omitempty"`
+	Available      bool   `json:"available"`
+	RemainingQuota uint32 `json:"remainingQuota"`
+	ReservedQuota  uint32 `json:"reservedQuota"`
 }
 
 type AuthorizationChallenge struct {
@@ -104,6 +112,27 @@ func (s *SubscriptionService) Templates() []SubscriptionTemplate {
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].Key < result[j].Key })
 	return result
+}
+
+// TemplatesForUser adds only aggregate one-shot quota state. It never resolves
+// or returns the user's OpenID, authorization nonce, or provider identifiers.
+func (s *SubscriptionService) TemplatesForUser(ctx context.Context, userID uint64) ([]SubscriptionTemplate, error) {
+	if userID == 0 {
+		return nil, ErrInvalidRecord
+	}
+	result := s.Templates()
+	for i := range result {
+		if !result[i].Available {
+			continue
+		}
+		state, err := s.repository.ReadSubscriptionAuthorizationState(ctx, userID, s.config.AppID, result[i].Key, s.templateTag(result[i].Key), s.now())
+		if err != nil {
+			return nil, ErrSubscriptionEmpty
+		}
+		result[i].RemainingQuota = state.RemainingQuota
+		result[i].ReservedQuota = state.ReservedQuota
+	}
+	return result, nil
 }
 
 func (s *SubscriptionService) available(key string) bool {

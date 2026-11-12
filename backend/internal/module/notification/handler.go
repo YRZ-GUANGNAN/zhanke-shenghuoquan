@@ -138,7 +138,16 @@ func (h *Handler) readInbox(c *gin.Context) {
 }
 
 func (h *Handler) templates(c *gin.Context) {
-	response.OK(c, gin.H{"items": h.subscriptions.Templates()})
+	if h.subscriptions == nil {
+		notificationError(c, ErrSubscriptionEmpty)
+		return
+	}
+	items, err := h.subscriptions.TemplatesForUser(c.Request.Context(), recipient(c))
+	if err != nil {
+		notificationError(c, err)
+		return
+	}
+	response.OK(c, gin.H{"items": items})
 }
 
 type nonceInput struct {

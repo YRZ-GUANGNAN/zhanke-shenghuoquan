@@ -15,7 +15,13 @@ import { isApiError } from '../../services/api'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
-import { prepareNotificationSubscription, requestNotificationSubscription, type PreparedNotificationSubscription } from '../../services/notification'
+import {
+  loadNotificationSubscriptionTemplates,
+  prepareNotificationSubscription,
+  requestNotificationSubscription,
+  type NotificationSubscriptionTemplate,
+  type PreparedNotificationSubscription
+} from '../../services/notification'
 import './index.scss'
 
 type ToggleKey = 'orderNotice' | 'socialNotice' | 'quietHours' | 'personalized'
@@ -72,14 +78,35 @@ export default function SettingsPage() {
   const [closeError, setCloseError] = useState('')
   const [preparedNotifications, setPreparedNotifications] = useState<Record<string, PreparedNotificationSubscription | null>>({})
   const [subscriptionStatus, setSubscriptionStatus] = useState<Record<string, string>>({})
+  const [subscriptionTemplates, setSubscriptionTemplates] = useState<Record<string, NotificationSubscriptionTemplate>>({})
   const subscriptionBusy = useRef(new Set<string>())
   const subscriptionEpoch = useRef(0)
+  const subscriptionRefreshSequence = useRef(0)
   useEffect(() => {
     subscriptionEpoch.current += 1
+    subscriptionRefreshSequence.current += 1
     subscriptionBusy.current.clear()
-    setPreparedNotifications({}); setSubscriptionStatus({})
+    setPreparedNotifications({}); setSubscriptionStatus({}); setSubscriptionTemplates({})
     return () => { subscriptionEpoch.current += 1 }
   }, [token, identity?.currentIdentity])
+
+  const refreshSubscriptionState = async (clearStatusKey = '') => {
+    const epoch = subscriptionEpoch.current
+    const sequence = ++subscriptionRefreshSequence.current
+    const current = () => epoch === subscriptionEpoch.current
+      && sequence === subscriptionRefreshSequence.current
+      && useSessionStore.getState().token === token
+    try {
+      const result = await loadNotificationSubscriptionTemplates()
+      if (!current()) return
+      const next: Record<string, NotificationSubscriptionTemplate> = {}
+      result.items.forEach(item => { next[item.templateKey] = item })
+      setSubscriptionTemplates(next)
+      if (clearStatusKey) setSubscriptionStatus(previous => ({ ...previous, [clearStatusKey]: '' }))
+    } catch {
+      if (current() && clearStatusKey) setSubscriptionStatus(previous => ({ ...previous, [clearStatusKey]: '通知额度暂时无法确认，请稍后重试' }))
+    }
+  }
 
   const prepareSubscription = async (key: string) => {
     if (subscriptionBusy.current.has(key)) return
@@ -108,7 +135,9 @@ export default function SettingsPage() {
     if (epoch !== subscriptionEpoch.current || useSessionStore.getState().token !== token) return
     subscriptionBusy.current.delete(key)
     setPreparedNotifications(current => ({ ...current, [key]: null }))
-    setSubscriptionStatus(current => ({ ...current, [key]: result.status === 'accept' && result.reportStatus === 'recorded' ? '已授权一次通知，不是长期订阅' : result.message || '未完成授权' }))
+    const accepted = result.status === 'accept' && result.reportStatus === 'recorded'
+    setSubscriptionStatus(current => ({ ...current, [key]: accepted ? '授权已记录，正在确认可用额度' : result.message || '未完成授权' }))
+    if (accepted) await refreshSubscriptionState(key)
   }
 
   const load = async () => {
@@ -122,7 +151,7 @@ export default function SettingsPage() {
     }
   }
 
-  useDidShow(() => { void load() })
+  useDidShow(() => { void load(); void refreshSubscriptionState() })
 
   const toggle = async (key: ToggleKey) => {
     if (saving || loading) return
@@ -247,14 +276,25 @@ export default function SettingsPage() {
             ))}
             {(['order', 'private_message'] as const).map((key) => {
               const title = key === 'order' ? '订阅订单通知' : '订阅私信提醒'
-              const statusText = subscriptionStatus[key] || '一次授权增加一次通知额度，实际送达以微信为准'
+              const template = subscriptionTemplates[key]
+              const quotaText = template?.available === false
+                ? '微信通知暂不可用，站内通知不受影响'
+                : template?.remainingQuota === null || template?.remainingQuota === undefined
+                  ? '通知额度待确认；一次授权只增加一次额度'
+                  : template.remainingQuota > 0
+                    ? `当前可用 ${template.remainingQuota} 次；实际送达以微信为准`
+                    : (template.reservedQuota || 0) > 0
+                      ? `有 ${template.reservedQuota} 次通知正在发送；结果以微信为准`
+                      : '当前无可用额度，可按需再订阅一次'
+              const statusText = subscriptionStatus[key] || quotaText
+              const unavailable = template?.available === false
               return <View key={key} className='student-settings-row student-settings-row--tall'>
                 <View className='student-settings-row__main'>
                   <Text className='student-settings-row__title'>{title}</Text>
                   <Text className='student-settings-row__subtitle'>{statusText}</Text>
                 </View>
-                <Button className='student-settings-phone' onClick={() => void authorizeSubscription(key)}>
-                  {preparedNotifications[key] ? '立即授权' : '订阅一次'}
+                <Button className='student-settings-phone' disabled={unavailable} onClick={() => void authorizeSubscription(key)}>
+                  {unavailable ? '暂不可用' : preparedNotifications[key] ? '立即授权' : template?.remainingQuota ? '再订阅一次' : '订阅一次'}
                 </Button>
               </View>
             })}

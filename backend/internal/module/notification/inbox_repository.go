@@ -3,6 +3,7 @@ package notification
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"time"
 
@@ -19,6 +20,31 @@ type InboxRepository interface {
 
 var _ InboxRepository = (*GormRepository)(nil)
 var _ SubscriptionAuthorizationRepository = (*GormRepository)(nil)
+
+func (r *GormRepository) ReadSubscriptionAuthorizationState(ctx context.Context, userID uint64, appID, templateKey, templateTag string, now time.Time) (SubscriptionAuthorizationState, error) {
+	if r == nil || r.db == nil || userID == 0 || appID == "" || !validTemplateKey(templateKey) || len(templateTag) != 32 || now.IsZero() {
+		return SubscriptionAuthorizationState{}, ErrInvalidRecord
+	}
+	if decoded, err := hex.DecodeString(templateTag); err != nil || len(decoded) != 16 {
+		return SubscriptionAuthorizationState{}, ErrInvalidRecord
+	}
+	totals := struct {
+		RemainingQuota uint64 `gorm:"column:remaining_quota"`
+		ReservedQuota  uint64 `gorm:"column:reserved_quota"`
+	}{}
+	err := r.db.WithContext(ctx).Session(&gorm.Session{Logger: logger.Discard}).Model(&Subscription{}).
+		Select("COALESCE(SUM(remaining_quota), 0) AS remaining_quota, COALESCE(SUM(reserved_quota), 0) AS reserved_quota").
+		Where("user_id = ? AND app_id = ? AND template_key = ? AND RIGHT(authorization_nonce, 32) = ? AND status IN ? AND (expires_at IS NULL OR expires_at > ?)",
+			userID, appID, templateKey, templateTag, []string{"accepted", "exhausted"}, now).
+		Scan(&totals).Error
+	if err != nil || totals.RemainingQuota > uint64(^uint32(0)) || totals.ReservedQuota > uint64(^uint32(0)) {
+		if err != nil {
+			return SubscriptionAuthorizationState{}, err
+		}
+		return SubscriptionAuthorizationState{}, ErrInvalidRecord
+	}
+	return SubscriptionAuthorizationState{RemainingQuota: uint32(totals.RemainingQuota), ReservedQuota: uint32(totals.ReservedQuota)}, nil
+}
 
 func (r *GormRepository) ListInbox(ctx context.Context, userID uint64, before string, limit int) ([]InboxItem, int64, error) {
 	if r == nil || r.db == nil || userID == 0 || limit < 1 || limit > 100 || (before != "" && !validID(before)) {

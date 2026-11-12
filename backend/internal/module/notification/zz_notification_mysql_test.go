@@ -290,6 +290,16 @@ func TestNotificationQuotaConcurrentReserveReleaseConsumeAgainstIsolatedMySQL(t 
 	db := openIsolatedNotificationMySQL(t)
 	repo := NewRepository(db)
 	subscription := isolatedNotificationSubscription(t, db)
+	readState := func() SubscriptionAuthorizationState {
+		state, err := repo.ReadSubscriptionAuthorizationState(context.Background(), 12, "isolated-app", "order", authorizationTemplateTag("isolated-app", "order", "isolated-template"), time.Now().UTC())
+		if err != nil {
+			t.Fatal(err)
+		}
+		return state
+	}
+	if state := readState(); state.RemainingQuota != 1 || state.ReservedQuota != 0 {
+		t.Fatalf("initial authorization state=%+v", state)
+	}
 	leases := make([]DeliveryLease, 8)
 	for i := range leases {
 		isolatedNotificationDelivery(t, db)
@@ -331,6 +341,9 @@ func TestNotificationQuotaConcurrentReserveReleaseConsumeAgainstIsolatedMySQL(t 
 	if err := db.First(&current, subscription.ID).Error; err != nil || current.RemainingQuota != 0 || current.ReservedQuota != 1 {
 		t.Fatal("quota not exclusively occupied", err)
 	}
+	if state := readState(); state.RemainingQuota != 0 || state.ReservedQuota != 1 {
+		t.Fatalf("reserved authorization state=%+v", state)
+	}
 	next := time.Now().UTC().Add(-time.Millisecond)
 	if err := repo.FinishSubscribe(context.Background(), winner, SubscribeOutcome{Status: DeliveryRetryWait, Code: "provider_not_sent", NextAttemptAt: &next, QuotaAction: "release"}, time.Now().UTC()); err != nil {
 		t.Fatal(err)
@@ -340,6 +353,9 @@ func TestNotificationQuotaConcurrentReserveReleaseConsumeAgainstIsolatedMySQL(t 
 	}
 	if err := db.First(&current, subscription.ID).Error; err != nil || current.RemainingQuota != 1 || current.ReservedQuota != 0 {
 		t.Fatal("quota release not conserved", err)
+	}
+	if state := readState(); state.RemainingQuota != 1 || state.ReservedQuota != 0 {
+		t.Fatalf("released authorization state=%+v", state)
 	}
 	retried := isolatedNotificationClaim(t, repo)
 	reserved, err := repo.ReserveForDelivery(context.Background(), retried, "isolated-app", "isolated-openid", "isolated-template", time.Now().UTC())
@@ -351,6 +367,9 @@ func TestNotificationQuotaConcurrentReserveReleaseConsumeAgainstIsolatedMySQL(t 
 	}
 	if err := db.First(&current, subscription.ID).Error; err != nil || current.Status != "exhausted" || current.RemainingQuota != 0 || current.ReservedQuota != 0 {
 		t.Fatal("accepted send did not consume quota exactly once", err)
+	}
+	if state := readState(); state.RemainingQuota != 0 || state.ReservedQuota != 0 {
+		t.Fatalf("consumed authorization state=%+v", state)
 	}
 	var accepted DeliveryItem
 	if err := db.First(&accepted, reserved.Item.ID).Error; err != nil || accepted.Status != DeliveryAccepted || accepted.LeaseToken != nil || accepted.LeaseExpiresAt != nil || accepted.ProcessedAt == nil {
