@@ -1,6 +1,7 @@
 const fs = require('node:fs')
 const path = require('node:path')
 const assert = require('node:assert/strict')
+const { readMiniappRoutes } = require('./miniapp-routes.cjs')
 
 const root = path.resolve(__dirname, '..')
 const read = (value) => fs.readFileSync(path.join(root, value), 'utf8')
@@ -12,7 +13,6 @@ const mediaClient = read('apps/miniapp/src/services/media.ts')
 const types = read('apps/miniapp/src/types.ts')
 
 const requirements = [
-  [app, 'pages/identity-application/index'],
   [profile, '/pages/identity-application/index?role='],
   [page, "chooseAndUploadImagesSettled('identity_application'"],
   [page, 'getMediaStatus(proof.assetId)'],
@@ -40,6 +40,11 @@ const requirements = [
   [types, 'userId: string'],
   [types, 'reviewerUserId?: string']
 ]
+
+assert.ok(
+  readMiniappRoutes(app).includes('pages/identity-application/index'),
+  'identity application route must be registered in the main package or a subpackage'
+)
 
 for (const [source, fragment] of requirements) {
   if (!source.includes(fragment)) throw new Error(`identity application contract missing: ${fragment}`)

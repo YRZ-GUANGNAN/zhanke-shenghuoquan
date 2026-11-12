@@ -9,7 +9,8 @@ const root = path.resolve(__dirname, '..')
 const src = path.join(root, 'apps/miniapp/src')
 const read = (name) => fs.readFileSync(path.join(src, name), 'utf8')
 const appConfig = read('app.config.ts')
-const routes = [...appConfig.matchAll(/'pages\/([^']+)\/index'/g)].map(match => match[1])
+const mainPagesBlock = appConfig.match(/pages:\s*\[([\s\S]*?)\],\s*subPackages:/)?.[1] || ''
+const routes = [...mainPagesBlock.matchAll(/'pages\/([^']+)\/index'/g)].map(match => match[1])
 // Wallet pages are deliberately kept in subPackages to control the main
 // bundle. They are still production routes and must receive the same layout
 // review as top-level pages; do not let package extraction hide them.
