@@ -601,14 +601,108 @@ def finish_activated(stage, inspector, values, db):
     print(json.dumps(result))
 
 
+def activate_features(stage, inspector, values, db):
+    current, target = current_release()
+    release = ROOT / 'releases' / RELEASE_ID
+    require(current.is_symlink() and target == release, 'release is not current')
+    require(sha256_file(release / 'bin/campus-api') == CANDIDATE_BINARY_SHA256,
+            'current binary mismatch')
+    version = await_ready(CANDIDATE_COMMIT)
+    assert_default_off(values)
+    validate_new_schema(db, inspector, flag_values(values))
+    broadcast_preflight = read_inspector(
+        stage / 'inspect-rider-release.py',
+        '--expected-commit',
+        CANDIDATE_COMMIT,
+    )['preflight']
+    require(broadcast_preflight.get('broadcastActivationReady') is True,
+            'broadcast activation preflight failed')
+    require(broadcast_preflight.get('withdrawalActivationPreflightReady') is True,
+            'withdrawal activation preflight failed')
+
+    previous = {name: values.get(name, 'false') for name in OFF_FLAGS}
+    backup_dir = Path('/var/backups/campus-circle') / RELEASE_ID
+    backup_dir.mkdir(mode=0o700, exist_ok=True)
+    backup_dir.chmod(0o700)
+    attempt = time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())
+    env_backup = backup_dir / ('campus-api.env-features-' + attempt)
+    shutil.copy2(ENV_FILE, env_backup)
+    env_backup.chmod(0o600)
+    try:
+        patch_env({
+            'ENABLE_DELIVERY_RIDER_BROADCAST': 'true',
+            'ENABLE_DELIVERY_RIDER_WITHDRAWAL': 'true',
+            'ENABLE_DELIVERY_RIDER_PAYOUT_QUEUE': 'false',
+            'ENABLE_NOTIFICATION_SENDING': 'false',
+        })
+        run(['systemctl', 'restart', 'campus-api'])
+        activated_version = await_ready(CANDIDATE_COMMIT)
+        broadcast = read_inspector(
+            stage / 'inspect-rider-release.py',
+            '--expected-commit',
+            CANDIDATE_COMMIT,
+            '--require-ready',
+            'broadcast',
+        )
+        withdrawal = read_inspector(
+            stage / 'inspect-rider-release.py',
+            '--expected-commit',
+            CANDIDATE_COMMIT,
+            '--require-ready',
+            'withdrawal',
+        )
+        require(broadcast['preflight'].get('broadcastActivationReady') is True,
+                'broadcast activation gate failed')
+        require(withdrawal['preflight'].get('withdrawalActivationPreflightReady') is True,
+                'withdrawal activation gate failed')
+        require(not withdrawal['preflight'].get('flagConflicts'),
+                'withdrawal activation flag conflict')
+        require(withdrawal['flags'].get('ENABLE_NOTIFICATION_SENDING') in ('false', '0'),
+                'notification sending changed during feature activation')
+    except Exception as original:
+        try:
+            patch_env(previous)
+            run(['systemctl', 'restart', 'campus-api'])
+            await_ready(CANDIDATE_COMMIT)
+        except Exception as rollback_error:
+            raise RuntimeError(
+                'feature activation failed and flag rollback failed: ' +
+                type(rollback_error).__name__
+            ) from original
+        raise
+
+    result = {
+        'release': RELEASE_ID,
+        'commit': CANDIDATE_COMMIT,
+        'version': activated_version,
+        'broadcastEnabled': True,
+        'manualWithdrawalEnabled': True,
+        'automaticPayoutQueueEnabled': False,
+        'notificationSendingEnabled': False,
+        'flags': withdrawal['flags'],
+        'envBackup': str(env_backup),
+        'broadcastGate': broadcast['requiredGate'],
+        'withdrawalGate': withdrawal['requiredGate'],
+        'withdrawalRows': sum(
+            withdrawal['counts'].get(table) or 0
+            for table in inspector.MIGRATION_056_TABLES
+        ),
+    }
+    receipt = release / 'feature-activation-receipt.json'
+    receipt.write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')
+    receipt.chmod(0o644)
+    print(json.dumps(result))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--stage', required=True)
     parser.add_argument('--deploy', action='store_true')
     parser.add_argument('--finish-activated', action='store_true')
+    parser.add_argument('--activate-features', action='store_true')
     args = parser.parse_args()
     require(os.geteuid() == 0, 'sudo required')
-    require(not (args.deploy and args.finish_activated),
+    require(sum((args.deploy, args.finish_activated, args.activate_features)) <= 1,
             'choose one mutation phase')
     lock = open('/run/campus-rider-055-056-release.lock', 'a', encoding='utf-8')
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -623,6 +717,9 @@ def main():
             == 'Asia/Shanghai', 'host clock changed')
     if args.finish_activated:
         finish_activated(stage, inspector, values, db)
+        return
+    if args.activate_features:
+        activate_features(stage, inspector, values, db)
         return
     require(run(['pgrep', '-c', '-x', 'campus-api'], text=True).strip() == '1',
             'unexpected API process count')
