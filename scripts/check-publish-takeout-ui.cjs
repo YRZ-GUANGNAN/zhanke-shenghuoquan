@@ -71,6 +71,11 @@ for (const forbidden of [
   '休息中',
   '暂停营业',
   '开始营业',
+  'merchant.subtitle',
+  'student-takeout-merchant__desc',
+  '到店自取',
+  '校园配送',
+  '校外配送',
 ]) assertExcludes(takeoutSource, forbidden)
 
 assertExcludes(takeoutStyle, '.student-bottom-nav')

@@ -363,7 +363,7 @@ function SearchContent() {
     return (
       <View className='student-search-result' key={merchant.id} onClick={() => void openResult(merchant)}>
         <Text className='student-search-result__title'>{merchant.title}</Text>
-        <Text className='student-search-result__summary'>{merchant.subtitle || '点击进入商家小程序'}</Text>
+        <Text className='student-search-result__summary'>点击进入商家小程序</Text>
       </View>
     )
   }

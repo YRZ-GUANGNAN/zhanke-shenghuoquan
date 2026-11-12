@@ -4,6 +4,7 @@ const path = require('node:path')
 const root = path.resolve(__dirname, '..')
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8')
 const takeoutPage = read('apps', 'miniapp', 'src', 'pages', 'student-takeout', 'index.tsx')
+const searchPage = read('apps', 'miniapp', 'src', 'pages', 'search', 'index.tsx')
 const navigationClient = read('apps', 'miniapp', 'src', 'services', 'd-navigation.ts')
 const adminClient = read('apps', 'admin', 'src', 'services', 'f-admin.ts')
 const adminPanel = read('apps', 'admin', 'src', 'ExternalTakeoutMerchants.tsx')
@@ -27,7 +28,10 @@ for (const required of [
 for (const forbidden of [
   'const merchants', '茶知味', '华莱士', '正新鸡排', '一点点', '塔斯汀', '蜜雪冰城',
   'g-takeout', 'stores/cart', 'pages/takeout/', 'operatingStatus', 'MerchantFilter', '营业中', '休息中', '暂停营业', '开始营业',
+  'merchant.subtitle', 'student-takeout-merchant__desc', '到店自取', '校园配送', '校外配送',
 ]) assertExcludes(takeoutPage, forbidden)
+
+for (const forbidden of ['merchant.subtitle', '到店自取', '校园配送', '校外配送']) assertExcludes(searchPage, forbidden)
 
 for (const forbidden of ['ServiceMerchantCatalog', 'g-takeout-buyer', 'merchantId', 'stores/cart', 'pages/takeout/']) {
   assertExcludes(takeoutPage, forbidden)

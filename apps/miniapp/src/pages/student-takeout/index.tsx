@@ -143,7 +143,6 @@ function StudentTakeoutPage() {
                     <View className='student-takeout-merchant__headline'>
                       <Text className='student-takeout-merchant__name'>{merchant.title}</Text>
                     </View>
-                    <Text className='student-takeout-merchant__desc'>{merchant.subtitle}</Text>
                     <Text className='student-takeout-merchant__action'>
                       {jumping ? '打开中' : '进入商家'}
                     </Text>

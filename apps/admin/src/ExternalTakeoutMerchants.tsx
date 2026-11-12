@@ -163,7 +163,6 @@ export function ExternalTakeoutMerchants() {
 
       <div className='external-merchant-form'>
         <label>商家名称<input value={draft.title} maxLength={64} onChange={(event) => updateDraft('title', event.target.value)} /></label>
-        <label>商家简介<input value={draft.subtitle} maxLength={120} onChange={(event) => updateDraft('subtitle', event.target.value)} /></label>
         <label>文字图标<input value={draft.iconText} maxLength={12} onChange={(event) => updateDraft('iconText', event.target.value)} /></label>
         <label>AppID<input value={draft.appId} placeholder='wx1234567890ABCDEF' onChange={(event) => updateDraft('appId', event.target.value)} /></label>
         <label className='external-merchant-form__wide'>页面路径<input value={draft.path} placeholder='pages/index/index' onChange={(event) => updateDraft('path', event.target.value)} /></label>
@@ -193,7 +192,7 @@ export function ExternalTakeoutMerchants() {
                   <td>
                     <div className='external-merchant-identity'>
                       <span className='external-merchant-avatar' style={{ backgroundColor: item.color }}>{item.iconText}</span>
-                      <span><strong>{item.title}</strong><small>{item.subtitle || '暂无简介'}</small></span>
+                      <span><strong>{item.title}</strong></span>
                     </div>
                   </td>
                   <td><code>{item.appId}</code><small>{item.path}</small></td>

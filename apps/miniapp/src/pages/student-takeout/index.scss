@@ -238,7 +238,7 @@
 .student-takeout-merchant {
   display: flex;
   align-items: center;
-  min-height: 152rpx;
+  min-height: 132rpx;
   padding: 0 24rpx;
   border-bottom: 1rpx solid $divider-nav;
   background: $bg-surface;
@@ -275,7 +275,7 @@
   flex: 1;
   min-width: 0;
   margin-left: 22rpx;
-  padding: 24rpx 0;
+  padding: 20rpx 0;
 }
 
 .student-takeout-merchant__headline {
@@ -293,16 +293,6 @@
   font-size: 29rpx;
   font-weight: 800;
   line-height: 1.3;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.student-takeout-merchant__desc {
-  @include ref.type(meta);
-  display: block;
-  overflow: hidden;
-  margin-top: 7rpx;
-  color: $text-secondary;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
