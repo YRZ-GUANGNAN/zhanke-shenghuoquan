@@ -43,6 +43,7 @@ function checkTransparentFixedSurface() {
     const scss = read(style)
     assert.doesNotMatch(source, /useBottomNavVisibility|--hidden/, `${component} 不得再根据滚动收起`)
     assert.doesNotMatch(scss, /--hidden|translateY\(calc\(100% - 12PX\)\)/, `${style} 不得保留收起位移`)
+    assert.doesNotMatch(scss, />\s*\*/, `${style} 不得使用微信 WXSS 不支持的通用子选择器`)
     assert.match(scss, new RegExp(`border-radius:\\s*${radius}PX`), `${style} 保留现有圆角`)
   }
 }
