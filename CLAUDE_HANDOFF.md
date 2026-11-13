@@ -103,32 +103,22 @@ WECOM_MERCHANT_WEBHOOK_URL
 WECOM_RIDER_WEBHOOK_URL
 ```
 
-微信公众平台当前登录账号下只看到小程序账号和小程序/小游戏测试号，没有可用服务号。企业微信管理端当前停留在扫码登录页，尚无可配置的组织登录态。
+微信公众平台当前存在的“湛科生活圈”是个人主体、未认证的普通公众号，不是企业服务号；其功能设置中没有网页授权域名，也不具备本项目所需的模板消息能力。
 
-因此当前不能在本地诚实完成正式服务号外发和正式企业微信群送达。
+项目决策：不再把微信服务号放入上线路径，也不执行 migration 057 作为发布前置条件。服务号相关代码继续保留为默认关闭的可选能力，但用户端和管理端不再显示未启用的公众号入口。
+
+当前消息方案为：
+
+1. 小程序内通知中心作为可靠底账。
+2. 小程序订阅消息按用户授权次数发送。
+3. 企业微信群用于商家、骑手值班提醒。
+4. 后台记录聚合发送量、失败和重试状态。
+
+企业微信管理端当前尚未登录组织账号，因此正式群机器人还未配置。
 
 ## Claude 下一步
 
-### 1. 微信服务号正式凭证
-
-需要一个已认证并登录的服务号，且最好与小程序绑定在同一微信开放平台主体：
-
-1. 获取服务号 AppID。
-2. 在服务号后台生成或确认 AppSecret，值只写入服务器环境文件，不进入 Git、日志、聊天或截图。
-3. 配置 OAuth 回调：
-   `https://zhanduiwang.top/api/v1/notification/official-account/callback`
-4. 在服务号后台配置对应网页授权域名。
-5. 在小程序后台“业务域名”加入 `https://zhanduiwang.top`，否则 `web-view` 绑定页无法打开。
-6. 创建并审核订单模板，记录模板 ID。
-7. 按模板实际字段构造审核过的 JSON 映射，例如：
-
-```json
-{"character_string1":"orderId","thing2":"status","time3":"time"}
-```
-
-实际字段必须与微信后台模板一致，不能猜测。
-
-### 2. 企业微信正式机器人
+### 1. 企业微信正式机器人
 
 1. 登录企业微信管理端。
 2. 分别创建商家值班群和骑手值班群。
@@ -137,36 +127,29 @@ WECOM_RIDER_WEBHOOK_URL
    - `WECOM_MERCHANT_WEBHOOK_URL`
    - `WECOM_RIDER_WEBHOOK_URL`
 
-### 3. 安全写入生产环境
+### 2. 安全写入生产环境
 
 不要把密钥放入命令行历史、仓库文件或工具输出。建议交互式登录服务器后使用受控编辑器写入 `/etc/campus-circle/campus-api.env`，并保持文件仅服务用户可读。
 
 需要增加的配置名称：
 
 ```text
-ENABLE_WECHAT_OFFICIAL_NOTIFICATIONS=true
-WECHAT_OFFICIAL_APP_ID
-WECHAT_OFFICIAL_APP_SECRET
-WECHAT_OFFICIAL_API_BASE=https://api.weixin.qq.com
-WECHAT_OFFICIAL_OAUTH_REDIRECT_URL=https://zhanduiwang.top/api/v1/notification/official-account/callback
-WECHAT_OFFICIAL_ORDER_TEMPLATE_ID
-WECHAT_OFFICIAL_ORDER_TEMPLATE_FIELDS
+ENABLE_WECHAT_OFFICIAL_NOTIFICATIONS=false
 WECOM_MERCHANT_WEBHOOK_URL
 WECOM_RIDER_WEBHOOK_URL
 ```
 
-### 4. 数据库与发布顺序
+### 3. 数据库与发布顺序
 
 1. 先备份生产数据库并核对当前 migration 状态。
-2. 在维护窗口执行 `backend/migrations/057_notification_official_account.sql`。
+2. 服务号关闭时不需要执行 migration 057。
 3. 发布后端二进制和管理后台静态文件。
 4. 重启 `campus-api`。
 5. 检查 `/healthz`、`/readyz`、`/version`。
-6. 打开管理后台“消息通知”，确认四类通道与配置状态。
-7. 用测试账号绑定服务号。
-8. 分别向商家群、骑手群发送后台测试消息。
-9. 创建一笔测试配送订单，验证商家和骑手收到站内、服务号或群提醒。
-10. 真实外发通过后，再评估是否把 `NOTIFICATION_AUDIENCE` 切到 `all`。
+6. 打开管理后台“消息通知”，确认小程序内通知、小程序订阅和值班群状态。
+7. 分别向商家群、骑手群发送后台测试消息。
+8. 创建一笔测试配送订单，验证商家和骑手收到站内、订阅或群提醒。
+9. 真实外发通过后，再评估是否把 `NOTIFICATION_AUDIENCE` 切到 `all`。
 
 发布细节参考：
 
@@ -181,7 +164,7 @@ WECOM_RIDER_WEBHOOK_URL
 - 不伪造微信接口成功、群消息送达、订单或后台验收。
 - 不在没有数据库备份和 migration 核对的情况下部署。
 - 不把“代码测试通过”写成“生产通知已送达”。
-- 服务号 OAuth 和模板字段必须按微信后台实际审核结果配置。
+- 不再要求普通个人公众号承担服务号 OAuth 或模板消息。
 
 ## 建议的首轮检查
 
@@ -191,4 +174,4 @@ npm.cmd run verify
 npm.cmd --workspace apps/admin run build
 ```
 
-如果 Claude 只处理生产凭证配置，不应改动当前已通过验证的业务代码；优先完成外部账号、模板、域名和环境变量配置，再做真实订单验收。
+如果 Claude 继续上线工作，不应重新引入服务号依赖；优先恢复生产后端、配置企业微信群、发布最新代码并用真实订单验收。

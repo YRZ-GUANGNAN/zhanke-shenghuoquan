@@ -2308,6 +2308,7 @@ table code { color: #405167; font-family: "Cascadia Code", Consolas, monospace; 
   align-items: start;
   gap: 16px;
 }
+.notification-detail-grid--single { grid-template-columns: 1fr; }
 .notification-readiness,
 .notification-binding-summary {
   display: grid;

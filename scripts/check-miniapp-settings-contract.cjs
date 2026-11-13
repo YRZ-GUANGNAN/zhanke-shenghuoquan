@@ -55,4 +55,8 @@ for (const forbidden of ['159****8834', '12.6MB', 'v2.4.0', 'initialBlockedUsers
   }
 }
 
+for (const hidden of ['loadOfficialAccountStatus', '公众号订单提醒', '/pages/official-account-bind/index']) {
+  if (settings.includes(hidden)) throw new Error(`disabled service-account entry must stay hidden: ${hidden}`)
+}
+
 console.log('miniapp settings and account closure contract check PASS')

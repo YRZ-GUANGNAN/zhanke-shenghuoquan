@@ -141,7 +141,7 @@ export function NotificationConsole() {
               </article>
             </section>
             {!value.sendingEnabled && <AdminNotice tone="warning" title="微信消息发送仍处于关闭状态">
-              小程序内通知不受影响；小程序提醒和微信服务号会在服务端发送开关开启后发出。
+              小程序内通知不受影响；微信小程序提醒会在服务端发送开关开启后发出。
             </AdminNotice>}
           </>}
     </AdminPanel>
@@ -152,7 +152,7 @@ export function NotificationConsole() {
         description="以下为最近 24 小时的数据。配置完成仍需要真实账号和真实订单完成一次验收。"
       >
         <div className="notification-channel-grid">
-          {value.channels.map(channel => <article
+          {value.channels.filter(channel => channel.channel !== 'wechat_official' || value.officialAccount.enabled).map(channel => <article
             className={`notification-channel-card notification-channel-card--${channel.enabled ? 'enabled' : 'disabled'}`}
             key={channel.channel}
           >
@@ -175,8 +175,8 @@ export function NotificationConsole() {
         </div>
       </AdminPanel>
 
-      <div className="notification-detail-grid">
-        <AdminPanel
+      <div className={`notification-detail-grid ${value.officialAccount.enabled ? '' : 'notification-detail-grid--single'}`}>
+        {value.officialAccount.enabled && <AdminPanel
           title="微信服务号绑定"
           description="用户绑定并关注服务号后，订单提醒可以持续发送；关注状态会在真实发送后更新。"
         >
@@ -199,7 +199,7 @@ export function NotificationConsole() {
           <p className="notification-panel-note">
             只有用户主动绑定并关注服务号后，微信提醒才可能送达。未关注、模板审核变化或账号迁移，都需要在真实发送记录中确认。
           </p>
-        </AdminPanel>
+        </AdminPanel>}
 
         <AdminPanel
           title="值班群发送测试"

@@ -28,6 +28,7 @@ const sources = fs.readdirSync(src, { withFileTypes: true })
 assert.doesNotMatch(sources, /window\.(confirm|prompt|alert)\s*\(/)
 const appSource = fs.readFileSync(path.join(src, 'App.tsx'), 'utf8')
 const adminAPI = fs.readFileSync(path.join(src, 'services', 'f-admin.ts'), 'utf8')
+const notificationConsole = fs.readFileSync(path.join(src, 'NotificationConsole.tsx'), 'utf8')
 assert.doesNotMatch(appSource, /icon:\s*'[A-Z]'/)
 
 assert.match(adminAPI, /reviews:\s*\(query[^)]*=\s*\{\}\)\s*=>/,
@@ -62,6 +63,10 @@ for (const token of ['--color-primary', '--radius-control', '--shadow-dialog', '
   assert.match(styles, new RegExp(token))
 }
 assert.ok(fs.existsSync(path.join(src, 'NotificationConsole.tsx')), 'NotificationConsole.tsx is required')
+assert.match(notificationConsole, /channel\.channel !== 'wechat_official' \|\| value\.officialAccount\.enabled/,
+  'disabled official-account channels must stay hidden from notification operations')
+assert.match(notificationConsole, /value\.officialAccount\.enabled && <AdminPanel/,
+  'official-account binding panel must only render when explicitly enabled')
 for (const contract of ['.notification-channel-grid', '.notification-detail-grid', '.notification-binding-progress']) {
   assert.ok(styles.includes(contract), `notification admin styles must include ${contract}`)
 }
