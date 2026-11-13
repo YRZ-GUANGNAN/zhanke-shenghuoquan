@@ -16,18 +16,41 @@ import (
 )
 
 type orderNotificationTemplate struct {
-	id     string
-	fields map[string]string
-	users  map[uint64]bool
+	id       string
+	fields   map[string]string
+	users    map[uint64]bool
+	allUsers bool
 }
 
 // privateMessageNotificationTemplate is deliberately metadata-only. The
 // WeChat subscription message never contains message text, phone numbers or
 // provider identifiers; it only points the user back to the conversation.
 type privateMessageNotificationTemplate struct {
-	id     string
-	fields map[string]string
-	users  map[uint64]bool
+	id       string
+	fields   map[string]string
+	users    map[uint64]bool
+	allUsers bool
+}
+
+func notificationAudience(cfg config.Config, users map[uint64]bool) (bool, error) {
+	mode := strings.TrimSpace(cfg.NotificationAudience)
+	if mode == "" {
+		mode = "test"
+	}
+	switch mode {
+	case "test":
+		if cfg.EnableNotificationSending && len(users) == 0 {
+			return false, errors.New("external notification test allowlist is empty")
+		}
+		return false, nil
+	case "all":
+		if len(users) != 0 {
+			return false, errors.New("all notification audience requires an empty test allowlist")
+		}
+		return true, nil
+	default:
+		return false, errors.New("notification audience must be test or all")
+	}
 }
 
 var notificationTemplateField = regexp.MustCompile(`^(thing|phrase|time|character_string)[1-9][0-9]*$`)
@@ -102,8 +125,9 @@ func configuredPrivateMessageNotificationTemplate(cfg config.Config) (*privateMe
 		}
 		template.users[id] = true
 	}
-	if cfg.EnableNotificationSending && len(template.users) == 0 {
-		return nil, errors.New("external notification test allowlist is empty")
+	template.allUsers, err = notificationAudience(cfg, template.users)
+	if err != nil {
+		return nil, err
 	}
 	_, err = template.snapshot(notification.Event{AggregatePublicID: "im-pair:1:2", OccurredAt: time.Now()}, notification.Recipient{Title: "收到新私信", TargetPath: "/pages/secondhand-chat/index?relationId=1"})
 	if err != nil {
@@ -159,8 +183,9 @@ func configuredOrderNotificationTemplate(cfg config.Config) (*orderNotificationT
 		}
 		template.users[id] = true
 	}
-	if cfg.EnableNotificationSending && len(template.users) == 0 {
-		return nil, errors.New("external notification test allowlist is empty")
+	template.allUsers, err = notificationAudience(cfg, template.users)
+	if err != nil {
+		return nil, err
 	}
 	// Validate the longest in-app title and public ID against the reviewed
 	// mapping. Phrase fields use explicit short status labels, never truncation.
@@ -205,6 +230,14 @@ func (t *orderNotificationTemplate) snapshot(event notification.Event, recipient
 	return raw, nil
 }
 
+func (t *orderNotificationTemplate) allowsWechat(userID uint64) bool {
+	return t != nil && (t.allUsers || t.users[userID])
+}
+
+func (t *privateMessageNotificationTemplate) allowsWechat(userID uint64) bool {
+	return t != nil && (t.allUsers || t.users[userID])
+}
+
 // The order resolver owns the validated state and its in-app title. Only the
 // reviewed WeChat phrase field needs shorter wording; keep thing fields and
 // private-message templates unchanged. Unknown titles fail closed even when
@@ -238,7 +271,7 @@ type notificationEventReader interface {
 
 func orderSubscribeGuard(events notificationEventReader, resolver *orderNotificationRecipients, lookup notification.OpenIDLookup, appID string) notification.SubscribeGuard {
 	return func(ctx context.Context, item notification.DeliveryItem, snapshot notification.TemplateSnapshot) (string, error) {
-		if events == nil || lookup == nil || appID == "" || resolver == nil || resolver.orders == nil || resolver.users == nil || resolver.template == nil || !resolver.template.users[item.RecipientUserID] || item.TemplateKey != "order" || snapshot.TemplateID != resolver.template.id {
+		if events == nil || lookup == nil || appID == "" || resolver == nil || resolver.orders == nil || resolver.users == nil || !resolver.template.allowsWechat(item.RecipientUserID) || item.TemplateKey != "order" || snapshot.TemplateID != resolver.template.id {
 			return "", notification.ErrNotificationIneligible
 		}
 		event, err := events.FindEvent(ctx, item.EventPublicID)
@@ -268,7 +301,7 @@ func orderSubscribeGuard(events notificationEventReader, resolver *orderNotifica
 
 func privateMessageSubscribeGuard(events notificationEventReader, resolver *privateNotificationRecipients, lookup notification.OpenIDLookup, appID string) notification.SubscribeGuard {
 	return func(ctx context.Context, item notification.DeliveryItem, snapshot notification.TemplateSnapshot) (string, error) {
-		if events == nil || lookup == nil || appID == "" || resolver == nil || resolver.identity == nil || resolver.users == nil || resolver.template == nil || !resolver.template.users[item.RecipientUserID] || item.Purpose != notification.PurposePrivateMessage || item.TemplateKey != "private_message" || snapshot.TemplateID != resolver.template.id {
+		if events == nil || lookup == nil || appID == "" || resolver == nil || resolver.identity == nil || resolver.users == nil || !resolver.template.allowsWechat(item.RecipientUserID) || item.Purpose != notification.PurposePrivateMessage || item.TemplateKey != "private_message" || snapshot.TemplateID != resolver.template.id {
 			return "", notification.ErrNotificationIneligible
 		}
 		event, err := events.FindEvent(ctx, item.EventPublicID)

@@ -92,7 +92,7 @@ func (r *orderNotificationRecipients) resolveRiderPoolRecipients(ctx context.Con
 		recipient := notification.Recipient{UserID: id, Purpose: notification.PurposeOrder, Title: "有新的校园配送单",
 			Summary: "进入接单大厅查看，订单以实时状态为准", AggregateType: event.AggregateType,
 			AggregatePublicID: event.AggregatePublicID, AggregateVersion: event.AggregateVersion, TargetPath: "/pages/delivery-rider/index"}
-		if r.template != nil && r.template.users[id] {
+		if r.template.allowsWechat(id) {
 			hour := now.In(time.FixedZone("Asia/Shanghai", 8*60*60)).Hour()
 			if !settings.QuietHours || (hour >= 7 && hour < 23) {
 				snapshot, err := r.template.snapshot(event, recipient)

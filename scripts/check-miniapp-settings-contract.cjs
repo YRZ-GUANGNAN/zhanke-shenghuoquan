@@ -21,7 +21,7 @@ const requirements = [
   [settings, 'closeAccount'],
   [settings, 'loadNotificationSubscriptionTemplates'],
   [settings, 'subscriptionRefreshSequence'],
-  [settings, '当前可用 ${template.remainingQuota} 次'],
+  [settings, '可用 ${template.remainingQuota} 次'],
   [notificationClient, 'remainingQuota'],
   [notificationClient, 'reservedQuota'],
   [blacklist, 'listBlockedUsers'],

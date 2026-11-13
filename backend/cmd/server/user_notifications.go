@@ -289,7 +289,7 @@ func (r *orderNotificationRecipients) resolveRecipients(ctx context.Context, eve
 		recipient := notification.Recipient{UserID: id, Purpose: purpose, Title: label,
 			Summary: "请进入订单查看最新进度", AggregateType: event.AggregateType, AggregatePublicID: event.AggregatePublicID,
 			AggregateVersion: event.AggregateVersion, TargetPath: path}
-		if r.template != nil && r.template.users[id] {
+		if r.template.allowsWechat(id) {
 			now := time.Now()
 			if r.now != nil {
 				now = r.now()

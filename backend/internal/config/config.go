@@ -58,6 +58,7 @@ type Config struct {
 	WechatMessageTemplateID            string
 	WechatOrderTemplateFields          string
 	WechatMessageTemplateFields        string
+	NotificationAudience               string
 	NotificationTestUserIDs            string
 	NotificationIMCallbackToken        string
 
@@ -209,6 +210,7 @@ func Load() (Config, error) {
 		WechatMessageTemplateID:            env("WECHAT_MESSAGE_TEMPLATE_ID", ""),
 		WechatOrderTemplateFields:          env("WECHAT_ORDER_TEMPLATE_FIELDS", ""),
 		WechatMessageTemplateFields:        env("WECHAT_MESSAGE_TEMPLATE_FIELDS", ""),
+		NotificationAudience:               env("NOTIFICATION_AUDIENCE", "test"),
 		NotificationTestUserIDs:            env("NOTIFICATION_TEST_USER_IDS", ""),
 		NotificationIMCallbackToken:        env("NOTIFICATION_IM_CALLBACK_TOKEN", ""),
 
@@ -290,8 +292,21 @@ func (c Config) Validate() error {
 			return errors.New("private message template ID and reviewed fields must be configured together")
 		}
 	}
-	if c.EnableNotificationSending && (!c.EnableWechatSubscribeNotifications || strings.TrimSpace(c.NotificationTestUserIDs) == "") {
-		return errors.New("notification sending requires subscribe feature and explicit NOTIFICATION_TEST_USER_IDS")
+	audience := strings.TrimSpace(c.NotificationAudience)
+	if audience == "" {
+		audience = "test"
+	}
+	if audience != "test" && audience != "all" {
+		return errors.New("NOTIFICATION_AUDIENCE must be test or all")
+	}
+	if c.EnableNotificationSending && !c.EnableWechatSubscribeNotifications {
+		return errors.New("notification sending requires the WeChat subscribe feature")
+	}
+	if c.EnableNotificationSending && audience == "test" && strings.TrimSpace(c.NotificationTestUserIDs) == "" {
+		return errors.New("test notification audience requires explicit NOTIFICATION_TEST_USER_IDS")
+	}
+	if audience == "all" && strings.TrimSpace(c.NotificationTestUserIDs) != "" {
+		return errors.New("all notification audience requires an empty NOTIFICATION_TEST_USER_IDS")
 	}
 	if c.EnableNotificationSending {
 		// A send-enabled rollout must be complete for both notification classes.

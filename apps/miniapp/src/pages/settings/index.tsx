@@ -280,12 +280,12 @@ export default function SettingsPage() {
               const quotaText = template?.available === false
                 ? '微信通知暂不可用，站内通知不受影响'
                 : template?.remainingQuota === null || template?.remainingQuota === undefined
-                  ? '通知额度待确认；一次授权只增加一次额度'
+                  ? '通知额度待确认；每次授权增加 1 次提醒'
                   : template.remainingQuota > 0
-                    ? `当前可用 ${template.remainingQuota} 次；实际送达以微信为准`
+                    ? `可用 ${template.remainingQuota} 次；每笔订单提醒消耗 1 次`
                     : (template.reservedQuota || 0) > 0
                       ? `有 ${template.reservedQuota} 次通知正在发送；结果以微信为准`
-                      : '当前无可用额度，可按需再订阅一次'
+                      : '暂无额度；可重复点击补充，每次增加 1 次提醒'
               const statusText = subscriptionStatus[key] || quotaText
               const unavailable = template?.available === false
               return <View key={key} className='student-settings-row student-settings-row--tall'>
@@ -294,7 +294,7 @@ export default function SettingsPage() {
                   <Text className='student-settings-row__subtitle'>{statusText}</Text>
                 </View>
                 <Button className='student-settings-phone' disabled={unavailable} onClick={() => void authorizeSubscription(key)}>
-                  {unavailable ? '暂不可用' : preparedNotifications[key] ? '立即授权' : template?.remainingQuota ? '再订阅一次' : '订阅一次'}
+                  {unavailable ? '暂不可用' : preparedNotifications[key] ? '立即授权' : template?.remainingQuota ? '补充 1 次' : '订阅 1 次'}
                 </Button>
               </View>
             })}

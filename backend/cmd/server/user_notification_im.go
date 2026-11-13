@@ -166,7 +166,7 @@ func (r *privateNotificationRecipients) ResolveRecipients(ctx context.Context, e
 		Title: "收到新私信", Summary: "请进入会话查看消息", AggregateType: event.AggregateType,
 		AggregatePublicID: event.AggregatePublicID, AggregateVersion: event.AggregateVersion,
 		TargetPath: relation.TargetPath, AllowWechat: false}
-	if r.template != nil && r.template.users[fact.RecipientUserID] {
+	if r.template.allowsWechat(fact.RecipientUserID) {
 		now := time.Now()
 		if r.now != nil {
 			now = r.now()

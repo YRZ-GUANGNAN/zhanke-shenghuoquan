@@ -79,6 +79,39 @@ func TestNotificationTemplateMappingPreservesSupportedReviewedTypes(t *testing.T
 	}
 }
 
+func TestNotificationAudienceAllUsesServerAuthoritativeConsent(t *testing.T) {
+	cfg := config.Config{
+		EnableWechatSubscribeNotifications: true,
+		EnableNotificationSending:          true,
+		NotificationAudience:               "all",
+		WechatOrderTemplateID:              "reviewed-order-template",
+		WechatOrderTemplateFields:          `{"thing1":"status"}`,
+		WechatMessageTemplateID:            "reviewed-private-template",
+		WechatMessageTemplateFields:        `{"thing1":"status"}`,
+	}
+	order, err := configuredOrderNotificationTemplate(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	private, err := configuredPrivateMessageNotificationTemplate(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, userID := range []uint64{2, 12, 999} {
+		if !order.allowsWechat(userID) || !private.allowsWechat(userID) {
+			t.Fatalf("all audience did not defer consent for user %d to the quota store", userID)
+		}
+	}
+
+	cfg.NotificationTestUserIDs = "12"
+	if _, err := configuredOrderNotificationTemplate(cfg); err == nil {
+		t.Fatal("all audience accepted a conflicting test allowlist")
+	}
+	if _, err := configuredPrivateMessageNotificationTemplate(cfg); err == nil {
+		t.Fatal("all audience accepted a conflicting private-message allowlist")
+	}
+}
+
 type notificationTemplateEventsStub struct {
 	event notification.Event
 	err   error

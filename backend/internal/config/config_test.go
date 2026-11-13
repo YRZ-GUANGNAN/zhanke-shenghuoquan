@@ -70,6 +70,48 @@ func TestProductionConfigurationAcceptsExplicitCredentials(t *testing.T) {
 	}
 }
 
+func TestNotificationAudienceRequiresExplicitSafeScope(t *testing.T) {
+	cfg := validConfig()
+	cfg.EnableUserNotifications = true
+	cfg.EnableWechatSubscribeNotifications = true
+	cfg.EnableNotificationSending = true
+	cfg.WechatOrderTemplateID = "order-template"
+	cfg.WechatOrderTemplateFields = `{"thing1":"status"}`
+	cfg.WechatMessageTemplateID = "message-template"
+	cfg.WechatMessageTemplateFields = `{"thing1":"status"}`
+	cfg.NotificationIMCallbackToken = "callback-token-long-enough"
+
+	cfg.NotificationAudience = "test"
+	cfg.NotificationTestUserIDs = "12"
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("explicit test audience rejected: %v", err)
+	}
+
+	cfg.NotificationAudience = "test"
+	cfg.NotificationTestUserIDs = ""
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("test audience accepted an empty allowlist")
+	}
+
+	cfg.NotificationAudience = "all"
+	cfg.NotificationTestUserIDs = ""
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("all eligible audience rejected: %v", err)
+	}
+
+	cfg.NotificationAudience = "all"
+	cfg.NotificationTestUserIDs = "12"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("all audience accepted an ambiguous test allowlist")
+	}
+
+	cfg.NotificationAudience = "public"
+	cfg.NotificationTestUserIDs = ""
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("unknown notification audience was accepted")
+	}
+}
+
 func TestPostVideoRequiresReviewBusinessType(t *testing.T) {
 	cfg := validConfig()
 	cfg.EnablePostVideo = true
