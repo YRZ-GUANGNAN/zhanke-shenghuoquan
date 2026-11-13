@@ -17,9 +17,11 @@ import { useSessionStore } from '../../stores/session'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import {
   loadNotificationSubscriptionTemplates,
+  loadOfficialAccountStatus,
   prepareNotificationSubscription,
   requestNotificationSubscription,
   type NotificationSubscriptionTemplate,
+  type OfficialAccountStatus,
   type PreparedNotificationSubscription
 } from '../../services/notification'
 import './index.scss'
@@ -79,6 +81,7 @@ export default function SettingsPage() {
   const [preparedNotifications, setPreparedNotifications] = useState<Record<string, PreparedNotificationSubscription | null>>({})
   const [subscriptionStatus, setSubscriptionStatus] = useState<Record<string, string>>({})
   const [subscriptionTemplates, setSubscriptionTemplates] = useState<Record<string, NotificationSubscriptionTemplate>>({})
+  const [officialAccount, setOfficialAccount] = useState<OfficialAccountStatus | null>(null)
   const subscriptionBusy = useRef(new Set<string>())
   const subscriptionEpoch = useRef(0)
   const subscriptionRefreshSequence = useRef(0)
@@ -87,6 +90,7 @@ export default function SettingsPage() {
     subscriptionRefreshSequence.current += 1
     subscriptionBusy.current.clear()
     setPreparedNotifications({}); setSubscriptionStatus({}); setSubscriptionTemplates({})
+    setOfficialAccount(null)
     return () => { subscriptionEpoch.current += 1 }
   }, [token, identity?.currentIdentity])
 
@@ -102,6 +106,9 @@ export default function SettingsPage() {
       const next: Record<string, NotificationSubscriptionTemplate> = {}
       result.items.forEach(item => { next[item.templateKey] = item })
       setSubscriptionTemplates(next)
+      const official = await loadOfficialAccountStatus()
+      if (!current()) return
+      setOfficialAccount(official)
       if (clearStatusKey) setSubscriptionStatus(previous => ({ ...previous, [clearStatusKey]: '' }))
     } catch {
       if (current() && clearStatusKey) setSubscriptionStatus(previous => ({ ...previous, [clearStatusKey]: '通知额度暂时无法确认，请稍后重试' }))
@@ -298,6 +305,27 @@ export default function SettingsPage() {
                 </Button>
               </View>
             })}
+            <View className='student-settings-row student-settings-row--tall'>
+              <View className='student-settings-row__main'>
+                <Text className='student-settings-row__title'>公众号订单提醒</Text>
+                <Text className='student-settings-row__subtitle'>
+                  {officialAccount?.enabled === false
+                    ? '公众号通道暂未开通；站内和小程序订阅通知不受影响'
+                    : officialAccount?.bound
+                      ? officialAccount.followState === 'not_following'
+                        ? '已绑定，但公众号发送提示未关注'
+                        : '已绑定，多笔订单可按公众号规则持续提醒'
+                      : '绑定服务号后，适合商家和骑手多订单提醒'}
+                </Text>
+              </View>
+              <Button
+                className='student-settings-phone'
+                disabled={!officialAccount?.enabled || officialAccount?.bound}
+                onClick={() => void Taro.navigateTo({ url: '/pages/official-account-bind/index' })}
+              >
+                {!officialAccount?.enabled ? '未开通' : officialAccount.bound ? '已绑定' : '去绑定'}
+              </Button>
+            </View>
           </View>
         </View>}
         {(visiblePrivacyRows.length > 0 || settings.blacklistCount > 0) && <View className='student-settings-section'>

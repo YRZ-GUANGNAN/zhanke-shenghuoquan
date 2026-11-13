@@ -61,6 +61,13 @@ type Config struct {
 	NotificationAudience               string
 	NotificationTestUserIDs            string
 	NotificationIMCallbackToken        string
+	EnableWechatOfficialNotifications  bool
+	WechatOfficialAppID                string
+	WechatOfficialAppSecret            string
+	WechatOfficialAPIBase              string
+	WechatOfficialOAuthRedirectURL     string
+	WechatOfficialOrderTemplateID      string
+	WechatOfficialOrderTemplateFields  string
 
 	WechatPayMchID            string
 	WechatPayAPIv3Key         string
@@ -85,6 +92,7 @@ type Config struct {
 	EnableFeaturePolicy                bool
 	DeliveryWechatPayNotifyURL         string
 	DeliveryWechatRefundNotifyURL      string
+	WeComMerchantWebhookURL            string
 	WeComRiderWebhookURL               string
 }
 
@@ -168,6 +176,10 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	enableWechatOfficialNotifications, err := envBool("ENABLE_WECHAT_OFFICIAL_NOTIFICATIONS", false)
+	if err != nil {
+		return Config{}, err
+	}
 
 	cfg := Config{
 		AppEnv:             appEnv,
@@ -213,6 +225,13 @@ func Load() (Config, error) {
 		NotificationAudience:               env("NOTIFICATION_AUDIENCE", "test"),
 		NotificationTestUserIDs:            env("NOTIFICATION_TEST_USER_IDS", ""),
 		NotificationIMCallbackToken:        env("NOTIFICATION_IM_CALLBACK_TOKEN", ""),
+		EnableWechatOfficialNotifications:  enableWechatOfficialNotifications,
+		WechatOfficialAppID:                env("WECHAT_OFFICIAL_APP_ID", ""),
+		WechatOfficialAppSecret:            env("WECHAT_OFFICIAL_APP_SECRET", ""),
+		WechatOfficialAPIBase:              env("WECHAT_OFFICIAL_API_BASE", "https://api.weixin.qq.com"),
+		WechatOfficialOAuthRedirectURL:     env("WECHAT_OFFICIAL_OAUTH_REDIRECT_URL", ""),
+		WechatOfficialOrderTemplateID:      env("WECHAT_OFFICIAL_ORDER_TEMPLATE_ID", ""),
+		WechatOfficialOrderTemplateFields:  env("WECHAT_OFFICIAL_ORDER_TEMPLATE_FIELDS", ""),
 
 		WechatPayMchID:            env("WECHAT_PAY_MCH_ID", ""),
 		WechatPayAPIv3Key:         env("WECHAT_PAY_API_V3_KEY", ""),
@@ -237,6 +256,7 @@ func Load() (Config, error) {
 		EnableFeaturePolicy:                enableFeaturePolicy,
 		DeliveryWechatPayNotifyURL:         env("DELIVERY_WECHAT_PAY_NOTIFY_URL", ""),
 		DeliveryWechatRefundNotifyURL:      env("DELIVERY_WECHAT_REFUND_NOTIFY_URL", ""),
+		WeComMerchantWebhookURL:            env("WECOM_MERCHANT_WEBHOOK_URL", ""),
 		WeComRiderWebhookURL:               env("WECOM_RIDER_WEBHOOK_URL", ""),
 	}
 	if err := cfg.Validate(); err != nil {
@@ -307,6 +327,25 @@ func (c Config) Validate() error {
 	}
 	if audience == "all" && strings.TrimSpace(c.NotificationTestUserIDs) != "" {
 		return errors.New("all notification audience requires an empty NOTIFICATION_TEST_USER_IDS")
+	}
+	if c.EnableWechatOfficialNotifications {
+		if !c.EnableUserNotifications {
+			return errors.New("WeChat official-account notifications require ENABLE_USER_NOTIFICATIONS")
+		}
+		if !c.EnableNotificationSending {
+			return errors.New("WeChat official-account notifications require ENABLE_NOTIFICATION_SENDING")
+		}
+		if strings.TrimSpace(c.WechatOfficialAppID) == "" || strings.TrimSpace(c.WechatOfficialAppSecret) == "" ||
+			strings.TrimSpace(c.WechatOfficialOAuthRedirectURL) == "" ||
+			strings.TrimSpace(c.WechatOfficialOrderTemplateID) == "" ||
+			strings.TrimSpace(c.WechatOfficialOrderTemplateFields) == "" {
+			return errors.New("enabled WeChat official-account notifications require AppID, AppSecret, OAuth redirect and order template")
+		}
+		redirect, err := url.Parse(c.WechatOfficialOAuthRedirectURL)
+		if err != nil || redirect.Scheme != "https" || redirect.Host == "" || redirect.User != nil ||
+			redirect.Fragment != "" || redirect.RawQuery != "" {
+			return errors.New("WECHAT_OFFICIAL_OAUTH_REDIRECT_URL must be an HTTPS URL without query or fragment")
+		}
 	}
 	if c.EnableNotificationSending {
 		// A send-enabled rollout must be complete for both notification classes.

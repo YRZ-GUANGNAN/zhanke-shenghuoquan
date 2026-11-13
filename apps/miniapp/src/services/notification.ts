@@ -36,6 +36,12 @@ export interface NotificationSubscriptionTemplates {
   items: NotificationSubscriptionTemplate[]
 }
 
+export interface OfficialAccountStatus {
+  enabled: boolean
+  bound: boolean
+  followState?: 'unknown' | 'following' | 'not_following'
+}
+
 export type NotificationSubscriptionStatus =
   | 'accept'
   | 'reject'
@@ -194,6 +200,28 @@ export function notificationTargetPath(item: NotificationInboxItem): string | nu
 
 export async function loadNotificationSubscriptionTemplates(): Promise<NotificationSubscriptionTemplates> {
   return normalizeTemplates(await request<unknown>('/notification/subscribe/templates'))
+}
+
+export async function loadOfficialAccountStatus(): Promise<OfficialAccountStatus> {
+  const value = await request<unknown>('/notification/official-account/status')
+  const row = asRecord(value)
+  const followState = asString(row.followState)
+  return {
+    enabled: row.enabled === true,
+    bound: row.bound === true,
+    followState: followState === 'following' || followState === 'not_following' ? followState : 'unknown'
+  }
+}
+
+export async function createOfficialAccountOAuthURL(): Promise<string> {
+  const value = await request<unknown>('/notification/official-account/oauth-url', {
+    url: '', method: 'POST', timeout: 10000
+  })
+  const url = asString(asRecord(value).url)
+  if (!/^https:\/\/open\.weixin\.qq\.com\/connect\/oauth2\/authorize\?/.test(url)) {
+    throw new Error('公众号绑定地址无效')
+  }
+  return url
 }
 
 /** Prepare before the user clicks. Network awaits must not consume the click gesture. */

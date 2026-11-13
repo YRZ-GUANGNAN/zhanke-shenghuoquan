@@ -1,7 +1,7 @@
 import type { AdminIconName } from './components'
 import type { AdminSection } from './types'
 
-export type AdminNavigationGroup = '运营中心' | '内容治理' | '平台管理'
+export type AdminNavigationGroup = '工作台' | '业务运营' | '内容与用户' | '平台设置'
 
 export interface AdminNavigationItem {
   key: AdminSection
@@ -12,26 +12,27 @@ export interface AdminNavigationItem {
 }
 
 export const adminNavigation: AdminNavigationItem[] = [
-  { key: 'media', label: '媒体运营', description: '检查素材状态、引用关系与失败任务', icon: 'media', group: '运营中心' },
-  { key: 'delivery', label: '配送运营', description: '处理配送订单、资金与异常记录', icon: 'delivery', group: '运营中心' },
-  { key: 'moderation', label: '统一审核', description: '按状态处理内容审核与人工改判', icon: 'moderation', group: '内容治理' },
-  { key: 'community', label: '帖子管理', description: '查看已提交帖子并执行合规下架', icon: 'community', group: '内容治理' },
-  { key: 'trade', label: '商品管理', description: '查看商品状态并衔接审核或下架', icon: 'trade', group: '内容治理' },
-  { key: 'reports', label: '举报审核', description: '查看用户举报及其审核状态', icon: 'reports', group: '内容治理' },
-  { key: 'identities', label: '身份审核', description: '处理骑手与商家身份申请', icon: 'identities', group: '内容治理' },
-  { key: 'feedbacks', label: '用户反馈', description: '查看用户提交的问题与建议', icon: 'reports', group: '内容治理' },
-  { key: 'dashboard', label: '数据统计', description: '查看平台总量、今日新增与待处理内容', icon: 'dashboard', group: '平台管理' },
-  { key: 'users', label: '用户管理', description: '管理用户状态和管理员角色', icon: 'users', group: '平台管理' },
-  { key: 'navigation', label: '导航管理', description: '维护普通导航入口与合作商家目录', icon: 'navigation', group: '平台管理' },
-  { key: 'share-settings', label: '分享卡片设置', description: '维护小程序转发标题、封面与内容卡片规则', icon: 'settings', group: '平台管理' },
+  { key: 'dashboard', label: '经营总览', description: '查看营收、订单、用户与待办事项', icon: 'dashboard', group: '工作台' },
+  { key: 'delivery', label: '配送与结算', description: '管理配送订单、骑手报酬、提现与退款', icon: 'delivery', group: '业务运营' },
+  { key: 'notifications', label: '消息通知', description: '检查订单提醒、服务号绑定与值班群送达情况', icon: 'notifications', group: '业务运营' },
+  { key: 'media', label: '素材中心', description: '检查图片视频、审核状态与异常处理记录', icon: 'media', group: '业务运营' },
+  { key: 'moderation', label: '审核中心', description: '处理待审内容并记录人工改判依据', icon: 'moderation', group: '内容与用户' },
+  { key: 'community', label: '社区内容', description: '查看帖子状态并对公开内容执行下架', icon: 'community', group: '内容与用户' },
+  { key: 'trade', label: '二手商品', description: '查看商品状态并衔接审核或下架', icon: 'trade', group: '内容与用户' },
+  { key: 'reports', label: '举报处理', description: '查看用户举报与最终处置进度', icon: 'reports', group: '内容与用户' },
+  { key: 'identities', label: '商家骑手认证', description: '审核商家与骑手身份材料', icon: 'identities', group: '内容与用户' },
+  { key: 'feedbacks', label: '意见反馈', description: '查看用户提交的问题与建议', icon: 'reports', group: '内容与用户' },
+  { key: 'users', label: '用户与权限', description: '管理账号状态与后台管理员角色', icon: 'users', group: '平台设置' },
+  { key: 'navigation', label: '服务入口', description: '维护校园服务导航与外部商家入口', icon: 'navigation', group: '平台设置' },
+  { key: 'share-settings', label: '分享设置', description: '维护小程序转发标题、封面与内容卡片', icon: 'settings', group: '平台设置' },
 ]
 
 export const featurePolicyNavigationItem: AdminNavigationItem = {
   key: 'feature-policy',
-  label: '小程序功能设置',
-  description: '控制模块入口、互动能力与新业务的开放状态',
+  label: '功能开关',
+  description: '控制小程序模块、互动能力与新业务开放状态',
   icon: 'settings',
-  group: '平台管理'
+  group: '平台设置'
 }
 
-export const adminNavigationGroups: AdminNavigationGroup[] = ['运营中心', '内容治理', '平台管理']
+export const adminNavigationGroups: AdminNavigationGroup[] = ['工作台', '业务运营', '内容与用户', '平台设置']

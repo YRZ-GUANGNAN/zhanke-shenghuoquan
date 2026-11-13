@@ -82,11 +82,42 @@ export interface DeliverySummary {
   cancelled: number
   todayOrders: number
   todayDelivered: number
+  todayDeliveryFeeCents: number
+  todayPlatformFeeCents: number
   merchantWalletCents: number
   riderWalletCents: number
   pendingRiderFeeCents: number
   paidOfflineCents: number
   platformFeeIncomeCents: number
+}
+
+export interface NotificationChannel {
+  channel: 'in_app' | 'wechat_subscribe' | 'wechat_official' | 'wecom'
+  label: string
+  enabled: boolean
+  pending: number
+  accepted: number
+  retryWait: number
+  blocked: number
+  deadletter: number
+}
+
+export interface NotificationChannelOverview {
+  checkedAt: string
+  sendingEnabled: boolean
+  audience: 'test' | 'all'
+  channels: NotificationChannel[]
+  officialAccount: {
+    enabled: boolean
+    templateConfigured: boolean
+    unknown: number
+    following: number
+    notFollowing: number
+  }
+  wecom: {
+    merchantConfigured: boolean
+    riderConfigured: boolean
+  }
 }
 
 export interface FundingSourceSummary {
@@ -412,5 +443,10 @@ export const deliveryAdminAPI = {
       ...body({ expectedRowVersion, idempotencyKey, reason }), method: 'POST'
     }),
   refunds: (query: DeliveryQuery = {}) => api<Page<Refund>>(`/refunds${queryString(query)}`),
-  refund: (id: string) => api<Refund>(`/refunds/${encodeURIComponent(id)}`)
+  refund: (id: string) => api<Refund>(`/refunds/${encodeURIComponent(id)}`),
+  notificationChannels: () => api<NotificationChannelOverview>('/notification-channels'),
+  testWecomGroup: (group: 'merchant_ops' | 'rider_ops') =>
+    api<{ accepted: boolean; group: string }>('/notification-channels/wecom/test', {
+      ...body({ group }), method: 'POST'
+    })
 }

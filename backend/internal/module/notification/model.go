@@ -51,6 +51,7 @@ type Channel string
 const (
 	ChannelInApp           Channel = "in_app"
 	ChannelWechatSubscribe Channel = "wechat_subscribe"
+	ChannelWechatOfficial  Channel = "wechat_official"
 	ChannelWecom           Channel = "wecom"
 )
 
@@ -188,6 +189,20 @@ type CallbackReceipt struct {
 
 func (CallbackReceipt) TableName() string { return "im_notification_receipts" }
 
+type OfficialAccountBinding struct {
+	UserID      uint64    `gorm:"column:user_id;primaryKey"`
+	AppID       string    `gorm:"column:app_id;size:64;not null;uniqueIndex:uq_notification_official_openid,priority:1"`
+	OpenID      string    `json:"-" gorm:"column:openid;size:128;not null;uniqueIndex:uq_notification_official_openid,priority:2"`
+	FollowState string    `gorm:"column:follow_state;size:24;not null"`
+	RowVersion  uint64    `gorm:"column:row_version;not null"`
+	BoundAt     time.Time `gorm:"column:bound_at;not null"`
+	UpdatedAt   time.Time `gorm:"column:updated_at;not null"`
+}
+
+func (OfficialAccountBinding) TableName() string {
+	return "notification_official_account_bindings"
+}
+
 type DeliveryLease struct {
 	Item       DeliveryItem
 	LeaseToken string
@@ -196,6 +211,14 @@ type SubscriptionReservation struct {
 	Subscription Subscription
 	Nonce        string
 }
+
+// WeCom group deliveries are not addressed to an application user. These
+// reserved IDs keep the existing delivery table unique without creating inbox
+// rows or pretending a group is a real account.
+const (
+	WecomMerchantGroupRecipientID uint64 = 1<<63 + 1
+	WecomRiderGroupRecipientID    uint64 = 1<<63 + 2
+)
 
 const crockfordAlphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 

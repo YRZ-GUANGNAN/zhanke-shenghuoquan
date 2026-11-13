@@ -112,6 +112,36 @@ func TestNotificationAudienceRequiresExplicitSafeScope(t *testing.T) {
 	}
 }
 
+func TestOfficialAccountNotificationConfigurationIsFailClosed(t *testing.T) {
+	cfg := validConfig()
+	cfg.EnableUserNotifications = true
+	cfg.EnableWechatSubscribeNotifications = true
+	cfg.EnableNotificationSending = true
+	cfg.NotificationAudience = "test"
+	cfg.NotificationTestUserIDs = "12"
+	cfg.WechatOrderTemplateID = "order-template"
+	cfg.WechatOrderTemplateFields = `{"thing1":"status"}`
+	cfg.WechatMessageTemplateID = "message-template"
+	cfg.WechatMessageTemplateFields = `{"thing1":"status"}`
+	cfg.NotificationIMCallbackToken = "callback-token-long-enough"
+	cfg.EnableWechatOfficialNotifications = true
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("official account notifications accepted missing credentials")
+	}
+	cfg.WechatOfficialAppID = "official-app"
+	cfg.WechatOfficialAppSecret = "official-secret"
+	cfg.WechatOfficialOAuthRedirectURL = "https://api.example.com/api/v1/notification/official-account/callback"
+	cfg.WechatOfficialOrderTemplateID = "official-order-template"
+	cfg.WechatOfficialOrderTemplateFields = `{"thing1":"status","time2":"time"}`
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("complete official account configuration rejected: %v", err)
+	}
+	cfg.WechatOfficialOAuthRedirectURL = "http://api.example.com/callback?token=unsafe"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("unsafe official account redirect was accepted")
+	}
+}
+
 func TestPostVideoRequiresReviewBusinessType(t *testing.T) {
 	cfg := validConfig()
 	cfg.EnablePostVideo = true

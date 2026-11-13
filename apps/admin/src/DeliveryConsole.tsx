@@ -25,7 +25,7 @@ import {
   type RiderWithdrawalCommand,
   type RiderAvailabilityConfig
 } from './services/delivery-admin'
-import { useAdminDialog } from './components'
+import { statusLabel, useAdminDialog } from './components'
 
 type View = 'summary' | 'funding-sources' | 'orders' | 'fee' | 'overrides' | 'merchant-wallets' | 'rider-wallets' | 'earnings' | 'payout-queue' | 'withdrawals' | 'refunds'
 
@@ -37,30 +37,30 @@ const time = (value?: string | null) => value ? new Date(value).toLocaleString('
 const errorMessage = (reason: unknown) => reason instanceof Error ? reason.message : String(reason)
 const isConflict = (reason: unknown) => reason instanceof DeliveryAPIError && reason.status === 409
 
-const statusOptions = [
-  'pending_fee_payment',
-  'ready_for_claim',
-  'claimed',
-  'to_pickup',
-  'picked_up',
-  'delivering',
-  'delivered',
-  'cancelled',
-  'payment_failed'
+const statusOptions: Array<[string, string]> = [
+  ['pending_fee_payment', '待付配送费'],
+  ['ready_for_claim', '等待接单'],
+  ['claimed', '已接单'],
+  ['to_pickup', '前往取货'],
+  ['picked_up', '已取货'],
+  ['delivering', '配送中'],
+  ['delivered', '已送达'],
+  ['cancelled', '已取消'],
+  ['payment_failed', '支付失败']
 ]
 
 export function DeliveryConsole() {
   const [view, setView] = useState<View>('summary')
   const tabs: Array<[View, string]> = [
-    ['summary', '配送总览'],
-    ['funding-sources', '资金核验'],
-    ['orders', '订单管理'],
-    ['fee', '配送费配置'],
-    ['overrides', '商家特殊价'],
+    ['summary', '配送概览'],
+    ['funding-sources', '资金核对'],
+    ['orders', '配送订单'],
+    ['fee', '默认运费'],
+    ['overrides', '商家专属运费'],
     ['merchant-wallets', '商家钱包'],
     ['rider-wallets', '骑手钱包'],
-    ['earnings', '报酬清账'],
-    ['payout-queue', '待打款队列'],
+    ['earnings', '骑手报酬'],
+    ['payout-queue', '待打款'],
     ['withdrawals', '骑手提现'],
     ['refunds', '退款记录']
   ]
@@ -103,7 +103,7 @@ function ErrorNotice({ error, conflict, refresh }: { error: string; conflict?: b
 }
 
 function Badge({ value }: { value: string }) {
-  return <span className={`delivery-badge delivery-badge--${value}`}>{value}</span>
+  return <span className={`delivery-badge delivery-badge--${value}`}>{statusLabel(value)}</span>
 }
 
 function Fact({ label, value }: { label: string; value: ReactNode }) {
@@ -146,7 +146,7 @@ function SummaryPanel() {
     ['商家钱包余额', money(value.merchantWalletCents)],
     ['骑手钱包余额', money(value.riderWalletCents)]
   ] : []
-  return <Panel title="配送运营总览" actions={<button className="delivery-secondary" onClick={() => void load()} disabled={loading}>{loading ? '加载中…' : '刷新'}</button>}>
+  return <Panel title="配送与结算概览" actions={<button className="delivery-secondary" onClick={() => void load()} disabled={loading}>{loading ? '加载中…' : '刷新'}</button>}>
     <ErrorNotice error={error} refresh={() => void load()} />
     {!value ? <p>加载中…</p> : <section className="delivery-summary-grid">{metrics.map(([label, metric]) => <article key={label}><span>{label}</span><strong>{metric}</strong></article>)}</section>}
   </Panel>
@@ -179,7 +179,7 @@ function FundingSourcesPanel() {
     ['支付错误码', String(value.paymentVerificationErrorCount)],
     ['退款错误码', String(value.refundVerificationErrorCount)]
   ] : []
-  return <Panel title="资金来源核验（只读）" actions={<button className="delivery-secondary" onClick={() => void load()} disabled={loading}>{loading ? '加载中…' : '刷新'}</button>}>
+  return <Panel title="钱包资金来源核对（只读）" actions={<button className="delivery-secondary" onClick={() => void load()} disabled={loading}>{loading ? '加载中…' : '刷新'}</button>}>
     <ErrorNotice error={error} refresh={() => void load()} />
     {!value ? <p>加载中…</p> : !value.fundingTablesAvailable ? <div className="delivery-notice"><strong>资金来源迁移尚未就绪</strong><span>当前只展示既有钱包数据，不会把历史余额标记为已核验，也不会开放自动打款。</span></div> : <>
       <div className="delivery-summary-grid">{metrics.map(([label, metric]) => <article key={label}><span>{label}</span><strong>{metric}</strong></article>)}</div>
@@ -222,7 +222,7 @@ function OrdersPanel() {
   const clear = () => { setStatus(''); setMerchantUserId(''); setRiderUserId(''); setFrom(''); setTo(''); setPage(1) }
   return <Panel title="配送订单管理" actions={<button className="delivery-secondary" disabled={loading} onClick={() => void load()}>{loading ? '加载中…' : '刷新'}</button>}>
     <div className="delivery-controls">
-      <label>状态<select value={status} onChange={event => { setPage(1); setStatus(event.target.value) }}><option value="">全部</option>{statusOptions.map(item => <option key={item}>{item}</option>)}</select></label>
+      <label>状态<select value={status} onChange={event => { setPage(1); setStatus(event.target.value) }}><option value="">全部</option>{statusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
       <label>商家用户 ID<input value={merchantUserId} inputMode="numeric" onChange={event => { setPage(1); setMerchantUserId(event.target.value) }} /></label>
       <label>骑手用户 ID<input value={riderUserId} inputMode="numeric" onChange={event => { setPage(1); setRiderUserId(event.target.value) }} /></label>
       <label>开始时间<input type="datetime-local" value={from} onChange={event => { setPage(1); setFrom(event.target.value) }} /></label>
@@ -266,7 +266,7 @@ function OrderDetailPanel({ value, close }: { value: OrderFunds; close: () => vo
       <Fact label="平台抽成快照" value={money(order.platformCutCents)} />
       <Fact label="取货信息" value={`${order.pickupContactName} / ${order.pickupContactPhone} / ${order.pickupAddress}`} />
       <Fact label="收货信息" value={`${order.recipientName} / ${order.recipientPhone} / ${order.deliveryAddress}`} />
-      <Fact label="Row Version" value={`v${order.rowVersion}`} />
+      <Fact label="数据版本" value={`v${order.rowVersion}`} />
     </div>
     <p className="delivery-description">{order.remark || '无备注'}</p>
     <h4>资金快照</h4>
@@ -318,7 +318,7 @@ function FeeConfigPanel() {
     {value ? <div className="delivery-form">
       <label>配送费（分）<input type="number" min="1" value={deliveryFee} onChange={event => setDeliveryFee(event.target.value)} /></label>
       <label>平台抽成（分）<input type="number" min="0" value={platformCut} onChange={event => setPlatformCut(event.target.value)} /></label>
-      <Fact label="当前 Row Version" value={`v${value.rowVersion}`} />
+      <Fact label="当前数据版本" value={`v${value.rowVersion}`} />
       <Fact label="更新时间" value={time(value.updatedAt)} />
       <button disabled={loading} onClick={() => void submit()}>{loading ? '保存中…' : '保存配置'}</button>
       <button className="delivery-secondary" disabled={loading} onClick={() => void load()}>刷新</button>
@@ -461,7 +461,7 @@ function MerchantOverridesPanel() {
       <label>状态<select value={status} onChange={event => { setPage(1); setStatus(event.target.value) }}><option value="">全部</option><option value="active">active</option><option value="disabled">disabled</option></select></label>
       <label>配送费（分）<input value={fee} inputMode="numeric" onChange={event => setFee(event.target.value)} /></label>
       <label>平台抽成（分）<input value={cut} inputMode="numeric" onChange={event => setCut(event.target.value)} /></label>
-      <label>Expected Row Version（更新时必填）<input value={expectedRowVersion} inputMode="numeric" onChange={event => setExpectedRowVersion(event.target.value)} /></label>
+      <label>当前数据版本（防止覆盖他人修改）<input value={expectedRowVersion} inputMode="numeric" onChange={event => setExpectedRowVersion(event.target.value)} /></label>
       <button disabled={Boolean(busy)} onClick={() => void upsert()}>{busy === 'upsert' ? '保存中…' : '保存 / 新增'}</button>
       <button className="delivery-secondary" onClick={() => { setFee(''); setCut(''); setExpectedRowVersion('') }}>清空编辑</button>
     </div>
@@ -577,7 +577,7 @@ function EarningsPanel() {
   }
   return <Panel title="骑手报酬清账">
     <p className="delivery-capability-notice delivery-capability-notice--inline"><strong>线下清账</strong><span>登记只用于记录已完成的线下支付，需填写可追溯备注；不会调用微信支付或其他自动打款服务。</span></p>
-    <div className="delivery-controls"><label>状态<select value={status} onChange={event => { setPage(1); setStatus(event.target.value) }}><option value="">全部</option><option value="pending">pending</option><option value="settled">settled</option><option value="paid_offline">paid_offline</option></select></label><label>骑手用户 ID<input value={riderUserId} inputMode="numeric" onChange={event => { setPage(1); setRiderUserId(event.target.value) }} /></label><button onClick={() => void load()}>刷新</button></div>
+    <div className="delivery-controls"><label>状态<select value={status} onChange={event => { setPage(1); setStatus(event.target.value) }}><option value="">全部</option><option value="pending">待结算</option><option value="settled">已结算</option><option value="paid_offline">已登记结款</option></select></label><label>骑手用户 ID<input value={riderUserId} inputMode="numeric" onChange={event => { setPage(1); setRiderUserId(event.target.value) }} /></label><button onClick={() => void load()}>刷新</button></div>
     <ErrorNotice error={error} conflict={conflict} refresh={() => void load()} />
     <div className="table-scroll"><table><thead><tr><th>报酬</th><th>配送单</th><th>骑手</th><th>金额</th><th>状态</th><th>版本</th><th>操作</th></tr></thead><tbody>{data.items.map(row => <tr key={row.earningPublicId}>
       <td><button className="link-button" onClick={() => void inspect(row.earningPublicId)}>{short(row.earningPublicId)}</button></td>
@@ -585,7 +585,7 @@ function EarningsPanel() {
       <td>{row.settlementStatus !== 'paid_offline' ? <button disabled={busy === row.earningPublicId} onClick={() => void pay(row)}>{busy === row.earningPublicId ? '登记中…' : '登记线下已付'}</button> : <span>已清账</span>}</td>
     </tr>)}</tbody></table></div>
     <Pagination value={data} setPage={setPage} />
-    {detail && <Detail title={`报酬 ${detail.earningPublicId}`} close={() => { setDetail(null); setResult(null) }}><div className="detail-grid"><Fact label="骑手" value={`#${detail.riderUserId}`} /><Fact label="配送单" value={detail.deliveryOrderPublicId} /><Fact label="骑手报酬" value={money(detail.riderFeeCents)} /><Fact label="状态" value={<Badge value={detail.settlementStatus} />} /><Fact label="Row Version" value={`v${detail.rowVersion}`} /><Fact label="线下支付时间" value={time(detail.paidOfflineAt)} /></div>{result && <p className="delivery-description">后端已返回清账结果：钱包余额 {money(result.wallet.availableBalanceCents)}，流水 {short(result.ledger.ledgerPublicId)}，登记记录 {short(result.payout.payoutPublicId)}。</p>}</Detail>}
+    {detail && <Detail title={`报酬 ${detail.earningPublicId}`} close={() => { setDetail(null); setResult(null) }}><div className="detail-grid"><Fact label="骑手" value={`#${detail.riderUserId}`} /><Fact label="配送单" value={detail.deliveryOrderPublicId} /><Fact label="骑手报酬" value={money(detail.riderFeeCents)} /><Fact label="状态" value={<Badge value={detail.settlementStatus} />} /><Fact label="数据版本" value={`v${detail.rowVersion}`} /><Fact label="线下支付时间" value={time(detail.paidOfflineAt)} /></div>{result && <p className="delivery-description">结款已登记：钱包余额 {money(result.wallet.availableBalanceCents)}，账本流水 {short(result.ledger.ledgerPublicId)}，结款记录 {short(result.payout.payoutPublicId)}。</p>}</Detail>}
     <h3 className="delivery-subtitle">最近清账登记</h3>
     <div className="table-scroll"><table><thead><tr><th>登记</th><th>报酬</th><th>骑手</th><th>金额</th><th>操作人</th><th>时间</th></tr></thead><tbody>{payouts.items.map(row => <tr key={row.payoutPublicId}><td>{short(row.payoutPublicId)}</td><td>{short(row.earningPublicId)}</td><td>#{row.riderUserId}</td><td>{money(row.amountCents)}</td><td>#{row.operatorUserId}</td><td>{time(row.paidOfflineAt)}</td></tr>)}</tbody></table></div>
   </Panel>
@@ -630,7 +630,7 @@ function RiderPayoutQueuePanel() {
   }
   return <Panel title="平台待打款队列">
     <p className="delivery-capability-notice delivery-capability-notice--inline"><strong>内部队列</strong><span>当前仅占用已核验收益，未调用微信转账；只能取消排队，不能标记到账或批准打款。</span></p>
-    <div className="delivery-controls"><label>状态<select value={status} onChange={event => { setPage(1); setStatus(event.target.value) }}><option value="">全部</option><option value="queued">queued</option><option value="blocked">blocked</option><option value="cancelled">cancelled</option></select></label><button onClick={() => void load()}>刷新</button></div>
+    <div className="delivery-controls"><label>状态<select value={status} onChange={event => { setPage(1); setStatus(event.target.value) }}><option value="">全部</option><option value="queued">已排队</option><option value="blocked">已暂停</option><option value="cancelled">已取消</option></select></label><button onClick={() => void load()}>刷新</button></div>
     <ErrorNotice error={error} refresh={() => void load()} />
     <div className="table-scroll"><table><thead><tr><th>队列</th><th>收益/配送单</th><th>骑手</th><th>金额</th><th>来源/状态</th><th>占用</th><th>操作</th></tr></thead><tbody>{data.items.map(row => <tr key={row.payoutQueuePublicId}><td>{short(row.payoutQueuePublicId)}<span>v{row.rowVersion}</span></td><td>{short(row.earningPublicId)}<span>{short(row.deliveryOrderPublicId)}</span></td><td>#{row.riderUserId}</td><td>{money(row.amountCents)}</td><td><Badge value={row.status} /><span>{row.reasonCode || '已核验'}</span></td><td>{money(row.reservedCents)}</td><td>{row.status !== 'cancelled' ? <button disabled={busy === row.payoutQueuePublicId} onClick={() => void cancel(row)}>{busy === row.payoutQueuePublicId ? '取消中…' : '取消排队'}</button> : <span>已释放</span>}</td></tr>)}</tbody></table></div>
     <Pagination value={data} setPage={setPage} />
@@ -754,7 +754,7 @@ function RiderWithdrawalsPanel() {
     <div className="table-scroll"><table><thead><tr><th>提现申请</th><th>骑手</th><th>金额</th><th>状态</th><th>版本</th><th>创建时间</th><th>操作</th></tr></thead><tbody>{data.items.map(row => <tr key={row.withdrawPublicId}><td>{short(row.withdrawPublicId)}</td><td>#{row.riderUserId}</td><td>{money(row.amountCents)}</td><td>{row.status === 'paid' ? '已登记打款' : row.status === 'processing' ? '提现中' : '已退回余额'}</td><td>v{row.rowVersion}</td><td>{time(row.createdAt)}</td><td><button disabled={Boolean(busy)} onClick={() => void inspect(row.withdrawPublicId)}>查看与处理</button></td></tr>)}</tbody></table></div>
     <Pagination value={data} setPage={setPage} />
     {detail && <Detail title={`提现 ${detail.withdrawal.withdrawPublicId}`} close={() => { detailVersion.current++; setDetail(null) }}>
-      <div className="detail-grid"><Fact label="骑手" value={`#${detail.withdrawal.riderUserId}`} /><Fact label="金额" value={money(detail.withdrawal.amountCents)} /><Fact label="状态" value={processingLabel(detail.status)} /><Fact label="处理人" value={detail.operatorUserId ? `#${detail.operatorUserId}${detail.ownedByMe ? '（本人）' : ''}` : '—'} /><Fact label="凭证" value={detail.paymentReference || '—'} /><Fact label="原因" value={detail.reason || detail.withdrawal.reason || '—'} /><Fact label="版本" value={`v${detail.withdrawal.rowVersion}`} /></div>
+      <div className="detail-grid"><Fact label="骑手" value={`#${detail.withdrawal.riderUserId}`} /><Fact label="金额" value={money(detail.withdrawal.amountCents)} /><Fact label="状态" value={processingLabel(detail.status)} /><Fact label="处理人" value={detail.operatorUserId ? `#${detail.operatorUserId}${detail.ownedByMe ? '（本人）' : ''}` : '—'} /><Fact label="付款凭证" value={detail.paymentReference || '—'} /><Fact label="处理说明" value={detail.reason || detail.withdrawal.reason || '—'} /><Fact label="数据版本" value={`v${detail.withdrawal.rowVersion}`} /></div>
       {error && <p role="alert">{error}</p>}
       <div className="takeout-row-actions">
         <button disabled={Boolean(busy)} onClick={() => void inspect(detail.withdrawal.withdrawPublicId)}>重新核对处理状态</button>
@@ -786,11 +786,11 @@ function RefundsPanel() {
     try { setDetail(await deliveryAdminAPI.refund(id)) } catch (reason) { setError(errorMessage(reason)) }
   }
   return <Panel title="退款记录（只读）" actions={<button className="delivery-secondary" onClick={() => void load()}>刷新</button>}>
-    <div className="delivery-controls"><label>状态<select value={status} onChange={event => { setPage(1); setStatus(event.target.value) }}><option value="">全部</option><option value="pending">pending</option><option value="succeeded">succeeded</option><option value="failed">failed</option><option value="retry_pending">retry_pending</option></select></label><label>商家用户 ID<input value={merchantUserId} inputMode="numeric" onChange={event => { setPage(1); setMerchantUserId(event.target.value) }} /></label></div>
+    <div className="delivery-controls"><label>状态<select value={status} onChange={event => { setPage(1); setStatus(event.target.value) }}><option value="">全部</option><option value="pending">处理中</option><option value="succeeded">已退款</option><option value="failed">退款失败</option><option value="retry_pending">等待重试</option></select></label><label>商家用户 ID<input value={merchantUserId} inputMode="numeric" onChange={event => { setPage(1); setMerchantUserId(event.target.value) }} /></label></div>
     <ErrorNotice error={error} refresh={() => void load()} />
     <div className="table-scroll"><table><thead><tr><th>退款</th><th>配送单</th><th>商家</th><th>金额</th><th>状态</th><th>时间</th></tr></thead><tbody>{data.items.map(row => <tr key={row.refundPublicId}><td><button className="link-button" onClick={() => void inspect(row.refundPublicId)}>{short(row.refundPublicId)}</button><span>{row.outRefundNo}</span></td><td>{short(row.deliveryOrderPublicId)}</td><td>#{row.merchantUserId}</td><td>{money(row.amountCents)}</td><td><Badge value={row.status} /></td><td>{time(row.updatedAt)}</td></tr>)}</tbody></table></div>
     <Pagination value={data} setPage={setPage} />
-    {detail && <Detail title={`退款 ${detail.refundPublicId}`} close={() => setDetail(null)}><div className="detail-grid"><Fact label="状态" value={<Badge value={detail.status} />} /><Fact label="配送单" value={detail.deliveryOrderPublicId} /><Fact label="商家" value={`#${detail.merchantUserId}`} /><Fact label="金额" value={money(detail.amountCents)} /><Fact label="退款单号" value={detail.outRefundNo} /><Fact label="失败原因" value={detail.failureReason || '—'} /><Fact label="Row Version" value={`v${detail.rowVersion}`} /><Fact label="成功时间" value={time(detail.succeededAt)} /></div><p className="delivery-description">D-6c 仅查看退款状态，不在前端发起或伪造退款动作。</p></Detail>}
+    {detail && <Detail title={`退款 ${detail.refundPublicId}`} close={() => setDetail(null)}><div className="detail-grid"><Fact label="状态" value={<Badge value={detail.status} />} /><Fact label="配送单" value={detail.deliveryOrderPublicId} /><Fact label="商家" value={`#${detail.merchantUserId}`} /><Fact label="金额" value={money(detail.amountCents)} /><Fact label="退款单号" value={detail.outRefundNo} /><Fact label="失败原因" value={detail.failureReason || '—'} /><Fact label="数据版本" value={`v${detail.rowVersion}`} /><Fact label="成功时间" value={time(detail.succeededAt)} /></div><p className="delivery-description">退款记录仅用于核对状态，后台不会在此页面直接发起或伪造退款。</p></Detail>}
   </Panel>
 }
 

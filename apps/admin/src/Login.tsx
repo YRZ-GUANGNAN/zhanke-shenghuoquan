@@ -28,11 +28,11 @@ export function Login() {
     <section className="login-card" aria-labelledby="admin-login-title">
       <div className="login-card__identity">
         <div className="login-card__mark" aria-hidden="true">湛</div>
-        <div><p className="login-card__eyebrow">湛科生活圈</p><span>运营管理系统</span></div>
+        <div><p className="login-card__eyebrow">湛科生活圈</p><span>经营与运营工作台</span></div>
       </div>
       <div className="login-card__intro">
         <h1 id="admin-login-title">欢迎回来</h1>
-        <p className="login-card__description">使用独立管理员密码进入后台，管理校园内容与服务运营。</p>
+        <p className="login-card__description">查看经营数据，处理订单、钱包、通知与校园内容。</p>
       </div>
       <form onSubmit={event => void submit(event)}>
         <AdminField label="管理员用户名" value="administrator" disabled autoComplete="username" />

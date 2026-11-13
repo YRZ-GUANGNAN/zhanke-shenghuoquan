@@ -196,6 +196,27 @@ func configuredOrderNotificationTemplate(cfg config.Config) (*orderNotificationT
 	return template, nil
 }
 
+func configuredOfficialOrderNotificationTemplate(cfg config.Config) (*orderNotificationTemplate, error) {
+	if !cfg.EnableWechatOfficialNotifications {
+		return nil, nil
+	}
+	template := &orderNotificationTemplate{
+		id: strings.TrimSpace(cfg.WechatOfficialOrderTemplateID), allUsers: true,
+	}
+	fields, err := decodeNotificationTemplateFields(cfg.WechatOfficialOrderTemplateFields, false)
+	if template.id == "" || err != nil {
+		return nil, errors.New("official-account order template requires approved ID and field mapping")
+	}
+	template.fields = fields
+	_, err = template.snapshot(notification.Event{
+		AggregatePublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAV", OccurredAt: time.Now(),
+	}, notification.Recipient{Title: "骑手正在前往取货", TargetPath: "/pages/delivery-rider/index"})
+	if err != nil {
+		return nil, errors.New("official-account template fields do not fit approved field types")
+	}
+	return template, nil
+}
+
 func (t *orderNotificationTemplate) snapshot(event notification.Event, recipient notification.Recipient) (json.RawMessage, error) {
 	if t == nil {
 		return nil, notification.ErrSubscribePayload
@@ -296,6 +317,40 @@ func orderSubscribeGuard(events notificationEventReader, resolver *orderNotifica
 			return lookup(ctx, item.RecipientUserID, appID)
 		}
 		return "", notification.ErrNotificationIneligible
+	}
+}
+
+func orderOfficialAccountGuard(
+	events notificationEventReader,
+	resolver *orderNotificationRecipients,
+) notification.OfficialAccountGuard {
+	return func(ctx context.Context, item notification.DeliveryItem, snapshot notification.TemplateSnapshot) (uint64, error) {
+		if events == nil || resolver == nil || resolver.orders == nil || resolver.users == nil ||
+			resolver.officialTemplate == nil || item.Channel != notification.ChannelWechatOfficial ||
+			item.TemplateKey != "official_order" || snapshot.TemplateID != resolver.officialTemplate.id {
+			return 0, notification.ErrNotificationIneligible
+		}
+		event, err := events.FindEvent(ctx, item.EventPublicID)
+		if err != nil {
+			return 0, errors.New("notification event lookup failed")
+		}
+		if event.EventPublicID != item.EventPublicID || notificationEventExpired(event, resolver.now) {
+			return 0, notification.ErrNotificationIneligible
+		}
+		recipients, err := resolver.resolveRecipients(ctx, event, item.RecipientUserID)
+		if err != nil {
+			return 0, err
+		}
+		for _, recipient := range recipients {
+			if recipient.UserID != item.RecipientUserID || recipient.Purpose != item.Purpose || !recipient.AllowOfficial {
+				continue
+			}
+			if !notificationSnapshotMatches(recipient.OfficialTemplateSnapshot, item.TemplateSnapshot, snapshot) {
+				return 0, notification.ErrNotificationIneligible
+			}
+			return item.RecipientUserID, nil
+		}
+		return 0, notification.ErrNotificationIneligible
 	}
 }
 

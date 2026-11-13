@@ -23,10 +23,14 @@ func parseNotificationIMSDKAppID(value string) uint64 {
 }
 
 type userNotificationRuntime struct {
-	handler    *notification.Handler
-	consumer   *notification.Consumer
-	wechat     *notification.SubscribeWorker
-	imCallback *notification.IMCallbackHandler
+	handler         *notification.Handler
+	consumer        *notification.Consumer
+	wechat          *notification.SubscribeWorker
+	wechatOfficial  *notification.OfficialAccountWorker
+	wecom           *notification.WecomWorker
+	wecomSender     *notification.WeComGroupSender
+	officialAccount *notification.OfficialAccountHandler
+	imCallback      *notification.IMCallbackHandler
 }
 
 // A disabled rollout still has stable authenticated API shapes, but never
@@ -40,12 +44,22 @@ func (disabledNotificationInbox) MarkInboxRead(context.Context, uint64, string, 
 	return false, nil
 }
 
-func notificationSchemaReady(db *gorm.DB) error {
+func notificationSchemaReady(db *gorm.DB, requireOfficial bool) error {
 	if db == nil {
 		return errors.New("notification database unavailable")
 	}
-	for _, model := range []any{&notification.Event{}, &notification.InboxItem{}, &notification.DeliveryItem{}, &notification.Subscription{}, &notification.CallbackReceipt{}} {
+	models := []any{
+		&notification.Event{}, &notification.InboxItem{}, &notification.DeliveryItem{},
+		&notification.Subscription{}, &notification.CallbackReceipt{},
+	}
+	if requireOfficial {
+		models = append(models, &notification.OfficialAccountBinding{})
+	}
+	for _, model := range models {
 		if !db.Migrator().HasTable(model) {
+			if requireOfficial {
+				return errors.New("official-account notifications require migrations 053 and 057")
+			}
 			return errors.New("user notifications require migration 053")
 		}
 	}
@@ -56,7 +70,7 @@ func newDeliveryNotificationAppender(cfg config.Config, db *gorm.DB) (delivery.N
 	if !cfg.EnableUserNotifications {
 		return nil, nil
 	}
-	if err := notificationSchemaReady(db); err != nil {
+	if err := notificationSchemaReady(db, cfg.EnableWechatOfficialNotifications); err != nil {
 		return nil, err
 	}
 	repo := notification.NewRepository(db)
@@ -96,13 +110,17 @@ func newUserNotificationRuntime(cfg config.Config, db *gorm.DB, users *user.Serv
 	var lookup notification.OpenIDLookup
 	var consumer *notification.Consumer
 	var wechat *notification.SubscribeWorker
+	var wechatOfficial *notification.OfficialAccountWorker
+	var wecom *notification.WecomWorker
+	var wecomSender *notification.WeComGroupSender
+	var officialAccount *notification.OfficialAccountHandler
 	identity := notificationIMIdentityAdapter{im: im.NewService(im.NewRepository(db), nil, "", ""), users: users}
 	var templates = map[string]string{"order": "", "private_message": ""}
 	if cfg.EnableUserNotifications {
 		if users == nil {
 			return nil, errors.New("notification identity service unavailable")
 		}
-		if err := notificationSchemaReady(db); err != nil {
+		if err := notificationSchemaReady(db, cfg.EnableWechatOfficialNotifications); err != nil {
 			return nil, err
 		}
 		repo := notification.NewRepository(db)
@@ -125,23 +143,75 @@ func newUserNotificationRuntime(cfg config.Config, db *gorm.DB, users *user.Serv
 		if err != nil {
 			return nil, err
 		}
+		officialTemplate, err := configuredOfficialOrderNotificationTemplate(cfg)
+		if err != nil {
+			return nil, err
+		}
 		if template != nil {
 			templates["order"] = template.id
 		}
 		if privateTemplate != nil {
 			templates["private_message"] = privateTemplate.id
 		}
-		resolver := &orderNotificationRecipients{orders: delivery.NewRepository(db), users: users, now: time.Now, template: template, availability: riderAvailability}
+		resolver := &orderNotificationRecipients{
+			orders: delivery.NewRepository(db), users: users, now: time.Now,
+			template: template, officialTemplate: officialTemplate,
+			officialBindings: repo, officialAppID: cfg.WechatOfficialAppID,
+			availability: riderAvailability,
+		}
 		recipients := &userNotificationRecipients{orders: resolver,
 			financial: &financialNotificationRecipients{funds: delivery.NewRepository(db), users: users},
 			private:   &privateNotificationRecipients{identity: identity, users: users, template: privateTemplate, now: time.Now}}
-		consumer = notification.NewConsumer(notification.NewExpander(notification.NewEventRepository(db), recipients))
+		expanderOptions := []notification.ExpanderOption{}
+		if cfg.WeComMerchantWebhookURL != "" || cfg.WeComRiderWebhookURL != "" {
+			groupSender, senderErr := notification.NewWeComGroupSender(map[string]string{
+				"merchant_ops": cfg.WeComMerchantWebhookURL,
+				"rider_ops":    cfg.WeComRiderWebhookURL,
+			})
+			if senderErr != nil {
+				return nil, senderErr
+			}
+			expanderOptions = append(expanderOptions, notification.WithWecomGroupFormatter(
+				deliveryWecomGroupFormatter(cfg.WeComMerchantWebhookURL != "", cfg.WeComRiderWebhookURL != ""),
+			))
+			wecomSender = groupSender
+			wecom = notification.NewWecomWorker(repo, groupSender)
+		}
+		consumer = notification.NewConsumer(notification.NewExpander(
+			notification.NewEventRepository(db), recipients, expanderOptions...,
+		))
 		if cfg.EnableWechatSubscribeNotifications && cfg.EnableNotificationSending {
 			sender, err := notification.NewSubscribeSender(cfg)
 			if err != nil {
 				return nil, err
 			}
 			wechat = notification.NewSubscribeWorker(repo, sender, userSubscribeGuard(repo, resolver, recipients.private.(*privateNotificationRecipients), lookup, cfg.WechatAppID), cfg.WechatAppID)
+		}
+		officialAccountService, serviceErr := notification.NewOfficialAccountService(repo, notification.OfficialAccountConfig{
+			Enabled: cfg.EnableWechatOfficialNotifications, AppID: cfg.WechatOfficialAppID,
+			AppSecret: cfg.WechatOfficialAppSecret, APIBase: cfg.WechatOfficialAPIBase,
+			RedirectURL: cfg.WechatOfficialOAuthRedirectURL, StateSecret: cfg.JWTSecret,
+			StateTTL: 10 * time.Minute,
+		})
+		if serviceErr != nil {
+			return nil, serviceErr
+		}
+		officialAccount = notification.NewOfficialAccountHandler(officialAccountService, func(c *gin.Context) uint64 {
+			return uint64(user.CurrentUserID(c))
+		})
+		if cfg.EnableWechatOfficialNotifications {
+			officialSender, senderErr := notification.NewOfficialAccountSender(notification.OfficialAccountSenderConfig{
+				AppID: cfg.WechatOfficialAppID, AppSecret: cfg.WechatOfficialAppSecret,
+				MiniProgramAppID: cfg.WechatAppID, APIBase: cfg.WechatOfficialAPIBase, Enabled: true,
+			})
+			if senderErr != nil {
+				return nil, senderErr
+			}
+			wechatOfficial = notification.NewOfficialAccountWorker(
+				repo, officialSender, orderOfficialAccountGuard(repo, resolver),
+				officialAccountService.LookupOpenID,
+			)
+			wechatOfficial.MarkFollow = officialAccountService.MarkFollowState
 		}
 	}
 	service := notification.NewSubscriptionService(authorization, lookup, notification.SubscriptionConfig{
@@ -155,14 +225,17 @@ func newUserNotificationRuntime(cfg config.Config, db *gorm.DB, users *user.Serv
 		if parseNotificationIMSDKAppID(cfg.TencentIMSDKAppID) == 0 || len(strings.TrimSpace(cfg.NotificationIMCallbackToken)) < 16 {
 			return nil, errors.New("IM notification callback requires valid SDKAppID and a strong callback token")
 		}
-		if err := notificationSchemaReady(db); err != nil {
+		if err := notificationSchemaReady(db, cfg.EnableWechatOfficialNotifications); err != nil {
 			return nil, err
 		}
 		imCallback = notification.NewIMCallbackHandler(notification.IMCallbackConfig{
 			SDKAppID: parseNotificationIMSDKAppID(cfg.TencentIMSDKAppID), Token: cfg.NotificationIMCallbackToken,
 		}, identity, notification.NewRepository(db))
 	}
-	return &userNotificationRuntime{handler: handler, consumer: consumer, wechat: wechat, imCallback: imCallback}, nil
+	return &userNotificationRuntime{
+		handler: handler, consumer: consumer, wechat: wechat, wechatOfficial: wechatOfficial,
+		wecom: wecom, wecomSender: wecomSender, officialAccount: officialAccount, imCallback: imCallback,
+	}, nil
 }
 
 // Dispatch by producer-owned aggregate; financial facts never reach the order
@@ -197,11 +270,14 @@ type notificationUserReader interface {
 	Settings(context.Context, uint) (user.SettingsView, error)
 }
 type orderNotificationRecipients struct {
-	orders       notificationOrderReader
-	users        notificationUserReader
-	now          func() time.Time
-	template     *orderNotificationTemplate
-	availability delivery.RiderAvailabilityRepository
+	orders           notificationOrderReader
+	users            notificationUserReader
+	now              func() time.Time
+	template         *orderNotificationTemplate
+	officialTemplate *orderNotificationTemplate
+	officialBindings notification.OfficialAccountBindingRepository
+	officialAppID    string
+	availability     delivery.RiderAvailabilityRepository
 }
 
 func (r *orderNotificationRecipients) ResolveRecipients(ctx context.Context, event notification.Event) ([]notification.Recipient, error) {
@@ -289,20 +365,39 @@ func (r *orderNotificationRecipients) resolveRecipients(ctx context.Context, eve
 		recipient := notification.Recipient{UserID: id, Purpose: purpose, Title: label,
 			Summary: "请进入订单查看最新进度", AggregateType: event.AggregateType, AggregatePublicID: event.AggregatePublicID,
 			AggregateVersion: event.AggregateVersion, TargetPath: path}
-		if r.template.allowsWechat(id) {
+		officialBound := false
+		if r.officialTemplate != nil && r.officialBindings != nil && r.officialAppID != "" {
+			binding, bindingErr := r.officialBindings.FindOfficialAccountBinding(ctx, id, r.officialAppID)
+			if bindingErr == nil {
+				officialBound = binding.FollowState != "not_following"
+			} else if !errors.Is(bindingErr, notification.ErrOfficialAccountNotBound) {
+				return nil, errors.New("official account binding lookup failed")
+			}
+		}
+		if r.template.allowsWechat(id) || officialBound {
 			now := time.Now()
 			if r.now != nil {
 				now = r.now()
 			}
 			hour := now.In(time.FixedZone("Asia/Shanghai", 8*60*60)).Hour()
 			if !settings.QuietHours || (hour >= 7 && hour < 23) {
-				snapshot, err := r.template.snapshot(event, recipient)
-				if err != nil {
-					return nil, err
+				if officialBound {
+					snapshot, err := r.officialTemplate.snapshot(event, recipient)
+					if err != nil {
+						return nil, err
+					}
+					recipient.AllowOfficial = true
+					recipient.OfficialTemplateKey = "official_order"
+					recipient.OfficialTemplateSnapshot = snapshot
+				} else if r.template.allowsWechat(id) {
+					snapshot, err := r.template.snapshot(event, recipient)
+					if err != nil {
+						return nil, err
+					}
+					recipient.AllowWechat = true
+					recipient.WechatTemplateKey = "order"
+					recipient.WechatTemplateSnapshot = snapshot
 				}
-				recipient.AllowWechat = true
-				recipient.WechatTemplateKey = "order"
-				recipient.WechatTemplateSnapshot = snapshot
 			}
 		}
 		result = append(result, recipient)

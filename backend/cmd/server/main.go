@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -30,6 +31,7 @@ import (
 	"campus-circle/backend/internal/module/admin/deliveryproof"
 	"campus-circle/backend/internal/module/admin/deliveryrider"
 	"campus-circle/backend/internal/module/admin/mediaconsole"
+	"campus-circle/backend/internal/module/admin/notificationconsole"
 	"campus-circle/backend/internal/module/admin/review"
 	"campus-circle/backend/internal/module/admin/takeoutbuyer"
 	"campus-circle/backend/internal/module/admin/takeoutconsole"
@@ -340,12 +342,35 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	notificationChannelConsole := notificationconsole.NewHandler(
+		notificationconsole.NewRepository(db),
+		notificationconsole.Config{
+			UserNotifications:    cfg.EnableUserNotifications,
+			SubscribeEnabled:     cfg.EnableUserNotifications && cfg.EnableWechatSubscribeNotifications,
+			NotificationSending:  cfg.EnableNotificationSending,
+			NotificationAudience: cfg.NotificationAudience,
+			OfficialEnabled:      cfg.EnableWechatOfficialNotifications,
+			OfficialAppID:        cfg.WechatOfficialAppID,
+			OfficialTemplateReady: strings.TrimSpace(cfg.WechatOfficialOrderTemplateID) != "" &&
+				strings.TrimSpace(cfg.WechatOfficialOrderTemplateFields) != "",
+			WecomMerchantConfigured: strings.TrimSpace(cfg.WeComMerchantWebhookURL) != "",
+			WecomRiderConfigured:    strings.TrimSpace(cfg.WeComRiderWebhookURL) != "",
+		},
+		userNotifications.wecomSender,
+		time.Now,
+	)
 	if userNotifications.consumer != nil {
 		notificationContext, cancelNotifications := context.WithCancel(context.Background())
 		defer cancelNotifications()
 		go func() { _ = userNotifications.consumer.Run(notificationContext) }()
 		if userNotifications.wechat != nil {
 			go func() { _ = userNotifications.wechat.Run(notificationContext) }()
+		}
+		if userNotifications.wecom != nil {
+			go func() { _ = userNotifications.wecom.Run(notificationContext) }()
+		}
+		if userNotifications.wechatOfficial != nil {
+			go func() { _ = userNotifications.wechatOfficial.Run(notificationContext) }()
 		}
 	}
 	if deliveryRuntime != nil {
@@ -512,6 +537,10 @@ func main() {
 	navigation.NewSearchHandler(navigationService, userService.AuthRequired(), user.CurrentUserID, navigationMetrics).Register(navigationRoutes)
 	im.NewHandler(imService, userService).Register(api.Group("/im"))
 	userNotifications.handler.Register(api.Group("", userService.AuthRequired()))
+	if userNotifications.officialAccount != nil {
+		userNotifications.officialAccount.Register(api, userService.AuthRequired())
+	}
+	notificationChannelConsole.Register(api.Group("/admin/delivery", adminAuthRequired, user.AdminRequired()))
 	if userNotifications.imCallback != nil {
 		userNotifications.imCallback.Register(api.Group("/notification/tencent-im"))
 	}

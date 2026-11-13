@@ -1,9 +1,10 @@
-export type AdminIconName = 'media' | 'delivery' | 'dashboard' | 'users' | 'identities' | 'moderation' | 'community' | 'trade' | 'reports' | 'navigation' | 'settings' | 'search' | 'close' | 'refresh' | 'chevron-right'
+export type AdminIconName = 'media' | 'delivery' | 'notifications' | 'dashboard' | 'users' | 'identities' | 'moderation' | 'community' | 'trade' | 'reports' | 'navigation' | 'settings' | 'search' | 'close' | 'refresh' | 'chevron-right'
 interface AdminIconProps { name: AdminIconName; size?: number; className?: string }
 
 const paths: Record<AdminIconName, JSX.Element> = {
   media: <><rect x='4' y='5' width='16' height='14' rx='2'/><path d='m7 15 3.5-3.5 3 3 2-2L21 18'/><circle cx='17.5' cy='9' r='1.5'/></>,
   delivery: <><path d='M3 7h11v9H3zM14 10h4l3 3v3h-7z'/><circle cx='7' cy='18' r='2'/><circle cx='18' cy='18' r='2'/></>,
+  notifications: <><path d='M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9'/><path d='M10 21h4'/></>,
   dashboard: <path d='M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-3H4zM14 7h6V4h-6z'/>,
   users: <><circle cx='9' cy='8' r='3'/><circle cx='17' cy='9' r='2.5'/><path d='M3 20c.5-4 2.5-6 6-6s5.5 2 6 6M14 15c3-.5 5 1.2 6 4'/></>,
   identities: <><rect x='3' y='5' width='18' height='14' rx='2'/><circle cx='8' cy='11' r='2.5'/><path d='M5 17c.5-2 1.5-3 3-3s2.5 1 3 3M14 9h4M14 13h4'/></>,

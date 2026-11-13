@@ -132,6 +132,14 @@ func (r *GormRepository) ClaimWechatDelivery(ctx context.Context, now time.Time,
 	return r.claimDelivery(ctx, now, lease, ChannelWechatSubscribe)
 }
 
+func (r *GormRepository) ClaimWecomDelivery(ctx context.Context, now time.Time, lease time.Duration) (DeliveryLease, bool, error) {
+	return r.claimDelivery(ctx, now, lease, ChannelWecom)
+}
+
+func (r *GormRepository) ClaimWechatOfficialDelivery(ctx context.Context, now time.Time, lease time.Duration) (DeliveryLease, bool, error) {
+	return r.claimDelivery(ctx, now, lease, ChannelWechatOfficial)
+}
+
 func (r *GormRepository) claimDelivery(ctx context.Context, now time.Time, lease time.Duration, channel Channel) (DeliveryLease, bool, error) {
 	if now.IsZero() || lease <= 0 {
 		return DeliveryLease{}, false, ErrInvalidRecord
@@ -371,7 +379,8 @@ func sameJSON(left, right json.RawMessage) bool {
 }
 
 func validChannel(value Channel) bool {
-	return value == ChannelInApp || value == ChannelWechatSubscribe || value == ChannelWecom
+	return value == ChannelInApp || value == ChannelWechatSubscribe ||
+		value == ChannelWechatOfficial || value == ChannelWecom
 }
 func terminalDeliveryStatus(value DeliveryStatus) bool {
 	return value == DeliveryAccepted || value == DeliveryDelivered || value == DeliveryRead || value == DeliveryUnknown || value == DeliveryBlocked || value == DeliverySkipped || value == DeliveryDeadletter

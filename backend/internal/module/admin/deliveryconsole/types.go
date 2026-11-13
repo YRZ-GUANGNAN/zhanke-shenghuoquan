@@ -22,6 +22,8 @@ type SummaryView struct {
 	Cancelled              int64  `json:"cancelled"`
 	TodayOrders            int64  `json:"todayOrders"`
 	TodayDelivered         int64  `json:"todayDelivered"`
+	TodayDeliveryFeeCents  uint64 `json:"todayDeliveryFeeCents"`
+	TodayPlatformFeeCents  uint64 `json:"todayPlatformFeeCents"`
 	MerchantWalletCents    uint64 `json:"merchantWalletCents"`
 	RiderWalletCents       uint64 `json:"riderWalletCents"`
 	PendingRiderFeeCents   uint64 `json:"pendingRiderFeeCents"`

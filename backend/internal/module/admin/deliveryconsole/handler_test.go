@@ -152,6 +152,41 @@ func TestDeliveryConsoleHandlerContract(t *testing.T) {
 	}
 }
 
+func TestDeliveryConsoleSummaryIncludesRevenueFacts(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	NewHandler(
+		fakeQueries{summary: SummaryView{
+			TodayOrders: 17, TodayDelivered: 14,
+			TodayDeliveryFeeCents: 2860, TodayPlatformFeeCents: 920,
+			PlatformFeeIncomeCents: 18470,
+		}},
+		fakeFees{}, fakeRiderWallets{}, func(*gin.Context) uint64 { return 99 },
+		func() time.Time { return time.Date(2026, 7, 2, 0, 0, 0, 0, time.UTC) },
+	).Register(router.Group("/api/v1/admin/delivery"))
+
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/admin/delivery/summary", nil)
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	body := decodeEnvelope(t, recorder.Body.String())
+	data, ok := body["data"].(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected envelope: %s", recorder.Body.String())
+	}
+	for key, want := range map[string]float64{
+		"todayOrders": 17, "todayDelivered": 14,
+		"todayDeliveryFeeCents": 2860, "todayPlatformFeeCents": 920,
+		"platformFeeIncomeCents": 18470,
+	} {
+		if data[key] != want {
+			t.Fatalf("%s=%v want=%v", key, data[key], want)
+		}
+	}
+}
+
 func TestDeliveryConsoleWriteErrorMapping(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	context, _ := gin.CreateTestContext(recorder)

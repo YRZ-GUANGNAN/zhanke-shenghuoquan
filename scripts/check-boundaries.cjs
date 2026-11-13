@@ -119,8 +119,15 @@ const notificationSource = notificationFiles
 if (/internal\/module\/(user|community|trade|navigation|im|admin|media|takeout|delivery)/.test(notificationSource)) {
   failures.push('notification imports another business domain')
 }
+// Provider callbacks, HTTP adapters, and outbound senders are explicit
+// transport boundaries. Keep the notification domain model and workers free of
+// Gin/HTTP while allowing these named adapters.
+const notificationTransportFiles = new Set([
+  'subscribe_sender.go', 'handler.go', 'im_handler.go', 'im_callback.go',
+  'official_account.go', 'official_sender.go', 'wecom_sender.go',
+])
 const notificationCoreSource = notificationFiles
-  .filter(file => !['subscribe_sender.go', 'handler.go', 'im_handler.go', 'im_callback.go'].includes(path.basename(file)))
+  .filter(file => !notificationTransportFiles.has(path.basename(file)))
   .map(file => fs.readFileSync(file, 'utf8')).join('\n')
 if (/github\.com\/gin-gonic\/gin|"net\/http"/.test(notificationCoreSource)) failures.push('notification core imports HTTP')
 

@@ -92,16 +92,35 @@ func (r *orderNotificationRecipients) resolveRiderPoolRecipients(ctx context.Con
 		recipient := notification.Recipient{UserID: id, Purpose: notification.PurposeOrder, Title: "有新的校园配送单",
 			Summary: "进入接单大厅查看，订单以实时状态为准", AggregateType: event.AggregateType,
 			AggregatePublicID: event.AggregatePublicID, AggregateVersion: event.AggregateVersion, TargetPath: "/pages/delivery-rider/index"}
-		if r.template.allowsWechat(id) {
+		officialBound := false
+		if r.officialTemplate != nil && r.officialBindings != nil && r.officialAppID != "" {
+			binding, bindingErr := r.officialBindings.FindOfficialAccountBinding(ctx, id, r.officialAppID)
+			if bindingErr == nil {
+				officialBound = binding.FollowState != "not_following"
+			} else if !errors.Is(bindingErr, notification.ErrOfficialAccountNotBound) {
+				return nil, errors.New("notification official account binding lookup failed")
+			}
+		}
+		if r.template.allowsWechat(id) || officialBound {
 			hour := now.In(time.FixedZone("Asia/Shanghai", 8*60*60)).Hour()
 			if !settings.QuietHours || (hour >= 7 && hour < 23) {
-				snapshot, err := r.template.snapshot(event, recipient)
-				if err != nil {
-					return nil, err
+				if officialBound {
+					snapshot, err := r.officialTemplate.snapshot(event, recipient)
+					if err != nil {
+						return nil, err
+					}
+					recipient.AllowOfficial = true
+					recipient.OfficialTemplateKey = "official_order"
+					recipient.OfficialTemplateSnapshot = snapshot
+				} else if r.template.allowsWechat(id) {
+					snapshot, err := r.template.snapshot(event, recipient)
+					if err != nil {
+						return nil, err
+					}
+					recipient.AllowWechat = true
+					recipient.WechatTemplateKey = "order"
+					recipient.WechatTemplateSnapshot = snapshot
 				}
-				recipient.AllowWechat = true
-				recipient.WechatTemplateKey = "order"
-				recipient.WechatTemplateSnapshot = snapshot
 			}
 		}
 		result = append(result, recipient)

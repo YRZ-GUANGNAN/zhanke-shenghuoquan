@@ -71,6 +71,10 @@ export default defineAppConfig({
       pages: ['index']
     },
     {
+      root: 'pages/official-account-bind',
+      pages: ['index']
+    },
+    {
       root: 'pages/notifications',
       pages: ['index']
     },

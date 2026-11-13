@@ -53,7 +53,7 @@ export function AccountPanel() {
         <span className="account-panel__avatar" aria-hidden="true">{(user?.nickname || '管').slice(0, 1)}</span>
         <div>
         <strong>{user?.nickname || '超级管理员'}</strong>
-        <span>administrator · #{user?.id}</span>
+        <span>{user?.role === 'superadmin' ? '超级管理员' : '管理员'} · 编号 #{user?.id}</span>
         {error && <small role="alert">{error}</small>}
         </div>
       </div>

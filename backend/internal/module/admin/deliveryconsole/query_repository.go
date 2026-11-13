@@ -270,11 +270,23 @@ func (r *GormQueryRepository) Summary(ctx context.Context, now time.Time) (Summa
 			return SummaryView{}, err
 		}
 	}
-	start := time.Date(now.UTC().Year(), now.UTC().Month(), now.UTC().Day(), 0, 0, 0, 0, time.UTC)
+	start := shanghaiBusinessDayStart(now)
 	if err := db.Model(&delivery.Order{}).Where("created_at >= ?", start).Count(&result.TodayOrders).Error; err != nil {
 		return SummaryView{}, err
 	}
 	if err := db.Model(&delivery.Order{}).Where("delivered_at >= ?", start).Count(&result.TodayDelivered).Error; err != nil {
+		return SummaryView{}, err
+	}
+	if err := db.Model(&delivery.Order{}).
+		Where("status = ? AND delivered_at >= ?", delivery.StatusDelivered, start).
+		Select("COALESCE(SUM(delivery_fee_cents),0)").
+		Scan(&result.TodayDeliveryFeeCents).Error; err != nil {
+		return SummaryView{}, err
+	}
+	if err := db.Model(&delivery.Order{}).
+		Where("status = ? AND delivered_at >= ?", delivery.StatusDelivered, start).
+		Select("COALESCE(SUM(platform_cut_cents),0)").
+		Scan(&result.TodayPlatformFeeCents).Error; err != nil {
 		return SummaryView{}, err
 	}
 	if err := db.Model(&delivery.MerchantWallet{}).
@@ -299,6 +311,12 @@ func (r *GormQueryRepository) Summary(ctx context.Context, now time.Time) (Summa
 		return SummaryView{}, err
 	}
 	return result, nil
+}
+
+func shanghaiBusinessDayStart(now time.Time) time.Time {
+	zone := time.FixedZone("Asia/Shanghai", 8*60*60)
+	local := now.In(zone)
+	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, zone).UTC()
 }
 
 func (r *GormQueryRepository) ListOrders(ctx context.Context, filter ListFilter) ([]delivery.Order, int64, error) {

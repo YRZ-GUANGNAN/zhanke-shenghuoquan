@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { adminAPI } from './services/f-admin'
+import { deliveryAdminAPI, type DeliverySummary } from './services/delivery-admin'
 import { navigationItemError } from './services/navigation-validation'
 import { useAdminStore } from './store'
 import { MediaConsole } from './MediaConsole'
 import { DeliveryConsole } from './DeliveryConsole'
+import { NotificationConsole } from './NotificationConsole'
 import { TakeoutConsole } from './TakeoutConsole'
 import { ExternalTakeoutMerchants } from './ExternalTakeoutMerchants'
 import { FeaturePolicyConsole } from './FeaturePolicyConsole'
@@ -13,11 +15,11 @@ import { featurePolicyEnabled, legacyTakeoutEnabled } from './feature-flags'
 import { Login } from './Login'
 import { AccountPanel } from './AccountPanel'
 import { adminAuthAPI } from './services/admin-auth'
-import { AdminButton, AdminField, AdminIcon, AdminNotice, AdminPageHeader, AdminPagination, AdminPanel, AdminRowActions, AdminSelect, AdminState, AdminStatusBadge, AdminTableFrame, AdminToolbar, useAdminDialog, type AdminDialogAPI } from './components'
+import { AdminBadge, AdminButton, AdminField, AdminIcon, AdminNotice, AdminPageHeader, AdminPagination, AdminPanel, AdminRowActions, AdminSelect, AdminState, AdminStatusBadge, AdminTableFrame, AdminToolbar, useAdminDialog, type AdminDialogAPI } from './components'
 import { adminNavigation, adminNavigationGroups, featurePolicyNavigationItem, type AdminNavigationItem } from './admin-navigation'
 import type { AdminSection, FeedbackRow, NavigationCategory, NavigationItem, NavigationItemInput, Page, PageQuery, PostRow, ProductRow, ReportRow, ReviewTask, Stats, UserRow } from './types'
 
-const takeoutNavigation:AdminNavigationItem={key:'takeout',label:'外卖运营',description:'处理商家、菜品、订单与结算',icon:'delivery',group:'运营中心'}
+const takeoutNavigation:AdminNavigationItem={key:'takeout',label:'旧版外卖',description:'仅保留历史外卖商家、菜品、订单与结算入口',icon:'delivery',group:'业务运营'}
 const baseNavigation=legacyTakeoutEnabled?[...adminNavigation.slice(0,2),takeoutNavigation,...adminNavigation.slice(2)]:adminNavigation
 const visibleNavigation=featurePolicyEnabled?[...baseNavigation,featurePolicyNavigationItem]:baseNavigation
 
@@ -32,28 +34,89 @@ function reviewDecisionSourceLabel(source:ReviewTask['decisionSource']){return({
 const REVIEW_PAGE_SIZE=20
 type ReviewStatusFilter=ReviewTask['status']|''
 
+const dashboardMoney=(value?:number)=>value===undefined?'—':`¥${(value/100).toFixed(2)}`
+
 function Dashboard(){
 	const[data,setData]=useState<Stats|null>(null)
-	const[error,setError]=useState('')
+	const[delivery,setDelivery]=useState<DeliverySummary|null>(null)
+	const[statsError,setStatsError]=useState('')
+	const[deliveryError,setDeliveryError]=useState('')
+	const[loading,setLoading]=useState(true)
 	const setSection=useAdminStore(state=>state.setSection)
-	useEffect(()=>{adminAPI.stats().then(setData).catch(e=>setError(String(e)))},[])
-	if(error)return <ErrorBox message={error}/>
-	if(!data)return <AdminState kind="loading" title="正在汇总平台数据" description="统计数据加载完成后会自动更新。"/>
+	const load=useCallback(async()=>{
+		setLoading(true)
+		setStatsError('')
+		setDeliveryError('')
+		const[statsResult,deliveryResult]=await Promise.allSettled([adminAPI.stats(),deliveryAdminAPI.summary()])
+		if(statsResult.status==='fulfilled')setData(statsResult.value)
+		else setStatsError(String(statsResult.reason))
+		if(deliveryResult.status==='fulfilled')setDelivery(deliveryResult.value)
+		else setDeliveryError(String(deliveryResult.reason))
+		setLoading(false)
+	},[])
+	useEffect(()=>{void load()},[load])
+	if(!data&&!delivery&&loading)return <AdminState kind="loading" title="正在汇总经营数据" description="营收、订单与平台数据加载完成后会自动显示。"/>
 	const metrics=[
-		{label:'注册用户',total:data.totals.users,today:data.today.users},
-		{label:'社区帖子',total:data.totals.posts,today:data.today.posts},
-		{label:'二手商品',total:data.totals.products,today:data.today.products},
-		{label:'待处理审核',total:data.totals.pendingReview,today:null},
+		{label:'注册用户',total:data?.totals.users,today:data?.today.users,note:'今日新增'},
+		{label:'社区帖子',total:data?.totals.posts,today:data?.today.posts,note:'今日新增'},
+		{label:'二手商品',total:data?.totals.products,today:data?.today.products,note:'今日新增'},
+		{label:'待处理审核',total:data?.totals.pendingReview,today:undefined,note:'待办事项'},
 	]
-	return <div className="dashboard-layout">
-		<section className="metric-grid" aria-label="平台核心指标">{metrics.map(metric=><article className="metric-card" key={metric.label}><div className="metric-card__label">{metric.label}</div><div className="metric-card__value">{metric.total}</div><div className="metric-card__footer"><span>{metric.today===null?'工作状态':'今日新增'}</span><strong>{metric.today===null?`${metric.total} 条待处理`:`+${metric.today}`}</strong></div></article>)}</section>
-		<AdminPanel title="今日运营工作" description="快捷入口只基于现有真实指标与管理模块。">
-			<div className="dashboard-actions">
-				<button type="button" onClick={()=>setSection('moderation')}><span>内容审核</span><strong>{data.totals.pendingReview}</strong><small>处理待审内容与人工改判</small></button>
-				<button type="button" onClick={()=>setSection('users')}><span>用户与权限</span><strong>{data.totals.users}</strong><small>查看用户状态和管理员角色</small></button>
-				<button type="button" onClick={()=>setSection('navigation')}><span>服务导航</span><strong>配置</strong><small>维护校内服务入口与商家目录</small></button>
+	return <div className="dashboard-layout dashboard-workspace">
+		<div className="dashboard-workspace__toolbar">
+			<div><strong>经营数据</strong><span>数据直接读取当前订单、钱包与内容模块</span></div>
+			<AdminButton tone="ghost" loading={loading} onClick={()=>void load()}>刷新概览</AdminButton>
+		</div>
+		{statsError&&<AdminNotice tone="warning" title="部分平台数据暂时不可用">{statsError}。其他经营指标仍会继续展示。</AdminNotice>}
+		{deliveryError&&<AdminNotice tone="warning" title="营收与订单数据暂时不可用">{deliveryError}。请稍后刷新，或前往“配送与结算”检查服务状态。</AdminNotice>}
+		<section className="business-hero" aria-label="今日经营与营收概览">
+			<div className="business-hero__revenue">
+				<span>累计平台配送收入</span>
+				<strong>{dashboardMoney(delivery?.platformFeeIncomeCents)}</strong>
+				<p>来自已完成配送单的平台服务收入，不包含商家充值余额或尚未完成的订单。</p>
+				<div className="business-hero__breakdown">
+					<div><small>今日平台收入</small><b>{dashboardMoney(delivery?.todayPlatformFeeCents)}</b></div>
+					<div><small>今日配送成交额</small><b>{dashboardMoney(delivery?.todayDeliveryFeeCents)}</b></div>
+				</div>
 			</div>
-		</AdminPanel>
+			<div className="business-hero__today">
+				<header><span>今日订单</span><AdminBadge tone={delivery?'success':'warning'}>{delivery?'实时数据':'等待同步'}</AdminBadge></header>
+				<div className="business-hero__order-pair">
+					<div><strong>{delivery?.todayOrders??'—'}</strong><span>新进入配送流程</span></div>
+					<div><strong>{delivery?.todayDelivered??'—'}</strong><span>已完成配送</span></div>
+				</div>
+				<AdminButton tone="secondary" onClick={()=>setSection('delivery')}>查看配送与结算</AdminButton>
+			</div>
+		</section>
+		<section className="metric-grid dashboard-community-metrics" aria-label="平台社区指标">
+			{metrics.map(metric=><article className="metric-card" key={metric.label}>
+				<div className="metric-card__label">{metric.label}</div>
+				<div className="metric-card__value">{metric.total??'—'}</div>
+				<div className="metric-card__footer">
+					<span>{metric.note}</span>
+					<strong>{metric.today===undefined?(metric.total===undefined?'等待同步':`${metric.total} 条`):`+${metric.today}`}</strong>
+				</div>
+			</article>)}
+		</section>
+		<div className="dashboard-detail-grid">
+			<AdminPanel title="资金与结算" description="帮助管理员快速判断平台、商家和骑手当前需要关注的金额。">
+				<div className="dashboard-finance-list">
+					<div><span><strong>商家钱包余额</strong><small>可用于后续配送支付</small></span><b>{dashboardMoney(delivery?.merchantWalletCents)}</b></div>
+					<div><span><strong>骑手钱包余额</strong><small>已计入骑手账户的可用金额</small></span><b>{dashboardMoney(delivery?.riderWalletCents)}</b></div>
+					<div><span><strong>待结骑手报酬</strong><small>已产生但尚未完成线下登记</small></span><b>{dashboardMoney(delivery?.pendingRiderFeeCents)}</b></div>
+					<div><span><strong>已登记结款</strong><small>后台已完成人工付款登记</small></span><b>{dashboardMoney(delivery?.paidOfflineCents)}</b></div>
+				</div>
+				<AdminButton tone="text" onClick={()=>setSection('delivery')}>进入资金与提现管理</AdminButton>
+			</AdminPanel>
+			<AdminPanel title="待办与快捷入口" description="只保留当前已经接入真实接口的常用操作。">
+				<div className="dashboard-actions dashboard-actions--stacked">
+					<button type="button" onClick={()=>setSection('moderation')}><span>内容审核</span><strong>{data?.totals.pendingReview??'—'}</strong><small>处理待审内容与人工改判</small></button>
+					<button type="button" onClick={()=>setSection('notifications')}><span>消息通知</span><strong>检查</strong><small>查看服务号绑定、发送失败与值班群状态</small></button>
+					<button type="button" onClick={()=>setSection('identities')}><span>商家骑手认证</span><strong>审核</strong><small>处理商家与骑手身份申请</small></button>
+					<button type="button" onClick={()=>setSection('navigation')}><span>服务入口</span><strong>配置</strong><small>维护校园服务与外部商家入口</small></button>
+				</div>
+			</AdminPanel>
+		</div>
 	</div>
 }
 
@@ -345,9 +408,9 @@ function Navigation(){
 
 async function takedownReason(dialog:AdminDialogAPI,kind:string,title:string){return dialog.prompt({title:`下架${kind}`,description:`确认下架“${title}”。下架后该内容将从用户端消失，恢复需重新提交审核。`,inputLabel:'下架原因',placeholder:'请输入本次操作原因',requiredMessage:'下架原因不能为空',confirmLabel:'确认下架',tone:'danger'})}
 
-function Content(){const section=useAdminStore(s=>s.section);if(section==='share-settings')return <ShareSettingsConsole/>;if(section==='dashboard')return <Dashboard/>;if(section==='users')return <Users/>;if(section==='identities')return <IdentityApplications/>;if(section==='moderation')return <Reviews/>;if(section==='media')return <MediaConsole/>;if(section==='delivery')return <DeliveryConsole/>;if(section==='takeout'&&legacyTakeoutEnabled)return <TakeoutConsole/>;if(section==='community')return <Posts/>;if(section==='trade')return <Products/>;if(section==='reports')return <Reports/>;if(section==='feedbacks')return <Feedbacks/>;if(section==='feature-policy'&&featurePolicyEnabled)return <FeaturePolicyConsole/>;return <Navigation/>}
+function Content(){const section=useAdminStore(s=>s.section);if(section==='share-settings')return <ShareSettingsConsole/>;if(section==='dashboard')return <Dashboard/>;if(section==='users')return <Users/>;if(section==='identities')return <IdentityApplications/>;if(section==='moderation')return <Reviews/>;if(section==='media')return <MediaConsole/>;if(section==='notifications')return <NotificationConsole/>;if(section==='delivery')return <DeliveryConsole/>;if(section==='takeout'&&legacyTakeoutEnabled)return <TakeoutConsole/>;if(section==='community')return <Posts/>;if(section==='trade')return <Products/>;if(section==='reports')return <Reports/>;if(section==='feedbacks')return <Feedbacks/>;if(section==='feature-policy'&&featurePolicyEnabled)return <FeaturePolicyConsole/>;return <Navigation/>}
 
-function AdminShell(){const section=useAdminStore(s=>s.section);const setSection=useAdminStore(s=>s.setSection);const active=visibleNavigation.find(item=>item.key===section)||adminNavigation[0];return <div className="app-shell"><aside className="sidebar"><div className="brand"><div className="brand__logo">湛</div><div><strong>湛科生活圈</strong><span>运营管理后台</span></div></div><nav className="admin-navigation" aria-label="后台主导航">{adminNavigationGroups.map(group=><section className="admin-navigation__group" key={group}><h2>{group}</h2>{visibleNavigation.filter(item=>item.group===group).map(item=><button key={item.key} type="button" className={section===item.key?'active':''} aria-current={section===item.key?'page':undefined} onClick={()=>setSection(item.key)}><span className="admin-navigation__icon"><AdminIcon name={item.icon}/></span><span className="admin-navigation__label">{item.label}</span></button>)}</section>)}</nav><footer className="sidebar__footer"><span className="sidebar__status"/>内部运营系统</footer></aside><main className="main"><div className="topbar"><AdminPageHeader eyebrow={active.group} title={active.label} description={active.description}/><AccountPanel/></div><div className="main__content"><Content/></div></main></div>}
+function AdminShell(){const section=useAdminStore(s=>s.section);const setSection=useAdminStore(s=>s.setSection);const active=visibleNavigation.find(item=>item.key===section)||adminNavigation[0];return <><a className="skip-link" href="#admin-main-content">跳到主要内容</a><div className="app-shell"><aside className="sidebar"><div className="brand"><div className="brand__logo">湛</div><div><strong>湛科生活圈</strong><span>经营与运营工作台</span></div></div><nav className="admin-navigation" aria-label="后台主导航">{adminNavigationGroups.map(group=><section className="admin-navigation__group" key={group}><h2>{group}</h2>{visibleNavigation.filter(item=>item.group===group).map(item=><button key={item.key} type="button" className={section===item.key?'active':''} aria-current={section===item.key?'page':undefined} onClick={()=>setSection(item.key)}><span className="admin-navigation__icon"><AdminIcon name={item.icon}/></span><span className="admin-navigation__label">{item.label}</span></button>)}</section>)}</nav><footer className="sidebar__footer"><span className="sidebar__status"/>数据来自当前运营系统</footer></aside><main className="main" id="admin-main-content"><div className="topbar"><AdminPageHeader eyebrow={active.group} title={active.label} description={active.description}/><AccountPanel/></div><div className="main__content"><Content/></div></main></div></>}
 
 export default function App(){
 	const authStatus=useAdminStore(state=>state.authStatus)
