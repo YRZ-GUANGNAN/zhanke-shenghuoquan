@@ -355,6 +355,7 @@ func main() {
 				strings.TrimSpace(cfg.WechatOfficialOrderTemplateFields) != "",
 			WecomMerchantConfigured: strings.TrimSpace(cfg.WeComMerchantWebhookURL) != "",
 			WecomRiderConfigured:    strings.TrimSpace(cfg.WeComRiderWebhookURL) != "",
+			Workers:                 userNotifications.health.Snapshot,
 		},
 		userNotifications.wecomSender,
 		time.Now,
@@ -362,15 +363,16 @@ func main() {
 	if userNotifications.consumer != nil {
 		notificationContext, cancelNotifications := context.WithCancel(context.Background())
 		defer cancelNotifications()
-		go func() { _ = userNotifications.consumer.Run(notificationContext) }()
+		// worker 崩溃后不会自动重启，交给 WorkerHealth 记录状态供后台展示。
+		userNotifications.health.Run(notificationContext, "事件分发", userNotifications.consumer.Run)
 		if userNotifications.wechat != nil {
-			go func() { _ = userNotifications.wechat.Run(notificationContext) }()
+			userNotifications.health.Run(notificationContext, "小程序订阅消息", userNotifications.wechat.Run)
 		}
 		if userNotifications.wecom != nil {
-			go func() { _ = userNotifications.wecom.Run(notificationContext) }()
+			userNotifications.health.Run(notificationContext, "企业微信群", userNotifications.wecom.Run)
 		}
 		if userNotifications.wechatOfficial != nil {
-			go func() { _ = userNotifications.wechatOfficial.Run(notificationContext) }()
+			userNotifications.health.Run(notificationContext, "微信服务号", userNotifications.wechatOfficial.Run)
 		}
 	}
 	if deliveryRuntime != nil {

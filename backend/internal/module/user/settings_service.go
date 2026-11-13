@@ -264,6 +264,37 @@ func validFeedbackCategory(value string) bool {
 	}
 }
 
+// MyFeedbackView 只暴露用户需要看的内容，不返回处理人身份。
+type MyFeedbackView struct {
+	ID        string     `json:"id"`
+	Category  string     `json:"category"`
+	Content   string     `json:"content"`
+	Status    string     `json:"status"`
+	Reply     string     `json:"reply"`
+	CreatedAt time.Time  `json:"createdAt"`
+	HandledAt *time.Time `json:"handledAt,omitempty"`
+}
+
+// 用户查看自己提交的反馈与处理结果。
+func (s *Service) MyFeedbacks(ctx context.Context, userID uint, page, size int) ([]MyFeedbackView, int64, error) {
+	repo, ok := s.repo.(feedbackRepository)
+	if !ok {
+		return nil, 0, ErrSettingsUnavailable
+	}
+	values, total, err := repo.ListFeedbacksByUser(ctx, userID, normalizePage(page), normalizeSize(size))
+	if err != nil {
+		return nil, 0, err
+	}
+	views := make([]MyFeedbackView, 0, len(values))
+	for _, value := range values {
+		views = append(views, MyFeedbackView{
+			ID: value.FeedbackPublicID, Category: value.Category, Content: value.Content,
+			Status: value.Status, Reply: value.AdminNote, CreatedAt: value.CreatedAt, HandledAt: value.HandledAt,
+		})
+	}
+	return views, total, nil
+}
+
 func (s *Service) AdminFeedbacks(ctx context.Context, page, size int) ([]Feedback, int64, error) {
 	repo, ok := s.repo.(feedbackRepository)
 	if !ok {

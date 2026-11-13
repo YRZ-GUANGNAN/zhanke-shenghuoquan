@@ -31,6 +31,7 @@ type userNotificationRuntime struct {
 	wecomSender     *notification.WeComGroupSender
 	officialAccount *notification.OfficialAccountHandler
 	imCallback      *notification.IMCallbackHandler
+	health          *notification.WorkerHealth
 }
 
 // A disabled rollout still has stable authenticated API shapes, but never
@@ -235,6 +236,7 @@ func newUserNotificationRuntime(cfg config.Config, db *gorm.DB, users *user.Serv
 	return &userNotificationRuntime{
 		handler: handler, consumer: consumer, wechat: wechat, wechatOfficial: wechatOfficial,
 		wecom: wecom, wecomSender: wecomSender, officialAccount: officialAccount, imCallback: imCallback,
+		health: notification.NewWorkerHealth(),
 	}, nil
 }
 

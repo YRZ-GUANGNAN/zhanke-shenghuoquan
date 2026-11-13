@@ -156,6 +156,35 @@ function normalizeUserSettings(value: UserSettingsView): UserSettingsView {
 	return { ...value, wechatBound: value.wechatBound !== false }
 }
 
+export interface MyFeedbackView {
+  id: string
+  category: string
+  content: string
+  status: string
+  reply: string
+  createdAt: string
+  handledAt?: string
+}
+
+export interface MyReportView {
+  id: number
+  targetType: string
+  targetId: number
+  reason: string
+  reviewStatus: string
+  createdAt: string
+}
+
+export async function listMyFeedbacks(): Promise<MyFeedbackView[]> {
+  const value = await request<{ items: MyFeedbackView[] }>('/auth/feedbacks')
+  return value.items || []
+}
+
+export async function listMyReports(): Promise<MyReportView[]> {
+  const value = await request<{ items: MyReportView[] }>('/reports/mine')
+  return value.items || []
+}
+
 export async function listBlockedUsers(): Promise<BlockedUserView[]> {
 	const value = await request<{ items: BlockedUserView[] }>('/auth/blocks')
 	return value.items

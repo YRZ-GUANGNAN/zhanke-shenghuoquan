@@ -24,9 +24,10 @@ const excluded = ['campus-guide']
 const reviewedRoutes = new Set([
   'notifications',
   'official-account-bind',
+  'my-feedback',
 ])
 const compiled = new Map()
-assert.equal(routes.length, 33, '路由变化需要显式复审覆盖表，不得顺带开启历史页面')
+assert.equal(routes.length, 34, '路由变化需要显式复审覆盖表，不得顺带开启历史页面')
 for (const route of reviewedRoutes) {
   assert.ok(routes.includes(route), `${route} 必须纳入显式复审覆盖表`)
 }

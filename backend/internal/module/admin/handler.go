@@ -39,6 +39,7 @@ func NewHandler(service *Service, reviews *review.Service, users *user.Service, 
 }
 func (h *Handler) Register(api *gin.RouterGroup) {
 	api.POST("/reports", h.users.AuthRequired(), user.UnmutedRequired(), h.submitReport)
+	api.GET("/reports/mine", h.users.AuthRequired(), h.myReports)
 	authRequired := h.users.AuthRequired()
 	if h.adminAuth != nil {
 		authRequired = h.adminAuth
@@ -116,6 +117,15 @@ func (h *Handler) updateFeedback(c *gin.Context) {
 		return
 	}
 	response.OK(c, gin.H{"updated": true})
+}
+func (h *Handler) myReports(c *gin.Context) {
+	page, size := pagination(c)
+	values, total, err := h.service.MyReports(c, user.CurrentUserID(c), page, size)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, "list my reports failed")
+		return
+	}
+	response.OK(c, gin.H{"items": values, "page": page, "pageSize": size, "total": total})
 }
 func (h *Handler) submitReport(c *gin.Context) {
 	var req struct {

@@ -139,6 +139,16 @@ export interface NotificationChannelOverview {
     merchantConfigured: boolean
     riderConfigured: boolean
   }
+  workers?: NotificationWorker[]
+}
+
+export interface NotificationWorker {
+  name: string
+  running: boolean
+  startedAt: string
+  stoppedAt?: string
+  lastError: string
+  exitReason: string
 }
 
 export interface FundingSourceSummary {

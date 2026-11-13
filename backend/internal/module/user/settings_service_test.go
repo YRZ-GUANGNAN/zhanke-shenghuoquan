@@ -114,6 +114,16 @@ func (r *domainARepositoryStub) CreateFeedback(_ context.Context, value *Feedbac
 	return nil
 }
 
+func (r *domainARepositoryStub) ListFeedbacksByUser(_ context.Context, userID uint, _, _ int) ([]Feedback, int64, error) {
+	values := make([]Feedback, 0, len(r.feedbacks))
+	for _, value := range r.feedbacks {
+		if value.UserID == userID {
+			values = append(values, value)
+		}
+	}
+	return values, int64(len(values)), nil
+}
+
 func (r *domainARepositoryStub) UpdateFeedbackHandling(_ context.Context, publicID, status, note string, actorID uint, now time.Time) error {
 	for index, value := range r.feedbacks {
 		if value.FeedbackPublicID != publicID {

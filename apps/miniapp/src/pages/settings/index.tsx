@@ -406,6 +406,9 @@ export default function SettingsPage() {
             <View className='student-settings-row' onClick={() => void Taro.navigateTo({ url: '/pages/feedback/index' })}>
               <Text className='student-settings-row__title'>意见反馈</Text><AppIcon name='chevron-right' className='student-settings-row__arrow app-icon--chevron' />
             </View>
+            <View className='student-settings-row' onClick={() => void Taro.navigateTo({ url: '/pages/my-feedback/index' })}>
+              <Text className='student-settings-row__title'>反馈与举报记录</Text><AppIcon name='chevron-right' className='student-settings-row__arrow app-icon--chevron' />
+            </View>
             <View className='student-settings-row' onClick={() => void Taro.navigateTo({ url: '/pages/about/index' })}>
               <Text className='student-settings-row__title'>关于湛科生活圈</Text><AppIcon name='chevron-right' className='student-settings-row__arrow app-icon--chevron' />
             </View>

@@ -47,6 +47,16 @@ func (r *reportMemoryRepository) ListReports(context.Context, int, int) ([]Repor
 	return values, int64(len(values)), nil
 }
 
+func (r *reportMemoryRepository) ListReportsByReporter(_ context.Context, reporterID uint, _, _ int) ([]Report, int64, error) {
+	values := make([]Report, 0, len(r.reports))
+	for _, value := range r.reports {
+		if value.ReporterID == reporterID {
+			values = append(values, value)
+		}
+	}
+	return values, int64(len(values)), nil
+}
+
 func (r *reportMemoryRepository) SetReportStatus(_ context.Context, id uint, status review.Status) error {
 	for key, value := range r.reports {
 		if value.ID == id {

@@ -151,7 +151,7 @@ const customNavigationPages = fs.readdirSync(miniappPagesRoot, { withFileTypes: 
     return fs.existsSync(configPath) && /navigationStyle:\s*'custom'/.test(fs.readFileSync(configPath, 'utf8'))
   })
 
-assert.equal(customNavigationPages.length, 30, 'custom navigation page inventory changed')
+assert.equal(customNavigationPages.length, 31, 'custom navigation page inventory changed')
 
 for (const pageName of customNavigationPages) {
   const sourcePath = path.join(miniappPagesRoot, pageName, 'index.tsx')

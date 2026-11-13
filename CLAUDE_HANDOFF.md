@@ -45,6 +45,14 @@
 - 接口：`PATCH /admin/feedbacks/:id`，只允许管理员与超级管理员调用。
 - 已知边界：MySQL 在写入值与现值相同时返回 `RowsAffected=0`，仓储层已改为再查一次存在性，避免把幂等更新误判为「记录不存在」。
 
+### 用户端记录与后台可观测性
+
+- 小程序新增「反馈与举报记录」页（`pages/my-feedback`），用户可查看自己提交的反馈状态、处理说明与举报进度。
+- 新接口：`GET /auth/feedbacks`（只返回本人的记录与处理说明，不含处理人身份）、`GET /reports/mine`。
+- 通知 worker 改为通过 `notification.WorkerHealth` 启动：崩溃会记录退出原因，后台「消息通知」页新增「后台投递任务」区块展示运行状态。
+- 新增 `npm run check:migrations` 并接入 `verify`：除 19 个历史遗留迁移外，任何新迁移缺少回滚脚本都会失败。
+- README 的代码规模与迁移数量已按实际统计更正。
+
 ### 本地开发环境
 
 - 本地库已补齐 038–058 迁移；`meilisearch.exe` 与后端 8080 可本地直接启动。

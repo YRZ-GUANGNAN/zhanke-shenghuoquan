@@ -261,6 +261,18 @@ export function NotificationConsole() {
         </AdminPanel>
       </div>
 
+      {(value.workers?.length ?? 0) > 0 && <AdminPanel
+        title="后台投递任务"
+        description="这些任务在服务启动后持续运行。任务停止后提醒会中断，需要重启服务恢复。"
+      >
+        <div className="notification-worker-list">
+          {(value.workers || []).map(worker => <div key={worker.name}>
+            <span><strong>{worker.name}</strong><small>{worker.running ? '正在运行' : worker.lastError || '已停止'}</small></span>
+            <AdminBadge tone={worker.running ? 'success' : 'danger'}>{worker.running ? '运行中' : '已停止'}</AdminBadge>
+          </div>)}
+        </div>
+      </AdminPanel>}
+
       <AdminPanel
         title="发送记录"
         description="每次提醒的实际投递结果。发送失败时会保留原因和重试次数，方便判断是用户未授权还是配置有误。"

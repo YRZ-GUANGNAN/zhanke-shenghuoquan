@@ -37,7 +37,7 @@ assert.throws(() => readMiniappRoutes('export default arbitraryCode()'))
 assert.throws(() => readMiniappRoutes('export default defineAppConfig({pages: [invalid syntax)'))
 const root = path.resolve(__dirname, '..')
 const actual = readMiniappRoutes(fs.readFileSync(path.join(root, 'apps/miniapp/src/app.config.ts'), 'utf8'))
-assert.equal(actual.length, 33)
+assert.equal(actual.length, 34)
 for (const route of ['pages/merchant-wallet/index', 'pages/rider-wallet/index']) {
   assert.ok(actual.includes(route), `must inspect sub-package page: ${route}`)
 }

@@ -42,6 +42,7 @@ func (h *Handler) Register(rg *gin.RouterGroup) {
 	rg.POST("/blocks/:id", h.service.AuthRequired(), h.addBlock)
 	rg.DELETE("/blocks/:id", h.service.AuthRequired(), h.removeBlock)
 	rg.POST("/feedbacks", h.service.AuthRequired(), h.submitFeedback)
+	rg.GET("/feedbacks", h.service.AuthRequired(), h.myFeedbacks)
 	rg.DELETE("/me", h.service.AuthRequired(), h.closeAccount)
 }
 
@@ -150,6 +151,26 @@ func (h *Handler) removeBlock(c *gin.Context) {
 		return
 	}
 	response.OK(c, gin.H{"blocked": false})
+}
+
+func (h *Handler) myFeedbacks(c *gin.Context) {
+	page, size := 1, 20
+	if raw := c.Query("page"); raw != "" {
+		if value, err := strconv.Atoi(raw); err == nil && value > 0 {
+			page = value
+		}
+	}
+	if raw := c.Query("pageSize"); raw != "" {
+		if value, err := strconv.Atoi(raw); err == nil && value > 0 && value <= 50 {
+			size = value
+		}
+	}
+	values, total, err := h.service.MyFeedbacks(c, CurrentUserID(c), page, size)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, "读取反馈记录失败")
+		return
+	}
+	response.OK(c, gin.H{"items": values, "page": page, "pageSize": size, "total": total})
 }
 
 func (h *Handler) submitFeedback(c *gin.Context) {

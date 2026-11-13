@@ -62,6 +62,15 @@ func (s *Service) Reports(ctx context.Context, page, size int) ([]Report, int64,
 	page, size = normalize(page, size)
 	return s.repo.ListReports(ctx, page, size)
 }
+
+// 用户只能查询自己提交的举报，用于在客户端查看处置进度。
+func (s *Service) MyReports(ctx context.Context, reporterID uint, page, size int) ([]Report, int64, error) {
+	if reporterID == 0 {
+		return nil, 0, errors.New("reporter is required")
+	}
+	page, size = normalize(page, size)
+	return s.repo.ListReportsByReporter(ctx, reporterID, page, size)
+}
 func (s *Service) ObjectType() string { return "report" }
 func (s *Service) SetReviewStatus(ctx context.Context, id uint, status review.Status) error {
 	return s.repo.SetReportStatus(ctx, id, status)

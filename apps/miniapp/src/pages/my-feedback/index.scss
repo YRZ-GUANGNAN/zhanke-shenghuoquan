@@ -1,0 +1,137 @@
+@use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
+
+.my-feedback-page {
+  @include ref.page-foundation;
+  min-height: 100vh;
+  background: $bg-app;
+  color: $text-primary;
+}
+
+.my-feedback-nav__back {
+  @include ref.touch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: $text-strong;
+  font-size: 54rpx;
+  line-height: 1;
+}
+
+.my-feedback-content {
+  display: grid;
+  gap: 20rpx;
+  padding: 12rpx 28rpx 48rpx;
+}
+
+.my-feedback-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10rpx;
+  padding: 64rpx 24rpx;
+  border-radius: 20rpx;
+  background: $bg-surface;
+  color: $text-secondary;
+  text-align: center;
+
+  &--error { color: $danger-static; }
+}
+
+.my-feedback-state__text {
+  @include ref.type(body);
+  @include ref.wrap;
+}
+
+.my-feedback-state__hint {
+  @include ref.type(meta);
+  @include ref.wrap;
+  color: $text-tertiary;
+}
+
+.my-feedback-state__action {
+  @include ref.type(label);
+  @include ref.wrap;
+  color: $brand-primary-static;
+}
+
+.my-feedback-section {
+  display: grid;
+  gap: 16rpx;
+}
+
+.my-feedback-section__title {
+  @include ref.type(author);
+  @include ref.wrap;
+  padding-left: 6rpx;
+  color: $text-secondary;
+  letter-spacing: 0.04em;
+}
+
+.my-feedback-card {
+  display: grid;
+  gap: 12rpx;
+  padding: 24rpx;
+  border-radius: 20rpx;
+  background: $bg-surface;
+  box-shadow: $shadow-card;
+}
+
+.my-feedback-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+}
+
+.my-feedback-card__time {
+  @include ref.type(meta);
+  @include ref.wrap;
+  color: $text-tertiary;
+}
+
+.my-feedback-status {
+  @include ref.touch;
+  @include ref.type(meta);
+  @include ref.wrap;
+  flex: none;
+  padding: 4rpx 16rpx;
+  border-radius: 999rpx;
+  font-weight: 600;
+
+  &--open,
+  &--submitted { color: $warning-static; background: $warning-tint-static; }
+  &--in_progress,
+  &--reviewing { color: $brand-primary-static; background: $brand-tint-static; }
+  &--resolved,
+  &--approved { color: $success-static; background: $success-tint-static; }
+  &--ignored,
+  &--rejected { color: $text-secondary; background: $bg-subtle; }
+}
+
+.my-feedback-card__body {
+  @include ref.type(comment);
+  @include ref.wrap;
+  color: $text-primary;
+}
+
+.my-feedback-reply {
+  display: grid;
+  gap: 6rpx;
+  padding: 16rpx 18rpx;
+  border-radius: 14rpx;
+  background: $bg-subtle;
+}
+
+.my-feedback-reply__label {
+  @include ref.type(meta);
+  @include ref.wrap;
+  color: $text-tertiary;
+  font-weight: 600;
+}
+
+.my-feedback-reply__text {
+  @include ref.type(author);
+  @include ref.wrap;
+  color: $text-secondary;
+}

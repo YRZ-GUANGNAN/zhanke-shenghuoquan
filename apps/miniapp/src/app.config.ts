@@ -79,6 +79,10 @@ export default defineAppConfig({
       pages: ['index']
     },
     {
+      root: 'pages/my-feedback',
+      pages: ['index']
+    },
+    {
       root: 'pages/merchant-home',
       pages: ['index']
     },

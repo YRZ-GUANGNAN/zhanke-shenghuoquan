@@ -26,6 +26,7 @@ const expectedRoutes = [
   'pages/notifications/index',
   'pages/blacklist/index',
   'pages/feedback/index',
+  'pages/my-feedback/index',
   'pages/about/index',
   'pages/legal/index',
   'pages/merchant-home/index',
@@ -52,6 +53,7 @@ const expectedLazyRoutes = [
   'pages/settings/index',
   'pages/official-account-bind/index',
   'pages/notifications/index',
+  'pages/my-feedback/index',
   'pages/merchant-home/index',
   'pages/delivery-rider/index',
   'pages/delivery-conversation/index'

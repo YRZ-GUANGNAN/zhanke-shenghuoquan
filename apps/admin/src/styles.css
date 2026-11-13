@@ -2224,6 +2224,22 @@ table code { color: #405167; font-family: "Cascadia Code", Consolas, monospace; 
 
 .admin-stack { display: grid; gap: 18px; }
 
+
+.notification-worker-list { display: grid; gap: 10px; }
+.notification-worker-list > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: #fafbfd;
+}
+.notification-worker-list > div > span { min-width: 0; display: grid; gap: 3px; }
+.notification-worker-list strong { color: var(--color-text); font-size: 13px; font-weight: 680; }
+.notification-worker-list small { color: var(--color-text-muted); font-size: 12px; overflow-wrap: anywhere; }
+
 .notification-delivery-filter { display: flex; align-items: center; gap: 8px; color: var(--color-text-secondary); font-size: 12px; font-weight: 650; }
 .notification-delivery-filter select { min-height: 34px; padding: 0 26px 0 10px; border: 1px solid var(--color-border-strong); border-radius: 7px; background: #fff; color: var(--color-text); font-size: 12px; }
 .notification-delivery-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 14px; color: var(--color-text-secondary); font-size: 12px; }
@@ -2915,4 +2931,140 @@ body {
   .business-hero__order-pair,
   .dashboard-actions--stacked { grid-template-columns: 1fr; }
   .dashboard-finance-list > div { align-items: flex-start; flex-direction: column; gap: 7px; }
+}
+
+/* 登录页：左右分栏，左侧只承载欢迎，右侧只放登录。 */
+.login-page {
+  padding: 32px;
+  background:
+    radial-gradient(circle at 12% 10%, rgba(53, 95, 125, .18), transparent 36%),
+    radial-gradient(circle at 88% 88%, rgba(110, 160, 200, .16), transparent 40%),
+    linear-gradient(160deg, #f5f8fb 0%, #e8eff5 58%, #e1e9f0 100%);
+}
+
+.login-shell {
+  width: min(1040px, 100%);
+  min-height: 560px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  overflow: hidden;
+  border: 1px solid rgba(220, 228, 235, .9);
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 40px 110px rgba(18, 36, 53, .18);
+}
+
+.login-brand {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0;
+  padding: 46px;
+  color: #e8f1f8;
+  background: linear-gradient(160deg, #1a3048 0%, #122234 55%, #0d1a28 100%);
+  overflow: hidden;
+}
+
+.login-brand::after {
+  content: "";
+  position: absolute;
+  right: -120px;
+  bottom: -150px;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(124, 176, 216, .26), transparent 68%);
+  pointer-events: none;
+}
+
+.login-brand__top { position: absolute; top: 42px; left: 46px; right: 46px; display: flex; align-items: center; gap: 13px; z-index: 1; }
+.login-brand__mark {
+  width: 46px; height: 46px;
+  display: grid; place-items: center;
+  flex: none;
+  border-radius: 13px;
+  background: linear-gradient(150deg, #f6fafd 0%, #caddeb 100%);
+  color: #1e3f57;
+  font-size: 19px; font-weight: 800;
+  box-shadow: 0 8px 22px rgba(4, 12, 20, .35), inset 0 1px 0 #fff;
+}
+.login-brand__name { display: grid; gap: 3px; }
+.login-brand__name strong { color: #fff; font-size: 16px; font-weight: 740; letter-spacing: .01em; }
+.login-brand__name span { color: #93a9bc; font-size: 12px; letter-spacing: .04em; }
+
+.login-brand__body { position: relative; z-index: 1; display: grid; gap: 20px; }
+.login-brand__body::before {
+  content: "";
+  width: 44px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #7fb6dd, rgba(127, 182, 221, 0));
+}
+.login-brand__hello {
+  margin: 0;
+  min-height: 1.4em;
+  max-width: 16em;
+  font-family: Georgia, "Songti SC", "Noto Serif SC", "STSong", "SimSun", serif;
+  color: #9db4c7;
+  font-size: 20px;
+  line-height: 1.7;
+  font-weight: 500;
+  letter-spacing: .06em;
+  animation: login-word-in .6s cubic-bezier(.2, .8, .2, 1) both;
+}
+.login-brand__hello.is-leaving { animation: login-word-out .42s ease-in both; }
+.login-brand__word {
+  margin: 0;
+  min-height: 1.25em;
+  font-family: Georgia, "Songti SC", "Noto Serif SC", "STSong", "SimSun", serif;
+  font-size: clamp(46px, 5.4vw, 76px);
+  line-height: 1.14;
+  font-weight: 600;
+  letter-spacing: .012em;
+  background: linear-gradient(102deg, #ffffff 12%, #d6e8f6 58%, #a7c8e2 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+@keyframes login-word-in {
+  from { opacity: 0; transform: translateY(14px); filter: blur(3px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+@keyframes login-word-out {
+  from { opacity: 1; transform: translateY(0); filter: blur(0); }
+  to { opacity: 0; transform: translateY(-12px); filter: blur(3px); }
+}
+
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 54px 50px;
+}
+.login-form__head { display: grid; gap: 8px; margin-bottom: 26px; }
+.login-form__eyebrow {
+  margin: 0;
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: .14em;
+}
+.login-form h1 { margin: 0; color: var(--color-text); font-size: 26px; line-height: 1.2; font-weight: 740; letter-spacing: -.02em; }
+.login-form__description { margin: 0; color: var(--color-text-secondary); font-size: 13px; line-height: 1.6; }
+.login-form form { display: grid; gap: 16px; }
+.login-form .admin-button--primary { min-height: 46px; margin-top: 6px; font-size: 14px; }
+.login-form__security { margin: 26px 0 0; padding-top: 18px; border-top: 1px solid #edf1f4; color: var(--color-text-muted); font-size: 11px; line-height: 1.65; text-align: center; }
+
+@media (max-width: 900px) {
+  .login-page { padding: 18px; }
+  .login-shell { grid-template-columns: 1fr; min-height: 0; }
+  .login-brand { justify-content: flex-start; gap: 22px; padding: 26px 24px 30px; }
+  .login-brand__top { position: static; }
+  .login-brand__body { gap: 10px; }
+  .login-brand__body::before { width: 32px; }
+  .login-brand__word { font-size: 34px; }
+  .login-form { padding: 30px 24px 34px; }
 }

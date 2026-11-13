@@ -22,6 +22,8 @@ type Config struct {
 	OfficialTemplateReady   bool
 	WecomMerchantConfigured bool
 	WecomRiderConfigured    bool
+	// Workers 返回通知 worker 的运行状态，未配置时后台不展示该区块。
+	Workers func() []notification.WorkerState
 }
 
 type Handler struct {
@@ -149,6 +151,7 @@ type Overview struct {
 		MerchantConfigured bool `json:"merchantConfigured"`
 		RiderConfigured    bool `json:"riderConfigured"`
 	} `json:"wecom"`
+	Workers []notification.WorkerState `json:"workers"`
 }
 
 func (h *Handler) overview(c *gin.Context) {
@@ -206,6 +209,9 @@ func (h *Handler) overview(c *gin.Context) {
 	result.Official.NotFollowing = officialCounts.NotFollowing
 	result.Wecom.MerchantConfigured = h.config.WecomMerchantConfigured
 	result.Wecom.RiderConfigured = h.config.WecomRiderConfigured
+	if h.config.Workers != nil {
+		result.Workers = h.config.Workers()
+	}
 	response.OK(c, result)
 }
 

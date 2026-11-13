@@ -15,6 +15,7 @@ var ErrReportNotFound = errors.New("report not found")
 type Repository interface {
 	CreateReportOrReplay(context.Context, *Report) (bool, error)
 	ListReports(context.Context, int, int) ([]Report, int64, error)
+	ListReportsByReporter(context.Context, uint, int, int) ([]Report, int64, error)
 	SetReportStatus(context.Context, uint, review.Status) error
 	WithinTransaction(context.Context, func(context.Context, Repository) error) error
 }
@@ -59,6 +60,16 @@ func (r *GormRepository) ListReports(ctx context.Context, page, size int) ([]Rep
 	var values []Report
 	var total int64
 	query := dbtx.DB(ctx, r.db).Model(&Report{})
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	err := query.Order("created_at DESC").Offset((page - 1) * size).Limit(size).Find(&values).Error
+	return values, total, err
+}
+func (r *GormRepository) ListReportsByReporter(ctx context.Context, reporterID uint, page, size int) ([]Report, int64, error) {
+	values := make([]Report, 0, size)
+	var total int64
+	query := dbtx.DB(ctx, r.db).Model(&Report{}).Where("reporter_id = ?", reporterID)
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
