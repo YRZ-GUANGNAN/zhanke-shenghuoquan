@@ -50,6 +50,16 @@
 - 运行时子用户只能执行 COS 数据操作和 STS，不具备修改桶配置的权限；版本控制通过控制台开启。
 - Gate-0“同一签名 PUT 重复覆盖必须被拒绝”测试在已开启版本控制的桶上未通过；同一 PUT 会生成新版本。
 - 该覆盖保护项不能标记为完整 PASS，需另做应用层限制或专用验收入口。
+- 切换期间旧桶与新桶的对象清单均为 0，没有可迁移的历史媒体对象。
+
+## 微信服务器域名补齐
+
+- 已将旧的 `zkshq-1436381937-1436381937.cos.ap-guangzhou.myqcloud.com` 从小程序 `request合法域名` 移除。
+- 已加入新桶 `https://zkshq-1507095774.cos.ap-guangzhou.myqcloud.com`。
+- 已加入腾讯云 IM 统计域名 `https://events.im.qcloud.com`。
+- 已加入 `wss://wss.im.qcloud.com`、`wss://wssv6.im.qcloud.com`、`wss://wss.tim.qq.com` 和 `wss://wss.im.tencent.cn` 到 `socket合法域名`。
+- 微信公众平台保存成功，域名修改次数由 50 变为 49。
+- 新桶真实图片写入返回 200，私有读取返回 200，匿名读取返回 403，删除返回 204，删除后读取返回 404；测试对象已清理。
 
 ## 当前仍需真实样本
 
