@@ -200,6 +200,47 @@
   border: 0;
 }
 
+.student-settings-phone-bound {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex: 0 0 auto;
+  min-height: 44px;
+}
+
+.student-settings-phone-rebind {
+  @include ref.touch;
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: 0 14px;
+  border: 1px solid rgba(47, 111, 168, 0.24);
+  border-radius: 999px;
+  background: transparent;
+  color: $brand-primary-static;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 32px;
+}
+
+.student-settings-phone-rebind::after {
+  border: 0;
+}
+
+.student-settings-phone-unbind {
+  @include ref.touch;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  border: 1px solid rgba(196, 61, 75, 0.28);
+  border-radius: 999px;
+  color: $danger-static;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 32px;
+}
+
 .student-settings-close {
   @include ref.touch;
   display: flex;

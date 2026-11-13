@@ -12,7 +12,8 @@ import {
 import {
   deliveryAdminAPI,
   type NotificationChannel,
-  type NotificationChannelOverview
+  type NotificationChannelOverview,
+  type NotificationDeliveryPage
 } from './services/delivery-admin'
 
 const channelDescriptions: Record<NotificationChannel['channel'], string> = {
@@ -48,6 +49,11 @@ export function NotificationConsole() {
   const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(false)
   const [testing, setTesting] = useState<'merchant_ops' | 'rider_ops' | ''>('')
+  const [deliveries, setDeliveries] = useState<NotificationDeliveryPage | null>(null)
+  const [deliveryStatus, setDeliveryStatus] = useState('')
+  const [deliveryPage, setDeliveryPage] = useState(1)
+  const [deliveriesLoading, setDeliveriesLoading] = useState(false)
+  const [deliveriesError, setDeliveriesError] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -61,7 +67,24 @@ export function NotificationConsole() {
     }
   }, [])
 
+  const loadDeliveries = useCallback(async () => {
+    setDeliveriesLoading(true)
+    setDeliveriesError('')
+    try {
+      setDeliveries(await deliveryAdminAPI.notificationDeliveries({
+        status: deliveryStatus || undefined,
+        page: deliveryPage,
+        pageSize: 20
+      }))
+    } catch (reason) {
+      setDeliveriesError(errorMessage(reason))
+    } finally {
+      setDeliveriesLoading(false)
+    }
+  }, [deliveryStatus, deliveryPage])
+
   useEffect(() => { void load() }, [load])
+  useEffect(() => { void loadDeliveries() }, [loadDeliveries])
 
   const testGroup = async (group: 'merchant_ops' | 'rider_ops') => {
     const label = group === 'merchant_ops' ? '商家值班群' : '骑手值班群'
@@ -97,7 +120,7 @@ export function NotificationConsole() {
   return <div className="notification-console">
     <AdminPanel
       title="消息通知概览"
-      description="查看订单和私信提醒是否正常发出。账号密钥与群机器人地址只在服务端安全配置，管理端不会读取或展示。"
+      description="查看订单和私信提醒是否正常发出。账号密钥与群机器人地址由系统统一保管，这里不会显示。"
       actions={<AdminButton tone="secondary" loading={loading} onClick={() => void load()}>刷新状态</AdminButton>}
     >
       <AdminToolbar
@@ -141,7 +164,7 @@ export function NotificationConsole() {
               </article>
             </section>
             {!value.sendingEnabled && <AdminNotice tone="warning" title="微信消息发送仍处于关闭状态">
-              小程序内通知不受影响；小程序提醒和微信服务号会在服务端发送开关开启后发出。
+              小程序内通知不受影响；微信提醒要等发送功能开启后才会发出。
             </AdminNotice>}
           </>}
     </AdminPanel>
@@ -197,7 +220,7 @@ export function NotificationConsole() {
             aria-label={`已确认关注 ${value.officialAccount.following} 人，共绑定 ${bindingTotal} 人`}
           />
           <p className="notification-panel-note">
-            只有用户主动绑定并关注服务号后，微信提醒才可能送达。未关注、模板审核变化或账号迁移，都需要在真实发送记录中确认。
+            用户主动绑定并关注服务号后，微信提醒才能送达。取关或模板变动会影响送达，可在发送记录中查看。
           </p>
         </AdminPanel>
 
@@ -233,10 +256,73 @@ export function NotificationConsole() {
           </div>
           <div className="notification-config-contract">
             <strong>安全说明</strong>
-            <span>群机器人地址由服务端安全配置，本页不会读取、显示或修改机器人密钥。</span>
+            <span>群机器人地址由系统统一保管，本页不会显示或修改。</span>
           </div>
         </AdminPanel>
       </div>
+
+      <AdminPanel
+        title="发送记录"
+        description="每次提醒的实际投递结果。发送失败时会保留原因和重试次数，方便判断是用户未授权还是配置有误。"
+        actions={<AdminButton tone="ghost" loading={deliveriesLoading} onClick={() => void loadDeliveries()}>刷新记录</AdminButton>}
+      >
+        <AdminToolbar
+          summary={<><span>共</span><strong>{number.format(deliveries?.total ?? 0)}</strong><span>条记录</span></>}
+          actions={<label className="notification-delivery-filter">
+            <span>状态</span>
+            <select
+              value={deliveryStatus}
+              onChange={event => { setDeliveryStatus(event.target.value); setDeliveryPage(1) }}
+            >
+              <option value="">全部</option>
+              <option value="pending">排队中</option>
+              <option value="accepted">已发出</option>
+              <option value="retry_wait">等待重试</option>
+              <option value="blocked">未发送</option>
+              <option value="deadletter">多次失败</option>
+            </select>
+          </label>}
+        />
+        {deliveriesError && <AdminNotice tone="danger" title="无法读取发送记录">{deliveriesError}</AdminNotice>}
+        {!deliveries && deliveriesLoading
+          ? <AdminState kind="loading" title="正在读取发送记录" description="最近的通知投递结果加载完成后会自动显示。" />
+          : deliveries?.items.length === 0
+            ? <AdminState
+                kind="empty"
+                title="还没有发送记录"
+                description="有订单或私信触发提醒后，每一次实际投递都会出现在这里。"
+              />
+            : <div className="table-scroll">
+                <table>
+                  <thead><tr>
+                    <th>时间</th><th>通知方式</th><th>接收用户</th><th>结果</th><th>重试</th><th>失败原因</th>
+                  </tr></thead>
+                  <tbody>
+                    {(deliveries?.items || []).map(item => <tr key={item.deliveryId}>
+                      <td>{timestamp(item.createdAt)}</td>
+                      <td>{channelNames[item.channel] || item.channel}</td>
+                      <td>#{item.recipientId}</td>
+                      <td><AdminStatusBadge value={item.status} /></td>
+                      <td>{item.attemptCount}</td>
+                      <td className="admin-cell-wrap">{item.error || item.errorCode || '—'}</td>
+                    </tr>)}
+                  </tbody>
+                </table>
+              </div>}
+        {deliveries && deliveries.total > deliveries.pageSize && <div className="notification-delivery-pagination">
+          <AdminButton
+            tone="ghost"
+            disabled={deliveriesLoading || deliveryPage <= 1}
+            onClick={() => setDeliveryPage(current => Math.max(1, current - 1))}
+          >上一页</AdminButton>
+          <span>第 {deliveries.page} / {Math.max(1, Math.ceil(deliveries.total / deliveries.pageSize))} 页</span>
+          <AdminButton
+            tone="ghost"
+            disabled={deliveriesLoading || deliveryPage >= Math.ceil(deliveries.total / deliveries.pageSize)}
+            onClick={() => setDeliveryPage(current => current + 1)}
+          >下一页</AdminButton>
+        </div>}
+      </AdminPanel>
     </>}
   </div>
 }

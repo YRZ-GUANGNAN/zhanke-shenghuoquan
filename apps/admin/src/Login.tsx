@@ -4,6 +4,7 @@ import { useAdminStore } from './store'
 import { AdminButton, AdminField, AdminNotice } from './components'
 
 export function Login() {
+  const [username, setUsername] = useState('administrator')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -14,7 +15,7 @@ export function Login() {
     setBusy(true)
     setError('')
     try {
-      const session = await adminAuthAPI.login(password)
+      const session = await adminAuthAPI.login(username.trim(), password)
       setPassword('')
       setAuthenticated(session)
     } catch (cause) {
@@ -35,8 +36,8 @@ export function Login() {
         <p className="login-card__description">查看经营数据，处理订单、钱包、通知与校园内容。</p>
       </div>
       <form onSubmit={event => void submit(event)}>
-        <AdminField label="管理员用户名" value="administrator" disabled autoComplete="username" />
-        <AdminField label="密码" type="password" value={password} onChange={event => setPassword(event.target.value)} minLength={14} maxLength={72} autoComplete="current-password" autoFocus required />
+        <AdminField label="管理员用户名" value={username} onChange={event => setUsername(event.target.value)} autoComplete="username" required />
+        <AdminField label="密码" type="password" value={password} onChange={event => setPassword(event.target.value)} minLength={14} maxLength={72} autoComplete="current-password" autoFocus required description={password.length < 14 ? `至少 14 位字符，当前 ${password.length} 位` : undefined} />
         {error && <AdminNotice tone="danger" title="登录失败">{error}</AdminNotice>}
         <AdminButton type="submit" tone="primary" loading={busy} disabled={password.length < 14}>登录</AdminButton>
       </form>

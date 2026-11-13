@@ -29,3 +29,6 @@ data.ms/
 meilisearch.exe
 meilisearch*.exe
 *.ms/
+
+# 本地工具配置
+.claude/

@@ -8,6 +8,7 @@ import {
   bindWechatPhone,
   closeAccount,
   getUserSettings,
+  unbindWechatPhone,
   updateUserSettings,
   type UserSettingsView
 } from '../../services/a-user'
@@ -179,14 +180,51 @@ export default function SettingsPage() {
   const bindPhone = async (event: { detail?: { code?: string; errMsg?: string } }) => {
     const code = event.detail?.code || ''
     if (!code) {
-      void Taro.showToast({ title: '未获得手机号授权', icon: 'none' })
+      const reason = event.detail?.errMsg || ''
+      void Taro.showToast({
+        title: reason.includes('deny') ? '你取消了手机号授权' : '未能读取微信手机号，请重试',
+        icon: 'none'
+      })
       return
     }
     try {
       setSettings(await bindWechatPhone(code))
-      void Taro.showToast({ title: '手机号已绑定', icon: 'success' })
+      void Taro.showToast({ title: settings.phoneBound ? '手机号已更新' : '手机号已绑定', icon: 'success' })
     } catch (error) {
+      if (isApiError(error) && error.status === 409) {
+        const result = await Taro.showModal({
+          title: '手机号已被占用',
+          content: '该手机号已绑定其他微信账号。如果你确认这是你的号码，可以把绑定转移到当前账号；原账号将解除手机号绑定。',
+          confirmText: '转移到当前账号',
+          cancelText: '暂不处理'
+        })
+        if (result.confirm) {
+          try {
+            setSettings(await bindWechatPhone(code, true))
+            void Taro.showToast({ title: '手机号已转移并绑定', icon: 'success' })
+          } catch (retryError) {
+            void Taro.showToast({ title: retryError instanceof Error ? retryError.message : '绑定失败', icon: 'none' })
+          }
+        }
+        return
+      }
       void Taro.showToast({ title: error instanceof Error ? error.message : '绑定失败', icon: 'none' })
+    }
+  }
+
+  const unbindPhone = async () => {
+    const result = await Taro.showModal({
+      title: '解绑手机号',
+      content: '解绑后该号码将释放，可重新绑定到其他微信账号。',
+      confirmText: '确认解绑',
+      cancelText: '取消'
+    })
+    if (!result.confirm) return
+    try {
+      setSettings(await unbindWechatPhone())
+      void Taro.showToast({ title: '手机号已解绑', icon: 'success' })
+    } catch (error) {
+      void Taro.showToast({ title: error instanceof Error ? error.message : '解绑失败', icon: 'none' })
     }
   }
 
@@ -249,9 +287,15 @@ export default function SettingsPage() {
             </View>
             {(!isCampusInfo || settings.phoneBound || hasHistoricalWork) && <View className='student-settings-row'>
               <Text className='student-settings-row__title'>手机号</Text>
-              <Button className='student-settings-phone' openType='getPhoneNumber' onGetPhoneNumber={bindPhone}>
-                {settings.phoneBound ? settings.maskedPhone : '绑定手机号'}
-              </Button>
+              {settings.phoneBound
+                ? <View className='student-settings-phone-bound'>
+                    <Text className='student-settings-row__value'>{settings.maskedPhone}</Text>
+                    <Button className='student-settings-phone-rebind' openType='getPhoneNumber' onGetPhoneNumber={bindPhone}>换绑</Button>
+                    <View className='student-settings-phone-unbind' onClick={() => void unbindPhone()}>解绑</View>
+                  </View>
+                : <Button className='student-settings-phone' openType='getPhoneNumber' onGetPhoneNumber={bindPhone}>
+                    绑定手机号
+                  </Button>}
             </View>}
             <View className='student-settings-row'>
               <Text className='student-settings-row__title'>当前身份</Text>
@@ -259,10 +303,10 @@ export default function SettingsPage() {
             </View>
             {!settings.phoneBound && <View className='student-settings-row student-settings-account-row'>
               <View className='student-settings-row__main'>
-                <Text className='student-settings-row__title'>手机号登录</Text>
-                <Text className='student-settings-row__subtitle'>功能预留中，暂不影响微信登录</Text>
+                <Text className='student-settings-row__title'>绑定后可用于</Text>
+                <Text className='student-settings-row__subtitle'>配送联系、账号找回与客服核实，不影响微信登录</Text>
               </View>
-              <Text className='student-settings-row__value'>暂未启用</Text>
+              <Text className='student-settings-row__value'>建议绑定</Text>
             </View>}
           </View>
         </View>

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 	"unicode/utf8"
 )
 
@@ -13,6 +14,7 @@ var (
 	ErrSettingsUnavailable       = errors.New("user settings are unavailable")
 	ErrPhoneBindingUnavailable   = errors.New("wechat phone binding is not configured")
 	ErrInvalidPhone              = errors.New("invalid phone number")
+	ErrPhoneTaken                = errors.New("phone number is already bound to another account")
 	ErrInvalidBlock              = errors.New("cannot block this user")
 	ErrFeedbackUnavailable       = errors.New("feedback media is unavailable")
 	ErrInvalidFeedback           = errors.New("invalid feedback")
@@ -106,31 +108,67 @@ func settingsView(value UserSettings, wechatBound bool, phone *string, count int
 	return view
 }
 
-func (s *Service) BindPhone(ctx context.Context, userID uint, code string) (SettingsView, error) {
-	if s.phoneResolver == nil {
-		return SettingsView{}, ErrPhoneBindingUnavailable
-	}
-	code = strings.TrimSpace(code)
-	if code == "" {
-		return SettingsView{}, ErrInvalidPhone
-	}
-	phone, err := s.phoneResolver.ResolvePhone(ctx, code)
+// takeOver 为 true 时表示用户已确认该手机号属于本人，可以把绑定从旧账号转移到当前账号。
+func (s *Service) BindPhone(ctx context.Context, userID uint, code string, takeOver bool) (SettingsView, error) {
+	phone, repo, err := s.resolvePhoneInput(ctx, code)
 	if err != nil {
-		return SettingsView{}, fmt.Errorf("resolve wechat phone: %w", err)
+		return SettingsView{}, err
 	}
-	phone = strings.TrimPrefix(strings.TrimSpace(phone), "+86")
-	if !regexp.MustCompile(`^1[3-9][0-9]{9}$`).MatchString(phone) {
-		return SettingsView{}, ErrInvalidPhone
-	}
-	repo, ok := s.repo.(settingsRepository)
-	if !ok {
-		return SettingsView{}, ErrSettingsUnavailable
+	owner, err := repo.FindByPhone(ctx, phone)
+	switch {
+	case err == nil && owner.ID == userID && owner.Phone != nil && *owner.Phone == phone:
+		return s.Settings(ctx, userID)
+	case err == nil && !takeOver:
+		return SettingsView{}, ErrPhoneTaken
+	case err == nil && takeOver:
+		// 只有持有该手机号的微信才能走到这里，转出方是同一号码的旧绑定。
+		if detachErr := repo.DetachPhone(ctx, phone, owner.ID); detachErr != nil && !errors.Is(detachErr, ErrNotFound) {
+			return SettingsView{}, detachErr
+		}
+	case err != nil && !errors.Is(err, ErrNotFound):
+		return SettingsView{}, err
 	}
 	if err := repo.UpdatePhone(ctx, userID, phone); err != nil {
 		return SettingsView{}, err
 	}
 	return s.Settings(ctx, userID)
 }
+
+func (s *Service) UnbindPhone(ctx context.Context, userID uint) (SettingsView, error) {
+	repo, ok := s.repo.(settingsRepository)
+	if !ok {
+		return SettingsView{}, ErrSettingsUnavailable
+	}
+	if err := repo.ClearPhone(ctx, userID); err != nil {
+		return SettingsView{}, err
+	}
+	return s.Settings(ctx, userID)
+}
+
+func (s *Service) resolvePhoneInput(ctx context.Context, code string) (string, settingsRepository, error) {
+	repo, ok := s.repo.(settingsRepository)
+	if !ok {
+		return "", nil, ErrSettingsUnavailable
+	}
+	if s.phoneResolver == nil {
+		return "", nil, ErrPhoneBindingUnavailable
+	}
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return "", nil, ErrInvalidPhone
+	}
+	phone, err := s.phoneResolver.ResolvePhone(ctx, code)
+	if err != nil {
+		return "", nil, fmt.Errorf("resolve wechat phone: %w", err)
+	}
+	phone = strings.TrimPrefix(strings.TrimSpace(phone), "+86")
+	if !phonePattern.MatchString(phone) {
+		return "", nil, ErrInvalidPhone
+	}
+	return phone, repo, nil
+}
+
+var phonePattern = regexp.MustCompile(`^1[3-9][0-9]{9}$`)
 
 func maskPhone(value string) string {
 	if len(value) != 11 {
@@ -232,6 +270,30 @@ func (s *Service) AdminFeedbacks(ctx context.Context, page, size int) ([]Feedbac
 		return nil, 0, ErrSettingsUnavailable
 	}
 	return repo.ListFeedbacks(ctx, normalizePage(page), normalizeSize(size))
+}
+
+var feedbackStatuses = map[string]bool{"open": true, "in_progress": true, "resolved": true, "ignored": true}
+
+// 管理员处理用户反馈：记录状态、处理人、时间和说明，供后续追溯。
+func (s *Service) AdminUpdateFeedback(ctx context.Context, actorID uint, publicID, status, note string) error {
+	if !feedbackStatuses[status] {
+		return errors.New("invalid feedback status")
+	}
+	if utf8.RuneCountInString(note) > 500 {
+		return errors.New("feedback note is too long")
+	}
+	actor, err := s.repo.FindByID(ctx, actorID)
+	if err != nil {
+		return err
+	}
+	if actor.Status != StatusActive || (actor.Role != RoleAdmin && actor.Role != RoleSuperAdmin) {
+		return ErrForbidden
+	}
+	repo, ok := s.repo.(feedbackRepository)
+	if !ok {
+		return ErrSettingsUnavailable
+	}
+	return repo.UpdateFeedbackHandling(ctx, publicID, status, strings.TrimSpace(note), actorID, time.Now().UTC())
 }
 
 func (s *Service) CloseAccount(ctx context.Context, userID uint) error {

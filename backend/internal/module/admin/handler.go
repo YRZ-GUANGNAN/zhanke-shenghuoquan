@@ -53,7 +53,9 @@ func (h *Handler) Register(api *gin.RouterGroup) {
 	secured.GET("/reports", h.reports)
 	secured.GET("/users", h.usersList)
 	secured.GET("/feedbacks", h.feedbacks)
+	secured.PATCH("/feedbacks/:id", h.updateFeedback)
 	secured.PATCH("/users/:id/status", h.userStatus)
+	secured.DELETE("/users/:id/phone", h.userPhoneRemove)
 	secured.PATCH("/users/:id/role", user.SuperAdminRequired(), h.userRole)
 	secured.GET("/posts", h.posts)
 	secured.PATCH("/community/posts/:id/takedown", h.takedownPost)
@@ -89,6 +91,31 @@ func (h *Handler) feedbacks(c *gin.Context) {
 		return
 	}
 	response.OK(c, gin.H{"items": values, "page": page, "pageSize": size, "total": total})
+}
+func (h *Handler) updateFeedback(c *gin.Context) {
+	publicID := strings.TrimSpace(c.Param("id"))
+	if publicID == "" {
+		response.Fail(c, http.StatusBadRequest, "invalid feedback id")
+		return
+	}
+	var req struct {
+		Status string `json:"status"`
+		Note   string `json:"note"`
+	}
+	if c.ShouldBindJSON(&req) != nil {
+		response.Fail(c, http.StatusBadRequest, "invalid feedback update")
+		return
+	}
+	err := h.users.AdminUpdateFeedback(c, user.CurrentUserID(c), publicID, req.Status, req.Note)
+	if err != nil {
+		if errors.Is(err, user.ErrForbidden) {
+			response.Fail(c, http.StatusForbidden, "只有管理员可以处理用户反馈")
+			return
+		}
+		response.Fail(c, http.StatusBadRequest, "更新反馈状态失败，请检查内容与状态值")
+		return
+	}
+	response.OK(c, gin.H{"updated": true})
 }
 func (h *Handler) submitReport(c *gin.Context) {
 	var req struct {
@@ -272,6 +299,14 @@ func (h *Handler) userStatus(c *gin.Context) {
 	}
 	err := h.users.AdminUpdateStatus(c, user.CurrentUserID(c), id, req.Status)
 	write(c, gin.H{"updated": err == nil}, err)
+}
+func (h *Handler) userPhoneRemove(c *gin.Context) {
+	id, ok := paramID(c)
+	if !ok {
+		return
+	}
+	err := h.users.AdminClearPhone(c, user.CurrentUserID(c), id)
+	write(c, gin.H{"removed": err == nil}, err)
 }
 func (h *Handler) userRole(c *gin.Context) {
 	id, ok := paramID(c)

@@ -14,7 +14,7 @@ import { IdentityApplications } from './IdentityApplications'
 import { featurePolicyEnabled, legacyTakeoutEnabled } from './feature-flags'
 import { Login } from './Login'
 import { AccountPanel } from './AccountPanel'
-import { adminAuthAPI } from './services/admin-auth'
+import { adminAuthAPI, type AdminCredential } from './services/admin-auth'
 import { AdminBadge, AdminButton, AdminField, AdminIcon, AdminNotice, AdminPageHeader, AdminPagination, AdminPanel, AdminRowActions, AdminSelect, AdminState, AdminStatusBadge, AdminTableFrame, AdminToolbar, useAdminDialog, type AdminDialogAPI } from './components'
 import { adminNavigation, adminNavigationGroups, featurePolicyNavigationItem, type AdminNavigationItem } from './admin-navigation'
 import type { AdminSection, FeedbackRow, NavigationCategory, NavigationItem, NavigationItemInput, Page, PageQuery, PostRow, ProductRow, ReportRow, ReviewTask, Stats, UserRow } from './types'
@@ -27,9 +27,19 @@ function Panel({title,children}:{title:string;children:ReactNode}){return <Admin
 function ErrorBox({message}:{message:string}){return <AdminState kind="error" title="暂时无法读取数据" description={`${message} 请确认管理员会话仍然有效；如果已过期，请重新登录。`}/>}
 function displayTime(value:string){if(!value)return '—';const date=new Date(value);return Number.isNaN(date.getTime())?value:new Intl.DateTimeFormat('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).format(date)}
 const ADMIN_PAGE_SIZE=20
-function reviewStatusLabel(status:ReviewTask['status']){return({submitted:'待开始',reviewing:'审核中',approved:'已通过',rejected:'已拒绝'})[status]}
-function reviewObjectLabel(objectType:ReviewTask['objectType']){return({post:'帖子',comment:'评论',product:'商品',product_comment:'商品留言',report:'举报'})[objectType]}
-function reviewDecisionSourceLabel(source:ReviewTask['decisionSource']){return({manual:'人工审核',automatic:'自动审核',manual_override:'人工改判'})[source]}
+const REVIEW_OBJECT_LABELS:Record<string,string>={post:'帖子',comment:'评论',product:'商品',product_comment:'商品留言',report:'举报',takeout_merchant:'外卖商家',takeout_dish:'外卖菜品',merchant:'商家',rider:'骑手'}
+const REVIEW_RISK_LABELS:Record<string,string>={
+	'wechat safety skipped':'微信安全检测未执行',
+	'wechat_safety_skipped':'微信安全检测未执行',
+	'manual:wechat_safety_unconfigured':'微信安全检测未配置（转人工）',
+	'takeout merchant onboarding':'外卖商家入驻审核',
+	'takeout_merchant_onboarding':'外卖商家入驻审核',
+	'local secondhand demo':'本地二手演示数据',
+}
+function reviewStatusLabel(status:ReviewTask['status']){return({submitted:'待开始',reviewing:'审核中',approved:'已通过',rejected:'已拒绝'})[status]||status}
+function reviewObjectLabel(objectType:ReviewTask['objectType']){return REVIEW_OBJECT_LABELS[objectType]||objectType||'未知类型'}
+function reviewDecisionSourceLabel(source:ReviewTask['decisionSource']){return({manual:'人工审核',automatic:'自动审核',manual_override:'人工改判'})[source]||source}
+function reviewRiskLabel(risk?:string){const value=(risk||'').trim();if(!value)return '无风险备注';return REVIEW_RISK_LABELS[value]||value}
 
 const REVIEW_PAGE_SIZE=20
 type ReviewStatusFilter=ReviewTask['status']|''
@@ -108,7 +118,7 @@ function Dashboard(){
 				</div>
 				<AdminButton tone="text" onClick={()=>setSection('delivery')}>进入资金与提现管理</AdminButton>
 			</AdminPanel>
-			<AdminPanel title="待办与快捷入口" description="只保留当前已经接入真实接口的常用操作。">
+			<AdminPanel title="待办与快捷入口" description="这里只列出目前可以使用的常用操作。">
 				<div className="dashboard-actions dashboard-actions--stacked">
 					<button type="button" onClick={()=>setSection('moderation')}><span>内容审核</span><strong>{data?.totals.pendingReview??'—'}</strong><small>处理待审内容与人工改判</small></button>
 					<button type="button" onClick={()=>setSection('notifications')}><span>消息通知</span><strong>检查</strong><small>查看服务号绑定、发送失败与值班群状态</small></button>
@@ -180,8 +190,8 @@ function Reviews(){
 		}catch(e){setError(String(e))}
 		finally{setBusyTaskId(null)}
 	}
-	return <Panel title="提交 → 审核 → 通过/拒绝 → 展示">
-		<p className="review-guide">点击任务行或“处理审核”打开操作区。商品管理页只展示状态，不直接执行审核。</p>
+	return <Panel title="审核任务">
+		<p className="review-guide">流程：提交 → 审核 → 通过或拒绝 → 展示。点击任务行或“处理审核”打开操作区；商品管理页只展示状态，不直接执行审核。</p>
 		<div className="review-toolbar">
 			<label className="review-filter">
 				<span>审核状态</span>
@@ -209,8 +219,8 @@ function Reviews(){
 				onKeyDown={event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();selectTask(item)}}}
 			>
 				<div>
-					<div className="audit-row__title"><span className="type-chip">{reviewObjectLabel(item.objectType)}</span>{reviewObjectLabel(item.objectType)} #{item.objectId}<small>任务 #{item.id}</small></div>
-					<p><span className={`decision-source decision-source--${item.decisionSource}`}>{reviewDecisionSourceLabel(item.decisionSource)}</span>{item.risk||'无风险备注'} · {item.createdAt}</p>
+					<div className="audit-row__title"><span className="type-chip">{reviewObjectLabel(item.objectType)}</span>#{item.objectId}<small>任务 #{item.id}</small></div>
+					<p><span className={`decision-source decision-source--${item.decisionSource}`}>{reviewDecisionSourceLabel(item.decisionSource)}</span>{reviewRiskLabel(item.risk)} · {displayTime(item.createdAt)}</p>
 				</div>
 				<div className="audit-row__actions">
 					<span className={`status status--${item.status}`}>{reviewStatusLabel(item.status)}</span>
@@ -226,7 +236,7 @@ function Reviews(){
 		</div>
 		{selected&&<section className="review-detail" aria-label={`审核任务 ${selected.id}`}>
 			<header><div><span>当前任务</span><strong>{reviewObjectLabel(selected.objectType)} #{selected.objectId}</strong></div><span className={`status status--${selected.status}`}>{reviewStatusLabel(selected.status)}</span></header>
-			<div className="review-detail__facts"><span>任务编号：#{selected.id}</span><span>决策来源：{reviewDecisionSourceLabel(selected.decisionSource)}</span><span>风险备注：{selected.risk||'无'}</span><span>决策原因：{selected.reason||'无'}</span><span>提交时间：{selected.createdAt}</span></div>
+			<div className="review-detail__facts"><span>任务编号：#{selected.id}</span><span>决策来源：{reviewDecisionSourceLabel(selected.decisionSource)}</span><span>风险备注：{selected.risk?reviewRiskLabel(selected.risk):'无'}</span><span>决策原因：{selected.reason||'无'}</span><span>提交时间：{displayTime(selected.createdAt)}</span></div>
 			<div className="review-detail__actions">
 				{selected.status==='submitted'&&<button type="button" disabled={busyTaskId===selected.id} onClick={()=>void act(selected,'start')}>{busyTaskId===selected.id?'处理中…':'开始审核'}</button>}
 				{selected.status==='reviewing'&&<><button type="button" disabled={busyTaskId===selected.id} onClick={()=>void act(selected,'approve')}>{busyTaskId===selected.id?'处理中…':'通过并公开'}</button><button type="button" className="danger" disabled={busyTaskId===selected.id} onClick={()=>void act(selected,'reject')}>拒绝</button></>}
@@ -255,6 +265,70 @@ function usePagedAdminData<T>(loader:(query:PageQuery)=>Promise<Page<T>>){
 	return{page,setPage,data,loading,error,setError,load}
 }
 
+type CredentialDraft={userId:number;username:string;password:string}
+const emptyCredentialDraft=():CredentialDraft=>({userId:0,username:'',password:''})
+
+function AdminCredentialsPanel(){
+	const dialog=useAdminDialog()
+	const sessionUser=useAdminStore(state=>state.user)
+	const[data,setData]=useState<AdminCredential[]>([])
+	const[users,setUsers]=useState<UserRow[]>([])
+	const[error,setError]=useState('')
+	const[notice,setNotice]=useState('')
+	const[loading,setLoading]=useState(false)
+	const[busy,setBusy]=useState(false)
+	const[draft,setDraft]=useState<CredentialDraft|null>(null)
+	const load=useCallback(async()=>{
+		setLoading(true)
+		try{const[creds,list]=await Promise.all([adminAuthAPI.credentials(),adminAPI.users({page:1,pageSize:100})]);setData(creds.items);setUsers(list.items.filter(row=>(row.role==='admin'||row.role==='superadmin')&&row.status==='active'));setError('')}
+		catch(e){setError(String(e))}
+		finally{setLoading(false)}
+	},[])
+	useEffect(()=>{if(sessionUser?.role==='superadmin')void load()},[load,sessionUser?.role])
+	if(sessionUser?.role!=='superadmin')return null
+	const covered=new Set(data.map(item=>item.userId))
+	const available=users.filter(row=>!covered.has(row.id)||row.id===draft?.userId)
+	const save=async()=>{
+		if(!draft)return
+		if(!draft.userId){setError('请选择要设置登录账号的管理员');return}
+		if(!/^[A-Za-z0-9._]{3,64}$/.test(draft.username.trim())){setError('用户名需为 3–64 位字母、数字、点或下划线');return}
+		if(draft.password.length<14||draft.password.length>72){setError('密码需为 14–72 位字符');return}
+		setBusy(true);setError('');setNotice('')
+		try{
+			await adminAuthAPI.saveCredential(draft.userId,draft.username.trim(),draft.password)
+			setNotice(`已为“${draft.username.trim()}”保存后台登录账号，该账号原有会话已失效。`)
+			setDraft(null)
+			await load()
+		}catch(e){setError(String(e))}
+		finally{setBusy(false)}
+	}
+	const remove=async(credential:AdminCredential)=>{
+		if(!await dialog.confirm({title:'移除后台登录账号',description:`确认移除“${credential.username}”的登录账号吗？该管理员将立即退出后台，但账号本身仍保留。`,confirmLabel:'确认移除',tone:'danger'}))return
+		setBusy(true);setError('');setNotice('')
+		try{await adminAuthAPI.removeCredential(credential.userId);setNotice(`已移除“${credential.username}”的后台登录账号。`);await load()}
+		catch(e){setError(String(e))}
+		finally{setBusy(false)}
+	}
+	return <AdminPanel title="后台登录账号" description="只有被授予后台登录账号的管理员才能进入本后台。超级管理员可以为管理员分配、重置或移除登录账号。" actions={<AdminButton tone="ghost" loading={loading} onClick={()=>void load()}>刷新</AdminButton>}>
+		{error&&<AdminNotice tone="danger" title="账号操作失败">{error}</AdminNotice>}
+		{notice&&<AdminNotice tone="success">{notice}</AdminNotice>}
+		{draft&&<form className="navigation-item-form" onSubmit={event=>{event.preventDefault();void save()}}>
+			<div className="navigation-item-form__title"><div><strong>设置后台登录账号</strong><span>用户名和密码用于登录本后台，不影响小程序用户身份。</span></div><AdminButton tone="text" onClick={()=>{setDraft(null);setError('')}}>取消</AdminButton></div>
+			<div className="navigation-item-form__grid">
+				<AdminSelect label="管理员" value={draft.userId} onChange={event=>{const id=Number(event.target.value);const picked=users.find(row=>row.id===id);setDraft(current=>current?{...current,userId:id,username:current.username||picked?.nickname||''}:current)}}>
+					<option value={0}>请选择管理员</option>
+					{available.map(row=><option value={row.id} key={row.id}>{row.nickname||`用户 #${row.id}`}（{row.role==='superadmin'?'超级管理员':'管理员'}）</option>)}
+				</AdminSelect>
+				<AdminField label="登录用户名" required value={draft.username} maxLength={64} description="3–64 位字母、数字、点或下划线" onChange={event=>setDraft(current=>current?{...current,username:event.target.value}:current)}/>
+				<AdminField label="初始密码" type="password" required value={draft.password} maxLength={72} description="14–72 位字符，保存后对方需用此密码登录" onChange={event=>setDraft(current=>current?{...current,password:event.target.value}:current)}/>
+			</div>
+			<div className="navigation-item-form__footer"><AdminButton tone="primary" type="submit" loading={busy}>保存登录账号</AdminButton></div>
+		</form>}
+		{!draft&&<AdminToolbar summary={data.length?`共 ${data.length} 个可登录账号`:'还没有可登录账号'} actions={<AdminButton tone="primary" onClick={()=>{setDraft(emptyCredentialDraft());setError('');setNotice('')}}>分配登录账号</AdminButton>}/>}
+		{data.length>0&&<AdminTableFrame label="后台登录账号列表"><table className="admin-data-table"><thead><tr><th>登录用户名</th><th>管理员</th><th>角色</th><th>状态</th><th>密码更新时间</th><th className="admin-table-actions">操作</th></tr></thead><tbody>{data.map(item=><tr key={item.credentialId}><td><strong>{item.username}</strong><span>#{item.userId}</span></td><td>{item.nickname||'未设置昵称'}</td><td><AdminStatusBadge value={item.role}/></td><td><AdminStatusBadge value={item.locked?'locked':'active'}/></td><td>{displayTime(item.passwordSetAt)}</td><td className="admin-table-actions"><AdminRowActions><AdminButton tone="text" disabled={busy} onClick={()=>{setDraft({userId:item.userId,username:item.username,password:''});setError('');setNotice('')}}>重置</AdminButton><AdminButton tone="danger" disabled={busy||sessionUser?.id===item.userId} onClick={()=>void remove(item)}>移除</AdminButton></AdminRowActions></td></tr>)}</tbody></table></AdminTableFrame>}
+	</AdminPanel>
+}
+
 function Users(){
 	const dialog=useAdminDialog()
 	const sessionUser=useAdminStore(state=>state.user)
@@ -275,13 +349,21 @@ function Users(){
 		setBusy(row.id);setError('');setNotice('')
 		try{await adminAPI.updateUserRole(row.id,role);setNotice(`已更新“${row.nickname}”的管理员角色。`);await load()}catch(e){setError(String(e))}finally{setBusy(null)}
 	}
-	return <AdminPanel title="用户与管理员权限" description="状态和角色变更均受后端权限与最后超级管理员保护。">
+	const removePhone=async(row:UserRow)=>{
+		if(!await dialog.confirm({title:'解除手机号绑定',description:`确认解除“${row.nickname}”的 ${row.maskedPhone||'手机号'} 绑定吗？该号码将被释放，可重新绑定到其他微信账号。`,confirmLabel:'确认解绑',tone:'danger'}))return
+		setBusy(row.id);setError('');setNotice('')
+		try{await adminAPI.removeUserPhone(row.id);setNotice(`已解除“${row.nickname}”的手机号绑定。`);await load()}catch(e){setError(String(e))}finally{setBusy(null)}
+	}
+	return <div className="admin-stack">
+		<AdminCredentialsPanel/>
+		<AdminPanel title="用户与管理员权限" description="系统会保护当前账号和最后一名启用中的超级管理员，避免误操作。手机号仅显示掩码，可用于客服核实身份。">
 		<AdminToolbar summary={data?`共 ${data.total} 名用户`:'正在读取用户'} actions={<AdminButton tone="ghost" loading={loading} onClick={()=>void load()}>刷新</AdminButton>}/>
 		{error&&<AdminNotice tone="danger" title="无法更新用户">{error}</AdminNotice>}
 		{notice&&<AdminNotice tone="success">{notice}</AdminNotice>}
-		{!data&&loading?<AdminState kind="loading" title="正在读取用户" description="用户与权限数据加载完成后会自动显示。"/>:data?.items.length===0?<AdminState kind="empty" title="暂无用户记录" description="当前页没有可展示的用户。"/>:<AdminTableFrame label="用户管理列表"><table className="admin-data-table"><thead><tr><th>用户</th><th>学校 / 校区</th><th>角色</th><th>状态</th><th className="admin-table-actions">管理操作</th></tr></thead><tbody>{(data?.items||[]).map(row=><tr key={row.id}><td><strong>{row.nickname||'未设置昵称'}</strong><span>#{row.id}{sessionUser?.id===row.id?' · 当前账号':''}</span></td><td>{row.school||'未设置'}<span>{row.campus||'未设置'}</span></td><td><AdminStatusBadge value={row.role}/></td><td><AdminStatusBadge value={row.status}/></td><td className="admin-table-actions"><AdminRowActions><select className="admin-inline-select" aria-label={`调整 ${row.nickname} 的状态`} value={row.status} disabled={busy===row.id} onChange={event=>void changeStatus(row,event.target.value as UserRow['status'])}><option value="active">正常</option><option value="muted">禁言</option><option value="banned">封禁</option></select><select className="admin-inline-select" aria-label={`调整 ${row.nickname} 的角色`} value={row.role} disabled={busy===row.id||sessionUser?.role!=='superadmin'} onChange={event=>void changeRole(row,event.target.value as UserRow['role'])}><option value="user">普通用户</option><option value="admin">管理员</option><option value="superadmin">超级管理员</option></select></AdminRowActions></td></tr>)}</tbody></table></AdminTableFrame>}
+		{!data&&loading?<AdminState kind="loading" title="正在读取用户" description="用户与权限数据加载完成后会自动显示。"/>:data?.items.length===0?<AdminState kind="empty" title="暂无用户记录" description="当前页没有可展示的用户。"/>:<AdminTableFrame label="用户管理列表"><table className="admin-data-table"><thead><tr><th>用户</th><th>手机号</th><th>学校 / 校区</th><th>角色</th><th>状态</th><th className="admin-table-actions">管理操作</th></tr></thead><tbody>{(data?.items||[]).map(row=><tr key={row.id}><td><strong>{row.nickname||'未设置昵称'}</strong><span>#{row.id}{sessionUser?.id===row.id?' · 当前账号':''}</span></td><td>{row.phoneBound?<><strong>{row.maskedPhone}</strong><span><AdminButton tone="text" disabled={busy===row.id} onClick={()=>void removePhone(row)}>解绑</AdminButton></span></>:<span className="admin-unavailable">未绑定</span>}</td><td>{row.school||'未设置'}<span>{row.campus||'未设置'}</span></td><td><AdminStatusBadge value={row.role}/></td><td><AdminStatusBadge value={row.status}/></td><td className="admin-table-actions"><AdminRowActions><select className="admin-inline-select" aria-label={`调整 ${row.nickname} 的状态`} value={row.status} disabled={busy===row.id} onChange={event=>void changeStatus(row,event.target.value as UserRow['status'])}><option value="active">正常</option><option value="muted">禁言</option><option value="banned">封禁</option></select><select className="admin-inline-select" aria-label={`调整 ${row.nickname} 的角色`} value={row.role} disabled={busy===row.id||sessionUser?.role!=='superadmin'} onChange={event=>void changeRole(row,event.target.value as UserRow['role'])}><option value="user">普通用户</option><option value="admin">管理员</option><option value="superadmin">超级管理员</option></select></AdminRowActions></td></tr>)}</tbody></table></AdminTableFrame>}
 		{data&&<AdminPagination page={page} pageSize={data.pageSize} total={data.total} loading={loading} onPageChange={setPage}/>}
-	</AdminPanel>
+		</AdminPanel>
+	</div>
 }
 
 function Posts(){
@@ -325,17 +407,43 @@ function Reports(){
 	</AdminPanel>
 }
 
+const FEEDBACK_STATUS_LABELS:Record<string,string>={open:'待处理',in_progress:'处理中',resolved:'已解决',ignored:'不处理'}
+const FEEDBACK_STATUS_TONES:Record<string,'success'|'warning'|'info'|'neutral'>={open:'warning',in_progress:'info',resolved:'success',ignored:'neutral'}
 function Feedbacks(){
-	const{page,setPage,data,loading,error,load}=usePagedAdminData<FeedbackRow>(adminAPI.feedbacks)
+	const dialog=useAdminDialog()
+	const{page,setPage,data,loading,error,setError,load}=usePagedAdminData<FeedbackRow>(adminAPI.feedbacks)
+	const[busy,setBusy]=useState<string>('')
+	const[notice,setNotice]=useState('')
 	const categoryLabel=(value:string)=>({bug:'功能异常',suggestion:'产品建议',content:'内容问题',account:'账号问题',other:'其他'}[value]||value||'未分类')
-	return <AdminPanel title="用户反馈" description="此处仅展示用户提交的真实反馈；当前后端未提供处理状态写入接口。">
+	const handle=async(row:FeedbackRow,status:string)=>{
+		const label=FEEDBACK_STATUS_LABELS[status]
+		const note=await dialog.prompt({
+			title:`标记为${label}`,
+			description:`确认将这条反馈标记为“${label}”吗？处理说明会记录在后台，方便后续追溯。`,
+			inputLabel:'处理说明',
+			placeholder:status==='resolved'?'例如：已修复，将在下个版本生效':'请说明处理结果或原因',
+			requiredMessage:'请填写处理说明',
+			initialValue:row.adminNote||'',
+			confirmLabel:`标记为${label}`,
+			tone:status==='ignored'?'danger':'default'
+		})
+		if(!note)return
+		if(!row.id){setError('该反馈缺少编号，无法更新');return}
+		setBusy(row.id);setError('');setNotice('')
+		try{await adminAPI.updateFeedback(row.id,status,note);setNotice(`反馈已标记为“${label}”。`);await load()}
+		catch(e){setError(String(e))}
+		finally{setBusy('')}
+	}
+	return <AdminPanel title="用户反馈" description="处理用户提交的问题与建议，并留下可追溯的处理说明。">
 		<AdminToolbar summary={data?`共 ${data.total} 条反馈`:'正在读取反馈'} actions={<AdminButton tone="ghost" loading={loading} onClick={()=>void load()}>刷新</AdminButton>}/>
 		{error&&<AdminNotice tone="danger" title="无法读取反馈">{error}</AdminNotice>}
-		{!data&&loading?<AdminState kind="loading" title="正在读取反馈" description="反馈数据加载完成后会自动显示。"/>:data?.items.length===0?<AdminState kind="empty" title="暂无用户反馈" description="当前页没有可展示的反馈。"/>:<AdminTableFrame label="用户反馈列表"><table className="admin-data-table"><thead><tr><th>提交用户</th><th>分类</th><th>反馈内容</th><th>附件</th><th>状态</th><th>提交时间</th></tr></thead><tbody>{(data?.items||[]).map((row,index)=><tr key={row.id||`${row.userId}-${row.createdAt}-${index}`}><td><strong>用户 #{row.userId}</strong></td><td>{categoryLabel(row.category)}</td><td className="admin-cell-wrap admin-feedback-content">{row.content}</td><td>{row.images?.length||0} 张</td><td><AdminStatusBadge value={row.status}/></td><td>{displayTime(row.createdAt)}</td></tr>)}</tbody></table></AdminTableFrame>}
+		{notice&&<AdminNotice tone="success">{notice}</AdminNotice>}
+		{!data&&loading?<AdminState kind="loading" title="正在读取反馈" description="反馈数据加载完成后会自动显示。"/>:data?.items.length===0?<AdminState kind="empty" title="暂无用户反馈" description="当前页没有可展示的反馈。"/>:<AdminTableFrame label="用户反馈列表"><table className="admin-data-table"><thead><tr><th>提交用户</th><th>分类</th><th>反馈内容</th><th>附件</th><th>状态</th><th>提交时间</th><th className="admin-table-actions">处理</th></tr></thead><tbody>{(data?.items||[]).map((row,index)=><tr key={row.id||`${row.userId}-${row.createdAt}-${index}`}><td><strong>用户 #{row.userId}</strong></td><td>{categoryLabel(row.category)}</td><td className="admin-cell-wrap admin-feedback-content">{row.content}{row.adminNote?<span>处理说明：{row.adminNote}</span>:null}</td><td>{row.images?.length||0} 张</td><td><AdminBadge tone={FEEDBACK_STATUS_TONES[row.status]||'neutral'}>{FEEDBACK_STATUS_LABELS[row.status]||row.status}</AdminBadge></td><td>{displayTime(row.createdAt)}</td><td className="admin-table-actions"><AdminRowActions><select className="admin-inline-select" aria-label="更新反馈状态" value={row.status} disabled={busy===row.id} onChange={event=>void handle(row,event.target.value)}><option value="open">待处理</option><option value="in_progress">处理中</option><option value="resolved">已解决</option><option value="ignored">不处理</option></select></AdminRowActions></td></tr>)}</tbody></table></AdminTableFrame>}
 		{data&&<AdminPagination page={page} pageSize={data.pageSize} total={data.total} loading={loading} onPageChange={setPage}/>}
 	</AdminPanel>
 }
 
+const isPlaceholderTarget=(value?:string)=>{const v=(value||'').trim();return v===''||v.startsWith('legacy-')}
 type NavigationItemDraft=NavigationItemInput&{id?:number}
 const emptyNavigationItem=(categoryId:number):NavigationItemDraft=>({categoryId,title:'',subtitle:'',iconText:'',appId:'',path:'',color:'',sort:0,enabled:true})
 
@@ -389,11 +497,11 @@ function Navigation(){
 	return <div className="navigation-console">
 		<ExternalTakeoutMerchants/>
 		<AdminPanel title="校园工具" description="维护小程序工具页的分类、用途说明与真实服务入口。保存后，小程序刷新工具页即可读取。" actions={<><AdminButton tone="ghost" loading={loading} onClick={()=>void load()}>刷新</AdminButton><AdminButton tone="primary" loading={busy==='category-new'} onClick={()=>void createCategory()}>新增分类</AdminButton></>}>
-			<AdminNotice>接入已有服务小程序，请向服务方获取正式 AppID 和页面 Path。格式校验通过不代表已验证可访问，启用前请用手机确认跳转及服务权限。当前接口提供小程序跳转，不会自动接入任意网站或第三方业务 API。</AdminNotice>
+			<AdminNotice>接入已有服务小程序，请向服务方获取正式 AppID 和页面路径。格式正确不代表一定能打开，启用前请用手机实际点一次。这里只配置小程序跳转，不支持接入网站或第三方业务。</AdminNotice>
 			{error&&<AdminNotice tone="danger" title="导航操作失败">{error}</AdminNotice>}{notice&&<AdminNotice tone="success">{notice}</AdminNotice>}
 			{itemDraft&&<form className="navigation-item-form" onSubmit={event=>{event.preventDefault();void saveItem()}}>
 				<div className="navigation-item-form__title"><div><strong>{itemDraft.id?'编辑导航入口':'新增导航入口'}</strong><span>只填写真实可用的小程序跳转信息</span></div><AdminButton tone="text" onClick={()=>setItemDraft(null)}>取消</AdminButton></div>
-				<div className="navigation-item-form__grid"><AdminSelect label="所属分类" value={itemDraft.categoryId} onChange={event=>setItemDraft(current=>current?{...current,categoryId:Number(event.target.value)}:current)}>{data.filter(category=>!category.systemKey).map(category=><option value={category.id} key={category.id}>{category.name}</option>)}</AdminSelect><AdminField label="入口名称" required value={itemDraft.title} onChange={event=>setItemDraft(current=>current?{...current,title:event.target.value}:current)}/><AdminField label="AppID" required value={itemDraft.appId} onChange={event=>setItemDraft(current=>current?{...current,appId:event.target.value}:current)}/><AdminField label="Path" required value={itemDraft.path} onChange={event=>setItemDraft(current=>current?{...current,path:event.target.value}:current)}/><AdminField label="排序" type="number" value={itemDraft.sort} onChange={event=>setItemDraft(current=>current?{...current,sort:Number(event.target.value)}:current)}/><label className="admin-check"><input type="checkbox" checked={itemDraft.enabled} onChange={event=>setItemDraft(current=>current?{...current,enabled:event.target.checked}:current)}/><span>启用入口</span></label></div>
+				<div className="navigation-item-form__grid"><AdminSelect label="所属分类" value={itemDraft.categoryId} onChange={event=>setItemDraft(current=>current?{...current,categoryId:Number(event.target.value)}:current)}>{data.filter(category=>!category.systemKey).map(category=><option value={category.id} key={category.id}>{category.name}</option>)}</AdminSelect><AdminField label="入口名称" required value={itemDraft.title} onChange={event=>setItemDraft(current=>current?{...current,title:event.target.value}:current)}/><AdminField label="小程序 AppID" required value={itemDraft.appId} onChange={event=>setItemDraft(current=>current?{...current,appId:event.target.value}:current)}/><AdminField label="页面路径" required value={itemDraft.path} placeholder="例如 pages/index/index" onChange={event=>setItemDraft(current=>current?{...current,path:event.target.value}:current)}/><AdminField label="排序" type="number" value={itemDraft.sort} onChange={event=>setItemDraft(current=>current?{...current,sort:Number(event.target.value)}:current)}/><label className="admin-check"><input type="checkbox" checked={itemDraft.enabled} onChange={event=>setItemDraft(current=>current?{...current,enabled:event.target.checked}:current)}/><span>启用入口</span></label></div>
 				<div className="navigation-item-form__grid">
 					<AdminField label="用途说明" value={itemDraft.subtitle} maxLength={120} description="显示在工具名称下方，说明能做什么。" onChange={event=>setItemDraft(current=>current?{...current,subtitle:event.target.value}:current)}/>
 					<AdminField label="图标文字" value={itemDraft.iconText} maxLength={12} description="建议 1–2 个字；留空显示统一服务图标。" onChange={event=>setItemDraft(current=>current?{...current,iconText:event.target.value}:current)}/>
@@ -401,7 +509,7 @@ function Navigation(){
 				</div>
 				<div className="navigation-item-form__footer"><AdminButton tone="primary" type="submit" loading={busy==='item-new'||busy===`item-${itemDraft.id}`}>保存入口</AdminButton></div>
 			</form>}
-			{!loading&&data.filter(category=>!category.systemKey).length===0?<AdminState kind="empty" title="暂无普通导航分类" description="创建分类后即可添加真实服务入口。"/>:<div className="navigation-category-list">{data.filter(category=>!category.systemKey).map(category=><section className="navigation-category" key={category.id}><header><div><h3>{category.name}</h3><span>排序 {category.sort} · {category.items.length} 个入口</span></div><div className="navigation-category__actions"><AdminStatusBadge value={category.enabled?'enabled':'disabled'}/>{!category.systemKey&&<><AdminButton tone="text" disabled={Boolean(busy)} onClick={()=>void editCategory(category)}>编辑</AdminButton><AdminButton tone="text" disabled={Boolean(busy)} onClick={()=>void toggleCategory(category)}>{category.enabled?'停用':'启用'}</AdminButton><AdminButton tone="danger" disabled={Boolean(busy)} onClick={()=>void deleteCategory(category)}>删除</AdminButton><AdminButton tone="primary" disabled={Boolean(busy)} onClick={()=>setItemDraft(emptyNavigationItem(category.id))}>新增入口</AdminButton></>}</div></header><AdminTableFrame label={`${category.name}导航入口`}><table className="admin-data-table"><thead><tr><th>名称</th><th>AppID</th><th>Path</th><th>排序</th><th>状态</th><th className="admin-table-actions">操作</th></tr></thead><tbody>{category.items.map(item=><tr key={item.id}><td><strong>{item.title}</strong><span>#{item.id}</span></td><td><code>{item.appId}</code></td><td className="admin-cell-wrap"><code>{item.path}</code></td><td>{item.sort}</td><td><AdminStatusBadge value={item.enabled?'enabled':'disabled'}/></td><td className="admin-table-actions"><AdminRowActions><AdminButton tone="text" disabled={Boolean(busy)||Boolean(category.systemKey)} onClick={()=>editItem(item)}>编辑</AdminButton><AdminButton tone="danger" disabled={Boolean(busy)||Boolean(category.systemKey)} onClick={()=>void deleteItem(item)}>删除</AdminButton></AdminRowActions></td></tr>)}{category.items.length===0&&<tr><td colSpan={6}><div className="admin-inline-empty">该分类暂无入口</div></td></tr>}</tbody></table></AdminTableFrame></section>)}</div>}
+			{!loading&&data.filter(category=>!category.systemKey).length===0?<AdminState kind="empty" title="暂无普通导航分类" description="创建分类后即可添加真实服务入口。"/>:<div className="navigation-category-list">{data.filter(category=>!category.systemKey).map(category=><section className="navigation-category" key={category.id}><header><div><h3>{category.name}</h3><span>排序 {category.sort} · {category.items.length} 个入口</span></div><div className="navigation-category__actions"><AdminStatusBadge value={category.enabled?'enabled':'disabled'}/>{!category.systemKey&&<><AdminButton tone="text" disabled={Boolean(busy)} onClick={()=>void editCategory(category)}>编辑</AdminButton><AdminButton tone="text" disabled={Boolean(busy)} onClick={()=>void toggleCategory(category)}>{category.enabled?'停用':'启用'}</AdminButton><AdminButton tone="danger" disabled={Boolean(busy)} onClick={()=>void deleteCategory(category)}>删除</AdminButton><AdminButton tone="primary" disabled={Boolean(busy)} onClick={()=>setItemDraft(emptyNavigationItem(category.id))}>新增入口</AdminButton></>}</div></header><AdminTableFrame label={`${category.name}导航入口`}><table className="admin-data-table"><thead><tr><th>名称</th><th>小程序 AppID</th><th>页面路径</th><th>排序</th><th>状态</th><th className="admin-table-actions">操作</th></tr></thead><tbody>{category.items.map(item=><tr key={item.id}><td><strong>{item.title}</strong><span>#{item.id}</span></td><td><code>{isPlaceholderTarget(item.appId)?'未配置':item.appId}</code></td><td className="admin-cell-wrap"><code>{isPlaceholderTarget(item.path)?'未配置':item.path}</code></td><td>{item.sort}</td><td><AdminStatusBadge value={item.enabled?'enabled':'disabled'}/></td><td className="admin-table-actions"><AdminRowActions><AdminButton tone="text" disabled={Boolean(busy)||Boolean(category.systemKey)} onClick={()=>editItem(item)}>编辑</AdminButton><AdminButton tone="danger" disabled={Boolean(busy)||Boolean(category.systemKey)} onClick={()=>void deleteItem(item)}>删除</AdminButton></AdminRowActions></td></tr>)}{category.items.length===0&&<tr><td colSpan={6}><div className="admin-inline-empty">该分类暂无入口</div></td></tr>}</tbody></table></AdminTableFrame></section>)}</div>}
 		</AdminPanel>
 	</div>
 }

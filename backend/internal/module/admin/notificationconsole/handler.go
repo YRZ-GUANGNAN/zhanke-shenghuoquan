@@ -3,6 +3,7 @@ package notificationconsole
 import (
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -39,7 +40,86 @@ func NewHandler(repository Repository, config Config, sender *notification.WeCom
 
 func (h *Handler) Register(group *gin.RouterGroup) {
 	group.GET("/notification-channels", h.overview)
+	group.GET("/notification-channels/deliveries", h.deliveries)
 	group.POST("/notification-channels/wecom/test", h.testWecom)
+}
+
+type DeliveryView struct {
+	DeliveryID    string     `json:"deliveryId"`
+	RecipientID   uint64     `json:"recipientId"`
+	Channel       string     `json:"channel"`
+	Purpose       string     `json:"purpose"`
+	Status        string     `json:"status"`
+	AttemptCount  uint32     `json:"attemptCount"`
+	ErrorCode     string     `json:"errorCode"`
+	Error         string     `json:"error"`
+	NextAttemptAt *time.Time `json:"nextAttemptAt"`
+	ProcessedAt   *time.Time `json:"processedAt"`
+	CreatedAt     time.Time  `json:"createdAt"`
+}
+
+type DeliveryPage struct {
+	Items    []DeliveryView `json:"items"`
+	Page     int            `json:"page"`
+	PageSize int            `json:"pageSize"`
+	Total    int64          `json:"total"`
+}
+
+// 只允许按状态筛选，避免把任意 SQL 条件透传到仓储层。
+var deliveryStatuses = map[string]notification.DeliveryStatus{
+	"pending":    notification.DeliveryPending,
+	"processing": notification.DeliveryProcessing,
+	"accepted":   notification.DeliveryAccepted,
+	"delivered":  notification.DeliveryDelivered,
+	"read":       notification.DeliveryRead,
+	"retry_wait": notification.DeliveryRetryWait,
+	"unknown":    notification.DeliveryUnknown,
+	"blocked":    notification.DeliveryBlocked,
+	"skipped":    notification.DeliverySkipped,
+	"deadletter": notification.DeliveryDeadletter,
+}
+
+func (h *Handler) deliveries(c *gin.Context) {
+	page := parsePositive(c.Query("page"), 1)
+	pageSize := parsePositive(c.Query("pageSize"), 20)
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	status := notification.DeliveryStatus("")
+	if raw := c.Query("status"); raw != "" {
+		value, ok := deliveryStatuses[raw]
+		if !ok {
+			response.Fail(c, http.StatusBadRequest, "invalid delivery status")
+			return
+		}
+		status = value
+	}
+	records, total, err := h.repository.RecentDeliveries(c.Request.Context(), status, pageSize, (page-1)*pageSize)
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, "notification deliveries unavailable")
+		return
+	}
+	items := make([]DeliveryView, 0, len(records))
+	for _, record := range records {
+		items = append(items, DeliveryView{
+			DeliveryID: record.DeliveryPublicID, RecipientID: record.RecipientUserID,
+			Channel: string(record.Channel), Purpose: string(record.Purpose), Status: string(record.Status),
+			AttemptCount: record.AttemptCount, ErrorCode: record.LastErrorCode, Error: record.LastError,
+			NextAttemptAt: record.NextAttemptAt, ProcessedAt: record.ProcessedAt, CreatedAt: record.CreatedAt,
+		})
+	}
+	response.OK(c, DeliveryPage{Items: items, Page: page, PageSize: pageSize, Total: total})
+}
+
+func parsePositive(raw string, fallback int) int {
+	if raw == "" {
+		return fallback
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 1 {
+		return fallback
+	}
+	return value
 }
 
 type ChannelView struct {

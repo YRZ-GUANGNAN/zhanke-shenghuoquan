@@ -240,8 +240,52 @@ func (s *Service) UpdateProfile(ctx context.Context, id uint, profile Profile) (
 func (s *Service) Profiles(ctx context.Context, ids []uint) (map[uint]Profile, error) {
 	return s.repo.FindProfiles(ctx, ids)
 }
-func (s *Service) AdminList(ctx context.Context, page, size int) ([]User, int64, error) {
-	return s.repo.List(ctx, normalizePage(page), normalizeSize(size))
+// AdminUserView 只暴露后台运营需要的字段，手机号始终是掩码形式。
+type AdminUserView struct {
+	ID          uint      `json:"id"`
+	Nickname    string    `json:"nickname"`
+	School      string    `json:"school"`
+	Campus      string    `json:"campus"`
+	Role        Role      `json:"role"`
+	Status      Status    `json:"status"`
+	PhoneBound  bool      `json:"phoneBound"`
+	MaskedPhone string    `json:"maskedPhone"`
+	CreatedAt   time.Time `json:"createdAt"`
+}
+
+func (s *Service) AdminList(ctx context.Context, page, size int) ([]AdminUserView, int64, error) {
+	values, total, err := s.repo.List(ctx, normalizePage(page), normalizeSize(size))
+	if err != nil {
+		return nil, 0, err
+	}
+	views := make([]AdminUserView, 0, len(values))
+	for _, value := range values {
+		view := AdminUserView{
+			ID: value.ID, Nickname: value.Nickname, School: value.School, Campus: value.Campus,
+			Role: value.Role, Status: value.Status, CreatedAt: value.CreatedAt,
+		}
+		if value.Phone != nil && *value.Phone != "" {
+			view.PhoneBound = true
+			view.MaskedPhone = maskPhone(*value.Phone)
+		}
+		views = append(views, view)
+	}
+	return views, total, nil
+}
+
+// 客服运营手段：号码被错误账号占用时，由管理员解除绑定。
+func (s *Service) AdminClearPhone(ctx context.Context, actorID, targetID uint) error {
+	if _, _, err := s.adminActorAndTarget(ctx, actorID, targetID); err != nil {
+		return err
+	}
+	repo, ok := s.repo.(settingsRepository)
+	if !ok {
+		return ErrSettingsUnavailable
+	}
+	if err := repo.ClearPhone(ctx, targetID); err != nil && !errors.Is(err, ErrNotFound) {
+		return err
+	}
+	return nil
 }
 func (s *Service) AdminUpdateStatus(ctx context.Context, actorID, id uint, status Status) error {
 	if status != StatusActive && status != StatusMuted && status != StatusBanned {

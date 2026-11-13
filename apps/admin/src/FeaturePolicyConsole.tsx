@@ -67,8 +67,8 @@ export function FeaturePolicyConsole() {
     setError('')
     try {
       const value = await adminAPI.featurePolicy()
-      if (!value.enabled || allKeys.some(key => typeof value.flags[key] !== 'boolean')) throw new Error('服务端功能配置版本不完整，请部署最新后端后重试。')
-      if (value.presentationMode !== undefined && value.presentationMode !== 'standard' && value.presentationMode !== 'campus_info') throw new Error('服务端展示模式无法识别，请更新后台后重试。')
+      if (!value.enabled || allKeys.some(key => typeof value.flags[key] !== 'boolean')) throw new Error('功能配置暂时无法读取，请稍后重试。')
+      if (value.presentationMode !== undefined && value.presentationMode !== 'standard' && value.presentationMode !== 'campus_info') throw new Error('展示模式暂不支持，请稍后重试。')
       const flags = Object.fromEntries(allKeys.map((key) => [key, value.flags[key] === true])) as Record<FeaturePolicyKey, boolean>
       setData(value)
       setDraft(flags)
@@ -100,7 +100,7 @@ export function FeaturePolicyConsole() {
       setDraft({ ...value.flags })
       setMode(value.postingMode)
       setPresentation(value.presentationMode || 'standard')
-      setNotice('配置已保存到服务器。小程序回前台立即刷新，使用中最迟约 15 秒更新入口；新的业务请求同时受服务端控制。')
+      setNotice('已保存。小程序回到前台后立即生效，使用中最迟约 15 秒更新。')
     } catch (reason) {
       setError(reason instanceof AdminAPIError && reason.status === 409 ? '配置已被其他管理员更新。请读取已保存配置后重新修改和保存；本次修改未覆盖服务器。' : String(reason))
     } finally {
@@ -131,7 +131,7 @@ export function FeaturePolicyConsole() {
           <label><input disabled={!canEdit || !canSelectPresentation || saving || loading} type='radio' name='presentation-mode' checked={presentation === 'standard'} onChange={() => setPresentation('standard')} /><span><strong>原版</strong><small>恢复原首页、服务和二手等模块，按下方已保存的开关开放</small></span></label>
           <label><input disabled={!canEdit || !canSelectPresentation || saving || loading} type='radio' name='presentation-mode' checked={presentation === 'campus_info'} onChange={() => setPresentation('campus_info')} /><span><strong>校园资讯</strong><small>展示独立的校园指南，保留账号、反馈和既有订单的必要处理</small></span></label>
         </section>
-        {!canSelectPresentation && <AdminNotice tone='info'>当前后端尚未支持展示模式；原模块开关仍可使用，更新后端后可选择模式。</AdminNotice>}
+        {!canSelectPresentation && <AdminNotice tone='info'>当前版本暂不支持切换展示模式，上面的模块开关仍可正常使用。</AdminNotice>}
         <AdminNotice tone='info' title={presentation === 'campus_info' ? '原版配置会保留' : '恢复的是原配置'}>{presentation === 'campus_info' ? '资讯模式下，下方20项原业务暂不对用户开放。开关值和发言权限仍保存，切回原版按这些值恢复，不会删除内容或改变账号角色。' : '选择原版不会自动打开全部功能，仍按下方开关和发言权限生效。'} 展示模式切换需配套本次小程序版本；实际开放功能应与平台已审核范围一致。</AdminNotice>
         <section className='feature-policy-mode' aria-label='发帖评论模式'>
           <div><h3>发帖与评论权限</h3><p>普通用户不会因此获得后台管理权限；这里只控制社区写入能力。</p></div>

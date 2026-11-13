@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"strings"
 	"time"
 
 	"campus-circle/backend/internal/module/user"
@@ -83,6 +84,118 @@ func (s *Service) Bootstrap(ctx context.Context, userID uint, password, eventTyp
 	return s.audit(ctx, &credential, eventType, "success", nil, nil, "")
 }
 
+// 后台允许普通管理员与超级管理员登录，其余角色由业务权限中间件继续限制。
+func isAdminRole(role user.Role) bool {
+	return role == user.RoleAdmin || role == user.RoleSuperAdmin
+}
+
+var ErrTargetNotAdmin = errors.New("target user is not an administrator")
+var ErrUsernameInvalid = errors.New("admin username must be 3-64 characters of letters, digits, dot or underscore")
+
+func validAdminUsername(value string) bool {
+	if len(value) < 3 || len(value) > 64 {
+		return false
+	}
+	for _, r := range value {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '.' || r == '_' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+// 超级管理员为已存在的管理员用户分配或重置后台登录账号。
+func (s *Service) SetCredential(ctx context.Context, actorID, targetUserID uint, username, password string, eventType string) (Credential, error) {
+	actor, err := s.users.Get(ctx, actorID)
+	if err != nil || actor.Status != user.StatusActive || actor.Role != user.RoleSuperAdmin {
+		return Credential{}, ErrNotSuperAdmin
+	}
+	target, err := s.users.Get(ctx, targetUserID)
+	if err != nil || target.Status != user.StatusActive || !isAdminRole(target.Role) {
+		return Credential{}, ErrTargetNotAdmin
+	}
+	username = strings.TrimSpace(username)
+	if !validAdminUsername(username) {
+		return Credential{}, ErrUsernameInvalid
+	}
+	hash, err := hashPassword(password)
+	if err != nil {
+		return Credential{}, err
+	}
+	now := s.now()
+	credential, err := s.repo.UpsertCredentialForUser(ctx, targetUserID, username, hash, now)
+	if err != nil {
+		return Credential{}, err
+	}
+	if err := s.repo.RevokeCredentialSessions(ctx, credential.ID, now); err != nil {
+		return Credential{}, err
+	}
+	return credential, s.audit(ctx, &credential, eventType, "success", nil, nil, "")
+}
+
+type CredentialSummary struct {
+	CredentialID  uint64    `json:"credentialId"`
+	UserID        uint      `json:"userId"`
+	Username      string    `json:"username"`
+	Nickname      string    `json:"nickname"`
+	Role          user.Role `json:"role"`
+	Locked        bool      `json:"locked"`
+	PasswordSetAt time.Time `json:"passwordSetAt"`
+}
+
+func (s *Service) ListCredentials(ctx context.Context, actorID uint) ([]CredentialSummary, error) {
+	actor, err := s.users.Get(ctx, actorID)
+	if err != nil || actor.Status != user.StatusActive || actor.Role != user.RoleSuperAdmin {
+		return nil, ErrNotSuperAdmin
+	}
+	credentials, err := s.repo.ListCredentials(ctx)
+	if err != nil {
+		return nil, err
+	}
+	now := s.now()
+	result := make([]CredentialSummary, 0, len(credentials))
+	for _, credential := range credentials {
+		value, err := s.users.Get(ctx, credential.UserID)
+		if err != nil {
+			continue
+		}
+		result = append(result, CredentialSummary{
+			CredentialID: credential.ID, UserID: credential.UserID, Username: credential.Username,
+			Nickname: value.Nickname, Role: value.Role,
+			Locked: credential.LockedUntil != nil && credential.LockedUntil.After(now),
+			PasswordSetAt: credential.PasswordChangedAt,
+		})
+	}
+	return result, nil
+}
+
+// 超级管理员移除某管理员的后台登录账号，同时吊销其全部会话。
+func (s *Service) RemoveCredential(ctx context.Context, actorID, targetUserID uint) error {
+	actor, err := s.users.Get(ctx, actorID)
+	if err != nil || actor.Status != user.StatusActive || actor.Role != user.RoleSuperAdmin {
+		return ErrNotSuperAdmin
+	}
+	if actorID == targetUserID {
+		return errors.New("cannot remove your own administrator credential")
+	}
+	credential, err := s.repo.FindCredentialByUserID(ctx, targetUserID)
+	if errors.Is(err, ErrCredentialNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	now := s.now()
+	if err := s.repo.RevokeCredentialSessions(ctx, credential.ID, now); err != nil {
+		return err
+	}
+	if err := s.repo.DeleteCredentialByUserID(ctx, targetUserID); err != nil {
+		return err
+	}
+	return s.audit(ctx, &credential, "credential_revoke", "success", nil, nil, "")
+}
+
 func (s *Service) Login(ctx context.Context, username, password, ip, userAgent string) (SessionResult, error) {
 	ipHash := digest(ip)
 	userAgentHash := digest(userAgent)
@@ -96,14 +209,14 @@ func (s *Service) Login(ctx context.Context, username, password, ip, userAgent s
 	}
 
 	passwordOK := verifyPassword(encoded, password)
-	if username != FixedUsername || findErr != nil || !passwordOK {
+	if findErr != nil || !passwordOK {
 		var credentialPointer *Credential
 		if findErr == nil {
 			credentialPointer = &credential
 		}
 		_ = s.audit(ctx, credentialPointer, "login", "failure", ipHash, userAgentHash, "invalid credentials")
 		if findErr == nil {
-			recent, err := s.repo.CountRecentFailures(ctx, username, ipHash, now.Add(-lockDuration))
+			recent, err := s.repo.CountRecentFailures(ctx, credential.Username, ipHash, now.Add(-lockDuration))
 			if err == nil {
 				attempts := credential.FailedAttempts + 1
 				var lockedUntil *time.Time
@@ -122,7 +235,7 @@ func (s *Service) Login(ctx context.Context, username, password, ip, userAgent s
 		return SessionResult{}, ErrLocked
 	}
 	value, err := s.users.Get(ctx, credential.UserID)
-	if err != nil || value.Status != user.StatusActive || value.Role != user.RoleSuperAdmin {
+	if err != nil || value.Status != user.StatusActive || !isAdminRole(value.Role) {
 		_ = s.audit(ctx, &credential, "login", "failure", ipHash, userAgentHash, "account unavailable")
 		return SessionResult{}, ErrInvalidCredentials
 	}
@@ -162,7 +275,7 @@ func (s *Service) Authenticate(ctx context.Context, token string) (Authenticated
 		return AuthenticatedSession{}, ErrInvalidSession
 	}
 	value, err := s.users.Get(ctx, session.UserID)
-	if err != nil || value.Status != user.StatusActive || value.Role != user.RoleSuperAdmin {
+	if err != nil || value.Status != user.StatusActive || !isAdminRole(value.Role) {
 		_ = s.repo.RevokeSession(ctx, session.ID, now)
 		return AuthenticatedSession{}, ErrInvalidSession
 	}
@@ -193,7 +306,7 @@ func (s *Service) Logout(ctx context.Context, token, ip, userAgent string) error
 	if err := s.repo.RevokeSession(ctx, authenticated.Session.ID, now); err != nil {
 		return err
 	}
-	credential, _ := s.repo.FindCredential(ctx, FixedUsername)
+	credential, _ := s.repo.FindCredentialByID(ctx, authenticated.Session.CredentialID)
 	return s.audit(ctx, &credential, "logout", "success", digest(ip), digest(userAgent), "")
 }
 
@@ -202,8 +315,8 @@ func (s *Service) ChangePassword(ctx context.Context, token, oldPassword, newPas
 	if err != nil {
 		return ErrInvalidSession
 	}
-	credential, err := s.repo.FindCredential(ctx, FixedUsername)
-	if err != nil || credential.ID != authenticated.Session.CredentialID || !verifyPassword(credential.PasswordHash, oldPassword) {
+	credential, err := s.repo.FindCredentialByID(ctx, authenticated.Session.CredentialID)
+	if err != nil || !verifyPassword(credential.PasswordHash, oldPassword) {
 		return ErrInvalidCredentials
 	}
 	hash, err := hashPassword(newPassword)

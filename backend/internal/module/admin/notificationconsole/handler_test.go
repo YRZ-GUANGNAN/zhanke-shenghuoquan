@@ -28,6 +28,17 @@ func (testRepository) OfficialAccountCounts(context.Context, string) (OfficialAc
 	return OfficialAccountCounts{Unknown: 3, Following: 4, NotFollowing: 1}, nil
 }
 
+func (testRepository) RecentDeliveries(context.Context, notification.DeliveryStatus, int, int) ([]DeliveryRecord, int64, error) {
+	next := time.Date(2026, 3, 5, 10, 30, 0, 0, time.UTC)
+	return []DeliveryRecord{{
+		DeliveryPublicID: "01JTESTDELIVERY0000000001", RecipientUserID: 42,
+		Channel: notification.ChannelWechatOfficial, Purpose: "order_status",
+		Status: notification.DeliveryRetryWait, AttemptCount: 3,
+		LastErrorCode: "errcode_43101", LastError: "user refuse to accept the msg",
+		NextAttemptAt: &next, CreatedAt: next,
+	}}, 1, nil
+}
+
 func TestNotificationChannelOverviewIsAggregateAndSecretFree(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()

@@ -194,7 +194,7 @@ async function run() {
     for (const operation of operations) { assert.equal(operation.props.disabled, true); operation.props.onClick() }
     await renderer.flush()
     assert.deepEqual(calls(), { reads: 1, writes: 0, prompts: 0 })
-    assert.match(text(renderer.tree), /资金写入未开放或状态未确认/)
+    assert.match(text(renderer.tree), /提现登记暂未开放/)
     renderer.unmount()
     console.log('PASS 后台提现记录可查，硬门禁禁用登记及退回操作，旧事件不弹付款提示或写入')
   }

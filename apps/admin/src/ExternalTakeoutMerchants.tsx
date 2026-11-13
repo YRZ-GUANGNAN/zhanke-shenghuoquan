@@ -164,7 +164,7 @@ export function ExternalTakeoutMerchants() {
       <div className='external-merchant-form'>
         <label>商家名称<input value={draft.title} maxLength={64} onChange={(event) => updateDraft('title', event.target.value)} /></label>
         <label>文字图标<input value={draft.iconText} maxLength={12} onChange={(event) => updateDraft('iconText', event.target.value)} /></label>
-        <label>AppID<input value={draft.appId} placeholder='wx1234567890ABCDEF' onChange={(event) => updateDraft('appId', event.target.value)} /></label>
+        <label>小程序 AppID<input value={draft.appId} placeholder='wx1234567890ABCDEF' onChange={(event) => updateDraft('appId', event.target.value)} /></label>
         <label className='external-merchant-form__wide'>页面路径<input value={draft.path} placeholder='pages/index/index' onChange={(event) => updateDraft('path', event.target.value)} /></label>
         <label>主题颜色<input value={draft.color} placeholder='#1677FF' onChange={(event) => updateDraft('color', event.target.value)} /></label>
         <label>排序<input type='number' min={0} max={10000} value={draft.sort} onChange={(event) => updateDraft('sort', Number(event.target.value))} /></label>

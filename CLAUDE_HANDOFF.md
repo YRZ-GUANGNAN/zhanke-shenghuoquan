@@ -4,6 +4,55 @@
 工作分支：`codex/experience-ui-wallet-20261101`
 交接基线：`0a2c7ba`，最终代码以本分支 HEAD 为准。
 
+## 2026-11-13 后续：管理后台可用性改造
+
+本节记录在上文之后完成、且已通过 `npm run verify` 的改动。
+
+### 多管理员支持
+
+- 后台不再是单一固定账号：`admin_credentials` 允许任意**管理员或超级管理员**登录，用户名可自定义。
+- 超级管理员可在「用户与权限 → 后台登录账号」为管理员分配、重置、移除登录账号；普通管理员只能看到自己的页面，管理接口返回 403。
+- 新增迁移 `058_admin_credential_events.sql`（扩展审计事件类型），回滚脚本在 `migrations/rollback/`。
+- 相关接口：`GET/PUT/DELETE /api/v1/admin-auth/credentials`，均需管理员会话与 CSRF。
+
+### 消息通知补全
+
+- 后台「消息通知」新增**发送记录**面板，可按状态筛选并翻页，展示通道、接收人、结果、重试次数和失败原因。
+- 新接口：`GET /api/v1/admin/delivery/notification-channels/deliveries`，只接受白名单状态值，不接受任意查询条件。
+
+### 后台界面与文案
+
+- 审核中心修复：类型标签重复渲染、`takeout_merchant` 等类型显示空白、时间显示为原始 ISO、风险字段直接暴露英文技术串。
+- 全站字号上调（原 10–11px 中文偏小），按钮与表格行高同步调整。
+- 管理后台文案统一改为运营视角，移除「服务端迁移」「账本核验」「显式开关」「数据版本」等技术表述。
+- 素材中心补齐 `unavailable` 等状态映射；服务入口把 `legacy-*` 占位值显示为「未配置」。
+- 登录页用户名改为可编辑，并提示密码长度要求。
+- 侧边栏与登录页视觉重做。
+
+### 微信与手机号绑定
+
+- 微信登录（openid）本身已完整，无需改动。
+- 手机号绑定补全：号码被其他账号占用时返回 409 与明确文案；用户确认归属后可把绑定转移到当前账号（`takeOver`）；新增解绑接口。
+- 后台新增手机号列（掩码）与解绑操作，供客服处理号码被误绑的情况。
+- 接口：`POST /auth/me/phone`（body 增加可选 `takeOver`）、`DELETE /auth/me/phone`、`DELETE /admin/users/:id/phone`。
+- 小程序设置页：已绑定时显示掩码与「解绑」，冲突时弹出转移确认。
+- 手机号不作为独立登录方式；界面文案已改为说明其真实用途。
+
+### 用户反馈处理
+
+- 后台「意见反馈」支持标记为待处理 / 处理中 / 已解决 / 不处理，并填写处理说明。
+- 迁移 `059_user_feedback_handling.sql` 新增 `admin_note`、`handled_by`、`handled_at` 与 `(status, created_at)` 索引，回滚脚本在 `migrations/rollback/`。
+- 接口：`PATCH /admin/feedbacks/:id`，只允许管理员与超级管理员调用。
+- 已知边界：MySQL 在写入值与现值相同时返回 `RowsAffected=0`，仓储层已改为再查一次存在性，避免把幂等更新误判为「记录不存在」。
+
+### 本地开发环境
+
+- 本地库已补齐 038–058 迁移；`meilisearch.exe` 与后端 8080 可本地直接启动。
+- 管理员本地密码需自行用 `backend/cmd/admin-credential` 或 `adminauth` 的 argon2id 规则设置，密码长度 14–72。
+- 开启 `ENABLE_USER_NOTIFICATIONS=true` 时，`MYSQL_DSN` 必须带固定偏移时区（`time_zone=%27%2B08%3A00%27`），否则启动即拒绝。本地 `.env` 已按此配置。
+- 服务号绑定路由在通知启用后注册；`ENABLE_WECHAT_OFFICIAL_NOTIFICATIONS=false` 时 `/notification/official-account/status` 返回「未开通」。
+
+
 ## 项目目标
 
 本项目是已上线的湛科生活圈微信小程序，包含 Taro 小程序、Go 后端和 React 管理后台。本轮目标是：

@@ -141,8 +141,12 @@ export async function updateUserSettings(value: Pick<UserSettingsView, 'orderNot
 	return normalizeUserSettings(await request<UserSettingsView>('/auth/settings', { url: '', method: 'PATCH', data: value }))
 }
 
-export async function bindWechatPhone(code: string): Promise<UserSettingsView> {
-	return normalizeUserSettings(await request<UserSettingsView>('/auth/me/phone', { url: '', method: 'POST', data: { code } }))
+export async function bindWechatPhone(code: string, takeOver = false): Promise<UserSettingsView> {
+	return normalizeUserSettings(await request<UserSettingsView>('/auth/me/phone', { url: '', method: 'POST', data: { code, takeOver } }))
+}
+
+export async function unbindWechatPhone(): Promise<UserSettingsView> {
+	return normalizeUserSettings(await request<UserSettingsView>('/auth/me/phone', { url: '', method: 'DELETE' }))
 }
 
 function normalizeUserSettings(value: UserSettingsView): UserSettingsView {

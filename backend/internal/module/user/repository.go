@@ -20,6 +20,9 @@ type settingsRepository interface {
 	GetOrCreateSettings(context.Context, uint) (UserSettings, error)
 	UpdateSettings(context.Context, uint, UserSettings) (UserSettings, error)
 	UpdatePhone(context.Context, uint, string) error
+	ClearPhone(context.Context, uint) error
+	FindByPhone(context.Context, string) (User, error)
+	DetachPhone(context.Context, string, uint) error
 }
 
 type blocksRepository interface {
@@ -33,6 +36,7 @@ type feedbackRepository interface {
 	CreateFeedback(context.Context, *Feedback, []string) error
 	DeleteFeedback(context.Context, uint, uint) error
 	ListFeedbacks(context.Context, int, int) ([]Feedback, int64, error)
+	UpdateFeedbackHandling(context.Context, string, string, string, uint, time.Time) error
 }
 
 type Repository interface {
@@ -244,7 +248,60 @@ func (r *GormRepository) UpdatePhone(ctx context.Context, userID uint, phone str
 	if result.Error == nil && result.RowsAffected == 0 {
 		return ErrNotFound
 	}
+	return mapPhoneWriteError(result.Error)
+}
+
+func (r *GormRepository) ClearPhone(ctx context.Context, userID uint) error {
+	result := r.db.WithContext(ctx).Model(&User{}).Where("id = ?", userID).Update("phone", nil)
+	if result.Error != nil {
+		return result.Error
+	}
+	// 手机号本就为空时 MySQL 返回 RowsAffected=0，此时应视为成功。
+	if result.RowsAffected == 0 {
+		var exists int64
+		if err := r.db.WithContext(ctx).Model(&User{}).Where("id = ?", userID).Count(&exists).Error; err != nil {
+			return err
+		}
+		if exists == 0 {
+			return ErrNotFound
+		}
+	}
+	return nil
+}
+
+// 已注销账号仍持有手机号，这里不能按状态过滤，否则转移时找不到占用者。
+func (r *GormRepository) FindByPhone(ctx context.Context, phone string) (User, error) {
+	var value User
+	err := r.db.WithContext(ctx).Where("phone = ?", phone).First(&value).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return User{}, ErrNotFound
+	}
+	return value, err
+}
+
+// 仅当手机号确实属于 expectedOwner 时才解除绑定，避免误伤其他账号。
+func (r *GormRepository) DetachPhone(ctx context.Context, phone string, expectedOwner uint) error {
+	result := r.db.WithContext(ctx).Model(&User{}).
+		Where("phone = ? AND id = ?", phone, expectedOwner).Update("phone", nil)
+	if result.Error == nil && result.RowsAffected == 0 {
+		return ErrNotFound
+	}
 	return result.Error
+}
+
+// 手机号被其他账号占用时给出可识别的错误，而不是把原始驱动错误抛给调用方。
+func mapPhoneWriteError(err error) error {
+	if err == nil {
+		return nil
+	}
+	var mysqlErr *mysqlDriver.MySQLError
+	if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
+		switch mysqlDuplicateKeyName(mysqlErr.Message) {
+		case "phone", "uq_users_phone", "idx_users_phone":
+			return ErrPhoneTaken
+		}
+	}
+	return err
 }
 
 func (r *GormRepository) ListBlocks(ctx context.Context, userID uint) ([]BlockedUserView, error) {
@@ -326,4 +383,24 @@ func (r *GormRepository) ListFeedbacks(ctx context.Context, page, size int) ([]F
 	}
 	err := query.Preload("Images").Order("created_at DESC, id DESC").Offset((page - 1) * size).Limit(size).Find(&values).Error
 	return values, total, err
+}
+
+func (r *GormRepository) UpdateFeedbackHandling(ctx context.Context, publicID, status, note string, actorID uint, now time.Time) error {
+	result := r.db.WithContext(ctx).Model(&Feedback{}).Where("feedback_public_id = ?", publicID).Updates(map[string]any{
+		"status": status, "admin_note": note, "handled_by": actorID, "handled_at": now, "updated_at": now,
+	})
+	if result.Error != nil {
+		return result.Error
+	}
+	// MySQL 在写入值与现有值相同时返回 RowsAffected=0，不能据此判断记录不存在。
+	if result.RowsAffected == 0 {
+		var exists int64
+		if err := r.db.WithContext(ctx).Model(&Feedback{}).Where("feedback_public_id = ?", publicID).Count(&exists).Error; err != nil {
+			return err
+		}
+		if exists == 0 {
+			return ErrNotFound
+		}
+	}
+	return nil
 }

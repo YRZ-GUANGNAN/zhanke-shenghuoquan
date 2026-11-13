@@ -284,7 +284,7 @@ export function IdentityApplications() {
         <label>审核状态<select value={status} onChange={event => { setPage(1); setStatus(event.target.value as IdentityApplicationStatus | '') }}><option value=''>全部</option><option value='pending'>待审核</option><option value='approved'>已通过</option><option value='rejected'>已拒绝</option></select></label>
       </div>
       {error && <div className='delivery-notice' role='alert'><strong>{error}</strong></div>}
-      <div className='table-scroll'><table><thead><tr><th>申请编号</th><th>用户号</th><th>角色</th><th>申请人 / 商家</th><th>提交时间</th><th>状态</th></tr></thead><tbody>
+      <div className='table-scroll'><table><thead><tr><th>申请编号</th><th>用户 ID</th><th>角色</th><th>申请人</th><th>提交时间</th><th>状态</th></tr></thead><tbody>
         {data.items.map(item => <tr key={item.applicationId}>
           <td><button className='link-button' onClick={() => void inspect(item.applicationId)}>{item.applicationId}</button></td>
           <td>#{item.userId}</td>

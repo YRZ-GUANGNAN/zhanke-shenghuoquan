@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 )
 
 type domainARepositoryStub struct {
@@ -39,8 +40,42 @@ func (r *domainARepositoryStub) UpdatePhone(_ context.Context, userID uint, phon
 	if !ok {
 		return ErrNotFound
 	}
+	for id, other := range r.users {
+		if id != userID && other.Phone != nil && *other.Phone == phone {
+			return ErrPhoneTaken
+		}
+	}
 	value.Phone = &phone
 	r.users[userID] = value
+	return nil
+}
+
+func (r *domainARepositoryStub) ClearPhone(_ context.Context, userID uint) error {
+	value, ok := r.users[userID]
+	if !ok {
+		return ErrNotFound
+	}
+	value.Phone = nil
+	r.users[userID] = value
+	return nil
+}
+
+func (r *domainARepositoryStub) FindByPhone(_ context.Context, phone string) (User, error) {
+	for _, value := range r.users {
+		if value.Phone != nil && *value.Phone == phone {
+			return value, nil
+		}
+	}
+	return User{}, ErrNotFound
+}
+
+func (r *domainARepositoryStub) DetachPhone(_ context.Context, phone string, expectedOwner uint) error {
+	value, ok := r.users[expectedOwner]
+	if !ok || value.Phone == nil || *value.Phone != phone {
+		return ErrNotFound
+	}
+	value.Phone = nil
+	r.users[expectedOwner] = value
 	return nil
 }
 
@@ -77,6 +112,20 @@ func (r *domainARepositoryStub) CreateFeedback(_ context.Context, value *Feedbac
 	value.ID = uint(len(r.feedbacks) + 1)
 	r.feedbacks = append(r.feedbacks, *value)
 	return nil
+}
+
+func (r *domainARepositoryStub) UpdateFeedbackHandling(_ context.Context, publicID, status, note string, actorID uint, now time.Time) error {
+	for index, value := range r.feedbacks {
+		if value.FeedbackPublicID != publicID {
+			continue
+		}
+		r.feedbacks[index].Status = status
+		r.feedbacks[index].AdminNote = note
+		r.feedbacks[index].HandledBy = &actorID
+		r.feedbacks[index].HandledAt = &now
+		return nil
+	}
+	return ErrNotFound
 }
 
 func (r *domainARepositoryStub) DeleteFeedback(_ context.Context, userID, feedbackID uint) error {
@@ -132,7 +181,7 @@ func TestSettingsPhoneBlocksAndFeedbackContracts(t *testing.T) {
 	if err != nil || !settings.OrderNotice || !settings.SocialNotice || !settings.Personalized || settings.QuietHours {
 		t.Fatalf("unexpected default settings: %+v err=%v", settings, err)
 	}
-	settings, err = service.BindPhone(context.Background(), 1, "wechat-code")
+	settings, err = service.BindPhone(context.Background(), 1, "wechat-code", false)
 	if err != nil || !settings.PhoneBound || settings.MaskedPhone != "138****8000" {
 		t.Fatalf("unexpected phone view: %+v err=%v", settings, err)
 	}
@@ -150,6 +199,57 @@ func TestSettingsPhoneBlocksAndFeedbackContracts(t *testing.T) {
 	feedback, err := service.SubmitFeedback(context.Background(), 1, "bug", "页面按钮无法点击", []string{"01ARZ3NDEKTSV4RRFFQ69G5FAV"})
 	if err != nil || feedback.FeedbackPublicID == "" || !media.reserved || !media.committed || media.cancelled {
 		t.Fatalf("feedback=%+v media=%+v err=%v", feedback, media, err)
+	}
+}
+
+func TestBindPhoneDetectsConflictAndSupportsTakeOver(t *testing.T) {
+	repo := newDomainARepositoryStub(
+		User{ID: 1, OpenID: "openid-a", Role: RoleUser, Status: StatusActive},
+		User{ID: 2, OpenID: "openid-b", Role: RoleUser, Status: StatusActive},
+	)
+	service := NewService(repo, testSecret, "", "", true, WithWechatPhoneResolver(phoneResolverStub{phone: "+8613800138000"}))
+	ctx := context.Background()
+
+	if _, err := service.BindPhone(ctx, 1, "code", false); err != nil {
+		t.Fatalf("first bind failed: %v", err)
+	}
+	if _, err := service.BindPhone(ctx, 2, "code", false); !errors.Is(err, ErrPhoneTaken) {
+		t.Fatalf("second account must be rejected with ErrPhoneTaken, got %v", err)
+	}
+	// 重复绑定同一号码不应被视为冲突。
+	if _, err := service.BindPhone(ctx, 1, "code", false); err != nil {
+		t.Fatalf("re-binding same phone must be a no-op: %v", err)
+	}
+
+	settings, err := service.BindPhone(ctx, 2, "code", true)
+	if err != nil {
+		t.Fatalf("take over failed: %v", err)
+	}
+	if !settings.PhoneBound || settings.MaskedPhone != "138****8000" {
+		t.Fatalf("take over must bind phone to the caller: %+v", settings)
+	}
+	previous, _ := service.Settings(ctx, 1)
+	if previous.PhoneBound {
+		t.Fatalf("previous owner must lose the phone binding: %+v", previous)
+	}
+}
+
+func TestUnbindPhoneReleasesNumber(t *testing.T) {
+	repo := newDomainARepositoryStub(
+		User{ID: 1, OpenID: "openid-a", Role: RoleUser, Status: StatusActive},
+		User{ID: 2, OpenID: "openid-b", Role: RoleUser, Status: StatusActive},
+	)
+	service := NewService(repo, testSecret, "", "", true, WithWechatPhoneResolver(phoneResolverStub{phone: "+8613800138000"}))
+	ctx := context.Background()
+	if _, err := service.BindPhone(ctx, 1, "code", false); err != nil {
+		t.Fatal(err)
+	}
+	settings, err := service.UnbindPhone(ctx, 1)
+	if err != nil || settings.PhoneBound {
+		t.Fatalf("unbind failed: %+v err=%v", settings, err)
+	}
+	if _, err := service.BindPhone(ctx, 2, "code", false); err != nil {
+		t.Fatalf("released number must be bindable: %v", err)
 	}
 }
 

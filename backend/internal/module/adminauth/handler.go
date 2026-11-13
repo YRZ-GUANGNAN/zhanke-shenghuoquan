@@ -3,6 +3,7 @@ package adminauth
 import (
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -24,6 +25,87 @@ func (h *Handler) Register(group *gin.RouterGroup) {
 	group.GET("/session", h.middleware.Required(), h.session)
 	group.POST("/logout", h.middleware.Required(), h.logout)
 	group.POST("/password/change", h.middleware.Required(), h.changePassword)
+	group.GET("/credentials", h.middleware.Required(), h.listCredentials)
+	group.PUT("/credentials/:userId", h.middleware.Required(), h.setCredential)
+	group.DELETE("/credentials/:userId", h.middleware.Required(), h.removeCredential)
+}
+
+func (h *Handler) listCredentials(c *gin.Context) {
+	authenticated, err := AuthenticatedFromContext(c)
+	if err != nil {
+		response.Fail(c, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	values, err := h.service.ListCredentials(c, authenticated.User.ID)
+	if err != nil {
+		if errors.Is(err, ErrNotSuperAdmin) {
+			response.Fail(c, http.StatusForbidden, "only a super administrator can manage administrator accounts")
+			return
+		}
+		response.Fail(c, http.StatusInternalServerError, "administrator accounts unavailable")
+		return
+	}
+	response.OK(c, gin.H{"items": values})
+}
+
+func (h *Handler) setCredential(c *gin.Context) {
+	authenticated, err := AuthenticatedFromContext(c)
+	if err != nil {
+		response.Fail(c, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	userID, convErr := strconv.ParseUint(c.Param("userId"), 10, 32)
+	if convErr != nil || userID == 0 {
+		response.Fail(c, http.StatusBadRequest, "invalid administrator user")
+		return
+	}
+	var request struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		response.Fail(c, http.StatusBadRequest, "invalid administrator account request")
+		return
+	}
+	_, err = h.service.SetCredential(c, authenticated.User.ID, uint(userID), request.Username, request.Password, "credential_set")
+	switch {
+	case err == nil:
+		response.OK(c, gin.H{"saved": true})
+	case errors.Is(err, ErrNotSuperAdmin):
+		response.Fail(c, http.StatusForbidden, "only a super administrator can manage administrator accounts")
+	case errors.Is(err, ErrTargetNotAdmin):
+		response.Fail(c, http.StatusBadRequest, "target user is not an active administrator")
+	case errors.Is(err, ErrUsernameInvalid):
+		response.Fail(c, http.StatusBadRequest, ErrUsernameInvalid.Error())
+	case errors.Is(err, ErrUsernameTaken):
+		response.Fail(c, http.StatusConflict, "this administrator username is already in use")
+	case errors.Is(err, ErrPasswordPolicy):
+		response.Fail(c, http.StatusBadRequest, ErrPasswordPolicy.Error())
+	default:
+		response.Fail(c, http.StatusInternalServerError, "save administrator account failed")
+	}
+}
+
+func (h *Handler) removeCredential(c *gin.Context) {
+	authenticated, err := AuthenticatedFromContext(c)
+	if err != nil {
+		response.Fail(c, http.StatusUnauthorized, "authentication required")
+		return
+	}
+	userID, convErr := strconv.ParseUint(c.Param("userId"), 10, 32)
+	if convErr != nil || userID == 0 {
+		response.Fail(c, http.StatusBadRequest, "invalid administrator user")
+		return
+	}
+	err = h.service.RemoveCredential(c, authenticated.User.ID, uint(userID))
+	switch {
+	case err == nil:
+		response.OK(c, gin.H{"removed": true})
+	case errors.Is(err, ErrNotSuperAdmin):
+		response.Fail(c, http.StatusForbidden, "only a super administrator can manage administrator accounts")
+	default:
+		response.Fail(c, http.StatusBadRequest, "remove administrator account failed")
+	}
 }
 
 func (h *Handler) login(c *gin.Context) {

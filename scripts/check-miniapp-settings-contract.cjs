@@ -41,7 +41,8 @@ for (const [source, fragment] of requirements) {
   if (!source.includes(fragment)) throw new Error(`settings contract missing: ${fragment}`)
 }
 
-for (const fragment of ['wechatBound', '微信登录', '手机号登录', '暂未启用']) {
+// 手机号不是独立登录方式，界面只能说明绑定后的实际用途。
+for (const fragment of ['wechatBound', '微信登录', '绑定后可用于', '不影响微信登录']) {
   if (!settings.includes(fragment) && !userClient.includes(fragment)) throw new Error(`account binding presentation missing: ${fragment}`)
 }
 

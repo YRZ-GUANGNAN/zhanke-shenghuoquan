@@ -10,10 +10,16 @@ import (
 )
 
 var ErrCredentialNotFound = errors.New("admin credential not found")
+var ErrUsernameTaken = errors.New("admin username already taken")
 
 type Repository interface {
 	FindCredential(context.Context, string) (Credential, error)
+	FindCredentialByID(context.Context, uint64) (Credential, error)
+	FindCredentialByUserID(context.Context, uint) (Credential, error)
+	ListCredentials(context.Context) ([]Credential, error)
 	UpsertCredential(context.Context, uint, string, string, time.Time) (Credential, error)
+	UpsertCredentialForUser(context.Context, uint, string, string, time.Time) (Credential, error)
+	DeleteCredentialByUserID(context.Context, uint) error
 	RecordFailure(context.Context, uint64, uint16, *time.Time) error
 	ResetFailures(context.Context, uint64) error
 	CreateSession(context.Context, *WebSession) error
@@ -37,6 +43,72 @@ func (r *GormRepository) FindCredential(ctx context.Context, username string) (C
 		return Credential{}, ErrCredentialNotFound
 	}
 	return value, err
+}
+
+func (r *GormRepository) FindCredentialByID(ctx context.Context, id uint64) (Credential, error) {
+	var value Credential
+	err := r.db.WithContext(ctx).Where("id = ?", id).First(&value).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return Credential{}, ErrCredentialNotFound
+	}
+	return value, err
+}
+
+func (r *GormRepository) FindCredentialByUserID(ctx context.Context, userID uint) (Credential, error) {
+	var value Credential
+	err := r.db.WithContext(ctx).Where("user_id = ?", userID).First(&value).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return Credential{}, ErrCredentialNotFound
+	}
+	return value, err
+}
+
+func (r *GormRepository) ListCredentials(ctx context.Context) ([]Credential, error) {
+	values := make([]Credential, 0)
+	err := r.db.WithContext(ctx).Order("id").Find(&values).Error
+	return values, err
+}
+
+// 按用户维度建立登录账号：同一用户只保留一条凭据，用户名全表唯一。
+func (r *GormRepository) UpsertCredentialForUser(ctx context.Context, userID uint, username, passwordHash string, now time.Time) (Credential, error) {
+	value := Credential{
+		Username: username, UserID: userID, PasswordHash: passwordHash,
+		PasswordChangedAt: now, RowVersion: 1, CreatedAt: now, UpdatedAt: now,
+	}
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var existing Credential
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("user_id = ?", userID).First(&existing).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			var taken Credential
+			if err := tx.Where("username = ?", username).First(&taken).Error; err == nil {
+				return ErrUsernameTaken
+			} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+			return tx.Create(&value).Error
+		}
+		if err != nil {
+			return err
+		}
+		var taken Credential
+		if err := tx.Where("username = ? AND id <> ?", username, existing.ID).First(&taken).Error; err == nil {
+			return ErrUsernameTaken
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		value.ID = existing.ID
+		value.RowVersion = existing.RowVersion + 1
+		return tx.Model(&Credential{}).Where("id = ?", existing.ID).Updates(map[string]any{
+			"username": username, "password_hash": passwordHash, "failed_attempts": 0,
+			"locked_until": nil, "password_changed_at": now,
+			"row_version": gorm.Expr("row_version + 1"), "updated_at": now,
+		}).Error
+	})
+	return value, err
+}
+
+func (r *GormRepository) DeleteCredentialByUserID(ctx context.Context, userID uint) error {
+	return r.db.WithContext(ctx).Where("user_id = ?", userID).Delete(&Credential{}).Error
 }
 
 func (r *GormRepository) UpsertCredential(ctx context.Context, userID uint, username, passwordHash string, now time.Time) (Credential, error) {

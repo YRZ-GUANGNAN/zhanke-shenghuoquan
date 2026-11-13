@@ -37,6 +37,7 @@ func (h *Handler) Register(rg *gin.RouterGroup) {
 	rg.GET("/settings", h.service.AuthRequired(), h.settings)
 	rg.PATCH("/settings", h.service.AuthRequired(), h.updateSettings)
 	rg.POST("/me/phone", h.service.AuthRequired(), h.bindPhone)
+	rg.DELETE("/me/phone", h.service.AuthRequired(), h.unbindPhone)
 	rg.GET("/blocks", h.service.AuthRequired(), h.blocks)
 	rg.POST("/blocks/:id", h.service.AuthRequired(), h.addBlock)
 	rg.DELETE("/blocks/:id", h.service.AuthRequired(), h.removeBlock)
@@ -69,23 +70,37 @@ func (h *Handler) updateSettings(c *gin.Context) {
 
 func (h *Handler) bindPhone(c *gin.Context) {
 	var request struct {
-		Code string `json:"code"`
+		Code     string `json:"code"`
+		TakeOver bool   `json:"takeOver"`
 	}
 	if err := c.ShouldBindJSON(&request); err != nil {
 		response.Fail(c, http.StatusBadRequest, "invalid phone code")
 		return
 	}
-	value, err := h.service.BindPhone(c, CurrentUserID(c), request.Code)
+	value, err := h.service.BindPhone(c, CurrentUserID(c), request.Code, request.TakeOver)
 	if err != nil {
 		status := http.StatusBadRequest
 		message := "手机号绑定失败，请稍后重试"
-		if errors.Is(err, ErrPhoneBindingUnavailable) {
+		switch {
+		case errors.Is(err, ErrPhoneBindingUnavailable):
 			status = http.StatusServiceUnavailable
 			message = "手机号绑定暂不可用"
-		} else if errors.Is(err, ErrInvalidPhone) {
+		case errors.Is(err, ErrInvalidPhone):
 			message = "微信返回的手机号无效"
+		case errors.Is(err, ErrPhoneTaken):
+			status = http.StatusConflict
+			message = "该手机号已绑定其他微信账号"
 		}
 		response.Fail(c, status, message)
+		return
+	}
+	response.OK(c, value)
+}
+
+func (h *Handler) unbindPhone(c *gin.Context) {
+	value, err := h.service.UnbindPhone(c, CurrentUserID(c))
+	if err != nil {
+		response.Fail(c, http.StatusInternalServerError, "解绑手机号失败，请稍后重试")
 		return
 	}
 	response.OK(c, value)

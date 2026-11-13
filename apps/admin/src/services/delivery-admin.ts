@@ -102,6 +102,27 @@ export interface NotificationChannel {
   deadletter: number
 }
 
+export interface NotificationDelivery {
+  deliveryId: string
+  recipientId: number
+  channel: 'in_app' | 'wechat_subscribe' | 'wechat_official' | 'wecom'
+  purpose: string
+  status: string
+  attemptCount: number
+  errorCode: string
+  error: string
+  nextAttemptAt: string | null
+  processedAt: string | null
+  createdAt: string
+}
+
+export interface NotificationDeliveryPage {
+  items: NotificationDelivery[]
+  page: number
+  pageSize: number
+  total: number
+}
+
 export interface NotificationChannelOverview {
   checkedAt: string
   sendingEnabled: boolean
@@ -445,6 +466,8 @@ export const deliveryAdminAPI = {
   refunds: (query: DeliveryQuery = {}) => api<Page<Refund>>(`/refunds${queryString(query)}`),
   refund: (id: string) => api<Refund>(`/refunds/${encodeURIComponent(id)}`),
   notificationChannels: () => api<NotificationChannelOverview>('/notification-channels'),
+  notificationDeliveries: (query: { status?: string; page?: number; pageSize?: number } = {}) =>
+    api<NotificationDeliveryPage>(`/notification-channels/deliveries${queryString(query)}`),
   testWecomGroup: (group: 'merchant_ops' | 'rider_ops') =>
     api<{ accepted: boolean; group: string }>('/notification-channels/wecom/test', {
       ...body({ group }), method: 'POST'
