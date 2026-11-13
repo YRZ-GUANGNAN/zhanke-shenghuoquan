@@ -27,7 +27,7 @@ func TestD3OrderFundsReadOnlyRealHTTPMySQL(t *testing.T) {
 	ctx := context.Background()
 	auth := user.NewService(
 		user.NewRepository(db), "d3-readonly-secret-that-is-longer-than-thirty-two-characters",
-		"", "", true, user.WithAppEnv("dev"),
+		"", "", true, user.WithAppEnv("dev"), user.WithIdentityEligibility(d2IdentityEligibility{}),
 	)
 	merchant, err := auth.WechatLogin(ctx, user.LoginInput{
 		Code: d3Fence + "-readonly-merchant", Nickname: "D3 Readonly Merchant",
@@ -40,6 +40,11 @@ func TestD3OrderFundsReadOnlyRealHTTPMySQL(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+	for _, account := range []user.LoginResult{merchant, other} {
+		if _, err := auth.SwitchIdentity(ctx, account.User.ID, user.IdentityMerchant); err != nil {
+			t.Fatalf("switch readonly merchant identity user=%d: %v", account.User.ID, err)
+		}
 	}
 	merchantUserID := uint64(merchant.User.ID)
 	otherUserID := uint64(other.User.ID)
@@ -56,6 +61,7 @@ func TestD3OrderFundsReadOnlyRealHTTPMySQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	runtime.paymentProvider = d3SimulatedRefundProvider{}
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	registerDeliveryRoutes(runtime, router.Group("/api/v1"), auth)
@@ -230,6 +236,19 @@ func TestD3OrderFundsReadOnlyRealHTTPMySQL(t *testing.T) {
 		t.Fatalf("disabled funds route status=%d", status)
 	}
 	t.Log("D-3 funds readonly=PASS unpaid_null+wallet_paid+wallet_refunded+wechat_refund_pending+owner_404+auth_401+gate_404+no_mutation")
+}
+
+// d3SimulatedRefundProvider exercises the HTTP/MySQL refund state machine
+// without pretending a real WeChat refund was submitted or completed.
+type d3SimulatedRefundProvider struct {
+	deliverypayment.MockProvider
+}
+
+func (d3SimulatedRefundProvider) CreateRefund(context.Context, deliverypayment.RefundRequest) (deliverypayment.RefundProviderResult, error) {
+	return deliverypayment.RefundProviderResult{
+		WechatRefundID: "simulated-wechat-refund",
+		Status:         "PROCESSING",
+	}, nil
 }
 
 func decodeD3OrderFunds(t *testing.T, body d2Envelope) deliverypayment.OrderFundsView {

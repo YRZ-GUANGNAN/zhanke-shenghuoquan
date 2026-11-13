@@ -34,7 +34,8 @@ assert.match(takeout, /import\s*\{\s*AppSkeleton,\s*AppState\s*\}\s*from\s*'\.\.
 assert.match(takeout, /status === 'loading'\s*&&\s*\(\s*<AppSkeleton\s+rows=\{3\}/)
 assert.match(takeout, /status === 'empty'\s*&&\s*\(\s*<AppState\s+kind='empty'/)
 assert.match(takeout, /status === 'error'\s*&&\s*\(\s*<AppState\s+kind='error'[^>]*actionText='重新加载'\s+onAction=\{\(\) => void load\(\)\}/)
-assert.match(takeout, /status === 'ready'\s*&&\s*filteredMerchants\.length === 0\s*&&\s*\(\s*<AppState\s+kind='empty'/)
+assert.match(takeout, /setStatus\(values\.length > 0 \? 'ready' : 'empty'\)/)
+assert.match(takeout, /status === 'ready'\s*&&\s*merchants\.length > 0\s*&&/)
 assert.match(appState, /<StatusGlyph\s+kind=/)
 assert.match(appState, /actionText && onAction\s*\?\s*<AppButton[^>]*onClick=\{onAction\}/)
 

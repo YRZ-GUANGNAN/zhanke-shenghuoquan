@@ -31,7 +31,7 @@ func TestD3DeliveryPaymentRealHTTPMySQLAuthAndGate(t *testing.T) {
 	ctx := context.Background()
 	auth := user.NewService(
 		user.NewRepository(db), "d3-test-secret-that-is-longer-than-thirty-two-characters",
-		"", "", true, user.WithAppEnv("dev"),
+		"", "", true, user.WithAppEnv("dev"), user.WithIdentityEligibility(d2IdentityEligibility{}),
 	)
 	merchant, err := auth.WechatLogin(ctx, user.LoginInput{Code: d3Fence + "-merchant", Nickname: "D3 Merchant"})
 	if err != nil {
@@ -40,6 +40,11 @@ func TestD3DeliveryPaymentRealHTTPMySQLAuthAndGate(t *testing.T) {
 	other, err := auth.WechatLogin(ctx, user.LoginInput{Code: d3Fence + "-other", Nickname: "D3 Other"})
 	if err != nil {
 		t.Fatal(err)
+	}
+	for _, account := range []user.LoginResult{merchant, other} {
+		if _, err := auth.SwitchIdentity(ctx, account.User.ID, user.IdentityMerchant); err != nil {
+			t.Fatalf("switch payment merchant identity user=%d: %v", account.User.ID, err)
+		}
 	}
 	runtime, err := newDeliveryRuntime(config.Config{
 		AppEnv: "dev", EnableDelivery: true, EnableDeliveryPayment: true,
