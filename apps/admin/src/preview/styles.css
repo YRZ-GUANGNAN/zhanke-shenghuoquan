@@ -1649,6 +1649,15 @@ body {
 
 /* 窄屏：侧边栏改抽屉，内容区不再被挤压。 */
 @media (max-width: 900px) {
+  /* 二级页面（弹窗与侧滑）原本固定 480–900px，窄屏会溢出。 */
+  .ant-modal { max-width: calc(100vw - 24px) !important; margin: 12px auto !important; }
+  .ant-modal-body { padding: 16px !important; }
+  .ant-modal-footer { display: flex; flex-wrap: wrap; gap: 8px; }
+  .ant-modal-footer .ant-btn { margin: 0 !important; flex: 1 1 auto; }
+  .ant-drawer-content-wrapper { max-width: calc(100vw - 24px) !important; }
+  .ant-drawer-body { padding: 16px !important; }
+
+@media (max-width: 900px) {
   .preview-main-shell { min-width: 0; }
   .preview-topbar { padding: 10px 12px; gap: 8px; }
   .preview-content { padding: 12px; }

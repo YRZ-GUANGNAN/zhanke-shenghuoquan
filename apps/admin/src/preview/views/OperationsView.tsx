@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import {
   formatMoney,
   formatTime,
+  isToday,
   type CommunityItem,
   type PreviewSection,
   type ProductItem,
@@ -259,7 +260,7 @@ function CommunityOperations() {
       <StatCard label="已公开" value={community.filter(item => item.status === '已公开').length} meta="展示在用户端" tone="mint" />
       <StatCard label="待审核" value={community.filter(item => item.status === '待审核').length} meta="进入统一审核流" tone="amber" />
       <StatCard label="已下架" value={community.filter(item => item.status === '已下架').length} meta="保留处理记录" tone="ink" />
-      <StatCard label="今日新增" value={community.filter(item => item.createdAt.startsWith('2026-11-14')).length} meta="今天提交的内容" tone="accent" />
+      <StatCard label="今日新增" value={community.filter(item => isToday(item.createdAt)).length} meta="今天提交的内容" tone="accent" />
     </section>
     <Panel eyebrow="COMMUNITY FEED" title="社区内容" description="公开内容可以直接下架，待审内容统一进入审核中心。" actions={<SearchBox value={query} onChange={setQuery} placeholder="搜索标题、作者或话题" />}>
       <div className="preview-toolbar"><Segmented value={status} onChange={setStatus} options={[{ value: '全部', label: '全部' }, { value: '已公开', label: '已公开' }, { value: '待审核', label: '待审核' }, { value: '已下架', label: '已下架' }]} /></div>

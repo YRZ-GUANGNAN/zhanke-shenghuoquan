@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { PreviewSection } from '../data'
-import { channelHealthFrom, formatMoney, formatTime } from '../data'
+import { channelHealthFrom, formatMoney, formatTime, isToday } from '../data'
 import { usePreviewStore } from '../store'
 import {
   Button,
@@ -21,7 +21,7 @@ export function DashboardView({ navigate }: { navigate: (section: PreviewSection
   const media = usePreviewStore(state => state.media)
 
   const summary = useMemo(() => {
-    const today = orders.filter(order => order.createdAt.startsWith('2026-11-14'))
+    const today = orders.filter(order => isToday(order.createdAt))
     return {
       todayOrders: today.length,
       revenueCents: today.filter(order => order.status === '已完成').reduce((total, order) => total + order.platformFeeCents, 0),
@@ -71,7 +71,7 @@ export function DashboardView({ navigate }: { navigate: (section: PreviewSection
     return feedbacks.some(item => item.status === '待处理')
   })
 
-  const todayOrders = orders.filter(order => order.createdAt.startsWith('2026-11-14'))
+  const todayOrders = orders.filter(order => isToday(order.createdAt))
   // 按真实订单时间聚合；时间轴覆盖当天实际出现的小时，避免漏掉区间外的订单。
   const orderHours = todayOrders.map(order => new Date(order.createdAt).getHours()).filter(hour => Number.isFinite(hour))
   const firstHour = orderHours.length ? Math.max(0, Math.min(...orderHours) - 1) : 8

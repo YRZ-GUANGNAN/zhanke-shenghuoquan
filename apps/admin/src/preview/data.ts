@@ -451,3 +451,13 @@ export function channelHealthFrom(deliveries: NotificationDelivery[]): ChannelHe
     return { ...bucket, rate: settled > 0 ? Math.round(bucket.delivered / settled * 100) : null }
   })
 }
+
+// 「今日」按本地日期计算，不能写死某一天，否则换天演示时全部归零。
+export function todayKey(now: Date = new Date()): string {
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+}
+
+export function isToday(value: string): boolean {
+  return typeof value === 'string' && value.startsWith(todayKey())
+}
