@@ -11,8 +11,10 @@ const requiredFiles = [
   path.join(preview, 'main.tsx'),
   path.join(preview, 'App.tsx'),
   path.join(preview, 'data.ts'),
+  path.join(preview, 'extra-data.ts'),
   path.join(preview, 'store.ts'),
   path.join(preview, 'ui.tsx'),
+  path.join(preview, 'ExtraViews.tsx'),
   path.join(preview, 'styles.css'),
   path.join(preview, 'views', 'DashboardView.tsx'),
   path.join(preview, 'views', 'NotificationsView.tsx'),
@@ -34,7 +36,7 @@ const notifications = read('views', 'NotificationsView.tsx')
 const operations = read('views', 'OperationsView.tsx')
 const settings = read('views', 'SettingsView.tsx')
 
-for (const label of ['经营总览', '配送与结算', '消息通知', '素材中心', '审核中心', '社区内容', '二手商品', '举报处理', '商家骑手认证', '意见反馈', '用户与权限', '服务入口', '分享设置', '功能开关', '旧版外卖']) {
+for (const label of ['经营总览', '上线流程', '配送与结算', '消息通知', '素材中心', '站点管理', '表单管理', '接单员管理', '推广员管理', '商品库存', '营销管理', '私信管理', '广告管理', '审核中心', '社区内容', '二手商品', '举报处理', '商家骑手认证', '意见反馈', '小程序设置', '服务号设置', '提现管理', '用户与权限', '服务入口', '分享设置', '功能开关', '通用设置', '旧版外卖']) {
   assert.ok(app.includes(label), `preview navigation must include ${label}`)
 }
 
