@@ -1930,3 +1930,15 @@ textarea.ant-input { border-radius: 10px !important; }
   font-weight: 500;
   font-size: 11px;
 }
+
+/* 素材卡片视觉区改成按钮后需要重置默认样式。 */
+button.preview-media-card__visual {
+  width: 100%;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+button.preview-media-card__visual:focus-visible {
+  outline: 3px solid rgba(47, 111, 168, .3);
+  outline-offset: 2px;
+}

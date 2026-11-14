@@ -307,18 +307,33 @@ export const usePreviewStore = create<PreviewState>()(
     }),
     {
       name: 'campus-circle-admin-preview-v1',
-      version: 3,
+      version: 4,
       // v2 补服务入口 appId；v3 把旧的 6 项开关迁移成真实的 20 项功能策略。
       migrate: (persisted: unknown) => {
-        const state = persisted as { serviceEntries?: Array<Record<string, unknown>>; settings?: { features?: Record<string, boolean> } } | undefined
+        const state = persisted as {
+          serviceEntries?: Array<Record<string, unknown>>
+          settings?: { features?: Record<string, boolean> }
+          media?: Array<Record<string, unknown>>
+          mediaDecisions?: Array<Record<string, unknown>>
+          mediaEvents?: Array<Record<string, unknown>>
+          mediaGc?: Array<Record<string, unknown>>
+        } | undefined
         if (!state) return persisted as never
         const features = state.settings?.features || {}
         const normalized = Object.fromEntries(FEATURE_KEYS.map(key => {
           const legacy = key === 'forum' ? features.community : key === 'secondhand' ? features.community : (features as Record<string, boolean>)[key]
           return [key, legacy !== false]
         })) as Record<string, boolean>
+        // v4：素材补了规格与引用字段，旧缓存缺字段时直接用种子重建素材相关数据。
+        const mediaNeedsReset = (state.media || []).some(item => item.dimensions === undefined)
         return {
           ...state,
+          ...(mediaNeedsReset ? {
+            media: structuredClone(seedMedia),
+            mediaDecisions: structuredClone(seedMediaDecisions),
+            mediaEvents: structuredClone(seedMediaEvents),
+            mediaGc: structuredClone(seedMediaGc)
+          } : {}),
           serviceEntries: (state.serviceEntries || []).map(entry => ({
             ...entry,
             appId: entry.appId || 'wx0dacef976daa8e55'

@@ -93,10 +93,12 @@ function MediaOperations() {
   const setMediaStatus = usePreviewStore(state => state.setMediaStatus)
   const [filter, setFilter] = useState<'全部' | '待审核' | '异常' | '已通过'>('全部')
   const [tab, setTab] = useState<'assets' | 'decisions' | 'events' | 'gc' | 'deadletters'>('assets')
+  const [detailId, setDetailId] = useState<string | null>(null)
   const decisions = usePreviewStore(state => state.mediaDecisions)
   const events = usePreviewStore(state => state.mediaEvents)
   const gcJobs = usePreviewStore(state => state.mediaGc)
   const { notify } = usePreviewToast()
+  const detail = media.find(item => item.id === detailId) || null
   const filtered = media.filter(item => filter === '全部' || item.status === filter)
   const pagedMedia = usePagedList(filtered, 8)
 
@@ -137,10 +139,10 @@ function MediaOperations() {
     >
       {filtered.length === 0 ? <EmptyState title="当前筛选下没有素材" description="调整状态筛选后再试。" /> : <div className="preview-media-grid">
         {pagedMedia.slice.map((asset, index) => <article key={asset.id} className="preview-media-card">
-          <div className={`preview-media-card__visual preview-media-card__visual--${index % 4}`}>
+          <button type="button" className={`preview-media-card__visual preview-media-card__visual--${index % 4}`} onClick={() => setDetailId(asset.id)} aria-label={`查看 ${asset.name} 详情`}>
             <span>{asset.kind === '视频' ? '▶' : '▧'}</span>
             <small>{asset.kind}</small>
-          </div>
+          </button>
           <div className="preview-media-card__body">
             <div><strong>{asset.name}</strong><StatusPill>{asset.status}</StatusPill></div>
             <dl><div><dt>用途</dt><dd>{asset.purpose}</dd></div><div><dt>大小</dt><dd>{asset.size}</dd></div><div><dt>编号</dt><dd>{asset.id}</dd></div><div><dt>时间</dt><dd>{formatTime(asset.createdAt)}</dd></div></dl>
@@ -155,6 +157,57 @@ function MediaOperations() {
       <Pagination page={pagedMedia.page} pageSize={pagedMedia.pageSize} total={pagedMedia.total} onChange={pagedMedia.setPage} label="素材列表分页" />
     </Panel>
     </>}
+
+    <Drawer
+      open={Boolean(detail)}
+      onClose={() => setDetailId(null)}
+      title={detail?.name || '素材详情'}
+      description={detail ? `${detail.kind} · ${detail.purpose} · ${formatTime(detail.createdAt)}` : undefined}
+      footer={detail && <>
+        <Button onClick={() => setDetailId(null)}>关闭</Button>
+        {detail.status === '异常' && <Button variant="primary" onClick={() => { setMediaStatus(detail.id, '待审核'); notify('素材已重新进入审核队列') }}>重新处理</Button>}
+        {detail.status === '待审核' && <Button variant="primary" onClick={() => { setMediaStatus(detail.id, '已通过'); notify('素材审核已通过') }}>标记通过</Button>}
+      </>}
+    >
+      {detail && <div className="preview-detail-stack">
+        <div className="preview-detail-banner">
+          <div><span>当前状态</span><strong>{detail.status}</strong></div>
+          <StatusPill>{detail.status}</StatusPill>
+        </div>
+        <div className="preview-kv-grid">
+          <div><span>用途</span><strong>{detail.purpose}</strong></div>
+          <div><span>文件大小</span><strong>{detail.size}</strong></div>
+          <div><span>规格</span><strong>{detail.dimensions || '—'}</strong></div>
+          <div><span>上传人</span><strong>{detail.owner || '—'}</strong></div>
+          <div><span>被引用</span><strong>{detail.referenceCount ?? 0} 处</strong></div>
+          <div><span>上传时间</span><strong>{formatTime(detail.createdAt)}</strong></div>
+        </div>
+
+        <div className="preview-note-block">
+          <span>审核记录</span>
+          {decisions.filter(item => item.assetId === detail.id).length === 0 && <p>暂无审核记录</p>}
+          {decisions.filter(item => item.assetId === detail.id).map(item => <p key={item.id}>
+            {item.result} · {item.note} · {formatTime(item.decidedAt)}
+          </p>)}
+        </div>
+
+        <div className="preview-note-block">
+          <span>处理记录</span>
+          {events.filter(item => item.assetId === detail.id).length === 0 && <p>暂无处理记录</p>}
+          {events.filter(item => item.assetId === detail.id).map(item => <p key={item.id}>
+            {item.action} · {item.status} · {formatTime(item.at)}
+          </p>)}
+        </div>
+
+        <div className="preview-note-block">
+          <span>清理任务</span>
+          {gcJobs.filter(item => item.assetId === detail.id).length === 0 && <p>暂无清理任务</p>}
+          {gcJobs.filter(item => item.assetId === detail.id).map(item => <p key={item.id}>
+            {item.kind} · {item.status} · {formatTime(item.at)}
+          </p>)}
+        </div>
+      </div>}
+    </Drawer>
 
     {tab === 'decisions' && <Panel eyebrow="REVIEW DECISION" title="审核记录" description="记录每次审核的结论与依据，用于事后追溯。">
       <div className="preview-table-wrap"><table className="preview-table" aria-label="素材审核记录">
@@ -458,6 +511,8 @@ function ReportOperations() {
   const reports = usePreviewStore(state => state.reports)
   const setReportStatus = usePreviewStore(state => state.setReportStatus)
   const [filter, setFilter] = useState<'全部' | ReportItem['status']>('全部')
+  const [detailId, setDetailId] = useState<string | null>(null)
+  const detail = reports.find(item => item.id === detailId) || null
   const { notify } = usePreviewToast()
   const filtered = reports.filter(item => filter === '全部' || item.status === filter)
   const paged3 = usePagedList(filtered, 8)
@@ -472,9 +527,33 @@ function ReportOperations() {
     <Panel eyebrow="SAFETY QUEUE" title="举报处理" description="处理结论会同步到对应内容模块。">
       <div className="preview-toolbar"><Segmented value={filter} onChange={setFilter} options={[{ value: '全部', label: '全部' }, { value: '待处理', label: '待处理' }, { value: '处理中', label: '处理中' }, { value: '已解决', label: '已解决' }]} /></div>
       <div className="preview-table-wrap"><table className="preview-table" aria-label="举报列表"><thead><tr><th>举报目标</th><th>原因</th><th>举报人</th><th>状态</th><th>时间</th><th /></tr></thead><tbody>
-        {paged3.slice.map(item => <tr key={item.id}><td><strong>{item.target}</strong><span>{item.id}</span></td><td>{item.reason}</td><td>{item.reporter}</td><td><StatusPill>{item.status}</StatusPill></td><td>{formatTime(item.createdAt)}</td><td>{item.status !== '已解决' && <Button size="sm" variant="primary" onClick={() => { setReportStatus(item.id, '已解决'); notify('举报已标记为已解决') }}>完成处理</Button>}</td></tr>)}
+        {paged3.slice.map(item => <tr key={item.id}><td><button type="button" className="preview-table__primary" onClick={() => setDetailId(item.id)}>{item.target}<small>{item.id}</small></button></td><td>{item.reason}</td><td>{item.reporter}</td><td><StatusPill>{item.status}</StatusPill></td><td>{formatTime(item.createdAt)}</td><td>{item.status !== '已解决' && <Button size="sm" variant="primary" onClick={() => { setReportStatus(item.id, '已解决'); notify('举报已标记为已解决') }}>完成处理</Button>}</td></tr>)}
       </tbody></table>{filtered.length === 0 && <EmptyState title="当前没有举报" description="切换状态后再试。" />}</div>
       <Pagination page={paged3.page} pageSize={paged3.pageSize} total={paged3.total} onChange={paged3.setPage} label="举报列表分页" />
     </Panel>
+
+    <Drawer
+      open={Boolean(detail)}
+      onClose={() => setDetailId(null)}
+      title={detail ? `举报 ${detail.id}` : '举报详情'}
+      description={detail ? `${detail.target} · ${formatTime(detail.createdAt)}` : undefined}
+      footer={detail && <>
+        <Button onClick={() => setDetailId(null)}>关闭</Button>
+        {detail.status !== '已解决' && <Button variant="primary" onClick={() => { setReportStatus(detail.id, '已解决'); notify('举报已标记为已解决'); }}>标记已解决</Button>}
+      </>}
+    >
+      {detail && <div className="preview-detail-stack">
+        <div className="preview-detail-banner">
+          <div><span>当前状态</span><strong>{detail.status}</strong></div>
+          <StatusPill>{detail.status}</StatusPill>
+        </div>
+        <div className="preview-kv-grid">
+          <div><span>举报目标</span><strong>{detail.target}</strong></div>
+          <div><span>举报人</span><strong>{detail.reporter}</strong></div>
+          <div><span>提交时间</span><strong>{formatTime(detail.createdAt)}</strong></div>
+        </div>
+        <div className="preview-note-block"><span>举报原因</span><p>{detail.reason}</p></div>
+      </div>}
+    </Drawer>
   </div>
 }

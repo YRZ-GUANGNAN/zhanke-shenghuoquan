@@ -106,6 +106,9 @@ export interface MediaItem {
   purpose: string
   status: '已通过' | '待审核' | '异常'
   size: string
+  dimensions: string
+  owner: string
+  referenceCount: number
   createdAt: string
 }
 
@@ -441,10 +444,10 @@ export const seedReports: ReportItem[] = [
 ]
 
 export const seedMedia: MediaItem[] = [
-  { id: 'AS-901', name: '社团招新封面.jpg', kind: '图片', purpose: '帖子封面', status: '已通过', size: '1.8 MB', createdAt: '2026-11-14T08:34:00+08:00' },
-  { id: 'AS-902', name: '键盘实拍 1.jpg', kind: '图片', purpose: '商品图片', status: '待审核', size: '2.4 MB', createdAt: '2026-11-14T08:20:00+08:00' },
-  { id: 'AS-903', name: '商家后厨巡检.mp4', kind: '视频', purpose: '商家认证', status: '异常', size: '18.2 MB', createdAt: '2026-11-13T16:05:00+08:00' },
-  { id: 'AS-904', name: '校园地图插画.png', kind: '图片', purpose: '导航素材', status: '已通过', size: '820 KB', createdAt: '2026-11-13T11:40:00+08:00' }
+  { id: 'AS-901', name: '社团招新封面.jpg', kind: '图片', purpose: '帖子封面', status: '已通过', size: '1.8 MB', dimensions: '1280×1280', owner: '林同学', referenceCount: 1, createdAt: '2026-11-14T08:34:00+08:00' },
+  { id: 'AS-902', name: '键盘实拍 1.jpg', kind: '图片', purpose: '商品图片', status: '待审核', size: '2.4 MB', dimensions: '2048×1536', owner: '陈同学', referenceCount: 1, createdAt: '2026-11-14T08:20:00+08:00' },
+  { id: 'AS-903', name: '商家后厨巡检.mp4', kind: '视频', purpose: '商家认证', status: '异常', size: '18.2 MB', dimensions: '1080p · 42s', owner: '北区轻食铺', referenceCount: 0, createdAt: '2026-11-13T16:05:00+08:00' },
+  { id: 'AS-904', name: '校园地图插画.png', kind: '图片', purpose: '导航素材', status: '已通过', size: '820 KB', dimensions: '2560×1440', owner: '运营', referenceCount: 3, createdAt: '2026-11-13T11:40:00+08:00' }
 ]
 
 export const seedIdentities: IdentityItem[] = [
@@ -677,16 +680,16 @@ export interface MediaEventItem { id: string; assetId: string; action: string; s
 export interface MediaGcJob { id: string; assetId: string; kind: string; status: '已完成' | '待处理'; at: string }
 
 export const seedMediaDecisions: MediaDecision[] = [
-  { id: 'MD-11', assetId: 'AS-1', result: '通过', note: '自动审核：未检出违规', decidedAt: '2026-11-14T09:02:00+08:00' },
-  { id: 'MD-12', assetId: 'AS-2', result: '拒绝', note: '人工复核：含外部联系方式', decidedAt: '2026-11-14T08:31:00+08:00' }
+  { id: 'MD-11', assetId: 'AS-901', result: '通过', note: '自动审核：未检出违规', decidedAt: '2026-11-14T09:02:00+08:00' },
+  { id: 'MD-12', assetId: 'AS-902', result: '拒绝', note: '人工复核：含外部联系方式', decidedAt: '2026-11-14T08:31:00+08:00' }
 ]
 export const seedMediaEvents: MediaEventItem[] = [
-  { id: 'ME-21', assetId: 'AS-1', action: '上传完成并转码', status: '已完成', at: '2026-11-14T09:01:00+08:00' },
-  { id: 'ME-22', assetId: 'AS-3', action: '清理任务入队', status: '失败', at: '2026-11-14T07:48:00+08:00' }
+  { id: 'ME-21', assetId: 'AS-901', action: '上传完成并转码', status: '已完成', at: '2026-11-14T09:01:00+08:00' },
+  { id: 'ME-22', assetId: 'AS-903', action: '清理任务入队', status: '失败', at: '2026-11-14T07:48:00+08:00' }
 ]
 export const seedMediaGc: MediaGcJob[] = [
-  { id: 'MG-31', assetId: 'AS-4', kind: '对象存储删除', status: '已完成', at: '2026-11-13T22:10:00+08:00' },
-  { id: 'MG-32', assetId: 'AS-3', kind: '对象存储删除', status: '待处理', at: '2026-11-14T07:48:00+08:00' }
+  { id: 'MG-31', assetId: 'AS-904', kind: '对象存储删除', status: '已完成', at: '2026-11-13T22:10:00+08:00' },
+  { id: 'MG-32', assetId: 'AS-903', kind: '对象存储删除', status: '待处理', at: '2026-11-14T07:48:00+08:00' }
 ]
 
 /* ===== 后台登录账号 ===== */
