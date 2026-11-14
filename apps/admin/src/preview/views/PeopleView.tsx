@@ -198,6 +198,15 @@ function UserPeople() {
   const [query, setQuery] = useState('')
   const [role, setRole] = useState<'全部' | UserItem['role']>('全部')
   const { notify } = usePreviewToast()
+  // 账号状态属于高风险操作，先确认再落库。
+  const [pendingStatus, setPendingStatus] = useState<{ item: UserItem; status: UserItem['status'] } | null>(null)
+  const confirmStatusChange = () => {
+    if (!pendingStatus) return
+    updateUserStatus(pendingStatus.item.id, pendingStatus.status)
+    notify(pendingStatus.status === '正常' ? '账号已恢复正常' : `账号已${pendingStatus.status}`, pendingStatus.status === '正常' ? 'success' : 'info')
+    setPendingStatus(null)
+  }
+
   const filtered = useMemo(() => users.filter(item =>
     (role === '全部' || item.role === role)
     && (!query.trim() || `${item.name}${item.phone}${item.id}`.toLowerCase().includes(query.trim().toLowerCase()))
@@ -227,9 +236,9 @@ function UserPeople() {
             <td><div className="preview-user-cell"><span>{item.name.slice(0, 1)}</span><div><strong>{item.name}</strong><small>{item.phone} · {item.id}</small></div></div></td>
             <td>{item.role}</td><td>{item.campus}</td><td><StatusPill>{item.status}</StatusPill></td><td>{item.createdAt}</td>
             <td><div className="preview-row-actions">
-              {item.status !== '正常' ? <Button size="sm" variant="ghost" onClick={() => { updateUserStatus(item.id, '正常'); notify('账号已恢复正常') }}>恢复</Button> : <>
-                <Button size="sm" variant="quiet" onClick={() => { updateUserStatus(item.id, '禁言'); notify('账号已禁言', 'info') }}>禁言</Button>
-                <Button size="sm" variant="danger" onClick={() => { updateUserStatus(item.id, '停用'); notify('账号已停用', 'info') }}>停用</Button>
+              {item.status !== '正常' ? <Button size="sm" variant="ghost" onClick={() => setPendingStatus({ item, status: '正常' })}>恢复</Button> : <>
+                <Button size="sm" variant="quiet" onClick={() => setPendingStatus({ item, status: '禁言' })}>禁言</Button>
+                <Button size="sm" variant="danger" onClick={() => setPendingStatus({ item, status: '停用' })}>停用</Button>
               </>}
             </div></td>
           </tr>)}
@@ -240,5 +249,20 @@ function UserPeople() {
         <p>管理员角色修改属于高风险操作。本地原型的“停用/禁言”只影响演示表，不会写入真实账号。</p>
       </div>
     </Panel>
+    <Modal
+      open={Boolean(pendingStatus)}
+      title={pendingStatus ? `将账号改为「${pendingStatus.status}」` : ''}
+      description={pendingStatus ? `${pendingStatus.item.name} · ${pendingStatus.item.id}` : ''}
+      onClose={() => setPendingStatus(null)}
+      footer={<>
+        <Button onClick={() => setPendingStatus(null)}>取消</Button>
+        <Button variant={pendingStatus?.status === '正常' ? 'primary' : 'danger'} onClick={confirmStatusChange}>确认修改</Button>
+      </>}
+    >
+      <div className="preview-warning-box">
+        <strong>{pendingStatus?.status === '正常' ? '恢复后用户可以继续使用全部功能' : '该操作会立即影响用户登录与互动'}</strong>
+        <p>本地原型只修改演示数据；生产环境会写入账号状态并让现有会话失效。</p>
+      </div>
+    </Modal>
   </div>
 }

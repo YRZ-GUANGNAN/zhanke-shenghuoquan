@@ -114,6 +114,7 @@ export interface ServiceEntry {
   id: string
   title: string
   subtitle: string
+  appId: string
   path: string
   color: string
   enabled: boolean
@@ -316,10 +317,10 @@ export const seedUsers: UserItem[] = [
 ]
 
 export const seedServiceEntries: ServiceEntry[] = [
-  { id: 'NV-1', title: '取快递', subtitle: '校园快递代取', path: 'pages/express/index', color: '#6f45a8', enabled: true, sort: 10 },
-  { id: 'NV-2', title: '打印资料', subtitle: '上传文件后到店取件', path: 'pages/print/index', color: '#3e8f74', enabled: true, sort: 20 },
-  { id: 'NV-3', title: '校园跑腿', subtitle: '发布同校互助任务', path: 'pages/errand/index', color: '#bf7a32', enabled: true, sort: 30 },
-  { id: 'NV-4', title: '失物招领', subtitle: '查看最新失物信息', path: 'pages/lost-found/index', color: '#ad5d7a', enabled: false, sort: 40 }
+  { id: 'NV-1', title: '取快递', subtitle: '校园快递代取', appId: 'wx0dacef976daa8e55', path: 'pages/express/index', color: '#6f45a8', enabled: true, sort: 10 },
+  { id: 'NV-2', title: '打印资料', subtitle: '上传文件后到店取件', appId: 'wx0dacef976daa8e55', path: 'pages/print/index', color: '#3e8f74', enabled: true, sort: 20 },
+  { id: 'NV-3', title: '校园跑腿', subtitle: '发布同校互助任务', appId: 'wx0dacef976daa8e55', path: 'pages/errand/index', color: '#bf7a32', enabled: true, sort: 30 },
+  { id: 'NV-4', title: '失物招领', subtitle: '查看最新失物信息', appId: 'wx0dacef976daa8e55', path: 'pages/lost-found/index', color: '#ad5d7a', enabled: false, sort: 40 }
 ]
 
 export const seedTemplates: MessageTemplateItem[] = [

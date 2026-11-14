@@ -199,6 +199,19 @@ export const usePreviewStore = create<PreviewState>()(
     }),
     {
       name: 'campus-circle-admin-preview-v1',
+      version: 2,
+      // v2：服务入口新增 appId 字段，旧缓存需要补默认值，避免列表出现空 AppID。
+      migrate: (persisted: unknown) => {
+        const state = persisted as { serviceEntries?: Array<Record<string, unknown>> } | undefined
+        if (!state?.serviceEntries) return persisted as never
+        return {
+          ...state,
+          serviceEntries: state.serviceEntries.map(entry => ({
+            ...entry,
+            appId: entry.appId || 'wx0dacef976daa8e55'
+          }))
+        } as never
+      },
       partialize: state => ({
         orders: state.orders,
         reviews: state.reviews,

@@ -1692,3 +1692,30 @@ body {
   font-size: 12px;
   line-height: 1.7;
 }
+
+/* 圆角统一：卡片 16、控件 10、弹窗 18，替换 antd 默认的 2px 直角感。 */
+.ant-card { border-radius: 16px !important; }
+.ant-card-head { border-radius: 16px 16px 0 0 !important; }
+.ant-btn { border-radius: 10px !important; }
+.ant-btn-sm { border-radius: 8px !important; }
+.ant-input,
+.ant-input-affix-wrapper,
+.ant-select:not(.ant-select-customize-input) .ant-select-selector,
+.ant-input-number,
+textarea.ant-input { border-radius: 10px !important; }
+.ant-tag { border-radius: 999px !important; }
+.ant-modal-content { border-radius: 18px !important; }
+.ant-drawer-content { border-radius: 0 18px 18px 0; }
+.ant-progress-inner,
+.ant-progress-bg { border-radius: 999px !important; }
+.ant-segmented,
+.ant-segmented-item { border-radius: 10px !important; }
+.preview-review-row,
+.preview-feedback-card,
+.preview-task,
+.preview-service-grid > article,
+.preview-channel-health-cards > article,
+.preview-media-card { border-radius: 14px; }
+.preview-table-wrap,
+.preview-table-frame { border-radius: 14px; }
+.preview-table { border-radius: 14px; overflow: hidden; }
