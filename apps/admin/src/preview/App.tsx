@@ -200,6 +200,9 @@ function PreviewApp() {
           </div>
         </header>
         <Layout.Content className="preview-content">
+          <div className="preview-mock-banner" role="note">
+            <span>演示数据</span>以下数字为本地模拟数据，仅用于界面评审，不代表真实经营情况。
+          </div>
           {content}
         </Layout.Content>
       </Layout>

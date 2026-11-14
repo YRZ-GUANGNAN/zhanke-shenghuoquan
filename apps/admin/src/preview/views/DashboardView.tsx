@@ -71,6 +71,16 @@ export function DashboardView({ navigate }: { navigate: (section: PreviewSection
   })
 
   const todayOrders = orders.filter(order => order.createdAt.startsWith('2026-11-14'))
+  // 按真实订单时间聚合；时间轴覆盖当天实际出现的小时，避免漏掉区间外的订单。
+  const orderHours = todayOrders.map(order => new Date(order.createdAt).getHours()).filter(hour => Number.isFinite(hour))
+  const firstHour = orderHours.length ? Math.max(0, Math.min(...orderHours) - 1) : 8
+  const lastHour = orderHours.length ? Math.min(23, Math.max(...orderHours) + 1) : 16
+  const chartHours = Array.from({ length: lastHour - firstHour + 1 }, (_, index) => firstHour + index)
+  const hourly = chartHours.map(hour => ({
+    hour,
+    count: todayOrders.filter(order => new Date(order.createdAt).getHours() === hour).length
+  }))
+  const chartMax = Math.max(1, ...hourly.map(item => item.count))
   const channelHealth = [
     { name: '小程序通知中心', rate: 100, detail: '近 24 小时 12 条全部送达' },
     { name: '微信订阅消息', rate: 82, detail: '近 24 小时 11 条，1 条待重试' },
@@ -90,7 +100,7 @@ export function DashboardView({ navigate }: { navigate: (section: PreviewSection
     />
 
     <section className="preview-stat-grid">
-      <StatCard label="今日进入订单" value={summary.todayOrders} meta="含待接单与已完成" trend="+12%" tone="accent" />
+      <StatCard label="今日进入订单" value={summary.todayOrders} meta="含待接单与已完成" tone="accent" />
       <StatCard label="今日平台收入" value={formatMoney(summary.revenueCents)} meta="仅统计已完成订单" trend="结算口径" tone="mint" />
       <StatCard label="待审核任务" value={summary.pendingReviews} meta="内容与身份审核合计" trend="需关注" tone="amber" />
       <StatCard label="通知异常" value={summary.notificationFailures} meta="可在通知工作台重试" trend={summary.notificationFailures ? '立即处理' : '暂无异常'} tone="rose" />
@@ -143,20 +153,17 @@ export function DashboardView({ navigate }: { navigate: (section: PreviewSection
         title="今日配送节奏"
         description="每小时新进入与完成订单的变化。"
       >
-        <div className="preview-chart" aria-label="今日订单变化趋势">
-          <div className="preview-chart__axis"><span>12</span><span>8</span><span>4</span><span>0</span></div>
+        <div className="preview-chart" aria-label="今日每小时进入订单数">
+          <div className="preview-chart__axis"><span>{chartMax}</span><span>{Math.round(chartMax / 2)}</span><span>0</span></div>
           <div className="preview-chart__plot">
-            <svg viewBox="0 0 600 180" role="img" aria-label="订单趋势折线图">
-              <defs>
-                <linearGradient id="preview-area" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#7b55aa" stopOpacity=".28" />
-                  <stop offset="100%" stopColor="#7b55aa" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              <path d="M0 154 C55 148 70 106 125 112 S205 150 250 84 S330 52 375 78 S455 136 505 82 S565 38 600 54 L600 180 L0 180 Z" fill="url(#preview-area)" />
-              <path d="M0 154 C55 148 70 106 125 112 S205 150 250 84 S330 52 375 78 S455 136 505 82 S565 38 600 54" fill="none" stroke="#684091" strokeWidth="3" strokeLinecap="round" />
-            </svg>
-            <div className="preview-chart__labels"><span>08:00</span><span>10:00</span><span>12:00</span><span>14:00</span><span>16:00</span></div>
+            <div className="preview-chart__bars" role="img" aria-label={`今日每小时进入订单数，共 ${todayOrders.length} 单`}>
+              {hourly.map(item => <div key={item.hour} className="preview-chart__bar-slot">
+                <div className="preview-chart__bar" style={{ height: `${Math.max(2, Math.round(item.count / chartMax * 100))}%` }}>
+                  {item.count > 0 && <span>{item.count}</span>}
+                </div>
+              </div>)}
+            </div>
+            <div className="preview-chart__labels">{hourly.map(item => <span key={item.hour}>{String(item.hour).padStart(2, '0')}:00</span>)}</div>
           </div>
         </div>
         <div className="preview-chart-legend">
