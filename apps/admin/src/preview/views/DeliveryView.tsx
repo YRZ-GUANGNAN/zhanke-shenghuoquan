@@ -2,10 +2,13 @@ import { useMemo, useState } from 'react'
 import { formatMoney, formatTime, type DeliveryOrder } from '../data'
 import { usePreviewStore } from '../store'
 import { FeeSection, FundsSection, type FeeView, type FundView } from './DeliveryFundsViews'
+import { DispatchSection } from './DispatchViews'
 import {
   Button,
   Drawer,
   EmptyState,
+  Field,
+  Modal,
   PageHeader,
   Panel,
   SearchBox,
@@ -34,7 +37,16 @@ export function DeliveryView() {
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [riderDraft, setRiderDraft] = useState('周师傅')
-  const [view, setView] = useState<'overview' | 'funds' | 'fee'>('overview')
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [batchAction, setBatchAction] = useState<'reassign' | 'cancel' | null>(null)
+  const [batchRider, setBatchRider] = useState('周师傅')
+  const [batchReason, setBatchReason] = useState('')
+  const [batchError, setBatchError] = useState('')
+  const riders = usePreviewStore(state => state.riders)
+  const reassignOrders = usePreviewStore(state => state.reassignOrders)
+  const cancelOrders = usePreviewStore(state => state.cancelOrders)
+  const [view, setView] = useState<'overview' | 'dispatch' | 'funds' | 'fee'>('overview')
+  const [dispatchView, setDispatchView] = useState<'riders' | 'merchants'>('riders')
   const [fundView, setFundView] = useState<FundView>('merchant')
   const [feeView, setFeeView] = useState<FeeView>('default')
   const { notify } = usePreviewToast()
@@ -78,7 +90,7 @@ export function DeliveryView() {
     />
 
     <div className="preview-subtabs" role="tablist" aria-label="配送模块">
-      {([['overview', '订单与概览'], ['funds', '资金与结算'], ['fee', '费率配置']] as const).map(([key, label]) => <button
+      {([['overview', '订单与概览'], ['dispatch', '派单管理'], ['funds', '资金与结算'], ['fee', '费率配置']] as const).map(([key, label]) => <button
         key={key}
         type="button"
         role="tab"
@@ -116,21 +128,50 @@ export function DeliveryView() {
         <span className="preview-toolbar__hint">显示 {filtered.length} 条订单</span>
       </div>
 
+      {selectedIds.length > 0 && <div className="preview-batch-bar">
+        <span>已选 {selectedIds.length} 笔订单</span>
+        <div className="preview-row-actions">
+          <Button size="sm" variant="primary" onClick={() => { setBatchRider('周师傅'); setBatchAction('reassign') }}>批量改派骑手</Button>
+          <Button size="sm" variant="danger" onClick={() => { setBatchReason(''); setBatchError(''); setBatchAction('cancel') }}>批量取消</Button>
+          <Button size="sm" onClick={() => setSelectedIds([])}>清除选择</Button>
+        </div>
+      </div>}
+
       {filtered.length === 0
         ? <EmptyState title="没有匹配的订单" description="调整筛选条件，或查看全部订单。" action={<Button onClick={() => { setStatus('全部'); setQuery('') }}>清除筛选</Button>} />
         : <div className="preview-table-wrap">
           <table className="preview-table preview-table--delivery" aria-label="配送订单列表">
             <thead><tr>
+              <th className="preview-table__check">
+                <input
+                  type="checkbox"
+                  aria-label="选择本页全部订单"
+                  checked={paged.slice.length > 0 && paged.slice.every(order => selectedIds.includes(order.id))}
+                  onChange={event => setSelectedIds(event.target.checked ? paged.slice.map(order => order.id) : [])}
+                />
+              </th>
               <th>订单</th><th>取送到</th><th>骑手</th><th>金额</th><th>状态</th><th>进入时间</th><th />
             </tr></thead>
             <tbody>{paged.slice.map(order => <tr key={order.id}>
+              <td className="preview-table__check">
+                <input
+                  type="checkbox"
+                  aria-label={`选择订单 ${order.id}`}
+                  checked={selectedIds.includes(order.id)}
+                  onChange={event => setSelectedIds(current => event.target.checked ? [...current, order.id] : current.filter(id => id !== order.id))}
+                />
+              </td>
               <td><button type="button" className="preview-table__primary" onClick={() => { setSelectedId(order.id); setRiderDraft(order.rider === '待分配' ? '周师傅' : order.rider) }}>{order.id}<small>{order.customer}</small></button></td>
               <td><strong>{order.pickup}</strong><span>→ {order.dropoff}</span></td>
               <td>{order.rider === '待分配' ? <StatusPill tone="warning">待分配</StatusPill> : order.rider}</td>
               <td><strong>{formatMoney(order.amountCents)}</strong><span className="preview-table__fee">平台抽成 {formatMoney(order.platformFeeCents)}</span></td>
               <td><StatusPill>{order.status}</StatusPill></td>
               <td>{formatTime(order.createdAt)}</td>
-              <td><Button size="sm" variant="ghost" onClick={() => { setSelectedId(order.id); setRiderDraft(order.rider === '待分配' ? '周师傅' : order.rider) }}>处理</Button></td>
+              <td><div className="preview-row-actions">
+                <Button size="sm" variant="ghost" onClick={() => { setSelectedId(order.id); setRiderDraft(order.rider === '待分配' ? '周师傅' : order.rider) }}>详情</Button>
+                {(order.status === '待接单' || order.status === '配送中') && <Button size="sm" variant="ghost" onClick={() => { setSelectedIds([order.id]); setBatchRider(order.rider === '待分配' ? '周师傅' : order.rider); setBatchAction('reassign') }}>改派</Button>}
+                {order.status !== '已完成' && order.status !== '已取消' && <Button size="sm" variant="danger" onClick={() => { setSelectedIds([order.id]); setBatchReason(''); setBatchError(''); setBatchAction('cancel') }}>取消</Button>}
+              </div></td>
             </tr>)}</tbody>
           </table>
         </div>}
@@ -138,8 +179,45 @@ export function DeliveryView() {
     </Panel>
     </>}
 
+    {view === 'dispatch' && <DispatchSection value={dispatchView} onChange={setDispatchView} />}
     {view === 'funds' && <FundsSection value={fundView} onChange={setFundView} />}
     {view === 'fee' && <FeeSection value={feeView} onChange={setFeeView} />}
+
+    <Modal
+      open={Boolean(batchAction)}
+      title={batchAction === 'reassign' ? `改派 ${selectedIds.length} 笔订单` : `取消 ${selectedIds.length} 笔订单`}
+      description={batchAction === 'reassign' ? '改派后原骑手不再负责该订单，新骑手会收到提醒。' : '取消后订单不再履约，用户会看到取消原因。'}
+      onClose={() => setBatchAction(null)}
+      footer={<>
+        <Button onClick={() => setBatchAction(null)}>返回</Button>
+        <Button
+          variant={batchAction === 'cancel' ? 'danger' : 'primary'}
+          onClick={() => {
+            if (batchAction === 'reassign') {
+              reassignOrders(selectedIds, batchRider)
+              notify(`已把 ${selectedIds.length} 笔订单改派给 ${batchRider}`)
+            } else {
+              if (!batchReason.trim()) { setBatchError('请填写取消原因'); return }
+              cancelOrders(selectedIds, batchReason.trim())
+              notify(`已取消 ${selectedIds.length} 笔订单`, 'info')
+            }
+            setSelectedIds([])
+            setBatchAction(null)
+            setBatchError('')
+          }}
+        >{batchAction === 'reassign' ? '确认改派' : '确认取消'}</Button>
+      </>}
+    >
+      <div className="preview-form-stack">
+        {batchAction === 'reassign'
+          ? <SelectField label="新骑手" value={batchRider} onChange={event => setBatchRider(event.target.value)}>
+            {riders.filter(rider => rider.state === '接单中').map(rider => <option key={rider.id} value={rider.name}>{rider.name}（在途 {rider.inFlight} 单）</option>)}
+          </SelectField>
+          : <Field label="取消原因" required value={batchReason} onChange={event => { setBatchReason(event.target.value); setBatchError('') }} placeholder="例如：用户要求取消" />}
+        {batchError && <div className="preview-form-error">{batchError}</div>}
+        <div className="preview-batch-list">{selectedIds.map(id => <span key={id}>{id}</span>)}</div>
+      </div>
+    </Modal>
 
     <Drawer
       open={Boolean(selected)}
@@ -153,6 +231,8 @@ export function DeliveryView() {
           notify(`已分配骑手 ${riderDraft}`)
         }}>确认分配</Button>}
         {selected.status !== '待接单' && selected.status !== '已完成' && selected.status !== '已取消' && <Button variant="primary" onClick={() => advance(selected)}>推进到“{nextStatus[selected.status]}”</Button>}
+        {selected.status !== '已完成' && selected.status !== '已取消' && <Button onClick={() => { setSelectedId(null); setSelectedIds([selected.id]); setBatchRider('周师傅'); setBatchAction('reassign') }}>改派骑手</Button>}
+        {selected.status !== '已完成' && selected.status !== '已取消' && <Button variant="danger" onClick={() => { setSelectedId(null); setSelectedIds([selected.id]); setBatchReason(''); setBatchError(''); setBatchAction('cancel') }}>取消订单</Button>}
       </>}
     >
       {selected && <div className="preview-detail-stack">
@@ -167,10 +247,16 @@ export function DeliveryView() {
         </div>
         <div className="preview-kv-grid">
           <div><span>下单用户</span><strong>{selected.customer}</strong></div>
-          <div><span>订单金额</span><strong>{formatMoney(selected.amountCents)}</strong></div>
-          <div><span>平台服务收入</span><strong>{formatMoney(selected.platformFeeCents)}</strong></div>
+          <div><span>收货电话</span><strong>{selected.recipientPhone || '—'}</strong></div>
+          <div><span>所属商家</span><strong>{selected.merchant || '—'}</strong></div>
+          <div><span>订单来源</span><strong>{selected.source || '—'}</strong></div>
           <div><span>当前骑手</span><strong>{selected.rider}</strong></div>
+          <div><span>订单金额</span><strong>{formatMoney(selected.amountCents)}</strong></div>
+          <div><span>商品金额</span><strong>{formatMoney(selected.goodsCents ?? 0)}</strong></div>
+          <div><span>平台服务收入</span><strong>{formatMoney(selected.platformFeeCents)}</strong></div>
+          <div><span>骑手报酬</span><strong>{formatMoney(selected.riderFeeCents ?? 0)}</strong></div>
         </div>
+        {selected.cancelReason && <div className="preview-note-block"><span>取消原因</span><p>{selected.cancelReason}</p></div>}
         {selected.status === '待接单' && <SelectField label="选择骑手" value={riderDraft} onChange={event => setRiderDraft(event.target.value)}>
           <option>周师傅</option>
           <option>黄师傅</option>
@@ -179,6 +265,10 @@ export function DeliveryView() {
         <div className="preview-note-block">
           <span>用户备注</span>
           <p>{selected.note}</p>
+        </div>
+        <div className="preview-note-block">
+          <span>时间线</span>
+          {(selected.timeline || []).map(event => <p key={`${event.label}-${event.at}`}>{event.label} · {formatTime(event.at)}</p>)}
         </div>
         <div className="preview-process-track">
           {['进入队列', '接单', '配送中', '待确认', '已完成'].map((step, index) => {

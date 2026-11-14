@@ -20,14 +20,32 @@ export type Tone = 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'acce
 export interface DeliveryOrder {
   id: string
   customer: string
+  recipientPhone: string
+  merchant: string
+  source: '商家发单' | '外部平台'
   rider: string
   pickup: string
   dropoff: string
   amountCents: number
   platformFeeCents: number
+  riderFeeCents: number
+  goodsCents: number
   status: '待接单' | '配送中' | '待确认' | '已完成' | '已取消'
   createdAt: string
   note: string
+  cancelReason?: string
+  timeline: Array<{ label: string; at: string }>
+}
+
+export interface RiderItem {
+  id: string
+  name: string
+  phone: string
+  state: '接单中' | '休息中' | '已封禁'
+  inFlight: number
+  todayOrders: number
+  todayIncomeCents: number
+  joinedAt: string
 }
 
 export interface ReviewItem {
@@ -42,6 +60,8 @@ export interface ReviewItem {
   reason?: string
 }
 
+export interface CommunityComment { id: string; author: string; content: string; status: '正常' | '已隐藏' }
+
 export interface CommunityItem {
   id: string
   title: string
@@ -49,6 +69,11 @@ export interface CommunityItem {
   topic: string
   status: '已公开' | '待审核' | '已下架'
   createdAt: string
+  body: string
+  imageCount: number
+  likeCount: number
+  comments: CommunityComment[]
+  reportCount: number
 }
 
 export interface ProductItem {
@@ -59,6 +84,10 @@ export interface ProductItem {
   category: string
   status: '出售中' | '已预留' | '已下架'
   createdAt: string
+  description: string
+  imageCount: number
+  favoriteCount: number
+  reportCount: number
 }
 
 export interface ReportItem {
@@ -243,6 +272,11 @@ export const seedOrders: DeliveryOrder[] = [
   {
     id: 'CC20261114001',
     customer: '林同学',
+    recipientPhone: '138****2231',
+    merchant: '北区轻食铺',
+    source: '商家发单',
+    riderFeeCents: 120,
+    goodsCents: 440,
     rider: '周师傅',
     pickup: '北区快递站',
     dropoff: '东区 7 号宿舍',
@@ -250,11 +284,17 @@ export const seedOrders: DeliveryOrder[] = [
     platformFeeCents: 120,
     status: '配送中',
     createdAt: '2026-11-14T09:18:00+08:00',
-    note: '快递两件，电话联系后放置门口。'
+    note: '快递两件，电话联系后放置门口。',
+    timeline: [{ label: '商家发单', at: '2026-11-14T09:18:00+08:00' }, { label: '骑手接单', at: '2026-11-14T09:22:00+08:00' }, { label: '已取货', at: '2026-11-14T09:31:00+08:00' }]
   },
   {
     id: 'CC20261114002',
     customer: '陈同学',
+    recipientPhone: '137****8842',
+    merchant: '西区外卖柜',
+    source: '商家发单',
+    riderFeeCents: 100,
+    goodsCents: 320,
     rider: '待分配',
     pickup: '西区外卖柜',
     dropoff: '图书馆南门',
@@ -262,11 +302,17 @@ export const seedOrders: DeliveryOrder[] = [
     platformFeeCents: 100,
     status: '待接单',
     createdAt: '2026-11-14T09:42:00+08:00',
-    note: '午餐配送，请注意保温。'
+    note: '午餐配送，请注意保温。',
+    timeline: [{ label: '商家发单', at: '2026-11-14T09:42:00+08:00' }]
   },
   {
     id: 'CC20261114003',
     customer: '吴同学',
+    recipientPhone: '135****6610',
+    merchant: '南区驿站',
+    source: '外部平台',
+    riderFeeCents: 140,
+    goodsCents: 480,
     rider: '黄师傅',
     pickup: '南区驿站',
     dropoff: '实训楼 A 座',
@@ -274,11 +320,17 @@ export const seedOrders: DeliveryOrder[] = [
     platformFeeCents: 140,
     status: '待确认',
     createdAt: '2026-11-14T08:21:00+08:00',
-    note: '文件袋，需本人签收。'
+    note: '文件袋，需本人签收。',
+    timeline: [{ label: '平台接入', at: '2026-11-14T08:21:00+08:00' }, { label: '骑手接单', at: '2026-11-14T08:25:00+08:00' }, { label: '已送达待确认', at: '2026-11-14T08:58:00+08:00' }]
   },
   {
     id: 'CC20261114004',
     customer: '赵同学',
+    recipientPhone: '136****9903',
+    merchant: '北门便利店',
+    source: '商家发单',
+    riderFeeCents: 80,
+    goodsCents: 290,
     rider: '李师傅',
     pickup: '北门便利店',
     dropoff: '北区 3 号宿舍',
@@ -286,11 +338,17 @@ export const seedOrders: DeliveryOrder[] = [
     platformFeeCents: 80,
     status: '已完成',
     createdAt: '2026-11-14T07:55:00+08:00',
-    note: '已完成，用户五星好评。'
+    note: '已完成，用户五星好评。',
+    timeline: [{ label: '商家发单', at: '2026-11-14T07:55:00+08:00' }, { label: '骑手接单', at: '2026-11-14T07:58:00+08:00' }, { label: '已完成', at: '2026-11-14T08:26:00+08:00' }]
   },
   {
     id: 'CC20261113018',
     customer: '许同学',
+    recipientPhone: '139****1120',
+    merchant: '东区快递站',
+    source: '商家发单',
+    riderFeeCents: 100,
+    goodsCents: 380,
     rider: '周师傅',
     pickup: '东区快递站',
     dropoff: '行政楼',
@@ -298,11 +356,17 @@ export const seedOrders: DeliveryOrder[] = [
     platformFeeCents: 100,
     status: '已完成',
     createdAt: '2026-11-13T17:12:00+08:00',
-    note: '已完成。'
+    note: '已完成。',
+    timeline: [{ label: '商家发单', at: '2026-11-13T17:12:00+08:00' }, { label: '骑手接单', at: '2026-11-13T17:15:00+08:00' }, { label: '已完成', at: '2026-11-13T17:44:00+08:00' }]
   },
   {
     id: 'CC20261113011',
     customer: '孙同学',
+    recipientPhone: '138****7788',
+    merchant: '南区食堂',
+    source: '商家发单',
+    riderFeeCents: 110,
+    goodsCents: 380,
     rider: '待分配',
     pickup: '南区食堂',
     dropoff: '体育馆',
@@ -310,8 +374,17 @@ export const seedOrders: DeliveryOrder[] = [
     platformFeeCents: 110,
     status: '已取消',
     createdAt: '2026-11-13T11:06:00+08:00',
-    note: '用户主动取消。'
+    cancelReason: '用户取消，商家已同意',
+    note: '用户主动取消。',
+    timeline: [{ label: '商家发单', at: '2026-11-13T11:06:00+08:00' }, { label: '用户取消', at: '2026-11-13T11:13:00+08:00' }]
   }
+]
+
+export const seedRiders: RiderItem[] = [
+  { id: 'R-01', name: '周师傅', phone: '138****2231', state: '接单中', inFlight: 1, todayOrders: 3, todayIncomeCents: 360, joinedAt: '2026-09-12' },
+  { id: 'R-02', name: '黄师傅', phone: '137****8842', state: '接单中', inFlight: 1, todayOrders: 2, todayIncomeCents: 220, joinedAt: '2026-10-02' },
+  { id: 'R-03', name: '李师傅', phone: '135****6610', state: '休息中', inFlight: 0, todayOrders: 1, todayIncomeCents: 80, joinedAt: '2026-10-21' },
+  { id: 'R-04', name: '吴师傅', phone: '136****9903', state: '已封禁', inFlight: 0, todayOrders: 0, todayIncomeCents: 0, joinedAt: '2026-11-02' }
 ]
 
 export const seedReviews: ReviewItem[] = [
@@ -323,17 +396,42 @@ export const seedReviews: ReviewItem[] = [
 ]
 
 export const seedCommunity: CommunityItem[] = [
-  { id: 'PO-101', title: '期末复习资料交换帖', author: '林同学', topic: '学习互助', status: '已公开', createdAt: '2026-11-14T08:42:00+08:00' },
-  { id: 'PO-102', title: '周末羽毛球搭子招募', author: '陈同学', topic: '校园活动', status: '待审核', createdAt: '2026-11-14T08:12:00+08:00' },
-  { id: 'PO-103', title: '图书馆失物招领', author: '吴同学', topic: '失物招领', status: '已公开', createdAt: '2026-11-13T19:35:00+08:00' },
-  { id: 'PO-104', title: '校外兼职信息合集', author: '匿名用户', topic: '兼职信息', status: '已下架', createdAt: '2026-11-13T16:22:00+08:00' }
+  {
+    id: 'PO-101', title: '期末复习资料交换帖', author: '林同学', topic: '学习互助', status: '已公开', createdAt: '2026-11-14T08:42:00+08:00',
+    body: '期末周临近，整理了高数、线代和大学物理的复习提纲，想和有需要的同学交换。我的资料包含近三年真题与详细解析，希望换到英语四级的写作模板。图书馆三楼自习区可以当面交换。',
+    imageCount: 3, likeCount: 24,
+    comments: [
+      { id: 'C-1', author: '陈同学', content: '我有四级模板，私信你了。', status: '正常' },
+      { id: 'C-2', author: '吴同学', content: '求高数提纲，可以用物理笔记换。', status: '正常' }
+    ],
+    reportCount: 0
+  },
+  {
+    id: 'PO-102', title: '周末羽毛球搭子招募', author: '陈同学', topic: '校园活动', status: '待审核', createdAt: '2026-11-14T08:12:00+08:00',
+    body: '周六下午两点体育馆三号场，缺两人打双打，水平不限，自带球拍。',
+    imageCount: 1, likeCount: 3, comments: [], reportCount: 0
+  },
+  {
+    id: 'PO-103', title: '图书馆失物招领', author: '吴同学', topic: '失物招领', status: '已公开', createdAt: '2026-11-13T19:35:00+08:00',
+    body: '在图书馆二楼靠窗座位捡到一个黑色蓝牙耳机盒，已交到一楼服务台。',
+    imageCount: 1, likeCount: 11,
+    comments: [{ id: 'C-3', author: '黄同学', content: '是我的，谢谢！', status: '正常' }],
+    reportCount: 0
+  },
+  {
+    id: 'PO-104', title: '校外兼职信息合集', author: '匿名用户', topic: '兼职信息', status: '已下架', createdAt: '2026-11-13T16:22:00+08:00',
+    body: '整理了一批校外兼职，包含家教、传单派发与线上客服，联系方式见文末二维码。',
+    imageCount: 2, likeCount: 2,
+    comments: [{ id: 'C-4', author: '孙同学', content: '这个靠谱吗？', status: '正常' }],
+    reportCount: 3
+  }
 ]
 
 export const seedProducts: ProductItem[] = [
-  { id: 'PD-220', title: '九成新机械键盘', seller: '陈同学', priceCents: 16800, category: '数码', status: '出售中', createdAt: '2026-11-14T08:48:00+08:00' },
-  { id: 'PD-221', title: '考研数学全套资料', seller: '林同学', priceCents: 8600, category: '书籍', status: '已预留', createdAt: '2026-11-14T08:10:00+08:00' },
-  { id: 'PD-222', title: '折叠露营椅两把', seller: '黄同学', priceCents: 9200, category: '生活用品', status: '出售中', createdAt: '2026-11-13T20:12:00+08:00' },
-  { id: 'PD-223', title: '旧版课程资料合集', seller: '匿名用户', priceCents: 2000, category: '书籍', status: '已下架', createdAt: '2026-11-13T14:00:00+08:00' }
+  { id: 'PD-220', title: '九成新机械键盘', seller: '陈同学', priceCents: 16800, category: '数码', status: '出售中', createdAt: '2026-11-14T08:48:00+08:00', description: '自用一年，茶轴 87 键，键帽无磨损，附原装线和拔键器。', imageCount: 4, favoriteCount: 9, reportCount: 0 },
+  { id: 'PD-221', title: '考研数学全套资料', seller: '林同学', priceCents: 8600, category: '书籍', status: '已预留', createdAt: '2026-11-14T08:10:00+08:00', description: '张宇 1000 题与真题解析，笔记完整，只有少量铅笔标注。', imageCount: 2, favoriteCount: 15, reportCount: 0 },
+  { id: 'PD-222', title: '折叠露营椅两把', seller: '黄同学', priceCents: 9200, category: '生活用品', status: '出售中', createdAt: '2026-11-13T20:12:00+08:00', description: '买重了，全新未拆封，两把一起出。', imageCount: 2, favoriteCount: 4, reportCount: 0 },
+  { id: 'PD-223', title: '旧版课程资料合集', seller: '匿名用户', priceCents: 2000, category: '书籍', status: '已下架', createdAt: '2026-11-13T14:00:00+08:00', description: '课程资料打包，图片含外部联系方式，已被举报。', imageCount: 1, favoriteCount: 0, reportCount: 2 }
 ]
 
 export const seedReports: ReportItem[] = [

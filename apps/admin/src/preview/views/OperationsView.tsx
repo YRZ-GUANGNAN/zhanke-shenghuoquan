@@ -12,6 +12,7 @@ import {
 import { usePreviewStore } from '../store'
 import {
   Button,
+  Drawer,
   EmptyState,
   Modal,
   PageHeader,
@@ -329,6 +330,9 @@ function CommunityOperations() {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<'全部' | CommunityItem['status']>('全部')
   const { notify } = usePreviewToast()
+  const hideComment = usePreviewStore(state => state.hideComment)
+  const [detailId, setDetailId] = useState<string | null>(null)
+  const detail = community.find(item => item.id === detailId) || null
   const filtered = community.filter(item => (status === '全部' || item.status === status) && (!query || `${item.id}${item.title}${item.author}${item.topic}`.includes(query)))
   const paged = usePagedList(filtered, 8)
   return <div>
@@ -342,10 +346,50 @@ function CommunityOperations() {
     <Panel eyebrow="COMMUNITY FEED" title="社区内容" description="公开内容可以直接下架，待审内容统一进入审核中心。" actions={<SearchBox value={query} onChange={setQuery} placeholder="搜索标题、作者或话题" />}>
       <div className="preview-toolbar"><Segmented value={status} onChange={setStatus} options={[{ value: '全部', label: '全部' }, { value: '已公开', label: '已公开' }, { value: '待审核', label: '待审核' }, { value: '已下架', label: '已下架' }]} /></div>
       <div className="preview-table-wrap"><table className="preview-table" aria-label="内容列表"><thead><tr><th>内容</th><th>作者</th><th>话题</th><th>状态</th><th>时间</th><th /></tr></thead><tbody>
-        {paged.slice.map(item => <tr key={item.id}><td><strong>{item.title}</strong><span>{item.id}</span></td><td>{item.author}</td><td>{item.topic}</td><td><StatusPill>{item.status}</StatusPill></td><td>{formatTime(item.createdAt)}</td><td>{item.status === '已公开' && <Button size="sm" variant="danger" onClick={() => { setCommunityStatus(item.id, '已下架'); notify('内容已下架，处理记录已保留', 'info') }}>下架</Button>}</td></tr>)}
+        {paged.slice.map(item => <tr key={item.id}><td><button type="button" className="preview-table__primary" onClick={() => setDetailId(item.id)}>{item.title}<small>{item.id}</small></button></td><td>{item.author}</td><td>{item.topic}</td><td><StatusPill>{item.status}</StatusPill></td><td>{formatTime(item.createdAt)}</td><td>{item.status === '已公开' && <Button size="sm" variant="danger" onClick={() => { setCommunityStatus(item.id, '已下架'); notify('内容已下架，处理记录已保留', 'info') }}>下架</Button>}</td></tr>)}
       </tbody></table>{filtered.length === 0 && <EmptyState title="没有匹配内容" description="调整筛选条件后再试。" />}</div>
       <Pagination page={paged.page} pageSize={paged.pageSize} total={paged.total} onChange={paged.setPage} label="内容列表分页" />
     </Panel>
+
+    <Drawer
+      open={Boolean(detail)}
+      onClose={() => setDetailId(null)}
+      title={detail?.title || '帖子详情'}
+      description={detail ? `${detail.author} · ${detail.topic} · ${formatTime(detail.createdAt)}` : undefined}
+      footer={detail && <>
+        <Button onClick={() => setDetailId(null)}>关闭</Button>
+        {detail.status === '已公开'
+          ? <Button variant="danger" onClick={() => { setCommunityStatus(detail.id, '已下架'); notify('内容已下架，处理记录已保留', 'info') }}>下架内容</Button>
+          : detail.status === '已下架'
+            ? <Button variant="primary" onClick={() => { setCommunityStatus(detail.id, '已公开'); notify('内容已恢复公开') }}>恢复公开</Button>
+            : null}
+      </>}
+    >
+      {detail && <div className="preview-detail-stack">
+        <div className="preview-detail-banner">
+          <div><span>当前状态</span><strong>{detail.status}</strong></div>
+          <StatusPill>{detail.status}</StatusPill>
+        </div>
+        <div className="preview-kv-grid">
+          <div><span>作者</span><strong>{detail.author}</strong></div>
+          <div><span>话题</span><strong>{detail.topic}</strong></div>
+          <div><span>图片</span><strong>{detail.imageCount ?? 0} 张</strong></div>
+          <div><span>点赞</span><strong>{detail.likeCount ?? 0}</strong></div>
+          <div><span>评论</span><strong>{(detail.comments || []).length} 条</strong></div>
+          <div><span>举报</span><strong>{detail.reportCount ?? 0} 次</strong></div>
+        </div>
+        <div className="preview-note-block"><span>正文</span><p>{detail.body || '（该内容没有正文）'}</p></div>
+        <div className="preview-note-block">
+          <span>评论（{(detail.comments || []).length}）</span>
+          {(detail.comments || []).length === 0 && <p>暂无评论</p>}
+          {(detail.comments || []).map(comment => <div key={comment.id} className={`preview-comment${comment.status === '已隐藏' ? ' is-hidden' : ''}`}>
+            <div><strong>{comment.author}</strong><StatusPill tone={comment.status === '已隐藏' ? 'neutral' : 'success'}>{comment.status}</StatusPill></div>
+            <p>{comment.content}</p>
+            {comment.status === '正常' && <Button size="sm" variant="ghost" onClick={() => { hideComment(detail.id, comment.id); notify('评论已隐藏', 'info') }}>隐藏评论</Button>}
+          </div>)}
+        </div>
+      </div>}
+    </Drawer>
   </div>
 }
 
@@ -354,6 +398,8 @@ function TradeOperations() {
   const setProductStatus = usePreviewStore(state => state.setProductStatus)
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<'全部' | ProductItem['status']>('全部')
+  const [detailId, setDetailId] = useState<string | null>(null)
+  const detail = products.find(item => item.id === detailId) || null
   const { notify } = usePreviewToast()
   const filtered = products.filter(item => (status === '全部' || item.status === status) && (!query || `${item.id}${item.title}${item.seller}${item.category}`.includes(query)))
   const paged2 = usePagedList(filtered, 8)
@@ -372,6 +418,35 @@ function TradeOperations() {
       </tbody></table>{filtered.length === 0 && <EmptyState title="没有匹配商品" description="调整筛选条件后再试。" />}</div>
       <Pagination page={paged2.page} pageSize={paged2.pageSize} total={paged2.total} onChange={paged2.setPage} label="商品列表分页" />
     </Panel>
+
+    <Drawer
+      open={Boolean(detail)}
+      onClose={() => setDetailId(null)}
+      title={detail?.title || '商品详情'}
+      description={detail ? `${detail.seller} · ${detail.category} · ${formatTime(detail.createdAt)}` : undefined}
+      footer={detail && <>
+        <Button onClick={() => setDetailId(null)}>关闭</Button>
+        {detail.status !== '已下架'
+          ? <Button variant="danger" onClick={() => { setProductStatus(detail.id, '已下架'); notify('商品已下架', 'info') }}>下架商品</Button>
+          : <Button variant="primary" onClick={() => { setProductStatus(detail.id, '出售中'); notify('商品已恢复出售') }}>恢复出售</Button>}
+      </>}
+    >
+      {detail && <div className="preview-detail-stack">
+        <div className="preview-detail-banner">
+          <div><span>当前状态</span><strong>{detail.status}</strong></div>
+          <StatusPill>{detail.status}</StatusPill>
+        </div>
+        <div className="preview-kv-grid">
+          <div><span>卖家</span><strong>{detail.seller}</strong></div>
+          <div><span>分类</span><strong>{detail.category}</strong></div>
+          <div><span>价格</span><strong>{formatMoney(detail.priceCents)}</strong></div>
+          <div><span>图片</span><strong>{detail.imageCount ?? 0} 张</strong></div>
+          <div><span>收藏</span><strong>{detail.favoriteCount ?? 0}</strong></div>
+          <div><span>举报</span><strong>{detail.reportCount ?? 0} 次</strong></div>
+        </div>
+        <div className="preview-note-block"><span>商品描述</span><p>{detail.description || '（无描述）'}</p></div>
+      </div>}
+    </Drawer>
   </div>
 }
 

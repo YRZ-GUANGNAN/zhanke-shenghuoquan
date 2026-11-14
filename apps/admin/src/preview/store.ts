@@ -23,6 +23,7 @@ import {
   seedOrders,
   seedProducts,
   seedReports,
+  seedRiders,
   seedReviews,
   seedServiceEntries,
   seedSettings,
@@ -55,6 +56,7 @@ import {
   type PreviewSettings,
   type ProductItem,
   type ReportItem,
+  type RiderItem,
   type ReviewItem,
   type ServiceEntry,
   type UserItem,
@@ -91,6 +93,7 @@ interface PreviewState {
   mediaEvents: MediaEventItem[]
   mediaGc: MediaGcJob[]
   adminCredentials: AdminCredentialItem[]
+  riders: RiderItem[]
   updateFeeConfig: (deliveryFeeCents: number, platformCutCents: number) => void
   toggleMerchantOverride: (merchantId: string) => void
   payWithdrawal: (id: string, reference: string) => void
@@ -99,6 +102,10 @@ interface PreviewState {
   addAdminCredential: (value: AdminCredentialItem) => void
   removeAdminCredential: (username: string) => void
   resetAdminCredential: (username: string, passwordUpdatedAt: string) => void
+  reassignOrders: (ids: string[], rider: string) => void
+  cancelOrders: (ids: string[], reason: string) => void
+  setRiderState: (id: string, state: RiderItem['state']) => void
+  hideComment: (postId: string, commentId: string) => void
   setSection: (section: PreviewSection) => void
   updateOrderStatus: (id: string, status: DeliveryOrder['status']) => void
   assignRider: (id: string, rider: string) => void
@@ -153,7 +160,8 @@ const initialData = () => ({
   mediaDecisions: structuredClone(seedMediaDecisions),
   mediaEvents: structuredClone(seedMediaEvents),
   mediaGc: structuredClone(seedMediaGc),
-  adminCredentials: structuredClone(seedAdminCredentials)
+  adminCredentials: structuredClone(seedAdminCredentials),
+  riders: structuredClone(seedRiders)
 })
 
 const now = () => new Date().toISOString()
@@ -184,7 +192,25 @@ export const usePreviewStore = create<PreviewState>()(
       resetAdminCredential: (username, passwordUpdatedAt) => set(state => ({
         adminCredentials: state.adminCredentials.map(item => item.username === username ? { ...item, passwordUpdatedAt, status: '正常' } : item)
       })),
-      setSection: section => set({ section }),
+      reassignOrders: (ids, rider) => set(state => ({
+    orders: state.orders.map(order => ids.includes(order.id)
+      ? { ...order, rider, status: order.status === '待接单' ? '配送中' : order.status, timeline: [...order.timeline, { label: `改派给${rider}`, at: now() }] }
+      : order)
+  })),
+  cancelOrders: (ids, reason) => set(state => ({
+    orders: state.orders.map(order => ids.includes(order.id)
+      ? { ...order, status: '已取消', cancelReason: reason, timeline: [...order.timeline, { label: `已取消：${reason}`, at: now() }] }
+      : order)
+  })),
+  setRiderState: (id, riderState) => set(state => ({
+    riders: state.riders.map(item => item.id === id ? { ...item, state: riderState } : item)
+  })),
+  hideComment: (postId, commentId) => set(state => ({
+    community: state.community.map(item => item.id === postId
+      ? { ...item, comments: (item.comments || []).map(comment => comment.id === commentId ? { ...comment, status: '已隐藏' } : comment) }
+      : item)
+  })),
+  setSection: section => set({ section }),
       updateOrderStatus: (id, status) => set(state => ({
         orders: state.orders.map(order => order.id === id ? { ...order, status } : order)
       })),
@@ -335,7 +361,8 @@ export const usePreviewStore = create<PreviewState>()(
         mediaDecisions: state.mediaDecisions,
         mediaEvents: state.mediaEvents,
         mediaGc: state.mediaGc,
-        adminCredentials: state.adminCredentials
+        adminCredentials: state.adminCredentials,
+        riders: state.riders
       })
     }
   )
