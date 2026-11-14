@@ -1656,6 +1656,7 @@ body {
   .ant-modal-footer .ant-btn { margin: 0 !important; flex: 1 1 auto; }
   .ant-drawer-content-wrapper { max-width: calc(100vw - 24px) !important; }
   .ant-drawer-body { padding: 16px !important; }
+}
 
 @media (max-width: 900px) {
   .preview-main-shell { min-width: 0; }
