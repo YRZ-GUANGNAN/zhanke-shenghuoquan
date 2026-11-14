@@ -43,7 +43,7 @@ const toneByLabel: Record<string, Tone> = {
   待认证: 'warning',
   待处理: 'warning',
   待接单: 'warning',
-  待确认: 'warning',
+  待确认: 'accent',
   处理中: 'info',
   审核中: 'info',
   配送中: 'info',

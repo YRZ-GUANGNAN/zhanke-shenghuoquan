@@ -72,10 +72,10 @@ export function DashboardView({ navigate }: { navigate: (section: PreviewSection
 
   const todayOrders = orders.filter(order => order.createdAt.startsWith('2026-11-14'))
   const channelHealth = [
-    { name: '小程序通知中心', value: 100, detail: '运行正常' },
-    { name: '微信订阅消息', value: 82, detail: '1 条待重试' },
-    { name: '服务号', value: 96, detail: '模板已配置' },
-    { name: '值班群', value: 100, detail: '机器人在线' }
+    { name: '小程序通知中心', rate: 100, detail: '近 24 小时 12 条全部送达' },
+    { name: '微信订阅消息', rate: 82, detail: '近 24 小时 11 条，1 条待重试' },
+    { name: '服务号', rate: 96, detail: '近 24 小时 25 条，1 条未送达' },
+    { name: '值班群', rate: 100, detail: '近 24 小时 6 条全部送达' }
   ]
 
   return <div className="preview-dashboard">
@@ -122,16 +122,16 @@ export function DashboardView({ navigate }: { navigate: (section: PreviewSection
       <Panel
         eyebrow="CHANNEL HEALTH"
         title="通知通道"
-        description="发送能力从用户授权、模板配置到值班群状态逐项确认。"
+        description="按近 24 小时的送达率排序，低于 90% 需要排查用户授权或模板配置。"
         actions={<Button size="sm" variant="ghost" onClick={() => navigate('notifications')}>管理</Button>}
       >
         <div className="preview-health-list">
           {channelHealth.map(channel => <div key={channel.name}>
             <div className="preview-health-list__head">
               <span><strong>{channel.name}</strong><small>{channel.detail}</small></span>
-              <b>{channel.value}%</b>
+              <b>{channel.rate}%</b>
             </div>
-            <ProgressBar value={channel.value} label={channel.name} />
+            <ProgressBar value={channel.rate} label={`${channel.name} 近 24 小时送达率`} />
           </div>)}
         </div>
       </Panel>

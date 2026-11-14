@@ -68,13 +68,12 @@ export function DeliveryView() {
       eyebrow="履约服务"
       title="配送与结算"
       description="从订单进入、骑手分配到完成确认，每一步都给出明确状态和下一步动作。"
-      actions={<Button variant="primary" onClick={() => setStatus('待接单')}>查看待分配订单</Button>}
     />
 
     <section className="preview-stat-grid">
-      <StatCard label="正在配送" value={totals.active} meta="实时履约中" tone="accent" marker="配" />
-      <StatCard label="等待接单" value={totals.waiting} meta="需要分配或广播" tone="amber" marker="待" />
-      <StatCard label="今日已完成" value={totals.complete} meta="可进入结算核对" tone="mint" marker="✓" />
+      <StatCard label="正在配送" value={totals.active} meta="实时履约中" tone="accent" marker="单" />
+      <StatCard label="等待接单" value={totals.waiting} meta="需要分配或广播" tone="amber" marker="单" />
+      <StatCard label="今日已完成" value={totals.complete} meta="可进入结算核对" tone="mint" marker="单" />
       <StatCard label="已完成交易额" value={formatMoney(totals.amount)} meta="含配送费与商品金额" tone="ink" marker="¥" />
     </section>
 
@@ -82,7 +81,7 @@ export function DeliveryView() {
       eyebrow="ORDER FLOW"
       title="订单工作队列"
       description="点击订单查看完整履约信息；状态推进只修改当前本地预览数据。"
-      actions={<SearchBox value={query} onChange={setQuery} placeholder="搜索订单号、用户、骑手或地点" />}
+      actions={<SearchBox value={query} onChange={setQuery} placeholder="搜索订单号或骑手" />}
     >
       <div className="preview-toolbar">
         <Segmented
@@ -110,7 +109,7 @@ export function DeliveryView() {
               <td><button type="button" className="preview-table__primary" onClick={() => { setSelectedId(order.id); setRiderDraft(order.rider === '待分配' ? '周师傅' : order.rider) }}>{order.id}<small>{order.customer}</small></button></td>
               <td><strong>{order.pickup}</strong><span>→ {order.dropoff}</span></td>
               <td>{order.rider === '待分配' ? <StatusPill tone="warning">待分配</StatusPill> : order.rider}</td>
-              <td><strong>{formatMoney(order.amountCents)}</strong><span>平台 {formatMoney(order.platformFeeCents)}</span></td>
+              <td><strong>{formatMoney(order.amountCents)}</strong><span className="preview-table__fee">平台抽成 {formatMoney(order.platformFeeCents)}</span></td>
               <td><StatusPill>{order.status}</StatusPill></td>
               <td>{formatTime(order.createdAt)}</td>
               <td><Button size="sm" variant="ghost" onClick={() => { setSelectedId(order.id); setRiderDraft(order.rider === '待分配' ? '周师傅' : order.rider) }}>处理</Button></td>

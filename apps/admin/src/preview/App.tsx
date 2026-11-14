@@ -179,7 +179,7 @@ function PreviewApp() {
               onClick={() => setCollapsed(!collapsed)}
               aria-label="切换导航"
             />
-            <span className="preview-breadcrumb">{active?.group} / <strong>{active?.label || ''}</strong></span>
+            <span className="preview-breadcrumb"><strong>{active?.label || ''}</strong></span>
           </div>
           <div className="preview-topbar__right">
             <Input

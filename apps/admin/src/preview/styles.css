@@ -98,8 +98,11 @@ body {
 }
 
 .preview-breadcrumb {
-  color: var(--preview-text-muted);
-  font-size: 13px;
+  color: var(--preview-text);
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .preview-breadcrumb strong {
@@ -108,7 +111,7 @@ body {
 }
 
 .preview-topbar__search {
-  width: 180px;
+  width: 220px;
 }
 
 .preview-topbar__avatar {
@@ -199,7 +202,7 @@ body {
 }
 
 .preview-stat .ant-card-body {
-  padding: 14px 16px;
+  padding: 16px 18px;
 }
 
 .preview-stat .ant-statistic-title {
@@ -209,8 +212,9 @@ body {
 
 .preview-stat .ant-statistic-content {
   color: var(--preview-text);
-  font-size: 22px;
-  font-weight: 600;
+  font-size: 26px;
+  font-weight: 650;
+  line-height: 1.25;
 }
 
 .preview-stat__marker {
@@ -241,7 +245,7 @@ body {
 }
 
 .preview-search {
-  width: 220px;
+  width: 240px;
 }
 
 .preview-toolbar {
@@ -306,6 +310,12 @@ body {
   margin-top: 3px;
   color: var(--preview-text-muted);
   font-size: 12px;
+}
+
+.preview-table__fee {
+  color: var(--preview-text-secondary) !important;
+  font-size: 12.5px !important;
+  font-variant-numeric: tabular-nums;
 }
 
 .preview-table__primary {
