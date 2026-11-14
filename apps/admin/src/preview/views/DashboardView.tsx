@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { PreviewSection } from '../data'
-import { formatMoney, formatTime } from '../data'
+import { channelHealthFrom, formatMoney, formatTime } from '../data'
 import { usePreviewStore } from '../store'
 import {
   Button,
@@ -94,12 +94,8 @@ export function DashboardView({ navigate }: { navigate: (section: PreviewSection
     if (Number.isNaN(at)) return oldest
     return !oldest || at < oldest.at ? { at, createdAt: item.createdAt } : oldest
   }, null)
-  const channelHealth = [
-    { name: '小程序通知中心', rate: 100, detail: '近 24 小时 12 条全部送达' },
-    { name: '微信订阅消息', rate: 82, detail: '近 24 小时 11 条，1 条待重试' },
-    { name: '服务号', rate: 96, detail: '近 24 小时 25 条，1 条未送达' },
-    { name: '值班群', rate: 100, detail: '近 24 小时 6 条全部送达' }
-  ]
+  // 渠道健康按真实投递记录聚合，和通知页同一份数据。
+  const channelHealth = channelHealthFrom(deliveries)
 
   return <div className="preview-dashboard">
     <PageHeader
@@ -151,10 +147,15 @@ export function DashboardView({ navigate }: { navigate: (section: PreviewSection
         <div className="preview-health-list">
           {channelHealth.map(channel => <div key={channel.name}>
             <div className="preview-health-list__head">
-              <span><strong>{channel.name}</strong><small>{channel.detail}</small></span>
-              <b>{channel.rate}%</b>
+              <span>
+                <strong>{channel.name}</strong>
+                <small>{channel.rate === null
+                  ? `${channel.pending} 条发送中，暂无结果`
+                  : `${channel.delivered + channel.failed} 条中 ${channel.delivered} 条送达${channel.failed ? `，${channel.failed} 条失败` : ''}`}</small>
+              </span>
+              <b>{channel.rate === null ? '—' : `${channel.rate}%`}</b>
             </div>
-            <ProgressBar value={channel.rate} label={`${channel.name} 近 24 小时送达率`} />
+            <ProgressBar value={channel.rate ?? 0} label={`${channel.name} 送达率`} />
           </div>)}
         </div>
       </Panel>
@@ -191,7 +192,7 @@ export function DashboardView({ navigate }: { navigate: (section: PreviewSection
         description="关键角色和任务的当前状态。"
       >
         <div className="preview-scene-list">
-          <div><span className="preview-scene-list__icon">骑</span><span><strong>{summary.activeRiders} 名骑手正在配送</strong><small>{overdueOrders.length ? `${overdueOrders.length} 单配送超过 60 分钟` : '当前没有超时订单'}</small></span><StatusPill tone="success">在线</StatusPill></div>
+          <div><span className="preview-scene-list__icon">骑</span><span><strong>{summary.activeRiders} 名骑手正在配送</strong><small>{overdueOrders.length ? `${overdueOrders.length} 单配送超过 60 分钟` : '当前没有超时订单'}</small></span><StatusPill tone={summary.activeRiders ? 'success' : 'neutral'}>{summary.activeRiders ? '在线' : '无人在线'}</StatusPill></div>
           <div><span className="preview-scene-list__icon">审</span><span><strong>{summary.pendingReviews} 条审核任务</strong><small>{oldestPending ? `最早一条已等待 ${formatWait(oldestPending.createdAt)}` : '当前没有待审核任务'}</small></span><StatusPill tone={summary.pendingReviews ? 'warning' : 'success'}>{summary.pendingReviews ? '待处理' : '已清空'}</StatusPill></div>
           <div><span className="preview-scene-list__icon">材</span><span><strong>{media.filter(item => item.status === '异常').length} 个素材异常</strong><small>可进入素材中心重新处理</small></span><StatusPill tone="danger">异常</StatusPill></div>
         </div>

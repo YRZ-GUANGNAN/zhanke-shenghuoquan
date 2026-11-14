@@ -222,7 +222,7 @@ function UserPeople() {
         <Segmented value={role} onChange={setRole} options={[{ value: '全部', label: '全部' }, { value: '普通用户', label: '普通用户' }, { value: '商家', label: '商家' }, { value: '骑手', label: '骑手' }, { value: '管理员', label: '管理员' }]} />
       </div>
       {filtered.length === 0 ? <EmptyState title="没有匹配的账号" description="调整搜索或角色筛选后再试。" /> : <div className="preview-table-wrap">
-        <table className="preview-table"><thead><tr><th>用户</th><th>角色</th><th>校区</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead><tbody>
+        <table className="preview-table" aria-label="用户列表"><thead><tr><th>用户</th><th>角色</th><th>校区</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead><tbody>
           {filtered.map(item => <tr key={item.id}>
             <td><div className="preview-user-cell"><span>{item.name.slice(0, 1)}</span><div><strong>{item.name}</strong><small>{item.phone} · {item.id}</small></div></div></td>
             <td>{item.role}</td><td>{item.campus}</td><td><StatusPill>{item.status}</StatusPill></td><td>{item.createdAt}</td>

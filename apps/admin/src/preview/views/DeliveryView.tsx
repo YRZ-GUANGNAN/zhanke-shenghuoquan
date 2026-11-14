@@ -101,7 +101,7 @@ export function DeliveryView() {
       {filtered.length === 0
         ? <EmptyState title="没有匹配的订单" description="调整筛选条件，或查看全部订单。" action={<Button onClick={() => { setStatus('全部'); setQuery('') }}>清除筛选</Button>} />
         : <div className="preview-table-wrap">
-          <table className="preview-table preview-table--delivery">
+          <table className="preview-table preview-table--delivery" aria-label="配送订单列表">
             <thead><tr>
               <th>订单</th><th>取送到</th><th>骑手</th><th>金额</th><th>状态</th><th>进入时间</th><th />
             </tr></thead>

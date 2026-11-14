@@ -419,3 +419,35 @@ export function maskEndpoint(endpoint: string) {
 export function createId(prefix: string) {
   return `${prefix}-${Date.now().toString(36).toUpperCase()}`
 }
+
+// 渠道健康统一口径：按真实投递记录聚合，总览与通知页共用。
+export interface ChannelHealth {
+  name: string
+  delivered: number
+  failed: number
+  pending: number
+  rate: number | null
+}
+
+const channelDisplayName: Record<string, string> = {
+  小程序通知: '小程序通知中心',
+  微信订阅: '微信订阅消息',
+  服务号: '微信服务号',
+  值班群: '值班群 Webhook'
+}
+
+export function channelHealthFrom(deliveries: NotificationDelivery[]): ChannelHealth[] {
+  const buckets = new Map<string, ChannelHealth>()
+  for (const record of deliveries) {
+    const name = channelDisplayName[record.channel] || record.channel
+    const bucket = buckets.get(name) || { name, delivered: 0, failed: 0, pending: 0, rate: null }
+    if (record.status === '已送达') bucket.delivered += 1
+    else if (record.status === '发送中') bucket.pending += 1
+    else bucket.failed += 1  // 失败与已跳过都算未送达，避免成功率被抬高
+    buckets.set(name, bucket)
+  }
+  return [...buckets.values()].map(bucket => {
+    const settled = bucket.delivered + bucket.failed
+    return { ...bucket, rate: settled > 0 ? Math.round(bucket.delivered / settled * 100) : null }
+  })
+}

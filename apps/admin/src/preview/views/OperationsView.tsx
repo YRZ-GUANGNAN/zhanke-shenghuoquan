@@ -263,7 +263,7 @@ function CommunityOperations() {
     </section>
     <Panel eyebrow="COMMUNITY FEED" title="社区内容" description="公开内容可以直接下架，待审内容统一进入审核中心。" actions={<SearchBox value={query} onChange={setQuery} placeholder="搜索标题、作者或话题" />}>
       <div className="preview-toolbar"><Segmented value={status} onChange={setStatus} options={[{ value: '全部', label: '全部' }, { value: '已公开', label: '已公开' }, { value: '待审核', label: '待审核' }, { value: '已下架', label: '已下架' }]} /></div>
-      <div className="preview-table-wrap"><table className="preview-table"><thead><tr><th>内容</th><th>作者</th><th>话题</th><th>状态</th><th>时间</th><th /></tr></thead><tbody>
+      <div className="preview-table-wrap"><table className="preview-table" aria-label="内容列表"><thead><tr><th>内容</th><th>作者</th><th>话题</th><th>状态</th><th>时间</th><th /></tr></thead><tbody>
         {filtered.map(item => <tr key={item.id}><td><strong>{item.title}</strong><span>{item.id}</span></td><td>{item.author}</td><td>{item.topic}</td><td><StatusPill>{item.status}</StatusPill></td><td>{formatTime(item.createdAt)}</td><td>{item.status === '已公开' && <Button size="sm" variant="danger" onClick={() => { setCommunityStatus(item.id, '已下架'); notify('内容已下架，处理记录已保留', 'info') }}>下架</Button>}</td></tr>)}
       </tbody></table>{filtered.length === 0 && <EmptyState title="没有匹配内容" description="调整筛选条件后再试。" />}</div>
     </Panel>
@@ -287,7 +287,7 @@ function TradeOperations() {
     </section>
     <Panel eyebrow="SECONDHAND MARKET" title="商品工作队列" description="审核状态与业务状态分离；下架只影响展示。" actions={<SearchBox value={query} onChange={setQuery} placeholder="搜索商品、卖家或分类" />}>
       <div className="preview-toolbar"><Segmented value={status} onChange={setStatus} options={[{ value: '全部', label: '全部' }, { value: '出售中', label: '出售中' }, { value: '已预留', label: '已预留' }, { value: '已下架', label: '已下架' }]} /></div>
-      <div className="preview-table-wrap"><table className="preview-table"><thead><tr><th>商品</th><th>卖家</th><th>分类</th><th>价格</th><th>状态</th><th>时间</th><th /></tr></thead><tbody>
+      <div className="preview-table-wrap"><table className="preview-table" aria-label="商品列表"><thead><tr><th>商品</th><th>卖家</th><th>分类</th><th>价格</th><th>状态</th><th>时间</th><th /></tr></thead><tbody>
         {filtered.map(item => <tr key={item.id}><td><strong>{item.title}</strong><span>{item.id}</span></td><td>{item.seller}</td><td>{item.category}</td><td><strong>{formatMoney(item.priceCents)}</strong></td><td><StatusPill>{item.status}</StatusPill></td><td>{formatTime(item.createdAt)}</td><td>{item.status !== '已下架' && <Button size="sm" variant="ghost" onClick={() => { setProductStatus(item.id, '已下架'); notify('商品已下架', 'info') }}>下架</Button>}</td></tr>)}
       </tbody></table>{filtered.length === 0 && <EmptyState title="没有匹配商品" description="调整筛选条件后再试。" />}</div>
     </Panel>
@@ -310,7 +310,7 @@ function ReportOperations() {
     </section>
     <Panel eyebrow="SAFETY QUEUE" title="举报处理" description="处理结论会同步到对应内容模块。">
       <div className="preview-toolbar"><Segmented value={filter} onChange={setFilter} options={[{ value: '全部', label: '全部' }, { value: '待处理', label: '待处理' }, { value: '处理中', label: '处理中' }, { value: '已解决', label: '已解决' }]} /></div>
-      <div className="preview-table-wrap"><table className="preview-table"><thead><tr><th>举报目标</th><th>原因</th><th>举报人</th><th>状态</th><th>时间</th><th /></tr></thead><tbody>
+      <div className="preview-table-wrap"><table className="preview-table" aria-label="举报列表"><thead><tr><th>举报目标</th><th>原因</th><th>举报人</th><th>状态</th><th>时间</th><th /></tr></thead><tbody>
         {filtered.map(item => <tr key={item.id}><td><strong>{item.target}</strong><span>{item.id}</span></td><td>{item.reason}</td><td>{item.reporter}</td><td><StatusPill>{item.status}</StatusPill></td><td>{formatTime(item.createdAt)}</td><td>{item.status !== '已解决' && <Button size="sm" variant="primary" onClick={() => { setReportStatus(item.id, '已解决'); notify('举报已标记为已解决') }}>完成处理</Button>}</td></tr>)}
       </tbody></table>{filtered.length === 0 && <EmptyState title="当前没有举报" description="切换状态后再试。" />}</div>
     </Panel>

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import {
+  channelHealthFrom,
   createId,
   formatTime,
   maskEndpoint,
@@ -226,19 +227,19 @@ export function NotificationsView() {
       <div className="preview-notification-grid">
         <Panel eyebrow="CHANNEL STATUS" title="渠道健康" description="从配置、模板到最近一次发送逐项检查。">
           <div className="preview-channel-health-cards">
-            {[
-              { name: '小程序通知中心', role: '用户端底账', value: 100, state: '运行正常', detail: '近 24 小时 12 条全部送达' },
-              { name: '微信订阅消息', role: '一次性授权提醒', value: 82, state: '1 条待重试', detail: '近 24 小时 11 条，1 条待重试' },
-              { name: '微信服务号', role: '持续触达', value: 96, state: '模板已配置', detail: '近 24 小时 25 条，1 条未送达' },
-              { name: '值班群 Webhook', role: '多人协同', value: webhooks.some(item => item.enabled) ? 100 : 45, state: webhooks.some(item => item.enabled) ? '机器人在线' : '待配置', detail: webhooks.some(item => item.enabled) ? '近 24 小时 6 条全部送达' : '尚未配置 Webhook 地址' }
-            ].map(channel => <article key={channel.name}>
+            {channelHealthFrom(deliveries).map(channel => <article key={channel.name}>
               <div className="preview-channel-health-cards__head">
-                <span className={`preview-channel-health-cards__icon ${channel.value < 90 ? 'is-warning' : ''}`}>◉</span>
-                <div><strong>{channel.name}</strong><small>{channel.role}</small></div>
-                <span>{channel.value}%</span>
+                <span className={`preview-channel-health-cards__icon ${channel.rate !== null && channel.rate < 90 ? 'is-warning' : ''}`}>◉</span>
+                <div><strong>{channel.name}</strong><small>{channel.failed ? `${channel.failed} 条失败` : '无失败记录'}</small></div>
+                <span>{channel.rate === null ? '—' : `${channel.rate}%`}</span>
               </div>
-              <ProgressBar value={channel.value} label={channel.name} />
-              <div className="preview-channel-health-cards__foot"><StatusPill tone={channel.value < 90 ? 'warning' : 'success'}>{channel.state}</StatusPill><p>{channel.detail}</p></div>
+              <ProgressBar value={channel.rate ?? 0} label={`${channel.name} 送达率`} />
+              <div className="preview-channel-health-cards__foot">
+                <StatusPill tone={channel.rate !== null && channel.rate < 90 ? 'warning' : 'success'}>
+                  {channel.rate === null ? '暂无结果' : channel.failed ? '需要关注' : '运行正常'}
+                </StatusPill>
+                <p>{channel.delivered + channel.failed} 条中 {channel.delivered} 条送达{channel.pending ? `，${channel.pending} 条发送中` : ''}</p>
+              </div>
             </article>)}
           </div>
         </Panel>
@@ -314,7 +315,7 @@ export function NotificationsView() {
       {filteredWebhooks.length === 0
         ? <EmptyState title="暂无 Webhook" description="新增一个企业微信或飞书机器人渠道。" action={<Button variant="primary" onClick={() => editWebhook()}>新增 Webhook</Button>} />
         : <div className="preview-table-wrap">
-          <table className="preview-table">
+          <table className="preview-table" aria-label="发送记录列表">
             <thead><tr><th>渠道</th><th>类型</th><th>地址</th><th>最近测试</th><th>启用</th><th /></tr></thead>
             <tbody>{filteredWebhooks.map(webhook => <tr key={webhook.id}>
               <td><strong>{webhook.name}</strong><span>{formatTime(webhook.updatedAt)} 更新</span></td>
@@ -360,7 +361,7 @@ export function NotificationsView() {
       {filteredDeliveries.length === 0
         ? <EmptyState title="没有匹配的记录" description="调整筛选条件后再试。" />
         : <div className="preview-table-wrap">
-          <table className="preview-table">
+          <table className="preview-table" aria-label="Webhook 列表">
             <thead><tr><th>消息</th><th>渠道</th><th>收件人</th><th>状态</th><th>尝试</th><th>时间</th><th /></tr></thead>
             <tbody>{filteredDeliveries.map(record => <tr key={record.id}>
               <td><strong>{record.templateName}</strong><span>{record.error || record.id}</span></td>

@@ -31,7 +31,7 @@ export function LegacyTakeoutView() {
     </section>
     <Panel eyebrow="LEGACY DATA" title="历史商家概览" description="此页不触发订单、结算或支付操作。">
       <div className="preview-table-wrap">
-        <table className="preview-table"><thead><tr><th>商家</th><th>分类</th><th>今日订单</th><th>今日营收</th><th>状态</th></tr></thead>
+        <table className="preview-table" aria-label="旧版外卖商家列表"><thead><tr><th>商家</th><th>分类</th><th>今日订单</th><th>今日营收</th><th>状态</th></tr></thead>
           <tbody>{merchants.map(merchant => <tr key={merchant.id}><td><strong>{merchant.name}</strong><span>{merchant.id}</span></td><td>{merchant.category}</td><td>{merchant.ordersToday}</td><td>{formatMoney(merchant.revenueCents)}</td><td><StatusPill>{merchant.status}</StatusPill></td></tr>)}</tbody>
         </table>
       </div>

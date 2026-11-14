@@ -222,7 +222,7 @@ function PreviewApp() {
               readOnly
             />
             <Badge count={attentionCount} size="small">
-              <AntButton type="text" icon={<BellOutlined />} onClick={() => navigate('notifications')} />
+              <AntButton type="text" icon={<BellOutlined />} aria-label="查看消息通知" onClick={() => navigate('notifications')} />
             </Badge>
             <Tag color="blue">本地预览</Tag>
             <AntButton type="link" onClick={() => setResetOpen(true)}>重置数据</AntButton>
