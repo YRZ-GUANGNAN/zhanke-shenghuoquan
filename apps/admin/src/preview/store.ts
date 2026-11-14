@@ -126,6 +126,7 @@ interface PreviewState {
   updateWebhook: (webhook: WebhookItem) => void
   toggleWebhook: (id: string) => void
   testWebhook: (id: string) => '测试成功' | '测试失败'
+  deleteWebhook: (id: string) => void
   testSend: (templateId: string, channel: NotificationDelivery['channel'], recipient: string) => NotificationDelivery
   retryDelivery: (id: string) => void
   saveSettings: (settings: PreviewSettings) => void
@@ -271,13 +272,21 @@ export const usePreviewStore = create<PreviewState>()(
       toggleWebhook: id => set(state => ({
         webhooks: state.webhooks.map(item => item.id === id ? { ...item, enabled: !item.enabled, updatedAt: now() } : item)
       })),
+      deleteWebhook: id => set(state => ({ webhooks: state.webhooks.filter(item => item.id !== id) })),
       testWebhook: id => {
         const webhook = get().webhooks.find(item => item.id === id)
         if (!webhook || !webhook.endpoint.trim()) return '测试失败'
         const result = webhook.enabled ? '测试成功' : '测试失败'
+        const failure = !webhook.endpoint.trim()
+          ? '地址为空'
+          : !webhook.enabled
+            ? '渠道已停用，未发起请求'
+            : !webhook.endpoint.startsWith('https://')
+              ? '地址必须以 https:// 开头'
+              : ''
         set(state => ({
           webhooks: state.webhooks.map(item => item.id === id
-            ? { ...item, lastTest: result, updatedAt: now() }
+            ? { ...item, lastTest: result, lastTestAt: now(), lastError: result === '测试成功' ? '' : failure, updatedAt: now() }
             : item)
         }))
         return result
@@ -307,7 +316,7 @@ export const usePreviewStore = create<PreviewState>()(
     }),
     {
       name: 'campus-circle-admin-preview-v1',
-      version: 4,
+      version: 5,
       // v2 补服务入口 appId；v3 把旧的 6 项开关迁移成真实的 20 项功能策略。
       migrate: (persisted: unknown) => {
         const state = persisted as {
@@ -317,6 +326,7 @@ export const usePreviewStore = create<PreviewState>()(
           mediaDecisions?: Array<Record<string, unknown>>
           mediaEvents?: Array<Record<string, unknown>>
           mediaGc?: Array<Record<string, unknown>>
+          identities?: Array<Record<string, unknown>>
         } | undefined
         if (!state) return persisted as never
         const features = state.settings?.features || {}
@@ -326,8 +336,11 @@ export const usePreviewStore = create<PreviewState>()(
         })) as Record<string, boolean>
         // v4：素材补了规格与引用字段，旧缓存缺字段时直接用种子重建素材相关数据。
         const mediaNeedsReset = (state.media || []).some(item => item.dimensions === undefined)
+        // v5：认证资料补了联系方式和证明材料，旧缓存缺字段时重建。
+        const identityNeedsReset = (state.identities || []).some(item => item.materials === undefined)
         return {
           ...state,
+          ...(identityNeedsReset ? { identities: structuredClone(seedIdentities) } : {}),
           ...(mediaNeedsReset ? {
             media: structuredClone(seedMedia),
             mediaDecisions: structuredClone(seedMediaDecisions),

@@ -112,6 +112,8 @@ export interface MediaItem {
   createdAt: string
 }
 
+export interface IdentityMaterial { label: string; kind: '图片' | '文件' }
+
 export interface IdentityItem {
   id: string
   applicant: string
@@ -120,6 +122,11 @@ export interface IdentityItem {
   status: '待认证' | '已通过' | '已拒绝'
   submittedAt: string
   reason?: string
+  contact?: string
+  address?: string
+  materials: IdentityMaterial[]
+  reviewedAt?: string
+  reviewer?: string
 }
 
 export interface FeedbackItem {
@@ -169,6 +176,8 @@ export interface WebhookItem {
   endpoint: string
   enabled: boolean
   lastTest: '未测试' | '测试成功' | '测试失败'
+  lastTestAt?: string
+  lastError?: string
   updatedAt: string
 }
 
@@ -451,9 +460,22 @@ export const seedMedia: MediaItem[] = [
 ]
 
 export const seedIdentities: IdentityItem[] = [
-  { id: 'ID-501', applicant: '北区轻食铺', role: '商家', business: '食品经营 · 北区商业街', status: '待认证', submittedAt: '2026-11-14T08:50:00+08:00' },
-  { id: 'ID-502', applicant: '周师傅', role: '骑手', business: '电动车 · 身份证已上传', status: '待认证', submittedAt: '2026-11-14T08:38:00+08:00' },
-  { id: 'ID-503', applicant: '小满文具店', role: '商家', business: '零售 · 东区生活广场', status: '已通过', submittedAt: '2026-11-13T15:18:00+08:00' }
+  {
+    id: 'ID-501', applicant: '北区轻食铺', role: '商家', business: '食品经营 · 北区商业街', status: '待认证',
+    submittedAt: '2026-11-14T08:50:00+08:00', contact: '138****3321', address: '北区商业街 12 号',
+    materials: [{ label: '营业执照', kind: '图片' }, { label: '食品经营许可证', kind: '图片' }, { label: '门店照片', kind: '图片' }]
+  },
+  {
+    id: 'ID-502', applicant: '周师傅', role: '骑手', business: '电动车 · 身份证已上传', status: '待认证',
+    submittedAt: '2026-11-14T08:38:00+08:00', contact: '139****8827', address: '校内宿舍 A 区',
+    materials: [{ label: '身份证正面', kind: '图片' }, { label: '身份证反面', kind: '图片' }, { label: '电动车行驶证', kind: '图片' }]
+  },
+  {
+    id: 'ID-503', applicant: '小满文具店', role: '商家', business: '零售 · 东区生活广场', status: '已通过',
+    submittedAt: '2026-11-13T15:18:00+08:00', contact: '137****6602', address: '东区生活广场 B1',
+    materials: [{ label: '营业执照', kind: '图片' }, { label: '门店照片', kind: '图片' }],
+    reviewedAt: '2026-11-13T16:02:00+08:00', reviewer: '校园用户'
+  }
 ]
 
 export const seedFeedbacks: FeedbackItem[] = [

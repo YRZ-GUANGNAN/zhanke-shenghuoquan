@@ -3,8 +3,10 @@ import { formatTime, type FeedbackItem, type IdentityItem, type PreviewSection, 
 import { usePreviewStore } from '../store'
 import {
   Button,
+  Drawer,
   EmptyState,
   Field,
+  ImageStrip,
   Modal,
   PageHeader,
   Panel,
@@ -32,6 +34,8 @@ function IdentityPeople() {
   const decideIdentity = usePreviewStore(state => state.decideIdentity)
   const [status, setStatus] = useState<'全部' | IdentityItem['status']>('全部')
   const [query, setQuery] = useState('')
+  const [detailId, setDetailId] = useState<string | null>(null)
+  const detail = identities.find(item => item.id === detailId) || null
   const [selected, setSelected] = useState<IdentityItem | null>(null)
   const [decision, setDecision] = useState<IdentityItem['status']>('已通过')
   const [reason, setReason] = useState('')
@@ -87,7 +91,7 @@ function IdentityPeople() {
         {filtered.map(item => <article key={item.id} className="preview-review-row">
           <span className="preview-review-row__kind">{item.role}</span>
           <div className="preview-review-row__copy">
-            <div><strong>{item.applicant}</strong><StatusPill>{item.status}</StatusPill></div>
+            <div><button type="button" className="preview-table__primary" onClick={() => setDetailId(item.id)}>{item.applicant}<small>{item.id}</small></button><StatusPill>{item.status}</StatusPill></div>
             <p>{item.business}</p>
             <small>{item.id} · {formatTime(item.submittedAt)}{item.reason ? ` · 结论依据：${item.reason}` : ''}</small>
           </div>
@@ -100,6 +104,47 @@ function IdentityPeople() {
         </article>)}
       </div>}
     </Panel>
+    <Drawer
+      open={Boolean(detail)}
+      onClose={() => setDetailId(null)}
+      title={detail ? `${detail.applicant} · ${detail.role}认证` : '认证资料'}
+      description={detail ? `提交于 ${formatTime(detail.submittedAt)}` : undefined}
+      footer={detail && <>
+        <Button onClick={() => setDetailId(null)}>关闭</Button>
+        {detail.status === '待认证' ? <>
+          <Button variant="primary" onClick={() => { setDetailId(null); openDecision(detail, '已通过') }}>通过认证</Button>
+          <Button variant="danger" onClick={() => { setDetailId(null); openDecision(detail, '已拒绝') }}>拒绝认证</Button>
+        </> : <Button onClick={() => { setDetailId(null); openDecision(detail, detail.status === '已通过' ? '已拒绝' : '已通过') }}>复核改判</Button>}
+      </>}
+    >
+      {detail && <div className="preview-detail-stack">
+        <div className="preview-detail-banner">
+          <div><span>当前状态</span><strong>{detail.status}</strong></div>
+          <StatusPill>{detail.status}</StatusPill>
+        </div>
+        <div className="preview-kv-grid">
+          <div><span>申请角色</span><strong>{detail.role}</strong></div>
+          <div><span>联系方式</span><strong>{detail.contact || '—'}</strong></div>
+          <div><span>经营/居住地址</span><strong>{detail.address || '—'}</strong></div>
+          <div><span>业务说明</span><strong>{detail.business}</strong></div>
+          <div><span>审核人</span><strong>{detail.reviewer || '未审核'}</strong></div>
+          <div><span>审核时间</span><strong>{detail.reviewedAt ? formatTime(detail.reviewedAt) : '—'}</strong></div>
+        </div>
+        <div className="preview-note-block">
+          <span>证明材料（{(detail.materials || []).length}）</span>
+          <ImageStrip
+            count={(detail.materials || []).filter(item => item.kind === '图片').length}
+            seed={detail.id}
+            label={`${detail.applicant} 的证明材料`}
+          />
+          <div className="preview-material-list">
+            {(detail.materials || []).map(item => <span key={item.label}>{item.kind === '文件' ? '文件' : '图片'} · {item.label}</span>)}
+          </div>
+        </div>
+        {detail.reason && <div className="preview-note-block"><span>结论依据</span><p>{detail.reason}</p></div>}
+      </div>}
+    </Drawer>
+
     <Modal
       open={Boolean(selected)}
       title={decision === '已通过' ? '通过认证' : '拒绝认证'}

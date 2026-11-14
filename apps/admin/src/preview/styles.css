@@ -1942,3 +1942,23 @@ button.preview-media-card__visual:focus-visible {
   outline: 3px solid rgba(47, 111, 168, .3);
   outline-offset: 2px;
 }
+
+.preview-webhook-error {
+  display: block;
+  margin-top: 2px;
+  color: #b45309;
+  font-size: 11px;
+}
+.preview-material-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.preview-material-list span {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f1f4f8;
+  color: var(--preview-text-secondary);
+  font-size: 11px;
+}

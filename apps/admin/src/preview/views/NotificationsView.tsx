@@ -80,6 +80,7 @@ export function NotificationsView() {
   const updateWebhook = usePreviewStore(state => state.updateWebhook)
   const toggleWebhook = usePreviewStore(state => state.toggleWebhook)
   const testWebhook = usePreviewStore(state => state.testWebhook)
+  const deleteWebhook = usePreviewStore(state => state.deleteWebhook)
   const testSend = usePreviewStore(state => state.testSend)
   const retryDelivery = usePreviewStore(state => state.retryDelivery)
   const [tab, setTab] = useState<NotificationTab>('overview')
@@ -87,6 +88,7 @@ export function NotificationsView() {
   const [templateDraft, setTemplateDraft] = useState<TemplateDraft | null>(null)
   const [templateError, setTemplateError] = useState('')
   const [webhookDraft, setWebhookDraft] = useState<WebhookDraft | null>(null)
+  const [deleteCandidate, setDeleteCandidate] = useState<WebhookItem | null>(null)
   const [webhookError, setWebhookError] = useState('')
   const [deliveryStatus, setDeliveryStatus] = useState<'全部' | NotificationDelivery['status']>('全部')
   const [testingTemplate, setTestingTemplate] = useState<MessageTemplateItem | null>(null)
@@ -321,7 +323,11 @@ export function NotificationsView() {
               <td><strong>{webhook.name}</strong><span>{formatTime(webhook.updatedAt)} 更新</span></td>
               <td><StatusPill tone={webhook.type === '飞书' ? 'info' : 'accent'}>{webhook.type}</StatusPill></td>
               <td><code className="preview-code">{maskEndpoint(webhook.endpoint)}</code></td>
-              <td><StatusPill>{webhook.lastTest}</StatusPill></td>
+              <td>
+                <StatusPill>{webhook.lastTest}</StatusPill>
+                {webhook.lastError && <span className="preview-webhook-error">{webhook.lastError}</span>}
+                {webhook.lastTestAt && <span>{formatTime(webhook.lastTestAt)}</span>}
+              </td>
               <td><Toggle checked={webhook.enabled} label={`${webhook.name}启用状态`} onChange={() => {
                 toggleWebhook(webhook.id)
                 notify(webhook.enabled ? 'Webhook 已停用' : 'Webhook 已启用', 'info')
@@ -332,6 +338,7 @@ export function NotificationsView() {
                   notify(result === '测试成功' ? 'Webhook 测试成功' : 'Webhook 未启用或地址无效，测试失败', result === '测试成功' ? 'success' : 'danger')
                 }}>测试</Button>
                 <Button size="sm" variant="quiet" onClick={() => editWebhook(webhook)}>编辑</Button>
+                <Button size="sm" variant="danger" onClick={() => setDeleteCandidate(webhook)}>删除</Button>
               </div></td>
             </tr>)}</tbody>
           </table>
@@ -466,6 +473,28 @@ export function NotificationsView() {
           <option>小程序通知</option><option>微信订阅</option><option>服务号</option><option>值班群</option>
         </SelectField>
         <Field label="测试收件人" value={testRecipient} onChange={event => setTestRecipient(event.target.value)} hint="只作为记录标签使用，不会发送真实消息。" />
+      </div>
+    </Modal>
+
+    <Modal
+      open={Boolean(deleteCandidate)}
+      title="删除 Webhook 渠道"
+      description={deleteCandidate ? `${deleteCandidate.type} · ${deleteCandidate.name}` : ''}
+      onClose={() => setDeleteCandidate(null)}
+      width="sm"
+      footer={<>
+        <Button onClick={() => setDeleteCandidate(null)}>取消</Button>
+        <Button variant="danger" onClick={() => {
+          if (!deleteCandidate) return
+          deleteWebhook(deleteCandidate.id)
+          notify('Webhook 渠道已删除', 'info')
+          setDeleteCandidate(null)
+        }}>确认删除</Button>
+      </>}
+    >
+      <div className="preview-warning-box">
+        <strong>删除后该渠道不再接收任何提醒</strong>
+        <p>已在队列中的发送任务会失败；需要重新添加才能恢复。</p>
       </div>
     </Modal>
   </div>
