@@ -31,35 +31,42 @@ export function DashboardView({ navigate }: { navigate: (section: PreviewSection
     }
   }, [deliveries, orders, reviews])
 
+  // 待办条数必须来自真实队列，不能写死。
+  const notificationPending = deliveries.filter(item => item.status === '失败').length
+  const reviewPending = reviews.filter(item => item.status === '待审核' || item.status === '审核中').length
+  const identityPending = identities.filter(item => item.status === '待认证').length
+  const feedbackPending = feedbacks.filter(item => item.status === '待处理').length
+  const highRiskPending = reviews.filter(item => item.risk === '高风险' && (item.status === '待审核' || item.status === '审核中')).length
+
   const tasks = [
     {
       id: 'notification',
-      title: '2 条通知需要重新确认',
-      detail: '一条订阅消息失败，另一条模板已停用。',
+      title: `${notificationPending} 条通知发送失败`,
+      detail: '可在发送记录中重试，或检查订阅额度与模板状态。',
       tone: 'danger',
       action: '处理通知',
       section: 'notifications' as PreviewSection
     },
     {
       id: 'review',
-      title: '3 条内容等待审核',
-      detail: '其中 1 条为高风险举报，建议优先处理。',
+      title: `${reviewPending} 条内容等待审核`,
+      detail: highRiskPending ? `其中 ${highRiskPending} 条为高风险，建议优先处理。` : '当前没有高风险任务。',
       tone: 'warning',
       action: '进入审核',
       section: 'moderation' as PreviewSection
     },
     {
       id: 'identity',
-      title: '2 份商家/骑手资料待认证',
-      detail: '材料齐全，可以开始核验。',
+      title: `${identityPending} 份商家/骑手资料待认证`,
+      detail: identityPending ? '材料已提交，可以开始核验。' : '当前没有待认证资料。',
       tone: 'info',
       action: '查看资料',
       section: 'identities' as PreviewSection
     },
     {
       id: 'feedback',
-      title: '1 条用户反馈等待首次响应',
-      detail: '用户希望通知中心支持订单类型筛选。',
+      title: `${feedbackPending} 条用户反馈等待首次响应`,
+      detail: feedbackPending ? '按提交时间排序，优先处理较早的反馈。' : '当前没有待处理反馈。',
       tone: 'neutral',
       action: '查看反馈',
       section: 'feedbacks' as PreviewSection

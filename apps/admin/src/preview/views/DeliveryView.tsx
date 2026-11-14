@@ -111,12 +111,12 @@ export function DeliveryView() {
       eyebrow="ORDER FLOW"
       title="订单工作队列"
       description="点击订单查看完整履约信息；状态推进只修改当前本地预览数据。"
-      actions={<SearchBox value={query} onChange={setQuery} placeholder="搜索订单号或骑手" />}
+      actions={<SearchBox value={query} onChange={value => { setQuery(value); setSelectedIds([]) }} placeholder="搜索订单号或骑手" />}
     >
       <div className="preview-toolbar">
         <Segmented
           value={status}
-          onChange={setStatus}
+          onChange={value => { setStatus(value); setSelectedIds([]) }}
           options={[
             { value: '全部', label: '全部', badge: orders.length },
             { value: '待接单', label: '待接单', badge: orders.filter(item => item.status === '待接单').length },
@@ -175,7 +175,7 @@ export function DeliveryView() {
             </tr>)}</tbody>
           </table>
         </div>}
-      <Pagination page={paged.page} pageSize={paged.pageSize} total={paged.total} onChange={paged.setPage} label="配送订单分页" />
+      <Pagination page={paged.page} pageSize={paged.pageSize} total={paged.total} onChange={page => { paged.setPage(page); setSelectedIds([]) }} label="配送订单分页" />
     </Panel>
     </>}
 

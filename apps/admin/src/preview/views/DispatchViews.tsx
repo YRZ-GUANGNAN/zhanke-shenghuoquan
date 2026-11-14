@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { formatMoney, formatTime, type DeliveryOrder, type RiderItem } from '../data'
 import { usePreviewStore } from '../store'
 import { Button, EmptyState, Field, Modal, Panel, SearchBox, SelectField, StatusPill, usePreviewToast } from '../ui'
@@ -124,6 +124,10 @@ function BulkOrderTable({ orders }: { orders: DeliveryOrder[] }) {
   const reassignOrders = usePreviewStore(state => state.reassignOrders)
   const cancelOrders = usePreviewStore(state => state.cancelOrders)
   const [selected, setSelected] = useState<string[]>([])
+  // 切换骑手或商家后，之前选中的订单可能已不在列表里，需要剔除。
+  useEffect(() => {
+    setSelected(current => current.filter(id => orders.some(order => order.id === id)))
+  }, [orders])
   const [mode, setMode] = useState<'reassign' | 'cancel' | null>(null)
   const [rider, setRider] = useState('')
   const [reason, setReason] = useState('')
