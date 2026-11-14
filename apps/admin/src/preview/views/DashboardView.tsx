@@ -8,7 +8,8 @@ import {
   Panel,
   ProgressBar,
   StatCard,
-  StatusPill
+  StatusPill,
+  formatWait
 } from '../ui'
 
 export function DashboardView({ navigate }: { navigate: (section: PreviewSection) => void }) {
@@ -81,6 +82,18 @@ export function DashboardView({ navigate }: { navigate: (section: PreviewSection
     count: todayOrders.filter(order => new Date(order.createdAt).getHours() === hour).length
   }))
   const chartMax = Math.max(1, ...hourly.map(item => item.count))
+  // 超时判断：配送中且进入超过 60 分钟视为可能超时，不再写死"没有超时订单"。
+  const overdueOrders = orders.filter(order => order.status === '配送中'
+    && Number.isFinite(new Date(order.createdAt).getTime())
+    && Date.now() - new Date(order.createdAt).getTime() > 60 * 60 * 1000)
+
+  // 待审核积压：与审核页保持一致的口径，不再写死分钟数。
+  const pendingReviewItems = reviews.filter(item => item.status === '待审核' || item.status === '审核中')
+  const oldestPending = pendingReviewItems.reduce<{ at: number; createdAt: string } | null>((oldest, item) => {
+    const at = new Date(item.createdAt).getTime()
+    if (Number.isNaN(at)) return oldest
+    return !oldest || at < oldest.at ? { at, createdAt: item.createdAt } : oldest
+  }, null)
   const channelHealth = [
     { name: '小程序通知中心', rate: 100, detail: '近 24 小时 12 条全部送达' },
     { name: '微信订阅消息', rate: 82, detail: '近 24 小时 11 条，1 条待重试' },
@@ -178,14 +191,14 @@ export function DashboardView({ navigate }: { navigate: (section: PreviewSection
         description="关键角色和任务的当前状态。"
       >
         <div className="preview-scene-list">
-          <div><span className="preview-scene-list__icon">骑</span><span><strong>{summary.activeRiders} 名骑手正在配送</strong><small>当前没有超时订单</small></span><StatusPill tone="success">在线</StatusPill></div>
-          <div><span className="preview-scene-list__icon">审</span><span><strong>{summary.pendingReviews} 条审核任务</strong><small>最早一条已等待 42 分钟</small></span><StatusPill tone="warning">待处理</StatusPill></div>
+          <div><span className="preview-scene-list__icon">骑</span><span><strong>{summary.activeRiders} 名骑手正在配送</strong><small>{overdueOrders.length ? `${overdueOrders.length} 单配送超过 60 分钟` : '当前没有超时订单'}</small></span><StatusPill tone="success">在线</StatusPill></div>
+          <div><span className="preview-scene-list__icon">审</span><span><strong>{summary.pendingReviews} 条审核任务</strong><small>{oldestPending ? `最早一条已等待 ${formatWait(oldestPending.createdAt)}` : '当前没有待审核任务'}</small></span><StatusPill tone={summary.pendingReviews ? 'warning' : 'success'}>{summary.pendingReviews ? '待处理' : '已清空'}</StatusPill></div>
           <div><span className="preview-scene-list__icon">材</span><span><strong>{media.filter(item => item.status === '异常').length} 个素材异常</strong><small>可进入素材中心重新处理</small></span><StatusPill tone="danger">异常</StatusPill></div>
         </div>
         <div className="preview-recent-note">
           <span>最近动态</span>
-          <strong>{formatTime(orders[0]?.createdAt || new Date().toISOString())}</strong>
-          <p>{orders[0]?.customer || '用户'} 的订单 {orders[0]?.id || ''} 已进入{orders[0]?.status || '处理'}。</p>
+          <strong>{orders[0] ? formatTime(orders[0].createdAt) : '暂无订单'}</strong>
+          <p>{orders[0] ? `${orders[0].customer} 的订单 ${orders[0].id} 已进入${orders[0].status}。` : '今天还没有新订单进入配送。'}</p>
         </div>
       </Panel>
     </div>

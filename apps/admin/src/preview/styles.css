@@ -1646,3 +1646,32 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* 窄屏：侧边栏改抽屉，内容区不再被挤压。 */
+@media (max-width: 900px) {
+  .preview-main-shell { min-width: 0; }
+  .preview-topbar { padding: 10px 12px; gap: 8px; }
+  .preview-content { padding: 12px; }
+}
+
+@media (max-width: 640px) {
+  .preview-scene-list > div {
+    grid-template-columns: 30px minmax(0, 1fr);
+    align-items: start;
+  }
+  .preview-scene-list > div > .ant-tag { grid-column: 2; justify-self: start; }
+  .preview-chart__bars { gap: 4px; }
+  .preview-chart__labels { gap: 2px; font-size: 10px; }
+  .preview-chart__labels span { overflow: hidden; text-overflow: clip; white-space: nowrap; }
+  .preview-table-wrap { overflow-x: auto; }
+}
+
+.preview-button--ghost {
+  color: var(--preview-text-secondary) !important;
+  border-color: var(--preview-border) !important;
+  background: #fff !important;
+}
+.preview-button--ghost:hover {
+  color: var(--preview-blue) !important;
+  border-color: var(--preview-blue) !important;
+}

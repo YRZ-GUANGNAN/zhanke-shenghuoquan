@@ -20,22 +20,17 @@ import {
   StatCard,
   StatusPill,
   TextAreaField,
-  usePreviewToast
+  usePreviewToast,
+  formatWait
 } from '../ui'
 
 type OperationSection = Extract<PreviewSection, 'media' | 'moderation' | 'community' | 'trade' | 'reports'>
 
-// 积压时长比时间戳更能说明优先级；只对待处理任务展示。
+// 只对待处理任务展示积压时长，口径与总览页一致。
 function waitingLabel(createdAt: string, status: ReviewItem['status']): string {
   if (status !== '待审核' && status !== '审核中') return ''
-  const started = new Date(createdAt).getTime()
-  if (Number.isNaN(started)) return ''
-  const minutes = Math.floor((Date.now() - started) / 60000)
-  if (minutes < 1) return '刚刚提交'
-  if (minutes < 60) return `已等待 ${minutes} 分钟`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `已等待 ${hours} 小时`
-  return `已等待 ${Math.floor(hours / 24)} 天`
+  const elapsed = formatWait(createdAt)
+  return elapsed ? `已等待 ${elapsed}` : ''
 }
 
 

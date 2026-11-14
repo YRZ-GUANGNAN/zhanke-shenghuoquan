@@ -92,12 +92,13 @@ export function Button({ variant = 'secondary', size = 'md', className, children
       : variant === 'quiet'
         ? 'text'
         : 'default'
+  // antd 的 ghost 是给深色背景用的（白字白边），浅色页面会看不见；
+  // 这里把 ghost 当作浅色描边按钮处理，不再透传 ghost 属性。
   return <AntButton
     {...props}
-    ghost={variant === 'ghost'}
     type={type as never}
     size={size === 'sm' ? 'small' : 'middle'}
-    className={cx('preview-button', className)}
+    className={cx('preview-button', variant === 'ghost' && 'preview-button--ghost', className)}
   >
     {children}
   </AntButton>
@@ -357,6 +358,19 @@ export function usePreviewToast() {
   const context = useContext(ToastContext)
   if (!context) throw new Error('usePreviewToast must be used inside ToastProvider')
   return context
+}
+
+
+// 积压时长统一口径：总览与审核列表共用，避免两处各算一套。
+export function formatWait(createdAt: string): string {
+  const started = new Date(createdAt).getTime()
+  if (Number.isNaN(started)) return ''
+  const minutes = Math.floor((Date.now() - started) / 60000)
+  if (minutes < 1) return '不到 1 分钟'
+  if (minutes < 60) return `${minutes} 分钟`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} 小时`
+  return `${Math.floor(hours / 24)} 天`
 }
 
 export function ProgressBar({ value, label }: { value: number; label: string }) {

@@ -2,6 +2,7 @@ import {
   Badge,
   Button as AntButton,
   ConfigProvider,
+  Drawer,
   Input,
   Layout,
   Menu,
@@ -24,7 +25,7 @@ import {
   UserOutlined,
   WarningOutlined
 } from '@ant-design/icons'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { PreviewSection } from './data'
 import { usePreviewStore } from './store'
 import { Modal, ToastProvider, usePreviewToast } from './ui'
@@ -71,6 +72,14 @@ function PreviewApp() {
   const features = usePreviewStore(state => state.settings.features)
   const resetPreview = usePreviewStore(state => state.resetPreview)
   const [collapsed, setCollapsed] = useState(false)
+  const [navOpen, setNavOpen] = useState(false)
+  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches)
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 900px)')
+    const onChange = () => setNarrow(query.matches)
+    query.addEventListener('change', onChange)
+    return () => query.removeEventListener('change', onChange)
+  }, [])
   const [searchOpen, setSearchOpen] = useState(false)
   const [resetOpen, setResetOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -150,7 +159,7 @@ function PreviewApp() {
 
   return <ConfigProvider componentSize="middle">
     <Layout className="preview-shell">
-      <Layout.Sider
+      {!narrow && <Layout.Sider
         className="preview-sider"
         width={216}
         collapsedWidth={64}
@@ -171,15 +180,36 @@ function PreviewApp() {
           items={menuItems}
           onClick={({ key }) => navigate(key as PreviewSection)}
         />
-      </Layout.Sider>
+      </Layout.Sider>}
+      {narrow && <Drawer
+        placement="left"
+        width={248}
+        open={navOpen}
+        onClose={() => setNavOpen(false)}
+        closable={false}
+        bodyStyle={{ padding: 0 }}
+      >
+        <div className="preview-logo">
+          <span className="preview-logo__mark">湛</span>
+          <span>湛科运营云</span>
+        </div>
+        <Menu
+          mode="inline"
+          theme="light"
+          selectedKeys={[section]}
+          defaultOpenKeys={[`group-${active?.group || '工作台'}`]}
+          items={menuItems}
+          onClick={({ key }) => { navigate(key as PreviewSection); setNavOpen(false) }}
+        />
+      </Drawer>}
       <Layout className="preview-main-shell">
         <header className="preview-topbar">
           <div className="preview-topbar__left">
             <AntButton
               type="text"
-              icon={collapsed ? <span>☰</span> : <span>◧</span>}
-              onClick={() => setCollapsed(!collapsed)}
-              aria-label="切换导航"
+              icon={collapsed || narrow ? <span>☰</span> : <span>◧</span>}
+              onClick={() => (narrow ? setNavOpen(true) : setCollapsed(!collapsed))}
+              aria-label={narrow ? '打开导航' : '切换导航'}
             />
             <span className="preview-breadcrumb"><strong>{active?.label || ''}</strong></span>
           </div>
