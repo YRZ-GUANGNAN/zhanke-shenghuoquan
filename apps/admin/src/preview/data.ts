@@ -157,15 +157,68 @@ export interface PreviewSettings {
     description: string
     coverName: string
   }
-  features: {
-    delivery: boolean
-    merchant: boolean
-    rider: boolean
-    notifications: boolean
-    takeout: boolean
-    community: boolean
-  }
+  features: Record<FeatureKey, boolean>
+  presentationMode: 'standard' | 'campus_info'
+  postingMode: 'admin_only' | 'all_users'
+  rowVersion: number
+  updatedAt: string
 }
+
+// 与真实小程序功能策略一一对应的 20 项开关，分组与文案取自生产后台。
+export const FEATURE_KEYS = [
+  'forum', 'post', 'comment', 'following', 'likes', 'favorites', 'notifications',
+  'secondhand', 'secondhand_publish', 'secondhand_chat', 'secondhand_comments',
+  'takeout', 'campus_tools', 'delivery', 'merchant', 'rider', 'identity_application',
+  'messages', 'search', 'publish'
+] as const
+export type FeatureKey = typeof FEATURE_KEYS[number]
+
+export interface FeatureGroup {
+  title: string
+  description: string
+  keys: Array<{ key: FeatureKey; label: string; description: string }>
+}
+
+export const FEATURE_GROUPS: FeatureGroup[] = [
+  {
+    title: '社区内容',
+    description: '只控制用户端入口与写入能力，不删除既有内容。',
+    keys: [
+      { key: 'forum', label: '论坛入口', description: '隐藏社区首页、帖子列表与旧链接入口' },
+      { key: 'post', label: '发帖', description: '允许用户创建新的社区帖子' },
+      { key: 'comment', label: '评论', description: '允许用户对社区帖子发表评论' },
+      { key: 'following', label: '关注', description: '显示关注关系与关注动态入口' },
+      { key: 'likes', label: '点赞', description: '帖子点赞入口与请求' },
+      { key: 'favorites', label: '收藏', description: '帖子和商品收藏入口与请求' },
+      { key: 'notifications', label: '互动通知', description: '评论与互动通知列表' }
+    ]
+  },
+  {
+    title: '交易与服务',
+    description: '二手与校园服务可以独立切换，避免关闭外卖时误伤校内工具。',
+    keys: [
+      { key: 'secondhand', label: '二手市场', description: '商品浏览、详情与历史链接' },
+      { key: 'secondhand_publish', label: '发布二手商品', description: '允许创建和编辑新的商品' },
+      { key: 'secondhand_chat', label: '二手沟通', description: '商品联系与交易会话入口' },
+      { key: 'secondhand_comments', label: '商品留言', description: '商品留言列表与回复，不受社区发言模式影响' },
+      { key: 'takeout', label: '外卖商家', description: '合作外卖商家目录，不影响常用校园工具' },
+      { key: 'campus_tools', label: '校园服务', description: '校内服务导航与工具入口' },
+      { key: 'delivery', label: '跑腿配送', description: '新发单与抢单；已有订单履约和资金不受影响' },
+      { key: 'merchant', label: '商家工作台', description: '工作台入口与新业务；历史订单处理仍保留' },
+      { key: 'rider', label: '骑手工作台', description: '工作台入口与抢单；已接订单仍可完成' },
+      { key: 'identity_application', label: '身份申请', description: '新增骑手/商家申请，不删除已有身份' }
+    ]
+  },
+  {
+    title: '交流关系',
+    description: '关闭入口不会删除会话、关注或历史记录。',
+    keys: [
+      { key: 'messages', label: '私信', description: '通用消息与会话入口' },
+      { key: 'search', label: '搜索', description: '社区、商品与商家的搜索入口' },
+      { key: 'publish', label: '统一发布入口', description: '底部加号与发布选择页，关闭后也限制帖子和商品发布' }
+    ]
+  }
+]
 
 export interface LegacyTakeoutMerchant {
   id: string
@@ -378,14 +431,11 @@ export const seedSettings: PreviewSettings = {
     description: '发现校园互助、二手好物与生活服务。',
     coverName: '校园服务默认分享封面.png'
   },
-  features: {
-    delivery: true,
-    merchant: true,
-    rider: true,
-    notifications: true,
-    takeout: false,
-    community: true
-  }
+  features: Object.fromEntries(FEATURE_KEYS.map(key => [key, key !== 'takeout'])) as Record<FeatureKey, boolean>,
+  presentationMode: 'standard',
+  postingMode: 'all_users',
+  rowVersion: 25,
+  updatedAt: '2026-10-18T15:37:29+08:00'
 }
 
 export const seedTakeoutMerchants: LegacyTakeoutMerchant[] = [

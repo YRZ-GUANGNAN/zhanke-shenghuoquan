@@ -1,7 +1,11 @@
 import { useState } from 'react'
 import {
   createId,
+  FEATURE_GROUPS,
+  FEATURE_KEYS,
+  type FeatureKey,
   type PreviewSection,
+  type PreviewSettings,
   type ServiceEntry
 } from '../data'
 import { usePreviewStore } from '../store'
@@ -170,40 +174,112 @@ function ShareSettings() {
 function FeatureSettings() {
   const settings = usePreviewStore(state => state.settings)
   const saveSettings = usePreviewStore(state => state.saveSettings)
-  const [features, setFeatures] = useState(settings.features)
+  const [draft, setDraft] = useState<PreviewSettings>(settings)
+  const [saved, setSaved] = useState(settings)
   const { notify } = usePreviewToast()
-  const labels: Array<{ key: keyof typeof features; name: string; description: string; risk: string }> = [
-    { key: 'delivery', name: '校园配送', description: '允许用户进入配送下单与骑手工作台。', risk: '涉及订单与资金，关闭前需确认在途订单。' },
-    { key: 'merchant', name: '商家能力', description: '允许商家管理店铺与商品。', risk: '影响商家接单和营业状态。' },
-    { key: 'rider', name: '骑手能力', description: '允许骑手接收新订单。', risk: '关闭后新订单将无法被接取。' },
-    { key: 'notifications', name: '消息通知', description: '启用小程序通知和服务号提醒。', risk: '关闭后用户可能收不到关键状态变更。' },
-    { key: 'community', name: '社区互动', description: '允许用户浏览和发布社区内容。', risk: '关闭后互动入口将隐藏。' },
-    { key: 'takeout', name: '旧版外卖', description: '显示历史外卖入口和只读业务数据。', risk: '仅用于存量数据查看。' }
-  ]
+
+  const dirty = JSON.stringify(draft) !== JSON.stringify(saved)
+  const enabledIn = (keys: Array<{ key: FeatureKey }>) => keys.filter(item => draft.features[item.key]).length
+  const wholeGroupOn = (keys: Array<{ key: FeatureKey }>) => keys.every(item => draft.features[item.key])
 
   const save = () => {
-    saveSettings({ ...settings, features })
-    notify('功能开关已保存')
+    const next = { ...draft, rowVersion: draft.rowVersion + 1, updatedAt: new Date().toISOString() }
+    saveSettings(next)
+    setSaved(next)
+    setDraft(next)
+    notify('功能开关已保存，小程序回到前台后生效')
   }
 
   return <div>
     <PageHeader
-      eyebrow="功能治理"
+      eyebrow="平台设置"
       title="功能开关"
-      description="每个开关都说明影响范围与风险，不把高风险配置藏在一排无上下文开关里。"
-      actions={<Button variant="primary" onClick={save}>保存开关</Button>}
+      description="控制小程序模块、互动能力与新业务开放状态"
+      actions={<>
+        <Button onClick={() => { setDraft(saved); notify('已恢复到上次保存的配置', 'info') }}>读取已保存配置</Button>
+        <Button onClick={() => { setDraft({ ...draft, features: Object.fromEntries(FEATURE_KEYS.map(key => [key, false])) as Record<FeatureKey, boolean> }); notify('已全部关闭，保存后生效', 'info') }}>全部隐藏</Button>
+        <Button variant="primary" disabled={!dirty} onClick={save}>保存配置</Button>
+      </>}
     />
-    <Panel eyebrow="FEATURE POLICY" title="模块开放状态" description="本地原型只改变预览菜单与提示，不会影响真实小程序。">
-      <div className="preview-feature-list">
-        {labels.map(item => <article key={item.key}>
-          <span className="preview-feature-list__icon">{item.name.slice(0, 1)}</span>
-          <div className="preview-feature-list__copy"><div><strong>{item.name}</strong><StatusPill tone={features[item.key] ? 'success' : 'neutral'}>{features[item.key] ? '已开启' : '已关闭'}</StatusPill></div><p>{item.description}</p><small>{item.risk}</small></div>
-          <Toggle checked={features[item.key]} label={item.name} onChange={checked => setFeatures({ ...features, [item.key]: checked })} />
-        </article>)}
+
+    <Panel eyebrow="FEATURE POLICY" title="小程序功能显隐中心" description="选择需要开放的模块，保存后控制所有用户的小程序入口和新业务。账号安全、隐私、反馈与已有订单的必要处理保持可用。">
+      <div className="preview-saved-bar">
+        <span>当前显示{dirty ? '未保存的编辑内容' : '服务器已保存配置'}</span>
+        <small>版本 {saved.rowVersion} · 最近更新 {new Date(saved.updatedAt).toLocaleString('zh-CN')}</small>
       </div>
+
+      <section className="preview-policy-block">
+        <div className="preview-policy-block__head">
+          <strong>小程序展示模式</strong>
+          <span>选择后点击“保存配置”，对所有用户统一生效。</span>
+        </div>
+        <div className="preview-choice-grid">
+          {([
+            { value: 'standard', title: '原版', description: '恢复原首页、服务和二手等模块，按下方已保存的开关开放' },
+            { value: 'campus_info', title: '校园资讯', description: '展示独立的校园指南，保留账号、反馈和既有订单的必要处理' }
+          ] as const).map(option => <button
+            key={option.value}
+            type="button"
+            className={`preview-choice${draft.presentationMode === option.value ? ' is-selected' : ''}`}
+            aria-pressed={draft.presentationMode === option.value}
+            onClick={() => setDraft({ ...draft, presentationMode: option.value })}
+          >
+            <span className="preview-choice__dot" aria-hidden="true" />
+            <strong>{option.title}</strong>
+            <small>{option.description}</small>
+          </button>)}
+        </div>
+      </section>
+
+      <section className="preview-policy-block">
+        <div className="preview-policy-block__head">
+          <strong>发帖与评论权限</strong>
+          <span>普通用户不会因此获得后台管理权限；这里只控制社区写入能力。</span>
+        </div>
+        <div className="preview-choice-grid">
+          {([
+            { value: 'admin_only', title: '仅管理员', description: '普通用户只能浏览，管理员与超级管理员可发帖评论' },
+            { value: 'all_users', title: '全部用户', description: '所有通过身份与禁言检查的用户可发帖评论' }
+          ] as const).map(option => <button
+            key={option.value}
+            type="button"
+            className={`preview-choice${draft.postingMode === option.value ? ' is-selected' : ''}`}
+            aria-pressed={draft.postingMode === option.value}
+            onClick={() => setDraft({ ...draft, postingMode: option.value })}
+          >
+            <span className="preview-choice__dot" aria-hidden="true" />
+            <strong>{option.title}</strong>
+            <small>{option.description}</small>
+          </button>)}
+        </div>
+      </section>
+
+      {FEATURE_GROUPS.map(group => <section className="preview-policy-block" key={group.title}>
+        <div className="preview-policy-block__head">
+          <strong>{group.title}</strong>
+          <span>{group.description}</span>
+          <em>{enabledIn(group.keys)}/{group.keys.length} 已开启
+            <button type="button" onClick={() => {
+              const next = !wholeGroupOn(group.keys)
+              setDraft(current => ({ ...current, features: { ...current.features, ...Object.fromEntries(group.keys.map(item => [item.key, next])) } as Record<FeatureKey, boolean> }))
+            }}>{wholeGroupOn(group.keys) ? '关闭本组' : '开启本组'}</button>
+          </em>
+        </div>
+        <div className="preview-policy-rows">
+          {group.keys.map(item => <label className={`preview-policy-row${draft.features[item.key] ? '' : ' is-off'}`} key={item.key}>
+            <span><strong>{item.label}</strong><small>{item.description}</small></span>
+            <Toggle
+              checked={draft.features[item.key]}
+              label={item.label}
+              onChange={checked => setDraft(current => ({ ...current, features: { ...current.features, [item.key]: checked } as Record<FeatureKey, boolean> }))}
+            />
+          </label>)}
+        </div>
+      </section>)}
+
       <div className="preview-policy-note">
         <span>变更纪律</span>
-        <p>生产环境需要保留操作人、时间与原因。预览版本只保存到 localStorage。</p>
+        <p>生产环境会记录操作人、时间与原因；本地原型只保存到 localStorage，不会影响真实小程序。</p>
       </div>
     </Panel>
   </div>

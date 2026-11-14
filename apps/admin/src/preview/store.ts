@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
+  FEATURE_KEYS,
   seedCommunity,
   seedDeliveries,
   seedFeedbacks,
@@ -199,17 +200,30 @@ export const usePreviewStore = create<PreviewState>()(
     }),
     {
       name: 'campus-circle-admin-preview-v1',
-      version: 2,
-      // v2：服务入口新增 appId 字段，旧缓存需要补默认值，避免列表出现空 AppID。
+      version: 3,
+      // v2 补服务入口 appId；v3 把旧的 6 项开关迁移成真实的 20 项功能策略。
       migrate: (persisted: unknown) => {
-        const state = persisted as { serviceEntries?: Array<Record<string, unknown>> } | undefined
-        if (!state?.serviceEntries) return persisted as never
+        const state = persisted as { serviceEntries?: Array<Record<string, unknown>>; settings?: { features?: Record<string, boolean> } } | undefined
+        if (!state) return persisted as never
+        const features = state.settings?.features || {}
+        const normalized = Object.fromEntries(FEATURE_KEYS.map(key => {
+          const legacy = key === 'forum' ? features.community : key === 'secondhand' ? features.community : (features as Record<string, boolean>)[key]
+          return [key, legacy !== false]
+        })) as Record<string, boolean>
         return {
           ...state,
-          serviceEntries: state.serviceEntries.map(entry => ({
+          serviceEntries: (state.serviceEntries || []).map(entry => ({
             ...entry,
             appId: entry.appId || 'wx0dacef976daa8e55'
-          }))
+          })),
+          settings: {
+            ...(state.settings || {}),
+            features: normalized,
+            presentationMode: (state.settings as { presentationMode?: string })?.presentationMode || 'standard',
+            postingMode: (state.settings as { postingMode?: string })?.postingMode || 'all_users',
+            rowVersion: (state.settings as { rowVersion?: number })?.rowVersion || 25,
+            updatedAt: (state.settings as { updatedAt?: string })?.updatedAt || '2026-10-18T15:37:29+08:00'
+          }
         } as never
       },
       partialize: state => ({

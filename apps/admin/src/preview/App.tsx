@@ -88,8 +88,8 @@ function PreviewApp() {
   const availableNavigation = useMemo(() => navigation.filter(item => {
     if (item.key === 'delivery') return features.delivery
     if (item.key === 'notifications') return features.notifications
-    if (item.key === 'community') return features.community
-    if (item.key === 'trade') return features.community
+    if (item.key === 'community') return features.forum
+    if (item.key === 'trade') return features.secondhand
     if (item.key === 'takeout') return features.takeout
     return true
   }), [features])
