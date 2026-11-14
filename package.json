@@ -49,6 +49,7 @@
     "check:miniapp-settings-contract": "node scripts/check-miniapp-settings-contract.cjs",
     "check:miniapp-ui-system": "node scripts/check-miniapp-ui-system.cjs",
     "check:admin-ui-system": "node scripts/check-admin-ui-system.cjs",
+    "check:admin-preview": "node scripts/check-admin-preview.cjs",
     "check:role-workbench-ui": "node scripts/check-role-workbench-ui.cjs",
     "check:identity-application-contract": "node scripts/check-identity-application-contract.cjs",
     "check:identity-application-ui": "node scripts/check-identity-application-ui.cjs && node scripts/test-identity-application-ui.cjs",
