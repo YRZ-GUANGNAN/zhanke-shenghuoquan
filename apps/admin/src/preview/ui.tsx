@@ -414,3 +414,46 @@ export function Pagination({ page, pageSize, total, onChange, label }: {
     <Button size="sm" disabled={page >= pages} onClick={() => onChange(page + 1)}>下一页</Button>
   </div>
 }
+
+// 原型没有真实图片资源，用确定性渐变占位，保证同一内容每次颜色一致。
+const thumbPalettes = [
+  ['#dbe7f5', '#b9cfe6'],
+  ['#e8e0f2', '#cfc0e6'],
+  ['#dceee4', '#bcdccb'],
+  ['#f6e6dc', '#e6cbbb'],
+  ['#e3ecf6', '#c4d6e8']
+]
+
+function seedIndex(seed: string, length: number) {
+  let hash = 0
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = (hash * 31 + seed.charCodeAt(index)) % 100000
+  }
+  return hash % length
+}
+
+export function ImageStrip({ count, seed, label }: { count: number; seed: string; label: string }) {
+  if (!count) return <p className="preview-image-empty">没有图片</p>
+  return <div className="preview-image-strip" role="list" aria-label={`${label}，共 ${count} 张图片`}>
+    {Array.from({ length: count }, (_, index) => {
+      const [from, to] = thumbPalettes[seedIndex(`${seed}-${index}`, thumbPalettes.length)]
+      return <div
+        key={index}
+        role="listitem"
+        className="preview-image-thumb"
+        style={{ background: `linear-gradient(135deg, ${from}, ${to})` }}
+        aria-label={`${label} 第 ${index + 1} 张`}
+      >
+        <span>{index + 1}</span>
+      </div>
+    })}
+  </div>
+}
+
+export function ImageCell({ count, seed, label }: { count: number; seed: string; label: string }) {
+  if (!count) return <span className="preview-image-cell is-empty">无图</span>
+  const [from, to] = thumbPalettes[seedIndex(seed, thumbPalettes.length)]
+  return <span className="preview-image-cell" style={{ background: `linear-gradient(135deg, ${from}, ${to})` }} aria-label={`${label}，${count} 张图片`}>
+    <b>{count}</b>
+  </span>
+}

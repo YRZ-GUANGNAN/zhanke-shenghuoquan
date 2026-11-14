@@ -14,6 +14,8 @@ import {
   Button,
   Drawer,
   EmptyState,
+  ImageCell,
+  ImageStrip,
   Modal,
   PageHeader,
   Panel,
@@ -345,8 +347,8 @@ function CommunityOperations() {
     </section>
     <Panel eyebrow="COMMUNITY FEED" title="社区内容" description="公开内容可以直接下架，待审内容统一进入审核中心。" actions={<SearchBox value={query} onChange={setQuery} placeholder="搜索标题、作者或话题" />}>
       <div className="preview-toolbar"><Segmented value={status} onChange={setStatus} options={[{ value: '全部', label: '全部' }, { value: '已公开', label: '已公开' }, { value: '待审核', label: '待审核' }, { value: '已下架', label: '已下架' }]} /></div>
-      <div className="preview-table-wrap"><table className="preview-table" aria-label="内容列表"><thead><tr><th>内容</th><th>作者</th><th>话题</th><th>状态</th><th>时间</th><th /></tr></thead><tbody>
-        {paged.slice.map(item => <tr key={item.id}><td><button type="button" className="preview-table__primary" onClick={() => setDetailId(item.id)}>{item.title}<small>{item.id}</small></button></td><td>{item.author}</td><td>{item.topic}</td><td><StatusPill>{item.status}</StatusPill></td><td>{formatTime(item.createdAt)}</td><td>{item.status === '已公开' && <Button size="sm" variant="danger" onClick={() => { setCommunityStatus(item.id, '已下架'); notify('内容已下架，处理记录已保留', 'info') }}>下架</Button>}</td></tr>)}
+      <div className="preview-table-wrap"><table className="preview-table" aria-label="内容列表"><thead><tr><th>内容</th><th>图片</th><th>作者</th><th>话题</th><th>状态</th><th>时间</th><th /></tr></thead><tbody>
+        {paged.slice.map(item => <tr key={item.id}><td><button type="button" className="preview-table__primary" onClick={() => setDetailId(item.id)}>{item.title}<small>{item.id}</small></button></td><td><ImageCell count={item.imageCount ?? 0} seed={item.id} label={item.title} /></td><td>{item.author}</td><td>{item.topic}</td><td><StatusPill>{item.status}</StatusPill></td><td>{formatTime(item.createdAt)}</td><td>{item.status === '已公开' && <Button size="sm" variant="danger" onClick={() => { setCommunityStatus(item.id, '已下架'); notify('内容已下架，处理记录已保留', 'info') }}>下架</Button>}</td></tr>)}
       </tbody></table>{filtered.length === 0 && <EmptyState title="没有匹配内容" description="调整筛选条件后再试。" />}</div>
       <Pagination page={paged.page} pageSize={paged.pageSize} total={paged.total} onChange={paged.setPage} label="内容列表分页" />
     </Panel>
@@ -378,6 +380,7 @@ function CommunityOperations() {
           <div><span>评论</span><strong>{(detail.comments || []).length} 条</strong></div>
           <div><span>举报</span><strong>{detail.reportCount ?? 0} 次</strong></div>
         </div>
+        <div className="preview-note-block"><span>图片（{detail.imageCount ?? 0}）</span><ImageStrip count={detail.imageCount ?? 0} seed={detail.id} label={detail.title} /></div>
         <div className="preview-note-block"><span>正文</span><p>{detail.body || '（该内容没有正文）'}</p></div>
         <div className="preview-note-block">
           <span>评论（{(detail.comments || []).length}）</span>
@@ -413,8 +416,8 @@ function TradeOperations() {
     </section>
     <Panel eyebrow="SECONDHAND MARKET" title="商品工作队列" description="审核状态与业务状态分离；下架只影响展示。" actions={<SearchBox value={query} onChange={setQuery} placeholder="搜索商品、卖家或分类" />}>
       <div className="preview-toolbar"><Segmented value={status} onChange={setStatus} options={[{ value: '全部', label: '全部' }, { value: '出售中', label: '出售中' }, { value: '已预留', label: '已预留' }, { value: '已下架', label: '已下架' }]} /></div>
-      <div className="preview-table-wrap"><table className="preview-table" aria-label="商品列表"><thead><tr><th>商品</th><th>卖家</th><th>分类</th><th>价格</th><th>状态</th><th>时间</th><th /></tr></thead><tbody>
-        {filtered.map(item => <tr key={item.id}><td><strong>{item.title}</strong><span>{item.id}</span></td><td>{item.seller}</td><td>{item.category}</td><td><strong>{formatMoney(item.priceCents)}</strong></td><td><StatusPill>{item.status}</StatusPill></td><td>{formatTime(item.createdAt)}</td><td>{item.status !== '已下架' && <Button size="sm" variant="ghost" onClick={() => { setProductStatus(item.id, '已下架'); notify('商品已下架', 'info') }}>下架</Button>}</td></tr>)}
+      <div className="preview-table-wrap"><table className="preview-table" aria-label="商品列表"><thead><tr><th>商品</th><th>图片</th><th>卖家</th><th>分类</th><th>价格</th><th>状态</th><th>时间</th><th /></tr></thead><tbody>
+        {paged2.slice.map(item => <tr key={item.id}><td><button type="button" className="preview-table__primary" onClick={() => setDetailId(item.id)}>{item.title}<small>{item.id}</small></button></td><td><ImageCell count={item.imageCount ?? 0} seed={item.id} label={item.title} /></td><td>{item.seller}</td><td>{item.category}</td><td><strong>{formatMoney(item.priceCents)}</strong></td><td><StatusPill>{item.status}</StatusPill></td><td>{formatTime(item.createdAt)}</td><td>{item.status !== '已下架' && <Button size="sm" variant="ghost" onClick={() => { setProductStatus(item.id, '已下架'); notify('商品已下架', 'info') }}>下架</Button>}</td></tr>)}
       </tbody></table>{filtered.length === 0 && <EmptyState title="没有匹配商品" description="调整筛选条件后再试。" />}</div>
       <Pagination page={paged2.page} pageSize={paged2.pageSize} total={paged2.total} onChange={paged2.setPage} label="商品列表分页" />
     </Panel>
@@ -444,6 +447,7 @@ function TradeOperations() {
           <div><span>收藏</span><strong>{detail.favoriteCount ?? 0}</strong></div>
           <div><span>举报</span><strong>{detail.reportCount ?? 0} 次</strong></div>
         </div>
+        <div className="preview-note-block"><span>图片（{detail.imageCount ?? 0}）</span><ImageStrip count={detail.imageCount ?? 0} seed={detail.id} label={detail.title} /></div>
         <div className="preview-note-block"><span>商品描述</span><p>{detail.description || '（无描述）'}</p></div>
       </div>}
     </Drawer>
