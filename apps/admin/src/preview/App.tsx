@@ -1,3 +1,4 @@
+import zhCN from 'antd/lib/locale/zh_CN'
 import {
   Badge,
   Button as AntButton,
@@ -17,7 +18,6 @@ import {
   FileImageOutlined,
   IdcardOutlined,
   MessageOutlined,
-  ProfileOutlined,
   SettingOutlined,
   ShareAltOutlined,
   ShopOutlined,
@@ -27,7 +27,6 @@ import {
 } from '@ant-design/icons'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { PreviewSection } from './data'
-import { usePreviewStore } from './store'
 import { Modal, ToastProvider, usePreviewToast } from './ui'
 import { DashboardView } from './views/DashboardView'
 import { DeliveryView } from './views/DeliveryView'
@@ -36,6 +35,12 @@ import { OperationsView } from './views/OperationsView'
 import { PeopleView } from './views/PeopleView'
 import { SettingsView } from './views/SettingsView'
 import { LegacyTakeoutView } from './views/LegacyTakeoutView'
+import { Login } from '../Login'
+import { AccountPanel } from '../AccountPanel'
+import { useAdminStore } from '../store'
+import { adminAuthAPI } from '../services/admin-auth'
+import { adminAPI } from '../services/f-admin'
+import { legacyTakeoutEnabled } from '../feature-flags'
 
 interface NavigationItem {
   key: PreviewSection
@@ -64,13 +69,10 @@ const navigation: NavigationItem[] = [
 
 const groups: NavigationItem['group'][] = ['工作台', '业务运营', '内容与用户', '平台设置']
 
-function PreviewApp() {
-  const section = usePreviewStore(state => state.section)
-  const setSection = usePreviewStore(state => state.setSection)
-  const deliveries = usePreviewStore(state => state.deliveries)
-  const reviews = usePreviewStore(state => state.reviews)
-  const features = usePreviewStore(state => state.settings.features)
-  const resetPreview = usePreviewStore(state => state.resetPreview)
+type FeatureVisibility = Record<string, boolean>
+
+function ConsoleShell() {
+  const [section, setSection] = useState<PreviewSection>('dashboard')
   const [collapsed, setCollapsed] = useState(false)
   const [navOpen, setNavOpen] = useState(false)
   const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches)
@@ -81,23 +83,39 @@ function PreviewApp() {
     return () => query.removeEventListener('change', onChange)
   }, [])
   const [searchOpen, setSearchOpen] = useState(false)
-  const [resetOpen, setResetOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [attentionCount, setAttentionCount] = useState(0)
+  const [features, setFeatures] = useState<FeatureVisibility | null>(null)
   const { notify } = usePreviewToast()
 
+  // 待办徽章与导航可见性都来自真实接口；失败时保持全部可见并静默降级。
+  useEffect(() => {
+    let active = true
+    adminAPI.stats()
+      .then(stats => { if (active) setAttentionCount(stats.totals.pendingReview) })
+      .catch(() => {})
+    adminAPI.featurePolicy()
+      .then(policy => { if (active) setFeatures(policy.flags as unknown as FeatureVisibility) })
+      .catch(() => {})
+    return () => { active = false }
+  }, [])
+
   const availableNavigation = useMemo(() => navigation.filter(item => {
-    if (item.key === 'delivery') return features.delivery
-    if (item.key === 'notifications') return features.notifications
-    if (item.key === 'community') return features.forum
-    if (item.key === 'trade') return features.secondhand
-    if (item.key === 'takeout') return features.takeout
+    if (!features) {
+      if (item.key === 'takeout') return legacyTakeoutEnabled
+      if (item.key === 'feature-policy') return false
+      return true
+    }
+    if (item.key === 'delivery') return features.delivery !== false
+    if (item.key === 'notifications') return features.notifications !== false
+    if (item.key === 'community') return features.forum !== false
+    if (item.key === 'trade') return features.secondhand !== false
+    if (item.key === 'takeout') return legacyTakeoutEnabled && features.takeout !== false
+    if (item.key === 'feature-policy') return false
     return true
   }), [features])
 
   const active = navigation.find(item => item.key === section)
-  const attentionCount = deliveries.filter(item => item.status === '失败').length
-    + reviews.filter(item => item.status === '待审核' && item.risk === '高风险').length
-
   const filteredNavigation = useMemo(() => {
     const normalized = query.trim().toLowerCase()
     if (!normalized) return availableNavigation
@@ -157,7 +175,7 @@ function PreviewApp() {
       .map(item => ({ key: item.key, icon: item.icon, label: item.label }))
   })).filter(item => item.children.length > 0)
 
-  return <ConfigProvider componentSize="middle">
+  return <ConfigProvider componentSize="middle" locale={zhCN}>
     <Layout className="preview-shell">
       {!narrow && <Layout.Sider
         className="preview-sider"
@@ -223,18 +241,13 @@ function PreviewApp() {
               aria-label="搜索页面"
             />
             {narrow && <AntButton type="text" aria-label="搜索页面" onClick={() => setSearchOpen(true)}>⌕</AntButton>}
-            <Badge count={attentionCount} size="small">
-              <AntButton type="text" icon={<BellOutlined />} aria-label="查看消息通知" onClick={() => navigate('notifications')} />
+            <Badge count={attentionCount} size="small" overflowCount={99}>
+              <AntButton type="text" icon={<BellOutlined />} aria-label="查看待处理任务" onClick={() => navigate('moderation')} />
             </Badge>
-            <Tag color="blue">本地预览</Tag>
-            <AntButton type="link" onClick={() => setResetOpen(true)}>重置数据</AntButton>
-            <span className="preview-topbar__avatar">运</span>
+            <AccountPanel />
           </div>
         </header>
         <Layout.Content className="preview-content">
-          <div className="preview-mock-banner" role="note">
-            <span>演示数据</span>以下数字为本地模拟数据，仅用于界面评审，不代表真实经营情况。
-          </div>
           {content}
         </Layout.Content>
       </Layout>
@@ -267,26 +280,22 @@ function PreviewApp() {
         {filteredNavigation.length === 0 && <p>没有匹配的模块</p>}
       </div>
     </Modal>
-
-    <Modal
-      open={resetOpen}
-      title="恢复本地演示数据"
-      onClose={() => setResetOpen(false)}
-      width="sm"
-      footer={<>
-        <AntButton onClick={() => setResetOpen(false)}>取消</AntButton>
-        <AntButton type="primary" onClick={() => {
-          resetPreview()
-          setResetOpen(false)
-          notify('本地预览数据已恢复', 'info')
-        }}>确认恢复</AntButton>
-      </>}
-    >
-      <p>将清除当前浏览器中新增和修改的本地预览数据。</p>
-    </Modal>
   </ConfigProvider>
 }
 
 export default function App() {
-  return <ToastProvider><PreviewApp /></ToastProvider>
+  const authStatus = useAdminStore(state => state.authStatus)
+  const setAuthenticated = useAdminStore(state => state.setAuthenticated)
+  const setUnauthenticated = useAdminStore(state => state.setUnauthenticated)
+  useEffect(() => {
+    if (authStatus !== 'checking') return
+    let active = true
+    adminAuthAPI.session()
+      .then(session => { if (active) setAuthenticated(session) })
+      .catch(() => { if (active) setUnauthenticated() })
+    return () => { active = false }
+  }, [authStatus, setAuthenticated, setUnauthenticated])
+  if (authStatus === 'checking') return <main className="auth-loading"><div className="auth-loading__mark">湛</div><p>正在验证管理员会话…</p></main>
+  if (authStatus === 'unauthenticated') return <Login />
+  return <ToastProvider><ConsoleShell /></ToastProvider>
 }
