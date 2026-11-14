@@ -512,3 +512,90 @@ export function todayKey(now: Date = new Date()): string {
 export function isToday(value: string): boolean {
   return typeof value === 'string' && value.startsWith(todayKey())
 }
+
+/* ===== 配送资金与费率 ===== */
+export interface MerchantWallet { merchantId: string; name: string; balanceCents: number; frozenCents: number; updatedAt: string }
+export interface RiderWallet { riderId: string; name: string; balanceCents: number; pendingCents: number; updatedAt: string }
+export interface RiderEarning { id: string; rider: string; orderId: string; amountCents: number; status: '待结' | '已结'; createdAt: string }
+export interface PayoutQueueItem { id: string; rider: string; amountCents: number; status: '排队中' | '已打款'; requestedAt: string }
+export interface WithdrawalItem { id: string; rider: string; amountCents: number; status: '待处理' | '已打款' | '已退回'; createdAt: string; reference: string; note: string }
+export interface RefundItem { id: string; orderId: string; amountCents: number; status: '处理中' | '已退款' | '失败'; reason: string; createdAt: string }
+export interface FeeConfig { deliveryFeeCents: number; platformCutCents: number; rowVersion: number; updatedAt: string }
+export interface MerchantOverride { merchantId: string; name: string; deliveryFeeCents: number; platformCutCents: number; enabled: boolean }
+export interface FundingSource { name: string; expectedCents: number; actualCents: number }
+
+export const seedMerchantWallets: MerchantWallet[] = [
+  { merchantId: 'M-01', name: '北区轻食铺', balanceCents: 38600, frozenCents: 0, updatedAt: '2026-11-14T09:20:00+08:00' },
+  { merchantId: 'M-02', name: '西区外卖柜', balanceCents: 12400, frozenCents: 680, updatedAt: '2026-11-14T08:55:00+08:00' },
+  { merchantId: 'M-03', name: '南区驿站', balanceCents: 0, frozenCents: 0, updatedAt: '2026-11-13T18:02:00+08:00' }
+]
+
+export const seedRiderWallets: RiderWallet[] = [
+  { riderId: 'R-01', name: '周师傅', balanceCents: 8600, pendingCents: 1200, updatedAt: '2026-11-14T09:30:00+08:00' },
+  { riderId: 'R-02', name: '黄师傅', balanceCents: 4200, pendingCents: 0, updatedAt: '2026-11-14T09:02:00+08:00' },
+  { riderId: 'R-03', name: '李师傅', balanceCents: 1500, pendingCents: 800, updatedAt: '2026-11-13T20:41:00+08:00' }
+]
+
+export const seedRiderEarnings: RiderEarning[] = [
+  { id: 'RE-101', rider: '周师傅', orderId: 'CC20261114001', amountCents: 120, status: '待结', createdAt: '2026-11-14T09:18:00+08:00' },
+  { id: 'RE-102', rider: '黄师傅', orderId: 'CC20261114003', amountCents: 140, status: '待结', createdAt: '2026-11-14T08:36:00+08:00' },
+  { id: 'RE-103', rider: '李师傅', orderId: 'CC20261114004', amountCents: 80, status: '已结', createdAt: '2026-11-13T19:12:00+08:00' },
+  { id: 'RE-104', rider: '周师傅', orderId: 'CC2026111302', amountCents: 100, status: '已结', createdAt: '2026-11-13T17:40:00+08:00' }
+]
+
+export const seedPayoutQueue: PayoutQueueItem[] = [
+  { id: 'PO-31', rider: '李师傅', amountCents: 800, status: '排队中', requestedAt: '2026-11-14T08:10:00+08:00' },
+  { id: 'PO-30', rider: '周师傅', amountCents: 1200, status: '排队中', requestedAt: '2026-11-14T07:55:00+08:00' }
+]
+
+export const seedWithdrawals: WithdrawalItem[] = [
+  { id: 'WD-51', rider: '周师傅', amountCents: 1200, status: '待处理', createdAt: '2026-11-14T07:55:00+08:00', reference: '', note: '' },
+  { id: 'WD-50', rider: '黄师傅', amountCents: 500, status: '已打款', createdAt: '2026-11-13T16:20:00+08:00', reference: '转账回单 1129', note: '已线下转账' },
+  { id: 'WD-49', rider: '李师傅', amountCents: 300, status: '已退回', createdAt: '2026-11-12T15:05:00+08:00', reference: '', note: '收款信息有误' }
+]
+
+export const seedRefunds: RefundItem[] = [
+  { id: 'RF-21', orderId: 'CC2026111305', amountCents: 520, status: '处理中', reason: '商家取消出餐', createdAt: '2026-11-14T08:44:00+08:00' },
+  { id: 'RF-20', orderId: 'CC2026111202', amountCents: 680, status: '已退款', reason: '超时未接单', createdAt: '2026-11-12T12:10:00+08:00' },
+  { id: 'RF-19', orderId: 'CC2026111101', amountCents: 450, status: '失败', reason: '微信返回退款失败', createdAt: '2026-11-11T19:30:00+08:00' }
+]
+
+export const seedFeeConfig: FeeConfig = { deliveryFeeCents: 100, platformCutCents: 20, rowVersion: 3, updatedAt: '2026-11-10T10:00:00+08:00' }
+
+export const seedMerchantOverrides: MerchantOverride[] = [
+  { merchantId: 'M-02', name: '西区外卖柜', deliveryFeeCents: 120, platformCutCents: 30, enabled: true },
+  { merchantId: 'M-01', name: '北区轻食铺', deliveryFeeCents: 80, platformCutCents: 10, enabled: false }
+]
+
+export const seedFundingSources: FundingSource[] = [
+  { name: '商家充值', expectedCents: 51000, actualCents: 51000 },
+  { name: '配送费支付', expectedCents: 3200, actualCents: 3120 },
+  { name: '退款支出', expectedCents: 680, actualCents: 680 }
+]
+
+/* ===== 素材处理链路 ===== */
+export interface MediaDecision { id: string; assetId: string; result: '通过' | '拒绝'; note: string; decidedAt: string }
+export interface MediaEventItem { id: string; assetId: string; action: string; status: '已完成' | '失败'; at: string }
+export interface MediaGcJob { id: string; assetId: string; kind: string; status: '已完成' | '待处理'; at: string }
+
+export const seedMediaDecisions: MediaDecision[] = [
+  { id: 'MD-11', assetId: 'AS-1', result: '通过', note: '自动审核：未检出违规', decidedAt: '2026-11-14T09:02:00+08:00' },
+  { id: 'MD-12', assetId: 'AS-2', result: '拒绝', note: '人工复核：含外部联系方式', decidedAt: '2026-11-14T08:31:00+08:00' }
+]
+export const seedMediaEvents: MediaEventItem[] = [
+  { id: 'ME-21', assetId: 'AS-1', action: '上传完成并转码', status: '已完成', at: '2026-11-14T09:01:00+08:00' },
+  { id: 'ME-22', assetId: 'AS-3', action: '清理任务入队', status: '失败', at: '2026-11-14T07:48:00+08:00' }
+]
+export const seedMediaGc: MediaGcJob[] = [
+  { id: 'MG-31', assetId: 'AS-4', kind: '对象存储删除', status: '已完成', at: '2026-11-13T22:10:00+08:00' },
+  { id: 'MG-32', assetId: 'AS-3', kind: '对象存储删除', status: '待处理', at: '2026-11-14T07:48:00+08:00' }
+]
+
+/* ===== 后台登录账号 ===== */
+export interface AdminCredentialItem { username: string; name: string; role: '管理员' | '超级管理员'; status: '正常' | '已锁定'; passwordUpdatedAt: string }
+
+export const seedAdminCredentials: AdminCredentialItem[] = [
+  { username: 'administrator', name: '校园用户', role: '超级管理员', status: '正常', passwordUpdatedAt: '2026-11-13T19:10:00+08:00' },
+  { username: 'ops.zhang', name: '张运营', role: '管理员', status: '正常', passwordUpdatedAt: '2026-11-13T19:35:00+08:00' },
+  { username: 'ops.li', name: '李客服', role: '管理员', status: '已锁定', passwordUpdatedAt: '2026-11-01T10:12:00+08:00' }
+]

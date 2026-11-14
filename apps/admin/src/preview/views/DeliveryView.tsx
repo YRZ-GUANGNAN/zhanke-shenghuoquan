@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { formatMoney, formatTime, type DeliveryOrder } from '../data'
 import { usePreviewStore } from '../store'
+import { FeeSection, FundsSection, type FeeView, type FundView } from './DeliveryFundsViews'
 import {
   Button,
   Drawer,
@@ -10,8 +11,10 @@ import {
   SearchBox,
   Segmented,
   SelectField,
+  Pagination,
   StatCard,
   StatusPill,
+  usePagedList,
   usePreviewToast
 } from '../ui'
 
@@ -31,6 +34,9 @@ export function DeliveryView() {
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [riderDraft, setRiderDraft] = useState('周师傅')
+  const [view, setView] = useState<'overview' | 'funds' | 'fee'>('overview')
+  const [fundView, setFundView] = useState<FundView>('merchant')
+  const [feeView, setFeeView] = useState<FeeView>('default')
   const { notify } = usePreviewToast()
 
   const filtered = useMemo(() => orders.filter(order => {
@@ -41,6 +47,7 @@ export function DeliveryView() {
     return matchesStatus && matchesQuery
   }), [orders, query, status])
 
+  const paged = usePagedList(filtered, 8)
   const selected = orders.find(order => order.id === selectedId) || null
   const totals = useMemo(() => ({
     active: orders.filter(order => order.status === '配送中').length,
@@ -70,7 +77,18 @@ export function DeliveryView() {
       description="从订单进入、骑手分配到完成确认，每一步都给出明确状态和下一步动作。"
     />
 
-    <section className="preview-stat-grid">
+    <div className="preview-subtabs" role="tablist" aria-label="配送模块">
+      {([['overview', '订单与概览'], ['funds', '资金与结算'], ['fee', '费率配置']] as const).map(([key, label]) => <button
+        key={key}
+        type="button"
+        role="tab"
+        aria-selected={view === key}
+        className={view === key ? 'active' : ''}
+        onClick={() => setView(key)}
+      >{label}</button>)}
+    </div>
+
+    {view === 'overview' && <><section className="preview-stat-grid">
       <StatCard label="正在配送" value={totals.active} meta="实时履约中" tone="accent" unit="单" />
       <StatCard label="等待接单" value={totals.waiting} meta="需要分配或广播" tone="amber" unit="单" />
       <StatCard label="今日已完成" value={totals.complete} meta="可进入结算核对" tone="mint" unit="单" />
@@ -105,7 +123,7 @@ export function DeliveryView() {
             <thead><tr>
               <th>订单</th><th>取送到</th><th>骑手</th><th>金额</th><th>状态</th><th>进入时间</th><th />
             </tr></thead>
-            <tbody>{filtered.map(order => <tr key={order.id}>
+            <tbody>{paged.slice.map(order => <tr key={order.id}>
               <td><button type="button" className="preview-table__primary" onClick={() => { setSelectedId(order.id); setRiderDraft(order.rider === '待分配' ? '周师傅' : order.rider) }}>{order.id}<small>{order.customer}</small></button></td>
               <td><strong>{order.pickup}</strong><span>→ {order.dropoff}</span></td>
               <td>{order.rider === '待分配' ? <StatusPill tone="warning">待分配</StatusPill> : order.rider}</td>
@@ -116,7 +134,12 @@ export function DeliveryView() {
             </tr>)}</tbody>
           </table>
         </div>}
+      <Pagination page={paged.page} pageSize={paged.pageSize} total={paged.total} onChange={paged.setPage} label="配送订单分页" />
     </Panel>
+    </>}
+
+    {view === 'funds' && <FundsSection value={fundView} onChange={setFundView} />}
+    {view === 'fee' && <FeeSection value={feeView} onChange={setFeeView} />}
 
     <Drawer
       open={Boolean(selected)}

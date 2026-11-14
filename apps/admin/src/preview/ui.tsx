@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   Button as AntButton,
   Card,
@@ -383,4 +384,33 @@ export function ProgressBar({ value, label }: { value: number; label: string }) 
     strokeWidth={6}
     aria-label={label}
   />
+}
+
+// 列表分页：统一 8 条一页，避免长列表把页面撑开。
+export function usePagedList<T>(items: T[], pageSize = 8) {
+  const [page, setPage] = useState(1)
+  const pages = Math.max(1, Math.ceil(items.length / pageSize))
+  const safePage = Math.min(page, pages)
+  return {
+    page: safePage,
+    setPage,
+    total: items.length,
+    pageSize,
+    slice: items.slice((safePage - 1) * pageSize, safePage * pageSize)
+  }
+}
+
+export function Pagination({ page, pageSize, total, onChange, label }: {
+  page: number
+  pageSize: number
+  total: number
+  onChange: (page: number) => void
+  label?: string
+}) {
+  const pages = Math.max(1, Math.ceil(total / pageSize))
+  return <div className="preview-pagination" aria-label={label || '分页'}>
+    <span>共 {total} 条 · 第 {page} / {pages} 页</span>
+    <Button size="sm" disabled={page <= 1} onClick={() => onChange(page - 1)}>上一页</Button>
+    <Button size="sm" disabled={page >= pages} onClick={() => onChange(page + 1)}>下一页</Button>
+  </div>
 }

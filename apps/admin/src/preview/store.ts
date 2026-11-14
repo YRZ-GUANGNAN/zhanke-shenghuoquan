@@ -2,7 +2,20 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
   FEATURE_KEYS,
+  seedAdminCredentials,
   seedCommunity,
+  seedFeeConfig,
+  seedFundingSources,
+  seedMediaDecisions,
+  seedMediaEvents,
+  seedMediaGc,
+  seedMerchantOverrides,
+  seedMerchantWallets,
+  seedPayoutQueue,
+  seedRefunds,
+  seedRiderEarnings,
+  seedRiderWallets,
+  seedWithdrawals,
   seedDeliveries,
   seedFeedbacks,
   seedIdentities,
@@ -17,11 +30,24 @@ import {
   seedTemplates,
   seedUsers,
   seedWebhooks,
+  type AdminCredentialItem,
   type CommunityItem,
   type DeliveryOrder,
+  type FeeConfig,
   type FeedbackItem,
+  type FundingSource,
+  type MediaDecision,
+  type MediaEventItem,
+  type MediaGcJob,
   type IdentityItem,
   type LegacyTakeoutMerchant,
+  type MerchantOverride,
+  type MerchantWallet,
+  type PayoutQueueItem,
+  type RefundItem,
+  type RiderEarning,
+  type RiderWallet,
+  type WithdrawalItem,
   type MediaItem,
   type MessageTemplateItem,
   type NotificationDelivery,
@@ -52,6 +78,27 @@ interface PreviewState {
   deliveries: NotificationDelivery[]
   settings: PreviewSettings
   takeoutMerchants: LegacyTakeoutMerchant[]
+  merchantWallets: MerchantWallet[]
+  riderWallets: RiderWallet[]
+  riderEarnings: RiderEarning[]
+  payoutQueue: PayoutQueueItem[]
+  withdrawals: WithdrawalItem[]
+  refunds: RefundItem[]
+  feeConfig: FeeConfig
+  merchantOverrides: MerchantOverride[]
+  fundingSources: FundingSource[]
+  mediaDecisions: MediaDecision[]
+  mediaEvents: MediaEventItem[]
+  mediaGc: MediaGcJob[]
+  adminCredentials: AdminCredentialItem[]
+  updateFeeConfig: (deliveryFeeCents: number, platformCutCents: number) => void
+  toggleMerchantOverride: (merchantId: string) => void
+  payWithdrawal: (id: string, reference: string) => void
+  rejectWithdrawal: (id: string, note: string) => void
+  markPayoutPaid: (id: string) => void
+  addAdminCredential: (value: AdminCredentialItem) => void
+  removeAdminCredential: (username: string) => void
+  resetAdminCredential: (username: string, passwordUpdatedAt: string) => void
   setSection: (section: PreviewSection) => void
   updateOrderStatus: (id: string, status: DeliveryOrder['status']) => void
   assignRider: (id: string, rider: string) => void
@@ -93,7 +140,20 @@ const initialData = () => ({
   webhooks: structuredClone(seedWebhooks),
   deliveries: structuredClone(seedDeliveries),
   settings: structuredClone(seedSettings),
-  takeoutMerchants: structuredClone(seedTakeoutMerchants)
+  takeoutMerchants: structuredClone(seedTakeoutMerchants),
+  merchantWallets: structuredClone(seedMerchantWallets),
+  riderWallets: structuredClone(seedRiderWallets),
+  riderEarnings: structuredClone(seedRiderEarnings),
+  payoutQueue: structuredClone(seedPayoutQueue),
+  withdrawals: structuredClone(seedWithdrawals),
+  refunds: structuredClone(seedRefunds),
+  feeConfig: structuredClone(seedFeeConfig),
+  merchantOverrides: structuredClone(seedMerchantOverrides),
+  fundingSources: structuredClone(seedFundingSources),
+  mediaDecisions: structuredClone(seedMediaDecisions),
+  mediaEvents: structuredClone(seedMediaEvents),
+  mediaGc: structuredClone(seedMediaGc),
+  adminCredentials: structuredClone(seedAdminCredentials)
 })
 
 const now = () => new Date().toISOString()
@@ -103,6 +163,27 @@ export const usePreviewStore = create<PreviewState>()(
     (set, get) => ({
       section: 'dashboard',
       ...initialData(),
+      updateFeeConfig: (deliveryFeeCents, platformCutCents) => set(state => ({
+        feeConfig: { deliveryFeeCents, platformCutCents, rowVersion: state.feeConfig.rowVersion + 1, updatedAt: now() }
+      })),
+      toggleMerchantOverride: merchantId => set(state => ({
+        merchantOverrides: state.merchantOverrides.map(item => item.merchantId === merchantId ? { ...item, enabled: !item.enabled } : item)
+      })),
+      payWithdrawal: (id, reference) => set(state => ({
+        withdrawals: state.withdrawals.map(item => item.id === id ? { ...item, status: '已打款', reference, note: '已线下转账' } : item),
+        payoutQueue: state.payoutQueue.map(item => item.id === id ? { ...item, status: '已打款' } : item)
+      })),
+      rejectWithdrawal: (id, note) => set(state => ({
+        withdrawals: state.withdrawals.map(item => item.id === id ? { ...item, status: '已退回', note } : item)
+      })),
+      markPayoutPaid: id => set(state => ({
+        payoutQueue: state.payoutQueue.map(item => item.id === id ? { ...item, status: '已打款' } : item)
+      })),
+      addAdminCredential: value => set(state => ({ adminCredentials: [...state.adminCredentials, value] })),
+      removeAdminCredential: username => set(state => ({ adminCredentials: state.adminCredentials.filter(item => item.username !== username) })),
+      resetAdminCredential: (username, passwordUpdatedAt) => set(state => ({
+        adminCredentials: state.adminCredentials.map(item => item.username === username ? { ...item, passwordUpdatedAt, status: '正常' } : item)
+      })),
       setSection: section => set({ section }),
       updateOrderStatus: (id, status) => set(state => ({
         orders: state.orders.map(order => order.id === id ? { ...order, status } : order)
@@ -241,7 +322,20 @@ export const usePreviewStore = create<PreviewState>()(
         webhooks: state.webhooks,
         deliveries: state.deliveries,
         settings: state.settings,
-        takeoutMerchants: state.takeoutMerchants
+        takeoutMerchants: state.takeoutMerchants,
+        merchantWallets: state.merchantWallets,
+        riderWallets: state.riderWallets,
+        riderEarnings: state.riderEarnings,
+        payoutQueue: state.payoutQueue,
+        withdrawals: state.withdrawals,
+        refunds: state.refunds,
+        feeConfig: state.feeConfig,
+        merchantOverrides: state.merchantOverrides,
+        fundingSources: state.fundingSources,
+        mediaDecisions: state.mediaDecisions,
+        mediaEvents: state.mediaEvents,
+        mediaGc: state.mediaGc,
+        adminCredentials: state.adminCredentials
       })
     }
   )

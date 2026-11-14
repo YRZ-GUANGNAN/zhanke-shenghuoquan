@@ -18,9 +18,11 @@ import {
   Panel,
   SearchBox,
   Segmented,
+  Pagination,
   StatCard,
   StatusPill,
   TextAreaField,
+  usePagedList,
   usePreviewToast,
   formatWait
 } from '../ui'
@@ -87,8 +89,13 @@ function MediaOperations() {
   const media = usePreviewStore(state => state.media)
   const setMediaStatus = usePreviewStore(state => state.setMediaStatus)
   const [filter, setFilter] = useState<'全部' | '待审核' | '异常' | '已通过'>('全部')
+  const [tab, setTab] = useState<'assets' | 'decisions' | 'events' | 'gc' | 'deadletters'>('assets')
+  const decisions = usePreviewStore(state => state.mediaDecisions)
+  const events = usePreviewStore(state => state.mediaEvents)
+  const gcJobs = usePreviewStore(state => state.mediaGc)
   const { notify } = usePreviewToast()
   const filtered = media.filter(item => filter === '全部' || item.status === filter)
+  const pagedMedia = usePagedList(filtered, 8)
 
   return <div>
     <PageHeader
@@ -97,7 +104,18 @@ function MediaOperations() {
       description={metaBySection.media.description}
       actions={<Button variant="primary" onClick={() => setFilter('异常')}>{metaBySection.media.action}</Button>}
     />
-    <section className="preview-stat-grid">
+    <div className="preview-subtabs" role="tablist" aria-label="素材模块">
+      {([['assets', '素材'], ['decisions', '审核记录'], ['events', '处理记录'], ['gc', '清理记录'], ['deadletters', '异常记录']] as const).map(([key, label]) => <button
+        key={key}
+        type="button"
+        role="tab"
+        aria-selected={tab === key}
+        className={tab === key ? 'active' : ''}
+        onClick={() => setTab(key)}
+      >{label}</button>)}
+    </div>
+
+    {tab === 'assets' && <><section className="preview-stat-grid">
       <StatCard label="素材总数" value={media.length} meta="图片与视频" tone="accent" />
       <StatCard label="待审核" value={media.filter(item => item.status === '待审核').length} meta="审核后才会对外展示" tone="amber" />
       <StatCard label="异常" value={media.filter(item => item.status === '异常').length} meta="需要重新处理" tone="rose" />
@@ -115,7 +133,7 @@ function MediaOperations() {
       ]} />}
     >
       {filtered.length === 0 ? <EmptyState title="当前筛选下没有素材" description="调整状态筛选后再试。" /> : <div className="preview-media-grid">
-        {filtered.map((asset, index) => <article key={asset.id} className="preview-media-card">
+        {pagedMedia.slice.map((asset, index) => <article key={asset.id} className="preview-media-card">
           <div className={`preview-media-card__visual preview-media-card__visual--${index % 4}`}>
             <span>{asset.kind === '视频' ? '▶' : '▧'}</span>
             <small>{asset.kind}</small>
@@ -131,7 +149,60 @@ function MediaOperations() {
           </div>
         </article>)}
       </div>}
+      <Pagination page={pagedMedia.page} pageSize={pagedMedia.pageSize} total={pagedMedia.total} onChange={pagedMedia.setPage} label="素材列表分页" />
     </Panel>
+    </>}
+
+    {tab === 'decisions' && <Panel eyebrow="REVIEW DECISION" title="审核记录" description="记录每次审核的结论与依据，用于事后追溯。">
+      <div className="preview-table-wrap"><table className="preview-table" aria-label="素材审核记录">
+        <thead><tr><th>记录</th><th>素材</th><th>结论</th><th>依据</th><th>时间</th></tr></thead>
+        <tbody>{decisions.map(item => <tr key={item.id}>
+          <td><strong>{item.id}</strong></td><td>{item.assetId}</td>
+          <td><StatusPill tone={item.result === '通过' ? 'success' : 'danger'}>{item.result}</StatusPill></td>
+          <td className="preview-cell-wrap">{item.note}</td><td>{formatTime(item.decidedAt)}</td>
+        </tr>)}</tbody>
+      </table></div>
+    </Panel>}
+
+    {tab === 'events' && <Panel eyebrow="PROCESS EVENT" title="处理记录" description="上传、转码、投影等处理动作的结果。">
+      <div className="preview-table-wrap"><table className="preview-table" aria-label="素材处理记录">
+        <thead><tr><th>记录</th><th>素材</th><th>动作</th><th>结果</th><th>时间</th></tr></thead>
+        <tbody>{events.map(item => <tr key={item.id}>
+          <td><strong>{item.id}</strong></td><td>{item.assetId}</td><td>{item.action}</td>
+          <td><StatusPill tone={item.status === '已完成' ? 'success' : 'danger'}>{item.status}</StatusPill></td>
+          <td>{formatTime(item.at)}</td>
+        </tr>)}</tbody>
+      </table></div>
+    </Panel>}
+
+    {tab === 'gc' && <Panel eyebrow="CLEANUP JOB" title="清理记录" description="删除素材后由后台异步清理对象存储，失败会重试。">
+      <div className="preview-table-wrap"><table className="preview-table" aria-label="素材清理记录">
+        <thead><tr><th>任务</th><th>素材</th><th>清理内容</th><th>状态</th><th>时间</th></tr></thead>
+        <tbody>{gcJobs.map(item => <tr key={item.id}>
+          <td><strong>{item.id}</strong></td><td>{item.assetId}</td><td>{item.kind}</td>
+          <td><StatusPill tone={item.status === '已完成' ? 'success' : 'warning'}>{item.status}</StatusPill></td>
+          <td>{formatTime(item.at)}</td>
+        </tr>)}</tbody>
+      </table></div>
+    </Panel>}
+
+    {tab === 'deadletters' && <Panel eyebrow="DEAD LETTER" title="异常记录" description="失败且已停止重试的任务，需要人工介入。">
+      {events.filter(item => item.status === '失败').length === 0 && gcJobs.filter(item => item.status === '待处理').length === 0
+        ? <EmptyState title="没有异常记录" description="当前处理与清理任务均正常。" />
+        : <div className="preview-table-wrap"><table className="preview-table" aria-label="素材异常记录">
+          <thead><tr><th>类型</th><th>对象</th><th>说明</th><th>状态</th><th>时间</th></tr></thead>
+          <tbody>
+            {events.filter(item => item.status === '失败').map(item => <tr key={item.id}>
+              <td>处理任务</td><td>{item.assetId}</td><td className="preview-cell-wrap">{item.action}</td>
+              <td><StatusPill tone="danger">失败</StatusPill></td><td>{formatTime(item.at)}</td>
+            </tr>)}
+            {gcJobs.filter(item => item.status === '待处理').map(item => <tr key={item.id}>
+              <td>清理任务</td><td>{item.assetId}</td><td className="preview-cell-wrap">{item.kind}</td>
+              <td><StatusPill tone="warning">待处理</StatusPill></td><td>{formatTime(item.at)}</td>
+            </tr>)}
+          </tbody>
+        </table></div>}
+    </Panel>}
   </div>
 }
 
@@ -259,6 +330,7 @@ function CommunityOperations() {
   const [status, setStatus] = useState<'全部' | CommunityItem['status']>('全部')
   const { notify } = usePreviewToast()
   const filtered = community.filter(item => (status === '全部' || item.status === status) && (!query || `${item.id}${item.title}${item.author}${item.topic}`.includes(query)))
+  const paged = usePagedList(filtered, 8)
   return <div>
     <PageHeader eyebrow={metaBySection.community.eyebrow} title={metaBySection.community.title} description={metaBySection.community.description} actions={<Button variant="primary" onClick={() => setStatus('待审核')}>查看待审内容</Button>} />
     <section className="preview-stat-grid">
@@ -270,8 +342,9 @@ function CommunityOperations() {
     <Panel eyebrow="COMMUNITY FEED" title="社区内容" description="公开内容可以直接下架，待审内容统一进入审核中心。" actions={<SearchBox value={query} onChange={setQuery} placeholder="搜索标题、作者或话题" />}>
       <div className="preview-toolbar"><Segmented value={status} onChange={setStatus} options={[{ value: '全部', label: '全部' }, { value: '已公开', label: '已公开' }, { value: '待审核', label: '待审核' }, { value: '已下架', label: '已下架' }]} /></div>
       <div className="preview-table-wrap"><table className="preview-table" aria-label="内容列表"><thead><tr><th>内容</th><th>作者</th><th>话题</th><th>状态</th><th>时间</th><th /></tr></thead><tbody>
-        {filtered.map(item => <tr key={item.id}><td><strong>{item.title}</strong><span>{item.id}</span></td><td>{item.author}</td><td>{item.topic}</td><td><StatusPill>{item.status}</StatusPill></td><td>{formatTime(item.createdAt)}</td><td>{item.status === '已公开' && <Button size="sm" variant="danger" onClick={() => { setCommunityStatus(item.id, '已下架'); notify('内容已下架，处理记录已保留', 'info') }}>下架</Button>}</td></tr>)}
+        {paged.slice.map(item => <tr key={item.id}><td><strong>{item.title}</strong><span>{item.id}</span></td><td>{item.author}</td><td>{item.topic}</td><td><StatusPill>{item.status}</StatusPill></td><td>{formatTime(item.createdAt)}</td><td>{item.status === '已公开' && <Button size="sm" variant="danger" onClick={() => { setCommunityStatus(item.id, '已下架'); notify('内容已下架，处理记录已保留', 'info') }}>下架</Button>}</td></tr>)}
       </tbody></table>{filtered.length === 0 && <EmptyState title="没有匹配内容" description="调整筛选条件后再试。" />}</div>
+      <Pagination page={paged.page} pageSize={paged.pageSize} total={paged.total} onChange={paged.setPage} label="内容列表分页" />
     </Panel>
   </div>
 }
@@ -283,6 +356,7 @@ function TradeOperations() {
   const [status, setStatus] = useState<'全部' | ProductItem['status']>('全部')
   const { notify } = usePreviewToast()
   const filtered = products.filter(item => (status === '全部' || item.status === status) && (!query || `${item.id}${item.title}${item.seller}${item.category}`.includes(query)))
+  const paged2 = usePagedList(filtered, 8)
   return <div>
     <PageHeader eyebrow={metaBySection.trade.eyebrow} title={metaBySection.trade.title} description={metaBySection.trade.description} actions={<Button variant="primary" onClick={() => setStatus('出售中')}>查看出售中商品</Button>} />
     <section className="preview-stat-grid">
@@ -296,6 +370,7 @@ function TradeOperations() {
       <div className="preview-table-wrap"><table className="preview-table" aria-label="商品列表"><thead><tr><th>商品</th><th>卖家</th><th>分类</th><th>价格</th><th>状态</th><th>时间</th><th /></tr></thead><tbody>
         {filtered.map(item => <tr key={item.id}><td><strong>{item.title}</strong><span>{item.id}</span></td><td>{item.seller}</td><td>{item.category}</td><td><strong>{formatMoney(item.priceCents)}</strong></td><td><StatusPill>{item.status}</StatusPill></td><td>{formatTime(item.createdAt)}</td><td>{item.status !== '已下架' && <Button size="sm" variant="ghost" onClick={() => { setProductStatus(item.id, '已下架'); notify('商品已下架', 'info') }}>下架</Button>}</td></tr>)}
       </tbody></table>{filtered.length === 0 && <EmptyState title="没有匹配商品" description="调整筛选条件后再试。" />}</div>
+      <Pagination page={paged2.page} pageSize={paged2.pageSize} total={paged2.total} onChange={paged2.setPage} label="商品列表分页" />
     </Panel>
   </div>
 }
@@ -306,6 +381,7 @@ function ReportOperations() {
   const [filter, setFilter] = useState<'全部' | ReportItem['status']>('全部')
   const { notify } = usePreviewToast()
   const filtered = reports.filter(item => filter === '全部' || item.status === filter)
+  const paged3 = usePagedList(filtered, 8)
   return <div>
     <PageHeader eyebrow={metaBySection.reports.eyebrow} title={metaBySection.reports.title} description={metaBySection.reports.description} actions={<Button variant="primary" onClick={() => setFilter('待处理')}>处理待办举报</Button>} />
     <section className="preview-stat-grid">
@@ -317,8 +393,9 @@ function ReportOperations() {
     <Panel eyebrow="SAFETY QUEUE" title="举报处理" description="处理结论会同步到对应内容模块。">
       <div className="preview-toolbar"><Segmented value={filter} onChange={setFilter} options={[{ value: '全部', label: '全部' }, { value: '待处理', label: '待处理' }, { value: '处理中', label: '处理中' }, { value: '已解决', label: '已解决' }]} /></div>
       <div className="preview-table-wrap"><table className="preview-table" aria-label="举报列表"><thead><tr><th>举报目标</th><th>原因</th><th>举报人</th><th>状态</th><th>时间</th><th /></tr></thead><tbody>
-        {filtered.map(item => <tr key={item.id}><td><strong>{item.target}</strong><span>{item.id}</span></td><td>{item.reason}</td><td>{item.reporter}</td><td><StatusPill>{item.status}</StatusPill></td><td>{formatTime(item.createdAt)}</td><td>{item.status !== '已解决' && <Button size="sm" variant="primary" onClick={() => { setReportStatus(item.id, '已解决'); notify('举报已标记为已解决') }}>完成处理</Button>}</td></tr>)}
+        {paged3.slice.map(item => <tr key={item.id}><td><strong>{item.target}</strong><span>{item.id}</span></td><td>{item.reason}</td><td>{item.reporter}</td><td><StatusPill>{item.status}</StatusPill></td><td>{formatTime(item.createdAt)}</td><td>{item.status !== '已解决' && <Button size="sm" variant="primary" onClick={() => { setReportStatus(item.id, '已解决'); notify('举报已标记为已解决') }}>完成处理</Button>}</td></tr>)}
       </tbody></table>{filtered.length === 0 && <EmptyState title="当前没有举报" description="切换状态后再试。" />}</div>
+      <Pagination page={paged3.page} pageSize={paged3.pageSize} total={paged3.total} onChange={paged3.setPage} label="举报列表分页" />
     </Panel>
   </div>
 }

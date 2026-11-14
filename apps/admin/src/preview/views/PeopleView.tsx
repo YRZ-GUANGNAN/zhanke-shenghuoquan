@@ -4,6 +4,7 @@ import { usePreviewStore } from '../store'
 import {
   Button,
   EmptyState,
+  Field,
   Modal,
   PageHeader,
   Panel,
@@ -11,8 +12,10 @@ import {
   Segmented,
   SelectField,
   StatCard,
+  Pagination,
   StatusPill,
   TextAreaField,
+  usePagedList,
   usePreviewToast
 } from '../ui'
 
@@ -129,6 +132,7 @@ function FeedbackPeople() {
   const [error, setError] = useState('')
   const { notify } = usePreviewToast()
   const filtered = feedbacks.filter(item => status === '全部' || item.status === status)
+  const pagedFeedbacks = usePagedList(filtered, 8)
 
   const open = (item: FeedbackItem) => {
     setSelected(item)
@@ -163,13 +167,14 @@ function FeedbackPeople() {
     <Panel eyebrow="VOICE OF USER" title="反馈处理" description="处理说明会保留在列表中，方便后续追溯。">
       <div className="preview-toolbar"><Segmented value={status} onChange={setStatus} options={[{ value: '全部', label: '全部' }, { value: '待处理', label: '待处理' }, { value: '处理中', label: '处理中' }, { value: '已解决', label: '已解决' }, { value: '不处理', label: '不处理' }]} /></div>
       {filtered.length === 0 ? <EmptyState title="没有匹配的反馈" description="调整筛选条件后再试。" /> : <div className="preview-feedback-list">
-        {filtered.map(item => <article key={item.id}>
+        {pagedFeedbacks.slice.map(item => <article key={item.id}>
           <div className="preview-feedback-list__meta"><span><strong>{item.user}</strong><small>{item.category} · {formatTime(item.createdAt)}</small></span><StatusPill>{item.status}</StatusPill></div>
           <p>{item.content}</p>
           {item.note && <div className="preview-feedback-list__note"><span>处理说明</span>{item.note}</div>}
           <div className="preview-feedback-list__footer"><span>{item.id}</span><Button size="sm" variant="ghost" onClick={() => open(item)}>{item.status === '已解决' ? '查看/更新' : '处理反馈'}</Button></div>
         </article>)}
       </div>}
+      <Pagination page={pagedFeedbacks.page} pageSize={pagedFeedbacks.pageSize} total={pagedFeedbacks.total} onChange={pagedFeedbacks.setPage} label="反馈列表分页" />
     </Panel>
     <Modal
       open={Boolean(selected)}
@@ -197,6 +202,38 @@ function UserPeople() {
   const updateUserStatus = usePreviewStore(state => state.updateUserStatus)
   const [query, setQuery] = useState('')
   const [role, setRole] = useState<'全部' | UserItem['role']>('全部')
+  const credentials = usePreviewStore(state => state.adminCredentials)
+  const addAdminCredential = usePreviewStore(state => state.addAdminCredential)
+  const removeAdminCredential = usePreviewStore(state => state.removeAdminCredential)
+  const resetAdminCredential = usePreviewStore(state => state.resetAdminCredential)
+  const [credentialDraft, setCredentialDraft] = useState<{ username: string; name: string; password: string } | null>(null)
+  const [credentialError, setCredentialError] = useState('')
+  const managerOptions = users.filter(item => item.role === '管理员' && !credentials.some(entry => entry.name === item.name))
+  const submitCredential = () => {
+    if (!credentialDraft) return
+    if (!/^[A-Za-z0-9._]{3,64}$/.test(credentialDraft.username.trim())) {
+      setCredentialError('用户名需为 3–64 位字母、数字、点或下划线')
+      return
+    }
+    if (credentialDraft.password.length < 14) {
+      setCredentialError('初始密码至少 14 位')
+      return
+    }
+    if (credentials.some(entry => entry.username === credentialDraft.username.trim())) {
+      setCredentialError('该用户名已被使用')
+      return
+    }
+    addAdminCredential({
+      username: credentialDraft.username.trim(),
+      name: credentialDraft.name || '未命名管理员',
+      role: '管理员',
+      status: '正常',
+      passwordUpdatedAt: new Date().toISOString()
+    })
+    notify('登录账号已分配，对方需用该密码登录')
+    setCredentialDraft(null)
+    setCredentialError('')
+  }
   const { notify } = usePreviewToast()
   // 账号状态属于高风险操作，先确认再落库。
   const [pendingStatus, setPendingStatus] = useState<{ item: UserItem; status: UserItem['status'] } | null>(null)
@@ -211,6 +248,7 @@ function UserPeople() {
     (role === '全部' || item.role === role)
     && (!query.trim() || `${item.name}${item.phone}${item.id}`.toLowerCase().includes(query.trim().toLowerCase()))
   ), [query, role, users])
+  const paged = usePagedList(filtered, 8)
 
   return <div>
     <PageHeader
@@ -225,6 +263,34 @@ function UserPeople() {
       <StatCard label="商家/骑手" value={users.filter(item => item.role === '商家' || item.role === '骑手').length} meta="业务角色账号" tone="amber" />
       <StatCard label="受限账号" value={users.filter(item => item.status !== '正常').length} meta="禁言或停用" tone="rose" />
     </section>
+    <Panel
+      eyebrow="ADMIN CREDENTIAL"
+      title="后台登录账号"
+      description="只有被授予登录账号的管理员才能进入本后台；超级管理员可分配、重置或移除。"
+      actions={<Button variant="primary" onClick={() => { setCredentialDraft({ username: '', name: managerOptions[0]?.name || '', password: '' }); setCredentialError('') }}>分配登录账号</Button>}
+    >
+      <div className="preview-table-wrap"><table className="preview-table" aria-label="后台登录账号列表">
+        <thead><tr><th>登录用户名</th><th>管理员</th><th>角色</th><th>状态</th><th>密码更新时间</th><th /></tr></thead>
+        <tbody>{credentials.map(item => <tr key={item.username}>
+          <td><strong>{item.username}</strong><span>{item.username === 'administrator' ? '固定超级管理员' : '可自定义'}</span></td>
+          <td>{item.name}</td>
+          <td>{item.role}</td>
+          <td><StatusPill tone={item.status === '正常' ? 'success' : 'danger'}>{item.status}</StatusPill></td>
+          <td>{formatTime(item.passwordUpdatedAt)}</td>
+          <td><div className="preview-row-actions">
+            <Button size="sm" variant="ghost" onClick={() => {
+              resetAdminCredential(item.username, new Date().toISOString())
+              notify('已重置密码，旧会话将失效', 'info')
+            }}>重置</Button>
+            <Button size="sm" variant="danger" disabled={item.username === 'administrator'} onClick={() => {
+              removeAdminCredential(item.username)
+              notify('已移除该登录账号', 'info')
+            }}>移除</Button>
+          </div></td>
+        </tr>)}</tbody>
+      </table></div>
+    </Panel>
+
     <Panel eyebrow="IDENTITY & ACCESS" title="账号工作队列" description="账号状态操作会即时反馈，并在本浏览器的本地数据中保留。">
       <div className="preview-toolbar">
         <SearchBox value={query} onChange={setQuery} placeholder="搜索姓名、手机号或编号" />
@@ -232,7 +298,7 @@ function UserPeople() {
       </div>
       {filtered.length === 0 ? <EmptyState title="没有匹配的账号" description="调整搜索或角色筛选后再试。" /> : <div className="preview-table-wrap">
         <table className="preview-table" aria-label="用户列表"><thead><tr><th>用户</th><th>角色</th><th>校区</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead><tbody>
-          {filtered.map(item => <tr key={item.id}>
+          {paged.slice.map(item => <tr key={item.id}>
             <td><div className="preview-user-cell"><span>{item.name.slice(0, 1)}</span><div><strong>{item.name}</strong><small>{item.phone} · {item.id}</small></div></div></td>
             <td>{item.role}</td><td>{item.campus}</td><td><StatusPill>{item.status}</StatusPill></td><td>{item.createdAt}</td>
             <td><div className="preview-row-actions">
@@ -244,11 +310,30 @@ function UserPeople() {
           </tr>)}
         </tbody></table>
       </div>}
+      <Pagination page={paged.page} pageSize={paged.pageSize} total={paged.total} onChange={paged.setPage} label="用户列表分页" />
       <div className="preview-policy-note">
         <span>权限说明</span>
         <p>管理员角色修改属于高风险操作。本地原型的“停用/禁言”只影响演示表，不会写入真实账号。</p>
       </div>
     </Panel>
+    <Modal
+      open={Boolean(credentialDraft)}
+      title="分配后台登录账号"
+      description="用户名和密码用于登录本后台，不影响小程序用户身份。"
+      onClose={() => setCredentialDraft(null)}
+      footer={<>
+        <Button onClick={() => setCredentialDraft(null)}>取消</Button>
+        <Button variant="primary" onClick={submitCredential}>保存登录账号</Button>
+      </>}
+    >
+      {credentialDraft && <div className="preview-form-stack">
+        <Field label="管理员姓名" required value={credentialDraft.name} onChange={event => setCredentialDraft({ ...credentialDraft, name: event.target.value })} placeholder="例如：张运营" />
+        <Field label="登录用户名" required value={credentialDraft.username} onChange={event => setCredentialDraft({ ...credentialDraft, username: event.target.value })} placeholder="例如：ops.zhang" hint="3–64 位字母、数字、点或下划线" />
+        <Field label="初始密码" required type="password" value={credentialDraft.password} onChange={event => setCredentialDraft({ ...credentialDraft, password: event.target.value })} placeholder="至少 14 位" />
+        {credentialError && <div className="preview-form-error">{credentialError}</div>}
+      </div>}
+    </Modal>
+
     <Modal
       open={Boolean(pendingStatus)}
       title={pendingStatus ? `将账号改为「${pendingStatus.status}」` : ''}

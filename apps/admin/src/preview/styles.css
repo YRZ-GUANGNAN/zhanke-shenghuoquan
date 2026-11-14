@@ -1802,3 +1802,57 @@ textarea.ant-input { border-radius: 10px !important; }
 .preview-policy-row strong { color: var(--preview-text); font-size: 13px; font-weight: 600; }
 .preview-policy-row small { color: var(--preview-text-muted); font-size: 12px; line-height: 1.5; }
 .preview-policy-row.is-off strong { color: var(--preview-text-muted); }
+
+/* 二级标签（配送、资金、费率） */
+.preview-subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.preview-subtabs button {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--preview-border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--preview-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--duration-fast), border-color var(--duration-fast), background var(--duration-fast);
+}
+.preview-subtabs button:hover { border-color: var(--preview-blue); color: var(--preview-blue); }
+.preview-subtabs button.active { border-color: var(--preview-blue); background: #eaf2fb; color: var(--preview-blue); }
+
+.preview-capability-note {
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border-left: 3px solid #f0b429;
+  border-radius: 8px;
+  background: #fffaf0;
+  color: #7a5200;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.preview-fee-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px 20px;
+  align-items: end;
+}
+.preview-fee-form__meta { color: var(--preview-text-muted); font-size: 12px; }
+.preview-fee-form__actions { display: flex; gap: 10px; margin-top: 14px; }
+
+.preview-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+  color: var(--preview-text-muted);
+  font-size: 12px;
+}
+.preview-row-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.preview-cell-wrap { max-width: 320px; white-space: normal; overflow-wrap: anywhere; }
