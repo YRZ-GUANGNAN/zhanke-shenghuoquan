@@ -140,12 +140,13 @@ function PreviewApp() {
   })()
 
   const menuItems = groups.map(group => ({
-    type: 'group' as const,
+    type: 'submenu' as const,
+    key: `group-${group}`,
     label: group,
     children: availableNavigation
       .filter(item => item.group === group)
       .map(item => ({ key: item.key, icon: item.icon, label: item.label }))
-  }))
+  })).filter(item => item.children.length > 0)
 
   return <ConfigProvider componentSize="middle">
     <Layout className="preview-shell">
@@ -166,6 +167,7 @@ function PreviewApp() {
           mode="inline"
           theme="light"
           selectedKeys={[section]}
+          defaultOpenKeys={[`group-${active?.group || '工作台'}`]}
           items={menuItems}
           onClick={({ key }) => navigate(key as PreviewSection)}
         />
