@@ -178,10 +178,16 @@ export const usePreviewStore = create<PreviewState>()(
       toggleMerchantOverride: merchantId => set(state => ({
         merchantOverrides: state.merchantOverrides.map(item => item.merchantId === merchantId ? { ...item, enabled: !item.enabled } : item)
       })),
-      payWithdrawal: (id, reference) => set(state => ({
-        withdrawals: state.withdrawals.map(item => item.id === id ? { ...item, status: '已打款', reference, note: '已线下转账' } : item),
-        payoutQueue: state.payoutQueue.map(item => item.id === id ? { ...item, status: '已打款' } : item)
-      })),
+      payWithdrawal: (id, reference) => set(state => {
+        const target = state.withdrawals.find(item => item.id === id)
+        return {
+          withdrawals: state.withdrawals.map(item => item.id === id ? { ...item, status: '已打款', reference, note: '已线下转账' } : item),
+          // 待打款与提现是同一笔钱：按骑手 + 金额结清对应的排队记录，避免重复打款。
+          payoutQueue: state.payoutQueue.map(item => target && item.rider === target.rider && item.amountCents === target.amountCents
+            ? { ...item, status: '已打款' }
+            : item)
+        }
+      }),
       rejectWithdrawal: (id, note) => set(state => ({
         withdrawals: state.withdrawals.map(item => item.id === id ? { ...item, status: '已退回', note } : item)
       })),
@@ -194,12 +200,12 @@ export const usePreviewStore = create<PreviewState>()(
         adminCredentials: state.adminCredentials.map(item => item.username === username ? { ...item, passwordUpdatedAt, status: '正常' } : item)
       })),
       reassignOrders: (ids, rider) => set(state => ({
-    orders: state.orders.map(order => ids.includes(order.id)
+    orders: state.orders.map(order => ids.includes(order.id) && order.status !== '已完成' && order.status !== '已取消'
       ? { ...order, rider, status: order.status === '待接单' ? '配送中' : order.status, timeline: [...order.timeline, { label: `改派给${rider}`, at: now() }] }
       : order)
   })),
   cancelOrders: (ids, reason) => set(state => ({
-    orders: state.orders.map(order => ids.includes(order.id)
+    orders: state.orders.map(order => ids.includes(order.id) && order.status !== '已完成' && order.status !== '已取消'
       ? { ...order, status: '已取消', cancelReason: reason, timeline: [...order.timeline, { label: `已取消：${reason}`, at: now() }] }
       : order)
   })),
@@ -213,18 +219,35 @@ export const usePreviewStore = create<PreviewState>()(
   })),
   setSection: section => set({ section }),
       updateOrderStatus: (id, status) => set(state => ({
-        orders: state.orders.map(order => order.id === id ? { ...order, status } : order)
+        orders: state.orders.map(order => order.id === id
+          ? { ...order, status, timeline: [...(order.timeline || []), { label: `状态更新为${status}`, at: now() }] }
+          : order)
       })),
       assignRider: (id, rider) => set(state => ({
         orders: state.orders.map(order => order.id === id
-          ? { ...order, rider, status: order.status === '待接单' ? '配送中' : order.status }
+          ? { ...order, rider, status: order.status === '待接单' ? '配送中' : order.status, timeline: [...order.timeline, { label: `分配给${rider}`, at: now() }] }
           : order)
       })),
-      decideReview: (id, status, reason) => set(state => ({
-        reviews: state.reviews.map(review => review.id === id
-          ? { ...review, status, reason }
-          : review)
-      })),
+      decideReview: (id, status, reason) => set(state => {
+        const review = state.reviews.find(item => item.id === id)
+        const next: Partial<PreviewState> = {
+          reviews: state.reviews.map(item => item.id === id ? { ...item, status, reason } : item)
+        }
+        // 审核中心的结论要回写到对应业务对象，否则同一内容在审核中心和内容页两种状态。
+        if (review?.kind === '帖子') {
+          const mapped: CommunityItem['status'] = status === '已通过' ? '已公开' : status === '已拒绝' ? '已下架' : '待审核'
+          next.community = state.community.map(item => item.title === review.title ? { ...item, status: mapped } : item)
+        }
+        if (review?.kind === '商品') {
+          const mapped: ProductItem['status'] | null = status === '已通过' ? '出售中' : status === '已拒绝' ? '已下架' : null
+          if (mapped) next.products = state.products.map(item => item.title === review.title ? { ...item, status: mapped } : item)
+        }
+        if (review && (review.kind === '骑手' || review.kind === '商家') && (status === '已通过' || status === '已拒绝')) {
+          next.identities = state.identities.map(item =>
+            item.applicant === review.submitter && item.role === review.kind ? { ...item, status, reason } : item)
+        }
+        return next
+      }),
       setCommunityStatus: (id, status) => set(state => ({
         community: state.community.map(item => item.id === id ? { ...item, status } : item)
       })),

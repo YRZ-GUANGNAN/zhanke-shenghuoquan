@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { formatMoney, formatTime, type DeliveryOrder } from '../data'
+import { formatMoney, formatTime, isToday, type DeliveryOrder } from '../data'
 import { usePreviewStore } from '../store'
 import { FeeSection, FundsSection, type FeeView, type FundView } from './DeliveryFundsViews'
 import { DispatchSection } from './DispatchViews'
@@ -36,15 +36,18 @@ export function DeliveryView() {
   const [status, setStatus] = useState<StatusFilter>('全部')
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [riderDraft, setRiderDraft] = useState('周师傅')
+  const [riderDraft, setRiderDraft] = useState('')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [batchAction, setBatchAction] = useState<'reassign' | 'cancel' | null>(null)
-  const [batchRider, setBatchRider] = useState('周师傅')
+  const [batchRider, setBatchRider] = useState('')
   const [batchReason, setBatchReason] = useState('')
   const [batchError, setBatchError] = useState('')
   const riders = usePreviewStore(state => state.riders)
   const reassignOrders = usePreviewStore(state => state.reassignOrders)
   const cancelOrders = usePreviewStore(state => state.cancelOrders)
+  // 只有接单中的骑手可以被分配或改派。
+  const availableRiders = riders.filter(rider => rider.state === '接单中')
+  const defaultRider = availableRiders[0]?.name || ''
   const [view, setView] = useState<'overview' | 'dispatch' | 'funds' | 'fee'>('overview')
   const [dispatchView, setDispatchView] = useState<'riders' | 'merchants'>('riders')
   const [fundView, setFundView] = useState<FundView>('merchant')
@@ -64,7 +67,7 @@ export function DeliveryView() {
   const totals = useMemo(() => ({
     active: orders.filter(order => order.status === '配送中').length,
     waiting: orders.filter(order => order.status === '待接单').length,
-    complete: orders.filter(order => order.status === '已完成').length,
+    complete: orders.filter(order => order.status === '已完成' && isToday(order.createdAt)).length,
     amount: orders.filter(order => order.status === '已完成').reduce((total, order) => total + order.amountCents, 0)
   }), [orders])
 
@@ -122,7 +125,8 @@ export function DeliveryView() {
             { value: '待接单', label: '待接单', badge: orders.filter(item => item.status === '待接单').length },
             { value: '配送中', label: '配送中', badge: orders.filter(item => item.status === '配送中').length },
             { value: '待确认', label: '待确认' },
-            { value: '已完成', label: '已完成' }
+            { value: '已完成', label: '已完成' },
+            { value: '已取消', label: '已取消' }
           ]}
         />
         <span className="preview-toolbar__hint">显示 {filtered.length} 条订单</span>
@@ -131,7 +135,7 @@ export function DeliveryView() {
       {selectedIds.length > 0 && <div className="preview-batch-bar">
         <span>已选 {selectedIds.length} 笔订单</span>
         <div className="preview-row-actions">
-          <Button size="sm" variant="primary" onClick={() => { setBatchRider('周师傅'); setBatchAction('reassign') }}>批量改派骑手</Button>
+          <Button size="sm" variant="primary" onClick={() => { setBatchRider(defaultRider); setBatchError(defaultRider ? '' : '当前没有接单中的骑手'); setBatchAction('reassign') }}>批量改派骑手</Button>
           <Button size="sm" variant="danger" onClick={() => { setBatchReason(''); setBatchError(''); setBatchAction('cancel') }}>批量取消</Button>
           <Button size="sm" onClick={() => setSelectedIds([])}>清除选择</Button>
         </div>
@@ -161,15 +165,15 @@ export function DeliveryView() {
                   onChange={event => setSelectedIds(current => event.target.checked ? [...current, order.id] : current.filter(id => id !== order.id))}
                 />
               </td>
-              <td><button type="button" className="preview-table__primary" onClick={() => { setSelectedId(order.id); setRiderDraft(order.rider === '待分配' ? '周师傅' : order.rider) }}>{order.id}<small>{order.customer}</small></button></td>
+              <td><button type="button" className="preview-table__primary" onClick={() => { setSelectedId(order.id); setRiderDraft(defaultRider) }}>{order.id}<small>{order.customer}</small></button></td>
               <td><strong>{order.pickup}</strong><span>→ {order.dropoff}</span></td>
               <td>{order.rider === '待分配' ? <StatusPill tone="warning">待分配</StatusPill> : order.rider}</td>
               <td><strong>{formatMoney(order.amountCents)}</strong><span className="preview-table__fee">平台抽成 {formatMoney(order.platformFeeCents)}</span></td>
               <td><StatusPill>{order.status}</StatusPill></td>
               <td>{formatTime(order.createdAt)}</td>
               <td><div className="preview-row-actions">
-                <Button size="sm" variant="ghost" onClick={() => { setSelectedId(order.id); setRiderDraft(order.rider === '待分配' ? '周师傅' : order.rider) }}>详情</Button>
-                {(order.status === '待接单' || order.status === '配送中') && <Button size="sm" variant="ghost" onClick={() => { setSelectedIds([order.id]); setBatchRider(order.rider === '待分配' ? '周师傅' : order.rider); setBatchAction('reassign') }}>改派</Button>}
+                <Button size="sm" variant="ghost" onClick={() => { setSelectedId(order.id); setRiderDraft(defaultRider) }}>详情</Button>
+                {(order.status === '待接单' || order.status === '配送中') && <Button size="sm" variant="ghost" onClick={() => { setSelectedIds([order.id]); setBatchRider(defaultRider); setBatchError(defaultRider ? '' : '当前没有接单中的骑手'); setBatchAction('reassign') }}>改派</Button>}
                 {order.status !== '已完成' && order.status !== '已取消' && <Button size="sm" variant="danger" onClick={() => { setSelectedIds([order.id]); setBatchReason(''); setBatchError(''); setBatchAction('cancel') }}>取消</Button>}
               </div></td>
             </tr>)}</tbody>
@@ -194,6 +198,7 @@ export function DeliveryView() {
           variant={batchAction === 'cancel' ? 'danger' : 'primary'}
           onClick={() => {
             if (batchAction === 'reassign') {
+              if (!batchRider) { setBatchError('当前没有接单中的骑手，无法改派'); return }
               reassignOrders(selectedIds, batchRider)
               notify(`已把 ${selectedIds.length} 笔订单改派给 ${batchRider}`)
             } else {
@@ -211,7 +216,9 @@ export function DeliveryView() {
       <div className="preview-form-stack">
         {batchAction === 'reassign'
           ? <SelectField label="新骑手" value={batchRider} onChange={event => setBatchRider(event.target.value)}>
-            {riders.filter(rider => rider.state === '接单中').map(rider => <option key={rider.id} value={rider.name}>{rider.name}（在途 {rider.inFlight} 单）</option>)}
+            {availableRiders.length === 0
+              ? <option value="">当前没有接单中的骑手</option>
+              : availableRiders.map(rider => <option key={rider.id} value={rider.name}>{rider.name}（在途 {orders.filter(order => order.rider === rider.name && order.status !== '已完成' && order.status !== '已取消').length} 单）</option>)}
           </SelectField>
           : <Field label="取消原因" required value={batchReason} onChange={event => { setBatchReason(event.target.value); setBatchError('') }} placeholder="例如：用户要求取消" />}
         {batchError && <div className="preview-form-error">{batchError}</div>}
@@ -227,11 +234,12 @@ export function DeliveryView() {
       footer={selected && <>
         <Button onClick={() => setSelectedId(null)}>关闭</Button>
         {selected.status === '待接单' && <Button variant="primary" onClick={() => {
+          if (!riderDraft) { notify('当前没有接单中的骑手，请先恢复骑手接单', 'danger'); return }
           assignRider(selected.id, riderDraft)
           notify(`已分配骑手 ${riderDraft}`)
         }}>确认分配</Button>}
         {selected.status !== '待接单' && selected.status !== '已完成' && selected.status !== '已取消' && <Button variant="primary" onClick={() => advance(selected)}>推进到“{nextStatus[selected.status]}”</Button>}
-        {selected.status !== '已完成' && selected.status !== '已取消' && <Button onClick={() => { setSelectedId(null); setSelectedIds([selected.id]); setBatchRider('周师傅'); setBatchAction('reassign') }}>改派骑手</Button>}
+        {selected.status !== '已完成' && selected.status !== '已取消' && <Button onClick={() => { setSelectedId(null); setSelectedIds([selected.id]); setBatchRider(defaultRider); setBatchError(defaultRider ? '' : '当前没有接单中的骑手'); setBatchAction('reassign') }}>改派骑手</Button>}
         {selected.status !== '已完成' && selected.status !== '已取消' && <Button variant="danger" onClick={() => { setSelectedId(null); setSelectedIds([selected.id]); setBatchReason(''); setBatchError(''); setBatchAction('cancel') }}>取消订单</Button>}
       </>}
     >
@@ -253,14 +261,14 @@ export function DeliveryView() {
           <div><span>当前骑手</span><strong>{selected.rider}</strong></div>
           <div><span>订单金额</span><strong>{formatMoney(selected.amountCents)}</strong></div>
           <div><span>商品金额</span><strong>{formatMoney(selected.goodsCents ?? 0)}</strong></div>
-          <div><span>平台服务收入</span><strong>{formatMoney(selected.platformFeeCents)}</strong></div>
+          <div><span>平台抽成</span><strong>{formatMoney(selected.platformFeeCents)}</strong></div>
           <div><span>骑手报酬</span><strong>{formatMoney(selected.riderFeeCents ?? 0)}</strong></div>
         </div>
         {selected.cancelReason && <div className="preview-note-block"><span>取消原因</span><p>{selected.cancelReason}</p></div>}
         {selected.status === '待接单' && <SelectField label="选择骑手" value={riderDraft} onChange={event => setRiderDraft(event.target.value)}>
-          <option>周师傅</option>
-          <option>黄师傅</option>
-          <option>李师傅</option>
+          {availableRiders.length === 0
+            ? <option value="">当前没有接单中的骑手</option>
+            : availableRiders.map(rider => <option key={rider.id} value={rider.name}>{rider.name}（在途 {orders.filter(order => order.rider === rider.name && order.status !== '已完成' && order.status !== '已取消').length} 单）</option>)}
         </SelectField>}
         <div className="preview-note-block">
           <span>用户备注</span>

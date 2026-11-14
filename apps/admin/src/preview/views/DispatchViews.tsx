@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { formatMoney, formatTime, type DeliveryOrder, type RiderItem } from '../data'
+import { formatMoney, formatTime, isToday, type DeliveryOrder } from '../data'
 import { usePreviewStore } from '../store'
 import { Button, EmptyState, Field, Modal, Panel, SearchBox, SelectField, StatusPill, usePreviewToast } from '../ui'
 
@@ -26,7 +26,25 @@ function RidersPanel() {
   const orders = usePreviewStore(state => state.orders)
   const setRiderState = usePreviewStore(state => state.setRiderState)
   const [focusRider, setFocusRider] = useState<string>('')
+  const [banTarget, setBanTarget] = useState<string | null>(null)
+  const banRider = riders.find(rider => rider.id === banTarget) || null
   const { notify } = usePreviewToast()
+
+  // 在途、今日单量、今日收入都由订单实时推导，避免和订单列表对不上。
+  const riderStats = useMemo(() => {
+    const stats = new Map<string, { inFlight: number; todayOrders: number; todayIncomeCents: number }>()
+    for (const rider of riders) stats.set(rider.name, { inFlight: 0, todayOrders: 0, todayIncomeCents: 0 })
+    for (const order of orders) {
+      const stat = stats.get(order.rider)
+      if (!stat) continue
+      if (order.status !== '已完成' && order.status !== '已取消') stat.inFlight += 1
+      if (order.status === '已完成' && isToday(order.createdAt)) {
+        stat.todayOrders += 1
+        stat.todayIncomeCents += order.riderFeeCents ?? 0
+      }
+    }
+    return stats
+  }, [orders, riders])
 
   const activeOrders = useMemo(() => orders.filter(order =>
     order.rider === focusRider && order.status !== '已完成' && order.status !== '已取消'
@@ -36,23 +54,47 @@ function RidersPanel() {
     <Panel eyebrow="RIDER DESK" title="骑手状态" description="暂停接单不影响已接订单；封禁后该骑手不能再接新单。">
       <div className="preview-table-wrap"><table className="preview-table" aria-label="骑手列表">
         <thead><tr><th>骑手</th><th>状态</th><th>在途</th><th>今日单量</th><th>今日收入</th><th>加入时间</th><th /></tr></thead>
-        <tbody>{riders.map(rider => <tr key={rider.id}>
+        <tbody>{riders.map(rider => {
+          const stat = riderStats.get(rider.name) || { inFlight: 0, todayOrders: 0, todayIncomeCents: 0 }
+          return <tr key={rider.id}>
           <td><strong>{rider.name}</strong><span>{rider.phone} · {rider.id}</span></td>
           <td><StatusPill tone={rider.state === '接单中' ? 'success' : rider.state === '休息中' ? 'neutral' : 'danger'}>{rider.state}</StatusPill></td>
-          <td>{rider.inFlight}</td>
-          <td>{rider.todayOrders}</td>
-          <td><strong>{formatMoney(rider.todayIncomeCents)}</strong></td>
+          <td>{stat.inFlight}</td>
+          <td>{stat.todayOrders}</td>
+          <td><strong>{formatMoney(stat.todayIncomeCents)}</strong></td>
           <td>{rider.joinedAt}</td>
           <td><div className="preview-row-actions">
             <Button size="sm" variant="ghost" onClick={() => setFocusRider(focusRider === rider.name ? '' : rider.name)}>{focusRider === rider.name ? '收起订单' : '查看订单'}</Button>
             {rider.state === '接单中' && <Button size="sm" onClick={() => { setRiderState(rider.id, '休息中'); notify(`${rider.name} 已暂停接单`, 'info') }}>暂停接单</Button>}
             {rider.state === '休息中' && <Button size="sm" variant="primary" onClick={() => { setRiderState(rider.id, '接单中'); notify(`${rider.name} 已恢复接单`) }}>恢复接单</Button>}
-            {rider.state !== '已封禁' && <Button size="sm" variant="danger" onClick={() => { setRiderState(rider.id, '已封禁'); notify(`${rider.name} 已封禁`, 'danger') }}>封禁</Button>}
+            {rider.state !== '已封禁' && <Button size="sm" variant="danger" onClick={() => setBanTarget(rider.id)}>封禁</Button>}
             {rider.state === '已封禁' && <Button size="sm" onClick={() => { setRiderState(rider.id, '休息中'); notify(`${rider.name} 已解封`, 'info') }}>解封</Button>}
           </div></td>
-        </tr>)}</tbody>
+        </tr>
+        })}</tbody>
       </table></div>
     </Panel>
+
+    <Modal
+      open={Boolean(banRider)}
+      title={`封禁骑手 ${banRider?.name || ''}`}
+      description={banRider ? `${banRider.phone} · ${banRider.id}` : ''}
+      onClose={() => setBanTarget(null)}
+      footer={<>
+        <Button onClick={() => setBanTarget(null)}>取消</Button>
+        <Button variant="danger" onClick={() => {
+          if (!banRider) return
+          setRiderState(banRider.id, '已封禁')
+          notify(`${banRider.name} 已封禁，不能再接新单`, 'danger')
+          setBanTarget(null)
+        }}>确认封禁</Button>
+      </>}
+    >
+      <div className="preview-warning-box">
+        <strong>封禁后该骑手不能再接新单，已接订单不受影响</strong>
+        <p>需要先与骑手核对情况；解封后恢复为“休息中”，需手动恢复接单。</p>
+      </div>
+    </Modal>
 
     {focusRider && <Panel
       eyebrow="RIDER ORDERS"
@@ -153,7 +195,7 @@ function BulkOrderTable({ orders }: { orders: DeliveryOrder[] }) {
     {selected.length > 0 && <div className="preview-batch-bar">
       <span>已选 {selected.length} 笔</span>
       <div className="preview-row-actions">
-        <Button size="sm" variant="primary" onClick={() => { setMode('reassign'); setRider(riders.find(item => item.state === '接单中')?.name || ''); setError('') }}>转给其他骑手</Button>
+        <Button size="sm" variant="primary" onClick={() => { setMode('reassign'); setRider(riders.find(item => item.state === '接单中')?.name || ''); setError('') }}>改派给其他骑手</Button>
         <Button size="sm" variant="danger" onClick={() => { setMode('cancel'); setReason(''); setError('') }}>取消订单</Button>
         <Button size="sm" onClick={() => setSelected([])}>清除</Button>
       </div>
@@ -186,19 +228,19 @@ function BulkOrderTable({ orders }: { orders: DeliveryOrder[] }) {
 
     <Modal
       open={Boolean(mode)}
-      title={mode === 'reassign' ? `转单给其他骑手（${selected.length} 笔）` : `取消订单（${selected.length} 笔）`}
-      description={mode === 'reassign' ? '转出后原骑手不再负责，新骑手会收到提醒。' : '取消后订单不再履约，用户会看到取消原因。'}
+      title={mode === 'reassign' ? `改派给其他骑手（${selected.length} 笔）` : `取消订单（${selected.length} 笔）`}
+      description={mode === 'reassign' ? '改派后原骑手不再负责，新骑手会收到提醒。' : '取消后订单不再履约，用户会看到取消原因。'}
       onClose={() => setMode(null)}
       footer={<>
         <Button onClick={() => setMode(null)}>返回</Button>
-        <Button variant={mode === 'cancel' ? 'danger' : 'primary'} onClick={submit}>{mode === 'reassign' ? '确认转单' : '确认取消'}</Button>
+        <Button variant={mode === 'cancel' ? 'danger' : 'primary'} onClick={submit}>{mode === 'reassign' ? '确认改派' : '确认取消'}</Button>
       </>}
     >
       <div className="preview-form-stack">
         {mode === 'reassign'
           ? <SelectField label="新骑手" value={rider} onChange={event => { setRider(event.target.value); setError('') }}>
             <option value="">请选择</option>
-            {riders.filter(item => item.state === '接单中').map(item => <option key={item.id} value={item.name}>{item.name}（在途 {item.inFlight} 单）</option>)}
+            {riders.filter(item => item.state === '接单中').map(item => <option key={item.id} value={item.name}>{item.name}（在途 {orders.filter(order => order.rider === item.name && order.status !== '已完成' && order.status !== '已取消').length} 单）</option>)}
           </SelectField>
           : <Field label="取消原因" required value={reason} onChange={event => { setReason(event.target.value); setError('') }} placeholder="例如：用户要求取消" />}
         {error && <div className="preview-form-error">{error}</div>}

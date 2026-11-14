@@ -201,12 +201,12 @@ export function FeeSection({ value, onChange }: { value: FeeView; onChange: (val
     }
     setError('')
     updateFeeConfig(deliveryCents, cutCents)
-    notify('默认运费已保存，仅影响之后新建的订单')
+    notify('默认配送费已保存，仅影响之后新建的订单')
   }
 
   return <>
     <div className="preview-subtabs" role="tablist" aria-label="费率模块">
-      {([['default', '默认运费'], ['override', '商家专属运费']] as const).map(([key, label]) => <button
+      {([['default', '默认配送费'], ['override', '商家专属配送费']] as const).map(([key, label]) => <button
         key={key}
         type="button"
         role="tab"
@@ -216,7 +216,7 @@ export function FeeSection({ value, onChange }: { value: FeeView; onChange: (val
       >{label}</button>)}
     </div>
 
-    {value === 'default' && <Panel eyebrow="DEFAULT FEE" title="默认运费" description="新订单使用这里的默认值；已提交的订单按下单时的金额计算。">
+    {value === 'default' && <Panel eyebrow="DEFAULT FEE" title="默认配送费" description="新订单使用这里的默认值；已提交的订单按下单时的金额计算。">
       <div className="preview-fee-form">
         <Field label="配送费（元）" required value={deliveryFee} onChange={event => setDeliveryFee(event.target.value)} />
         <Field label="平台抽成（元）" required value={platformCut} onChange={event => setPlatformCut(event.target.value)} />
@@ -233,10 +233,10 @@ export function FeeSection({ value, onChange }: { value: FeeView; onChange: (val
       </div>
     </Panel>}
 
-    {value === 'override' && <Panel eyebrow="MERCHANT OVERRIDE" title="商家专属运费" description="为个别商家覆盖默认运费；停用后立即回到默认值。">
+    {value === 'override' && <Panel eyebrow="MERCHANT OVERRIDE" title="商家专属配送费" description="为个别商家覆盖默认配送费；停用后立即回到默认值。">
       {overrides.length === 0
-        ? <EmptyState title="没有商家专属配置" description="默认运费适用于所有商家。" />
-        : <div className="preview-table-wrap"><table className="preview-table" aria-label="商家专属运费列表">
+        ? <EmptyState title="没有商家专属配置" description="默认配送费适用于所有商家。" />
+        : <div className="preview-table-wrap"><table className="preview-table" aria-label="商家专属配送费列表">
           <thead><tr><th>商家</th><th>配送费</th><th>平台抽成</th><th>状态</th><th /></tr></thead>
           <tbody>{overrides.map(item => <tr key={item.merchantId}>
             <td><strong>{item.name}</strong><span>{item.merchantId}</span></td>
@@ -245,7 +245,7 @@ export function FeeSection({ value, onChange }: { value: FeeView; onChange: (val
             <td><StatusPill>{item.enabled ? '已启用' : '已停用'}</StatusPill></td>
             <td><Button size="sm" variant="ghost" onClick={() => {
               toggleOverride(item.merchantId)
-              notify(item.enabled ? '已停用该商家专属运费' : '已启用该商家专属运费', 'info')
+              notify(item.enabled ? '已停用该商家专属配送费' : '已启用该商家专属配送费', 'info')
             }}>{item.enabled ? '停用' : '启用'}</Button></td>
           </tr>)}</tbody>
         </table></div>}

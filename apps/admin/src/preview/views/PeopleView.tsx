@@ -99,7 +99,7 @@ function IdentityPeople() {
             {item.status === '待认证' ? <>
               <Button size="sm" variant="primary" onClick={() => openDecision(item, '已通过')}>通过</Button>
               <Button size="sm" variant="danger" onClick={() => openDecision(item, '已拒绝')}>拒绝</Button>
-            </> : <Button size="sm" variant="ghost" onClick={() => openDecision(item, item.status === '已通过' ? '已拒绝' : '已通过')}>复核</Button>}
+            </> : <Button size="sm" variant="ghost" onClick={() => openDecision(item, item.status === '已通过' ? '已拒绝' : '已通过')}>改判</Button>}
           </div>
         </article>)}
       </div>}
@@ -114,7 +114,7 @@ function IdentityPeople() {
         {detail.status === '待认证' ? <>
           <Button variant="primary" onClick={() => { setDetailId(null); openDecision(detail, '已通过') }}>通过认证</Button>
           <Button variant="danger" onClick={() => { setDetailId(null); openDecision(detail, '已拒绝') }}>拒绝认证</Button>
-        </> : <Button onClick={() => { setDetailId(null); openDecision(detail, detail.status === '已通过' ? '已拒绝' : '已通过') }}>复核改判</Button>}
+        </> : <Button onClick={() => { setDetailId(null); openDecision(detail, detail.status === '已通过' ? '已拒绝' : '已通过') }}>改判结论</Button>}
       </>}
     >
       {detail && <div className="preview-detail-stack">
@@ -253,6 +253,7 @@ function UserPeople() {
   const resetAdminCredential = usePreviewStore(state => state.resetAdminCredential)
   const [credentialDraft, setCredentialDraft] = useState<{ username: string; name: string; password: string } | null>(null)
   const [credentialError, setCredentialError] = useState('')
+  const [pendingCredential, setPendingCredential] = useState<{ action: 'reset' | 'remove'; username: string } | null>(null)
   const managerOptions = users.filter(item => item.role === '管理员' && !credentials.some(entry => entry.name === item.name))
   const submitCredential = () => {
     if (!credentialDraft) return
@@ -323,14 +324,8 @@ function UserPeople() {
           <td><StatusPill tone={item.status === '正常' ? 'success' : 'danger'}>{item.status}</StatusPill></td>
           <td>{formatTime(item.passwordUpdatedAt)}</td>
           <td><div className="preview-row-actions">
-            <Button size="sm" variant="ghost" onClick={() => {
-              resetAdminCredential(item.username, new Date().toISOString())
-              notify('已重置密码，旧会话将失效', 'info')
-            }}>重置</Button>
-            <Button size="sm" variant="danger" disabled={item.username === 'administrator'} onClick={() => {
-              removeAdminCredential(item.username)
-              notify('已移除该登录账号', 'info')
-            }}>移除</Button>
+            <Button size="sm" variant="ghost" onClick={() => setPendingCredential({ action: 'reset', username: item.username })}>重置</Button>
+            <Button size="sm" variant="danger" disabled={item.username === 'administrator'} onClick={() => setPendingCredential({ action: 'remove', username: item.username })}>移除</Button>
           </div></td>
         </tr>)}</tbody>
       </table></div>
@@ -392,6 +387,32 @@ function UserPeople() {
       <div className="preview-warning-box">
         <strong>{pendingStatus?.status === '正常' ? '恢复后用户可以继续使用全部功能' : '该操作会立即影响用户登录与互动'}</strong>
         <p>本地原型只修改演示数据；生产环境会写入账号状态并让现有会话失效。</p>
+      </div>
+    </Modal>
+
+    <Modal
+      open={Boolean(pendingCredential)}
+      title={pendingCredential?.action === 'remove' ? '移除登录账号' : '重置登录密码'}
+      description={pendingCredential ? `账号：${pendingCredential.username}` : ''}
+      onClose={() => setPendingCredential(null)}
+      footer={<>
+        <Button onClick={() => setPendingCredential(null)}>取消</Button>
+        <Button variant={pendingCredential?.action === 'remove' ? 'danger' : 'primary'} onClick={() => {
+          if (!pendingCredential) return
+          if (pendingCredential.action === 'remove') {
+            removeAdminCredential(pendingCredential.username)
+            notify('已移除该登录账号，对方将无法登录', 'info')
+          } else {
+            resetAdminCredential(pendingCredential.username, new Date().toISOString())
+            notify('已重置密码，旧会话将失效', 'info')
+          }
+          setPendingCredential(null)
+        }}>{pendingCredential?.action === 'remove' ? '确认移除' : '确认重置'}</Button>
+      </>}
+    >
+      <div className="preview-warning-box">
+        <strong>{pendingCredential?.action === 'remove' ? '移除后该管理员将立即失去后台访问权限' : '重置后旧密码立即失效，需要把新密码线下告知对方'}</strong>
+        <p>本操作只修改当前浏览器里的演示数据。</p>
       </div>
     </Modal>
   </div>

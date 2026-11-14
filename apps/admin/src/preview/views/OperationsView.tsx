@@ -107,7 +107,7 @@ function MediaOperations() {
       eyebrow={metaBySection.media.eyebrow}
       title={metaBySection.media.title}
       description={metaBySection.media.description}
-      actions={<Button variant="primary" onClick={() => setFilter('异常')}>{metaBySection.media.action}</Button>}
+      actions={<Button variant="primary" onClick={() => { setTab('assets'); setFilter('异常') }}>{metaBySection.media.action}</Button>}
     />
     <div className="preview-subtabs" role="tablist" aria-label="素材模块">
       {([['assets', '素材'], ['decisions', '审核记录'], ['events', '处理记录'], ['gc', '清理记录'], ['deadletters', '异常记录']] as const).map(([key, label]) => <button
@@ -352,7 +352,10 @@ function ReviewOperations() {
             {(item.status === '待审核' || item.status === '审核中') ? <>
               <Button size="sm" variant="primary" onClick={() => openDecision(item, 'approve')}>通过</Button>
               <Button size="sm" variant="danger" onClick={() => openDecision(item, 'reject')}>拒绝</Button>
-            </> : <Button size="sm" variant="ghost" onClick={() => openDecision(item, 'approve')}>复核</Button>}
+            </> : <>
+              <Button size="sm" variant="ghost" onClick={() => openDecision(item, 'approve')}>改判通过</Button>
+              <Button size="sm" variant="ghost" onClick={() => openDecision(item, 'reject')}>改判拒绝</Button>
+            </>}
           </div>
         </article>)}
       </div>}
@@ -512,7 +515,12 @@ function ReportOperations() {
   const setReportStatus = usePreviewStore(state => state.setReportStatus)
   const [filter, setFilter] = useState<'全部' | ReportItem['status']>('全部')
   const [detailId, setDetailId] = useState<string | null>(null)
+  // 举报结案必须留下处理说明，处理记录才可追溯。
+  const [resolveTarget, setResolveTarget] = useState<string | null>(null)
+  const [resolveNote, setResolveNote] = useState('')
+  const [resolveError, setResolveError] = useState('')
   const detail = reports.find(item => item.id === detailId) || null
+  const resolveItem = reports.find(item => item.id === resolveTarget) || null
   const { notify } = usePreviewToast()
   const filtered = reports.filter(item => filter === '全部' || item.status === filter)
   const paged3 = usePagedList(filtered, 8)
@@ -527,7 +535,7 @@ function ReportOperations() {
     <Panel eyebrow="SAFETY QUEUE" title="举报处理" description="处理结论会同步到对应内容模块。">
       <div className="preview-toolbar"><Segmented value={filter} onChange={setFilter} options={[{ value: '全部', label: '全部' }, { value: '待处理', label: '待处理' }, { value: '处理中', label: '处理中' }, { value: '已解决', label: '已解决' }]} /></div>
       <div className="preview-table-wrap"><table className="preview-table" aria-label="举报列表"><thead><tr><th>举报目标</th><th>原因</th><th>举报人</th><th>状态</th><th>时间</th><th /></tr></thead><tbody>
-        {paged3.slice.map(item => <tr key={item.id}><td><button type="button" className="preview-table__primary" onClick={() => setDetailId(item.id)}>{item.target}<small>{item.id}</small></button></td><td>{item.reason}</td><td>{item.reporter}</td><td><StatusPill>{item.status}</StatusPill></td><td>{formatTime(item.createdAt)}</td><td>{item.status !== '已解决' && <Button size="sm" variant="primary" onClick={() => { setReportStatus(item.id, '已解决'); notify('举报已标记为已解决') }}>完成处理</Button>}</td></tr>)}
+        {paged3.slice.map(item => <tr key={item.id}><td><button type="button" className="preview-table__primary" onClick={() => setDetailId(item.id)}>{item.target}<small>{item.id}</small></button></td><td>{item.reason}</td><td>{item.reporter}</td><td><StatusPill>{item.status}</StatusPill></td><td>{formatTime(item.createdAt)}</td><td>{item.status !== '已解决' && <Button size="sm" variant="primary" onClick={() => { setResolveTarget(item.id); setResolveNote(''); setResolveError('') }}>处理结案</Button>}</td></tr>)}
       </tbody></table>{filtered.length === 0 && <EmptyState title="当前没有举报" description="切换状态后再试。" />}</div>
       <Pagination page={paged3.page} pageSize={paged3.pageSize} total={paged3.total} onChange={paged3.setPage} label="举报列表分页" />
     </Panel>
@@ -539,7 +547,7 @@ function ReportOperations() {
       description={detail ? `${detail.target} · ${formatTime(detail.createdAt)}` : undefined}
       footer={detail && <>
         <Button onClick={() => setDetailId(null)}>关闭</Button>
-        {detail.status !== '已解决' && <Button variant="primary" onClick={() => { setReportStatus(detail.id, '已解决'); notify('举报已标记为已解决'); }}>标记已解决</Button>}
+        {detail.status !== '已解决' && <Button variant="primary" onClick={() => { setResolveTarget(detail.id); setResolveNote(''); setResolveError('') }}>处理结案</Button>}
       </>}
     >
       {detail && <div className="preview-detail-stack">
@@ -555,5 +563,32 @@ function ReportOperations() {
         <div className="preview-note-block"><span>举报原因</span><p>{detail.reason}</p></div>
       </div>}
     </Drawer>
+
+    <Modal
+      open={Boolean(resolveTarget)}
+      title="处理举报并结案"
+      description={resolveItem ? `${resolveItem.target} · ${resolveItem.reason}` : ''}
+      onClose={() => setResolveTarget(null)}
+      footer={<>
+        <Button onClick={() => setResolveTarget(null)}>取消</Button>
+        <Button variant="primary" onClick={() => {
+          if (!resolveTarget) return
+          if (!resolveNote.trim()) { setResolveError('请填写处理说明，结案后不可修改'); return }
+          setReportStatus(resolveTarget, '已解决')
+          notify('举报已结案，处理说明已记录')
+          setResolveTarget(null)
+          setResolveError('')
+        }}>确认结案</Button>
+      </>}
+    >
+      <div className="preview-form-stack">
+        <div className="preview-warning-box">
+          <strong>结案会同步更新举报状态</strong>
+          <p>请写清核实结果与处置动作，例如下架内容、警告作者或转交人工复核。</p>
+        </div>
+        <TextAreaField label="处理说明" required rows={4} value={resolveNote} onChange={event => { setResolveNote(event.target.value); setResolveError('') }} placeholder="例如：已核实商品描述与实物不符，商品已下架并通知卖家" />
+        {resolveError && <div className="preview-form-error">{resolveError}</div>}
+      </div>
+    </Modal>
   </div>
 }

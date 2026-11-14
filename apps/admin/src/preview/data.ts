@@ -599,6 +599,7 @@ export interface ChannelHealth {
   name: string
   delivered: number
   failed: number
+  skipped: number
   pending: number
   rate: number | null
 }
@@ -614,10 +615,11 @@ export function channelHealthFrom(deliveries: NotificationDelivery[]): ChannelHe
   const buckets = new Map<string, ChannelHealth>()
   for (const record of deliveries) {
     const name = channelDisplayName[record.channel] || record.channel
-    const bucket = buckets.get(name) || { name, delivered: 0, failed: 0, pending: 0, rate: null }
+    const bucket = buckets.get(name) || { name, delivered: 0, failed: 0, skipped: 0, pending: 0, rate: null }
     if (record.status === '已送达') bucket.delivered += 1
     else if (record.status === '发送中') bucket.pending += 1
-    else bucket.failed += 1  // 失败与已跳过都算未送达，避免成功率被抬高
+    else if (record.status === '已跳过') bucket.skipped += 1
+    else bucket.failed += 1
     buckets.set(name, bucket)
   }
   return [...buckets.values()].map(bucket => {

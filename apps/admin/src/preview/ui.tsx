@@ -40,10 +40,17 @@ const toneByLabel: Record<string, Tone> = {
   已解决: 'success',
   已公开: 'success',
   出售中: 'success',
+  已结: 'success',
+  已打款: 'success',
+  已退款: 'success',
+  已启用: 'success',
   待审核: 'warning',
   待认证: 'warning',
   待处理: 'warning',
   待接单: 'warning',
+  待结: 'warning',
+  排队中: 'warning',
+  需关注: 'warning',
   待确认: 'accent',
   处理中: 'info',
   审核中: 'info',
@@ -60,6 +67,8 @@ const toneByLabel: Record<string, Tone> = {
   不处理: 'neutral',
   禁言: 'danger',
   已取消: 'neutral',
+  已停用: 'neutral',
+  已退回: 'danger',
   已跳过: 'neutral',
   休息中: 'neutral',
   未测试: 'neutral'
@@ -107,6 +116,8 @@ export function Button({ variant = 'secondary', size = 'md', className, children
 
 export function Panel({
   title,
+  eyebrow,
+  description,
   actions,
   className,
   children
@@ -118,10 +129,17 @@ export function Panel({
   className?: string
   children: ReactNode
 }) {
+  const heading = (eyebrow || description)
+    ? <div className="preview-panel__head">
+      {eyebrow && <small>{eyebrow}</small>}
+      {title && <strong>{title}</strong>}
+      {description && <span>{description}</span>}
+    </div>
+    : title
   return <Card
     className={cx('preview-panel', className)}
     size="small"
-    title={title}
+    title={heading}
     extra={actions}
     bordered
   >
@@ -130,7 +148,9 @@ export function Panel({
 }
 
 export function PageHeader({
+  eyebrow,
   title,
+  description,
   actions
 }: {
   eyebrow?: string
@@ -139,7 +159,11 @@ export function PageHeader({
   actions?: ReactNode
 }) {
   return <header className="preview-page-header">
-    <h1>{title}</h1>
+    <div className="preview-page-header__text">
+      {eyebrow && <small className="preview-page-header__eyebrow">{eyebrow}</small>}
+      <h1>{title}</h1>
+      {description && <p className="preview-page-header__desc">{description}</p>}
+    </div>
     {actions && <div className="preview-page-header__actions">{actions}</div>}
   </header>
 }
@@ -278,8 +302,8 @@ export function Toggle({
   return <Switch checked={checked} onChange={onChange} aria-label={label} />
 }
 
-export function EmptyState({ title, action }: { title: string; description?: string; action?: ReactNode }) {
-  return <Empty className="preview-empty" description={title}>
+export function EmptyState({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
+  return <Empty className="preview-empty" description={<div className="preview-empty__text"><strong>{title}</strong>{description && <span>{description}</span>}</div>}>
     {action}
   </Empty>
 }
@@ -287,6 +311,7 @@ export function EmptyState({ title, action }: { title: string; description?: str
 export function Modal({
   open,
   title,
+  description,
   children,
   footer,
   onClose,
@@ -303,7 +328,7 @@ export function Modal({
   const widths = { sm: 480, md: 640, lg: 900 }
   return <AntModal
     visible={open}
-    title={title}
+    title={description ? <div className="preview-overlay-head"><strong>{title}</strong><span>{description}</span></div> : title}
     footer={footer}
     width={widths[width]}
     centered
@@ -317,6 +342,7 @@ export function Modal({
 export function Drawer({
   open,
   title,
+  description,
   children,
   footer,
   onClose
@@ -330,7 +356,7 @@ export function Drawer({
 }) {
   return <AntDrawer
     visible={open}
-    title={title}
+    title={description ? <div className="preview-overlay-head"><strong>{title}</strong><span>{description}</span></div> : title}
     width={520}
     footer={footer}
     destroyOnClose
