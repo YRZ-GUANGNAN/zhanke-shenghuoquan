@@ -1684,3 +1684,11 @@ body {
   color: var(--preview-blue) !important;
   border-color: var(--preview-blue) !important;
 }
+
+.preview-health-list__empty {
+  margin: 0;
+  padding: 16px 4px;
+  color: var(--preview-text-muted);
+  font-size: 12px;
+  line-height: 1.7;
+}

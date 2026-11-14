@@ -220,7 +220,9 @@ function PreviewApp() {
               placeholder="搜索页面"
               onFocus={() => setSearchOpen(true)}
               readOnly
+              aria-label="搜索页面"
             />
+            {narrow && <AntButton type="text" aria-label="搜索页面" onClick={() => setSearchOpen(true)}>⌕</AntButton>}
             <Badge count={attentionCount} size="small">
               <AntButton type="text" icon={<BellOutlined />} aria-label="查看消息通知" onClick={() => navigate('notifications')} />
             </Badge>

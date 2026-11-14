@@ -145,6 +145,7 @@ export function DashboardView({ navigate }: { navigate: (section: PreviewSection
         actions={<Button size="sm" variant="ghost" onClick={() => navigate('notifications')}>管理</Button>}
       >
         <div className="preview-health-list">
+          {channelHealth.length === 0 && <p className="preview-health-list__empty">近 24 小时还没有发送记录，触发一次订单或私信提醒后会出现在这里。</p>}
           {channelHealth.map(channel => <div key={channel.name}>
             <div className="preview-health-list__head">
               <span>

@@ -140,6 +140,7 @@ function ReviewOperations() {
   const decideReview = usePreviewStore(state => state.decideReview)
   const [status, setStatus] = useState<'全部' | ReviewItem['status']>('待审核')
   const [search, setSearch] = useState('')
+  const [riskOnly, setRiskOnly] = useState(false)
   const [selected, setSelected] = useState<ReviewItem | null>(null)
   const [decision, setDecision] = useState<'approve' | 'reject'>('approve')
   const [reason, setReason] = useState('')
@@ -147,7 +148,8 @@ function ReviewOperations() {
   const { notify } = usePreviewToast()
 
   const filtered = reviews.filter(item =>
-    (status === '全部' || item.status === status)
+    (!riskOnly || item.risk === '高风险')
+    && (status === '全部' || item.status === status)
     && (!search.trim() || `${item.id}${item.title}${item.submitter}${item.kind}`.toLowerCase().includes(search.trim().toLowerCase()))
   )
 
@@ -182,7 +184,10 @@ function ReviewOperations() {
       eyebrow={metaBySection.moderation.eyebrow}
       title={metaBySection.moderation.title}
       description={metaBySection.moderation.description}
-      actions={<Button variant="primary" onClick={() => setStatus('待审核')}>{metaBySection.moderation.action}</Button>}
+      actions={<Button
+        variant={riskOnly ? 'primary' : 'ghost'}
+        onClick={() => { setRiskOnly(current => !current); setStatus('待审核') }}
+      >{riskOnly ? '显示全部待审核' : metaBySection.moderation.action}</Button>}
     />
     <section className="preview-stat-grid">
       <StatCard label="待审核" value={reviews.filter(item => item.status === '待审核').length} meta="等待首次处理" tone="amber" />
