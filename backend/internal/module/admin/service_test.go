@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"campus-circle/backend/internal/module/admin/review"
+	"gorm.io/gorm"
 )
 
 type reportMemoryRepository struct {
@@ -55,6 +56,21 @@ func (r *reportMemoryRepository) ListReportsByReporter(_ context.Context, report
 		}
 	}
 	return values, int64(len(values)), nil
+}
+
+func (r *reportMemoryRepository) FindReport(_ context.Context, id uint) (Report, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, value := range r.reports {
+		if value.ID == id {
+			return value, nil
+		}
+	}
+	return Report{}, gorm.ErrRecordNotFound
+}
+
+func (r *reportMemoryRepository) LatestReviewTask(context.Context, string, uint) (*review.Task, error) {
+	return nil, nil
 }
 
 func (r *reportMemoryRepository) SetReportStatus(_ context.Context, id uint, status review.Status) error {

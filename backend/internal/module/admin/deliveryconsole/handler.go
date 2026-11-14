@@ -23,6 +23,8 @@ type Handler struct {
 	now                  func() time.Time
 	payoutQueue          delivery.RiderPayoutQueueRepository
 	manualWithdrawalMode bool
+	commands             orderCommands
+	riderAdmin           RiderAdminRepository
 }
 
 func NewHandler(
@@ -69,6 +71,11 @@ func (h *Handler) Register(group *gin.RouterGroup) {
 	group.POST("/rider-payout-queue/:id/cancel", h.cancelRiderPayoutQueue)
 	group.GET("/refunds", h.refunds)
 	group.GET("/refunds/:id", h.refund)
+	group.POST("/orders/:id/reassign", h.reassignOrder)
+	group.POST("/orders/:id/cancel", h.cancelOrder)
+	group.GET("/riders", h.riders)
+	group.GET("/riders/:riderUserId/orders", h.riderOrders)
+	group.POST("/riders/:riderUserId/status", h.setRiderStatus)
 }
 
 func (h *Handler) WithPayoutQueue(value delivery.RiderPayoutQueueRepository) *Handler {
@@ -485,6 +492,9 @@ func (h *Handler) write(c *gin.Context, value any, err error) {
 		response.Fail(c, http.StatusConflict, err.Error())
 	case errors.Is(err, delivery.ErrPayoutQueueUnavailable):
 		response.Fail(c, http.StatusServiceUnavailable, "rider payout queue unavailable")
+	case errors.Is(err, delivery.ErrInvalidTransition), errors.Is(err, delivery.ErrRiderUnavailable),
+		errors.Is(err, delivery.ErrRiderRequired):
+		response.Fail(c, http.StatusConflict, err.Error())
 	case errors.Is(err, delivery.ErrInvalidRecord), errors.Is(err, delivery.ErrInvalidULID),
 		errors.Is(err, delivery.ErrAmountOverflow), errors.Is(err, ErrInvalidQuery):
 		response.Fail(c, http.StatusBadRequest, err.Error())

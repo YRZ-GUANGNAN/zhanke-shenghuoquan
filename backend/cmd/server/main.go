@@ -670,6 +670,7 @@ func newSanitizedRecovery(recoveryOutput io.Writer) gin.HandlerFunc {
 }
 
 type deliveryRuntime struct {
+	db             *gorm.DB
 	externalIntake *delivery.ExternalIntake
 	// externalOrdersReady is deliberately separate from externalIntake:
 	// accepting a callback boundary is not proof that an official provider,
@@ -744,6 +745,7 @@ func newDeliveryRuntime(cfg config.Config, db *gorm.DB, proofPorts ...delivery.M
 		return nil, fmt.Errorf("configure delivery notification consumer: %w", err)
 	}
 	runtime := &deliveryRuntime{
+		db:     db,
 		orders: orderService, dispatch: dispatchService, identity: identityAdapter,
 		availability:         availability,
 		notificationConsumer: consumer,
@@ -942,7 +944,10 @@ func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, user
 	).WithPayoutQueue(func() delivery.RiderPayoutQueueRepository {
 		value, _ := any(runtime.riderWallets).(delivery.RiderPayoutQueueRepository)
 		return value
-	}()).WithManualWithdrawalMode(runtime.withdrawalReady).Register(adminRoutes)
+	}()).WithManualWithdrawalMode(runtime.withdrawalReady).
+		WithOrderCommands(runtime.orders).
+		WithRiderAdmin(deliveryconsole.NewRiderAdmin(runtime.db)).
+		Register(adminRoutes)
 }
 
 func registerDeliveryCapabilities(api *gin.RouterGroup, runtime *deliveryRuntime, authentication gin.HandlerFunc) {

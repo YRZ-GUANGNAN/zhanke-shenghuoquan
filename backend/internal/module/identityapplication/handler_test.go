@@ -42,11 +42,15 @@ func (s *userApplicationHTTPServiceStub) GetAdmin(ctx context.Context, applicati
 	return s.adminGetFn(ctx, applicationPublicID)
 }
 
-func (s *userApplicationHTTPServiceStub) Approve(ctx context.Context, reviewerUserID uint64, applicationPublicID string, expectedRowVersion uint64) (ApplicationView, error) {
+func (s *userApplicationHTTPServiceStub) Approve(ctx context.Context, reviewerUserID uint64, applicationPublicID string, expectedRowVersion uint64, _ string) (ApplicationView, error) {
 	if s.adminApproveFn == nil {
 		return ApplicationView{}, errors.New("unexpected approve")
 	}
 	return s.adminApproveFn(ctx, reviewerUserID, applicationPublicID, expectedRowVersion)
+}
+
+func (s *userApplicationHTTPServiceStub) Override(context.Context, uint64, string, uint64, string, string) (ApplicationView, error) {
+	return ApplicationView{}, ErrInvalidInput
 }
 
 func (s *userApplicationHTTPServiceStub) Reject(ctx context.Context, reviewerUserID uint64, applicationPublicID string, expectedRowVersion uint64, reason string) (ApplicationView, error) {

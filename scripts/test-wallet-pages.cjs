@@ -68,6 +68,7 @@ function adminWithdrawalsHarness(enabled = false) {
   const imports = {
     react: renderer.React,
     './components': { useAdminDialog: () => ({ prompt: async () => { prompts++; return '凭证' }, confirm: async () => { prompts++; return true } }) },
+    './RiderDispatchPanel': { RiderDispatchPanel: () => null },
     './services/delivery-admin': { DeliveryAPIError: Error, deliveryAdminAPI: {
       riderWithdrawals: async () => { reads++; return { items: [{ withdrawPublicId: 'WITHDRAWAL', riderUserId: 1, amountCents: 120, status: 'processing', rowVersion: 1 }], page: 1, pageSize: 20, total: 1 } },
       riderWithdrawalCapabilities: async () => ({ withdrawalEnabled: enabled, mode: 'manual', claimRequired: true }),

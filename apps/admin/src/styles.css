@@ -3098,3 +3098,19 @@ body {
   .login-brand__word { font-size: 34px; }
   .login-form { padding: 30px 24px 34px; }
 }
+
+/* 内容详情图片缩略图 */
+.admin-content-images{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+.admin-content-images img{
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border: 1px solid #e8edf3;
+  border-radius: 10px;
+  background: #f5f7fa;
+}

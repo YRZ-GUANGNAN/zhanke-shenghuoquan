@@ -157,7 +157,23 @@ func (r *memoryRepository) Reject(ctx context.Context, input DecisionInput) (App
 	return r.decide(ctx, input, StatusRejected, EventRejected, nil)
 }
 
+func (r *memoryRepository) Override(ctx context.Context, input DecisionInput, status Status, commit ApprovalCommit) (Application, error) {
+	eventType := EventRejected
+	if status == StatusApproved {
+		eventType = EventApproved
+	}
+	return r.decideTerminal(ctx, input, status, eventType, commit)
+}
+
 func (r *memoryRepository) decide(ctx context.Context, input DecisionInput, status Status, eventType EventType, commit ApprovalCommit) (Application, error) {
+	return r.decideInternal(ctx, input, status, eventType, commit, false)
+}
+
+func (r *memoryRepository) decideTerminal(ctx context.Context, input DecisionInput, status Status, eventType EventType, commit ApprovalCommit) (Application, error) {
+	return r.decideInternal(ctx, input, status, eventType, commit, true)
+}
+
+func (r *memoryRepository) decideInternal(ctx context.Context, input DecisionInput, status Status, eventType EventType, commit ApprovalCommit, allowTerminal bool) (Application, error) {
 	var key string
 	var value Application
 	found := false
@@ -173,7 +189,14 @@ func (r *memoryRepository) decide(ctx context.Context, input DecisionInput, stat
 	if value.UserID == input.ReviewerUserID {
 		return Application{}, ErrSelfReview
 	}
-	if value.Status != StatusPending || value.RowVersion != input.ExpectedRowVersion {
+	if value.RowVersion != input.ExpectedRowVersion {
+		return Application{}, ErrDecisionConflict
+	}
+	if allowTerminal {
+		if value.Status != StatusApproved && value.Status != StatusRejected {
+			return Application{}, ErrDecisionConflict
+		}
+	} else if value.Status != StatusPending {
 		return Application{}, ErrDecisionConflict
 	}
 	originalApplications := cloneApplicationMap(r.applications)
@@ -195,6 +218,14 @@ func (r *memoryRepository) decide(ctx context.Context, input DecisionInput, stat
 		if err := commit(ctx, nil, ApprovedIdentity{UserID: value.UserID, Role: value.Role, RealName: value.RealName, Phone: value.Phone}); err != nil {
 			r.applications, r.grants, r.events = originalApplications, originalGrants, originalEvents
 			return Application{}, err
+		}
+	}
+	if allowTerminal && status == StatusRejected {
+		if current, ok := r.grants[key]; ok {
+			current.Status = GrantSuspended
+			current.RowVersion++
+			current.UpdatedAt = input.DecidedAt
+			r.grants[key] = current
 		}
 	}
 	value.Status = status
@@ -820,7 +851,7 @@ func TestApproveForbidsSelfReviewAndProvisionFailureIsAtomic(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := service.Approve(context.Background(), 41, pending.ApplicationPublicID, pending.RowVersion); !errors.Is(err, ErrSelfReview) {
+	if _, err := service.Approve(context.Background(), 41, pending.ApplicationPublicID, pending.RowVersion, ""); !errors.Is(err, ErrSelfReview) {
 		t.Fatalf("self review err=%v", err)
 	}
 	current, _, _ := repo.FindCurrent(context.Background(), 41, RoleRider)
@@ -829,7 +860,7 @@ func TestApproveForbidsSelfReviewAndProvisionFailureIsAtomic(t *testing.T) {
 	}
 
 	provisioner.err = errors.New("rider provisioning failed")
-	if _, err := service.Approve(context.Background(), 7, pending.ApplicationPublicID, pending.RowVersion); err == nil {
+	if _, err := service.Approve(context.Background(), 7, pending.ApplicationPublicID, pending.RowVersion, ""); err == nil {
 		t.Fatal("provision failure was accepted")
 	}
 	current, _, _ = repo.FindCurrent(context.Background(), 41, RoleRider)
@@ -858,7 +889,7 @@ func TestApproveRiderAndMerchantWritesGrantAndImmutableEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	approvedRider, err := service.Approve(context.Background(), 7, rider.ApplicationPublicID, rider.RowVersion)
+	approvedRider, err := service.Approve(context.Background(), 7, rider.ApplicationPublicID, rider.RowVersion, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -872,7 +903,7 @@ func TestApproveRiderAndMerchantWritesGrantAndImmutableEvent(t *testing.T) {
 		t.Fatalf("rider grant=%+v found=%v", grant, ok)
 	}
 
-	approvedMerchant, err := service.Approve(context.Background(), 7, merchant.ApplicationPublicID, merchant.RowVersion)
+	approvedMerchant, err := service.Approve(context.Background(), 7, merchant.ApplicationPublicID, merchant.RowVersion, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -914,7 +945,7 @@ func TestRejectRequiresReasonAndDecisionConflictsAreRecognizable(t *testing.T) {
 	if _, err := service.Reject(context.Background(), 8, pending.ApplicationPublicID, pending.RowVersion, "重复处理"); !errors.Is(err, ErrDecisionConflict) {
 		t.Fatalf("repeated reject err=%v", err)
 	}
-	if _, err := service.Approve(context.Background(), 8, pending.ApplicationPublicID, pending.RowVersion); !errors.Is(err, ErrDecisionConflict) {
+	if _, err := service.Approve(context.Background(), 8, pending.ApplicationPublicID, pending.RowVersion, ""); !errors.Is(err, ErrDecisionConflict) {
 		t.Fatalf("approve after reject err=%v", err)
 	}
 	if repo.hasGrant(41, RoleRider) {

@@ -216,6 +216,51 @@ export function IdentityApplications() {
     setReason('')
   }
 
+
+  const overrideDecision = async (status: 'approved' | 'rejected') => {
+    if (!mountedRef.current || !selected) return
+    if (selected.status !== 'approved' && selected.status !== 'rejected') return
+    const applicationId = selected.applicationId
+    const expectedRowVersion = selected.rowVersion
+    const normalizedReason = reason.trim()
+    if (!normalizedReason) { setError('改判依据不能为空'); return }
+    const targetLabel = status === 'approved' ? '通过' : '拒绝'
+    if (!await dialog.confirm({
+      title: `改判为${targetLabel}`,
+      description: `确认将用户 #${selected.userId} 的${roleLabel(selected.role)}申请改判为“${targetLabel}”吗？${status === 'rejected' ? '已生效的身份授权会立即失效。' : '若此前被拒绝，将重新授予身份。'}`,
+      confirmLabel: `确认改判为${targetLabel}`,
+      tone: status === 'rejected' ? 'danger' : 'default'
+    })) return
+    const selectionGeneration = selectionGenerationRef.current
+    setBusy(true)
+    setError('')
+    try {
+      await adminAPI.overrideIdentityApplication(applicationId, expectedRowVersion, status, normalizedReason)
+      if (!mountedRef.current || selectionGenerationRef.current !== selectionGeneration) return
+      setReason('')
+      const [listRefreshed, detailRefreshed] = await Promise.all([
+        loadLatestRef.current({ silent: true }),
+        fetchDetail(applicationId, 'decision'),
+      ])
+      if (!listRefreshed || !detailRefreshed) setError('改判已提交，但刷新失败，请重新加载')
+    } catch (decisionError) {
+      if (!mountedRef.current) return
+      if (decisionError instanceof AdminAPIError && decisionError.status === 409) {
+        lockConflictDecision(applicationId)
+        const [listRefreshed, detailRefreshed] = await Promise.all([
+          loadLatestRef.current({ silent: true }),
+          fetchDetail(applicationId, 'conflict', undefined, undefined, () => clearConflictDecisionLock(applicationId)),
+        ])
+        if (!mountedRef.current) return
+        setError(listRefreshed && detailRefreshed ? '该申请已被其他管理员修改，请刷新后重试' : '该申请已被其他管理员修改，刷新失败，请重新加载')
+      } else {
+        setError(String(decisionError))
+      }
+    } finally {
+      if (mountedRef.current) setBusy(false)
+    }
+  }
+
   const decide = async (action: 'approve' | 'reject') => {
     if (!mountedRef.current || !selected || selected.status !== 'pending' || selectedApplicationIdRef.current !== selected.applicationId || conflictLockedApplicationIdRef.current === selected.applicationId) return
     const applicationId = selected.applicationId
@@ -301,11 +346,11 @@ export function IdentityApplications() {
         <button disabled={data.page >= pageCount || loading} onClick={() => setPage(data.page + 1)}>下一页</button>
       </div>
     </Panel>
-    {selected && <ApplicationDetail value={selected} reason={reason} setReason={setReason} busy={busy} decisionLocked={conflictLockedApplicationId === selected.applicationId} close={closeDetail} decide={decide} />}
+    {selected && <ApplicationDetail value={selected} reason={reason} setReason={setReason} busy={busy} decisionLocked={conflictLockedApplicationId === selected.applicationId} close={closeDetail} decide={decide} overrideDecision={overrideDecision} />}
   </div>
 }
 
-function ApplicationDetail({ value, reason, setReason, busy, decisionLocked, close, decide }: {
+function ApplicationDetail({ value, reason, setReason, busy, decisionLocked, close, decide, overrideDecision }: {
   value: IdentityApplicationDetail
   reason: string
   setReason: (value: string) => void
@@ -313,6 +358,7 @@ function ApplicationDetail({ value, reason, setReason, busy, decisionLocked, clo
   decisionLocked: boolean
   close: () => void
   decide: (action: 'approve' | 'reject') => Promise<void>
+  overrideDecision: (status: 'approved' | 'rejected') => Promise<void>
 }) {
   return <aside className='panel delivery-detail identity-detail'>
     <header><div><span className='eyebrow'>申请编号</span><h2>{value.applicationId}</h2></div><button onClick={close}>关闭</button></header>
@@ -345,10 +391,17 @@ function ApplicationDetail({ value, reason, setReason, busy, decisionLocked, clo
     </div>
 
     {value.status === 'pending' && !decisionLocked && <div className='identity-decision'>
-      <label>拒绝原因<textarea value={reason} maxLength={500} placeholder='拒绝时必填' onChange={event => setReason(event.target.value)} /></label>
+      <label>审核依据<textarea value={reason} maxLength={500} placeholder='通过或拒绝都建议填写依据' onChange={event => setReason(event.target.value)} /></label>
       <div className='delivery-row-actions'>
         <button disabled={busy} onClick={() => void decide('approve')}>{busy ? '处理中…' : '通过'}</button>
         <button className='danger' disabled={busy} onClick={() => void decide('reject')}>{busy ? '处理中…' : '拒绝'}</button>
+      </div>
+    </div>}
+    {(value.status === 'approved' || value.status === 'rejected') && !decisionLocked && <div className='identity-decision'>
+      <label>改判依据<textarea value={reason} maxLength={500} placeholder='改判必须填写可追溯的依据' onChange={event => setReason(event.target.value)} /></label>
+      <div className='delivery-row-actions'>
+        {value.status === 'rejected' && <button disabled={busy} onClick={() => void overrideDecision('approved')}>{busy ? '处理中…' : '改判为通过'}</button>}
+        {value.status === 'approved' && <button className='danger' disabled={busy} onClick={() => void overrideDecision('rejected')}>{busy ? '处理中…' : '改判为拒绝'}</button>}
       </div>
     </div>}
   </aside>

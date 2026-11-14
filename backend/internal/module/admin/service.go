@@ -63,6 +63,28 @@ func (s *Service) Reports(ctx context.Context, page, size int) ([]Report, int64,
 	return s.repo.ListReports(ctx, page, size)
 }
 
+// ReportDetail couples the report with its unified review decision so the
+// console can show how the report was finally handled.
+type ReportDetail struct {
+	Report Report       `json:"report"`
+	Review *review.Task `json:"review,omitempty"`
+}
+
+func (s *Service) ReportDetail(ctx context.Context, id uint) (ReportDetail, error) {
+	if id == 0 {
+		return ReportDetail{}, errors.New("report id is required")
+	}
+	value, err := s.repo.FindReport(ctx, id)
+	if err != nil {
+		return ReportDetail{}, err
+	}
+	task, err := s.repo.LatestReviewTask(ctx, "report", id)
+	if err != nil {
+		return ReportDetail{}, err
+	}
+	return ReportDetail{Report: value, Review: task}, nil
+}
+
 // 用户只能查询自己提交的举报，用于在客户端查看处置进度。
 func (s *Service) MyReports(ctx context.Context, reporterID uint, page, size int) ([]Report, int64, error) {
 	if reporterID == 0 {

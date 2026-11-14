@@ -21,6 +21,7 @@ type Repository interface {
 	FindDetail(context.Context, string) (ApplicationDetail, error)
 	Approve(context.Context, DecisionInput, ApprovalCommit) (Application, error)
 	Reject(context.Context, DecisionInput) (Application, error)
+	Override(context.Context, DecisionInput, Status, ApprovalCommit) (Application, error)
 }
 
 // GrantFinder is the read-only boundary used by other domains to decide
@@ -164,17 +165,30 @@ func (r *GormRepository) SaveSubmission(ctx context.Context, value *Application,
 }
 
 func (r *GormRepository) Approve(ctx context.Context, input DecisionInput, commit ApprovalCommit) (Application, error) {
-	if commit == nil || input.Reason != "" {
+	if commit == nil {
 		return Application{}, ErrInvalidInput
 	}
-	return r.decide(ctx, input, StatusApproved, EventApproved, commit)
+	return r.decide(ctx, input, StatusApproved, EventApproved, commit, false)
 }
 
 func (r *GormRepository) Reject(ctx context.Context, input DecisionInput) (Application, error) {
 	if input.Reason == "" {
 		return Application{}, ErrInvalidInput
 	}
-	return r.decide(ctx, input, StatusRejected, EventRejected, nil)
+	return r.decide(ctx, input, StatusRejected, EventRejected, nil, false)
+}
+
+// Override re-decides an application that already reached a terminal state.
+// Approving re-grants the identity; rejecting suspends the active grant.
+func (r *GormRepository) Override(ctx context.Context, input DecisionInput, status Status, commit ApprovalCommit) (Application, error) {
+	eventType := EventRejected
+	if status == StatusApproved {
+		eventType = EventApproved
+		if commit == nil {
+			return Application{}, ErrInvalidInput
+		}
+	}
+	return r.decide(ctx, input, status, eventType, commit, true)
 }
 
 func (r *GormRepository) decide(
@@ -183,6 +197,7 @@ func (r *GormRepository) decide(
 	status Status,
 	eventType EventType,
 	commit ApprovalCommit,
+	allowTerminal bool,
 ) (Application, error) {
 	if r == nil || r.db == nil || input.ReviewerUserID == 0 || !validULID(input.ApplicationPublicID) ||
 		input.ExpectedRowVersion == 0 || input.DecidedAt.IsZero() ||
@@ -203,9 +218,17 @@ func (r *GormRepository) decide(
 		if result.UserID == input.ReviewerUserID {
 			return ErrSelfReview
 		}
-		if result.Status != StatusPending || result.RowVersion != input.ExpectedRowVersion {
+		if result.RowVersion != input.ExpectedRowVersion {
 			return ErrDecisionConflict
 		}
+		if allowTerminal {
+			if result.Status != StatusApproved && result.Status != StatusRejected {
+				return ErrDecisionConflict
+			}
+		} else if result.Status != StatusPending {
+			return ErrDecisionConflict
+		}
+		previousStatus := result.Status
 
 		if status == StatusApproved {
 			grant := IdentityGrant{
@@ -232,9 +255,22 @@ func (r *GormRepository) decide(
 			}
 		}
 
+		if allowTerminal && status == StatusRejected {
+			// Re-deciding an approved application revokes the identity grant so
+			// downstream eligibility checks stop passing immediately.
+			if err := tx.Model(&IdentityGrant{}).
+				Where("user_id = ? AND role = ? AND status = ?", result.UserID, result.Role, GrantActive).
+				Updates(map[string]any{
+					"status": GrantSuspended, "row_version": gorm.Expr("row_version + 1"),
+					"updated_at": input.DecidedAt,
+				}).Error; err != nil {
+				return mapDecisionWriteError(err)
+			}
+		}
+
 		nextVersion := result.RowVersion + 1
 		update := tx.Model(&Application{}).
-			Where("id = ? AND status = ? AND row_version = ?", result.ID, StatusPending, input.ExpectedRowVersion).
+			Where("id = ? AND status = ? AND row_version = ?", result.ID, previousStatus, input.ExpectedRowVersion).
 			Updates(map[string]any{
 				"status": status, "review_reason": input.Reason,
 				"reviewer_user_id": input.ReviewerUserID, "reviewed_at": input.DecidedAt,

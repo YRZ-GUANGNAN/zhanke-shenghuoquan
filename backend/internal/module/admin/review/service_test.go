@@ -112,7 +112,7 @@ func TestDecisionReasonValidation(t *testing.T) {
 		reason string
 	}{
 		{name: "blank rejection", status: StatusRejected, reason: " \t\n"},
-		{name: "approval reason", status: StatusApproved, reason: "looks good"},
+		{name: "overlong approval", status: StatusApproved, reason: strings.Repeat("界", 241)},
 		{name: "overlong rejection", status: StatusRejected, reason: strings.Repeat("界", 241)},
 	}
 	for _, test := range tests {

@@ -251,10 +251,11 @@ func newD6BRouter(auth *user.Service, db *gorm.DB, now func() time.Time) http.Ha
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	repository := delivery.NewRepository(db)
+	base, _ := delivery.NewService(repository, now)
 	handler := NewHandler(
 		NewQueryRepository(db), repository, repository,
 		func(c *gin.Context) uint64 { return uint64(user.CurrentUserID(c)) }, now,
-	)
+	).WithOrderCommands(base).WithRiderAdmin(NewRiderAdmin(db))
 	handler.Register(router.Group("/api/v1/admin/delivery", auth.AuthRequired(), user.AdminRequired()))
 	return router
 }

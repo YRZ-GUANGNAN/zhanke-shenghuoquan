@@ -52,6 +52,7 @@ func (h *Handler) Register(api *gin.RouterGroup) {
 	secured.POST("/reviews/:id/reject", h.reject)
 	secured.POST("/reviews/:id/override", h.overrideReview)
 	secured.GET("/reports", h.reports)
+	secured.GET("/reports/:id", h.reportDetail)
 	secured.GET("/users", h.usersList)
 	secured.GET("/feedbacks", h.feedbacks)
 	secured.PATCH("/feedbacks/:id", h.updateFeedback)
@@ -286,6 +287,19 @@ func (h *Handler) reports(c *gin.Context) {
 	}
 	response.OK(c, gin.H{"items": values, "page": page, "pageSize": size, "total": total})
 }
+func (h *Handler) reportDetail(c *gin.Context) {
+	id, ok := paramID(c)
+	if !ok {
+		return
+	}
+	value, err := h.service.ReportDetail(c.Request.Context(), id)
+	if err != nil {
+		response.Fail(c, http.StatusNotFound, "report not found")
+		return
+	}
+	response.OK(c, value)
+}
+
 func (h *Handler) usersList(c *gin.Context) {
 	page, size := pagination(c)
 	values, total, err := h.users.AdminList(c, page, size)

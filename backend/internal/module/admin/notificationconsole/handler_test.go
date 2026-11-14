@@ -39,6 +39,10 @@ func (testRepository) RecentDeliveries(context.Context, notification.DeliverySta
 	}}, 1, nil
 }
 
+func (testRepository) RetryDelivery(context.Context, string, time.Time) (DeliveryRecord, error) {
+	return DeliveryRecord{}, ErrDeliveryNotRetryable
+}
+
 func TestNotificationChannelOverviewIsAggregateAndSecretFree(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()

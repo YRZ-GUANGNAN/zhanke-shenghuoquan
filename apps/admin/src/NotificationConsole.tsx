@@ -54,6 +54,7 @@ export function NotificationConsole() {
   const [deliveryPage, setDeliveryPage] = useState(1)
   const [deliveriesLoading, setDeliveriesLoading] = useState(false)
   const [deliveriesError, setDeliveriesError] = useState('')
+  const [retryingId, setRetryingId] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -307,7 +308,7 @@ export function NotificationConsole() {
             : <div className="table-scroll">
                 <table>
                   <thead><tr>
-                    <th>时间</th><th>通知方式</th><th>接收用户</th><th>结果</th><th>重试</th><th>失败原因</th>
+                    <th>时间</th><th>通知方式</th><th>接收用户</th><th>结果</th><th>重试</th><th>失败原因</th><th>操作</th>
                   </tr></thead>
                   <tbody>
                     {(deliveries?.items || []).map(item => <tr key={item.deliveryId}>
@@ -317,6 +318,30 @@ export function NotificationConsole() {
                       <td><AdminStatusBadge value={item.status} /></td>
                       <td>{item.attemptCount}</td>
                       <td className="admin-cell-wrap">{item.error || item.errorCode || '—'}</td>
+                      <td>{(item.status === 'blocked' || item.status === 'deadletter') && <AdminButton
+                        tone="ghost"
+                        loading={retryingId === item.deliveryId}
+                        onClick={async () => {
+                          const ok = await dialog.confirm({
+                            title: '重投这条通知',
+                            description: '重投会把该消息重新放回发送队列并清零重试次数。若渠道配置或用户授权仍未修复，消息可能再次失败。',
+                            confirmLabel: '确认重投'
+                          })
+                          if (!ok) return
+                          setRetryingId(item.deliveryId)
+                          setDeliveriesError('')
+                          setNotice('')
+                          try {
+                            await deliveryAdminAPI.retryNotificationDelivery(item.deliveryId)
+                            setNotice('消息已重新进入发送队列')
+                            await loadDeliveries()
+                          } catch (reason) {
+                            setDeliveriesError(errorMessage(reason))
+                          } finally {
+                            setRetryingId('')
+                          }
+                        }}
+                      >重投</AdminButton>}</td>
                     </tr>)}
                   </tbody>
                 </table>

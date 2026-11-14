@@ -26,8 +26,9 @@ type userApplicationService interface {
 type adminApplicationService interface {
 	ListAdmin(context.Context, AdminListFilter) (AdminListView, error)
 	GetAdmin(context.Context, string) (ApplicationDetail, error)
-	Approve(context.Context, uint64, string, uint64) (ApplicationView, error)
+	Approve(context.Context, uint64, string, uint64, string) (ApplicationView, error)
 	Reject(context.Context, uint64, string, uint64, string) (ApplicationView, error)
+	Override(context.Context, uint64, string, uint64, string, string) (ApplicationView, error)
 }
 
 type currentUserIDResolver func(*gin.Context) uint64
@@ -67,6 +68,7 @@ func (h *Handler) RegisterAdmin(rg *gin.RouterGroup) {
 	rg.GET("/:applicationId", h.getAdmin)
 	rg.POST("/:applicationId/approve", h.approve)
 	rg.POST("/:applicationId/reject", h.reject)
+	rg.POST("/:applicationId/override", h.overrideDecision)
 }
 
 type submitRequest struct {
@@ -80,6 +82,7 @@ type submitRequest struct {
 
 type approveRequest struct {
 	ExpectedRowVersion uint64 `json:"expectedRowVersion"`
+	Reason             string `json:"reason"`
 }
 
 type rejectRequest struct {
@@ -115,11 +118,29 @@ func (h *Handler) getAdmin(c *gin.Context) {
 
 func (h *Handler) approve(c *gin.Context) {
 	var request approveRequest
-	if err := decodeAdminRequest(c, map[string]struct{}{"expectedRowVersion": {}}, &request); err != nil {
+	if err := decodeAdminRequest(c, map[string]struct{}{"expectedRowVersion": {}, "reason": {}}, &request); err != nil {
 		response.Fail(c, http.StatusBadRequest, "invalid identity application decision")
 		return
 	}
-	value, err := h.adminService.Approve(c, h.currentUserID(c), c.Param("applicationId"), request.ExpectedRowVersion)
+	value, err := h.adminService.Approve(c, h.currentUserID(c), c.Param("applicationId"), request.ExpectedRowVersion, request.Reason)
+	if err != nil {
+		writeAdminApplicationError(c, err)
+		return
+	}
+	response.OK(c, value)
+}
+
+func (h *Handler) overrideDecision(c *gin.Context) {
+	var request struct {
+		ExpectedRowVersion uint64 `json:"expectedRowVersion"`
+		Status             string `json:"status"`
+		Reason             string `json:"reason"`
+	}
+	if err := decodeAdminRequest(c, map[string]struct{}{"expectedRowVersion": {}, "status": {}, "reason": {}}, &request); err != nil {
+		response.Fail(c, http.StatusBadRequest, "invalid identity application decision")
+		return
+	}
+	value, err := h.adminService.Override(c, h.currentUserID(c), c.Param("applicationId"), request.ExpectedRowVersion, request.Status, request.Reason)
 	if err != nil {
 		writeAdminApplicationError(c, err)
 		return

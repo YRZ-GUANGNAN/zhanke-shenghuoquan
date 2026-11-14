@@ -29,6 +29,26 @@ export interface DeliveryQuery {
   to?: string
 }
 
+export interface RiderAdminRow {
+  riderUserId: number
+  status: 'active' | 'resting' | 'suspended'
+  dutyState: 'on_duty' | 'off_duty'
+  realName: string
+  phone: string
+  rowVersion: number
+  inFlight: number
+  todayOrders: number
+  todayIncomeCents: number
+  updatedAt: string
+}
+
+export interface RiderAdminQuery {
+  status?: string
+  query?: string
+  page?: number
+  pageSize?: number
+}
+
 export type RiderAvailabilityConfig = { enabled: false } | {
   enabled: true
   maxInFlightPerRider: number
@@ -212,6 +232,7 @@ export interface DeliveryOrder {
   deliveredAt?: string | null
   paymentFailedAt?: string | null
   cancelledAt?: string | null
+  cancelReason?: string
   createdAt: string
   updatedAt: string
 }
@@ -475,9 +496,25 @@ export const deliveryAdminAPI = {
     }),
   refunds: (query: DeliveryQuery = {}) => api<Page<Refund>>(`/refunds${queryString(query)}`),
   refund: (id: string) => api<Refund>(`/refunds/${encodeURIComponent(id)}`),
+  riders: (query: RiderAdminQuery = {}) => api<Page<RiderAdminRow>>(`/riders${queryString(query as DeliveryQuery)}`),
+  riderOrders: (riderUserId: number) => api<DeliveryOrder[]>(`/riders/${riderUserId}/orders`),
+  setRiderStatus: (riderUserId: number, status: RiderAdminRow['status'], expectedRowVersion: number, reason: string) =>
+    api<RiderAdminRow>(`/riders/${riderUserId}/status`, {
+      ...body({ status, rowVersion: expectedRowVersion, reason }), method: 'POST'
+    }),
+  reassignOrder: (id: string, riderUserId: number, expectedRowVersion: number, reason: string) =>
+    api<DeliveryOrder>(`/orders/${encodeURIComponent(id)}/reassign`, {
+      ...body({ riderUserId, rowVersion: expectedRowVersion, reason }), method: 'POST'
+    }),
+  cancelOrder: (id: string, expectedRowVersion: number, reason: string) =>
+    api<DeliveryOrder>(`/orders/${encodeURIComponent(id)}/cancel`, {
+      ...body({ rowVersion: expectedRowVersion, reason }), method: 'POST'
+    }),
   notificationChannels: () => api<NotificationChannelOverview>('/notification-channels'),
   notificationDeliveries: (query: { status?: string; page?: number; pageSize?: number } = {}) =>
     api<NotificationDeliveryPage>(`/notification-channels/deliveries${queryString(query)}`),
+  retryNotificationDelivery: (deliveryId: string) =>
+    api<NotificationDelivery>(`/notification-channels/deliveries/${encodeURIComponent(deliveryId)}/retry`, { method: 'POST' }),
   testWecomGroup: (group: 'merchant_ops' | 'rider_ops') =>
     api<{ accepted: boolean; group: string }>('/notification-channels/wecom/test', {
       ...body({ group }), method: 'POST'

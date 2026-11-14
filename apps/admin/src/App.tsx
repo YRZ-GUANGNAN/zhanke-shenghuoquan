@@ -17,7 +17,7 @@ import { AccountPanel } from './AccountPanel'
 import { adminAuthAPI, type AdminCredential } from './services/admin-auth'
 import { AdminBadge, AdminButton, AdminField, AdminIcon, AdminNotice, AdminPageHeader, AdminPagination, AdminPanel, AdminRowActions, AdminSelect, AdminState, AdminStatusBadge, AdminTableFrame, AdminToolbar, useAdminDialog, type AdminDialogAPI } from './components'
 import { adminNavigation, adminNavigationGroups, featurePolicyNavigationItem, type AdminNavigationItem } from './admin-navigation'
-import type { AdminSection, FeedbackRow, NavigationCategory, NavigationItem, NavigationItemInput, Page, PageQuery, PostRow, ProductRow, ReportRow, ReviewTask, Stats, UserRow } from './types'
+import type { AdminSection, FeedbackRow, NavigationCategory, NavigationItem, NavigationItemInput, Page, PageQuery, PostRow, ProductRow, ReportDetail, ReportRow, ReviewTask, Stats, UserRow } from './types'
 
 const takeoutNavigation:AdminNavigationItem={key:'takeout',label:'旧版外卖',description:'仅保留历史外卖商家、菜品、订单与结算入口',icon:'delivery',group:'业务运营'}
 const baseNavigation=legacyTakeoutEnabled?[...adminNavigation.slice(0,2),takeoutNavigation,...adminNavigation.slice(2)]:adminNavigation
@@ -171,7 +171,10 @@ function Reviews(){
 	const selectTask=(item:ReviewTask)=>{setSelectedTaskId(item.id);setError('');setNotice('')}
 	const act=async(item:ReviewTask,action:'start'|'approve'|'reject')=>{
 		let reason=''
-		if(action==='approve'&&!await dialog.confirm({title:'通过并公开',description:`确认通过${reviewObjectLabel(item.objectType)} #${item.objectId} 吗？通过后将按业务规则公开展示。`,confirmLabel:'通过并公开'}))return
+		if(action==='approve'){
+			reason=await dialog.prompt({title:'通过并公开',description:`确认通过${reviewObjectLabel(item.objectType)} #${item.objectId} 吗？通过后将按业务规则公开展示。`,inputLabel:'审核依据',placeholder:'请填写核对结果或风险判断',requiredMessage:'审核依据不能为空',confirmLabel:'通过并公开'})||''
+			if(!reason)return
+		}
 		if(action==='reject'){
 			reason=await dialog.prompt({title:'拒绝审核',description:`拒绝${reviewObjectLabel(item.objectType)} #${item.objectId} 后，内容不会公开展示。`,inputLabel:'拒绝原因',placeholder:'请说明具体原因',requiredMessage:'拒绝原因不能为空',confirmLabel:'确认拒绝',tone:'danger'})||''
 			if(!reason)return
@@ -251,8 +254,7 @@ function Reviews(){
 			<div className="review-detail__actions">
 				{selected.status==='submitted'&&<button type="button" disabled={busyTaskId===selected.id} onClick={()=>void act(selected,'start')}>{busyTaskId===selected.id?'处理中…':'开始审核'}</button>}
 				{selected.status==='reviewing'&&<><button type="button" disabled={busyTaskId===selected.id} onClick={()=>void act(selected,'approve')}>{busyTaskId===selected.id?'处理中…':'通过并公开'}</button><button type="button" className="danger" disabled={busyTaskId===selected.id} onClick={()=>void act(selected,'reject')}>拒绝</button></>}
-				{(selected.status==='approved'||selected.status==='rejected')&&(selected.decisionSource==='automatic'||selected.decisionSource==='manual_override')&&<><button type="button" disabled={busyTaskId===selected.id||selected.status==='approved'} onClick={()=>void override(selected,'approved')}>改判为通过</button><button type="button" className="danger" disabled={busyTaskId===selected.id||selected.status==='rejected'} onClick={()=>void override(selected,'rejected')}>改判为拒绝</button></>}
-				{(selected.status==='approved'||selected.status==='rejected')&&selected.decisionSource==='manual'&&<span>该任务已由人工完成，无需再次操作。</span>}
+				{(selected.status==='approved'||selected.status==='rejected')&&<><button type="button" disabled={busyTaskId===selected.id||selected.status==='approved'} onClick={()=>void override(selected,'approved')}>改判为通过</button><button type="button" className="danger" disabled={busyTaskId===selected.id||selected.status==='rejected'} onClick={()=>void override(selected,'rejected')}>改判为拒绝</button></>}
 			</div>
 		</section>}
 	</Panel>
@@ -382,11 +384,26 @@ function Posts(){
 	const{page,setPage,data,loading,error,setError,load}=usePagedAdminData<PostRow>(adminAPI.posts)
 	const[busy,setBusy]=useState<number|null>(null)
 	const[notice,setNotice]=useState('')
+	const[detailId,setDetailId]=useState<number|null>(null)
+	const detail=(data?.items||[]).find(item=>item.id===detailId)||null
 	const takedown=async(row:PostRow)=>{const reason=await takedownReason(dialog,'帖子',row.title);if(reason===null)return;setBusy(row.id);setError('');setNotice('');try{await adminAPI.takedownPost(row.id,reason);setNotice(`帖子“${row.title}”已下架。`);await load()}catch(e){setError(String(e))}finally{setBusy(null)}}
-	return <AdminPanel title="帖子管理" description="查看社区帖子审核状态，并对已公开内容执行合规下架。">
+	return <AdminPanel title="帖子管理" description="查看社区帖子审核状态与内容详情，并对已公开内容执行合规下架。">
 		<AdminToolbar summary={data?`共 ${data.total} 条帖子`:'正在读取帖子'} actions={<AdminButton tone="ghost" loading={loading} onClick={()=>void load()}>刷新</AdminButton>}/>
 		{error&&<AdminNotice tone="danger" title="帖子操作失败">{error}</AdminNotice>}{notice&&<AdminNotice tone="success">{notice}</AdminNotice>}
-		{!data&&loading?<AdminState kind="loading" title="正在读取帖子" description="帖子数据加载完成后会自动显示。"/>:data?.items.length===0?<AdminState kind="empty" title="暂无帖子" description="当前页没有可展示的帖子。"/>:<AdminTableFrame label="帖子管理列表"><table className="admin-data-table"><thead><tr><th>帖子</th><th>作者</th><th>话题</th><th>审核状态</th><th>提交时间</th><th className="admin-table-actions">操作</th></tr></thead><tbody>{(data?.items||[]).map(row=><tr key={row.id}><td><strong>{row.title||'无标题帖子'}</strong><span>#{row.id}</span></td><td>{row.author.nickname||'未知用户'}<span>{[row.author.school,row.author.campus].filter(Boolean).join(' / ')||'学校未设置'}</span></td><td>{row.topic||'未分类'}</td><td><AdminStatusBadge value={row.reviewStatus}/></td><td>{displayTime(row.createdAt)}</td><td className="admin-table-actions">{row.reviewStatus==='approved'?<AdminButton tone="text" loading={busy===row.id} onClick={()=>void takedown(row)}>下架</AdminButton>:<span className="admin-unavailable">当前不可下架</span>}</td></tr>)}</tbody></table></AdminTableFrame>}
+		{!data&&loading?<AdminState kind="loading" title="正在读取帖子" description="帖子数据加载完成后会自动显示。"/>:data?.items.length===0?<AdminState kind="empty" title="暂无帖子" description="当前页没有可展示的帖子。"/>:<AdminTableFrame label="帖子管理列表"><table className="admin-data-table"><thead><tr><th>帖子</th><th>作者</th><th>图片</th><th>话题</th><th>审核状态</th><th>提交时间</th><th className="admin-table-actions">操作</th></tr></thead><tbody>{(data?.items||[]).map(row=><tr key={row.id}><td><button className="link-button" onClick={()=>setDetailId(detailId===row.id?null:row.id)}>{row.title||'无标题帖子'}</button><span>#{row.id}</span></td><td>{row.author.nickname||'未知用户'}<span>{[row.author.school,row.author.campus].filter(Boolean).join(' / ')||'学校未设置'}</span></td><td>{row.images?.length?`${row.images.length} 张`:'无'}</td><td>{row.topic||'未分类'}</td><td><AdminStatusBadge value={row.reviewStatus}/></td><td>{displayTime(row.createdAt)}</td><td className="admin-table-actions"><AdminRowActions><AdminButton tone="text" onClick={()=>setDetailId(detailId===row.id?null:row.id)}>{detailId===row.id?'收起详情':'查看详情'}</AdminButton>{row.reviewStatus==='approved'?<AdminButton tone="text" loading={busy===row.id} onClick={()=>void takedown(row)}>下架</AdminButton>:<span className="admin-unavailable">当前不可下架</span>}</AdminRowActions></td></tr>)}</tbody></table></AdminTableFrame>}
+		{detail&&<section className="review-detail" aria-label={`帖子 ${detail.id} 详情`}>
+			<header><div><span>帖子详情</span><strong>{detail.title||'无标题帖子'}</strong></div><AdminStatusBadge value={detail.reviewStatus}/></header>
+			<div className="review-detail__facts">
+				<span>编号：#{detail.id}</span>
+				<span>作者：{detail.author.nickname||'未知用户'}</span>
+				<span>话题：{detail.topic||'未分类'}</span>
+				{detail.tags?.length?<span>标签：{detail.tags.join('、')}</span>:null}
+				<span>点赞 {detail.likedCount??0} · 评论 {detail.commentCount??0} · 收藏 {detail.favoriteCount??0}</span>
+				<span>发布时间：{displayTime(detail.createdAt)}</span>
+			</div>
+			{detail.content&&<p className="delivery-description">{detail.content}</p>}
+			{detail.images?.length?<div className="admin-content-images">{detail.images.map(image=><img key={image.id} src={image.url} alt={`帖子图片 ${image.id}`} loading="lazy"/>)}</div>:<p className="placeholder">该帖子没有图片</p>}
+		</section>}
 		{data&&<AdminPagination page={page} pageSize={data.pageSize} total={data.total} loading={loading} onPageChange={setPage}/>}
 	</AdminPanel>
 }
@@ -397,11 +414,28 @@ function Products(){
 	const{page,setPage,data,loading,error,setError,load}=usePagedAdminData<ProductRow>(adminAPI.products)
 	const[busy,setBusy]=useState<number|null>(null)
 	const[notice,setNotice]=useState('')
+	const[detailId,setDetailId]=useState<number|null>(null)
+	const detail=(data?.items||[]).find(item=>item.id===detailId)||null
 	const takedown=async(row:ProductRow)=>{const reason=await takedownReason(dialog,'商品',row.title);if(reason===null)return;setBusy(row.id);setError('');setNotice('');try{await adminAPI.takedownProduct(row.id,reason);setNotice(`商品“${row.title}”已下架。`);await load()}catch(e){setError(String(e))}finally{setBusy(null)}}
-	return <AdminPanel title="商品管理" description="商品审核由统一审核处理，本页负责业务状态查看和合规下架。">
+	return <AdminPanel title="商品管理" description="商品审核由统一审核处理，本页负责业务状态、商品详情查看和合规下架。">
 		<AdminToolbar summary={data?`共 ${data.total} 件商品`:'正在读取商品'} actions={<AdminButton tone="ghost" loading={loading} onClick={()=>void load()}>刷新</AdminButton>}/>
 		{error&&<AdminNotice tone="danger" title="商品操作失败">{error}</AdminNotice>}{notice&&<AdminNotice tone="success">{notice}</AdminNotice>}
-		{!data&&loading?<AdminState kind="loading" title="正在读取商品" description="商品数据加载完成后会自动显示。"/>:data?.items.length===0?<AdminState kind="empty" title="暂无商品" description="当前页没有可展示的商品。"/>:<AdminTableFrame label="商品管理列表"><table className="admin-data-table"><thead><tr><th>商品</th><th>卖家</th><th>价格</th><th>业务状态</th><th>审核状态</th><th className="admin-table-actions">操作</th></tr></thead><tbody>{(data?.items||[]).map(row=><tr key={row.id}><td><strong>{row.title||'无标题商品'}</strong><span>#{row.id} · {row.category||'未分类'}</span></td><td>{row.seller.nickname||'未知用户'}</td><td className="admin-price">¥{(row.price/100).toFixed(2)}</td><td><AdminStatusBadge value={row.status}/></td><td><AdminStatusBadge value={row.reviewStatus}/></td><td className="admin-table-actions"><AdminRowActions>{row.reviewStatus==='approved'?<AdminButton tone="text" loading={busy===row.id} onClick={()=>void takedown(row)}>下架</AdminButton>:row.reviewStatus==='submitted'||row.reviewStatus==='reviewing'?<AdminButton tone="text" onClick={()=>setSection('moderation')}>前往审核</AdminButton>:<span className="admin-unavailable">当前不可操作</span>}</AdminRowActions></td></tr>)}</tbody></table></AdminTableFrame>}
+		{!data&&loading?<AdminState kind="loading" title="正在读取商品" description="商品数据加载完成后会自动显示。"/>:data?.items.length===0?<AdminState kind="empty" title="暂无商品" description="当前页没有可展示的商品。"/>:<AdminTableFrame label="商品管理列表"><table className="admin-data-table"><thead><tr><th>商品</th><th>卖家</th><th>图片</th><th>价格</th><th>业务状态</th><th>审核状态</th><th className="admin-table-actions">操作</th></tr></thead><tbody>{(data?.items||[]).map(row=><tr key={row.id}><td><button className="link-button" onClick={()=>setDetailId(detailId===row.id?null:row.id)}>{row.title||'无标题商品'}</button><span>#{row.id} · {row.category||'未分类'}</span></td><td>{row.seller.nickname||'未知用户'}</td><td>{row.images?.length?`${row.images.length} 张`:'无'}</td><td className="admin-price">¥{(row.price/100).toFixed(2)}</td><td><AdminStatusBadge value={row.status}/></td><td><AdminStatusBadge value={row.reviewStatus}/></td><td className="admin-table-actions"><AdminRowActions><AdminButton tone="text" onClick={()=>setDetailId(detailId===row.id?null:row.id)}>{detailId===row.id?'收起详情':'查看详情'}</AdminButton>{row.reviewStatus==='approved'?<AdminButton tone="text" loading={busy===row.id} onClick={()=>void takedown(row)}>下架</AdminButton>:row.reviewStatus==='submitted'||row.reviewStatus==='reviewing'?<AdminButton tone="text" onClick={()=>setSection('moderation')}>前往审核</AdminButton>:<span className="admin-unavailable">当前不可操作</span>}</AdminRowActions></td></tr>)}</tbody></table></AdminTableFrame>}
+		{detail&&<section className="review-detail" aria-label={`商品 ${detail.id} 详情`}>
+			<header><div><span>商品详情</span><strong>{detail.title||'无标题商品'}</strong></div><AdminStatusBadge value={detail.status}/></header>
+			<div className="review-detail__facts">
+				<span>编号：#{detail.id}</span>
+				<span>卖家：{detail.seller.nickname||'未知用户'}</span>
+				<span>分类：{detail.category||'未分类'}</span>
+				{detail.condition?<span>成色：{detail.condition}</span>:null}
+				{detail.campus?<span>校区：{detail.campus}</span>:null}
+				<span>价格：¥{(detail.price/100).toFixed(2)}{detail.originalPrice?`（原价 ¥${(detail.originalPrice/100).toFixed(2)}）`:''}</span>
+				<span>收藏 {detail.favoriteCount??0}</span>
+				<span>发布时间：{displayTime(detail.createdAt)}</span>
+			</div>
+			{detail.description&&<p className="delivery-description">{detail.description}</p>}
+			{detail.images?.length?<div className="admin-content-images">{detail.images.map(image=><img key={image.id} src={image.url} alt={`商品图片 ${image.id}`} loading="lazy"/>)}</div>:<p className="placeholder">该商品没有图片</p>}
+		</section>}
 		{data&&<AdminPagination page={page} pageSize={data.pageSize} total={data.total} loading={loading} onPageChange={setPage}/>}
 	</AdminPanel>
 }
@@ -409,11 +443,39 @@ function Products(){
 function Reports(){
 	const setSection=useAdminStore(state=>state.setSection)
 	const{page,setPage,data,loading,error,load}=usePagedAdminData<ReportRow>(adminAPI.reports)
+	const[detail,setDetail]=useState<ReportDetail|null>(null)
+	const[detailError,setDetailError]=useState('')
+	const[detailLoading,setDetailLoading]=useState('')
 	const targetLabel=(value:string)=>({post:'帖子',comment:'评论',product:'商品',product_comment:'商品留言',user:'用户'}[value]||value)
+	const openDetail=async(row:ReportRow)=>{
+		if(detail?.report.id===row.id){setDetail(null);return}
+		setDetailError('')
+		setDetailLoading(String(row.id))
+		try{setDetail(await adminAPI.reportDetail(row.id))}
+		catch(e){setDetailError(String(e))}
+		finally{setDetailLoading('')}
+	}
 	return <AdminPanel title="举报审核" description="举报证据在此集中查看，实际处置沿用统一审核流程。">
 		<AdminToolbar summary={data?`共 ${data.total} 条举报`:'正在读取举报'} actions={<><AdminButton tone="ghost" loading={loading} onClick={()=>void load()}>刷新</AdminButton><AdminButton tone="primary" onClick={()=>setSection('moderation')}>进入统一审核</AdminButton></>}/>
 		{error&&<AdminNotice tone="danger" title="无法读取举报">{error}</AdminNotice>}
-		{!data&&loading?<AdminState kind="loading" title="正在读取举报" description="举报数据加载完成后会自动显示。"/>:data?.items.length===0?<AdminState kind="empty" title="暂无举报" description="当前页没有待展示的举报。"/>:<AdminTableFrame label="举报审核列表"><table className="admin-data-table"><thead><tr><th>举报目标</th><th>原因</th><th>审核状态</th><th>提交时间</th><th className="admin-table-actions">操作</th></tr></thead><tbody>{(data?.items||[]).map(row=><tr key={row.id}><td><strong>{targetLabel(row.targetType)} #{row.targetId}</strong><span>举报 #{row.id}</span></td><td className="admin-cell-wrap">{row.reason||'未填写原因'}</td><td><AdminStatusBadge value={row.reviewStatus}/></td><td>{displayTime(row.createdAt)}</td><td className="admin-table-actions"><AdminButton tone="text" onClick={()=>setSection('moderation')}>前往审核</AdminButton></td></tr>)}</tbody></table></AdminTableFrame>}
+		{detailError&&<AdminNotice tone="danger" title="无法读取举报详情">{detailError}</AdminNotice>}
+		{!data&&loading?<AdminState kind="loading" title="正在读取举报" description="举报数据加载完成后会自动显示。"/>:data?.items.length===0?<AdminState kind="empty" title="暂无举报" description="当前页没有待展示的举报。"/>:<AdminTableFrame label="举报审核列表"><table className="admin-data-table"><thead><tr><th>举报目标</th><th>原因</th><th>审核状态</th><th>提交时间</th><th className="admin-table-actions">操作</th></tr></thead><tbody>{(data?.items||[]).map(row=><tr key={row.id}><td><strong>{targetLabel(row.targetType)} #{row.targetId}</strong><span>举报 #{row.id}</span></td><td className="admin-cell-wrap">{row.reason||'未填写原因'}</td><td><AdminStatusBadge value={row.reviewStatus}/></td><td>{displayTime(row.createdAt)}</td><td className="admin-table-actions"><AdminRowActions><AdminButton tone="text" loading={detailLoading===String(row.id)} onClick={()=>void openDetail(row)}>{detail?.report.id===row.id?'收起详情':'查看详情'}</AdminButton><AdminButton tone="text" onClick={()=>setSection('moderation')}>前往审核</AdminButton></AdminRowActions></td></tr>)}</tbody></table></AdminTableFrame>}
+		{detail&&<section className="review-detail" aria-label={`举报 ${detail.report.id} 详情`}>
+			<header><div><span>举报详情</span><strong>{targetLabel(detail.report.targetType)} #{detail.report.targetId}</strong></div><span className={`status status--${detail.review?.status||detail.report.reviewStatus}`}>{reviewStatusLabel((detail.review?.status||detail.report.reviewStatus) as ReviewTask['status'])}</span></header>
+			<div className="review-detail__facts">
+				<span>举报编号：#{detail.report.id}</span>
+				<span>举报人：{detail.report.reporterId?`用户 #${detail.report.reporterId}`:'匿名'}</span>
+				<span>提交时间：{displayTime(detail.report.createdAt)}</span>
+				<span>举报原因：{detail.report.reason||'未填写原因'}</span>
+			</div>
+			{detail.report.detail&&<p className="delivery-description">{detail.report.detail}</p>}
+			{detail.review?<div className="review-detail__facts">
+				<span>处理结论：{reviewStatusLabel(detail.review.status)}</span>
+				<span>决策来源：{reviewDecisionSourceLabel(detail.review.decisionSource)}</span>
+				<span>处理依据：{detail.review.reason||'未填写'}</span>
+				<span>处理时间：{displayTime(detail.review.updatedAt||'')}</span>
+			</div>:<p className="placeholder">该举报尚未进入统一审核流。</p>}
+		</section>}
 		{data&&<AdminPagination page={page} pageSize={data.pageSize} total={data.total} loading={loading} onPageChange={setPage}/>}
 	</AdminPanel>
 }

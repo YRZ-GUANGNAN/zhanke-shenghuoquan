@@ -108,11 +108,11 @@ func (s *Service) GetAdmin(ctx context.Context, applicationPublicID string) (App
 	return detail, nil
 }
 
-func (s *Service) Approve(ctx context.Context, reviewerUserID uint64, applicationPublicID string, expectedRowVersion uint64) (ApplicationView, error) {
+func (s *Service) Approve(ctx context.Context, reviewerUserID uint64, applicationPublicID string, expectedRowVersion uint64, reason string) (ApplicationView, error) {
 	if s == nil || s.repo == nil {
 		return ApplicationView{}, errors.New("identity application repository is required")
 	}
-	input, err := normalizeDecisionInput(reviewerUserID, applicationPublicID, expectedRowVersion, "", false, s.now)
+	input, err := normalizeDecisionInput(reviewerUserID, applicationPublicID, expectedRowVersion, reason, false, s.now)
 	if err != nil {
 		return ApplicationView{}, err
 	}
@@ -126,6 +126,35 @@ func (s *Service) Approve(ctx context.Context, reviewerUserID uint64, applicatio
 		return s.provisioner.ProvisionApproved(commitContext, tx, approved)
 	}
 	value, err := s.repo.Approve(ctx, input, commit)
+	if err != nil {
+		return ApplicationView{}, err
+	}
+	return toApplicationView(value), nil
+}
+
+// Override re-decides a terminal (approved or rejected) application with a
+// mandatory review reason; the admin console uses it for 改判.
+func (s *Service) Override(ctx context.Context, reviewerUserID uint64, applicationPublicID string, expectedRowVersion uint64, status string, reason string) (ApplicationView, error) {
+	if s == nil || s.repo == nil {
+		return ApplicationView{}, errors.New("identity application repository is required")
+	}
+	if status != string(StatusApproved) && status != string(StatusRejected) {
+		return ApplicationView{}, ErrInvalidInput
+	}
+	input, err := normalizeDecisionInput(reviewerUserID, applicationPublicID, expectedRowVersion, reason, true, s.now)
+	if err != nil {
+		return ApplicationView{}, err
+	}
+	commit := func(commitContext context.Context, tx *gorm.DB, approved ApprovedIdentity) error {
+		if approved.Role != RoleRider {
+			return nil
+		}
+		if s.provisioner == nil {
+			return errors.New("approved rider provisioner is required")
+		}
+		return s.provisioner.ProvisionApproved(commitContext, tx, approved)
+	}
+	value, err := s.repo.Override(ctx, input, Status(status), commit)
 	if err != nil {
 		return ApplicationView{}, err
 	}

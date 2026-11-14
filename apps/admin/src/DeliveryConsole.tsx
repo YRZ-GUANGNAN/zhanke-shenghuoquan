@@ -23,11 +23,13 @@ import {
   type RiderWithdrawalProcessing,
   type RiderWithdrawalAction,
   type RiderWithdrawalCommand,
+  type RiderAdminRow,
   type RiderAvailabilityConfig
 } from './services/delivery-admin'
 import { statusLabel, useAdminDialog } from './components'
+import { RiderDispatchPanel } from './RiderDispatchPanel'
 
-type View = 'summary' | 'funding-sources' | 'orders' | 'fee' | 'overrides' | 'merchant-wallets' | 'rider-wallets' | 'earnings' | 'payout-queue' | 'withdrawals' | 'refunds'
+type View = 'summary' | 'funding-sources' | 'orders' | 'riders' | 'fee' | 'overrides' | 'merchant-wallets' | 'rider-wallets' | 'earnings' | 'payout-queue' | 'withdrawals' | 'refunds'
 
 const pageSize = 20
 const emptyPage = <T,>(): Page<T> => ({ items: [], page: 1, pageSize, total: 0 })
@@ -53,7 +55,7 @@ type ViewGroup = { key: string; label: string; views: Array<[View, string]> }
 
 const VIEW_GROUPS: ViewGroup[] = [
   { key: 'overview', label: '概览', views: [['summary', '配送概览']] },
-  { key: 'orders', label: '订单', views: [['orders', '配送订单']] },
+  { key: 'orders', label: '订单与派单', views: [['orders', '配送订单'], ['riders', '骑手派单']] },
   {
     key: 'funds', label: '资金', views: [
       ['merchant-wallets', '商家钱包'],
@@ -92,6 +94,7 @@ export function DeliveryConsole() {
     {view === 'summary' && <SummaryPanel />}
     {view === 'funding-sources' && <FundingSourcesPanel />}
     {view === 'orders' && <OrdersPanel />}
+    {view === 'riders' && <RiderDispatchPanel />}
     {view === 'fee' && <FeeConfigPanel />}
     {view === 'overrides' && <MerchantOverridesPanel />}
     {view === 'merchant-wallets' && <MerchantWalletsPanel />}
@@ -209,7 +212,12 @@ function FundingSourcesPanel() {
   </Panel>
 }
 
+const operableStatuses = new Set(['ready_for_claim', 'claimed', 'to_pickup', 'picked_up', 'delivering'])
+const reassignableStatuses = new Set(['claimed', 'to_pickup', 'picked_up', 'delivering'])
+const cancellableStatuses = new Set(['pending_fee_payment', 'payment_failed', 'ready_for_claim', 'claimed', 'to_pickup'])
+
 function OrdersPanel() {
+  const dialog = useAdminDialog()
   const [data, setData] = useState<Page<DeliveryOrder>>(emptyPage())
   const [detail, setDetail] = useState<OrderFunds | null>(null)
   const [status, setStatus] = useState('')
@@ -219,7 +227,13 @@ function OrdersPanel() {
   const [to, setTo] = useState('')
   const [page, setPage] = useState(1)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(false)
+  const [selected, setSelected] = useState<string[]>([])
+  const [candidates, setCandidates] = useState<RiderAdminRow[]>([])
+  const [batchRider, setBatchRider] = useState('')
+  const [batchReason, setBatchReason] = useState('')
+  const [busy, setBusy] = useState('')
   const query = useCallback((): DeliveryQuery => ({
     status,
     merchantUserId,
@@ -232,14 +246,91 @@ function OrdersPanel() {
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
+    setSelected([])
     try { setData(await deliveryAdminAPI.orders(query())) } catch (reason) { setError(errorMessage(reason)) } finally { setLoading(false) }
   }, [query])
   useEffect(() => { void load() }, [load])
+  // 改派候选人：只列接单中的骑手，避免把订单交给休息中或已封禁的骑手。
+  useEffect(() => {
+    deliveryAdminAPI.riders({ status: 'active', pageSize: 100 })
+      .then(value => setCandidates(value.items))
+      .catch(() => setCandidates([]))
+  }, [])
   const inspect = async (id: string) => {
     setError('')
     try { setDetail(await deliveryAdminAPI.orderFunds(id)) } catch (reason) { setError(errorMessage(reason)) }
   }
   const clear = () => { setStatus(''); setMerchantUserId(''); setRiderUserId(''); setFrom(''); setTo(''); setPage(1) }
+
+  const reassignOne = async (order: DeliveryOrder, targetUserId: number) => {
+    const target = candidates.find(row => row.riderUserId === targetUserId)
+    if (!target) { setError('请选择接单中的骑手'); return }
+    const reason = await dialog.prompt({
+      title: '改派订单',
+      description: `把配送单 ${order.deliveryOrderPublicId} 改派给 ${target.realName || `#${target.riderUserId}`}。原骑手不再负责该订单。`,
+      inputLabel: '改派原因',
+      placeholder: '例如：原骑手车辆故障',
+      requiredMessage: '请填写改派原因',
+      confirmLabel: '确认改派'
+    })
+    if (!reason?.trim()) return
+    setBusy(order.deliveryOrderPublicId); setError(''); setNotice('')
+    try {
+      await deliveryAdminAPI.reassignOrder(order.deliveryOrderPublicId, target.riderUserId, order.rowVersion, reason.trim())
+      setNotice(`配送单 ${order.deliveryOrderPublicId} 已改派给 ${target.realName || `#${target.riderUserId}`}`)
+      await load()
+    } catch (cause) { setError(isConflict(cause) ? conflictMessage : errorMessage(cause)) }
+    finally { setBusy('') }
+  }
+
+  const cancelOne = async (order: DeliveryOrder) => {
+    const reason = await dialog.prompt({
+      title: '取消订单',
+      description: `取消配送单 ${order.deliveryOrderPublicId} 后订单不再履约。已取货的订单不能直接取消，需要走退款流程。`,
+      inputLabel: '取消原因',
+      placeholder: '例如：用户要求取消',
+      requiredMessage: '请填写取消原因',
+      confirmLabel: '确认取消',
+      tone: 'danger'
+    })
+    if (!reason?.trim()) return
+    setBusy(order.deliveryOrderPublicId); setError(''); setNotice('')
+    try {
+      await deliveryAdminAPI.cancelOrder(order.deliveryOrderPublicId, order.rowVersion, reason.trim())
+      setNotice(`配送单 ${order.deliveryOrderPublicId} 已取消`)
+      await load()
+    } catch (cause) { setError(isConflict(cause) ? conflictMessage : errorMessage(cause)) }
+    finally { setBusy('') }
+  }
+
+  const runBatch = async (kind: 'reassign' | 'cancel') => {
+    const targets = data.items.filter(row => selected.includes(row.deliveryOrderPublicId)
+      && (kind === 'reassign' ? reassignableStatuses : cancellableStatuses).has(row.status))
+    if (!targets.length) { setError('所选订单当前都不可操作，请刷新后重试'); return }
+    const reason = batchReason.trim()
+    if (!reason) { setError('批量操作需要填写操作原因'); return }
+    const target = kind === 'reassign' ? candidates.find(row => row.riderUserId === Number(batchRider)) : null
+    if (kind === 'reassign' && !target) { setError('请选择接单中的骑手'); return }
+    setBusy('batch'); setError(''); setNotice('')
+    let ok = 0
+    const failures: string[] = []
+    for (const order of targets) {
+      try {
+        if (target) await deliveryAdminAPI.reassignOrder(order.deliveryOrderPublicId, target.riderUserId, order.rowVersion, reason)
+        else await deliveryAdminAPI.cancelOrder(order.deliveryOrderPublicId, order.rowVersion, reason)
+        ok += 1
+      } catch (cause) {
+        failures.push(`${order.deliveryOrderPublicId}：${isConflict(cause) ? '已被他人修改' : errorMessage(cause)}`)
+      }
+    }
+    setSelected([]); setBatchReason(''); setBusy('')
+    await load()
+    setNotice(`${kind === 'reassign' ? '改派' : '取消'}完成 ${ok} 笔${failures.length ? `，${failures.length} 笔失败` : ''}`)
+    if (failures.length) setError(failures.join('；'))
+  }
+
+  const operableOnPage = data.items.filter(row => operableStatuses.has(row.status))
+  const allChecked = operableOnPage.length > 0 && operableOnPage.every(row => selected.includes(row.deliveryOrderPublicId))
   return <Panel title="配送订单管理" actions={<button className="delivery-secondary" disabled={loading} onClick={() => void load()}>{loading ? '加载中…' : '刷新'}</button>}>
     <div className="delivery-controls">
       <label>状态<select value={status} onChange={event => { setPage(1); setStatus(event.target.value) }}><option value="">全部</option>{statusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
@@ -250,14 +341,59 @@ function OrdersPanel() {
       <button onClick={() => void load()} disabled={loading}>查询</button>
       <button className="delivery-secondary" onClick={clear}>清空</button>
     </div>
+    {selected.length > 0 && <div className="delivery-controls delivery-batch-bar">
+      <span className="delivery-batch-count">已选 {selected.length} 笔（仅处理当前页可操作订单）</span>
+      <label>改派给<select value={batchRider} onChange={event => setBatchRider(event.target.value)}>
+        <option value="">选择骑手</option>
+        {candidates.map(row => <option key={row.riderUserId} value={row.riderUserId}>{row.realName || `#${row.riderUserId}`}（在途 {row.inFlight} 单）</option>)}
+      </select></label>
+      <label>操作原因<input value={batchReason} onChange={event => setBatchReason(event.target.value)} placeholder="批量改派与取消都需要填写" /></label>
+      <button disabled={busy === 'batch'} onClick={() => void runBatch('reassign')}>{busy === 'batch' ? '处理中…' : '批量改派'}</button>
+      <button className="danger" disabled={busy === 'batch'} onClick={() => void runBatch('cancel')}>批量取消</button>
+      <button className="delivery-secondary" onClick={() => setSelected([])}>清除选择</button>
+    </div>}
     <ErrorNotice error={error} refresh={() => void load()} />
-    <div className="table-scroll"><table><thead><tr><th>配送单</th><th>商家 / 骑手</th><th>地址</th><th>金额</th><th>状态</th><th>创建时间</th></tr></thead><tbody>{data.items.map(row => <tr key={row.deliveryOrderPublicId}>
+    {notice && <p className="review-feedback review-feedback--success" role="status">{notice}</p>}
+    <div className="table-scroll"><table><thead><tr>
+      <th style={{ width: 36 }}><input
+        type="checkbox"
+        aria-label="全选当前页可操作订单"
+        checked={allChecked}
+        onChange={event => setSelected(event.target.checked ? operableOnPage.map(row => row.deliveryOrderPublicId) : [])}
+      /></th>
+      <th>配送单</th><th>商家 / 骑手</th><th>地址</th><th>金额</th><th>状态</th><th>创建时间</th><th>操作</th>
+    </tr></thead><tbody>{data.items.map(row => <tr key={row.deliveryOrderPublicId}>
+      <td>{operableStatuses.has(row.status) && <input
+        type="checkbox"
+        aria-label={`选择配送单 ${row.deliveryOrderPublicId}`}
+        checked={selected.includes(row.deliveryOrderPublicId)}
+        onChange={event => setSelected(current => event.target.checked
+          ? [...current, row.deliveryOrderPublicId]
+          : current.filter(id => id !== row.deliveryOrderPublicId))}
+      />}</td>
       <td><button className="link-button" onClick={() => void inspect(row.deliveryOrderPublicId)}>{short(row.deliveryOrderPublicId)}</button><span>{row.merchantRequestId || '无商家请求号'}</span></td>
       <td>商家 #{row.merchantUserId}<span>骑手 {row.riderUserId ? `#${row.riderUserId}` : '未分配'}</span></td>
       <td>{row.deliveryAddress}<span>{row.recipientName} / {row.recipientPhone}</span></td>
       <td>{money(row.deliveryFeeCents)}<span>骑手 {money(row.riderFeeCents)} / 平台 {money(row.platformCutCents)}</span></td>
       <td><Badge value={row.status} /></td>
       <td>{time(row.createdAt)}</td>
+      <td><div className="delivery-row-actions">
+        {reassignableStatuses.has(row.status) && candidates.length > 0 && <select
+          aria-label={`改派配送单 ${row.deliveryOrderPublicId}`}
+          defaultValue=""
+          disabled={busy === row.deliveryOrderPublicId}
+          onChange={event => {
+            const value = Number(event.target.value)
+            event.target.value = ''
+            if (value) void reassignOne(row, value)
+          }}
+        >
+          <option value="">改派给…</option>
+          {candidates.map(item => <option key={item.riderUserId} value={item.riderUserId}>{item.realName || `#${item.riderUserId}`}</option>)}
+        </select>}
+        {cancellableStatuses.has(row.status) && <button className="danger" disabled={busy === row.deliveryOrderPublicId} onClick={() => void cancelOne(row)}>取消</button>}
+        {!operableStatuses.has(row.status) && row.status !== 'delivered' && row.status !== 'cancelled' && <span className="delivery-muted-note">—</span>}
+      </div></td>
     </tr>)}</tbody></table></div>
     <Pagination value={data} setPage={setPage} />
     {detail && <OrderDetailPanel value={detail} close={() => setDetail(null)} />}
@@ -279,6 +415,7 @@ function OrderDetailPanel({ value, close }: { value: OrderFunds; close: () => vo
   return <Detail title={`配送单 ${order.deliveryOrderPublicId}`} close={close}>
     <div className="detail-grid">
       <Fact label="状态" value={<Badge value={order.status} />} />
+    {order.cancelReason && <Fact label="取消原因" value={order.cancelReason} />}
       <Fact label="商家" value={`#${order.merchantUserId}`} />
       <Fact label="骑手" value={order.riderUserId ? `#${order.riderUserId}` : '未分配'} />
       <Fact label="配送费" value={money(order.deliveryFeeCents)} />

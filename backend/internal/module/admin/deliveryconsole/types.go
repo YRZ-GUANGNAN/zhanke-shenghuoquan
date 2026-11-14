@@ -98,6 +98,7 @@ type OrderView struct {
 	DeliveredAt           *time.Time              `json:"deliveredAt"`
 	PaymentFailedAt       *time.Time              `json:"paymentFailedAt"`
 	CancelledAt           *time.Time              `json:"cancelledAt"`
+	CancelReason          string                  `json:"cancelReason"`
 	CreatedAt             time.Time               `json:"createdAt"`
 	UpdatedAt             time.Time               `json:"updatedAt"`
 }
@@ -321,7 +322,7 @@ func orderView(value delivery.Order) OrderView {
 		ReadyForClaimAt: value.ReadyForClaimAt, ClaimedAt: value.ClaimedAt,
 		ToPickupAt: value.ToPickupAt, PickedUpAt: value.PickedUpAt,
 		DeliveringAt: value.DeliveringAt, DeliveredAt: value.DeliveredAt,
-		PaymentFailedAt: value.PaymentFailedAt, CancelledAt: value.CancelledAt,
+		PaymentFailedAt: value.PaymentFailedAt, CancelledAt: value.CancelledAt, CancelReason: value.CancelReason,
 		CreatedAt: value.CreatedAt, UpdatedAt: value.UpdatedAt,
 	}
 }

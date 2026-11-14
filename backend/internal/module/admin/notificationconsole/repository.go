@@ -2,10 +2,12 @@ package notificationconsole
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"campus-circle/backend/internal/module/notification"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type ChannelStat struct {
@@ -38,7 +40,12 @@ type Repository interface {
 	ChannelStats(context.Context, time.Time) ([]ChannelStat, error)
 	OfficialAccountCounts(context.Context, string) (OfficialAccountCounts, error)
 	RecentDeliveries(context.Context, notification.DeliveryStatus, int, int) ([]DeliveryRecord, int64, error)
+	RetryDelivery(context.Context, string, time.Time) (DeliveryRecord, error)
 }
+
+// ErrDeliveryNotRetryable marks delivery records that are still in flight or
+// already delivered; only blocked and deadletter records can be re-queued.
+var ErrDeliveryNotRetryable = errors.New("delivery is not retryable")
 
 type GormRepository struct{ db *gorm.DB }
 
@@ -82,6 +89,40 @@ func (r *GormRepository) RecentDeliveries(ctx context.Context, status notificati
 		return nil, 0, err
 	}
 	return records, total, nil
+}
+
+func (r *GormRepository) RetryDelivery(ctx context.Context, deliveryPublicID string, now time.Time) (DeliveryRecord, error) {
+	if r == nil || r.db == nil || deliveryPublicID == "" || !r.db.Migrator().HasTable(&notification.DeliveryItem{}) {
+		return DeliveryRecord{}, ErrDeliveryNotRetryable
+	}
+	var item notification.DeliveryItem
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("delivery_public_id = ?", deliveryPublicID).First(&item).Error; err != nil {
+			return err
+		}
+		if item.Status != notification.DeliveryBlocked && item.Status != notification.DeliveryDeadletter {
+			return ErrDeliveryNotRetryable
+		}
+		return tx.Model(&notification.DeliveryItem{}).Where("id = ?", item.ID).Updates(map[string]any{
+			"status":           notification.DeliveryPending,
+			"attempt_count":    0,
+			"next_attempt_at":  now.UTC(),
+			"lease_token":      nil,
+			"lease_expires_at": nil,
+			"row_version":      gorm.Expr("row_version + 1"),
+			"updated_at":       now.UTC(),
+		}).Error
+	})
+	if err != nil {
+		return DeliveryRecord{}, err
+	}
+	return DeliveryRecord{
+		DeliveryPublicID: item.DeliveryPublicID, RecipientUserID: item.RecipientUserID,
+		Channel: item.Channel, Purpose: item.Purpose, Status: notification.DeliveryPending,
+		AttemptCount: 0, LastErrorCode: item.LastErrorCode, LastError: item.LastError,
+		NextAttemptAt: &now, ProcessedAt: nil, CreatedAt: item.CreatedAt,
+	}, nil
 }
 
 func (r *GormRepository) OfficialAccountCounts(ctx context.Context, appID string) (OfficialAccountCounts, error) {

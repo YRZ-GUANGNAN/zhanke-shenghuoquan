@@ -76,6 +76,7 @@ type Order struct {
 	DeliveredAt           *time.Time     `gorm:"column:delivered_at"`
 	PaymentFailedAt       *time.Time     `gorm:"column:payment_failed_at"`
 	CancelledAt           *time.Time     `gorm:"column:cancelled_at"`
+	CancelReason          string         `gorm:"column:cancel_reason;size:255;not null;default:''"`
 	RowVersion            uint64         `gorm:"column:row_version;not null"`
 	CreatedAt             time.Time      `gorm:"column:created_at;not null;index:idx_delivery_order_merchant_created,priority:2;index:idx_delivery_order_status_created,priority:2"`
 	UpdatedAt             time.Time      `gorm:"column:updated_at;not null"`

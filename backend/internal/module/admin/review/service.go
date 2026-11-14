@@ -121,9 +121,6 @@ func (s *Service) Decide(ctx context.Context, id, operatorID uint, status Status
 	if status == StatusRejected && reason == "" {
 		return Task{}, errors.New("rejected review requires a reason")
 	}
-	if status == StatusApproved && reason != "" {
-		return Task{}, errors.New("approved review must not include a reason")
-	}
 	return s.mutateTask(ctx, id, func(txCtx context.Context, txRepo Repository, value *Task) error {
 		if value.Status != StatusReviewing {
 			return errors.New("task must be reviewing before decision")

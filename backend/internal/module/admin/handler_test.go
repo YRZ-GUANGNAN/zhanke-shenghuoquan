@@ -21,7 +21,7 @@ func TestReviewDecisionStrictRequestValidation(t *testing.T) {
 		{name: "null", path: "/api/v1/admin/reviews/1/approve", body: `null`},
 		{name: "blank rejection", path: "/api/v1/admin/reviews/1/reject", body: `{"reason":" \t\n"}`},
 		{name: "overlong rejection", path: "/api/v1/admin/reviews/1/reject", body: `{"reason":"` + strings.Repeat("界", 241) + `"}`},
-		{name: "approval with reason", path: "/api/v1/admin/reviews/1/approve", body: `{"reason":"looks good"}`},
+		{name: "overlong approval", path: "/api/v1/admin/reviews/1/approve", body: `{"reason":"` + strings.Repeat("界", 241) + `"}`},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -37,14 +37,18 @@ func TestReviewDecisionStrictRequestValidation(t *testing.T) {
 	}
 }
 
-func TestReviewApprovalAcceptsOnlyEmptyReason(t *testing.T) {
-	for _, body := range []string{`{}`, `{"reason":""}`, `{"reason":" \t\n"}`} {
+func TestReviewApprovalAcceptsReason(t *testing.T) {
+	for _, body := range []string{`{}`, `{"reason":""}`, `{"reason":" \t\n"}`, `{"reason":"核对无违规"}`} {
 		fixture := newOverrideReviewFixture(t, review.StatusReviewing)
 		got := fixture.perform("admin", "/api/v1/admin/reviews/1/approve", body)
 		if got.Code != http.StatusOK {
 			t.Fatalf("body=%s status=%d response=%s", body, got.Code, got.Body.String())
 		}
-		if fixture.repo.task.Status != review.StatusApproved || fixture.repo.task.Reason != "" {
+		wantReason := ""
+		if strings.Contains(body, "核对无违规") {
+			wantReason = "核对无违规"
+		}
+		if fixture.repo.task.Status != review.StatusApproved || fixture.repo.task.Reason != wantReason {
 			t.Fatalf("body=%s task=%#v", body, fixture.repo.task)
 		}
 	}

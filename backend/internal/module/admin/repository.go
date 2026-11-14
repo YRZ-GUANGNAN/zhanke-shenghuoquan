@@ -16,6 +16,8 @@ type Repository interface {
 	CreateReportOrReplay(context.Context, *Report) (bool, error)
 	ListReports(context.Context, int, int) ([]Report, int64, error)
 	ListReportsByReporter(context.Context, uint, int, int) ([]Report, int64, error)
+	FindReport(context.Context, uint) (Report, error)
+	LatestReviewTask(context.Context, string, uint) (*review.Task, error)
 	SetReportStatus(context.Context, uint, review.Status) error
 	WithinTransaction(context.Context, func(context.Context, Repository) error) error
 }
@@ -76,6 +78,26 @@ func (r *GormRepository) ListReportsByReporter(ctx context.Context, reporterID u
 	err := query.Order("created_at DESC").Offset((page - 1) * size).Limit(size).Find(&values).Error
 	return values, total, err
 }
+func (r *GormRepository) FindReport(ctx context.Context, id uint) (Report, error) {
+	var value Report
+	err := dbtx.DB(ctx, r.db).Where("id = ?", id).First(&value).Error
+	return value, err
+}
+
+// LatestReviewTask returns the review task attached to an object, or nil when
+// the object was never routed through the unified review flow.
+func (r *GormRepository) LatestReviewTask(ctx context.Context, objectType string, objectID uint) (*review.Task, error) {
+	var task review.Task
+	err := dbtx.DB(ctx, r.db).Where("object_type = ? AND object_id = ?", objectType, objectID).First(&task).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &task, nil
+}
+
 func (r *GormRepository) SetReportStatus(ctx context.Context, id uint, status review.Status) error {
 	result := dbtx.DB(ctx, r.db).Model(&Report{}).Where("id = ?", id).Update("review_status", status)
 	if result.Error == nil && result.RowsAffected == 0 {

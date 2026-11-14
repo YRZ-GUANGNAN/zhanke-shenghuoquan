@@ -1,5 +1,5 @@
 // Domain F client: management and the unified review workflow only.
-import type { ExternalTakeoutMerchant, ExternalTakeoutMerchantDirectory, ExternalTakeoutMerchantInput, FeaturePolicy, FeaturePolicyKey, FeedbackRow, IdentityApplicationAdminList, IdentityApplicationDetail, IdentityApplicationQuery, IdentityApplicationRow, MediaAssetDetail, MediaAssetRow, MediaDeadletters, MediaDecisionRow, MediaEventRow, MediaGCJobRow, MediaQuery, MediaSummary, NavigationCategory, NavigationCategoryInput, NavigationItem, NavigationItemInput, Page, PageQuery, PostRow, ProductRow, ReportRow, ReviewTask, Stats, UserRow } from '../types'
+import type { ExternalTakeoutMerchant, ExternalTakeoutMerchantDirectory, ExternalTakeoutMerchantInput, FeaturePolicy, FeaturePolicyKey, FeedbackRow, IdentityApplicationAdminList, IdentityApplicationDetail, IdentityApplicationQuery, IdentityApplicationRow, MediaAssetDetail, MediaAssetRow, MediaDeadletters, MediaDecisionRow, MediaEventRow, MediaGCJobRow, MediaQuery, MediaSummary, NavigationCategory, NavigationCategoryInput, NavigationItem, NavigationItemInput, Page, PageQuery, PostRow, ProductRow, ReportRow, ReviewTask, Stats, UserRow, ReportDetail} from '../types'
 import { adminRequest } from './http'
 type ReviewQuery={status?:ReviewTask['status']|'';page?:number;pageSize?:number}
 export class AdminAPIError extends Error {
@@ -22,7 +22,8 @@ export const adminAPI={
 	users:(query:PageQuery={})=>api<Page<UserRow>>(`/admin/users${pageQueryString(query)}`),
 	listIdentityApplications:(query:IdentityApplicationQuery={})=>api<IdentityApplicationAdminList>(`/admin/identity-applications${identityQueryString(query)}`),
 	identityApplication:(applicationId:string)=>api<IdentityApplicationDetail>(`/admin/identity-applications/${encodeURIComponent(applicationId)}`),
-	approveIdentityApplication:(applicationId:string,expectedRowVersion:number)=>api<IdentityApplicationRow>(`/admin/identity-applications/${encodeURIComponent(applicationId)}/approve`,{method:'POST',body:JSON.stringify({expectedRowVersion})}),
+	approveIdentityApplication:(applicationId:string,expectedRowVersion:number,reason='')=>api<IdentityApplicationRow>(`/admin/identity-applications/${encodeURIComponent(applicationId)}/approve`,{method:'POST',body:JSON.stringify(reason?{expectedRowVersion,reason}:{expectedRowVersion})}),
+	overrideIdentityApplication:(applicationId:string,expectedRowVersion:number,status:'approved'|'rejected',reason:string)=>api<IdentityApplicationRow>(`/admin/identity-applications/${encodeURIComponent(applicationId)}/override`,{method:'POST',body:JSON.stringify({expectedRowVersion,status,reason})}),
 	rejectIdentityApplication:(applicationId:string,expectedRowVersion:number,reason:string)=>api<IdentityApplicationRow>(`/admin/identity-applications/${encodeURIComponent(applicationId)}/reject`,{method:'POST',body:JSON.stringify({expectedRowVersion,reason})}),
 	updateUserStatus:(id:number,status:UserRow['status'])=>api(`/admin/users/${id}/status`,{method:'PATCH',body:JSON.stringify({status})}),
 	updateUserRole:(id:number,role:UserRow['role'])=>api(`/admin/users/${id}/role`,{method:'PATCH',body:JSON.stringify({role})}),
@@ -32,6 +33,7 @@ export const adminAPI={
 	products:(query:PageQuery={})=>api<Page<ProductRow>>(`/admin/products${pageQueryString(query)}`),
 	takedownProduct:(id:number,reason:string)=>api<{updated:boolean}>(`/admin/trade/products/${id}/takedown`,{method:'PATCH',body:JSON.stringify({reason})}),
 	reports:(query:PageQuery={})=>api<Page<ReportRow>>(`/admin/reports${pageQueryString(query)}`),
+	reportDetail:(id:number)=>api<ReportDetail>(`/admin/reports/${id}`),
 	feedbacks:(query:PageQuery&{status?:string}={})=>api<Page<FeedbackRow>>(`/admin/feedbacks${feedbackQueryString(query)}`),
 	updateFeedback:(id:string,status:string,note:string)=>api<{updated:boolean}>(`/admin/feedbacks/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify({status,note})}),
 	navigation:()=>api<NavigationCategory[]>('/admin/navigation'),

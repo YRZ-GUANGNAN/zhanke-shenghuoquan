@@ -442,10 +442,10 @@ func TestGormRepositoryDecisionAtomicityAgainstMySQL(t *testing.T) {
 		return err
 	})
 	decisionService := NewService(repository, &submissionMediaStub{}, func() time.Time { return now }, provisioner)
-	if _, err := decisionService.Approve(ctx, 81, riderApplication.ApplicationPublicID, riderApplication.RowVersion); !errors.Is(err, ErrSelfReview) {
+	if _, err := decisionService.Approve(ctx, 81, riderApplication.ApplicationPublicID, riderApplication.RowVersion, ""); !errors.Is(err, ErrSelfReview) {
 		t.Fatalf("self review err=%v", err)
 	}
-	approved, err := decisionService.Approve(ctx, 7, riderApplication.ApplicationPublicID, riderApplication.RowVersion)
+	approved, err := decisionService.Approve(ctx, 7, riderApplication.ApplicationPublicID, riderApplication.RowVersion, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -455,7 +455,7 @@ func TestGormRepositoryDecisionAtomicityAgainstMySQL(t *testing.T) {
 	assertMySQLCount(t, db, 1, &IdentityGrant{}, "user_id = ? AND role = ? AND status = ? AND source_application_id = ?", 81, RoleRider, GrantActive, riderApplication.ID)
 	assertMySQLCount(t, db, 1, &takeout.Rider{}, "rider_user_id = ? AND status = ?", 81, takeout.RiderActive)
 	assertMySQLCount(t, db, 1, &ApplicationEvent{}, "application_id = ? AND event_type = ? AND actor_user_id = ?", riderApplication.ID, EventApproved, 7)
-	if _, err := decisionService.Approve(ctx, 8, riderApplication.ApplicationPublicID, riderApplication.RowVersion); !errors.Is(err, ErrDecisionConflict) {
+	if _, err := decisionService.Approve(ctx, 8, riderApplication.ApplicationPublicID, riderApplication.RowVersion, ""); !errors.Is(err, ErrDecisionConflict) {
 		t.Fatalf("repeated approval err=%v", err)
 	}
 
@@ -473,7 +473,7 @@ func TestGormRepositoryDecisionAtomicityAgainstMySQL(t *testing.T) {
 			return errors.New("force decision rollback")
 		},
 	))
-	if _, err := failingService.Approve(ctx, 7, failingApplication.ApplicationPublicID, failingApplication.RowVersion); err == nil {
+	if _, err := failingService.Approve(ctx, 7, failingApplication.ApplicationPublicID, failingApplication.RowVersion, ""); err == nil {
 		t.Fatal("failing provisioner was accepted")
 	}
 	current, found, err := repository.FindCurrent(ctx, 82, RoleRider)
@@ -486,7 +486,7 @@ func TestGormRepositoryDecisionAtomicityAgainstMySQL(t *testing.T) {
 
 	now = now.Add(time.Minute)
 	merchantApplication := submitMySQLApplication(t, submissionService, 83, RoleMerchant, "商家负责人")
-	merchantApproved, err := decisionService.Approve(ctx, 7, merchantApplication.ApplicationPublicID, merchantApplication.RowVersion)
+	merchantApproved, err := decisionService.Approve(ctx, 7, merchantApplication.ApplicationPublicID, merchantApplication.RowVersion, "")
 	if err != nil || merchantApproved.Status != StatusApproved {
 		t.Fatalf("merchant approval=%+v err=%v", merchantApproved, err)
 	}

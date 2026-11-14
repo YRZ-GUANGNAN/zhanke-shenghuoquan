@@ -4,9 +4,11 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 
 	"campus-circle/backend/internal/module/notification"
 	"campus-circle/backend/internal/pkg/response"
@@ -43,6 +45,7 @@ func NewHandler(repository Repository, config Config, sender *notification.WeCom
 func (h *Handler) Register(group *gin.RouterGroup) {
 	group.GET("/notification-channels", h.overview)
 	group.GET("/notification-channels/deliveries", h.deliveries)
+	group.POST("/notification-channels/deliveries/:id/retry", h.retryDelivery)
 	group.POST("/notification-channels/wecom/test", h.testWecom)
 }
 
@@ -79,6 +82,32 @@ var deliveryStatuses = map[string]notification.DeliveryStatus{
 	"blocked":    notification.DeliveryBlocked,
 	"skipped":    notification.DeliverySkipped,
 	"deadletter": notification.DeliveryDeadletter,
+}
+
+// retryDelivery re-queues a blocked or deadlettered notification delivery so
+// operators can recover failed messages after fixing channel configuration.
+func (h *Handler) retryDelivery(c *gin.Context) {
+	deliveryID := strings.TrimSpace(c.Param("id"))
+	if len(deliveryID) != 26 {
+		response.Fail(c, http.StatusBadRequest, "invalid delivery id")
+		return
+	}
+	record, err := h.repository.RetryDelivery(c.Request.Context(), deliveryID, h.now())
+	switch {
+	case err == nil:
+		response.OK(c, DeliveryView{
+			DeliveryID: record.DeliveryPublicID, RecipientID: record.RecipientUserID,
+			Channel: string(record.Channel), Purpose: string(record.Purpose), Status: string(record.Status),
+			AttemptCount: record.AttemptCount, ErrorCode: record.LastErrorCode, Error: record.LastError,
+			NextAttemptAt: record.NextAttemptAt, ProcessedAt: record.ProcessedAt, CreatedAt: record.CreatedAt,
+		})
+	case errors.Is(err, ErrDeliveryNotRetryable):
+		response.Fail(c, http.StatusConflict, "该消息当前不是失败终态，暂时无法重投")
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		response.Fail(c, http.StatusNotFound, "投递记录不存在")
+	default:
+		response.Fail(c, http.StatusInternalServerError, "重投失败，请稍后再试")
+	}
 }
 
 func (h *Handler) deliveries(c *gin.Context) {
