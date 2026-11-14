@@ -89,29 +89,6 @@ export function DashboardView({ navigate }: { navigate: (section: PreviewSection
       </>}
     />
 
-    <section className="preview-dashboard-hero">
-      <div className="preview-dashboard-hero__lead">
-        <span className="preview-eyebrow">SERVICE PULSE</span>
-        <h2>今天有 <mark>{tasks.length} 件</mark> 事需要你确认</h2>
-        <p>订单履约整体平稳。优先处理通知失败和高风险审核，再确认新骑手与商家资料。</p>
-        <div className="preview-dashboard-hero__timeline">
-          <div><span>09:20</span><strong>早间订单进入高峰</strong></div>
-          <div><span>10:00</span><strong>值班群提醒已完成</strong></div>
-          <div><span>12:30</span><strong>预计午间配送峰值</strong></div>
-        </div>
-      </div>
-      <div className="preview-dashboard-hero__score">
-        <div className="preview-score-ring" style={{ '--score': '87%' } as React.CSSProperties}>
-          <span><strong>87</strong><small>服务健康分</small></span>
-        </div>
-        <div className="preview-dashboard-hero__score-copy">
-          <StatusPill tone="success">整体稳定</StatusPill>
-          <p>较昨日提升 4 分</p>
-          <span>异常集中在订阅消息和 1 条高风险举报。</span>
-        </div>
-      </div>
-    </section>
-
     <section className="preview-stat-grid">
       <StatCard label="今日进入订单" value={summary.todayOrders} meta="含待接单与已完成" trend="+12%" tone="accent" marker="↗" />
       <StatCard label="今日平台收入" value={formatMoney(summary.revenueCents)} meta="仅统计已完成订单" trend="结算口径" tone="mint" marker="¥" />

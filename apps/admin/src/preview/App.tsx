@@ -8,33 +8,20 @@ import {
   Tag
 } from 'antd'
 import {
-  AccountBookOutlined,
   AppstoreOutlined,
   AuditOutlined,
-  BankOutlined,
   BellOutlined,
-  CarOutlined,
-  CommentOutlined as ChatIcon,
   CommentOutlined,
   DashboardOutlined,
-  DatabaseOutlined,
   FileImageOutlined,
-  FormOutlined,
-  FundOutlined,
-  GiftOutlined,
-  GlobalOutlined,
   IdcardOutlined,
   MessageOutlined,
-  MobileOutlined,
   ProfileOutlined,
-  RocketOutlined,
   SettingOutlined,
   ShareAltOutlined,
   ShopOutlined,
   ShoppingOutlined,
-  TeamOutlined,
   UserOutlined,
-  WechatOutlined,
   WarningOutlined
 } from '@ant-design/icons'
 import { useEffect, useMemo, useState } from 'react'
@@ -48,21 +35,6 @@ import { OperationsView } from './views/OperationsView'
 import { PeopleView } from './views/PeopleView'
 import { SettingsView } from './views/SettingsView'
 import { LegacyTakeoutView } from './views/LegacyTakeoutView'
-import {
-  AdsView,
-  ChatManagementView,
-  FormManagementView,
-  GeneralSettingsView,
-  InventoryView,
-  LaunchProcessView,
-  MarketingView,
-  MiniProgramView,
-  PromoterManagementView,
-  ServiceAccountView,
-  SiteManagementView,
-  TakerManagementView,
-  WithdrawalsView
-} from './ExtraViews'
 
 interface NavigationItem {
   key: PreviewSection
@@ -73,32 +45,19 @@ interface NavigationItem {
 
 const navigation: NavigationItem[] = [
   { key: 'dashboard', label: '经营总览', icon: <DashboardOutlined />, group: '工作台' },
-  { key: 'launch-process', label: '上线流程', icon: <RocketOutlined />, group: '工作台' },
   { key: 'delivery', label: '配送与结算', icon: <ShoppingOutlined />, group: '业务运营' },
   { key: 'notifications', label: '消息通知', icon: <BellOutlined />, group: '业务运营' },
   { key: 'media', label: '素材中心', icon: <FileImageOutlined />, group: '业务运营' },
-  { key: 'sites', label: '站点管理', icon: <BankOutlined />, group: '业务运营' },
-  { key: 'forms', label: '表单管理', icon: <FormOutlined />, group: '业务运营' },
-  { key: 'takers', label: '接单员管理', icon: <CarOutlined />, group: '业务运营' },
-  { key: 'promoters', label: '推广员管理', icon: <TeamOutlined />, group: '业务运营' },
-  { key: 'inventory', label: '商品库存', icon: <DatabaseOutlined />, group: '业务运营' },
-  { key: 'marketing', label: '营销管理', icon: <GiftOutlined />, group: '业务运营' },
-  { key: 'chat', label: '私信管理', icon: <ChatIcon />, group: '业务运营' },
-  { key: 'ads', label: '广告管理', icon: <FundOutlined />, group: '业务运营' },
   { key: 'moderation', label: '审核中心', icon: <AuditOutlined />, group: '内容与用户' },
   { key: 'community', label: '社区内容', icon: <CommentOutlined />, group: '内容与用户' },
   { key: 'trade', label: '二手商品', icon: <AppstoreOutlined />, group: '内容与用户' },
   { key: 'reports', label: '举报处理', icon: <WarningOutlined />, group: '内容与用户' },
   { key: 'identities', label: '商家骑手认证', icon: <IdcardOutlined />, group: '内容与用户' },
   { key: 'feedbacks', label: '意见反馈', icon: <MessageOutlined />, group: '内容与用户' },
-  { key: 'miniapp', label: '小程序设置', icon: <MobileOutlined />, group: '平台设置' },
-  { key: 'service-account', label: '服务号设置', icon: <WechatOutlined />, group: '平台设置' },
-  { key: 'withdrawals', label: '提现管理', icon: <AccountBookOutlined />, group: '平台设置' },
   { key: 'users', label: '用户与权限', icon: <UserOutlined />, group: '平台设置' },
   { key: 'navigation', label: '服务入口', icon: <AppstoreOutlined />, group: '平台设置' },
   { key: 'share-settings', label: '分享设置', icon: <ShareAltOutlined />, group: '平台设置' },
   { key: 'feature-policy', label: '功能开关', icon: <SettingOutlined />, group: '平台设置' },
-  { key: 'general-settings', label: '通用设置', icon: <GlobalOutlined />, group: '平台设置' },
   { key: 'takeout', label: '旧版外卖', icon: <ShopOutlined />, group: '平台设置' }
 ]
 
@@ -157,28 +116,10 @@ function PreviewApp() {
     switch (section) {
       case 'dashboard':
         return <DashboardView navigate={navigate} />
-      case 'launch-process':
-        return <LaunchProcessView />
       case 'delivery':
         return <DeliveryView />
       case 'notifications':
         return <NotificationsView />
-      case 'sites':
-        return <SiteManagementView />
-      case 'forms':
-        return <FormManagementView />
-      case 'takers':
-        return <TakerManagementView />
-      case 'promoters':
-        return <PromoterManagementView />
-      case 'inventory':
-        return <InventoryView />
-      case 'marketing':
-        return <MarketingView />
-      case 'chat':
-        return <ChatManagementView />
-      case 'ads':
-        return <AdsView />
       case 'media':
       case 'moderation':
       case 'community':
@@ -189,18 +130,10 @@ function PreviewApp() {
       case 'feedbacks':
       case 'users':
         return <PeopleView section={section} />
-      case 'miniapp':
-        return <MiniProgramView />
-      case 'service-account':
-        return <ServiceAccountView />
-      case 'withdrawals':
-        return <WithdrawalsView />
       case 'navigation':
       case 'share-settings':
       case 'feature-policy':
         return <SettingsView section={section} />
-      case 'general-settings':
-        return <GeneralSettingsView />
       case 'takeout':
         return <LegacyTakeoutView />
     }
