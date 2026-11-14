@@ -147,8 +147,14 @@ func (r *domainARepositoryStub) DeleteFeedback(_ context.Context, userID, feedba
 	return nil
 }
 
-func (r *domainARepositoryStub) ListFeedbacks(_ context.Context, _, _ int) ([]Feedback, int64, error) {
-	return append([]Feedback(nil), r.feedbacks...), int64(len(r.feedbacks)), nil
+func (r *domainARepositoryStub) ListFeedbacks(_ context.Context, _, _ int, status string) ([]Feedback, int64, error) {
+	values := make([]Feedback, 0, len(r.feedbacks))
+	for _, value := range r.feedbacks {
+		if status == "" || value.Status == status {
+			values = append(values, value)
+		}
+	}
+	return values, int64(len(values)), nil
 }
 
 type phoneResolverStub struct{ phone string }

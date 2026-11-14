@@ -49,26 +49,46 @@ const statusOptions: Array<[string, string]> = [
   ['payment_failed', '支付失败']
 ]
 
+type ViewGroup = { key: string; label: string; views: Array<[View, string]> }
+
+const VIEW_GROUPS: ViewGroup[] = [
+  { key: 'overview', label: '概览', views: [['summary', '配送概览']] },
+  { key: 'orders', label: '订单', views: [['orders', '配送订单']] },
+  {
+    key: 'funds', label: '资金', views: [
+      ['merchant-wallets', '商家钱包'],
+      ['rider-wallets', '骑手钱包'],
+      ['earnings', '骑手报酬'],
+      ['payout-queue', '待打款'],
+      ['withdrawals', '骑手提现'],
+      ['refunds', '退款记录'],
+      ['funding-sources', '资金核对']
+    ]
+  },
+  { key: 'config', label: '费率配置', views: [['fee', '默认运费'], ['overrides', '商家专属运费']] }
+]
+
 export function DeliveryConsole() {
   const [view, setView] = useState<View>('summary')
-  const tabs: Array<[View, string]> = [
-    ['summary', '配送概览'],
-    ['funding-sources', '资金核对'],
-    ['orders', '配送订单'],
-    ['fee', '默认运费'],
-    ['overrides', '商家专属运费'],
-    ['merchant-wallets', '商家钱包'],
-    ['rider-wallets', '骑手钱包'],
-    ['earnings', '骑手报酬'],
-    ['payout-queue', '待打款'],
-    ['withdrawals', '骑手提现'],
-    ['refunds', '退款记录']
-  ]
+  const activeGroup = VIEW_GROUPS.find(group => group.views.some(([key]) => key === view)) || VIEW_GROUPS[0]
   return <div className="delivery-console">
     <DeliveryCapabilityNotice />
     <section className="panel delivery-tabs" aria-label="配送后台模块">
-      {tabs.map(([key, label]) => <button key={key} className={view === key ? 'active' : ''} onClick={() => setView(key)}>{label}</button>)}
+      {VIEW_GROUPS.map(group => <button
+        key={group.key}
+        className={activeGroup.key === group.key ? 'active' : ''}
+        aria-current={activeGroup.key === group.key ? 'true' : undefined}
+        onClick={() => setView(group.views[0][0])}
+      >{group.label}</button>)}
     </section>
+    {activeGroup.views.length > 1 && <div className="delivery-subtabs" role="group" aria-label={`${activeGroup.label}子模块`}>
+      {activeGroup.views.map(([key, label]) => <button
+        key={key}
+        className={view === key ? 'active' : ''}
+        aria-current={view === key ? 'true' : undefined}
+        onClick={() => setView(key)}
+      >{label}</button>)}
+    </div>}
     {view === 'summary' && <SummaryPanel />}
     {view === 'funding-sources' && <FundingSourcesPanel />}
     {view === 'orders' && <OrdersPanel />}

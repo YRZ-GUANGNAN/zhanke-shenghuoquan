@@ -295,12 +295,15 @@ func (s *Service) MyFeedbacks(ctx context.Context, userID uint, page, size int) 
 	return views, total, nil
 }
 
-func (s *Service) AdminFeedbacks(ctx context.Context, page, size int) ([]Feedback, int64, error) {
+func (s *Service) AdminFeedbacks(ctx context.Context, page, size int, status string) ([]Feedback, int64, error) {
 	repo, ok := s.repo.(feedbackRepository)
 	if !ok {
 		return nil, 0, ErrSettingsUnavailable
 	}
-	return repo.ListFeedbacks(ctx, normalizePage(page), normalizeSize(size))
+	if status != "" && !feedbackStatuses[status] {
+		return nil, 0, errors.New("invalid feedback status")
+	}
+	return repo.ListFeedbacks(ctx, normalizePage(page), normalizeSize(size), status)
 }
 
 var feedbackStatuses = map[string]bool{"open": true, "in_progress": true, "resolved": true, "ignored": true}

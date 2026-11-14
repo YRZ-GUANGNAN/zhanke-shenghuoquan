@@ -49,6 +49,7 @@ const dashboardMoney=(value?:number)=>value===undefined?'—':`¥${(value/100).t
 function Dashboard(){
 	const[data,setData]=useState<Stats|null>(null)
 	const[delivery,setDelivery]=useState<DeliverySummary|null>(null)
+	const[pending,setPending]=useState<{identities:number;feedbacks:number}|null>(null)
 	const[statsError,setStatsError]=useState('')
 	const[deliveryError,setDeliveryError]=useState('')
 	const[loading,setLoading]=useState(true)
@@ -57,11 +58,21 @@ function Dashboard(){
 		setLoading(true)
 		setStatsError('')
 		setDeliveryError('')
-		const[statsResult,deliveryResult]=await Promise.allSettled([adminAPI.stats(),deliveryAdminAPI.summary()])
+		const[statsResult,deliveryResult,identityResult,feedbackResult]=await Promise.allSettled([
+			adminAPI.stats(),
+			deliveryAdminAPI.summary(),
+			adminAPI.listIdentityApplications({status:'pending',page:1,pageSize:1}),
+			adminAPI.feedbacks({status:'open',page:1,pageSize:1})
+		])
 		if(statsResult.status==='fulfilled')setData(statsResult.value)
 		else setStatsError(String(statsResult.reason))
 		if(deliveryResult.status==='fulfilled')setDelivery(deliveryResult.value)
 		else setDeliveryError(String(deliveryResult.reason))
+		// 待办数量取列表 total，避免为此新增接口。
+		setPending({
+			identities:identityResult.status==='fulfilled'?identityResult.value.total:0,
+			feedbacks:feedbackResult.status==='fulfilled'?feedbackResult.value.total:0
+		})
 		setLoading(false)
 	},[])
 	useEffect(()=>{void load()},[load])
@@ -118,12 +129,12 @@ function Dashboard(){
 				</div>
 				<AdminButton tone="text" onClick={()=>setSection('delivery')}>进入资金与提现管理</AdminButton>
 			</AdminPanel>
-			<AdminPanel title="待办与快捷入口" description="这里只列出目前可以使用的常用操作。">
+			<AdminPanel title="待办与快捷入口" description="按处理量排序，数量来自当前真实队列。">
 				<div className="dashboard-actions dashboard-actions--stacked">
 					<button type="button" onClick={()=>setSection('moderation')}><span>内容审核</span><strong>{data?.totals.pendingReview??'—'}</strong><small>处理待审内容与人工改判</small></button>
+					<button type="button" onClick={()=>setSection('identities')}><span>商家骑手认证</span><strong>{pending?pending.identities:'—'}</strong><small>处理商家与骑手身份申请</small></button>
+					<button type="button" onClick={()=>setSection('feedbacks')}><span>意见反馈</span><strong>{pending?pending.feedbacks:'—'}</strong><small>查看用户提交的问题与建议</small></button>
 					<button type="button" onClick={()=>setSection('notifications')}><span>消息通知</span><strong>检查</strong><small>查看服务号绑定、发送失败与值班群状态</small></button>
-					<button type="button" onClick={()=>setSection('identities')}><span>商家骑手认证</span><strong>审核</strong><small>处理商家与骑手身份申请</small></button>
-					<button type="button" onClick={()=>setSection('navigation')}><span>服务入口</span><strong>配置</strong><small>维护校园服务与外部商家入口</small></button>
 				</div>
 			</AdminPanel>
 		</div>

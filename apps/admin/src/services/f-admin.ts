@@ -12,6 +12,7 @@ function queryString(query:MediaQuery={}){const params=new URLSearchParams();Obj
 function identityQueryString(query:IdentityApplicationQuery={}){const params=new URLSearchParams();Object.entries(query).forEach(([key,value])=>{if(value!==undefined&&value!=='')params.set(key,String(value))});const value=params.toString();return value?`?${value}`:''}
 function reviewQueryString(query:ReviewQuery={}){const params=new URLSearchParams();Object.entries(query).forEach(([key,value])=>{if(value!==undefined&&value!=='')params.set(key,String(value))});const value=params.toString();return value?`?${value}`:''}
 function pageQueryString(query:PageQuery={}){const params=new URLSearchParams();if(query.page)params.set('page',String(query.page));if(query.pageSize)params.set('pageSize',String(query.pageSize));const value=params.toString();return value?`?${value}`:''}
+function feedbackQueryString(query:PageQuery&{status?:string}={}){const params=new URLSearchParams();if(query.page)params.set('page',String(query.page));if(query.pageSize)params.set('pageSize',String(query.pageSize));if(query.status)params.set('status',query.status);const value=params.toString();return value?`?${value}`:''}
 export const adminAPI={
 	stats:()=>api<Stats>('/admin/stats'),
 	reviews:(query:ReviewQuery={})=>api<Page<ReviewTask>>(`/admin/reviews${reviewQueryString(query)}`),
@@ -31,7 +32,7 @@ export const adminAPI={
 	products:(query:PageQuery={})=>api<Page<ProductRow>>(`/admin/products${pageQueryString(query)}`),
 	takedownProduct:(id:number,reason:string)=>api<{updated:boolean}>(`/admin/trade/products/${id}/takedown`,{method:'PATCH',body:JSON.stringify({reason})}),
 	reports:(query:PageQuery={})=>api<Page<ReportRow>>(`/admin/reports${pageQueryString(query)}`),
-	feedbacks:(query:PageQuery={})=>api<Page<FeedbackRow>>(`/admin/feedbacks${pageQueryString(query)}`),
+	feedbacks:(query:PageQuery&{status?:string}={})=>api<Page<FeedbackRow>>(`/admin/feedbacks${feedbackQueryString(query)}`),
 	updateFeedback:(id:string,status:string,note:string)=>api<{updated:boolean}>(`/admin/feedbacks/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify({status,note})}),
 	navigation:()=>api<NavigationCategory[]>('/admin/navigation'),
 	createNavigationCategory:(input:NavigationCategoryInput)=>api<NavigationCategory>('/admin/navigation/categories',{method:'POST',body:JSON.stringify(input)}),

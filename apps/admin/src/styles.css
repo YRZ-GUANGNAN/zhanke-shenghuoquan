@@ -2035,6 +2035,36 @@ table code { color: #405167; font-family: "Cascadia Code", Consolas, monospace; 
 .media-tabs, .takeout-tabs, .delivery-tabs, .identity-tabs { display: flex; align-items: center; gap: 4px; overflow-x: auto; padding: 5px; }
 .media-tabs button, .takeout-tabs button, .delivery-tabs button, .identity-tabs button { min-height: 36px; padding: 0 14px; border: 0; border-radius: 6px; color: var(--color-text-secondary); background: transparent; font-size: 12px; font-weight: 650; white-space: nowrap; cursor: pointer; }
 .media-tabs button.active, .takeout-tabs button.active, .delivery-tabs button.active, .identity-tabs button.active { color: var(--color-text); background: #fff; box-shadow: 0 1px 3px rgba(23,34,51,.08); }
+
+/* 配送页二级模块：主标签只保留四组，组内再切换具体页面。 */
+.delivery-subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -6px 0 16px;
+  padding: 0 2px;
+}
+.delivery-subtabs button {
+  width: auto;
+  flex: 0 0 auto;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: color var(--duration-fast), border-color var(--duration-fast), background var(--duration-fast);
+}
+.delivery-subtabs button:hover { border-color: var(--color-border-strong); color: var(--color-text); }
+.delivery-subtabs button.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
 .delivery-controls button, .delivery-form button, .delivery-header button, .delivery-row-actions button,
 .takeout-controls button, .takeout-form button, .takeout-row-actions button,
 .media-filters button, .external-merchant-header button, .external-merchant-form button,

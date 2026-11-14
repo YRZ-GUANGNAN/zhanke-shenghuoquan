@@ -35,7 +35,7 @@ type blocksRepository interface {
 type feedbackRepository interface {
 	CreateFeedback(context.Context, *Feedback, []string) error
 	DeleteFeedback(context.Context, uint, uint) error
-	ListFeedbacks(context.Context, int, int) ([]Feedback, int64, error)
+	ListFeedbacks(context.Context, int, int, string) ([]Feedback, int64, error)
 	ListFeedbacksByUser(context.Context, uint, int, int) ([]Feedback, int64, error)
 	UpdateFeedbackHandling(context.Context, string, string, string, uint, time.Time) error
 }
@@ -375,10 +375,13 @@ func (r *GormRepository) DeleteFeedback(ctx context.Context, userID, feedbackID 
 	})
 }
 
-func (r *GormRepository) ListFeedbacks(ctx context.Context, page, size int) ([]Feedback, int64, error) {
+func (r *GormRepository) ListFeedbacks(ctx context.Context, page, size int, status string) ([]Feedback, int64, error) {
 	var values []Feedback
 	var total int64
 	query := r.db.WithContext(ctx).Model(&Feedback{})
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}

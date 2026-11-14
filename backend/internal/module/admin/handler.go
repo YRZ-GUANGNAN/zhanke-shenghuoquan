@@ -86,7 +86,7 @@ func (h *Handler) Register(api *gin.RouterGroup) {
 
 func (h *Handler) feedbacks(c *gin.Context) {
 	page, size := pagination(c)
-	values, total, err := h.users.AdminFeedbacks(c, page, size)
+	values, total, err := h.users.AdminFeedbacks(c, page, size, strings.TrimSpace(c.Query("status")))
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, "list feedbacks failed")
 		return
