@@ -217,20 +217,20 @@ export function NotificationsView() {
 
     {tab === 'overview' && <div className="preview-notification-overview">
       <section className="preview-stat-grid">
-        <StatCard label="近 24 小时送达" value={stats.accepted} meta="所有通知通道" tone="mint" marker="✓" />
-        <StatCard label="正在发送" value={stats.queued} meta="队列中的消息" tone="accent" marker="…" />
-        <StatCard label="发送失败" value={stats.failed} meta="可进入记录重试" tone="rose" marker="!" />
-        <StatCard label="启用模板" value={stats.enabledTemplates} meta={`共 ${templates.length} 个模板`} tone="amber" marker="模" />
+        <StatCard label="近 24 小时送达" value={stats.accepted} meta="所有通知通道" tone="mint" />
+        <StatCard label="正在发送" value={stats.queued} meta="队列中的消息" tone="accent" />
+        <StatCard label="发送失败" value={stats.failed} meta="可进入记录重试" tone="rose" />
+        <StatCard label="近 24 小时送达率" value={`${stats.accepted + stats.failed > 0 ? Math.round(stats.accepted / (stats.accepted + stats.failed) * 100) : 100}%`} meta={`${stats.accepted + stats.failed} 条中 ${stats.accepted} 条送达`} tone="amber" />
       </section>
 
       <div className="preview-notification-grid">
         <Panel eyebrow="CHANNEL STATUS" title="渠道健康" description="从配置、模板到最近一次发送逐项检查。">
           <div className="preview-channel-health-cards">
             {[
-              { name: '小程序通知中心', role: '用户端底账', value: 100, state: '运行正常', detail: '所有通知都会写入用户通知中心' },
-              { name: '微信订阅消息', role: '一次性授权提醒', value: 82, state: '1 条待重试', detail: '注意用户授权额度是否用完' },
-              { name: '微信服务号', role: '持续触达', value: 96, state: '模板已配置', detail: '关注状态会影响实际送达' },
-              { name: '值班群 Webhook', role: '多人协同', value: webhooks.some(item => item.enabled) ? 100 : 45, state: webhooks.some(item => item.enabled) ? '机器人在线' : '待配置', detail: '地址只显示脱敏值' }
+              { name: '小程序通知中心', role: '用户端底账', value: 100, state: '运行正常', detail: '近 24 小时 12 条全部送达' },
+              { name: '微信订阅消息', role: '一次性授权提醒', value: 82, state: '1 条待重试', detail: '近 24 小时 11 条，1 条待重试' },
+              { name: '微信服务号', role: '持续触达', value: 96, state: '模板已配置', detail: '近 24 小时 25 条，1 条未送达' },
+              { name: '值班群 Webhook', role: '多人协同', value: webhooks.some(item => item.enabled) ? 100 : 45, state: webhooks.some(item => item.enabled) ? '机器人在线' : '待配置', detail: webhooks.some(item => item.enabled) ? '近 24 小时 6 条全部送达' : '尚未配置 Webhook 地址' }
             ].map(channel => <article key={channel.name}>
               <div className="preview-channel-health-cards__head">
                 <span className={`preview-channel-health-cards__icon ${channel.value < 90 ? 'is-warning' : ''}`}>◉</span>

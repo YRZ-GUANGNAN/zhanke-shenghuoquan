@@ -90,10 +90,10 @@ export function DashboardView({ navigate }: { navigate: (section: PreviewSection
     />
 
     <section className="preview-stat-grid">
-      <StatCard label="今日进入订单" value={summary.todayOrders} meta="含待接单与已完成" trend="+12%" tone="accent" marker="↗" />
-      <StatCard label="今日平台收入" value={formatMoney(summary.revenueCents)} meta="仅统计已完成订单" trend="结算口径" tone="mint" marker="¥" />
-      <StatCard label="待审核任务" value={summary.pendingReviews} meta="内容与身份审核合计" trend="需关注" tone="amber" marker="!" />
-      <StatCard label="通知异常" value={summary.notificationFailures} meta="可在通知工作台重试" trend={summary.notificationFailures ? '立即处理' : '暂无异常'} tone="rose" marker="◇" />
+      <StatCard label="今日进入订单" value={summary.todayOrders} meta="含待接单与已完成" trend="+12%" tone="accent" />
+      <StatCard label="今日平台收入" value={formatMoney(summary.revenueCents)} meta="仅统计已完成订单" trend="结算口径" tone="mint" />
+      <StatCard label="待审核任务" value={summary.pendingReviews} meta="内容与身份审核合计" trend="需关注" tone="amber" />
+      <StatCard label="通知异常" value={summary.notificationFailures} meta="可在通知工作台重试" trend={summary.notificationFailures ? '立即处理' : '暂无异常'} tone="rose" />
     </section>
 
     <div className="preview-dashboard-grid">

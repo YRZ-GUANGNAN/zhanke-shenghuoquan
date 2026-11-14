@@ -148,20 +148,20 @@ export function StatCard({
   meta,
   trend,
   tone = 'accent',
-  marker
+  unit
 }: {
   label: string
   value: ReactNode
   meta: ReactNode
   trend?: ReactNode
   tone?: 'accent' | 'mint' | 'amber' | 'rose' | 'ink'
-  marker?: string
+  unit?: string
 }) {
   return <Card className={`preview-stat preview-stat--${tone}`} size="small" bordered>
     <Statistic
       title={label}
       value={value as never}
-      suffix={marker ? <span className="preview-stat__marker">{marker}</span> : undefined}
+      suffix={unit ? <span className="preview-stat__unit">{unit}</span> : undefined}
     />
     <div className="preview-stat__bottom">
       <span>{meta}</span>
@@ -360,5 +360,13 @@ export function usePreviewToast() {
 }
 
 export function ProgressBar({ value, label }: { value: number; label: string }) {
-  return <Progress className="preview-progress" percent={value} showInfo={false} strokeWidth={6} aria-label={label} />
+  // 阈值配色：低于 90% 需要排查，90–95% 观察，95% 以上视为健康。
+  const tone = value >= 95 ? 'healthy' : value >= 90 ? 'watch' : 'risk'
+  return <Progress
+    className={`preview-progress preview-progress--${tone}`}
+    percent={value}
+    showInfo={false}
+    strokeWidth={6}
+    aria-label={label}
+  />
 }

@@ -66,10 +66,10 @@ function IdentityPeople() {
       actions={<Button variant="primary" onClick={() => setStatus('待认证')}>查看待认证资料</Button>}
     />
     <section className="preview-stat-grid">
-      <StatCard label="待认证" value={identities.filter(item => item.status === '待认证').length} meta="商家与骑手合计" tone="amber" marker="待" />
-      <StatCard label="商家申请" value={identities.filter(item => item.role === '商家').length} meta="含新驻与变更" tone="accent" marker="商" />
-      <StatCard label="骑手申请" value={identities.filter(item => item.role === '骑手').length} meta="配送服务准入" tone="mint" marker="骑" />
-      <StatCard label="已通过" value={identities.filter(item => item.status === '已通过').length} meta="可正常接单/营业" tone="ink" marker="✓" />
+      <StatCard label="待认证" value={identities.filter(item => item.status === '待认证').length} meta="商家与骑手合计" tone="amber" />
+      <StatCard label="商家申请" value={identities.filter(item => item.role === '商家').length} meta="含新驻与变更" tone="accent" />
+      <StatCard label="骑手申请" value={identities.filter(item => item.role === '骑手').length} meta="配送服务准入" tone="mint" />
+      <StatCard label="已通过" value={identities.filter(item => item.status === '已通过').length} meta="可正常接单/营业" tone="ink" />
     </section>
     <Panel
       eyebrow="TRUST & ACCESS"
@@ -155,10 +155,10 @@ function FeedbackPeople() {
       actions={<Button variant="primary" onClick={() => setStatus('待处理')}>处理待响应反馈</Button>}
     />
     <section className="preview-stat-grid">
-      <StatCard label="待处理" value={feedbacks.filter(item => item.status === '待处理').length} meta="等待首次响应" tone="rose" marker="待" />
-      <StatCard label="处理中" value={feedbacks.filter(item => item.status === '处理中').length} meta="已有管理员跟进" tone="amber" marker="…" />
-      <StatCard label="已解决" value={feedbacks.filter(item => item.status === '已解决').length} meta="已给出处理说明" tone="mint" marker="✓" />
-      <StatCard label="全部反馈" value={feedbacks.length} meta="用户问题与建议" tone="accent" marker="反" />
+      <StatCard label="待处理" value={feedbacks.filter(item => item.status === '待处理').length} meta="等待首次响应" tone="rose" />
+      <StatCard label="处理中" value={feedbacks.filter(item => item.status === '处理中').length} meta="已有管理员跟进" tone="amber" />
+      <StatCard label="已解决" value={feedbacks.filter(item => item.status === '已解决').length} meta="已给出处理说明" tone="mint" />
+      <StatCard label="全部反馈" value={feedbacks.length} meta="用户问题与建议" tone="accent" />
     </section>
     <Panel eyebrow="VOICE OF USER" title="反馈处理" description="处理说明会保留在列表中，方便后续追溯。">
       <div className="preview-toolbar"><Segmented value={status} onChange={setStatus} options={[{ value: '全部', label: '全部' }, { value: '待处理', label: '待处理' }, { value: '处理中', label: '处理中' }, { value: '已解决', label: '已解决' }, { value: '不处理', label: '不处理' }]} /></div>
@@ -211,10 +211,10 @@ function UserPeople() {
       actions={<Button variant="primary" onClick={() => setRole('管理员')}>查看管理员</Button>}
     />
     <section className="preview-stat-grid">
-      <StatCard label="账号总数" value={users.length} meta="当前演示账号" tone="accent" marker="用" />
-      <StatCard label="普通用户" value={users.filter(item => item.role === '普通用户').length} meta="社区与交易用户" tone="mint" marker="普" />
-      <StatCard label="商家/骑手" value={users.filter(item => item.role === '商家' || item.role === '骑手').length} meta="业务角色账号" tone="amber" marker="业" />
-      <StatCard label="受限账号" value={users.filter(item => item.status !== '正常').length} meta="禁言或停用" tone="rose" marker="!" />
+      <StatCard label="账号总数" value={users.length} meta="当前演示账号" tone="accent" />
+      <StatCard label="普通用户" value={users.filter(item => item.role === '普通用户').length} meta="社区与交易用户" tone="mint" />
+      <StatCard label="商家/骑手" value={users.filter(item => item.role === '商家' || item.role === '骑手').length} meta="业务角色账号" tone="amber" />
+      <StatCard label="受限账号" value={users.filter(item => item.status !== '正常').length} meta="禁言或停用" tone="rose" />
     </section>
     <Panel eyebrow="IDENTITY & ACCESS" title="账号工作队列" description="账号状态操作会即时反馈，并在本浏览器的本地数据中保留。">
       <div className="preview-toolbar">

@@ -63,10 +63,10 @@ function NavigationSettings() {
       actions={<Button variant="primary" onClick={() => { setError(''); setOpen(true) }}>新增入口</Button>}
     />
     <section className="preview-stat-grid">
-      <StatCard label="服务入口" value={entries.length} meta="当前配置总数" tone="accent" marker="入" />
-      <StatCard label="已启用" value={entries.filter(item => item.enabled).length} meta="用户端可见" tone="mint" marker="✓" />
-      <StatCard label="已停用" value={entries.filter(item => !item.enabled).length} meta="保留配置但不展示" tone="ink" marker="停" />
-      <StatCard label="配置状态" value="正常" meta="没有重复排序或空路径" tone="ink" marker="静" />
+      <StatCard label="服务入口" value={entries.length} meta="当前配置总数" tone="accent" />
+      <StatCard label="已启用" value={entries.filter(item => item.enabled).length} meta="用户端可见" tone="mint" />
+      <StatCard label="已停用" value={entries.filter(item => !item.enabled).length} meta="保留配置但不展示" tone="ink" />
+      <StatCard label="配置状态" value="正常" meta="没有重复排序或空路径" tone="ink" />
     </section>
     <Panel eyebrow="SERVICE DIRECTORY" title="校园服务目录" description="入口按排序展示。停用后不会删除配置，可随时恢复。">
       <div className="preview-service-grid">

@@ -217,6 +217,25 @@ body {
   line-height: 1.25;
 }
 
+
+.preview-stat__unit {
+  margin-left: 4px;
+  color: var(--preview-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.preview-progress .ant-progress-bg { background: var(--preview-blue) !important; }
+.preview-progress--watch .ant-progress-bg { background: #d48806 !important; }
+.preview-progress--risk .ant-progress-bg { background: #cf1322 !important; }
+.preview-progress--healthy .ant-progress-bg { background: #389e0d !important; }
+
+.preview-review-row__wait {
+  color: #b45309 !important;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .preview-stat__marker {
   margin-left: 4px;
   color: var(--preview-blue);

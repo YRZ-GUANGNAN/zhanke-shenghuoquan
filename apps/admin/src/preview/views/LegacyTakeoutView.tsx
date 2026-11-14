@@ -24,10 +24,10 @@ export function LegacyTakeoutView() {
       <p>旧版外卖入口目前关闭。下方数据仅用于查看历史配置，不提供真实业务操作。</p>
     </div>}
     <section className="preview-stat-grid">
-      <StatCard label="存量商家" value={merchants.length} meta="只读概览" tone="accent" marker="商" />
-      <StatCard label="今日订单" value={merchants.reduce((sum, item) => sum + item.ordersToday, 0)} meta="历史演示数据" tone="amber" marker="单" />
-      <StatCard label="今日营收" value={formatMoney(merchants.reduce((sum, item) => sum + item.revenueCents, 0))} meta="仅作展示" tone="mint" marker="¥" />
-      <StatCard label="业务模式" value="只读" meta="不支持新增操作" tone="ink" marker="静" />
+      <StatCard label="存量商家" value={merchants.length} meta="只读概览" tone="accent" />
+      <StatCard label="今日订单" value={merchants.reduce((sum, item) => sum + item.ordersToday, 0)} meta="历史演示数据" tone="amber" unit="单" />
+      <StatCard label="今日营收" value={formatMoney(merchants.reduce((sum, item) => sum + item.revenueCents, 0))} meta="仅作展示" tone="mint" />
+      <StatCard label="业务模式" value="只读" meta="不支持新增操作" tone="ink" />
     </section>
     <Panel eyebrow="LEGACY DATA" title="历史商家概览" description="此页不触发订单、结算或支付操作。">
       <div className="preview-table-wrap">

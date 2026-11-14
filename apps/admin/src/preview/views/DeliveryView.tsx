@@ -71,10 +71,10 @@ export function DeliveryView() {
     />
 
     <section className="preview-stat-grid">
-      <StatCard label="正在配送" value={totals.active} meta="实时履约中" tone="accent" marker="单" />
-      <StatCard label="等待接单" value={totals.waiting} meta="需要分配或广播" tone="amber" marker="单" />
-      <StatCard label="今日已完成" value={totals.complete} meta="可进入结算核对" tone="mint" marker="单" />
-      <StatCard label="已完成交易额" value={formatMoney(totals.amount)} meta="含配送费与商品金额" tone="ink" marker="¥" />
+      <StatCard label="正在配送" value={totals.active} meta="实时履约中" tone="accent" unit="单" />
+      <StatCard label="等待接单" value={totals.waiting} meta="需要分配或广播" tone="amber" unit="单" />
+      <StatCard label="今日已完成" value={totals.complete} meta="可进入结算核对" tone="mint" unit="单" />
+      <StatCard label="已完成交易额" value={formatMoney(totals.amount)} meta="含配送费与商品金额" tone="ink" />
     </section>
 
     <Panel

@@ -25,6 +25,20 @@ import {
 
 type OperationSection = Extract<PreviewSection, 'media' | 'moderation' | 'community' | 'trade' | 'reports'>
 
+// 积压时长比时间戳更能说明优先级；只对待处理任务展示。
+function waitingLabel(createdAt: string, status: ReviewItem['status']): string {
+  if (status !== '待审核' && status !== '审核中') return ''
+  const started = new Date(createdAt).getTime()
+  if (Number.isNaN(started)) return ''
+  const minutes = Math.floor((Date.now() - started) / 60000)
+  if (minutes < 1) return '刚刚提交'
+  if (minutes < 60) return `已等待 ${minutes} 分钟`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `已等待 ${hours} 小时`
+  return `已等待 ${Math.floor(hours / 24)} 天`
+}
+
+
 interface OperationMeta {
   eyebrow: string
   title: string
@@ -88,10 +102,10 @@ function MediaOperations() {
       actions={<Button variant="primary" onClick={() => setFilter('异常')}>{metaBySection.media.action}</Button>}
     />
     <section className="preview-stat-grid">
-      <StatCard label="素材总数" value={media.length} meta="图片与视频" tone="accent" marker="材" />
-      <StatCard label="待审核" value={media.filter(item => item.status === '待审核').length} meta="审核后才会对外展示" tone="amber" marker="审" />
-      <StatCard label="异常" value={media.filter(item => item.status === '异常').length} meta="需要重新处理" tone="rose" marker="!" />
-      <StatCard label="已通过" value={media.filter(item => item.status === '已通过').length} meta="可被业务引用" tone="mint" marker="✓" />
+      <StatCard label="素材总数" value={media.length} meta="图片与视频" tone="accent" />
+      <StatCard label="待审核" value={media.filter(item => item.status === '待审核').length} meta="审核后才会对外展示" tone="amber" />
+      <StatCard label="异常" value={media.filter(item => item.status === '异常').length} meta="需要重新处理" tone="rose" />
+      <StatCard label="已通过" value={media.filter(item => item.status === '已通过').length} meta="可被业务引用" tone="mint" />
     </section>
     <Panel
       eyebrow="ASSET REVIEW"
@@ -175,10 +189,10 @@ function ReviewOperations() {
       actions={<Button variant="primary" onClick={() => setStatus('待审核')}>{metaBySection.moderation.action}</Button>}
     />
     <section className="preview-stat-grid">
-      <StatCard label="待审核" value={reviews.filter(item => item.status === '待审核').length} meta="等待首次处理" tone="amber" marker="待" />
-      <StatCard label="高风险" value={reviews.filter(item => item.risk === '高风险').length} meta="建议优先处理" tone="rose" marker="!" />
-      <StatCard label="审核中" value={reviews.filter(item => item.status === '审核中').length} meta="正在核对资料" tone="accent" marker="…" />
-      <StatCard label="今日已处理" value={reviews.filter(item => item.status === '已通过' || item.status === '已拒绝').length} meta="可查看结论原因" tone="mint" marker="✓" />
+      <StatCard label="待审核" value={reviews.filter(item => item.status === '待审核').length} meta="等待首次处理" tone="amber" />
+      <StatCard label="高风险" value={reviews.filter(item => item.risk === '高风险').length} meta="建议优先处理" tone="rose" />
+      <StatCard label="审核中" value={reviews.filter(item => item.status === '审核中').length} meta="正在核对资料" tone="accent" />
+      <StatCard label="今日已处理" value={reviews.filter(item => item.status === '已通过' || item.status === '已拒绝').length} meta="可查看结论原因" tone="mint" />
     </section>
     <Panel
       eyebrow="REVIEW QUEUE"
@@ -202,6 +216,7 @@ function ReviewOperations() {
           <div className="preview-review-row__copy">
             <div><strong>{item.title}</strong><StatusPill>{item.risk}</StatusPill></div>
             <p>{item.id} · {item.submitter} · {item.source} · {formatTime(item.createdAt)}</p>
+            {waitingLabel(item.createdAt, item.status) && <p className="preview-review-row__wait">{waitingLabel(item.createdAt, item.status)}</p>}
             {item.reason && <small>审核依据：{item.reason}</small>}
           </div>
           <StatusPill>{item.status}</StatusPill>
@@ -246,10 +261,10 @@ function CommunityOperations() {
   return <div>
     <PageHeader eyebrow={metaBySection.community.eyebrow} title={metaBySection.community.title} description={metaBySection.community.description} actions={<Button variant="primary" onClick={() => setStatus('待审核')}>查看待审内容</Button>} />
     <section className="preview-stat-grid">
-      <StatCard label="已公开" value={community.filter(item => item.status === '已公开').length} meta="展示在用户端" tone="mint" marker="公" />
-      <StatCard label="待审核" value={community.filter(item => item.status === '待审核').length} meta="进入统一审核流" tone="amber" marker="审" />
-      <StatCard label="已下架" value={community.filter(item => item.status === '已下架').length} meta="保留处理记录" tone="ink" marker="下" />
-      <StatCard label="今日新增" value={community.filter(item => item.createdAt.startsWith('2026-11-14')).length} meta="今天提交的内容" tone="accent" marker="+" />
+      <StatCard label="已公开" value={community.filter(item => item.status === '已公开').length} meta="展示在用户端" tone="mint" />
+      <StatCard label="待审核" value={community.filter(item => item.status === '待审核').length} meta="进入统一审核流" tone="amber" />
+      <StatCard label="已下架" value={community.filter(item => item.status === '已下架').length} meta="保留处理记录" tone="ink" />
+      <StatCard label="今日新增" value={community.filter(item => item.createdAt.startsWith('2026-11-14')).length} meta="今天提交的内容" tone="accent" />
     </section>
     <Panel eyebrow="COMMUNITY FEED" title="社区内容" description="公开内容可以直接下架，待审内容统一进入审核中心。" actions={<SearchBox value={query} onChange={setQuery} placeholder="搜索标题、作者或话题" />}>
       <div className="preview-toolbar"><Segmented value={status} onChange={setStatus} options={[{ value: '全部', label: '全部' }, { value: '已公开', label: '已公开' }, { value: '待审核', label: '待审核' }, { value: '已下架', label: '已下架' }]} /></div>
@@ -270,10 +285,10 @@ function TradeOperations() {
   return <div>
     <PageHeader eyebrow={metaBySection.trade.eyebrow} title={metaBySection.trade.title} description={metaBySection.trade.description} actions={<Button variant="primary" onClick={() => setStatus('出售中')}>查看出售中商品</Button>} />
     <section className="preview-stat-grid">
-      <StatCard label="出售中" value={products.filter(item => item.status === '出售中').length} meta="用户可见" tone="mint" marker="售" />
-      <StatCard label="已预留" value={products.filter(item => item.status === '已预留').length} meta="正在沟通交易" tone="accent" marker="留" />
-      <StatCard label="已下架" value={products.filter(item => item.status === '已下架').length} meta="不再展示" tone="ink" marker="下" />
-      <StatCard label="在售金额" value={formatMoney(products.filter(item => item.status === '出售中').reduce((sum, item) => sum + item.priceCents, 0))} meta="商品标价合计" tone="ink" marker="¥" />
+      <StatCard label="出售中" value={products.filter(item => item.status === '出售中').length} meta="用户可见" tone="mint" />
+      <StatCard label="已预留" value={products.filter(item => item.status === '已预留').length} meta="正在沟通交易" tone="accent" />
+      <StatCard label="已下架" value={products.filter(item => item.status === '已下架').length} meta="不再展示" tone="ink" />
+      <StatCard label="在售金额" value={formatMoney(products.filter(item => item.status === '出售中').reduce((sum, item) => sum + item.priceCents, 0))} meta="商品标价合计" tone="ink" />
     </section>
     <Panel eyebrow="SECONDHAND MARKET" title="商品工作队列" description="审核状态与业务状态分离；下架只影响展示。" actions={<SearchBox value={query} onChange={setQuery} placeholder="搜索商品、卖家或分类" />}>
       <div className="preview-toolbar"><Segmented value={status} onChange={setStatus} options={[{ value: '全部', label: '全部' }, { value: '出售中', label: '出售中' }, { value: '已预留', label: '已预留' }, { value: '已下架', label: '已下架' }]} /></div>
@@ -293,10 +308,10 @@ function ReportOperations() {
   return <div>
     <PageHeader eyebrow={metaBySection.reports.eyebrow} title={metaBySection.reports.title} description={metaBySection.reports.description} actions={<Button variant="primary" onClick={() => setFilter('待处理')}>处理待办举报</Button>} />
     <section className="preview-stat-grid">
-      <StatCard label="待处理" value={reports.filter(item => item.status === '待处理').length} meta="按影响程度排序" tone="rose" marker="!" />
-      <StatCard label="处理中" value={reports.filter(item => item.status === '处理中').length} meta="已有管理员跟进" tone="amber" marker="…" />
-      <StatCard label="已解决" value={reports.filter(item => item.status === '已解决').length} meta="结论已记录" tone="mint" marker="✓" />
-      <StatCard label="全部举报" value={reports.length} meta="当前演示数据" tone="accent" marker="报" />
+      <StatCard label="待处理" value={reports.filter(item => item.status === '待处理').length} meta="按影响程度排序" tone="rose" />
+      <StatCard label="处理中" value={reports.filter(item => item.status === '处理中').length} meta="已有管理员跟进" tone="amber" />
+      <StatCard label="已解决" value={reports.filter(item => item.status === '已解决').length} meta="结论已记录" tone="mint" />
+      <StatCard label="全部举报" value={reports.length} meta="当前演示数据" tone="accent" />
     </section>
     <Panel eyebrow="SAFETY QUEUE" title="举报处理" description="处理结论会同步到对应内容模块。">
       <div className="preview-toolbar"><Segmented value={filter} onChange={setFilter} options={[{ value: '全部', label: '全部' }, { value: '待处理', label: '待处理' }, { value: '处理中', label: '处理中' }, { value: '已解决', label: '已解决' }]} /></div>
