@@ -327,7 +327,7 @@ export function Modal({
 }) {
   const widths = { sm: 480, md: 640, lg: 900 }
   return <AntModal
-    visible={open}
+    open={open}
     title={description ? <div className="preview-overlay-head"><strong>{title}</strong><span>{description}</span></div> : title}
     footer={footer}
     width={widths[width]}
@@ -355,7 +355,7 @@ export function Drawer({
   onClose: () => void
 }) {
   return <AntDrawer
-    visible={open}
+    open={open}
     title={description ? <div className="preview-overlay-head"><strong>{title}</strong><span>{description}</span></div> : title}
     width={520}
     footer={footer}
