@@ -29,10 +29,26 @@ type Config struct {
 }
 
 type Handler struct {
-	repository Repository
-	config     Config
-	sender     *notification.WeComGroupSender
-	now        func() time.Time
+	repository  Repository
+	config      Config
+	sender      *notification.WeComGroupSender
+	now         func() time.Time
+	settings    WeComSettingsStore
+	riderSender riderWebhookSetter
+	actor       func(*gin.Context) uint64
+}
+
+// riderWebhookSetter updates the delivery rider-group sender at runtime.
+type riderWebhookSetter interface {
+	SetWebhookURL(string) error
+}
+
+// WithWeComSettings enables administrator-editable WeCom webhooks.
+func (h *Handler) WithWeComSettings(store WeComSettingsStore, rider riderWebhookSetter, actor func(*gin.Context) uint64) *Handler {
+	h.settings = store
+	h.riderSender = rider
+	h.actor = actor
+	return h
 }
 
 func NewHandler(repository Repository, config Config, sender *notification.WeComGroupSender, now func() time.Time) *Handler {
@@ -47,6 +63,7 @@ func (h *Handler) Register(group *gin.RouterGroup) {
 	group.GET("/notification-channels/deliveries", h.deliveries)
 	group.POST("/notification-channels/deliveries/:id/retry", h.retryDelivery)
 	group.POST("/notification-channels/wecom/test", h.testWecom)
+	group.PUT("/notification-channels/wecom", h.updateWecom)
 }
 
 type DeliveryView struct {
@@ -177,8 +194,12 @@ type Overview struct {
 		NotFollowing       int64 `json:"notFollowing"`
 	} `json:"officialAccount"`
 	Wecom struct {
-		MerchantConfigured bool `json:"merchantConfigured"`
-		RiderConfigured    bool `json:"riderConfigured"`
+		MerchantConfigured bool   `json:"merchantConfigured"`
+		RiderConfigured    bool   `json:"riderConfigured"`
+		MerchantHint       string `json:"merchantHint"`
+		RiderHint          string `json:"riderHint"`
+		SettingsSaved      bool   `json:"settingsSaved"`
+		RowVersion         uint64 `json:"rowVersion"`
 	} `json:"wecom"`
 	Workers []notification.WorkerState `json:"workers"`
 }
@@ -236,8 +257,20 @@ func (h *Handler) overview(c *gin.Context) {
 	result.Official.Unknown = officialCounts.Unknown
 	result.Official.Following = officialCounts.Following
 	result.Official.NotFollowing = officialCounts.NotFollowing
+	if h.settings != nil {
+		if saved, err := h.settings.LoadWeComSettings(c.Request.Context()); err == nil {
+			result.Wecom.SettingsSaved = saved.Saved
+			result.Wecom.RowVersion = saved.RowVersion
+			result.Wecom.MerchantHint = webhookHint(saved.MerchantWebhook)
+			result.Wecom.RiderHint = webhookHint(saved.RiderWebhook)
+		}
+	}
 	result.Wecom.MerchantConfigured = h.config.WecomMerchantConfigured
 	result.Wecom.RiderConfigured = h.config.WecomRiderConfigured
+	if h.sender != nil {
+		result.Wecom.MerchantConfigured = h.sender.Enabled("merchant_ops")
+		result.Wecom.RiderConfigured = h.sender.Enabled("rider_ops") || result.Wecom.RiderConfigured
+	}
 	if h.config.Workers != nil {
 		result.Workers = h.config.Workers()
 	}

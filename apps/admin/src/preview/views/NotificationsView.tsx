@@ -11,6 +11,7 @@ import {
 import {
   Button,
   EmptyState,
+  Field,
   Modal,
   PageHeader,
   Pagination,
@@ -103,6 +104,11 @@ export function NotificationsView() {
   const [testCandidate, setTestCandidate] = useState<WecomGroup | null>(null)
   const [testError, setTestError] = useState('')
   const [testing, setTesting] = useState<WecomGroup | ''>('')
+  const [wecomMerchantInput, setWecomMerchantInput] = useState('')
+  const [wecomRiderInput, setWecomRiderInput] = useState('')
+  const [wecomSaving, setWecomSaving] = useState(false)
+  const [wecomError, setWecomError] = useState('')
+  const [wecomNotice, setWecomNotice] = useState('')
 
   const loadOverview = useCallback(async () => {
     setOverviewLoading(true)
@@ -369,9 +375,9 @@ export function NotificationsView() {
       >
         <div className="preview-toolbar">
           <span className="preview-toolbar__hint">
-            商家值班群{overview ? (merchantConfigured ? '已配置' : '未配置') : '状态未知'}
+            商家值班群{overview ? (merchantConfigured ? `已配置${overview.wecom.merchantHint ? `（${overview.wecom.merchantHint}）` : ''}` : '未配置') : '状态未知'}
             {' · '}
-            骑手值班群{overview ? (riderConfigured ? '已配置' : '未配置') : '状态未知'}
+            骑手值班群{overview ? (riderConfigured ? `已配置${overview.wecom.riderHint ? `（${overview.wecom.riderHint}）` : ''}` : '未配置') : '状态未知'}
           </span>
           <div className="preview-row-actions">
             <Button
@@ -387,6 +393,57 @@ export function NotificationsView() {
               onClick={() => { setTestError(''); setTestCandidate('rider_ops') }}
             >测试骑手值班群</Button>
           </div>
+        </div>
+        <div className="preview-wecom-form">
+          <Field
+            label="商家值班群 Webhook"
+            value={wecomMerchantInput}
+            onChange={event => { setWecomMerchantInput(event.target.value); setWecomError('') }}
+            placeholder={merchantConfigured ? '已配置，留空保持不变；粘贴新地址可替换' : '粘贴企业微信商家值班群机器人 Webhook'}
+          />
+          <Field
+            label="骑手值班群 Webhook"
+            value={wecomRiderInput}
+            onChange={event => { setWecomRiderInput(event.target.value); setWecomError('') }}
+            placeholder={riderConfigured ? '已配置，留空保持不变；粘贴新地址可替换' : '粘贴企业微信骑手值班群机器人 Webhook'}
+          />
+          <div className="preview-row-actions">
+            <Button
+              size="sm"
+              variant="primary"
+              disabled={wecomSaving || !overview || (!wecomMerchantInput.trim() && !wecomRiderInput.trim())}
+              onClick={async () => {
+                if (!overview) return
+                setWecomSaving(true)
+                setWecomError('')
+                setWecomNotice('')
+                try {
+                  const payload: { merchantWebhook?: string; riderWebhook?: string; expectedRowVersion: number } = {
+                    expectedRowVersion: overview.wecom.rowVersion ?? 1
+                  }
+                  if (wecomMerchantInput.trim()) payload.merchantWebhook = wecomMerchantInput.trim()
+                  if (wecomRiderInput.trim()) payload.riderWebhook = wecomRiderInput.trim()
+                  await deliveryAdminAPI.updateWecomSettings(payload)
+                  setWecomMerchantInput('')
+                  setWecomRiderInput('')
+                  setWecomNotice('渠道配置已保存并立即生效')
+                  await loadOverview()
+                } catch (reason) {
+                  setWecomError(errorText(reason))
+                } finally {
+                  setWecomSaving(false)
+                }
+              }}
+            >{wecomSaving ? '保存中…' : '保存渠道配置'}</Button>
+            <Button
+              size="sm"
+              disabled={wecomSaving}
+              onClick={() => { setWecomMerchantInput(''); setWecomRiderInput(''); setWecomError('') }}
+            >清空输入</Button>
+          </div>
+          {wecomError && <div className="preview-form-error" role="alert">{wecomError}</div>}
+          {wecomNotice && <div className="preview-policy-note" role="status">{wecomNotice}</div>}
+          <p className="preview-policy-note">地址包含群机器人密钥，保存后只显示尾号。只更新填写的群，留空的群保持不变；保存后立即生效，无需重启服务。</p>
         </div>
       </Panel>
 

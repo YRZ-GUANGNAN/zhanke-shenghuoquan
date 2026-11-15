@@ -164,20 +164,23 @@ func newUserNotificationRuntime(cfg config.Config, db *gorm.DB, users *user.Serv
 			financial: &financialNotificationRecipients{funds: delivery.NewRepository(db), users: users},
 			private:   &privateNotificationRecipients{identity: identity, users: users, template: privateTemplate, now: time.Now}}
 		expanderOptions := []notification.ExpanderOption{}
-		if cfg.WeComMerchantWebhookURL != "" || cfg.WeComRiderWebhookURL != "" {
-			groupSender, senderErr := notification.NewWeComGroupSender(map[string]string{
-				"merchant_ops": cfg.WeComMerchantWebhookURL,
-				"rider_ops":    cfg.WeComRiderWebhookURL,
-			})
-			if senderErr != nil {
-				return nil, senderErr
-			}
-			expanderOptions = append(expanderOptions, notification.WithWecomGroupFormatter(
-				deliveryWecomGroupFormatter(cfg.WeComMerchantWebhookURL != "", cfg.WeComRiderWebhookURL != ""),
-			))
-			wecomSender = groupSender
-			wecom = notification.NewWecomWorker(repo, groupSender)
+		// 企微群通道始终初始化：环境变量留空时由后台填写 Webhook，
+		// 保存后即时生效，无需重启。
+		groupSender, senderErr := notification.NewWeComGroupSender(map[string]string{
+			"merchant_ops": cfg.WeComMerchantWebhookURL,
+			"rider_ops":    cfg.WeComRiderWebhookURL,
+		})
+		if senderErr != nil {
+			return nil, senderErr
 		}
+		expanderOptions = append(expanderOptions, notification.WithWecomGroupFormatter(
+			deliveryWecomGroupFormatter(
+				func() bool { return groupSender.Enabled("merchant_ops") },
+				func() bool { return groupSender.Enabled("rider_ops") },
+			),
+		))
+		wecomSender = groupSender
+		wecom = notification.NewWecomWorker(repo, groupSender)
 		consumer = notification.NewConsumer(notification.NewExpander(
 			notification.NewEventRepository(db), recipients, expanderOptions...,
 		))

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"campus-circle/backend/internal/module/delivery"
@@ -26,6 +27,7 @@ type Sender interface {
 }
 
 type WeComSender struct {
+	mu         sync.RWMutex
 	webhookURL string
 	client     *http.Client
 }
@@ -50,7 +52,40 @@ func newSenderForTest(webhookURL string, client *http.Client) *WeComSender {
 	return &WeComSender{webhookURL: webhookURL, client: client}
 }
 
-func (s *WeComSender) Enabled() bool { return s.webhookURL != "" }
+func (s *WeComSender) Enabled() bool {
+	if s == nil {
+		return false
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.webhookURL != ""
+}
+
+// SetWebhookURL replaces the rider webhook at runtime; empty disables delivery
+// pushes without restarting the service.
+func (s *WeComSender) SetWebhookURL(webhookURL string) error {
+	if s == nil {
+		return nil
+	}
+	webhookURL = strings.TrimSpace(webhookURL)
+	if webhookURL != "" {
+		parsed, err := url.Parse(webhookURL)
+		if err != nil || parsed.Scheme != "https" || parsed.Hostname() != "qyapi.weixin.qq.com" ||
+			parsed.Path != "/cgi-bin/webhook/send" || parsed.Query().Get("key") == "" {
+			return ErrWebhookConfiguration
+		}
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.webhookURL = webhookURL
+	return nil
+}
+
+func (s *WeComSender) endpoint() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.webhookURL
+}
 
 func (s *WeComSender) Send(
 	ctx context.Context,
@@ -76,7 +111,7 @@ func (s *WeComSender) Send(
 	if err != nil {
 		return err
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, s.webhookURL, bytes.NewReader(body))
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, s.endpoint(), bytes.NewReader(body))
 	if err != nil {
 		return ErrWebhookConfiguration
 	}

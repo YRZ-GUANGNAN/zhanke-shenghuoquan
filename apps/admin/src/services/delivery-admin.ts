@@ -158,6 +158,10 @@ export interface NotificationChannelOverview {
   wecom: {
     merchantConfigured: boolean
     riderConfigured: boolean
+    merchantHint?: string
+    riderHint?: string
+    settingsSaved?: boolean
+    rowVersion?: number
   }
   workers?: NotificationWorker[]
 }
@@ -518,5 +522,16 @@ export const deliveryAdminAPI = {
   testWecomGroup: (group: 'merchant_ops' | 'rider_ops') =>
     api<{ accepted: boolean; group: string }>('/notification-channels/wecom/test', {
       ...body({ group }), method: 'POST'
+    }),
+  updateWecomSettings: (payload: { merchantWebhook?: string; riderWebhook?: string; expectedRowVersion: number }) =>
+    api<{
+      merchantConfigured: boolean
+      riderConfigured: boolean
+      merchantHint: string
+      riderHint: string
+      settingsSaved: boolean
+      rowVersion: number
+    }>('/notification-channels/wecom', {
+      ...body(payload), method: 'PUT'
     })
 }

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -23,6 +24,7 @@ type WecomSender interface {
 }
 
 type WeComGroupSender struct {
+	mu     sync.RWMutex
 	urls   map[string]string
 	client *http.Client
 }
@@ -37,15 +39,56 @@ func NewWeComGroupSender(urls map[string]string) (*WeComGroupSender, error) {
 		if raw == "" {
 			continue
 		}
-		parsed, err := url.Parse(raw)
-		if err != nil || parsed.Scheme != "https" || parsed.Hostname() != "qyapi.weixin.qq.com" ||
-			parsed.Path != "/cgi-bin/webhook/send" || parsed.Query().Get("key") == "" ||
-			parsed.User != nil || parsed.Fragment != "" {
-			return nil, ErrWecomConfiguration
+		if err := ValidateWeComGroupURL(raw); err != nil {
+			return nil, err
 		}
 		normalized[group] = raw
 	}
 	return &WeComGroupSender{urls: normalized, client: &http.Client{Timeout: 8 * time.Second}}, nil
+}
+
+// ValidateWeComGroupURL enforces the exact WeCom group robot webhook shape.
+func ValidateWeComGroupURL(raw string) error {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Scheme != "https" || parsed.Hostname() != "qyapi.weixin.qq.com" ||
+		parsed.Path != "/cgi-bin/webhook/send" || parsed.Query().Get("key") == "" ||
+		parsed.User != nil || parsed.Fragment != "" {
+		return ErrWecomConfiguration
+	}
+	return nil
+}
+
+// SetGroupURL updates a single group webhook at runtime; empty disables it.
+func (s *WeComGroupSender) SetGroupURL(group, raw string) error {
+	if _, ok := wecomGroupRecipientID(group); !ok {
+		return ErrWecomConfiguration
+	}
+	raw = strings.TrimSpace(raw)
+	if err := ValidateWeComGroupURL(raw); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.urls == nil {
+		s.urls = make(map[string]string, 2)
+	}
+	if raw == "" {
+		delete(s.urls, group)
+	} else {
+		s.urls[group] = raw
+	}
+	return nil
+}
+
+// GroupURL returns the configured webhook for a group (empty when disabled).
+func (s *WeComGroupSender) GroupURL(group string) string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.urls[group]
 }
 
 func newWeComGroupSenderForTest(urls map[string]string, client *http.Client) *WeComGroupSender {
@@ -53,7 +96,12 @@ func newWeComGroupSenderForTest(urls map[string]string, client *http.Client) *We
 }
 
 func (s *WeComGroupSender) Enabled(group string) bool {
-	return s != nil && s.client != nil && s.urls[group] != ""
+	if s == nil || s.client == nil {
+		return false
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.urls[group] != ""
 }
 
 func (s *WeComGroupSender) Send(ctx context.Context, message WecomGroupSnapshot) (SendStatus, error) {
@@ -80,7 +128,7 @@ func (s *WeComGroupSender) Send(ctx context.Context, message WecomGroupSnapshot)
 	if err != nil {
 		return SendStatusBlocked, ErrWecomPayload
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, s.urls[message.GroupKey], bytes.NewReader(body))
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, s.GroupURL(message.GroupKey), bytes.NewReader(body))
 	if err != nil {
 		return SendStatusBlocked, ErrWecomConfiguration
 	}

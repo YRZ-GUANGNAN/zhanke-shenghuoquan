@@ -342,6 +342,17 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// 管理员在后台填写的企微 Webhook 优先于环境变量，并在保存后立即生效。
+	wecomSettingsStore := notificationconsole.NewWeComSettingsStore(db)
+	if saved, err := wecomSettingsStore.LoadWeComSettings(context.Background()); err == nil && saved.Saved {
+		if userNotifications.wecomSender != nil {
+			_ = userNotifications.wecomSender.SetGroupURL("merchant_ops", saved.MerchantWebhook)
+			_ = userNotifications.wecomSender.SetGroupURL("rider_ops", saved.RiderWebhook)
+		}
+		if deliveryRuntime != nil && deliveryRuntime.riderNotifier != nil {
+			_ = deliveryRuntime.riderNotifier.SetWebhookURL(saved.RiderWebhook)
+		}
+	}
 	notificationChannelConsole := notificationconsole.NewHandler(
 		notificationconsole.NewRepository(db),
 		notificationconsole.Config{
@@ -359,7 +370,12 @@ func main() {
 		},
 		userNotifications.wecomSender,
 		time.Now,
-	)
+	).WithWeComSettings(wecomSettingsStore, func() *deliverynotify.WeComSender {
+		if deliveryRuntime != nil {
+			return deliveryRuntime.riderNotifier
+		}
+		return nil
+	}(), func(c *gin.Context) uint64 { return uint64(user.CurrentUserID(c)) })
 	if userNotifications.consumer != nil {
 		notificationContext, cancelNotifications := context.WithCancel(context.Background())
 		defer cancelNotifications()
@@ -690,6 +706,7 @@ type deliveryRuntime struct {
 	availability                   *delivery.RiderAvailabilityStore
 	identity                       *deliveryrider.IdentityAdapter
 	notificationConsumer           *deliverynotify.Consumer
+	riderNotifier                  *deliverynotify.WeComSender
 	proofs                         *delivery.ProofService
 	conversations                  *delivery.ConversationService
 	conversationLifecycle          *deliveryim.Lifecycle
@@ -749,6 +766,7 @@ func newDeliveryRuntime(cfg config.Config, db *gorm.DB, proofPorts ...delivery.M
 		orders: orderService, dispatch: dispatchService, identity: identityAdapter,
 		availability:         availability,
 		notificationConsumer: consumer,
+		riderNotifier:        sender,
 		fees:                 repository, riderWallets: repository, consoleQueries: deliveryconsole.NewQueryRepository(db),
 		allowMockConfirm: cfg.AppEnv != "prod" && cfg.EnableDelivery &&
 			cfg.AllowMockDeliveryFeeConfirmation,
