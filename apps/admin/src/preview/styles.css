@@ -2166,3 +2166,36 @@ button.preview-media-card__visual:focus-visible {
   min-width: 34px;
   font-size: 10px;
 }
+
+/* 分享封面上传：拖拽或选择文件 */
+.preview-cover-drop {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  padding: 18px 14px;
+  border: 1.5px dashed #c3d4e8;
+  border-radius: 12px;
+  background: #f8fbff;
+  color: var(--preview-text-secondary);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--duration-fast), background var(--duration-fast);
+}
+.preview-cover-drop:hover,
+.preview-cover-drop.is-drag {
+  border-color: var(--preview-blue);
+  background: #eef5fd;
+}
+.preview-cover-drop strong {
+  color: var(--preview-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+.preview-cover-drop small {
+  color: var(--preview-text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.preview-cover-drop.is-busy {
+  cursor: progress;
+}

@@ -529,7 +529,7 @@ func main() {
 	community.NewSearchHandler(communityService, userService, communityMetrics).Register(communityRoutes)
 	api.GET("/features", featureflags.PublicHandler)
 	campusGuides.Register(api)
-	sharesettings.NewHandler(shareStore).Register(api, adminAuthRequired)
+	sharesettings.NewHandler(shareStore).WithCoverStorage(cfg.ShareCoverDir, cfg.MediaPublicBaseURL).Register(api, adminAuthRequired)
 	tradeRoutes := api.Group("/trade")
 	trade.NewHandler(tradeService, userService, safety).Register(tradeRoutes)
 	trade.NewProductCommentHandler(tradeCommentService, userService, safety).Register(tradeRoutes)

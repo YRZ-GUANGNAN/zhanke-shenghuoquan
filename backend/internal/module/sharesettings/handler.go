@@ -11,16 +11,22 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type Handler struct{ store Store }
+type Handler struct {
+	store      Store
+	coverDir   string
+	publicBase string
+}
 
 func NewHandler(store Store) *Handler { return &Handler{store: store} }
 
 // The caller supplies the existing admin cookie/CSRF authentication middleware.
 func (h *Handler) Register(api *gin.RouterGroup, adminAuth gin.HandlerFunc) {
 	api.GET("/share-settings", h.get)
+	api.GET("/share-covers/:name", h.serveCover)
 	secured := api.Group("/admin/share-settings", adminAuth, user.AdminRequired())
 	secured.GET("", h.get)
 	secured.PUT("", h.update)
+	secured.POST("/cover", h.uploadCover)
 }
 
 func (h *Handler) get(c *gin.Context) {

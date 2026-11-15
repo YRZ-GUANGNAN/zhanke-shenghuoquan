@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { FEATURE_GROUPS, FEATURE_KEYS, type FeatureKey, type PreviewSection } from '../data'
 import {
   Button,
@@ -770,7 +770,8 @@ function ShareSettingsView() {
             <Field label="二手市场分享标题" required value={draft.secondhandTitle} maxLength={60} error={titleErrors?.secondhandTitle} onChange={event => setDraft({ ...draft, secondhandTitle: event.target.value })} />
             <Field label="校园服务分享标题" required value={draft.servicesTitle} maxLength={60} error={titleErrors?.servicesTitle} onChange={event => setDraft({ ...draft, servicesTitle: event.target.value })} />
             <Field label="详情标题后缀" value={draft.detailTitleSuffix} maxLength={60} error={suffixError} onChange={event => setDraft({ ...draft, detailTitleSuffix: event.target.value })} hint="跟在真实帖子、商品标题或公开主页昵称后；留空则不追加。" />
-            <Field label="通用封面地址" value={draft.defaultImageUrl} maxLength={2048} error={imageError} placeholder="https://.../share-cover.jpg" onChange={event => setDraft({ ...draft, defaultImageUrl: event.target.value })} hint="本站或腾讯云 COS 的公开 HTTPS JPG/PNG 地址；留空使用内置默认封面。" />
+            <Field label="通用封面地址" value={draft.defaultImageUrl} maxLength={2048} error={imageError} placeholder="https://.../share-cover.jpg" onChange={event => setDraft({ ...draft, defaultImageUrl: event.target.value })} hint="也可直接拖拽下方上传图片，或粘贴本站/腾讯云 COS 的公开 HTTPS JPG/PNG 地址；留空使用内置默认封面。" />
+            <CoverUploader onUploaded={url => setDraft(previous => previous ? { ...previous, defaultImageUrl: url } : previous)} />
             <label className="preview-field"><span>详情优先使用真实内容图片</span><div><Toggle checked={draft.preferContentImage} label="详情优先使用真实内容图片" onChange={checked => setDraft({ ...draft, preferContentImage: checked })} /></div></label>
           </div>}
       </Panel>
@@ -991,5 +992,75 @@ function FeatureSettings() {
           <p>功能开关变更会记录操作人和时间；保存后由小程序读取生效，账号安全、隐私、反馈与已有订单的必要处理保持可用。</p>
         </div>
       </Panel>}
+  </div>
+}
+
+
+function CoverUploader({ onUploaded }: { onUploaded: (url: string) => void }) {
+  const [drag, setDrag] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+  const upload = async (file: File) => {
+    if (!/^image\/(jpeg|png)$/.test(file.type)) {
+      setError('仅支持 JPG 或 PNG 图片')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('图片需在 5MB 以内')
+      return
+    }
+    const form = new FormData()
+    form.append('file', file)
+    setBusy(true)
+    setError('')
+    try {
+      const data = await shareSettingsAPI.uploadCover(form)
+      onUploaded(data.url)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return <div
+    className={`preview-cover-drop${drag ? ' is-drag' : ''}${busy ? ' is-busy' : ''}`}
+    role="button"
+    tabIndex={0}
+    aria-label="上传分享封面图"
+    onClick={() => { if (!busy) inputRef.current?.click() }}
+    onKeyDown={event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault()
+        if (!busy) inputRef.current?.click()
+      }
+    }}
+    onDragOver={event => { event.preventDefault(); if (!busy) setDrag(true) }}
+    onDragLeave={() => setDrag(false)}
+    onDrop={event => {
+      event.preventDefault()
+      setDrag(false)
+      const file = event.dataTransfer.files?.[0]
+      if (file) void upload(file)
+    }}
+  >
+    <input
+      ref={inputRef}
+      type="file"
+      accept="image/jpeg,image/png"
+      hidden
+      onChange={event => {
+        const file = event.target.files?.[0]
+        if (file) void upload(file)
+        event.target.value = ''
+      }}
+    />
+    {busy
+      ? <strong>正在上传封面图…</strong>
+      : <>
+        <strong>拖拽图片到这里，或点击选择文件</strong>
+        <small>支持 JPG/PNG，5MB 以内。上传成功后会自动填入封面地址，再点右上角「保存设置」生效。</small>
+      </>}
+    {error && <span className="preview-form-error">{error}</span>}
   </div>
 }

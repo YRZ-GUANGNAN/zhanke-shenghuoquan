@@ -14,6 +14,9 @@ export const shareSettingsAPI = {
   read: () => adminRequest<ShareSettings>('/admin/share-settings'),
   save: (value: ShareCards, expectedRowVersion: number) => adminRequest<ShareSettings>('/admin/share-settings', {
     method: 'PUT', body: JSON.stringify({ ...value, expectedRowVersion })
+  }),
+  uploadCover: (form: FormData) => adminRequest<{ url: string }>('/admin/share-settings/cover', {
+    method: 'POST', body: form
   })
 }
 
