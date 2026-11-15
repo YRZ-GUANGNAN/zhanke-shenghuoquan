@@ -88,3 +88,7 @@
 - 数据库：无新增迁移。
 
 验证：`/version` 返回上述版本；后台首页引用 `assets/index-DgfpbYQD.js`；上传接口未登录返回 `401`；封面对外读取路由存在（不存在文件返回 `404`）。真实上传与保存效果需登录后台人工验收。
+
+### candidate.3 部署修正（同日，systemd）
+
+首次上线后线上拖拽上传返回「保存封面图失败」。原因：`campus-api.service` 启用了 `ProtectSystem=strict`，整个文件系统对服务只读，`/opt/campus-circle/shared` 未在白名单内导致写盘被拒。修复：新增 drop-in `/etc/systemd/system/campus-api.service.d/readwrite-shared.conf`（`ReadWritePaths=/opt/campus-circle/shared`），`daemon-reload` 并重启服务；`/proc/<pid>/mountinfo` 确认该目录在服务沙箱内为可写挂载。
