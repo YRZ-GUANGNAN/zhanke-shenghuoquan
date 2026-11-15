@@ -15,6 +15,7 @@ import {
   formatMoney,
   isDeliveryConflict,
   merchantName,
+  newOperationKey,
   orderStatusLabel,
   sourcePlatformLabel,
   sourcePlatformTone,
@@ -207,6 +208,11 @@ export function DeliveryView() {
       setBatchError('请选择接单中的骑手')
       return
     }
+    // 选中项必须都还在当前列表中，否则会「显示了成功提示但实际 0 笔生效」。
+    if (selectedOrders.length !== selectedIds.length) {
+      setBatchError('部分选中的订单已不在当前列表，请刷新后重新选择')
+      return
+    }
     setBatchBusy(true)
     setBatchError('')
     const failures: string[] = []
@@ -231,16 +237,20 @@ export function DeliveryView() {
         failures.push(`${id}：${isDeliveryConflict(reason) ? conflictMessage : errorText(reason)}`)
       }
     }
-    setBatchBusy(false)
-    await refreshAfterWrite()
+    // busy 必须覆盖整个刷新窗口：刷新期间弹窗仍开着，提前复位会让用户
+    // 用旧 rowVersion 重复提交同一批订单。
     if (failures.length === 0) {
+      setBatchAction(null)
+      setBatchError('')
+      resetSelection()
+      await refreshAfterWrite()
+      setBatchBusy(false)
       notify(batchAction === 'reassign'
         ? `已改派 ${ok} 笔订单给 ${riderName(targetRiderUserId, candidates.find(row => row.riderUserId === targetRiderUserId)?.realName)}`
         : `已取消 ${ok} 笔订单`, batchAction === 'reassign' ? 'success' : 'info')
-      resetSelection()
-      setBatchAction(null)
-      setBatchError('')
     } else {
+      await refreshAfterWrite()
+      setBatchBusy(false)
       notify(`已完成 ${ok} 笔，${failures.length} 笔失败`, 'danger')
       // 失败项保留选中，方便调整后重试；成功项从选择中剔除。
       const succeeded = selectedOrders
@@ -332,7 +342,7 @@ export function DeliveryView() {
         </div>
       </div>}
 
-      {!ordersState.loading && visibleOrders.length === 0
+      {!ordersState.loading && visibleOrders.length === 0 && !ordersState.error
         ? <EmptyState
           title="没有匹配的订单"
           description={query.trim() ? '没有匹配的订单，换个关键字或清空搜索。' : '调整状态筛选，或查看全部状态。'}
@@ -446,7 +456,7 @@ export function DeliveryView() {
           openBatch('cancel', [detail.order.deliveryOrderPublicId])
         }}>取消订单</Button>}
         {refundableOrderStatuses.has(detail.order.status) && <Button variant="danger" onClick={() => {
-          refundKeyRef.current = crypto.randomUUID()
+          refundKeyRef.current = newOperationKey()
           setRefundTarget(detail.order)
           setRefundError('')
         }}>发起退款</Button>}
@@ -464,7 +474,7 @@ export function DeliveryView() {
             setRefundBusy(true)
             setRefundError('')
             try {
-              await deliveryAdminAPI.refundOrder(refundTarget.deliveryOrderPublicId, refundTarget.rowVersion, refundKeyRef.current || crypto.randomUUID())
+              await deliveryAdminAPI.refundOrder(refundTarget.deliveryOrderPublicId, refundTarget.rowVersion, refundKeyRef.current || newOperationKey())
               notify(`配送单 ${shortId(refundTarget.deliveryOrderPublicId)} 已发起退款并取消订单`)
               setRefundTarget(null)
               closeDetail()

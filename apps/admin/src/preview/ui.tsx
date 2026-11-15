@@ -329,7 +329,8 @@ export function Modal({
   return <AntModal
     open={open}
     title={description ? <div className="preview-overlay-head"><strong>{title}</strong><span>{description}</span></div> : title}
-    footer={footer}
+    // 未提供 footer 时 antd 会渲染默认「取消/确定」，其中「确定」没有 onOk 是个死按钮。
+    footer={footer ?? null}
     width={widths[width]}
     centered
     destroyOnClose

@@ -720,7 +720,19 @@ function WithdrawalProcessModal({ withdrawalId, canWrite, onClose, onChanged }: 
 
   useEffect(() => { void load() }, [load])
 
+  // 每个转账类动作在一次打开期间使用同一个幂等键：失败重试时复用，
+  // 只有成功或重新进入模式才更新，避免"响应丢失后重试换新键"导致去重失效。
+  const commandKeys = useRef<Map<WithdrawalMode, { key: string; claimKey: string }>>(new Map())
+  const commandKeyFor = (next: WithdrawalMode) => {
+    let entry = commandKeys.current.get(next)
+    if (!entry) {
+      entry = { key: newOperationKey(), claimKey: newOperationKey() }
+      commandKeys.current.set(next, entry)
+    }
+    return entry
+  }
   const startMode = (next: WithdrawalMode) => {
+    commandKeys.current.delete(next)
     setMode(next)
     setReason('')
     setReference('')
@@ -741,12 +753,13 @@ function WithdrawalProcessModal({ withdrawalId, canWrite, onClose, onChanged }: 
       setFormError('请填写具体原因')
       return
     }
-    // 幂等键固定本次提交；失败重试生成新键前请先核对处理状态，避免重复转账。
+    // 幂等键在本次操作打开期间固定；失败重试复用同一键让服务端去重。
+    const keys = commandKeyFor(mode)
     const command: RiderWithdrawalCommand = {
       expectedRowVersion: row.rowVersion,
-      idempotencyKey: newOperationKey()
+      idempotencyKey: keys.key
     }
-    if (mode === 'claim') command.claimKey = newOperationKey()
+    if (mode === 'claim') command.claimKey = keys.claimKey
     else if (mode !== 'reject') command.claimKey = target.claimKey
     if (withdrawalNeedsReason(mode)) command.reason = trimmedReason
     if (withdrawalNeedsReference(mode)) command.paymentReference = trimmedReference
@@ -762,6 +775,7 @@ function WithdrawalProcessModal({ withdrawalId, canWrite, onClose, onChanged }: 
         await deliveryAdminAPI.processRiderWithdrawal(row.withdrawPublicId, mode, command)
       }
       notify(`提现申请已执行：${withdrawalModeTitles[mode]}`)
+      commandKeys.current.delete(mode)
       setMode(null)
       setReason('')
       setReference('')

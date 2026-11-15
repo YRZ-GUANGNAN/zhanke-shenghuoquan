@@ -259,13 +259,16 @@ function ConsoleShell() {
             <span className="preview-breadcrumb"><strong>{active?.label || ''}</strong></span>
           </div>
           <div className="preview-topbar__right">
+            {/* 用点击打开而不是 focus：Modal 关闭会把焦点还给触发元素，
+                onFocus 会导致「关闭后立刻重开」的死循环。 */}
             <Input
               className="preview-topbar__search"
               prefix={<span>⌕</span>}
-              placeholder="搜索页面"
-              onFocus={() => setSearchOpen(true)}
+              placeholder="搜索订单、用户、帖子或页面"
+              onClick={() => setSearchOpen(true)}
+              onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') setSearchOpen(true) }}
               readOnly
-              aria-label="搜索页面"
+              aria-label="搜索"
             />
             {narrow && <AntButton type="text" aria-label="搜索页面" onClick={() => setSearchOpen(true)}>⌕</AntButton>}
             <Badge count={attentionCount} size="small" overflowCount={99}>

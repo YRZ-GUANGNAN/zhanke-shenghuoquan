@@ -306,7 +306,9 @@ function IdentityPeople() {
         <Button size="sm" variant="ghost" disabled={loading} onClick={() => { void loadList(); void loadCounts() }}>{loading ? '加载中…' : '刷新'}</Button>
       </div>
       {listError && <div className="preview-form-error" role="alert">{listError}</div>}
-      {loading && list.items.length === 0
+      {listError
+        ? null
+        : loading && list.items.length === 0
         ? <div className="preview-policy-note">正在加载认证资料…</div>
         : visibleItems.length === 0
           ? <EmptyState title="没有匹配的认证资料" description="调整筛选条件后再试。" />
@@ -557,7 +559,9 @@ function FeedbackPeople() {
         <Button size="sm" variant="ghost" disabled={loading} onClick={() => { void loadList(); void loadCounts() }}>{loading ? '加载中…' : '刷新'}</Button>
       </div>
       {listError && <div className="preview-form-error" role="alert">{listError}</div>}
-      {loading && data.items.length === 0
+      {listError
+        ? null
+        : loading && data.items.length === 0
         ? <div className="preview-policy-note">正在加载反馈…</div>
         : data.items.length === 0
           ? <EmptyState title="没有匹配的反馈" description="调整筛选条件后再试。" />
@@ -914,7 +918,9 @@ function UserPeople() {
       </div>
       {listError && <div className="preview-form-error" role="alert">{listError}</div>}
       {allUsersError && <div className="preview-form-error" role="alert">账号统计加载失败：{allUsersError}</div>}
-      {loading && data.items.length === 0
+      {listError
+        ? null
+        : loading && data.items.length === 0
         ? <div className="preview-policy-note">正在加载用户列表…</div>
         : filtered.length === 0
           ? <EmptyState title="没有匹配的账号" description="调整搜索或角色筛选后再试。" />

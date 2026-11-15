@@ -350,12 +350,12 @@ body {
 }
 
 .preview-table td > strong,
-.preview-table td > span,
+.preview-table td > span:not(.ant-tag):not(.preview-image-cell),
 .preview-table td > small {
   display: block;
 }
 
-.preview-table td > span,
+.preview-table td > span:not(.ant-tag):not(.preview-image-cell),
 .preview-table td > small {
   margin-top: 3px;
   color: var(--preview-text-muted);
@@ -2273,4 +2273,16 @@ button.preview-media-card__visual:focus-visible {
 .preview-search-hit__copy small {
   color: var(--preview-text-muted);
   font-size: 12px;
+}
+
+/* 旧后台的窄屏规则会把 AccountPanel 撑满整行；预览壳的顶栏里保持紧凑。 */
+.preview-topbar .account-panel {
+  width: auto;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.preview-topbar .account-panel > div {
+  min-width: 0;
+  text-align: right;
 }

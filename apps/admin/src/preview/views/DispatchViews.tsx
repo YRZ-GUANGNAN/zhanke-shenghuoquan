@@ -122,6 +122,13 @@ function RidersPanel() {
       await candidatesState.reload()
     } catch (reason) {
       setStatusError(deliveryErrorMessage(reason))
+      // 冲突时行版本已失效：刷新列表并把弹窗目标换成最新行，避免重试必然再 409。
+      if (isDeliveryConflict(reason)) {
+        await ridersState.reload()
+        await candidatesState.reload()
+        const fresh = (ridersState.data?.items ?? []).find(row => row.riderUserId === target.rider.riderUserId)
+        if (fresh) setStatusTarget(current => current ? { ...current, rider: fresh } : current)
+      }
     } finally {
       setStatusBusy(false)
     }
@@ -366,6 +373,10 @@ function OrderActionsTable({ orders, candidates, onChanged }: {
       setError('请选择接单中的骑手')
       return
     }
+    if (selectedOrders.length !== selected.length) {
+      setError('部分选中的订单已不在当前列表，请刷新后重新选择')
+      return
+    }
     setBusy(true)
     setError('')
     const failures: string[] = []
@@ -390,16 +401,19 @@ function OrderActionsTable({ orders, candidates, onChanged }: {
         failures.push(`${id}：${isDeliveryConflict(cause) ? conflictMessage : errorText(cause)}`)
       }
     }
-    setBusy(false)
-    await onChanged()
+    // busy 覆盖刷新窗口，避免刷新期间用旧 rowVersion 重复提交。
     if (failures.length === 0) {
+      setMode(null)
+      setReason('')
+      setSelected([])
+      await onChanged()
+      setBusy(false)
       notify(mode === 'reassign'
         ? `已把 ${ok} 笔订单转给 ${riderName(riderUserId, candidates.find(row => row.riderUserId === riderUserId)?.realName)}`
         : `已取消 ${ok} 笔订单`, mode === 'reassign' ? 'success' : 'info')
-      setSelected([])
-      setMode(null)
-      setReason('')
     } else {
+      await onChanged()
+      setBusy(false)
       notify(`已完成 ${ok} 笔，${failures.length} 笔失败`, 'danger')
       const succeeded = selectedOrders
         .filter(order => !failures.some(failure => failure.startsWith(order.deliveryOrderPublicId)))

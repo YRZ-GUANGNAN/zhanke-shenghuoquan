@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDebouncedValue } from '../delivery-hooks'
 import type { Tone } from '../data'
 import {
@@ -124,7 +124,10 @@ export function NotificationsView() {
   }, [])
 
   const debouncedSearch = useDebouncedValue(search, 350)
+  // 请求版本守卫：慢响应不能覆盖用户已经切换到的筛选/页码/关键字结果。
+  const deliveriesRequest = useRef(0)
   const loadDeliveries = useCallback(async () => {
+    const requestId = ++deliveriesRequest.current
     setDeliveriesLoading(true)
     setDeliveriesError('')
     try {
@@ -134,6 +137,7 @@ export function NotificationsView() {
         page,
         pageSize: PAGE_SIZE
       })
+      if (requestId !== deliveriesRequest.current) return
       // 重投后列表可能变短，当前页超出总页数时回退到最后一页。
       if (result.items.length === 0 && result.total > 0 && page > 1) {
         setPage(Math.max(1, Math.ceil(result.total / result.pageSize)))
@@ -141,9 +145,9 @@ export function NotificationsView() {
         setDeliveries(result)
       }
     } catch (reason) {
-      setDeliveriesError(errorText(reason))
+      if (requestId === deliveriesRequest.current) setDeliveriesError(errorText(reason))
     } finally {
-      setDeliveriesLoading(false)
+      if (requestId === deliveriesRequest.current) setDeliveriesLoading(false)
     }
   }, [deliveryStatus, debouncedSearch, page])
 

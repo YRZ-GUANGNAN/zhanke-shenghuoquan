@@ -250,15 +250,26 @@ function useRemotePage<T>(loader: (page: number, pageSize: number) => Promise<Pa
   const [version, setVersion] = useState(0)
   const loaderRef = useRef(loader)
   loaderRef.current = loader
+  // 筛选/搜索条件变化（reloadKey）时回到第 1 页，避免停在旧页码上。
+  const lastReloadKey = useRef(reloadKey)
 
   useEffect(() => {
+    if (lastReloadKey.current !== reloadKey) {
+      lastReloadKey.current = reloadKey
+      if (page !== 1) {
+        setPageState(1)
+        return
+      }
+    }
     let active = true
     setLoading(true)
     loaderRef.current(page, PAGE_SIZE)
       .then(value => {
         if (!active) return
         if (value.items.length === 0 && page > 1) {
-          setPageState(current => Math.max(1, current - 1))
+          // 当前页越界：直接跳到最后一页，而不是逐页回退。
+          const lastPage = value.total > 0 ? Math.max(1, Math.ceil(value.total / (value.pageSize || PAGE_SIZE))) : 1
+          setPageState(current => current === lastPage ? 1 : lastPage)
           return
         }
         setData(value)
@@ -340,6 +351,7 @@ const MEDIA_FILTER_STATUS: Record<Exclude<MediaFilter, '全部'>, string> = {
 
 function MediaOperations() {
   const [tab, setTab] = useState<'assets' | 'decisions' | 'events' | 'gc' | 'deadletters'>('assets')
+  const [refreshTick, setRefreshTick] = useState(0)
   const [filter, setFilter] = useState<MediaFilter>('全部')
 
   return <div>
@@ -347,7 +359,7 @@ function MediaOperations() {
       eyebrow={metaBySection.media.eyebrow}
       title={metaBySection.media.title}
       description={metaBySection.media.description}
-      actions={<Button variant="primary" onClick={() => { setTab('assets'); setFilter('异常') }}>{metaBySection.media.action}</Button>}
+      actions={<Button variant="primary" onClick={() => { setTab('assets'); setFilter('异常'); setRefreshTick(tick => tick + 1) }}>{metaBySection.media.action}</Button>}
     />
     <div className="preview-subtabs" role="tablist" aria-label="素材模块">
       {([['assets', '素材'], ['decisions', '审核记录'], ['events', '处理记录'], ['gc', '清理记录'], ['deadletters', '异常记录']] as const).map(([key, label]) => <button
@@ -360,7 +372,7 @@ function MediaOperations() {
       >{label}</button>)}
     </div>
 
-    {tab === 'assets' && <MediaAssetsTab filter={filter} onFilter={setFilter} />}
+    {tab === 'assets' && <MediaAssetsTab filter={filter} onFilter={setFilter} refreshTick={refreshTick} />}
     {tab === 'decisions' && <MediaDecisionsTab />}
     {tab === 'events' && <MediaEventsTab />}
     {tab === 'gc' && <MediaGCJobsTab />}
@@ -368,7 +380,7 @@ function MediaOperations() {
   </div>
 }
 
-function MediaAssetsTab({ filter, onFilter }: { filter: MediaFilter; onFilter: (value: MediaFilter) => void }) {
+function MediaAssetsTab({ filter, onFilter, refreshTick }: { filter: MediaFilter; onFilter: (value: MediaFilter) => void; refreshTick: number }) {
   const [search, setSearch] = useState('')
   const debouncedSearch = search.trim()
   const list = useRemotePage<MediaAssetRow>((page, pageSize) => adminAPI.mediaAssets({
@@ -376,7 +388,7 @@ function MediaAssetsTab({ filter, onFilter }: { filter: MediaFilter; onFilter: (
     pageSize,
     ...(debouncedSearch ? { keyword: debouncedSearch } : {}),
     ...(filter === '全部' ? {} : { reviewStatus: MEDIA_FILTER_STATUS[filter] })
-  }), `${filter}|${debouncedSearch}`)
+  }), `${filter}|${debouncedSearch}|${refreshTick}`)
   const [summary, setSummary] = useState<MediaSummary | null>(null)
   const [summaryError, setSummaryError] = useState('')
   const [detailId, setDetailId] = useState<string | null>(null)
@@ -450,8 +462,10 @@ function MediaAssetsTab({ filter, onFilter }: { filter: MediaFilter; onFilter: (
       {list.error && <div className="preview-form-error" role="alert">{list.error}</div>}
       {!list.data && list.loading
         ? <EmptyState title="正在读取素材" description="素材数据加载完成后会自动显示。" />
-        : items.length === 0
+        : items.length === 0 && !list.error
           ? <EmptyState title="当前筛选下没有素材" description="调整状态筛选后再试。" />
+          : list.error && items.length === 0
+            ? null
           : <div className="preview-media-grid">
             {items.map((asset, index) => {
               const kind = mediaKind(asset)
@@ -567,7 +581,9 @@ function MediaDecisionsTab() {
   const items = list.data?.items ?? []
   return <Panel eyebrow="REVIEW DECISION" title="审核记录" description="审核投影收到的每次结论都会留下不可修改的版本记录。">
     {list.error && <div className="preview-form-error" role="alert">{list.error}</div>}
-    {!list.data && list.loading
+    {list.error
+      ? null
+      : !list.data && list.loading
       ? <EmptyState title="正在读取审核记录" description="结论记录加载完成后会自动显示。" />
       : items.length === 0
         ? <EmptyState title="暂无审核记录" description="素材审核投影还没有产生结论。" />
@@ -591,7 +607,9 @@ function MediaEventsTab() {
   const items = list.data?.items ?? []
   return <Panel eyebrow="PROCESS EVENT" title="处理记录" description="上传、转码、投影等处理动作的消费结果。">
     {list.error && <div className="preview-form-error" role="alert">{list.error}</div>}
-    {!list.data && list.loading
+    {list.error
+      ? null
+      : !list.data && list.loading
       ? <EmptyState title="正在读取处理记录" description="事件记录加载完成后会自动显示。" />
       : items.length === 0
         ? <EmptyState title="暂无处理记录" description="素材处理事件还没有产生记录。" />
@@ -615,7 +633,9 @@ function MediaGCJobsTab() {
   const items = list.data?.items ?? []
   return <Panel eyebrow="CLEANUP JOB" title="清理记录" description="删除素材后由后台异步清理对象存储，失败会重试。">
     {list.error && <div className="preview-form-error" role="alert">{list.error}</div>}
-    {!list.data && list.loading
+    {list.error
+      ? null
+      : !list.data && list.loading
       ? <EmptyState title="正在读取清理记录" description="清理任务加载完成后会自动显示。" />
       : items.length === 0
         ? <EmptyState title="暂无清理任务" description="还没有素材进入对象存储清理流程。" />
@@ -672,7 +692,9 @@ function MediaDeadlettersTab() {
       </span>
       <Button size="sm" onClick={() => setVersion(current => current + 1)}>刷新</Button>
     </div>
-    {!data && loading
+    {error
+      ? null
+      : !data && loading
       ? <EmptyState title="正在读取异常记录" description="死信任务加载完成后会自动显示。" />
       : empty
         ? <EmptyState title="没有异常记录" description="当前处理与清理任务均正常。" />
@@ -889,7 +911,9 @@ function ReviewOperations() {
         ]} />
         <span className="preview-toolbar__hint">{list.data?.total ?? 0} 条任务{list.loading ? ' · 刷新中…' : ''}</span>
       </div>
-      {!list.data && list.loading
+      {list.error
+        ? null
+        : !list.data && list.loading
         ? <EmptyState title="正在读取审核任务" description="数据加载完成后会自动显示。" />
         : visible.length === 0
           ? <EmptyState title="当前没有审核任务" description="切换状态或调整搜索条件。" />
@@ -923,9 +947,9 @@ function ReviewOperations() {
       open={Boolean(dialog)}
       title={dialogTitle}
       description={dialog ? `${objectLabel(dialog.task.objectType)} #${dialog.task.objectId} · 任务 #${dialog.task.id}` : ''}
-      onClose={() => setDialog(null)}
+      onClose={() => { if (!busy) setDialog(null) }}
       footer={<>
-        <Button onClick={() => setDialog(null)}>取消</Button>
+        <Button disabled={busy} onClick={() => { if (!busy) setDialog(null) }}>取消</Button>
         <Button variant={isReject ? 'danger' : 'primary'} disabled={busy} onClick={() => void submitDecision()}>{busy ? '提交中…' : confirmLabel}</Button>
       </>}
     >
@@ -966,9 +990,9 @@ function TakedownModal({
     open={Boolean(target)}
     title={`下架${kind}`}
     description={target ? `${kind} #${target.id} · ${target.title || '未命名'}` : ''}
-    onClose={onClose}
+    onClose={() => { if (!busy) onClose() }}
     footer={<>
-      <Button onClick={onClose}>取消</Button>
+      <Button disabled={busy} onClick={() => { if (!busy) onClose() }}>取消</Button>
       <Button variant="danger" disabled={busy} onClick={onConfirm}>{busy ? '处理中…' : '确认下架'}</Button>
     </>}
   >
@@ -1087,7 +1111,7 @@ function CommunityOperations() {
                 ? <span className="preview-muted-action">已下架</span>
                 : <span className="preview-muted-action">当前不可下架</span>}</td>
           </tr>)}
-        </tbody></table>{visible.length === 0 && <EmptyState title="当前页没有匹配内容" description="调整筛选条件，或翻到其他页查找。" />}</div>}
+        </tbody></table>{visible.length === 0 && !list.error && <EmptyState title="当前页没有匹配内容" description="调整筛选条件，或翻到其他页查找。" />}</div>}
       <Pagination page={list.data?.page ?? list.page} pageSize={list.data?.pageSize ?? PAGE_SIZE} total={list.data?.total ?? 0} onChange={list.setPage} label="内容列表分页" />
     </Panel>
 
@@ -1241,7 +1265,7 @@ function TradeOperations() {
                 ? <span className="preview-muted-action">已下架</span>
                 : <span className="preview-muted-action">当前不可下架</span>}</td>
           </tr>)}
-        </tbody></table>{visible.length === 0 && <EmptyState title="当前页没有匹配商品" description="调整筛选条件，或翻到其他页查找。" />}</div>}
+        </tbody></table>{visible.length === 0 && !list.error && <EmptyState title="当前页没有匹配商品" description="调整筛选条件，或翻到其他页查找。" />}</div>}
       <Pagination page={list.data?.page ?? list.page} pageSize={list.data?.pageSize ?? PAGE_SIZE} total={list.data?.total ?? 0} onChange={list.setPage} label="商品列表分页" />
     </Panel>
 
@@ -1349,7 +1373,7 @@ function ReportOperations() {
             <td>{displayTime(item.createdAt)}</td>
             <td onClick={event => event.stopPropagation()}><Button size="sm" variant="primary" onClick={() => setDetailId(item.id)}>查看详情</Button></td>
           </tr>)}
-        </tbody></table>{visible.length === 0 && <EmptyState title="当前页没有举报" description="切换状态后再试。" />}</div>}
+        </tbody></table>{visible.length === 0 && !list.error && <EmptyState title="当前页没有举报" description="切换状态后再试。" />}</div>}
       <Pagination page={list.data?.page ?? list.page} pageSize={list.data?.pageSize ?? PAGE_SIZE} total={list.data?.total ?? 0} onChange={list.setPage} label="举报列表分页" />
     </Panel>
 
