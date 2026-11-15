@@ -73,6 +73,10 @@ func (r *reportMemoryRepository) LatestReviewTask(context.Context, string, uint)
 	return nil, nil
 }
 
+func (r *reportMemoryRepository) GlobalSearch(context.Context, string) ([]SearchHit, error) {
+	return []SearchHit{}, nil
+}
+
 func (r *reportMemoryRepository) SetReportStatus(_ context.Context, id uint, status review.Status) error {
 	for key, value := range r.reports {
 		if value.ID == id {

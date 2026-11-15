@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useAdminStore } from '../../store'
 import {
   deliveryAdminAPI,
   type DeliveryOrder,
@@ -125,6 +126,16 @@ export function DeliveryView() {
   const candidates = (ridersState.data?.items ?? []).filter(rider => rider.grantActive !== false && (rider.accountStatus ?? 'active') === 'active')
   const selectedOrders = orders.filter(order => selectedIds.includes(order.deliveryOrderPublicId))
 
+  // 全局搜索结果跳转：订单类型直接打开详情抽屉。
+  const searchTarget = useAdminStore(state => state.searchTarget)
+  const setSearchTarget = useAdminStore(state => state.setSearchTarget)
+  const openDetailRef = useRef<(id: string) => void>(() => {})
+  useEffect(() => {
+    if (!searchTarget || searchTarget.section !== 'delivery' || !searchTarget.orderId) return
+    openDetailRef.current(searchTarget.orderId)
+    setSearchTarget(null)
+  }, [searchTarget, setSearchTarget])
+
   // 搜索由服务端完成，这里不再按当前页过滤。
   const visibleOrders = orders
 
@@ -152,6 +163,7 @@ export function DeliveryView() {
       if (detailEpoch.current === version) setDetailLoading(false)
     }
   }
+  openDetailRef.current = id => { void openDetail(id) }
 
   const closeDetail = () => {
     detailEpoch.current += 1

@@ -13,8 +13,10 @@ function identityQueryString(query:IdentityApplicationQuery={}){const params=new
 function reviewQueryString(query:ReviewQuery={}){const params=new URLSearchParams();Object.entries(query).forEach(([key,value])=>{if(value!==undefined&&value!=='')params.set(key,String(value))});const value=params.toString();return value?`?${value}`:''}
 function pageQueryString(query:PageQuery={}){const params=new URLSearchParams();if(query.page)params.set('page',String(query.page));if(query.pageSize)params.set('pageSize',String(query.pageSize));const value=params.toString();return value?`?${value}`:''}
 function feedbackQueryString(query:PageQuery&{status?:string}={}){const params=new URLSearchParams();if(query.page)params.set('page',String(query.page));if(query.pageSize)params.set('pageSize',String(query.pageSize));if(query.status)params.set('status',query.status);const value=params.toString();return value?`?${value}`:''}
+export interface AdminSearchHit{type:'order'|'user'|'post'|'product'|'rider';id:string;title:string;subtitle:string;section:string}
 export const adminAPI={
 	stats:()=>api<Stats>('/admin/stats'),
+	search:(query:string)=>api<{hits:AdminSearchHit[]}>(`/admin/search?q=${encodeURIComponent(query)}`),
 	reviews:(query:ReviewQuery={})=>api<Page<ReviewTask>>(`/admin/reviews${reviewQueryString(query)}`),
 	startReview:(id:number)=>api<ReviewTask>(`/admin/reviews/${id}/start`,{method:'POST'}),
 	decideReview:(id:number,decision:'approve'|'reject',reason='')=>api<ReviewTask>(`/admin/reviews/${id}/${decision}`,{method:'POST',body:JSON.stringify({reason})}),

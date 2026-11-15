@@ -18,6 +18,7 @@ type Repository interface {
 	ListReportsByReporter(context.Context, uint, int, int) ([]Report, int64, error)
 	FindReport(context.Context, uint) (Report, error)
 	LatestReviewTask(context.Context, string, uint) (*review.Task, error)
+	GlobalSearch(context.Context, string) ([]SearchHit, error)
 	SetReportStatus(context.Context, uint, review.Status) error
 	WithinTransaction(context.Context, func(context.Context, Repository) error) error
 }

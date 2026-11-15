@@ -46,6 +46,7 @@ func (h *Handler) Register(api *gin.RouterGroup) {
 	}
 	secured := api.Group("/admin", authRequired, user.AdminRequired())
 	secured.GET("/stats", h.stats)
+	secured.GET("/search", h.globalSearch)
 	secured.GET("/reviews", h.reviewList)
 	secured.POST("/reviews/:id/start", h.startReview)
 	secured.POST("/reviews/:id/approve", h.approve)
@@ -491,4 +492,14 @@ func writeTakedown(c *gin.Context, data any, err error) {
 		return
 	}
 	response.OK(c, data)
+}
+
+func (h *Handler) globalSearch(c *gin.Context) {
+	keyword := strings.TrimSpace(c.Query("q"))
+	value, err := h.service.GlobalSearch(c.Request.Context(), keyword)
+	if err != nil {
+		response.Fail(c, 500, "search failed")
+		return
+	}
+	response.OK(c, gin.H{"hits": value})
 }

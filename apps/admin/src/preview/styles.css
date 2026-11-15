@@ -2213,3 +2213,64 @@ button.preview-media-card__visual:focus-visible {
   padding: 0;
   background: transparent;
 }
+
+/* 全局搜索结果：内容分组与条目 */
+.preview-search-group {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+.preview-search-group__title {
+  color: var(--preview-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.preview-search-hit {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--preview-border);
+  border-radius: 10px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--duration-fast), background var(--duration-fast);
+}
+.preview-search-hit:hover {
+  border-color: var(--preview-blue);
+  background: #f8fbff;
+}
+.preview-search-hit__type {
+  flex: none;
+  min-width: 44px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: #eef4fb;
+  color: #21518a;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}
+.preview-search-hit__type.is-order { background: #e8f3ff; color: #1f5b98; }
+.preview-search-hit__type.is-user { background: #eaf7ef; color: #2f7d4f; }
+.preview-search-hit__type.is-post { background: #f3eefe; color: #6b4b8f; }
+.preview-search-hit__type.is-product { background: #fdf3e6; color: #a86a1f; }
+.preview-search-hit__type.is-rider { background: #fdeef0; color: #a63d4e; }
+.preview-search-hit__copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.preview-search-hit__copy strong {
+  overflow: hidden;
+  color: var(--preview-text);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.preview-search-hit__copy small {
+  color: var(--preview-text-muted);
+  font-size: 12px;
+}

@@ -37,9 +37,10 @@ import { SettingsView } from './views/SettingsView'
 import { LegacyTakeoutView } from './views/LegacyTakeoutView'
 import { Login } from '../Login'
 import { AccountPanel } from '../AccountPanel'
-import { useAdminStore } from '../store'
+import { useAdminStore, type AdminSearchTarget } from '../store'
+import type { AdminSection } from '../types'
 import { adminAuthAPI } from '../services/admin-auth'
-import { adminAPI } from '../services/f-admin'
+import { adminAPI, type AdminSearchHit } from '../services/f-admin'
 import { legacyTakeoutEnabled } from '../feature-flags'
 
 interface NavigationItem {
@@ -69,6 +70,14 @@ const navigation: NavigationItem[] = [
 
 const groups: NavigationItem['group'][] = ['工作台', '业务运营', '内容与用户', '平台设置']
 
+const SEARCH_TYPE_LABELS: Record<string, string> = {
+  order: '订单',
+  user: '用户',
+  post: '帖子',
+  product: '商品',
+  rider: '骑手'
+}
+
 function ConsoleShell() {
   const [section, setSection] = useState<PreviewSection>('dashboard')
   const [collapsed, setCollapsed] = useState(false)
@@ -82,6 +91,9 @@ function ConsoleShell() {
   }, [])
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [hits, setHits] = useState<AdminSearchHit[]>([])
+  const [hitsLoading, setHitsLoading] = useState(false)
+  const [hitsError, setHitsError] = useState('')
   const [attentionCount, setAttentionCount] = useState(0)
   const { notify } = usePreviewToast()
 
@@ -119,10 +131,39 @@ function ConsoleShell() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
+  // 全局内容搜索：≥2 个字符，防抖 300ms，带竞态守卫。
+  useEffect(() => {
+    const keyword = query.trim()
+    if (keyword.length < 2) {
+      setHits([])
+      setHitsError('')
+      setHitsLoading(false)
+      return
+    }
+    let active = true
+    setHitsLoading(true)
+    setHitsError('')
+    const timer = window.setTimeout(() => {
+      adminAPI.search(keyword)
+        .then(result => { if (active) setHits(result.hits ?? []) })
+        .catch(reason => { if (active) setHitsError(reason instanceof Error ? reason.message : String(reason)) })
+        .finally(() => { if (active) setHitsLoading(false) })
+    }, 300)
+    return () => { active = false; window.clearTimeout(timer) }
+  }, [query])
+
+  const setSearchTarget = useAdminStore(state => state.setSearchTarget)
   const navigate = (next: PreviewSection) => {
     setSection(next)
     setSearchOpen(false)
     setQuery('')
+  }
+  const openSearchHit = (hit: AdminSearchHit) => {
+    const target: AdminSearchTarget = { section: hit.section as AdminSection }
+    if (hit.type === 'order') target.orderId = hit.id
+    else if (hit.type === 'rider') target.keyword = hit.title
+    setSearchTarget(target)
+    navigate(hit.section as PreviewSection)
   }
 
   const content = (() => {
@@ -241,29 +282,51 @@ function ConsoleShell() {
 
     <Modal
       open={searchOpen}
-      title="搜索页面"
+      title="搜索"
       onClose={() => setSearchOpen(false)}
-      width="sm"
+      width="md"
     >
       <Input
         autoFocus
         value={query}
         prefix={<span>⌕</span>}
-        placeholder="输入模块名称"
+        placeholder="搜索订单号、收件人、用户、帖子、商品，或输入页面名称"
         onChange={event => setQuery(event.target.value)}
       />
       <div className="preview-search-results">
-        {filteredNavigation.map(item => (
-          <AntButton
-            key={item.key}
-            type="text"
-            block
-            onClick={() => navigate(item.key)}
-          >
-            {item.icon} {item.label}
-          </AntButton>
-        ))}
-        {filteredNavigation.length === 0 && <p>没有匹配的模块</p>}
+        {query.trim().length >= 2 && <div className="preview-search-group">
+          <span className="preview-search-group__title">内容搜索结果{hitsLoading ? ' · 搜索中…' : ` · ${hits.length} 条`}</span>
+          {hitsError && <p className="preview-form-error">{hitsError}</p>}
+          {!hitsError && !hitsLoading && hits.length === 0 && <p>没有匹配的订单、用户、帖子、商品或骑手</p>}
+          {hits.map(hit => (
+            <button
+              key={`${hit.type}-${hit.id}`}
+              type="button"
+              className="preview-search-hit"
+              onClick={() => openSearchHit(hit)}
+            >
+              <span className={`preview-search-hit__type is-${hit.type}`}>{SEARCH_TYPE_LABELS[hit.type] || hit.type}</span>
+              <span className="preview-search-hit__copy">
+                <strong>{hit.title}</strong>
+                <small>{hit.subtitle}</small>
+              </span>
+            </button>
+          ))}
+        </div>}
+        <div className="preview-search-group">
+          <span className="preview-search-group__title">页面模块</span>
+          {filteredNavigation.map(item => (
+            <AntButton
+              key={item.key}
+              type="text"
+              block
+              onClick={() => navigate(item.key)}
+            >
+              {item.icon} {item.label}
+            </AntButton>
+          ))}
+          {filteredNavigation.length === 0 && <p>没有匹配的模块</p>}
+        </div>
       </div>
     </Modal>
   </ConfigProvider>
