@@ -800,7 +800,7 @@ function ShareSettingsView() {
               <p>{draft.detailTitleSuffix ? `详情标题后缀：${draft.detailTitleSuffix}` : '未设置详情标题后缀'}</p>
             </div>
             <div className="preview-share-preview__brand">
-              <span>湛</span>
+              <span><img className="brand-logo-img" src="/images/brand-logo.png" alt="湛科万事通" /></span>
               <div><strong>湛科生活圈</strong><small>{draft.preferContentImage ? '详情优先使用真实内容图片' : '详情使用通用封面'}</small></div>
             </div>
           </div>

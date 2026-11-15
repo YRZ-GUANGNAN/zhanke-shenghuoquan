@@ -187,7 +187,7 @@ function ConsoleShell() {
         trigger={null}
       >
         <div className="preview-logo">
-          <span className="preview-logo__mark">湛</span>
+          <span className="preview-logo__mark"><img className="brand-logo-img" src="/images/brand-logo.png" alt="湛科万事通" /></span>
           {!collapsed && <span>湛科运营云</span>}
         </div>
         <Menu
@@ -208,7 +208,7 @@ function ConsoleShell() {
         bodyStyle={{ padding: 0 }}
       >
         <div className="preview-logo">
-          <span className="preview-logo__mark">湛</span>
+          <span className="preview-logo__mark"><img className="brand-logo-img" src="/images/brand-logo.png" alt="湛科万事通" /></span>
           <span>湛科运营云</span>
         </div>
         <Menu
@@ -295,7 +295,7 @@ export default function App() {
       .catch(() => { if (active) setUnauthenticated() })
     return () => { active = false }
   }, [authStatus, setAuthenticated, setUnauthenticated])
-  if (authStatus === 'checking') return <main className="auth-loading"><div className="auth-loading__mark">湛</div><p>正在验证管理员会话…</p></main>
+  if (authStatus === 'checking') return <main className="auth-loading"><div className="auth-loading__mark"><img className="brand-logo-img" src="/images/brand-logo.png" alt="湛科万事通" /></div><p>正在验证管理员会话…</p></main>
   if (authStatus === 'unauthenticated') return <Login />
   return <ToastProvider><ConsoleShell /></ToastProvider>
 }

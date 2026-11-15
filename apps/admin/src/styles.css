@@ -3114,3 +3114,7 @@ body {
   border-radius: 10px;
   background: #f5f7fa;
 }
+
+/* 登录页品牌 Logo 图片 */
+.login-brand__mark { overflow: hidden; padding: 0; background: transparent; }
+.login-brand__mark .brand-logo-img { border-radius: inherit; }

@@ -38,7 +38,7 @@ export function Login() {
     <div className="login-shell">
       <section className="login-brand" aria-hidden="true">
         <div className="login-brand__top">
-          <div className="login-brand__mark">湛</div>
+          <div className="login-brand__mark"><img className="brand-logo-img" src="/images/brand-logo.png" alt="湛科万事通" /></div>
           <div className="login-brand__name"><strong>湛科生活圈</strong><span>经营与运营工作台</span></div>
         </div>
         <div className="login-brand__body">
