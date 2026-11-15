@@ -64,3 +64,9 @@
 - 移除渐变假图；图片加载失败显示明确占位。
 
 数据库：无新增迁移。验证：`/version` 返回上述版本与 commit；后台首页与 `assets/index-CUtcpiJW.js`、`assets/index-CUTAtt3m.css` 返回 `200`；管理端素材预览接口未登录返回 `401`；生产 42 个媒体资产中 38 个已定稿可在后台预览，4 个未定稿显示「未定稿」。
+
+## 补充发布：素材网格紧凑布局（同日，静态）
+
+- 后台静态 release 更新为 `/var/www/campus-admin/releases/admin-20261115d-9ce745e`，commit `9ce745e`。
+- 素材中心网格改为自适应多列（大屏 5–8 列、1100px 以下两列），图片预览区高度 96px，一屏可核对更多素材。
+- 后端无变化；首页引用 `assets/index-CeoTGRLQ.js`、`assets/index-sYRXa0GN.css`，返回 `200`。
