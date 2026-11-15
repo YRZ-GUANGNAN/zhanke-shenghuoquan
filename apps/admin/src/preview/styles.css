@@ -1216,8 +1216,8 @@ body {
 
 .preview-media-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
 }
 
 .preview-media-card {
@@ -1227,7 +1227,7 @@ body {
 }
 
 .preview-media-card__visual {
-  height: 120px;
+  height: 96px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1243,8 +1243,8 @@ body {
 
 .preview-media-card__body {
   display: grid;
-  gap: 9px;
-  padding: 11px;
+  gap: 6px;
+  padding: 8px 10px;
 }
 
 .preview-media-card__body > div:first-child {
@@ -1632,10 +1632,13 @@ body {
 
   .preview-channel-health-cards,
   .preview-template-grid,
-  .preview-media-grid,
   .preview-service-grid,
   .preview-feedback-list {
     grid-template-columns: 1fr;
+  }
+
+  .preview-media-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
