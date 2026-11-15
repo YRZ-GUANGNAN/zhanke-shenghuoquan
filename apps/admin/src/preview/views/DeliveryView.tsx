@@ -15,6 +15,8 @@ import {
   isDeliveryConflict,
   merchantName,
   orderStatusLabel,
+  sourcePlatformLabel,
+  sourcePlatformTone,
   orderStatusTone,
   paymentStatusLabel,
   reassignableOrderStatuses,
@@ -345,7 +347,7 @@ export function DeliveryView() {
                     : [])}
                 />
               </th>
-              <th>订单</th><th>取送到</th><th>骑手</th><th>金额</th><th>状态</th><th>进入时间</th><th />
+              <th>订单</th><th>来源</th><th>取送到</th><th>骑手</th><th>金额</th><th>状态</th><th>进入时间</th><th />
             </tr></thead>
             <tbody>{visibleOrders.map(order => {
               const id = order.deliveryOrderPublicId
@@ -361,6 +363,7 @@ export function DeliveryView() {
                   />}
                 </td>
                 <td><button type="button" className="preview-table__primary" onClick={event => { event.stopPropagation(); void openDetail(id) }}>{shortId(id)}<small>商家 #{order.merchantUserId}{order.merchantRequestId ? ` · 请求号 ${shortId(order.merchantRequestId, 6, 4)}` : ''}</small></button></td>
+                <td><StatusPill tone={sourcePlatformTone(order.sourcePlatform)}>{sourcePlatformLabel(order.sourcePlatform)}</StatusPill></td>
                 <td><strong>{order.pickupAddress}</strong><span>→ {order.deliveryAddress}</span></td>
                 <td>{order.riderUserId ? `骑手 #${order.riderUserId}` : <StatusPill tone="warning">待分配</StatusPill>}</td>
                 <td><strong>{formatMoney(order.deliveryFeeCents)}</strong><span className="preview-table__fee">骑手 {formatMoney(order.riderFeeCents)} · 平台 {formatMoney(order.platformCutCents)}</span></td>
@@ -465,6 +468,7 @@ function OrderDetailContent({ value }: { value: OrderFunds }) {
     </div>
     <div className="preview-kv-grid">
       <div><span>所属商家</span><strong>{merchantName(order.merchantUserId)}</strong></div>
+      <div><span>订单来源</span><strong>{sourcePlatformLabel(order.sourcePlatform)}</strong></div>
       <div><span>当前骑手</span><strong>{order.riderUserId ? `骑手 #${order.riderUserId}` : '待分配'}</strong></div>
       <div><span>配送费</span><strong>{formatMoney(order.deliveryFeeCents)}</strong></div>
       <div><span>骑手报酬</span><strong>{formatMoney(order.riderFeeCents)}</strong></div>

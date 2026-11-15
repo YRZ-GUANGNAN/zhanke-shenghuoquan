@@ -214,6 +214,7 @@ export interface MerchantFeeOverride {
 export interface DeliveryOrder {
   deliveryOrderPublicId: string
   merchantRequestId?: string
+  sourcePlatform?: string
   merchantUserId: number
   riderUserId?: number
   pickupContactName: string

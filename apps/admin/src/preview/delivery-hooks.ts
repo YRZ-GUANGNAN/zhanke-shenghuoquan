@@ -260,3 +260,19 @@ export const ledgerReferenceLabels: Record<string, string> = {
 }
 export const ledgerReferenceLabel = (referenceType: string) =>
   ledgerReferenceLabels[referenceType] || referenceType || '—'
+
+export const sourcePlatformLabels: Record<string, string> = {
+  local: '本地发单',
+  jd: '京东',
+  taobao: '淘宝',
+  meituan: '美团'
+}
+export const sourcePlatformLabel = (platform?: string) => sourcePlatformLabels[platform || 'local'] || platform || '本地发单'
+export const sourcePlatformTone = (platform?: string): 'accent' | 'info' | 'warning' | 'neutral' => {
+  switch (platform) {
+    case 'jd': return 'warning'
+    case 'taobao': return 'info'
+    case 'meituan': return 'accent'
+    default: return 'neutral'
+  }
+}
