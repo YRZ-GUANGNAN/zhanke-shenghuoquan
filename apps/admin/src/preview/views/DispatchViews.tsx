@@ -129,7 +129,7 @@ function RidersPanel() {
     <Panel
       eyebrow="RIDER DESK"
       title="骑手状态"
-      description="暂停接单不影响已接订单；封禁后该骑手不能再接新单。状态变更会携带行版本与操作原因写入后台。"
+      description="暂停或封禁后骑手无法登录工作台推进订单，因此有在途订单时需先转出；没有在途订单时方可暂停或封禁。"
       actions={<SearchBox value={search} onChange={value => { setSearch(value); setPage(1) }} placeholder="搜索骑手姓名或手机号" />}
     >
       <div className="preview-toolbar">
@@ -205,7 +205,7 @@ function RidersPanel() {
     >
       <div className="preview-form-stack">
         {statusTarget?.next === 'suspended' && <div className="preview-warning-box">
-          <strong>封禁后该骑手不能再接新单，已接订单不受影响</strong>
+          <strong>封禁后该骑手不能再接新单；若仍有在途订单，需先转出才能封禁</strong>
           <p>解封后恢复为“休息中”，需手动恢复接单。操作原因会记录在案。</p>
         </div>}
         <Field

@@ -82,19 +82,34 @@ func (h *Handler) updateWecom(c *gin.Context) {
 		response.Fail(c, http.StatusInternalServerError, "保存渠道配置失败")
 		return
 	}
+	// 库中留空的字段沿用环境变量，避免只填写一个群时把另一个群静默停用。
+	effectiveMerchant, effectiveRider := h.effectiveWecom(saved)
 	if h.sender != nil {
-		_ = h.sender.SetGroupURL("merchant_ops", saved.MerchantWebhook)
-		_ = h.sender.SetGroupURL("rider_ops", saved.RiderWebhook)
+		_ = h.sender.SetGroupURL("merchant_ops", effectiveMerchant)
+		_ = h.sender.SetGroupURL("rider_ops", effectiveRider)
 	}
 	if h.riderSender != nil {
-		_ = h.riderSender.SetWebhookURL(saved.RiderWebhook)
+		_ = h.riderSender.SetWebhookURL(effectiveRider)
 	}
 	response.OK(c, gin.H{
-		"merchantConfigured": saved.MerchantWebhook != "",
-		"riderConfigured":    saved.RiderWebhook != "",
-		"merchantHint":       webhookHint(saved.MerchantWebhook),
-		"riderHint":          webhookHint(saved.RiderWebhook),
+		"merchantConfigured": effectiveMerchant != "",
+		"riderConfigured":    effectiveRider != "",
+		"merchantHint":       webhookHint(effectiveMerchant),
+		"riderHint":          webhookHint(effectiveRider),
 		"settingsSaved":      saved.Saved,
 		"rowVersion":         saved.RowVersion,
 	})
+}
+
+// effectiveWecom 合并数据库配置与环境变量：数据库字段为空时沿用 env。
+func (h *Handler) effectiveWecom(saved WeComSettings) (string, string) {
+	merchant := strings.TrimSpace(saved.MerchantWebhook)
+	if merchant == "" {
+		merchant = strings.TrimSpace(h.config.EnvMerchantWebhook)
+	}
+	rider := strings.TrimSpace(saved.RiderWebhook)
+	if rider == "" {
+		rider = strings.TrimSpace(h.config.EnvRiderWebhook)
+	}
+	return merchant, rider
 }

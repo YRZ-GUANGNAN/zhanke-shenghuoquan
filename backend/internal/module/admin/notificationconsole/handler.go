@@ -24,6 +24,9 @@ type Config struct {
 	OfficialTemplateReady   bool
 	WecomMerchantConfigured bool
 	WecomRiderConfigured    bool
+	// Env 兜底值：数据库未配置（或字段留空）时沿用环境变量的 Webhook。
+	EnvMerchantWebhook string
+	EnvRiderWebhook    string
 	// Workers 返回通知 worker 的运行状态，未配置时后台不展示该区块。
 	Workers func() []notification.WorkerState
 }
@@ -261,8 +264,9 @@ func (h *Handler) overview(c *gin.Context) {
 		if saved, err := h.settings.LoadWeComSettings(c.Request.Context()); err == nil {
 			result.Wecom.SettingsSaved = saved.Saved
 			result.Wecom.RowVersion = saved.RowVersion
-			result.Wecom.MerchantHint = webhookHint(saved.MerchantWebhook)
-			result.Wecom.RiderHint = webhookHint(saved.RiderWebhook)
+			merchant, rider := h.effectiveWecom(saved)
+			result.Wecom.MerchantHint = webhookHint(merchant)
+			result.Wecom.RiderHint = webhookHint(rider)
 		}
 	}
 	result.Wecom.MerchantConfigured = h.config.WecomMerchantConfigured

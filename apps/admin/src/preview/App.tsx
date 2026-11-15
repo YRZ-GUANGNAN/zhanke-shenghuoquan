@@ -69,8 +69,6 @@ const navigation: NavigationItem[] = [
 
 const groups: NavigationItem['group'][] = ['工作台', '业务运营', '内容与用户', '平台设置']
 
-type FeatureVisibility = Record<string, boolean>
-
 function ConsoleShell() {
   const [section, setSection] = useState<PreviewSection>('dashboard')
   const [collapsed, setCollapsed] = useState(false)
@@ -85,7 +83,6 @@ function ConsoleShell() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [attentionCount, setAttentionCount] = useState(0)
-  const [features, setFeatures] = useState<FeatureVisibility | null>(null)
   const { notify } = usePreviewToast()
 
   // 待办徽章与导航可见性都来自真实接口；失败时保持全部可见并静默降级。
@@ -94,26 +91,15 @@ function ConsoleShell() {
     adminAPI.stats()
       .then(stats => { if (active) setAttentionCount(stats.totals.pendingReview) })
       .catch(() => {})
-    adminAPI.featurePolicy()
-      .then(policy => { if (active) setFeatures(policy.flags as unknown as FeatureVisibility) })
-      .catch(() => {})
     return () => { active = false }
   }, [])
 
+  // 后台入口与用户端功能开关解耦：开关只影响小程序端展示，
+  // 关闭某个用户功能不应连后台的履约、资金与通知管理入口一起隐藏。
   const availableNavigation = useMemo(() => navigation.filter(item => {
-    if (!features) {
-      if (item.key === 'takeout') return legacyTakeoutEnabled
-      if (item.key === 'feature-policy') return false
-      return true
-    }
-    if (item.key === 'delivery') return features.delivery !== false
-    if (item.key === 'notifications') return features.notifications !== false
-    if (item.key === 'community') return features.forum !== false
-    if (item.key === 'trade') return features.secondhand !== false
-    if (item.key === 'takeout') return legacyTakeoutEnabled && features.takeout !== false
-    if (item.key === 'feature-policy') return false
+    if (item.key === 'takeout') return legacyTakeoutEnabled
     return true
-  }), [features])
+  }), [])
 
   const active = navigation.find(item => item.key === section)
   const filteredNavigation = useMemo(() => {

@@ -2,6 +2,7 @@ package deliveryconsole
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -114,6 +115,19 @@ func (r *GormRiderAdmin) SetRiderStatus(ctx context.Context, riderUserID uint64,
 		if rider.RowVersion != rowVersion {
 			return delivery.ErrConcurrentUpdate
 		}
+		if status != "active" {
+			// 骑手暂停或封禁后无法登录工作台推进已接订单，必须先转出在途单。
+			var inFlight int64
+			if err := tx.Table("delivery_orders").
+				Where("rider_user_id = ? AND status IN ?", riderUserID, []delivery.Status{
+					delivery.StatusClaimed, delivery.StatusToPickup, delivery.StatusPickedUp, delivery.StatusDelivering,
+				}).Count(&inFlight).Error; err != nil {
+				return err
+			}
+			if inFlight > 0 {
+				return ErrRiderHasActiveOrders
+			}
+		}
 		if err := tx.Table("takeout_riders").Where("rider_user_id = ?", riderUserID).Updates(map[string]any{
 			"status":      status,
 			"row_version": gorm.Expr("row_version + 1"),
@@ -150,3 +164,7 @@ func (r *GormRiderAdmin) SetRiderStatus(ctx context.Context, riderUserID uint64,
 	}
 	return result, nil
 }
+
+// ErrRiderHasActiveOrders rejects suspension while the rider still has orders
+// in flight; the console maps it to a retry-after-handover conflict.
+var ErrRiderHasActiveOrders = errors.New("rider still has active orders")

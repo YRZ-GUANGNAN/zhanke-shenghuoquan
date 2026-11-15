@@ -35,6 +35,8 @@ PrivateTmp=true
 PrivateDevices=true
 ProtectSystem=strict
 ProtectHome=true
+# 分享封面等运行时上传写入独立持久目录（不随 release 切换丢失）。
+ReadWritePaths=/opt/campus-circle/shared
 ProtectHostname=true
 ProtectClock=true
 ProtectKernelTunables=true

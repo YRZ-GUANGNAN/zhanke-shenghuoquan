@@ -399,13 +399,13 @@ export function NotificationsView() {
             label="商家值班群 Webhook"
             value={wecomMerchantInput}
             onChange={event => { setWecomMerchantInput(event.target.value); setWecomError('') }}
-            placeholder={merchantConfigured ? '已配置，留空保持不变；粘贴新地址可替换' : '粘贴企业微信商家值班群机器人 Webhook'}
+            placeholder={merchantConfigured ? '已配置，留空保持不变；粘贴新地址可替换' : '粘贴企业微信商家值班群机器人 Webhook（留空沿用服务器配置）'}
           />
           <Field
             label="骑手值班群 Webhook"
             value={wecomRiderInput}
             onChange={event => { setWecomRiderInput(event.target.value); setWecomError('') }}
-            placeholder={riderConfigured ? '已配置，留空保持不变；粘贴新地址可替换' : '粘贴企业微信骑手值班群机器人 Webhook'}
+            placeholder={riderConfigured ? '已配置，留空保持不变；粘贴新地址可替换' : '粘贴企业微信骑手值班群机器人 Webhook（留空沿用服务器配置）'}
           />
           <div className="preview-row-actions">
             <Button
@@ -443,7 +443,7 @@ export function NotificationsView() {
           </div>
           {wecomError && <div className="preview-form-error" role="alert">{wecomError}</div>}
           {wecomNotice && <div className="preview-policy-note" role="status">{wecomNotice}</div>}
-          <p className="preview-policy-note">地址包含群机器人密钥，保存后只显示尾号。只更新填写的群，留空的群保持不变；保存后立即生效，无需重启服务。</p>
+          <p className="preview-policy-note">地址包含群机器人密钥，保存后只显示尾号。只更新填写的群；留空的群沿用服务器配置，不会被停用。保存后立即生效，无需重启服务。</p>
         </div>
       </Panel>
 

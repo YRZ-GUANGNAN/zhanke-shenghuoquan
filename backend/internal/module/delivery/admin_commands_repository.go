@@ -119,6 +119,16 @@ func (r *GormRepository) CancelWithReason(
 		if _, ok := adminCancellableStatuses[result.Status]; !ok {
 			return ErrInvalidTransition
 		}
+		// 防御：只要存在已支付（未退款）的配送费结算，就不能直接取消。
+		var paidSettlements int64
+		if err := tx.Table("delivery_fee_settlements").
+			Where("delivery_order_public_id = ? AND status = ? AND refunded_at IS NULL", result.DeliveryOrderPublicID, "paid").
+			Count(&paidSettlements).Error; err != nil {
+			return err
+		}
+		if paidSettlements > 0 {
+			return ErrInvalidTransition
+		}
 		action := AdminOrderAction{
 			DeliveryOrderPublicID: result.DeliveryOrderPublicID,
 			Action:                AdminActionCancel,
@@ -141,11 +151,16 @@ func (r *GormRepository) CancelWithReason(
 		if err := tx.Model(&Order{}).Where("id = ?", result.ID).Updates(updates).Error; err != nil {
 			return err
 		}
+		before := result
 		result.Status = StatusCancelled
 		result.CancelReason = reason
 		result.CancelledAt = &now
 		result.RowVersion++
 		result.UpdatedAt = now.UTC()
+		// 取消同样广播订单通知（商家群/骑手群会收到「配送单已取消」卡片）。
+		if err := appendOrderNotificationTx(tx, r.notificationAppender, before, result, now); err != nil {
+			return err
+		}
 		return nil
 	})
 	if err != nil {

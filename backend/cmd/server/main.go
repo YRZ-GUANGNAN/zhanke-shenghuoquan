@@ -342,15 +342,23 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// 管理员在后台填写的企微 Webhook 优先于环境变量，并在保存后立即生效。
+	// 管理员在后台填写的企微 Webhook 优先于环境变量，并在保存后立即生效；
+	// 库中留空的字段回退到环境变量，避免只填一个群时静默停用另一个群。
+	// legacy 回池通知（deliverynotify）停用：骑手群统一由模板卡片通知，
+	// 否则「等待接单」会同时以 markdown 与卡片两种形式重复推送。
 	wecomSettingsStore := notificationconsole.NewWeComSettingsStore(db)
 	if saved, err := wecomSettingsStore.LoadWeComSettings(context.Background()); err == nil && saved.Saved {
-		if userNotifications.wecomSender != nil {
-			_ = userNotifications.wecomSender.SetGroupURL("merchant_ops", saved.MerchantWebhook)
-			_ = userNotifications.wecomSender.SetGroupURL("rider_ops", saved.RiderWebhook)
+		merchant := strings.TrimSpace(saved.MerchantWebhook)
+		if merchant == "" {
+			merchant = strings.TrimSpace(cfg.WeComMerchantWebhookURL)
 		}
-		if deliveryRuntime != nil && deliveryRuntime.riderNotifier != nil {
-			_ = deliveryRuntime.riderNotifier.SetWebhookURL(saved.RiderWebhook)
+		rider := strings.TrimSpace(saved.RiderWebhook)
+		if rider == "" {
+			rider = strings.TrimSpace(cfg.WeComRiderWebhookURL)
+		}
+		if userNotifications.wecomSender != nil {
+			_ = userNotifications.wecomSender.SetGroupURL("merchant_ops", merchant)
+			_ = userNotifications.wecomSender.SetGroupURL("rider_ops", rider)
 		}
 	}
 	notificationChannelConsole := notificationconsole.NewHandler(
@@ -366,16 +374,13 @@ func main() {
 				strings.TrimSpace(cfg.WechatOfficialOrderTemplateFields) != "",
 			WecomMerchantConfigured: strings.TrimSpace(cfg.WeComMerchantWebhookURL) != "",
 			WecomRiderConfigured:    strings.TrimSpace(cfg.WeComRiderWebhookURL) != "",
+			EnvMerchantWebhook:      cfg.WeComMerchantWebhookURL,
+			EnvRiderWebhook:         cfg.WeComRiderWebhookURL,
 			Workers:                 userNotifications.health.Snapshot,
 		},
 		userNotifications.wecomSender,
 		time.Now,
-	).WithWeComSettings(wecomSettingsStore, func() *deliverynotify.WeComSender {
-		if deliveryRuntime != nil {
-			return deliveryRuntime.riderNotifier
-		}
-		return nil
-	}(), func(c *gin.Context) uint64 { return uint64(user.CurrentUserID(c)) })
+	).WithWeComSettings(wecomSettingsStore, nil, func(c *gin.Context) uint64 { return uint64(user.CurrentUserID(c)) })
 	if userNotifications.consumer != nil {
 		notificationContext, cancelNotifications := context.WithCancel(context.Background())
 		defer cancelNotifications()
@@ -965,6 +970,12 @@ func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, user
 	}()).WithManualWithdrawalMode(runtime.withdrawalReady).
 		WithOrderCommands(runtime.orders).
 		WithRiderAdmin(deliveryconsole.NewRiderAdmin(runtime.db)).
+		WithRefundCommands(func() deliveryconsole.RefundCommands {
+		if runtime.funds != nil {
+			return runtime.funds
+		}
+		return nil
+	}()).
 		Register(adminRoutes)
 }
 

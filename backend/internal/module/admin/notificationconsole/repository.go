@@ -110,8 +110,10 @@ func (r *GormRepository) RetryDelivery(ctx context.Context, deliveryPublicID str
 			"next_attempt_at":  now.UTC(),
 			"lease_token":      nil,
 			"lease_expires_at": nil,
-			"row_version":      gorm.Expr("row_version + 1"),
-			"updated_at":       now.UTC(),
+			// 重投必须刷新有效期，否则 worker 会因过期直接跳过，形成"重投成功但永不发送"。
+			"expires_at":    now.UTC().Add(2 * time.Hour),
+			"row_version":   gorm.Expr("row_version + 1"),
+			"updated_at":    now.UTC(),
 		}).Error
 	})
 	if err != nil {

@@ -25,6 +25,7 @@ type Handler struct {
 	manualWithdrawalMode bool
 	commands             orderCommands
 	riderAdmin           RiderAdminRepository
+	refundCommands       RefundCommands
 }
 
 func NewHandler(
@@ -73,6 +74,7 @@ func (h *Handler) Register(group *gin.RouterGroup) {
 	group.GET("/refunds/:id", h.refund)
 	group.POST("/orders/:id/reassign", h.reassignOrder)
 	group.POST("/orders/:id/cancel", h.cancelOrder)
+	group.POST("/orders/:id/refund", h.refundOrder)
 	group.GET("/riders", h.riders)
 	group.GET("/riders/:riderUserId/orders", h.riderOrders)
 	group.POST("/riders/:riderUserId/status", h.setRiderStatus)

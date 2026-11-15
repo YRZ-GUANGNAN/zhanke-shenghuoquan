@@ -511,6 +511,10 @@ export const deliveryAdminAPI = {
     api<DeliveryOrder>(`/orders/${encodeURIComponent(id)}/reassign`, {
       ...body({ riderUserId, rowVersion: expectedRowVersion, reason }), method: 'POST'
     }),
+  refundOrder: (id: string, expectedRowVersion: number, idempotencyKey: string) =>
+    api<{ refund: string; order: string; status: string }>(`/orders/${encodeURIComponent(id)}/refund`, {
+      ...body({ rowVersion: expectedRowVersion, idempotencyKey }), method: 'POST'
+    }),
   cancelOrder: (id: string, expectedRowVersion: number, reason: string) =>
     api<DeliveryOrder>(`/orders/${encodeURIComponent(id)}/cancel`, {
       ...body({ rowVersion: expectedRowVersion, reason }), method: 'POST'

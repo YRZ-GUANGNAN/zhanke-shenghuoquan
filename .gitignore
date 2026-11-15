@@ -34,3 +34,4 @@ meilisearch*.exe
 .claude/
 backend/.data/
 backend/server.exe
+backend/*.exe

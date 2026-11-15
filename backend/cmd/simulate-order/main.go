@@ -31,6 +31,10 @@ func main() {
 	if len(os.Args) > 1 {
 		action = os.Args[1]
 	}
+	if strings.TrimSpace(os.Getenv("SIMULATE_ORDER_ENABLE")) != "1" {
+		fmt.Fprintln(os.Stderr, "未启用：请先设置 SIMULATE_ORDER_ENABLE=1，并确认不会在真实业务时段误用该联调工具。")
+		os.Exit(1)
+	}
 	db, err := gorm.Open(mysql.Open(dsn()), &gorm.Config{})
 	if err != nil {
 		panic(err)
@@ -46,8 +50,28 @@ func main() {
 			fmt.Fprintln(os.Stderr, "invalid order id")
 			os.Exit(1)
 		}
-		res := db.Exec(`DELETE FROM delivery_orders WHERE delivery_order_public_id = ?`, id)
-		fmt.Printf("cleanup: deleted=%d order=%s\n", res.RowsAffected, id)
+		// 级联清理该订单触发的通知事件、投递与站内通知，避免残留幽灵消息。
+		var deletedEvents, deletedDeliveries, deletedInbox, deletedOrders int64
+		err := db.Transaction(func(tx *gorm.DB) error {
+			var eventIDs []string
+			tx.Table("delivery_notification_events").Where("aggregate_public_id = ?", id).Pluck("event_public_id", &eventIDs)
+			if len(eventIDs) > 0 {
+				res := tx.Exec("DELETE FROM delivery_notification_deliveries WHERE event_public_id IN ?", eventIDs)
+				deletedDeliveries = res.RowsAffected
+				res = tx.Exec("DELETE FROM delivery_notification_inbox WHERE event_public_id IN ?", eventIDs)
+				deletedInbox = res.RowsAffected
+				res = tx.Exec("DELETE FROM delivery_notification_events WHERE event_public_id IN ?", eventIDs)
+				deletedEvents = res.RowsAffected
+			}
+			res := tx.Exec("DELETE FROM delivery_orders WHERE delivery_order_public_id = ?", id)
+			deletedOrders = res.RowsAffected
+			return nil
+		})
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("cleanup: order=%s events=%d deliveries=%d inbox=%d orders=%d\n",
+			id, deletedEvents, deletedDeliveries, deletedInbox, deletedOrders)
 	case "create":
 		notifications := notification.NewRepository(db)
 		repository := delivery.NewRepository(db, delivery.WithNotificationEvents(

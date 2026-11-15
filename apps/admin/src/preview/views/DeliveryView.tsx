@@ -20,6 +20,7 @@ import {
   orderStatusTone,
   paymentStatusLabel,
   reassignableOrderStatuses,
+  refundableOrderStatuses,
   refundStatusLabel,
   riderName,
   selectableOrderStatuses,
@@ -94,6 +95,10 @@ export function DeliveryView() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState('')
   const detailEpoch = useRef(0)
+  const [refundTarget, setRefundTarget] = useState<DeliveryOrder | null>(null)
+  const [refundBusy, setRefundBusy] = useState(false)
+  const [refundError, setRefundError] = useState('')
+  const refundKeyRef = useRef('')
 
   // 订单列表分页与状态筛选都走真实接口；搜索只过滤当前页，不伪造跨页结果。
   const ordersState = useRemoteData(async () => {
@@ -395,7 +400,7 @@ export function DeliveryView() {
     <Modal
       open={Boolean(batchAction)}
       title={batchAction === 'reassign' ? `改派 ${selectedIds.length} 笔订单` : `取消 ${selectedIds.length} 笔订单`}
-      description={batchAction === 'reassign' ? '改派后原骑手不再负责该订单，新骑手会收到提醒。仅已接单及之后的在途订单可以改派。' : '取消后订单不再履约，用户会看到取消原因。已取货、配送中的订单需走退款流程，不能直接取消。'}
+      description={batchAction === 'reassign' ? '改派后原骑手不再负责该订单，新骑手会收到提醒。仅已接单及之后的在途订单可以改派。' : '取消后订单不再履约，用户会看到取消原因。只有未支付配送费的订单可以直接取消；已支付订单请在订单详情发起退款。'}
       onClose={() => { if (!batchBusy) { setBatchAction(null); setBatchError('') } }}
       footer={<>
         <Button disabled={batchBusy} onClick={() => { setBatchAction(null); setBatchError('') }}>返回</Button>
@@ -441,8 +446,44 @@ export function DeliveryView() {
           closeDetail()
           openBatch('cancel', [detail.order.deliveryOrderPublicId])
         }}>取消订单</Button>}
+        {refundableOrderStatuses.has(detail.order.status) && <Button variant="danger" onClick={() => {
+          refundKeyRef.current = crypto.randomUUID()
+          setRefundTarget(detail.order)
+          setRefundError('')
+        }}>发起退款</Button>}
       </>}
     >
+      <Modal
+        open={Boolean(refundTarget)}
+        title="发起退款"
+        description={refundTarget ? `配送单 ${refundTarget.deliveryOrderPublicId} · 配送费 ${formatMoney(refundTarget.deliveryFeeCents)}` : ''}
+        onClose={() => { if (!refundBusy) { setRefundTarget(null); setRefundError('') } }}
+        footer={<>
+          <Button disabled={refundBusy} onClick={() => { setRefundTarget(null); setRefundError('') }}>取消</Button>
+          <Button variant="danger" disabled={refundBusy} onClick={async () => {
+            if (!refundTarget) return
+            setRefundBusy(true)
+            setRefundError('')
+            try {
+              await deliveryAdminAPI.refundOrder(refundTarget.deliveryOrderPublicId, refundTarget.rowVersion, refundKeyRef.current || crypto.randomUUID())
+              notify(`配送单 ${shortId(refundTarget.deliveryOrderPublicId)} 已发起退款并取消订单`)
+              setRefundTarget(null)
+              closeDetail()
+              await ordersState.reload()
+            } catch (cause) {
+              setRefundError(isDeliveryConflict(cause) ? conflictMessage : errorText(cause))
+            } finally {
+              setRefundBusy(false)
+            }
+          }}>{refundBusy ? '退款中…' : '确认退款并取消订单'}</Button>
+        </>}
+      >
+        <div className="preview-warning-box">
+          <strong>退款会退回配送费，并在同一事务内取消该订单</strong>
+          <p>退款记录会出现在「资金与结算 → 退款记录」。已送达或已取消的订单不能再退款。</p>
+        </div>
+        {refundError && <div className="preview-form-error" role="alert">{refundError}</div>}
+      </Modal>
       {detailLoading && !detail && <p className="preview-toolbar__hint">正在加载订单资金明细…</p>}
       {detailError && <div className="preview-form-error" role="alert">{detailError}</div>}
       {detail && <OrderDetailContent value={detail} />}

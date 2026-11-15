@@ -106,7 +106,9 @@ export const orderStatusTone = (status: string): Tone => orderStatusTones[status
 // 与后端管理员命令保持一致的可用状态集合：
 // 已取货、配送中的订单不能直接取消，需要走退款流程。
 export const reassignableOrderStatuses = new Set(['claimed', 'to_pickup', 'picked_up', 'delivering'])
-export const cancellableOrderStatuses = new Set(['pending_fee_payment', 'payment_failed', 'ready_for_claim', 'claimed', 'to_pickup'])
+// 只有未支付配送费的订单可以直接取消；已支付订单必须走退款（会自动取消订单）。
+export const cancellableOrderStatuses = new Set(['pending_fee_payment', 'payment_failed'])
+export const refundableOrderStatuses = new Set(['ready_for_claim', 'claimed', 'to_pickup', 'picked_up', 'delivering'])
 export const selectableOrderStatuses = new Set([...reassignableOrderStatuses, ...cancellableOrderStatuses])
 
 /* ===== 骑手状态 ===== */

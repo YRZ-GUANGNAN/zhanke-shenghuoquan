@@ -21,14 +21,11 @@ var adminReassignableStatuses = map[Status]struct{}{
 	StatusDelivering: {},
 }
 
-// Orders already picked up move through the refund flow instead of a direct
-// administrator cancellation.
+// 只有未支付配送费的订单可以直接取消。已支付订单必须走退款流程
+// （退款在同一事务内完成取消与资金退回），否则配送费会永久滞留。
 var adminCancellableStatuses = map[Status]struct{}{
 	StatusPendingFeePayment: {},
 	StatusPaymentFailed:     {},
-	StatusReadyForClaim:     {},
-	StatusClaimed:           {},
-	StatusToPickup:          {},
 }
 
 type AdminOrderAction struct {

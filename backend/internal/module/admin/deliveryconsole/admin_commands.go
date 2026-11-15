@@ -26,6 +26,49 @@ func (h *Handler) WithOrderCommands(value orderCommands) *Handler {
 	return h
 }
 
+// RefundCommands 暴露管理员退款（退款会在同一事务内取消订单并退回配送费）。
+type RefundCommands interface {
+	RequestAdminRefund(ctx context.Context, orderPublicID string, expectedRowVersion uint64, idempotencyKey string) (delivery.RefundResult, error)
+}
+
+// WithRefundCommands enables the administrator refund route.
+func (h *Handler) WithRefundCommands(value RefundCommands) *Handler {
+	h.refundCommands = value
+	return h
+}
+
+func (h *Handler) refundOrder(c *gin.Context) {
+	if !delivery.ValidULID(c.Param("id")) {
+		response.Fail(c, http.StatusBadRequest, "invalid delivery order id")
+		return
+	}
+	if h.refundCommands == nil {
+		response.Fail(c, http.StatusServiceUnavailable, "delivery refunds unavailable")
+		return
+	}
+	var request struct {
+		RowVersion     uint64 `json:"rowVersion"`
+		IdempotencyKey string `json:"idempotencyKey"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil || request.RowVersion == 0 || strings.TrimSpace(request.IdempotencyKey) == "" {
+		response.Fail(c, http.StatusBadRequest, "rowVersion and idempotencyKey are required")
+		return
+	}
+	result, err := h.refundCommands.RequestAdminRefund(c.Request.Context(), c.Param("id"), request.RowVersion, strings.TrimSpace(request.IdempotencyKey))
+	switch {
+	case err == nil:
+		response.OK(c, gin.H{"refund": result.Refund.RefundPublicID, "order": result.Order.DeliveryOrderPublicID, "status": string(result.Order.Status)})
+	case errors.Is(err, delivery.ErrRefundNotAllowed), errors.Is(err, delivery.ErrInvalidTransition):
+		response.Fail(c, http.StatusConflict, "该订单当前状态不允许退款（未支付、已送达或已取消）")
+	case errors.Is(err, delivery.ErrConcurrentUpdate):
+		response.Fail(c, http.StatusConflict, "数据已被他人修改，请刷新后重试")
+	case errors.Is(err, delivery.ErrNotFound):
+		response.Fail(c, http.StatusNotFound, "配送单不存在")
+	default:
+		response.Fail(c, http.StatusInternalServerError, "退款发起失败")
+	}
+}
+
 func (h *Handler) reassignOrder(c *gin.Context) {
 	if !delivery.ValidULID(c.Param("id")) {
 		response.Fail(c, http.StatusBadRequest, "invalid delivery order id")
@@ -193,6 +236,8 @@ func (h *Handler) setRiderStatus(c *gin.Context) {
 	switch {
 	case err == nil:
 		response.OK(c, value)
+	case errors.Is(err, ErrRiderHasActiveOrders):
+		response.Fail(c, http.StatusConflict, "骑手仍有在途订单，请先转出在途订单再暂停或封禁")
 	case errors.Is(err, delivery.ErrConcurrentUpdate):
 		response.Fail(c, http.StatusConflict, "rider state changed, refresh and retry")
 	case errors.Is(err, delivery.ErrNotFound):
