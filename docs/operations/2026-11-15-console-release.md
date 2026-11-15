@@ -98,3 +98,21 @@
 - 后台静态 release 更新为 `/var/www/campus-admin/releases/admin-20261115f-d24affc`，commit `d24affc`。
 - 「湛」字标记（侧栏、移动端抽屉、登录页、会话校验、分享预览品牌位）替换为「湛科万事通」圆形 logo（用户提供原图处理为 256px 圆形透明 PNG，`/images/brand-logo.png`）。
 - 验证：首页引用 `assets/index-CS-xp9dh.js`、`assets/index-CGpf7_sM.css`，logo 图片返回 `200 image/png`。
+
+## 补充发布：2026.11.15.candidate.4（同日，值班群渠道后台填写）
+
+| 项 | 值 |
+| --- | --- |
+| 运行时版本 | `2026.11.15.candidate.4` |
+| 运行时 commit | `06065b42c7fee53b9a00a64351efdc218db41fb8` |
+| 后端 release | `/opt/campus-circle/releases/20261115d-console-06065b4` |
+| 后台静态 release | `/var/www/campus-admin/releases/admin-20261115g-06065b4` |
+| 后端二进制 SHA256 | `5ad1ccdf1836c728590882c908c936f33a80c73c0b6be6a3fe65797dedafe492` |
+
+本次内容：
+- 新增迁移 `061_notification_channel_settings.sql`：单行表保存商家/骑手值班群 Webhook；`updated_by` 为空表示从未保存，继续以环境变量为准。
+- 新增 `PUT /api/v1/admin/delivery/notification-channels/wecom`：按字段更新（未填写的群保持不变）、行版本 CAS、企微 Webhook 严格校验、记录操作人；保存后立即作用于用户通知与配送通知两个发送器，无需重启。
+- 企微群通道改为始终初始化：环境变量留空时也能通过后台启用；消息格式化动态读取当前配置。
+- 消息通知页新增「渠道配置」表单，已配置群显示密钥尾号；overview 返回脱敏提示与来源。
+
+数据库：迁移 061 已在生产执行（1 行、row_version=1、updated_by 为空，即 env 兜底）。验证：`/version` 返回上述版本；首页引用 `assets/index-Ub77jhDY.js`；渠道配置接口未登录返回 `401`。真实保存与群消息送达需登录后台并配置真实机器人后人工验收。
