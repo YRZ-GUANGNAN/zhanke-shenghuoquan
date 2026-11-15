@@ -70,3 +70,21 @@
 - 后台静态 release 更新为 `/var/www/campus-admin/releases/admin-20261115d-9ce745e`，commit `9ce745e`。
 - 素材中心网格改为自适应多列（大屏 5–8 列、1100px 以下两列），图片预览区高度 96px，一屏可核对更多素材。
 - 后端无变化；首页引用 `assets/index-CeoTGRLQ.js`、`assets/index-sYRXa0GN.css`，返回 `200`。
+
+## 补充发布：2026.11.15.candidate.3（同日，分享封面拖拽上传）
+
+| 项 | 值 |
+| --- | --- |
+| 运行时版本 | `2026.11.15.candidate.3` |
+| 运行时 commit | `6b18a0c0b5fcb4ec431610797abb6e3be992411a` |
+| 后端 release | `/opt/campus-circle/releases/20261115c-console-6b18a0c` |
+| 后台静态 release | `/var/www/campus-admin/releases/admin-20261115e-6b18a0c` |
+| 后端二进制 SHA256 | `bf2d69ca5baf739b9eb5b612c7481deb7ef2a0a027be3b50b891b337cf31e6f0` |
+
+本次内容：
+- 分享封面支持拖拽上传：`POST /api/v1/admin/share-settings/cover`（multipart，JPG/PNG ≤5MB、尺寸 ≤4096，内容哈希命名），公开读取 `GET /api/v1/share-covers/:name`（长缓存不可变）。
+- 封面文件存放在独立持久目录 `/opt/campus-circle/shared/share-covers`（campus 可写），不随 release 切换丢失；`SHARE_COVER_DIR` 已写入 `/etc/campus-circle/campus-api.env`（原文件备份为 `campus-api.env.bak-20261115`）。
+- 分享设置页新增拖拽上传区，上传成功自动回填封面地址，保存设置后生效；手工粘贴地址的方式保留。
+- 数据库：无新增迁移。
+
+验证：`/version` 返回上述版本；后台首页引用 `assets/index-DgfpbYQD.js`；上传接口未登录返回 `401`；封面对外读取路由存在（不存在文件返回 `404`）。真实上传与保存效果需登录后台人工验收。
