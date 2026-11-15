@@ -31,7 +31,9 @@ func TestOrderNotificationSnapshotContainsNoContactData(t *testing.T) {
 	if payload.MerchantUserID != 42 || payload.RiderUserID == nil || *payload.RiderUserID != 61 || payload.From != StatusReadyForClaim {
 		t.Fatal("wrong recipient facts")
 	}
-	for _, value := range []string{"private-pickup", "private-phone", "private-note"} {
+	// 取送地址经产品确认允许进入订单通知事件（供内部值班群卡片展示）；
+	// 联系电话与备注仍然禁止进入事件负载。
+	for _, value := range []string{"private-phone", "private-note"} {
 		if strings.Contains(string(event.Payload), value) {
 			t.Fatal("contact data leaked")
 		}

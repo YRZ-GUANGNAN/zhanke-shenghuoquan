@@ -49,9 +49,10 @@ func deliveryWecomGroupFormatter(merchantEnabled, riderEnabled func() bool) noti
 			return nil, nil
 		}
 		platform := sourcePlatformCardLabel(fact.SourcePlatform)
-		// 事件负载保持隐私最小化（不含地址/电话/备注），卡片只展示非敏感要素。
 		items := []notification.WecomCardItem{
 			{Key: "单号", Value: fact.OrderPublicID},
+			{Key: "起点", Value: fact.PickupAddress},
+			{Key: "终点", Value: fact.DeliveryAddress},
 			{Key: "状态", Value: label},
 			{Key: "时间", Value: event.OccurredAt.In(time.FixedZone("Asia/Shanghai", 8*60*60)).Format("01-02 15:04")},
 		}
@@ -104,7 +105,7 @@ func sourcePlatformCardLabel(platform string) string {
 	case "meituan":
 		return "美团订单"
 	default:
-		return "私人独立订单"
+		return "小程序独立订单"
 	}
 }
 

@@ -160,6 +160,9 @@ type OrderNotificationPayload struct {
 	DeliveryFeeCents    uint64  `json:"deliveryFeeCents"`
 	RiderFeeCents       uint64  `json:"riderFeeCents,omitempty"`
 	SourcePlatform      string  `json:"sourcePlatform,omitempty"`
+	// 取送地址仅用于内部值班群卡片（产品确认）；电话与备注仍然禁止进入事件。
+	PickupAddress       string  `json:"pickupAddress,omitempty"`
+	DeliveryAddress     string  `json:"deliveryAddress,omitempty"`
 }
 
 func orderNotification(before, after Order, now time.Time) (NotificationEvent, error) {
@@ -177,6 +180,7 @@ func orderNotification(before, after Order, now time.Time) (NotificationEvent, e
 		RiderUserID: after.RiderUserID, PreviousRiderUserID: before.RiderUserID,
 		From: before.Status, To: after.Status, DeliveryFeeCents: after.DeliveryFeeCents,
 		RiderFeeCents: after.RiderFeeCents, SourcePlatform: string(after.SourcePlatform.Effective()),
+		PickupAddress: after.PickupAddress, DeliveryAddress: after.DeliveryAddress,
 	})
 	if err != nil {
 		return NotificationEvent{}, err
