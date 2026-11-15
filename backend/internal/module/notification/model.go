@@ -312,7 +312,8 @@ func metadataObject(decoder *json.Decoder, depth int) bool {
 		}
 		keys[key] = true
 		normalized := strings.ToLower(strings.NewReplacer("_", "", "-", "", ".", "").Replace(key))
-		for _, forbidden := range []string{"openid", "secret", "token", "password", "privatekey", "phone", "address", "messagebody", "messagecontent", "msgbody", "rawbody", "rawcallback", "content", "body"} {
+		// address 经产品确认允许进入订单通知事件（内部值班群卡片展示取送地址）。
+		for _, forbidden := range []string{"openid", "secret", "token", "password", "privatekey", "phone", "messagebody", "messagecontent", "msgbody", "rawbody", "rawcallback", "content", "body"} {
 			if strings.Contains(normalized, forbidden) {
 				return false
 			}
