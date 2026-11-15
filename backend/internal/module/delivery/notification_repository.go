@@ -29,6 +29,7 @@ func WithNotificationEvents(appendEvent NotificationEventAppender) RepositoryOpt
 
 const (
 	EventOrderStatusChanged      = "DeliveryOrderStatusChanged"
+	EventOrderReassigned         = "DeliveryOrderReassigned"
 	EventRiderIncomeRecorded     = "RiderIncomeRecorded"
 	EventRiderPayoutCompleted    = "RiderPayoutCompleted"
 	EventRiderWithdrawalChanged  = "RiderWithdrawalChanged"
@@ -202,4 +203,33 @@ func appendOrderNotificationTx(tx *gorm.DB, appender NotificationEventAppender, 
 		return err
 	}
 	return appender(tx, event)
+}
+
+// appendReassignNotificationTx 为管理端改派单独追加事件（状态不变，payload 标注新旧骑手）。
+func appendReassignNotificationTx(tx *gorm.DB, appender NotificationEventAppender, before, after Order, now time.Time) error {
+	if appender == nil {
+		return nil
+	}
+	if tx == nil || !ValidULID(after.DeliveryOrderPublicID) || after.MerchantUserID == 0 ||
+		after.RowVersion != before.RowVersion+1 || before.Status != after.Status || now.IsZero() {
+		return ErrInvalidRecord
+	}
+	id, err := NewULID()
+	if err != nil {
+		return err
+	}
+	payload, err := json.Marshal(OrderNotificationPayload{
+		OrderPublicID: after.DeliveryOrderPublicID, MerchantUserID: after.MerchantUserID,
+		RiderUserID: after.RiderUserID, PreviousRiderUserID: before.RiderUserID,
+		From: before.Status, To: after.Status, DeliveryFeeCents: after.DeliveryFeeCents,
+		RiderFeeCents: after.RiderFeeCents, SourcePlatform: string(after.SourcePlatform.Effective()),
+	})
+	if err != nil {
+		return err
+	}
+	return appender(tx, NotificationEvent{
+		EventPublicID: id, EventType: EventOrderReassigned,
+		AggregatePublicID: after.DeliveryOrderPublicID, AggregateVersion: after.RowVersion,
+		Payload: payload, OccurredAt: now.UTC(),
+	})
 }

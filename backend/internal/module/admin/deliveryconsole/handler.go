@@ -421,7 +421,7 @@ func (h *Handler) parseFilter(c *gin.Context) (ListFilter, bool) {
 		response.Fail(c, http.StatusBadRequest, "invalid pagination")
 		return ListFilter{}, false
 	}
-	filter := ListFilter{Page: page, PageSize: pageSize, Status: strings.TrimSpace(c.Query("status"))}
+	filter := ListFilter{Page: page, PageSize: pageSize, Status: strings.TrimSpace(c.Query("status")), Keyword: strings.TrimSpace(c.Query("keyword"))}
 	if !h.optionalUintQuery(c, "merchantUserId", &filter.MerchantUserID) ||
 		!h.optionalUintQuery(c, "riderUserId", &filter.RiderUserID) {
 		return ListFilter{}, false

@@ -52,9 +52,12 @@ func (r *GormRepository) ReassignRider(
 		if *result.RiderUserID == newRiderUserID {
 			return nil // already assigned to the requested rider; idempotent success.
 		}
+		// 资格校验与骑手工作台一致：骑手状态 active + 账号未注销 + 身份授权有效。
 		var active int64
 		if err := tx.Table("takeout_riders").
-			Where("rider_user_id = ? AND status = ?", newRiderUserID, "active").
+			Joins("JOIN users u ON u.id = takeout_riders.rider_user_id AND u.status = 'active' AND u.deleted_at IS NULL").
+			Joins("JOIN user_identity_grants g ON g.user_id = takeout_riders.rider_user_id AND g.role = 'rider' AND g.status = 'active'").
+			Where("takeout_riders.rider_user_id = ? AND takeout_riders.status = ?", newRiderUserID, "active").
 			Count(&active).Error; err != nil {
 			return err
 		}
@@ -83,10 +86,14 @@ func (r *GormRepository) ReassignRider(
 		if err := tx.Model(&Order{}).Where("id = ?", result.ID).Updates(updates).Error; err != nil {
 			return err
 		}
+		before := result
 		claimed := newRiderUserID
 		result.RiderUserID = &claimed
 		result.RowVersion++
 		result.UpdatedAt = now.UTC()
+		if err := appendReassignNotificationTx(tx, r.notificationAppender, before, result, now); err != nil {
+			return err
+		}
 		return nil
 	})
 	if err != nil {

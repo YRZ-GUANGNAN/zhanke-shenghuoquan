@@ -27,6 +27,7 @@ import {
   settlementSourceLabel,
   settlementStatusLabel,
   shortId,
+  useDebouncedValue,
   useRemoteData
 } from '../delivery-hooks'
 import { FeeSection, FundsSection, type FeeView, type FundView } from './DeliveryFundsViews'
@@ -100,10 +101,12 @@ export function DeliveryView() {
   const [refundError, setRefundError] = useState('')
   const refundKeyRef = useRef('')
 
-  // 订单列表分页与状态筛选都走真实接口；搜索只过滤当前页，不伪造跨页结果。
+  // 订单列表分页、状态筛选与关键字搜索都走真实接口（跨页搜索）。
+  const debouncedQuery = useDebouncedValue(query, 350)
   const ordersState = useRemoteData(async () => {
     const result = await deliveryAdminAPI.orders({
       status: statusFilter || undefined,
+      keyword: debouncedQuery.trim() || undefined,
       page,
       pageSize: DELIVERY_PAGE_SIZE
     })
@@ -111,35 +114,19 @@ export function DeliveryView() {
       setPage(Math.max(1, Math.ceil(result.total / result.pageSize)))
     }
     return result
-  }, [statusFilter, page])
+  }, [statusFilter, debouncedQuery, page])
   const summaryState = useRemoteData(() => deliveryAdminAPI.summary(), [])
   // 改派候选人只列接单中的骑手，避免把订单交给休息中或已封禁的骑手。
   const ridersState = useRemoteData(() => deliveryAdminAPI.riders({ status: 'active', pageSize: 100 }), [])
 
   const orders = ordersState.data?.items ?? []
   const summary = summaryState.data
-  const candidates = ridersState.data?.items ?? []
+  // 改派候选仅包含账号与身份授权有效的骑手（后端同样校验）。
+  const candidates = (ridersState.data?.items ?? []).filter(rider => rider.grantActive !== false && (rider.accountStatus ?? 'active') === 'active')
   const selectedOrders = orders.filter(order => selectedIds.includes(order.deliveryOrderPublicId))
 
-  const visibleOrders = useMemo(() => {
-    const normalized = query.trim().toLowerCase()
-    if (!normalized) return orders
-    return orders.filter(order => {
-      const haystack = [
-        order.deliveryOrderPublicId,
-        order.merchantRequestId || '',
-        order.pickupAddress,
-        order.deliveryAddress,
-        order.pickupContactName,
-        order.pickupContactPhone,
-        order.recipientName,
-        order.recipientPhone,
-        `#${order.merchantUserId}`,
-        order.riderUserId ? `#${order.riderUserId}` : '待分配'
-      ].join(' ').toLowerCase()
-      return haystack.includes(normalized)
-    })
-  }, [orders, query])
+  // 搜索由服务端完成，这里不再按当前页过滤。
+  const visibleOrders = orders
 
   const selectableOnPage = visibleOrders.filter(order => selectableOrderStatuses.has(order.status))
   const allOnPageSelected = selectableOnPage.length > 0
@@ -311,14 +298,14 @@ export function DeliveryView() {
       eyebrow="ORDER FLOW"
       title="订单工作队列"
       description="点击订单查看完整履约与资金信息；状态筛选与服务端分页来自真实接口，搜索仅过滤当前页。"
-      actions={<SearchBox value={query} onChange={value => { setQuery(value); resetSelection() }} placeholder="搜索订单号、商家/骑手 ID、地址" />}
+      actions={<SearchBox value={query} onChange={value => { setQuery(value); setPage(1); resetSelection() }} placeholder="搜索订单号、收件人、地址" />}
     >
       <div className="preview-toolbar">
         <SelectField label="状态" value={statusFilter} onChange={event => { setStatusFilter(event.target.value); setPage(1); resetSelection() }}>
           {STATUS_FILTERS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </SelectField>
         <span className="preview-toolbar__hint">
-          {ordersState.loading ? '正在加载…' : `共 ${ordersState.data?.total ?? 0} 条订单${query.trim() ? ` · 本页匹配 ${visibleOrders.length} 条` : ''}`}
+          {ordersState.loading ? '正在加载…' : `共 ${ordersState.data?.total ?? 0} 条订单${debouncedQuery.trim() ? ` · 搜索“${debouncedQuery.trim()}”` : ''}`}
         </span>
       </div>
 
@@ -336,7 +323,7 @@ export function DeliveryView() {
       {!ordersState.loading && visibleOrders.length === 0
         ? <EmptyState
           title="没有匹配的订单"
-          description={query.trim() ? '当前页没有匹配项，可翻页或清空搜索。' : '调整状态筛选，或查看全部状态。'}
+          description={query.trim() ? '没有匹配的订单，换个关键字或清空搜索。' : '调整状态筛选，或查看全部状态。'}
           action={<Button onClick={() => { setStatusFilter(''); setQuery(''); setPage(1); resetSelection() }}>清除筛选</Button>}
         />
         : <div className="preview-table-wrap">

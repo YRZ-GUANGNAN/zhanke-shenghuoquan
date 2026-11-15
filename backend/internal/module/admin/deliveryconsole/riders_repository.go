@@ -30,6 +30,8 @@ type riderListRow struct {
 	InFlight         int64     `gorm:"column:in_flight"`
 	TodayOrders      int64     `gorm:"column:today_orders"`
 	TodayIncomeCents int64     `gorm:"column:today_income"`
+	AccountStatus    string    `gorm:"column:account_status"`
+	GrantActive      bool      `gorm:"column:grant_active"`
 }
 
 func (row riderListRow) view() RiderRow {
@@ -37,17 +39,21 @@ func (row riderListRow) view() RiderRow {
 		RiderUserID: row.RiderUserID, Status: row.Status, DutyState: row.DutyState,
 		RealName: row.RealName, Phone: row.Phone, RowVersion: row.RowVersion,
 		InFlight: row.InFlight, TodayOrders: row.TodayOrders, TodayIncomeCents: row.TodayIncomeCents,
-		UpdatedAt: row.UpdatedAt,
+		UpdatedAt: row.UpdatedAt, AccountStatus: row.AccountStatus, GrantActive: row.GrantActive,
 	}
 }
 
 const riderListSelect = `
 SELECT r.rider_user_id, r.status, r.real_name, r.phone, r.row_version, r.updated_at,
        COALESCE(a.state, 'off_duty') AS duty_state,
+       COALESCE(u.status, 'missing') AS account_status,
+       (g.id IS NOT NULL) AS grant_active,
        COALESCE(f.in_flight, 0) AS in_flight,
        COALESCE(t.today_orders, 0) AS today_orders,
        COALESCE(t.today_income, 0) AS today_income
 FROM takeout_riders r
+LEFT JOIN users u ON u.id = r.rider_user_id AND u.deleted_at IS NULL
+LEFT JOIN user_identity_grants g ON g.user_id = r.rider_user_id AND g.role = 'rider' AND g.status = 'active'
 LEFT JOIN delivery_rider_availability a ON a.rider_user_id = r.rider_user_id
 LEFT JOIN (
   SELECT rider_user_id, COUNT(*) AS in_flight FROM delivery_orders
@@ -100,7 +106,7 @@ func (r *GormRiderAdmin) RiderOrders(ctx context.Context, riderUserID uint64) ([
 	return rows, nil
 }
 
-func (r *GormRiderAdmin) SetRiderStatus(ctx context.Context, riderUserID uint64, status string, rowVersion uint64, now time.Time) (RiderRow, error) {
+func (r *GormRiderAdmin) SetRiderStatus(ctx context.Context, riderUserID uint64, status string, rowVersion uint64, actor uint64, reason string, now time.Time) (RiderRow, error) {
 	status = strings.TrimSpace(status)
 	var result RiderRow
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -132,6 +138,16 @@ func (r *GormRiderAdmin) SetRiderStatus(ctx context.Context, riderUserID uint64,
 			"status":      status,
 			"row_version": gorm.Expr("row_version + 1"),
 			"updated_at":  now.UTC(),
+		}).Error; err != nil {
+			return err
+		}
+		if err := tx.Table("delivery_rider_admin_actions").Create(map[string]any{
+			"rider_user_id": riderUserID,
+			"actor_user_id": actor,
+			"from_status":   rider.Status,
+			"to_status":     status,
+			"reason":        reason,
+			"created_at":    now.UTC(),
 		}).Error; err != nil {
 			return err
 		}

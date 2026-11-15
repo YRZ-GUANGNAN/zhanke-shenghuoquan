@@ -3,6 +3,7 @@ package deliveryconsole
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"campus-circle/backend/internal/module/delivery"
@@ -18,6 +19,7 @@ type ListFilter struct {
 	Status         string
 	MerchantUserID uint64
 	RiderUserID    uint64
+	Keyword        string
 	From           *time.Time
 	To             *time.Time
 }
@@ -333,6 +335,12 @@ func (r *GormQueryRepository) ListOrders(ctx context.Context, filter ListFilter)
 	}
 	if filter.RiderUserID != 0 {
 		query = query.Where("rider_user_id = ?", filter.RiderUserID)
+	}
+	if keyword := strings.TrimSpace(filter.Keyword); keyword != "" {
+		pattern := "%" + keyword + "%"
+		query = query.Where(
+			"delivery_order_public_id LIKE ? OR recipient_name LIKE ? OR recipient_phone LIKE ? OR pickup_address LIKE ? OR delivery_address LIKE ?",
+			pattern, pattern, pattern, pattern, pattern)
 	}
 	query = applyTimeFilter(query, "created_at", filter)
 	return listModels[delivery.Order](query, filter)

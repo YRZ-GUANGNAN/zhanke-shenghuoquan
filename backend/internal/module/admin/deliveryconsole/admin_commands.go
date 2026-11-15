@@ -144,13 +144,15 @@ type RiderRow struct {
 	InFlight         int64     `json:"inFlight"`
 	TodayOrders      int64     `json:"todayOrders"`
 	TodayIncomeCents int64     `json:"todayIncomeCents"`
+	AccountStatus    string    `json:"accountStatus"`
+	GrantActive      bool      `json:"grantActive"`
 	UpdatedAt        time.Time `json:"updatedAt"`
 }
 
 type RiderAdminRepository interface {
 	ListRiders(context.Context, RiderFilter) ([]RiderRow, int64, error)
 	RiderOrders(context.Context, uint64) ([]delivery.Order, error)
-	SetRiderStatus(context.Context, uint64, string, uint64, time.Time) (RiderRow, error)
+	SetRiderStatus(context.Context, uint64, string, uint64, uint64, string, time.Time) (RiderRow, error)
 }
 
 // WithRiderAdmin enables the rider management routes.
@@ -232,7 +234,12 @@ func (h *Handler) setRiderStatus(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, "invalid rider status")
 		return
 	}
-	value, err := h.riderAdmin.SetRiderStatus(c.Request.Context(), riderUserID, request.Status, request.RowVersion, h.now())
+	reason := strings.TrimSpace(request.Reason)
+	if reason == "" {
+		response.Fail(c, http.StatusBadRequest, "rider status change requires a reason")
+		return
+	}
+	value, err := h.riderAdmin.SetRiderStatus(c.Request.Context(), riderUserID, request.Status, request.RowVersion, h.actorUserID(c), reason, h.now())
 	switch {
 	case err == nil:
 		response.OK(c, value)

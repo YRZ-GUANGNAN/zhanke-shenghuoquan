@@ -3,6 +3,7 @@ package notificationconsole
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"campus-circle/backend/internal/module/notification"
@@ -39,7 +40,7 @@ type DeliveryRecord struct {
 type Repository interface {
 	ChannelStats(context.Context, time.Time) ([]ChannelStat, error)
 	OfficialAccountCounts(context.Context, string) (OfficialAccountCounts, error)
-	RecentDeliveries(context.Context, notification.DeliveryStatus, int, int) ([]DeliveryRecord, int64, error)
+	RecentDeliveries(context.Context, notification.DeliveryStatus, string, int, int) ([]DeliveryRecord, int64, error)
 	RetryDelivery(context.Context, string, time.Time) (DeliveryRecord, error)
 }
 
@@ -63,7 +64,7 @@ func (r *GormRepository) ChannelStats(ctx context.Context, since time.Time) ([]C
 	return values, err
 }
 
-func (r *GormRepository) RecentDeliveries(ctx context.Context, status notification.DeliveryStatus, limit, offset int) ([]DeliveryRecord, int64, error) {
+func (r *GormRepository) RecentDeliveries(ctx context.Context, status notification.DeliveryStatus, keyword string, limit, offset int) ([]DeliveryRecord, int64, error) {
 	if r == nil || r.db == nil || !r.db.Migrator().HasTable(&notification.DeliveryItem{}) {
 		return []DeliveryRecord{}, 0, nil
 	}
@@ -76,6 +77,12 @@ func (r *GormRepository) RecentDeliveries(ctx context.Context, status notificati
 	query := r.db.WithContext(ctx).Model(&notification.DeliveryItem{})
 	if status != "" {
 		query = query.Where("status = ?", status)
+	}
+	if keyword = strings.TrimSpace(keyword); keyword != "" {
+		pattern := "%" + keyword + "%"
+		query = query.Where(
+			"delivery_public_id LIKE ? OR template_key LIKE ? OR last_error LIKE ? OR CAST(recipient_user_id AS CHAR) LIKE ?",
+			pattern, pattern, pattern, pattern)
 	}
 	var total int64
 	if err := query.Count(&total).Error; err != nil {

@@ -2,17 +2,20 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"time"
 
+	"gorm.io/gorm"
+
 	"campus-circle/backend/internal/module/delivery"
 	"campus-circle/backend/internal/module/notification"
 )
 
-func deliveryWecomGroupFormatter(merchantEnabled, riderEnabled func() bool) notification.WecomGroupFormatter {
+func deliveryWecomGroupFormatter(db *gorm.DB, merchantEnabled, riderEnabled func() bool) notification.WecomGroupFormatter {
 	labels := map[delivery.Status]string{
 		delivery.StatusPaymentFailed: "配送费支付失败",
 		delivery.StatusReadyForClaim: "配送单等待接单",
@@ -33,7 +36,9 @@ func deliveryWecomGroupFormatter(merchantEnabled, riderEnabled func() bool) noti
 		delivery.StatusCancelled:     true,
 	}
 	return func(event notification.Event) ([]notification.WecomGroupMessage, error) {
-		if event.AggregateType != "delivery_order" || event.EventType != delivery.EventOrderStatusChanged {
+		reassigned := event.EventType == delivery.EventOrderReassigned
+		if event.AggregateType != "delivery_order" ||
+			(event.EventType != delivery.EventOrderStatusChanged && !reassigned) {
 			return nil, nil
 		}
 		decoder := json.NewDecoder(bytes.NewReader(event.Payload))
@@ -44,9 +49,26 @@ func deliveryWecomGroupFormatter(merchantEnabled, riderEnabled func() bool) noti
 			!delivery.CanTransition(fact.From, fact.To) {
 			return nil, errors.New("invalid WeCom order notification payload")
 		}
+		// 只对「订单当前状态仍与事件一致」的订单发群卡片，避免重试/乱序把
+		// 过期状态广播到值班群（订单已推进或已删除时直接跳过）。
+		if db != nil {
+			var current struct {
+				Status     string
+				RowVersion uint64
+			}
+			if err := db.WithContext(context.Background()).Raw(
+				`SELECT status, row_version FROM delivery_orders WHERE delivery_order_public_id = ? AND deleted_at IS NULL`,
+				fact.OrderPublicID).Scan(&current).Error; err != nil || current.Status == "" ||
+				current.RowVersion != event.AggregateVersion || current.Status != string(fact.To) {
+				return nil, nil
+			}
+		}
 		label, ok := labels[fact.To]
-		if !ok {
+		if !ok && !reassigned {
 			return nil, nil
+		}
+		if reassigned {
+			label = "订单已改派"
 		}
 		platform := sourcePlatformCardLabel(fact.SourcePlatform)
 		items := []notification.WecomCardItem{

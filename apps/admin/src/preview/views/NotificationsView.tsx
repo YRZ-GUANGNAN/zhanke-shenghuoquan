@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useDebouncedValue } from '../delivery-hooks'
 import type { Tone } from '../data'
 import {
   deliveryAdminAPI,
@@ -122,12 +123,14 @@ export function NotificationsView() {
     }
   }, [])
 
+  const debouncedSearch = useDebouncedValue(search, 350)
   const loadDeliveries = useCallback(async () => {
     setDeliveriesLoading(true)
     setDeliveriesError('')
     try {
       const result = await deliveryAdminAPI.notificationDeliveries({
         status: deliveryStatus === '全部' ? undefined : deliveryStatus,
+        keyword: debouncedSearch.trim() || undefined,
         page,
         pageSize: PAGE_SIZE
       })
@@ -142,7 +145,7 @@ export function NotificationsView() {
     } finally {
       setDeliveriesLoading(false)
     }
-  }, [deliveryStatus, page])
+  }, [deliveryStatus, debouncedSearch, page])
 
   useEffect(() => {
     void loadOverview()
@@ -171,17 +174,8 @@ export function NotificationsView() {
   const merchantConfigured = overview?.wecom.merchantConfigured === true
   const riderConfigured = overview?.wecom.riderConfigured === true
 
-  const normalizedSearch = search.trim().toLowerCase()
-  const visibleDeliveries = (deliveries?.items ?? []).filter(item => !normalizedSearch
-    || [
-      item.purpose,
-      channelLabel(item.channel),
-      statusLabel(item.status),
-      `#${item.recipientId}`,
-      item.error,
-      item.errorCode,
-      item.deliveryId
-    ].join(' ').toLowerCase().includes(normalizedSearch))
+  // 搜索走服务端（跨页），这里直接使用接口结果。
+  const visibleDeliveries = deliveries?.items ?? []
   const deliveryPages = deliveries ? Math.max(1, Math.ceil(deliveries.total / deliveries.pageSize)) : 1
 
   const openDeliveries = (status: string) => {
@@ -469,7 +463,7 @@ export function NotificationsView() {
       eyebrow="DELIVERY LOG"
       title="发送记录"
       description="每次通知都保留通知方式、接收用户、投递结果与失败原因。"
-      actions={<SearchBox value={search} onChange={setSearch} placeholder="搜索当前页的用途、渠道或失败原因" />}
+      actions={<SearchBox value={search} onChange={value => { setSearch(value); setPage(1) }} placeholder="搜索用途、渠道、收件人或失败原因" />}
     >
       <div className="preview-toolbar">
         <Segmented
@@ -502,7 +496,7 @@ export function NotificationsView() {
             action={<Button variant="primary" onClick={() => void loadDeliveries()}>重新加载</Button>}
           />
         : visibleDeliveries.length === 0
-          ? <EmptyState title="没有匹配的记录" description={normalizedSearch ? '调整搜索词后再试。' : '当前状态下还没有发送记录。'} />
+          ? <EmptyState title="没有匹配的记录" description={search.trim() ? '换个搜索词或清空搜索再试。' : '当前状态下还没有发送记录。'} />
           : <div className="preview-table-wrap">
             <table className="preview-table" aria-label="发送记录列表">
               <thead><tr><th>通知用途</th><th>渠道</th><th>接收用户</th><th>状态</th><th>尝试</th><th>时间</th><th /></tr></thead>

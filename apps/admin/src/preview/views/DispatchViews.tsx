@@ -87,7 +87,9 @@ function RidersPanel() {
   const candidatesState = useRemoteData(() => deliveryAdminAPI.riders({ status: 'active', pageSize: 100 }), [])
 
   const riders = ridersState.data?.items ?? []
-  const candidates = candidatesState.data?.items ?? []
+  // 候选需同时满足接单中、账号有效、身份授权有效（与后端改派校验一致）。
+  const eligible = (row: RiderAdminRow) => row.grantActive !== false && (row.accountStatus ?? 'active') === 'active'
+  const candidates = (candidatesState.data?.items ?? []).filter(eligible)
 
   const openStatusModal = (rider: RiderAdminRow, next: RiderAdminRow['status']) => {
     setStatusTarget({ rider, next })
@@ -156,7 +158,7 @@ function RidersPanel() {
             <td><strong>{riderName(rider.riderUserId, rider.realName)}</strong><span>{rider.phone || '未登记手机号'} · 骑手 #{rider.riderUserId}</span></td>
             <td>
               <StatusPill tone={riderStatusTone(rider.status)}>{riderStatusLabel(rider.status)}</StatusPill>
-              <span className="preview-table__fee">{dutyStateLabel(rider.dutyState)}</span>
+              <span className="preview-table__fee">{dutyStateLabel(rider.dutyState)}{eligible(rider) ? '' : ' · 资格异常（账号或授权失效）'}</span>
             </td>
             <td>{rider.inFlight}</td>
             <td>{rider.todayOrders}</td>

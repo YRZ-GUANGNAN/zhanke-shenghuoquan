@@ -145,7 +145,8 @@ func (h *Handler) deliveries(c *gin.Context) {
 		}
 		status = value
 	}
-	records, total, err := h.repository.RecentDeliveries(c.Request.Context(), status, pageSize, (page-1)*pageSize)
+	keyword := strings.TrimSpace(c.Query("keyword"))
+	records, total, err := h.repository.RecentDeliveries(c.Request.Context(), status, keyword, pageSize, (page-1)*pageSize)
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, "notification deliveries unavailable")
 		return

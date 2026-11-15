@@ -11,6 +11,7 @@ type ListFilter struct {
 	Page         int
 	PageSize     int
 	AssetID      string
+	Keyword      string
 	Status       string
 	ReviewStatus string
 	Purpose      string

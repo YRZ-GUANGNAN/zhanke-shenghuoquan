@@ -100,7 +100,7 @@ func parseFilter(c *gin.Context) (ListFilter, error) {
 		return ListFilter{}, ErrInvalidQuery
 	}
 	filter := ListFilter{
-		Page: page, PageSize: pageSize, AssetID: c.Query("assetId"), Status: c.Query("status"),
+		Page: page, PageSize: pageSize, AssetID: c.Query("assetId"), Keyword: c.Query("keyword"), Status: c.Query("status"),
 		ReviewStatus: c.Query("reviewStatus"), Purpose: c.Query("purpose"), Operation: c.Query("operation"), Kind: c.Query("kind"),
 	}
 	if raw := c.Query("taskId"); raw != "" {

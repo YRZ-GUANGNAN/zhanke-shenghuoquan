@@ -369,11 +369,14 @@ function MediaOperations() {
 }
 
 function MediaAssetsTab({ filter, onFilter }: { filter: MediaFilter; onFilter: (value: MediaFilter) => void }) {
+  const [search, setSearch] = useState('')
+  const debouncedSearch = search.trim()
   const list = useRemotePage<MediaAssetRow>((page, pageSize) => adminAPI.mediaAssets({
     page,
     pageSize,
+    ...(debouncedSearch ? { keyword: debouncedSearch } : {}),
     ...(filter === '全部' ? {} : { reviewStatus: MEDIA_FILTER_STATUS[filter] })
-  }), filter)
+  }), `${filter}|${debouncedSearch}`)
   const [summary, setSummary] = useState<MediaSummary | null>(null)
   const [summaryError, setSummaryError] = useState('')
   const [detailId, setDetailId] = useState<string | null>(null)
@@ -434,12 +437,15 @@ function MediaAssetsTab({ filter, onFilter }: { filter: MediaFilter; onFilter: (
       eyebrow="ASSET REVIEW"
       title="素材工作区"
       description="只读巡检素材的技术处理与审核投影状态；素材审核通过统一审核流处理。"
-      actions={<Segmented value={filter} onChange={changeFilter} options={[
-        { value: '全部', label: '全部' },
-        { value: '待审核', label: '待审核' },
-        { value: '异常', label: '异常' },
-        { value: '已通过', label: '已通过' }
-      ]} />}
+      actions={<div className="preview-row-actions">
+        <SearchBox value={search} onChange={setSearch} placeholder="搜索资产编号或工单号" />
+        <Segmented value={filter} onChange={changeFilter} options={[
+          { value: '全部', label: '全部' },
+          { value: '待审核', label: '待审核' },
+          { value: '异常', label: '异常' },
+          { value: '已通过', label: '已通过' }
+        ]} />
+      </div>}
     >
       {list.error && <div className="preview-form-error" role="alert">{list.error}</div>}
       {!list.data && list.loading

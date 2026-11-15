@@ -21,7 +21,7 @@ func TestDeliveryWecomFormatterRoutesOrderMetadataByGroup(t *testing.T) {
 		AggregateType: "delivery_order", AggregatePublicID: notificationTestOrderID,
 		AggregateVersion: 3, PayloadVersion: 1, Payload: payload, OccurredAt: now,
 	}
-	format := deliveryWecomGroupFormatter(func() bool { return true }, func() bool { return true })
+	format := deliveryWecomGroupFormatter(nil, func() bool { return true }, func() bool { return true })
 	groups, err := format(event)
 	if err != nil || len(groups) != 2 || groups[0].GroupKey != "merchant_ops" || groups[1].GroupKey != "rider_ops" {
 		t.Fatalf("routing groups=%+v err=%v", groups, err)
@@ -32,7 +32,7 @@ func TestDeliveryWecomFormatterRoutesOrderMetadataByGroup(t *testing.T) {
 			t.Fatalf("unsafe or incorrect group message: %+v", group)
 		}
 	}
-	merchantOnly, err := deliveryWecomGroupFormatter(func() bool { return true }, func() bool { return false })(event)
+	merchantOnly, err := deliveryWecomGroupFormatter(nil, func() bool { return true }, func() bool { return false })(event)
 	if err != nil || len(merchantOnly) != 1 || merchantOnly[0].GroupKey != "merchant_ops" {
 		t.Fatalf("merchant-only routing=%+v err=%v", merchantOnly, err)
 	}
@@ -51,7 +51,7 @@ func TestDeliveryWecomFormatterRejectsUnknownPayloads(t *testing.T) {
 	} {
 		event := notification.Event{EventType: delivery.EventOrderStatusChanged, AggregateType: "delivery_order",
 			AggregatePublicID: notificationTestOrderID, PayloadVersion: 1, Payload: payload, OccurredAt: now}
-		if groups, err := deliveryWecomGroupFormatter(func() bool { return true }, func() bool { return true })(event); err == nil || len(groups) != 0 {
+		if groups, err := deliveryWecomGroupFormatter(nil, func() bool { return true }, func() bool { return true })(event); err == nil || len(groups) != 0 {
 			t.Fatalf("invalid payload accepted: groups=%+v err=%v", groups, err)
 		}
 	}

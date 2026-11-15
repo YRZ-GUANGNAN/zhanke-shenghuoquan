@@ -23,6 +23,7 @@ export interface DeliveryQuery {
   page?: number
   pageSize?: number
   status?: string
+  keyword?: string
   merchantUserId?: string | number
   riderUserId?: string | number
   from?: string
@@ -39,6 +40,8 @@ export interface RiderAdminRow {
   inFlight: number
   todayOrders: number
   todayIncomeCents: number
+  accountStatus?: string
+  grantActive?: boolean
   updatedAt: string
 }
 
@@ -520,7 +523,7 @@ export const deliveryAdminAPI = {
       ...body({ rowVersion: expectedRowVersion, reason }), method: 'POST'
     }),
   notificationChannels: () => api<NotificationChannelOverview>('/notification-channels'),
-  notificationDeliveries: (query: { status?: string; page?: number; pageSize?: number } = {}) =>
+  notificationDeliveries: (query: { status?: string; keyword?: string; page?: number; pageSize?: number } = {}) =>
     api<NotificationDeliveryPage>(`/notification-channels/deliveries${queryString(query)}`),
   retryNotificationDelivery: (deliveryId: string) =>
     api<NotificationDelivery>(`/notification-channels/deliveries/${encodeURIComponent(deliveryId)}/retry`, { method: 'POST' }),

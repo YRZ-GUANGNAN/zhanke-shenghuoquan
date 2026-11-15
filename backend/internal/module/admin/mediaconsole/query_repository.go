@@ -99,6 +99,10 @@ func (r *GormQueryRepository) assetQuery(ctx context.Context, filter ListFilter)
 	if filter.AssetID != "" {
 		query = query.Where("a.asset_public_id = ?", filter.AssetID)
 	}
+	if keyword := strings.TrimSpace(filter.Keyword); keyword != "" {
+		pattern := "%" + keyword + "%"
+		query = query.Where("a.asset_public_id LIKE ? OR t.ticket_id LIKE ? OR t.status LIKE ?", pattern, pattern, pattern)
+	}
 	if filter.Status != "" {
 		query = query.Where("a.technical_status = ?", filter.Status)
 	}

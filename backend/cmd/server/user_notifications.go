@@ -175,6 +175,7 @@ func newUserNotificationRuntime(cfg config.Config, db *gorm.DB, users *user.Serv
 		}
 		expanderOptions = append(expanderOptions, notification.WithWecomGroupFormatter(
 			deliveryWecomGroupFormatter(
+				db,
 				func() bool { return groupSender.Enabled("merchant_ops") },
 				func() bool { return groupSender.Enabled("rider_ops") },
 			),

@@ -50,7 +50,7 @@ export interface IdentityApplicationDetail extends IdentityApplicationRow{events
 export interface IdentityApplicationQuery{page?:number;pageSize?:number;role?:IdentityApplicationRole;status?:IdentityApplicationStatus}
 export interface IdentityApplicationAdminList{items:IdentityApplicationRow[];page:number;pageSize:number;total:number}
 
-export interface MediaQuery{page?:number;pageSize?:number;assetId?:string;status?:string;reviewStatus?:string;purpose?:string;taskId?:string;operation?:string;kind?:string;from?:string;to?:string}
+export interface MediaQuery{page?:number;pageSize?:number;assetId?:string;keyword?:string;status?:string;reviewStatus?:string;purpose?:string;taskId?:string;operation?:string;kind?:string;from?:string;to?:string}
 export interface MediaSummary{assets:number;pendingReview:number;consumerDeadletters:number;gcDeadletters:number}
 export interface MediaAssetRow{assetId:string;ownerId:number;purpose:string;storageStage:string;technicalStatus:string;reviewStatus:string;reviewTaskId?:number;ticketId?:string;ticketStatus?:string;completionPhase?:string;referenceCount:number;blockingReferences:number;mimeType:string;byteSize:number;width:number;height:number;createdAt:string;updatedAt:string;deleteRequestedAt?:string;deletedAt?:string}
 export interface MediaReferenceRow{id:number;referenceType:string;referenceId:string;slot:number;status:string;parentVisibility:string;aggregateVersion:number;fenceExpiresAt?:string;updatedAt:string}
