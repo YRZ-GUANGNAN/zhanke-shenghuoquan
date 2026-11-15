@@ -92,3 +92,9 @@
 ### candidate.3 部署修正（同日，systemd）
 
 首次上线后线上拖拽上传返回「保存封面图失败」。原因：`campus-api.service` 启用了 `ProtectSystem=strict`，整个文件系统对服务只读，`/opt/campus-circle/shared` 未在白名单内导致写盘被拒。修复：新增 drop-in `/etc/systemd/system/campus-api.service.d/readwrite-shared.conf`（`ReadWritePaths=/opt/campus-circle/shared`），`daemon-reload` 并重启服务；`/proc/<pid>/mountinfo` 确认该目录在服务沙箱内为可写挂载。
+
+## 补充发布：品牌 Logo 更换（同日，静态）
+
+- 后台静态 release 更新为 `/var/www/campus-admin/releases/admin-20261115f-d24affc`，commit `d24affc`。
+- 「湛」字标记（侧栏、移动端抽屉、登录页、会话校验、分享预览品牌位）替换为「湛科万事通」圆形 logo（用户提供原图处理为 256px 圆形透明 PNG，`/images/brand-logo.png`）。
+- 验证：首页引用 `assets/index-CS-xp9dh.js`、`assets/index-CGpf7_sM.css`，logo 图片返回 `200 image/png`。
