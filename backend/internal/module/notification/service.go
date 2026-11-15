@@ -203,6 +203,7 @@ func (e *Expander) build(event Event, recipients []Recipient, now time.Time) ([]
 			}
 			snapshot, err := json.Marshal(WecomGroupSnapshot{
 				Version: 1, GroupKey: group.GroupKey, Title: group.Title, Summary: group.Summary,
+				Card: group.Card,
 				AggregateType: event.AggregateType, AggregatePublicID: event.AggregatePublicID,
 				AggregateVersion: event.AggregateVersion, OccurredAt: event.OccurredAt,
 			})
@@ -229,13 +230,34 @@ type WecomGroupMessage struct {
 	GroupKey string
 	Title    string
 	Summary  string
+	// Card, when present, is delivered as a WeCom template card instead of
+	// markdown text (group robot webhook supports card_type=text_notice).
+	Card *WecomTemplateCard
+}
+
+type WecomCardItem struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+// WecomTemplateCard mirrors the subset of WeCom template_card text_notice
+// used for order notifications.
+type WecomTemplateCard struct {
+	SourceDesc    string          `json:"sourceDesc,omitempty"`
+	Title         string          `json:"title,omitempty"`
+	Desc          string          `json:"desc,omitempty"`
+	EmphasisTitle string          `json:"emphasisTitle,omitempty"`
+	EmphasisDesc  string          `json:"emphasisDesc,omitempty"`
+	Items         []WecomCardItem `json:"items,omitempty"`
+	ActionURL     string          `json:"actionUrl,omitempty"`
 }
 
 type WecomGroupSnapshot struct {
-	Version           uint32    `json:"version"`
-	GroupKey          string    `json:"groupKey"`
-	Title             string    `json:"title"`
-	Summary           string    `json:"summary"`
+	Version           uint32             `json:"version"`
+	GroupKey          string             `json:"groupKey"`
+	Title             string             `json:"title"`
+	Summary           string             `json:"summary"`
+	Card              *WecomTemplateCard `json:"card,omitempty"`
 	AggregateType     string    `json:"aggregateType"`
 	AggregatePublicID string    `json:"aggregatePublicId"`
 	AggregateVersion  uint64    `json:"aggregateVersion"`

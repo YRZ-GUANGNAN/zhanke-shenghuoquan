@@ -114,17 +114,23 @@ func (s *WeComGroupSender) Send(ctx context.Context, message WecomGroupSnapshot)
 	}) {
 		return SendStatusBlocked, ErrWecomPayload
 	}
-	content := fmt.Sprintf(
-		"### %s\n> 订单：%s\n> 状态：%s\n> 时间：%s",
-		message.Title,
-		message.AggregatePublicID,
-		message.Summary,
-		message.OccurredAt.In(time.FixedZone("Asia/Shanghai", 8*60*60)).Format("2006-01-02 15:04"),
-	)
-	body, err := json.Marshal(map[string]any{
-		"msgtype":  "markdown",
-		"markdown": map[string]string{"content": content},
-	})
+	var body []byte
+	var err error
+	if message.Card != nil {
+		body, err = marshalWecomTemplateCard(*message.Card, message.OccurredAt)
+	} else {
+		content := fmt.Sprintf(
+			"### %s\n> 订单：%s\n> 状态：%s\n> 时间：%s",
+			message.Title,
+			message.AggregatePublicID,
+			message.Summary,
+			message.OccurredAt.In(time.FixedZone("Asia/Shanghai", 8*60*60)).Format("2006-01-02 15:04"),
+		)
+		body, err = json.Marshal(map[string]any{
+			"msgtype":  "markdown",
+			"markdown": map[string]string{"content": content},
+		})
+	}
 	if err != nil {
 		return SendStatusBlocked, ErrWecomPayload
 	}
@@ -151,4 +157,67 @@ func (s *WeComGroupSender) Send(ctx context.Context, message WecomGroupSnapshot)
 		return SendStatusRejected, ErrWecomPayload
 	}
 	return SendStatusRejected, ErrWecomPayload
+}
+
+// marshalWecomTemplateCard builds a text_notice template card payload. Lengths
+// are clamped to the values accepted by the group robot API.
+func marshalWecomTemplateCard(card WecomTemplateCard, occurredAt time.Time) ([]byte, error) {
+	clamp := func(value string, limit int) string {
+		runes := []rune(strings.TrimSpace(value))
+		if len(runes) > limit {
+			return string(runes[:limit]) + "…"
+		}
+		return string(runes)
+	}
+	card.SourceDesc = clamp(card.SourceDesc, 20)
+	card.Title = clamp(card.Title, 26)
+	card.Desc = clamp(card.Desc, 40)
+	card.EmphasisTitle = clamp(card.EmphasisTitle, 16)
+	card.EmphasisDesc = clamp(card.EmphasisDesc, 8)
+	items := make([]map[string]string, 0, len(card.Items))
+	for index, item := range card.Items {
+		if index >= 6 {
+			break
+		}
+		items = append(items, map[string]string{
+			"keyname": clamp(item.Key, 12),
+			"value":   clamp(item.Value, 30),
+		})
+	}
+	if len(items) == 0 {
+		items = append(items, map[string]string{
+			"keyname": "时间",
+			"value":   occurredAt.In(time.FixedZone("Asia/Shanghai", 8*60*60)).Format("2006-01-02 15:04"),
+		})
+	}
+	actionURL := strings.TrimSpace(card.ActionURL)
+	if actionURL == "" {
+		actionURL = "https://zhanduiwang.top/"
+	}
+	template := map[string]any{
+		"card_type": "text_notice",
+		"source": map[string]any{
+			"desc":       card.SourceDesc,
+			"desc_color": 0,
+		},
+		"main_title": map[string]any{
+			"title": card.Title,
+			"desc":  card.Desc,
+		},
+		"horizontal_content_list": items,
+		"card_action": map[string]any{
+			"type": 1,
+			"url":  actionURL,
+		},
+	}
+	if card.EmphasisTitle != "" {
+		template["emphasis_content"] = map[string]any{
+			"title": card.EmphasisTitle,
+			"desc":  card.EmphasisDesc,
+		}
+	}
+	return json.Marshal(map[string]any{
+		"msgtype":       "template_card",
+		"template_card": template,
+	})
 }

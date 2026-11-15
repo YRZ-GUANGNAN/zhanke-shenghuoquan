@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"time"
 
 	"campus-circle/backend/internal/module/delivery"
 	"campus-circle/backend/internal/module/notification"
@@ -46,12 +48,28 @@ func deliveryWecomGroupFormatter(merchantEnabled, riderEnabled func() bool) noti
 		if !ok {
 			return nil, nil
 		}
+		platform := sourcePlatformCardLabel(fact.SourcePlatform)
+		// 事件负载保持隐私最小化（不含地址/电话/备注），卡片只展示非敏感要素。
+		items := []notification.WecomCardItem{
+			{Key: "单号", Value: fact.OrderPublicID},
+			{Key: "状态", Value: label},
+			{Key: "时间", Value: event.OccurredAt.In(time.FixedZone("Asia/Shanghai", 8*60*60)).Format("01-02 15:04")},
+		}
 		result := make([]notification.WecomGroupMessage, 0, 2)
 		if merchantEnabled() {
 			result = append(result, notification.WecomGroupMessage{
 				GroupKey: "merchant_ops",
 				Title:    "商家订单 · " + label,
 				Summary:  label,
+				Card: &notification.WecomTemplateCard{
+					SourceDesc:    "湛科生活圈 · " + platform,
+					Title:         "新订单通知",
+					Desc:          platform + " · " + label,
+					EmphasisTitle: yuanLabel(fact.DeliveryFeeCents),
+					EmphasisDesc:  "配送费",
+					Items:         items,
+					ActionURL:     wecomOrderActionURL,
+				},
 			})
 		}
 		if riderEnabled() && riderStatuses[fact.To] {
@@ -59,8 +77,40 @@ func deliveryWecomGroupFormatter(merchantEnabled, riderEnabled func() bool) noti
 				GroupKey: "rider_ops",
 				Title:    "骑手调度 · " + label,
 				Summary:  label,
+				Card: &notification.WecomTemplateCard{
+					SourceDesc:    "湛科生活圈 · " + platform,
+					Title:         "新订单通知",
+					Desc:          platform + " · " + label,
+					EmphasisTitle: yuanLabel(fact.RiderFeeCents),
+					EmphasisDesc:  "赏金",
+					Items:         items,
+					ActionURL:     wecomOrderActionURL,
+				},
 			})
 		}
 		return result, nil
 	}
+}
+
+// 企微卡片底部动作跳转；暂指向站点，小程序接单页 scheme 就绪后替换。
+const wecomOrderActionURL = "https://zhanduiwang.top/"
+
+func sourcePlatformCardLabel(platform string) string {
+	switch platform {
+	case "jd":
+		return "京东订单"
+	case "taobao":
+		return "淘宝订单"
+	case "meituan":
+		return "美团订单"
+	default:
+		return "私人独立订单"
+	}
+}
+
+func yuanLabel(cents uint64) string {
+	if cents%100 == 0 {
+		return fmt.Sprintf("%d元", cents/100)
+	}
+	return fmt.Sprintf("%d.%02d元", cents/100, cents%100)
 }

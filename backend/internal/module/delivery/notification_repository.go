@@ -158,6 +158,8 @@ type OrderNotificationPayload struct {
 	From                Status  `json:"from"`
 	To                  Status  `json:"to"`
 	DeliveryFeeCents    uint64  `json:"deliveryFeeCents"`
+	RiderFeeCents       uint64  `json:"riderFeeCents,omitempty"`
+	SourcePlatform      string  `json:"sourcePlatform,omitempty"`
 }
 
 func orderNotification(before, after Order, now time.Time) (NotificationEvent, error) {
@@ -174,6 +176,7 @@ func orderNotification(before, after Order, now time.Time) (NotificationEvent, e
 		OrderPublicID: after.DeliveryOrderPublicID, MerchantUserID: after.MerchantUserID,
 		RiderUserID: after.RiderUserID, PreviousRiderUserID: before.RiderUserID,
 		From: before.Status, To: after.Status, DeliveryFeeCents: after.DeliveryFeeCents,
+		RiderFeeCents: after.RiderFeeCents, SourcePlatform: string(after.SourcePlatform.Effective()),
 	})
 	if err != nil {
 		return NotificationEvent{}, err
