@@ -9,7 +9,7 @@
 | 运行时版本 | `2026.11.15.candidate.1` |
 | 运行时 commit | `93b8f4f9ad1e7f22b7adb368ba5bf9902dee675a` |
 | 后端 release | `/opt/campus-circle/releases/20261115-console-93b8f4f` |
-| 后台静态 release | `/var/www/campus-admin/releases/admin-20261115-93b8f4f` |
+| 后台静态 release | `/var/www/campus-admin/releases/admin-20261115b-605b879`（首版 admin-20261115-93b8f4f） |
 | 后端二进制 SHA256 | `19f89bbefb87d928d1fc54a1b4aa49e5ace243a3b549a94a36fba1851afdc522` |
 | 上一后端 release | `20261114-admin-ops-b71fc54` |
 | 上一后台 release | `admin-20261114-b71fc54` |
@@ -33,7 +33,8 @@
 
 - `https://zhanduiwang.top/healthz` 返回 `{"code":0,"message":"ok"}`。
 - `/version` 返回 `2026.11.15.candidate.1` 与上述 commit。
-- 管理后台首页与 `assets/index-BsN2u2iO.js`、`assets/index-D8njK-3z.css` 均返回 `200`。
+- 管理后台首页与 `assets/index-BsN2u2iO.js`、`assets/index-D8njK-3z.css` 均返回 `200`（首版）。
+- 修复 antd `visible` 弃用警告后重新构建并切换静态 release `admin-20261115b-605b879`，首页引用 `assets/index-CrPb4vFk.js`，返回 `200`；后端无变化。
 - `GET /api/v1/admin/delivery/riders` 未登录返回 `401`，确认新接口已随后端上线。
 - `campus-api` 重启后状态 `active`。
 - 本机网络访问 `zhandui.top` SSL 连接失败，未能从本机直接验收后台页面；以上后台静态验证是在服务器本机带 Host 头完成的。登录后的人工验收仍需在浏览器完成。
