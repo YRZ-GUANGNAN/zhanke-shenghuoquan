@@ -548,7 +548,7 @@ func main() {
 	}
 	admin.NewHandler(adminService, reviewService, userService, communityService, tradeService, navigationService, adminAuthRequired).Register(api)
 	mediaAdminRoutes := api.Group("/admin/media", adminAuthRequired, user.AdminRequired())
-	mediaconsole.NewHandler(mediaAdminQuery).Register(mediaAdminRoutes)
+	mediaconsole.NewHandler(mediaAdminQuery).WithObjectSigner(completionStore).Register(mediaAdminRoutes)
 	registerLegacyTakeoutRoutes(legacyTakeout, api, userService, reviewService, coreMediaService, adminAuthRequired)
 	catalog, err := takeout.NewBuyerQueryService(takeout.NewRepository(db))
 	if err != nil {

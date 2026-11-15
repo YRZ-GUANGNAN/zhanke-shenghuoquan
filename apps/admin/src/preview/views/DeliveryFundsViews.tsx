@@ -183,8 +183,8 @@ function MerchantWalletsPanel() {
         ? <EmptyState title="没有商家钱包" description="商家完成充值后会在这里出现。" />
         : <div className="preview-table-wrap"><table className="preview-table" aria-label="商家钱包列表">
           <thead><tr><th>商家</th><th>钱包</th><th>可用余额</th><th>版本</th><th>更新时间</th></tr></thead>
-          <tbody>{wallets.map(item => <tr key={item.walletPublicId}>
-            <td><button type="button" className="preview-table__primary" onClick={() => void openLedger(item)}>商家 #{item.merchantUserId}<small>查看流水</small></button></td>
+          <tbody>{wallets.map(item => <tr key={item.walletPublicId} className="is-clickable" onClick={() => void openLedger(item)}>
+            <td><button type="button" className="preview-table__primary" onClick={event => { event.stopPropagation(); void openLedger(item) }}>商家 #{item.merchantUserId}<small>查看流水</small></button></td>
             <td>{shortId(item.walletPublicId)}</td>
             <td><strong>{formatMoney(item.availableBalanceCents)}</strong></td>
             <td>v{item.rowVersion}</td>
@@ -283,8 +283,8 @@ function RiderWalletsPanel() {
         ? <EmptyState title="没有骑手钱包" description="骑手完成配送产生报酬后会在这里出现。" />
         : <div className="preview-table-wrap"><table className="preview-table" aria-label="骑手钱包列表">
           <thead><tr><th>骑手</th><th>钱包</th><th>可用余额</th><th>版本</th><th>更新时间</th></tr></thead>
-          <tbody>{wallets.map(item => <tr key={item.walletPublicId}>
-            <td><button type="button" className="preview-table__primary" onClick={() => void openLedger(item)}>骑手 #{item.riderUserId}<small>查看流水</small></button></td>
+          <tbody>{wallets.map(item => <tr key={item.walletPublicId} className="is-clickable" onClick={() => void openLedger(item)}>
+            <td><button type="button" className="preview-table__primary" onClick={event => { event.stopPropagation(); void openLedger(item) }}>骑手 #{item.riderUserId}<small>查看流水</small></button></td>
             <td>{shortId(item.walletPublicId)}</td>
             <td><strong>{formatMoney(item.availableBalanceCents)}</strong></td>
             <td>v{item.rowVersion}</td>
@@ -397,8 +397,8 @@ function EarningsPanel() {
         ? <EmptyState title="没有报酬记录" description="调整筛选条件，或等待骑手完成配送。" />
         : <div className="preview-table-wrap"><table className="preview-table" aria-label="骑手报酬列表">
           <thead><tr><th>记录</th><th>骑手</th><th>配送单</th><th>金额</th><th>状态</th><th>产生时间</th></tr></thead>
-          <tbody>{earnings.map(item => <tr key={item.earningPublicId}>
-            <td><button type="button" className="preview-table__primary" onClick={() => void openDetail(item.earningPublicId)}>{shortId(item.earningPublicId)}<small>查看详情</small></button></td>
+          <tbody>{earnings.map(item => <tr key={item.earningPublicId} className="is-clickable" onClick={() => void openDetail(item.earningPublicId)}>
+            <td><button type="button" className="preview-table__primary" onClick={event => { event.stopPropagation(); void openDetail(item.earningPublicId) }}>{shortId(item.earningPublicId)}<small>查看详情</small></button></td>
             <td>骑手 #{item.riderUserId}</td>
             <td>{shortId(item.deliveryOrderPublicId)}</td>
             <td><strong>{formatMoney(item.riderFeeCents)}</strong><span className="preview-table__fee">平台抽成 {formatMoney(item.platformCutCents)}</span></td>
@@ -526,7 +526,7 @@ function PayoutQueuePanel() {
             <td><StatusPill tone={payoutQueueStatusTone(item.status)}>{payoutQueueStatusLabel(item.status)}</StatusPill><span className="preview-table__fee">{item.reasonCode || (item.status === 'blocked' ? '资金占用未释放' : '已核验收益')}</span></td>
             <td>{formatMoney(item.reservedCents)}</td>
             <td>{formatDateTime(item.createdAt)}</td>
-            <td>{item.status !== 'cancelled' && <Button size="sm" variant="ghost" onClick={() => { setCancelTarget(item); setReason(''); setFormError('') }}>取消排队</Button>}</td>
+            <td onClick={event => event.stopPropagation()}>{item.status !== 'cancelled' && <Button size="sm" variant="ghost" onClick={() => { setCancelTarget(item); setReason(''); setFormError('') }}>取消排队</Button>}</td>
           </tr>)}</tbody>
         </table></div>}
       <Pagination
@@ -657,14 +657,14 @@ function WithdrawalsPanel() {
         ? <EmptyState title="没有提现申请" description="骑手申请提现后会出现在这里。" />
         : <div className="preview-table-wrap"><table className="preview-table" aria-label="骑手提现列表">
           <thead><tr><th>申请</th><th>骑手</th><th>金额</th><th>状态</th><th>说明</th><th>申请时间</th><th /></tr></thead>
-          <tbody>{items.map((item: RiderWithdrawal) => <tr key={item.withdrawPublicId}>
+          <tbody>{items.map((item: RiderWithdrawal) => <tr key={item.withdrawPublicId} className="is-clickable" onClick={() => setProcessingId(item.withdrawPublicId)}>
             <td><strong>{shortId(item.withdrawPublicId)}</strong><span>v{item.rowVersion}</span></td>
             <td>骑手 #{item.riderUserId}</td>
             <td><strong>{formatMoney(item.amountCents)}</strong></td>
             <td><StatusPill tone={withdrawalStatusTone(item.status)}>{withdrawalStatusLabel(item.status)}</StatusPill></td>
             <td>{item.reason || '—'}</td>
             <td>{formatDateTime(item.createdAt)}</td>
-            <td>{item.status === 'processing'
+            <td onClick={event => event.stopPropagation()}>{item.status === 'processing'
               ? <Button size="sm" variant="ghost" onClick={() => setProcessingId(item.withdrawPublicId)}>查看与处理</Button>
               : <Button size="sm" variant="ghost" onClick={() => setProcessingId(item.withdrawPublicId)}>查看详情</Button>}</td>
           </tr>)}</tbody>
@@ -943,8 +943,8 @@ function RefundsPanel() {
         ? <EmptyState title="没有退款记录" description="支付通道产生退款后会出现在这里。" />
         : <div className="preview-table-wrap"><table className="preview-table" aria-label="退款记录列表">
           <thead><tr><th>退款单</th><th>配送单</th><th>商家</th><th>金额</th><th>结果</th><th>原因</th><th>更新时间</th></tr></thead>
-          <tbody>{refunds.map(item => <tr key={item.refundPublicId}>
-            <td><button type="button" className="preview-table__primary" onClick={() => void openDetail(item.refundPublicId)}>{shortId(item.refundPublicId)}<small>{item.outRefundNo}</small></button></td>
+          <tbody>{refunds.map(item => <tr key={item.refundPublicId} className="is-clickable" onClick={() => void openDetail(item.refundPublicId)}>
+            <td><button type="button" className="preview-table__primary" onClick={event => { event.stopPropagation(); void openDetail(item.refundPublicId) }}>{shortId(item.refundPublicId)}<small>{item.outRefundNo}</small></button></td>
             <td>{shortId(item.deliveryOrderPublicId)}</td>
             <td>商家 #{item.merchantUserId}</td>
             <td><strong>{formatMoney(item.amountCents)}</strong></td>
@@ -1251,7 +1251,7 @@ function MerchantOverridePanel() {
             <td>{formatMoney(item.platformCutCents)}</td>
             <td><StatusPill tone={feeStatusTone(item.status)}>{feeStatusLabel(item.status)}</StatusPill></td>
             <td>v{item.rowVersion}<span>{formatDateTime(item.updatedAt)}</span></td>
-            <td><div className="preview-row-actions">
+            <td onClick={event => event.stopPropagation()}><div className="preview-row-actions">
               <Button size="sm" variant="ghost" onClick={() => editRow(item)}>编辑</Button>
               {item.status !== 'disabled' && <Button size="sm" variant="danger" onClick={() => { setDisableTarget(item); setDisableError('') }}>停用</Button>}
             </div></td>

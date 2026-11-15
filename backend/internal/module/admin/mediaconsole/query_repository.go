@@ -16,11 +16,29 @@ type QueryRepository interface {
 	ListDecisions(context.Context, ListFilter) ([]DecisionRow, int64, error)
 	ListEvents(context.Context, ListFilter) ([]EventRow, int64, error)
 	ListGCJobs(context.Context, ListFilter) ([]GCJobRow, int64, error)
+	AssetObject(context.Context, string) (string, string, error)
 }
 
 type GormQueryRepository struct{ db *gorm.DB }
 
 func NewQueryRepository(db *gorm.DB) *GormQueryRepository { return &GormQueryRepository{db: db} }
+
+// AssetObject returns the finalized object key and version for an asset.
+func (r *GormQueryRepository) AssetObject(ctx context.Context, assetPublicID string) (string, string, error) {
+	var row struct {
+		FinalKey       *string
+		FinalVersionID *string
+	}
+	if err := r.db.WithContext(ctx).
+		Raw(`SELECT final_key, final_version_id FROM media_assets WHERE asset_public_id = ? AND deleted_at IS NULL`, assetPublicID).
+		Scan(&row).Error; err != nil {
+		return "", "", err
+	}
+	if row.FinalKey == nil || *row.FinalKey == "" || row.FinalVersionID == nil || *row.FinalVersionID == "" {
+		return "", "", ErrNotFound
+	}
+	return *row.FinalKey, *row.FinalVersionID, nil
+}
 
 func (r *GormQueryRepository) Summary(ctx context.Context) (Summary, error) {
 	var value Summary

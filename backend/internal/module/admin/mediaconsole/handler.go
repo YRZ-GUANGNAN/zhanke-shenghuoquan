@@ -10,7 +10,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type Handler struct{ service *QueryService }
+type Handler struct {
+	service *QueryService
+	signer  ObjectURLSigner
+}
 
 func NewHandler(service *QueryService) *Handler { return &Handler{service: service} }
 
@@ -24,6 +27,7 @@ func (h *Handler) Register(group *gin.RouterGroup) {
 	group.GET("/events", h.events)
 	group.GET("/gc-jobs", h.gcJobs)
 	group.GET("/deadletters", h.deadletters)
+	group.GET("/assets/:assetId/content", h.assetContent)
 }
 
 func (h *Handler) summary(c *gin.Context) {

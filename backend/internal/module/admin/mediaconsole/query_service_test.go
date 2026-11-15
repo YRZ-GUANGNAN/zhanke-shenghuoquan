@@ -12,6 +12,10 @@ type queryRepositoryStub struct {
 	lastFilter ListFilter
 }
 
+func (r *queryRepositoryStub) AssetObject(context.Context, string) (string, string, error) {
+	return "final/key", "version-1", nil
+}
+
 func (r *queryRepositoryStub) Summary(context.Context) (Summary, error) {
 	return Summary{Assets: 1}, r.err
 }

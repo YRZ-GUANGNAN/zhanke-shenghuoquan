@@ -351,8 +351,8 @@ export function DeliveryView() {
               const id = order.deliveryOrderPublicId
               const canReassign = reassignableOrderStatuses.has(order.status)
               const canCancel = cancellableOrderStatuses.has(order.status)
-              return <tr key={id}>
-                <td className="preview-table__check">
+              return <tr key={id} className="is-clickable" onClick={() => void openDetail(id)}>
+                <td className="preview-table__check" onClick={event => event.stopPropagation()}>
                   {selectableOrderStatuses.has(order.status) && <input
                     type="checkbox"
                     aria-label={`选择订单 ${id}`}
@@ -360,13 +360,13 @@ export function DeliveryView() {
                     onChange={event => toggleRow(id, event.target.checked)}
                   />}
                 </td>
-                <td><button type="button" className="preview-table__primary" onClick={() => void openDetail(id)}>{shortId(id)}<small>商家 #{order.merchantUserId}{order.merchantRequestId ? ` · 请求号 ${shortId(order.merchantRequestId, 6, 4)}` : ''}</small></button></td>
+                <td><button type="button" className="preview-table__primary" onClick={event => { event.stopPropagation(); void openDetail(id) }}>{shortId(id)}<small>商家 #{order.merchantUserId}{order.merchantRequestId ? ` · 请求号 ${shortId(order.merchantRequestId, 6, 4)}` : ''}</small></button></td>
                 <td><strong>{order.pickupAddress}</strong><span>→ {order.deliveryAddress}</span></td>
                 <td>{order.riderUserId ? `骑手 #${order.riderUserId}` : <StatusPill tone="warning">待分配</StatusPill>}</td>
                 <td><strong>{formatMoney(order.deliveryFeeCents)}</strong><span className="preview-table__fee">骑手 {formatMoney(order.riderFeeCents)} · 平台 {formatMoney(order.platformCutCents)}</span></td>
                 <td><StatusPill tone={orderStatusTone(order.status)}>{orderStatusLabel(order.status)}</StatusPill></td>
                 <td>{formatDateTime(order.createdAt)}</td>
-                <td><div className="preview-row-actions">
+                <td onClick={event => event.stopPropagation()}><div className="preview-row-actions">
                   <Button size="sm" variant="ghost" onClick={() => void openDetail(id)}>详情</Button>
                   {canReassign && <Button size="sm" variant="ghost" onClick={() => openBatch('reassign', [id])}>改派</Button>}
                   {canCancel && <Button size="sm" variant="danger" onClick={() => openBatch('cancel', [id])}>取消</Button>}

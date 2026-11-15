@@ -21,8 +21,6 @@ import {
   Button,
   Drawer,
   EmptyState,
-  ImageCell,
-  ImageStrip,
   Modal,
   PageHeader,
   Pagination,
@@ -35,6 +33,7 @@ import {
   formatWait,
   usePreviewToast
 } from '../ui'
+import { RealImage, RealImageCell, RealImageStrip, adminAssetContentUrl } from '../media-thumbs'
 
 type OperationSection = Extract<PreviewSection, 'media' | 'moderation' | 'community' | 'trade' | 'reports'>
 
@@ -399,7 +398,17 @@ function MediaAssetsTab({ filter, onFilter }: { filter: MediaFilter; onFilter: (
     setDetailLoading(true)
     setDetailError('')
     adminAPI.mediaAsset(detailId)
-      .then(value => { if (active) setDetail(value) })
+      .then(value => {
+        if (!active) return
+        // 后端对未产生的明细可能返回 null，这里统一兜底为空数组，避免详情渲染崩溃。
+        setDetail({
+          ...value,
+          references: value.references ?? [],
+          decisions: value.decisions ?? [],
+          events: value.events ?? [],
+          gcJobs: value.gcJobs ?? []
+        })
+      })
       .catch(error => { if (active) setDetailError(requestErrorText(error)) })
       .finally(() => { if (active) setDetailLoading(false) })
     return () => { active = false }
@@ -440,10 +449,13 @@ function MediaAssetsTab({ filter, onFilter }: { filter: MediaFilter; onFilter: (
           : <div className="preview-media-grid">
             {items.map((asset, index) => {
               const kind = mediaKind(asset)
-              return <article key={asset.assetId} className="preview-media-card">
-                <button type="button" className={`preview-media-card__visual preview-media-card__visual--${index % 4}`} onClick={() => setDetailId(asset.assetId)} aria-label={`查看 ${asset.assetId} 详情`}>
-                  <span>{kind === '视频' ? '▶' : '▧'}</span>
-                  <small>{kind}</small>
+              return <article key={asset.assetId} className="preview-media-card is-clickable" onClick={() => setDetailId(asset.assetId)}>
+                <button type="button" className="preview-media-card__visual preview-media-card__visual--real" onClick={event => { event.stopPropagation(); setDetailId(asset.assetId) }} aria-label={`查看 ${asset.assetId} 详情`}>
+                  {asset.storageStage !== 'final'
+                    ? <span className="preview-media-card__kind">未定稿</span>
+                    : kind === '视频'
+                      ? <span className="preview-media-card__kind">▶ 视频</span>
+                      : <RealImage src={adminAssetContentUrl(asset.assetId)} alt={`素材 ${asset.assetId}`} className="preview-media-card__img" />}
                 </button>
                 <div className="preview-media-card__body">
                   <div>
@@ -474,6 +486,11 @@ function MediaAssetsTab({ filter, onFilter }: { filter: MediaFilter; onFilter: (
       {detailLoading && !detail && <EmptyState title="正在读取素材详情" description="处理记录、审核记录与清理任务会一并展示。" />}
       {detailError && <div className="preview-form-error" role="alert">{detailError}</div>}
       {detail && <div className="preview-detail-stack">
+        <div className="preview-media-detail-image">
+          {detail.asset.storageStage === 'final'
+            ? <RealImage src={adminAssetContentUrl(detail.asset.assetId)} alt={`素材 ${detail.asset.assetId}`} className="preview-media-detail-image__img" />
+            : <p className="preview-image-empty">该素材尚未完成定稿，暂无可预览的文件。</p>}
+        </div>
         <div className="preview-detail-banner">
           <div><span>审核投影状态</span><strong>{mediaReviewLabel(detail.asset.reviewStatus)}</strong></div>
           <StatusPill tone={mediaReviewTone(detail.asset.reviewStatus)}>{mediaReviewLabel(detail.asset.reviewStatus)}</StatusPill>
@@ -1051,14 +1068,14 @@ function CommunityOperations() {
       {!list.data && list.loading
         ? <EmptyState title="正在读取社区内容" description="内容加载完成后会自动显示。" />
         : <div className="preview-table-wrap"><table className="preview-table" aria-label="内容列表"><thead><tr><th>内容</th><th>图片</th><th>作者</th><th>话题</th><th>状态</th><th>时间</th><th /></tr></thead><tbody>
-          {visible.map(item => <tr key={item.id}>
-            <td><button type="button" className="preview-table__primary" onClick={() => setDetailId(item.id)}>{item.title || '无标题内容'}<small>#{item.id}</small></button></td>
-            <td><ImageCell count={item.images?.length ?? 0} seed={String(item.id)} label={item.title} /></td>
+          {visible.map(item => <tr key={item.id} className="is-clickable" onClick={() => setDetailId(item.id)}>
+            <td><button type="button" className="preview-table__primary" onClick={event => { event.stopPropagation(); setDetailId(item.id) }}>{item.title || '无标题内容'}<small>#{item.id}</small></button></td>
+            <td><RealImageCell url={item.images?.[0]?.url} label={item.title} /></td>
             <td>{item.author.nickname || '未知用户'}</td>
             <td>{item.topic || '未分类'}</td>
             <td><StatusPill>{POST_STATUS_LABELS[item.reviewStatus] || item.reviewStatus}</StatusPill></td>
             <td>{displayTime(item.createdAt)}</td>
-            <td>{item.reviewStatus === 'approved'
+            <td onClick={event => event.stopPropagation()}>{item.reviewStatus === 'approved'
               ? <Button size="sm" variant="danger" onClick={() => openTakedown(item)}>下架</Button>
               : item.reviewStatus === 'taken_down'
                 ? <span className="preview-muted-action">已下架</span>
@@ -1092,7 +1109,7 @@ function CommunityOperations() {
           <div><span>收藏</span><strong>{detail.favoriteCount ?? 0}</strong></div>
         </div>
         {detail.tags && detail.tags.length > 0 && <div className="preview-note-block"><span>标签</span><p>{detail.tags.join('、')}</p></div>}
-        <div className="preview-note-block"><span>图片（{detail.images?.length ?? 0}）</span><ImageStrip count={detail.images?.length ?? 0} seed={String(detail.id)} label={detail.title} /></div>
+        <div className="preview-note-block"><span>图片（{detail.images?.length ?? 0}）</span><RealImageStrip urls={(detail.images ?? []).map(image => image.url)} label={detail.title} /></div>
         <div className="preview-note-block"><span>正文</span><p>{detail.content || '（该内容没有正文）'}</p></div>
       </div>}
     </Drawer>
@@ -1203,16 +1220,16 @@ function TradeOperations() {
       {!list.data && list.loading
         ? <EmptyState title="正在读取商品" description="商品数据加载完成后会自动显示。" />
         : <div className="preview-table-wrap"><table className="preview-table" aria-label="商品列表"><thead><tr><th>商品</th><th>图片</th><th>卖家</th><th>分类</th><th>价格</th><th>业务状态</th><th>审核状态</th><th>时间</th><th /></tr></thead><tbody>
-          {visible.map(item => <tr key={item.id}>
-            <td><button type="button" className="preview-table__primary" onClick={() => setDetailId(item.id)}>{item.title || '无标题商品'}<small>#{item.id}</small></button></td>
-            <td><ImageCell count={item.images?.length ?? 0} seed={String(item.id)} label={item.title} /></td>
+          {visible.map(item => <tr key={item.id} className="is-clickable" onClick={() => setDetailId(item.id)}>
+            <td><button type="button" className="preview-table__primary" onClick={event => { event.stopPropagation(); setDetailId(item.id) }}>{item.title || '无标题商品'}<small>#{item.id}</small></button></td>
+            <td><RealImageCell url={item.images?.[0]?.url} label={item.title} /></td>
             <td>{item.seller.nickname || '未知用户'}</td>
             <td>{item.category || '未分类'}</td>
             <td><strong>{money(item.price)}</strong></td>
             <td><StatusPill>{PRODUCT_BUSINESS_LABELS[item.status] || item.status}</StatusPill></td>
             <td><StatusPill>{PRODUCT_STATUS_LABELS[item.reviewStatus] || item.reviewStatus}</StatusPill></td>
             <td>{displayTime(item.createdAt)}</td>
-            <td>{item.reviewStatus === 'approved'
+            <td onClick={event => event.stopPropagation()}>{item.reviewStatus === 'approved'
               ? <Button size="sm" variant="ghost" onClick={() => openTakedown(item)}>下架</Button>
               : item.reviewStatus === 'taken_down'
                 ? <span className="preview-muted-action">已下架</span>
@@ -1249,7 +1266,7 @@ function TradeOperations() {
           <div><span>收藏</span><strong>{detail.favoriteCount ?? 0}</strong></div>
           <div><span>发布时间</span><strong>{displayTime(detail.createdAt)}</strong></div>
         </div>
-        <div className="preview-note-block"><span>图片（{detail.images?.length ?? 0}）</span><ImageStrip count={detail.images?.length ?? 0} seed={String(detail.id)} label={detail.title} /></div>
+        <div className="preview-note-block"><span>图片（{detail.images?.length ?? 0}）</span><RealImageStrip urls={(detail.images ?? []).map(image => image.url)} label={detail.title} /></div>
         <div className="preview-note-block"><span>商品描述</span><p>{detail.description || '（无描述）'}</p></div>
       </div>}
     </Drawer>
@@ -1318,13 +1335,13 @@ function ReportOperations() {
       {!list.data && list.loading
         ? <EmptyState title="正在读取举报" description="举报数据加载完成后会自动显示。" />
         : <div className="preview-table-wrap"><table className="preview-table" aria-label="举报列表"><thead><tr><th>举报目标</th><th>原因</th><th>举报人</th><th>审核状态</th><th>时间</th><th /></tr></thead><tbody>
-          {visible.map(item => <tr key={item.id}>
-            <td><button type="button" className="preview-table__primary" onClick={() => setDetailId(item.id)}>{reportTargetLabel(item.targetType)} #{item.targetId}<small>举报 #{item.id}</small></button></td>
+          {visible.map(item => <tr key={item.id} className="is-clickable" onClick={() => setDetailId(item.id)}>
+            <td><button type="button" className="preview-table__primary" onClick={event => { event.stopPropagation(); setDetailId(item.id) }}>{reportTargetLabel(item.targetType)} #{item.targetId}<small>举报 #{item.id}</small></button></td>
             <td className="preview-cell-wrap">{item.reason || '未填写原因'}</td>
             <td>{item.reporterId ? `用户 #${item.reporterId}` : '匿名'}</td>
             <td><StatusPill tone={reviewStatusTone(item.reviewStatus)}>{reviewStatusLabel(item.reviewStatus)}</StatusPill></td>
             <td>{displayTime(item.createdAt)}</td>
-            <td><Button size="sm" variant="primary" onClick={() => setDetailId(item.id)}>查看详情</Button></td>
+            <td onClick={event => event.stopPropagation()}><Button size="sm" variant="primary" onClick={() => setDetailId(item.id)}>查看详情</Button></td>
           </tr>)}
         </tbody></table>{visible.length === 0 && <EmptyState title="当前页没有举报" description="切换状态后再试。" />}</div>}
       <Pagination page={list.data?.page ?? list.page} pageSize={list.data?.pageSize ?? PAGE_SIZE} total={list.data?.total ?? 0} onChange={list.setPage} label="举报列表分页" />

@@ -31,6 +31,7 @@ import {
   TextAreaField,
   usePreviewToast
 } from '../ui'
+import { RealImage, RealImageStrip, adminAssetContentUrl } from '../media-thumbs'
 
 type PeopleSection = Extract<PreviewSection, 'identities' | 'feedbacks' | 'users'>
 
@@ -310,11 +311,11 @@ function IdentityPeople() {
         : visibleItems.length === 0
           ? <EmptyState title="没有匹配的认证资料" description="调整筛选条件后再试。" />
           : <div className="preview-review-list">
-            {visibleItems.map(item => <article key={item.applicationId} className="preview-review-row">
+            {visibleItems.map(item => <article key={item.applicationId} className="preview-review-row is-clickable" onClick={() => openDetail(item.applicationId)}>
               <span className="preview-review-row__kind">{identityRoleLabel(item.role)}</span>
               <div className="preview-review-row__copy">
                 <div>
-                  <button type="button" className="preview-table__primary" onClick={() => openDetail(item.applicationId)}>
+                  <button type="button" className="preview-table__primary" onClick={event => { event.stopPropagation(); openDetail(item.applicationId) }}>
                     {item.realName || `用户 #${item.userId}`}<small>{item.applicationId}</small>
                   </button>
                   <StatusPill>{identityStatusLabel(item.status)}</StatusPill>
@@ -324,7 +325,7 @@ function IdentityPeople() {
                   : item.phone || '未填写联系方式'}</p>
                 <small>{item.applicationId} · {displayTime(item.submittedAt)}{item.reviewReason ? ` · 结论依据：${item.reviewReason}` : ''}</small>
               </div>
-              <div className="preview-row-actions">
+              <div className="preview-row-actions" onClick={event => event.stopPropagation()}>
                 {item.status === 'pending' ? <>
                   <Button size="sm" variant="ghost" onClick={() => openDetail(item.applicationId)}>开始审核</Button>
                   <Button size="sm" variant="primary" onClick={() => openDecision(item, 'approved')}>通过</Button>
@@ -419,12 +420,8 @@ function IdentityDetailBody({ detail, loading, error, onRefresh }: {
     </div>
     <div className="preview-note-block">
       <span>证明材料（{proofs.length || detail.assetIds.length}）</span>
-      {proofs.length > 0 ? <div className="preview-material-list">
-        {proofs.map(proof => <span key={proof.assetId}>
-          <a href={proof.url} target="_blank" rel="noreferrer">查看证明 · {proof.assetId}</a>
-          <small> 有效至 {displayTime(proof.expiresAt)}</small>
-        </span>)}
-      </div> : <p>{detail.assetIds.length > 0 ? '证明链接已过期或暂不可用，请刷新后重试。' : '申请未附带证明材料。'}</p>}
+      {proofs.length > 0 ? <RealImageStrip urls={proofs.map(proof => proof.url)} label="证明材料" />
+        : <p>{detail.assetIds.length > 0 ? '证明链接已过期或暂不可用，请刷新后重试。' : '申请未附带证明材料。'}</p>}
       {proofsExpired && <p>证明链接已过期，请刷新后查看。</p>}
       <Button size="sm" variant="ghost" onClick={onRefresh} disabled={loading}>{loading ? '刷新中…' : '刷新证明材料'}</Button>
     </div>
@@ -565,17 +562,30 @@ function FeedbackPeople() {
         : data.items.length === 0
           ? <EmptyState title="没有匹配的反馈" description="调整筛选条件后再试。" />
           : <div className="preview-feedback-list">
-            {data.items.map(item => <article key={item.id || `${item.userId}-${item.createdAt}`}>
+            {data.items.map(item => <article key={item.id || `${item.userId}-${item.createdAt}`} className="is-clickable" onClick={() => open(item)}>
               <div className="preview-feedback-list__meta">
                 <span><strong>用户 #{item.userId}</strong><small>{item.category} · {displayTime(item.createdAt)}</small></span>
                 <StatusPill>{feedbackStatusText(item.status)}</StatusPill>
               </div>
               <p>{item.content}</p>
+              {item.images?.length ? <div className="preview-image-strip" role="list" aria-label={`反馈附图 ${item.images.length} 张`}>
+                {item.images.map(image => <a
+                  key={`${image.assetId}-${image.slot}`}
+                  role="listitem"
+                  className="preview-image-thumb preview-image-thumb--real"
+                  href={adminAssetContentUrl(image.assetId)}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={event => event.stopPropagation()}
+                >
+                  <RealImage src={adminAssetContentUrl(image.assetId)} alt={`反馈附图 ${image.slot + 1}`} />
+                </a>)}
+              </div> : null}
               {item.adminNote && <div className="preview-feedback-list__note">
                 <span>处理说明{item.handledBy ? ` · 处理人 #${item.handledBy}` : ''}{item.handledAt ? ` · ${displayTime(item.handledAt)}` : ''}</span>
                 {item.adminNote}
               </div>}
-              <div className="preview-feedback-list__footer">
+              <div className="preview-feedback-list__footer" onClick={event => event.stopPropagation()}>
                 <span>{item.id || '—'}</span>
                 <Button size="sm" variant="ghost" onClick={() => open(item)}>{item.status === 'resolved' ? '查看/更新' : '处理反馈'}</Button>
               </div>

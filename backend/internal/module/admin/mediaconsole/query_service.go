@@ -32,6 +32,13 @@ func (s *QueryService) Assets(ctx context.Context, filter ListFilter) (Page[Asse
 	return Page[AssetRow]{Items: nonNil(items), Page: filter.Page, PageSize: filter.PageSize, Total: total}, err
 }
 
+func (s *QueryService) AssetObject(ctx context.Context, assetID string) (string, string, error) {
+	if !ulidPattern.MatchString(assetID) {
+		return "", "", ErrInvalidQuery
+	}
+	return s.repository.AssetObject(ctx, assetID)
+}
+
 func (s *QueryService) Asset(ctx context.Context, assetID string) (AssetDetail, error) {
 	if !ulidPattern.MatchString(assetID) {
 		return AssetDetail{}, ErrInvalidQuery

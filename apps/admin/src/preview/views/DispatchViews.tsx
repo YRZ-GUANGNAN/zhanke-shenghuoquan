@@ -152,7 +152,7 @@ function RidersPanel() {
         ? <EmptyState title="没有匹配的骑手" description="调整筛选条件，或查看全部骑手。" />
         : <div className="preview-table-wrap"><table className="preview-table" aria-label="骑手列表">
           <thead><tr><th>骑手</th><th>状态</th><th>在途</th><th>今日单量</th><th>今日收入</th><th>更新时间</th><th /></tr></thead>
-          <tbody>{riders.map(rider => <tr key={rider.riderUserId}>
+          <tbody>{riders.map(rider => <tr key={rider.riderUserId} className="is-clickable" onClick={() => setFocusRider(rider)}>
             <td><strong>{riderName(rider.riderUserId, rider.realName)}</strong><span>{rider.phone || '未登记手机号'} · 骑手 #{rider.riderUserId}</span></td>
             <td>
               <StatusPill tone={riderStatusTone(rider.status)}>{riderStatusLabel(rider.status)}</StatusPill>
@@ -162,7 +162,7 @@ function RidersPanel() {
             <td>{rider.todayOrders}</td>
             <td><strong>{formatMoney(rider.todayIncomeCents)}</strong></td>
             <td>{formatDateTime(rider.updatedAt)}</td>
-            <td><div className="preview-row-actions">
+            <td onClick={event => event.stopPropagation()}><div className="preview-row-actions">
               <Button size="sm" variant="ghost" onClick={() => setFocusRider(focusRider?.riderUserId === rider.riderUserId ? null : rider)}>
                 {focusRider?.riderUserId === rider.riderUserId ? '收起订单' : '查看订单'}
               </Button>
