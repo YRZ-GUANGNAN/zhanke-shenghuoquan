@@ -133,9 +133,9 @@
   box-sizing: border-box;
 }
 .student-search-filter-toggle--active {
-  color: $brand-primary;
+  color: $bg-surface;
   border-color: transparent;
-  background: $brand-tint;
+  background: $text-strong;
 }
 
 .student-search-filter-summary__scroll {
@@ -148,7 +148,7 @@
 .student-search-filter-summary__text {
   display: inline-block;
   overflow: hidden;
-  color: $brand-primary;
+  color: $text-secondary;
   font-size: 22rpx;
   line-height: 40rpx;
 }
@@ -264,7 +264,6 @@
   color: $text-strong;
 }
 
-.student-search-filter-description,
 .student-search-filter-hint,
 .student-search-filter-unit {
   @include ref.type(meta);
@@ -294,8 +293,7 @@
 }
 
 .student-search-filter-group {
-  padding: 20rpx 0 26rpx;
-  border-top: 1rpx solid $divider-nav;
+  padding: 22rpx 0 26rpx;
 }
 
 .student-search-filter-label {
@@ -322,19 +320,18 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1rpx solid $divider-nav;
+  border: none;
   border-radius: 12rpx;
-  color: $text-secondary;
-  background: $bg-surface;
+  color: $text-strong;
+  background: $bg-screen;
   max-width: 100%;
   text-align: center;
 }
 
 .student-search-filter-option--selected {
-  border-color: $brand-primary;
-  color: $brand-primary;
-  background: $brand-tint;
-  font-weight: 700;
+  color: $bg-surface;
+  background: $text-strong;
+  font-weight: 600;
 }
 
 .student-search-control--pressed { opacity: .68; transform: translateY(1rpx); }
@@ -371,8 +368,7 @@
 }
 
 .student-search-filter-footer {
-  border-top: 1rpx solid $divider-nav;
-  padding-top: 18rpx;
+  padding-top: 22rpx;
 }
 
 .student-search-filter-reset,
@@ -388,7 +384,8 @@
 
 .student-search-filter-reset {
   width: 180rpx;
-  border: 1rpx solid $divider-nav;
+  border: none;
+  background: $bg-screen;
   justify-content: center;
   color: $text-secondary;
 }

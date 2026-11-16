@@ -31,7 +31,7 @@ export default function SearchFilterPanel({ scope, value, onCancel, onApply }: P
       <View className='student-search-filter-backdrop' onClick={onCancel} catchMove />
       <View className='student-search-filter-panel' role='dialog' ariaLabel={scope === 'community' ? '帖子筛选' : '商品筛选'}>
         <View className='student-search-filter-heading'>
-          <View><Text className='student-search-filter-title'>{scope === 'community' ? '帖子筛选' : '商品筛选'}</Text><Text className='student-search-filter-description'>选好条件后，点击确认筛选</Text></View>
+          <Text className='student-search-filter-title'>{scope === 'community' ? '帖子筛选' : '商品筛选'}</Text>
           <View className='student-search-filter-cancel' role='button' onClick={onCancel}>取消</View>
         </View>
         <ScrollView scrollY showScrollbar={false} className='student-search-filter-scroll'>

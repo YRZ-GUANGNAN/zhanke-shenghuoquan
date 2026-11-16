@@ -80,3 +80,8 @@ export function searchFilterLabels(scope: FilterScope, value: SearchFilterValues
   }
   return labels.filter(Boolean)
 }
+
+// 漏斗按钮高亮与筛选摘要只统计弹层专属条件；排序「最新」顶部分段控件已可见，不重复计入。
+export function searchPanelFilterLabels(scope: FilterScope, value: SearchFilterValues): string[] {
+  return searchFilterLabels(scope, value).filter((_, index) => !(value.sort === 'recent' && index === 0))
+}

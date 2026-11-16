@@ -34,7 +34,7 @@ import {
   communitySearchFilters,
   defaultSearchFilters,
   searchFilterKey,
-  searchFilterLabels,
+  searchPanelFilterLabels,
   tradeSearchFilters,
   type SearchFilterValues,
 } from './search-filters'
@@ -420,18 +420,18 @@ function SearchContent() {
             >{item.label}</View>)}
           </View>
           <View
-            className={`student-search-filter-toggle${searchFilterLabels(scope, appliedFilters).length ? ' student-search-filter-toggle--active' : ''}`}
+            className={`student-search-filter-toggle${searchPanelFilterLabels(scope, appliedFilters).length ? ' student-search-filter-toggle--active' : ''}`}
             role='button'
             hoverClass='student-search-control--pressed'
             onClick={openFilters}
-            ariaLabel={`筛选${searchFilterLabels(scope, appliedFilters).length ? `，已选 ${searchFilterLabels(scope, appliedFilters).length} 项` : ''}`}
+            ariaLabel={`筛选${searchPanelFilterLabels(scope, appliedFilters).length ? `，已选 ${searchPanelFilterLabels(scope, appliedFilters).length} 项` : ''}`}
           >
             <View className='student-search-filter-toggle__icon' />
           </View>
         </View>
-        {searchFilterLabels(scope, appliedFilters).length > 0 && <View className='student-search-filter-summary'>
+        {searchPanelFilterLabels(scope, appliedFilters).length > 0 && <View className='student-search-filter-summary'>
           <ScrollView scrollX showScrollbar={false} className='student-search-filter-summary__scroll'>
-            <Text className='student-search-filter-summary__text' onClick={openFilters}>{searchFilterLabels(scope, appliedFilters).join(' · ')}</Text>
+            <Text className='student-search-filter-summary__text' onClick={openFilters}>{searchPanelFilterLabels(scope, appliedFilters).join(' · ')}</Text>
           </ScrollView>
           <View className='student-search-clear-filters' role='button' onClick={() => applyFilters(defaultSearchFilters())}>清除</View>
         </View>}
@@ -500,7 +500,7 @@ function SearchContent() {
             )}
             {!error && !loading && results.length === 0 && <>
               <Text className='student-search-state'>{copy.empty}</Text>
-              {searchFilterLabels(scope === 'community' || scope === 'secondhand' ? scope : 'community', appliedFilters).length > 0 && <Text className='student-search-state student-search-state--action' onClick={() => applyFilters(defaultSearchFilters())}>清除筛选</Text>}
+              {searchPanelFilterLabels(scope === 'community' || scope === 'secondhand' ? scope : 'community', appliedFilters).length > 0 && <Text className='student-search-state student-search-state--action' onClick={() => applyFilters(defaultSearchFilters())}>清除筛选</Text>}
             </>}
             {results.map(renderResult)}
             {error && results.length > 0 && <Text className='student-search-state student-search-state--error' onClick={() => void loadMore()}>{error}</Text>}
