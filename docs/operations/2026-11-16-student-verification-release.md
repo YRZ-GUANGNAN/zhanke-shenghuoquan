@@ -53,6 +53,14 @@
 - 代码：后端与后台静态分别切回上一 release 并重启；小程序回滚需重新提交版本。
 - 数据库：执行 `backend/migrations/rollback/063_student_verification.sql`（删除三张新表并恢复媒体用途约束）。学生认证为纯新增，回滚代码时也可暂不撤销表结构。
 
+## 本地验收结果（2026-11-16，本地 campus_circle）
+
+- 迁移 063 已在本地库实际执行：三张表创建、媒体用途约束包含 `student_verification`；执行前已备份（schema+data，57KB gz）。
+- API 冒烟（本地后端 + mock 登录）通过：未登录用户/管理端接口均 401；新用户 mock 登录成功（默认昵称「校园用户」，与首登引导判定一致）；无记录查询 404；字段缺失 400；伪造素材提交返回 409 媒体冲突；无记录申请取消 404。
+- 真实 MySQL 闭环验收 14/14 通过：提交→通过→过期版本拦截→防自审→已认证禁止重提→申请取消（重复申请幂等）→解除绑定→重新提交（照片资产替换）→驳回（原因落库）→审计事件序列完整。
+- 新增 MySQL 集成测试 `backend/internal/module/studentverification/repository_mysql_test.go`（按仓库规范使用 TEST_MYSQL_DSN 临时库，门控跳过；本地 campus 账号无建库权限时自动 skip）。
+- 管理后台「学生认证」页面与小程序真机流程未在本次本地验收中人工操作（见下方人工清单）。
+
 ## 本次验证结果（部署前，本机）
 
 - Go：`studentverification`、`migrations`、`user`、`cmd/server` 测试通过；`go build ./...`、`go vet ./...` 通过。
