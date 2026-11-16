@@ -15,6 +15,7 @@ const allowedDomains = new Set([
   'delivery',
   'adminauth',
   'identityapplication',
+  'studentverification',
   'featureflags',
   'sharesettings',
   'campusinfo',
@@ -23,6 +24,8 @@ const allowedDomains = new Set([
 const transactionOrchestrators = new Set([
   path.join('identityapplication', 'media.go'),
   path.join('identityapplication', 'service.go'),
+  path.join('studentverification', 'media.go'),
+  path.join('studentverification', 'service.go'),
 ])
 const failures = []
 

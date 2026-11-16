@@ -18,7 +18,7 @@ const userHandler = read('backend', 'internal', 'module', 'user', 'handler.go')
 for (const required of [
   'listExternalTakeoutMerchants',
   '/pages/search/index?scope=takeout',
-  'student-takeout-directory',
+  'student-takeout-list',
 ]) {
   assert.ok(takeout.includes(required), `student takeout entry is missing ${required}`)
 }
@@ -27,7 +27,7 @@ for (const forbidden of ['蜜雪冰城', '华莱士', '塔斯汀', 'const mercha
   assert.ok(!takeout.includes(forbidden), `student takeout must not contain fabricated merchant ${forbidden}`)
 }
 
-assert.match(takeoutStyle, /\.student-takeout-directory/)
+assert.match(takeoutStyle, /\.student-takeout-list/)
 // Loading and failure visuals are now owned by the shared state components.
 // Verify the live states and retry path instead of an unused legacy selector.
 assert.match(takeout, /import\s*\{\s*AppSkeleton,\s*AppState\s*\}\s*from\s*'\.\.\/\.\.\/components\/ui'/)

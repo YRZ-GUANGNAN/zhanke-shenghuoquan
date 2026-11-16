@@ -50,6 +50,7 @@ import (
 	"campus-circle/backend/internal/module/media/miniappflow"
 	"campus-circle/backend/internal/module/navigation"
 	"campus-circle/backend/internal/module/sharesettings"
+	"campus-circle/backend/internal/module/studentverification"
 	"campus-circle/backend/internal/module/takeout"
 	"campus-circle/backend/internal/module/trade"
 	"campus-circle/backend/internal/module/user"
@@ -80,6 +81,7 @@ func main() {
 		log.Fatalf("load campus guides: %v", err)
 	}
 	identityApplicationRepository := identityapplication.NewRepository(db)
+	studentVerificationRepository := studentverification.NewRepository(db)
 	// Composition root: repositories are private to their domain; only services cross boundaries.
 	reviewService := review.NewService(review.NewRepository(db))
 	var identityRiders *takeout.RiderIdentityService
@@ -174,6 +176,11 @@ func main() {
 		identityApplicationRepository, identityApplicationMedia, nil,
 		newIdentityApplicationApprovalProvisioner(nil),
 	)
+	studentVerificationMedia, err := studentverification.NewApplicationMedia(bindingService, mediaRepository, completionStore, nil)
+	if err != nil {
+		log.Fatalf("configure student verification proof media: %v", err)
+	}
+	studentVerificationService := studentverification.NewService(studentVerificationRepository, studentVerificationMedia, nil)
 	feedbackMedia, err := user.NewCoreFeedbackMedia(bindingService)
 	if err != nil {
 		log.Fatalf("configure feedback media binding: %v", err)
@@ -530,6 +537,15 @@ func main() {
 			adminAuth:       adminAuthRequired,
 		},
 	)
+	registerStudentVerificationRoutes(
+		api, authRoutes, studentverification.NewHandler(studentVerificationService),
+		identityRoutePolicies{
+			authRequired:    userService.AuthRequired(),
+			unmutedRequired: user.UnmutedRequired(),
+			adminRequired:   user.AdminRequired(),
+			adminAuth:       adminAuthRequired,
+		},
+	)
 	legacymedia.NewHandler(mediaService, cfg.WechatCallbackToken, userService.AuthRequired(), user.UnmutedRequired(), func(c *gin.Context) (uint, string) {
 		value := user.CurrentUser(c)
 		return value.ID, value.OpenID
@@ -662,6 +678,20 @@ func registerIdentityApplicationRoutes(
 		adminAuthentication = policies.adminAuth
 	}
 	handler.RegisterAdmin(api.Group("/admin/identity-applications", adminAuthentication, policies.adminRequired))
+}
+
+func registerStudentVerificationRoutes(
+	api *gin.RouterGroup,
+	authRoutes *gin.RouterGroup,
+	handler *studentverification.Handler,
+	policies identityRoutePolicies,
+) {
+	handler.RegisterUser(authRoutes.Group("", policies.authRequired, policies.unmutedRequired))
+	adminAuthentication := policies.authRequired
+	if policies.adminAuth != nil {
+		adminAuthentication = policies.adminAuth
+	}
+	handler.RegisterAdmin(api.Group("/admin/student-verifications", adminAuthentication, policies.adminRequired))
 }
 
 func newRouter(loggerOutput io.Writer, recoveryOutput io.Writer) *gin.Engine {
@@ -971,11 +1001,11 @@ func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, user
 		WithOrderCommands(runtime.orders).
 		WithRiderAdmin(deliveryconsole.NewRiderAdmin(runtime.db)).
 		WithRefundCommands(func() deliveryconsole.RefundCommands {
-		if runtime.funds != nil {
-			return runtime.funds
-		}
-		return nil
-	}()).
+			if runtime.funds != nil {
+				return runtime.funds
+			}
+			return nil
+		}()).
 		Register(adminRoutes)
 }
 

@@ -21,6 +21,7 @@ export const adminNavigation: AdminNavigationItem[] = [
   { key: 'trade', label: '二手商品', description: '查看商品状态并衔接审核或下架', icon: 'trade', group: '内容与用户' },
   { key: 'reports', label: '举报处理', description: '查看用户举报与最终处置进度', icon: 'reports', group: '内容与用户' },
   { key: 'identities', label: '商家骑手认证', description: '审核商家与骑手身份材料', icon: 'identities', group: '内容与用户' },
+  { key: 'student-verifications', label: '学生认证', description: '审核学生证材料并处理取消绑定申请', icon: 'identities', group: '内容与用户' },
   { key: 'feedbacks', label: '意见反馈', description: '查看用户提交的问题与建议', icon: 'reports', group: '内容与用户' },
   { key: 'users', label: '用户与权限', description: '管理账号状态与后台管理员角色', icon: 'users', group: '平台设置' },
   { key: 'navigation', label: '服务入口', description: '维护校园服务导航与外部商家入口', icon: 'navigation', group: '平台设置' },

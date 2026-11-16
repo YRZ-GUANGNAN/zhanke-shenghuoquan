@@ -5,7 +5,7 @@ package media
 // Tencent Cloud image review before that human decision.
 func (p Purpose) ContentReviewRequired() bool {
 	switch p {
-	case PurposeAvatar, PurposeProfileCover, PurposeIdentityApplication, PurposeDish, PurposeMerchantLogo:
+	case PurposeAvatar, PurposeProfileCover, PurposeIdentityApplication, PurposeStudentVerification, PurposeDish, PurposeMerchantLogo:
 		return false
 	default:
 		return true
@@ -23,5 +23,5 @@ func ReviewAllowsUse(p Purpose, status ProjectionStatus) bool {
 const displayReviewPredicate = "(p.status = ? OR (p.status = ? AND a.purpose IN ?))"
 
 func directUsePurposes() []Purpose {
-	return []Purpose{PurposeAvatar, PurposeProfileCover, PurposeIdentityApplication, PurposeDish, PurposeMerchantLogo}
+	return []Purpose{PurposeAvatar, PurposeProfileCover, PurposeIdentityApplication, PurposeStudentVerification, PurposeDish, PurposeMerchantLogo}
 }

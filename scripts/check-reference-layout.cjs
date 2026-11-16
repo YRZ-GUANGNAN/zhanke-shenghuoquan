@@ -27,7 +27,7 @@ const reviewedRoutes = new Set([
   'my-feedback',
 ])
 const compiled = new Map()
-assert.equal(routes.length, 34, '路由变化需要显式复审覆盖表，不得顺带开启历史页面')
+assert.equal(routes.length, 36, '路由变化需要显式复审覆盖表，不得顺带开启历史页面')
 for (const route of reviewedRoutes) {
   assert.ok(routes.includes(route), `${route} 必须纳入显式复审覆盖表`)
 }
@@ -133,7 +133,7 @@ for (const [route, css] of compiled) {
 }
 assert.match(read('styles/design-tokens.scss'), /\$brand-primary-static:\s*#2E7DD4;[\s\S]*\$brand-primary:\s*var\(--c0\);/, '保持既有蓝色品牌')
 assert.match(read('pages/post-detail/post-comments.tsx'), /ExpandableText\s+text=\{comment\.content\}/, '评论折叠接收完整正文，不截断数据')
-assert.match(read('components/content-motion.tsx'), /selectable>\{text\}<\/Text>/, '完整正文保留在可展开组件中')
+assert.match(read('components/content-motion.tsx'), /userSelect>\{text\}<\/Text>/, '完整正文保留在可展开组件中')
 assert.doesNotMatch(read('pages/delivery-conversation/index.config.ts'), /navigationStyle:\s*['"]custom['"]/, '配送沟通仍由原生导航保留系统区')
 assert.doesNotMatch(read('pages/delivery-conversation/index.tsx'), /CapsuleSystemRow/, '原生导航页面不再叠加自定义系统区')
 console.log(`参考排版检查通过：${routes.length - excluded.length} 个页面接入，${excluded.length} 个咨询页保留；Sass + Taro PostCSS 后六类字号在 320–1280px 屏受控，色调、长文本与物理触控检查通过。`)

@@ -1,0 +1,278 @@
+@use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
+
+.student-verify-page {
+  @include ref.page-foundation;
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding-bottom: calc(64rpx + env(safe-area-inset-bottom));
+  background: $bg-app;
+  color: $text-strong;
+}
+
+.student-verify-nav__back {
+  @include ref.touch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  color: $text-strong;
+  font-size: 54rpx;
+  line-height: 1;
+}
+
+.student-verify-content {
+  padding: 8rpx 32rpx 0;
+}
+
+.student-verify-status {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin: 12rpx 8rpx 12rpx;
+}
+
+/* 绑定状态：卡片行内的纯色文字，成功态配小对勾 */
+.student-verify-state {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  margin-left: 24rpx;
+  color: $text-muted;
+  font-size: 26rpx;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.student-verify-state--brand {
+  color: $brand-primary-strong;
+  font-weight: 600;
+}
+
+.student-verify-state--success {
+  color: $success;
+  font-weight: 600;
+}
+
+.student-verify-state--pending {
+  color: $warning;
+  font-weight: 600;
+}
+
+.student-verify-state__check {
+  width: 15rpx;
+  height: 26rpx;
+  border-right: 4rpx solid currentColor;
+  border-bottom: 4rpx solid currentColor;
+  box-sizing: border-box;
+  transform: rotate(42deg) translateY(-4rpx);
+}
+
+.student-verify-card {
+  overflow: hidden;
+  border-radius: 24rpx;
+  background: $bg-surface;
+  box-shadow: $shadow-card;
+}
+
+.student-verify-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  min-height: 104rpx;
+  padding: 18rpx 28rpx;
+  box-sizing: border-box;
+}
+
+.student-verify-row:not(:last-child)::after {
+  position: absolute;
+  right: 28rpx;
+  bottom: 0;
+  left: 28rpx;
+  height: 1rpx;
+  background: $divider-hairline;
+  content: '';
+}
+
+.student-verify-row__main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+  min-width: 0;
+}
+
+.student-verify-row__title {
+  flex: 0 0 auto;
+  color: $text-strong;
+  font-size: 28rpx;
+  font-weight: 500;
+  line-height: 40rpx;
+}
+
+.student-verify-row__subtitle {
+  @include ref.wrap;
+  color: $text-muted;
+  font-size: 23rpx;
+  line-height: 34rpx;
+}
+
+.student-verify-thumb {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96rpx;
+  height: 96rpx;
+  overflow: hidden;
+  border: 2rpx dashed $border-default;
+  border-radius: 16rpx;
+  background: $bg-surface;
+  color: $text-muted;
+}
+
+.student-verify-thumb--filled {
+  border-style: solid;
+  border-color: $divider-nav;
+}
+
+.student-verify-thumb image {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.student-verify-thumb__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rpx;
+}
+
+.student-verify-thumb__plus {
+  color: $brand-primary;
+  font-size: 34rpx;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.student-verify-thumb__text {
+  color: $text-muted;
+  font-size: 20rpx;
+  line-height: 1.2;
+}
+
+.student-verify-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 56rpx;
+  min-height: 56rpx;
+  margin-left: 24rpx;
+  padding: 0;
+  color: $text-strong;
+  font-size: 26rpx;
+  line-height: 56rpx;
+  text-align: right;
+}
+
+.student-verify-actions {
+  margin-top: 36rpx;
+}
+
+.student-verify-link {
+  @include ref.touch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 88rpx;
+  margin-top: 16rpx;
+  color: $text-muted;
+  font-size: 24rpx;
+}
+
+.student-verify-link:active {
+  opacity: .6;
+}
+
+.student-verify-link--danger {
+  color: $danger;
+}
+
+.student-verify-pending-hint {
+  display: block;
+  margin-top: 8rpx;
+  color: $text-secondary;
+  font-size: 24rpx;
+  line-height: 1.7;
+  text-align: center;
+}
+
+.student-verify-state--danger {
+  color: $danger;
+  font-weight: 600;
+}
+
+.student-verify-proofs {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12rpx;
+  flex-wrap: wrap;
+}
+
+.student-verify-proof {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 88rpx;
+  height: 88rpx;
+  overflow: hidden;
+  border: 1rpx solid $divider-nav;
+  border-radius: 14rpx;
+  background: $bg-surface;
+  color: $text-muted;
+  font-size: 20rpx;
+}
+
+.student-verify-proof image {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.student-verify-reason {
+  margin-top: 20rpx;
+  padding: 20rpx 28rpx;
+  border: 1rpx solid rgba($danger-static, .16);
+  border-radius: 24rpx;
+  background: rgba($danger-static, .06);
+}
+
+.student-verify-reason__label {
+  display: block;
+  color: $danger;
+  font-size: 23rpx;
+  font-weight: 600;
+}
+
+.student-verify-reason__text {
+  display: block;
+  margin-top: 8rpx;
+  color: $text-secondary;
+  font-size: 24rpx;
+  line-height: 1.7;
+}
+
+.student-verify-notice {
+  display: block;
+  margin-top: 18rpx;
+  color: $text-secondary;
+  font-size: 23rpx;
+  line-height: 1.6;
+  text-align: center;
+}

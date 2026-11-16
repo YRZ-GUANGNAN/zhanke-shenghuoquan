@@ -1,5 +1,5 @@
 // Domain F presentation contracts. Admin never queries domain databases directly.
-export type AdminSection = 'dashboard' | 'users' | 'identities' | 'moderation' | 'media' | 'delivery' | 'notifications' | 'takeout' | 'community' | 'trade' | 'reports' | 'feedbacks' | 'navigation' | 'feature-policy' | 'share-settings'
+export type AdminSection = 'dashboard' | 'users' | 'identities' | 'student-verifications' | 'moderation' | 'media' | 'delivery' | 'notifications' | 'takeout' | 'community' | 'trade' | 'reports' | 'feedbacks' | 'navigation' | 'feature-policy' | 'share-settings'
 export interface AdminUser{id:number;nickname:string;role:'admin'|'superadmin'}
 export interface AdminSession{user:AdminUser;csrfToken:string;expiresAt:string}
 export interface Page<T>{items:T[];page:number;pageSize:number;total:number}
@@ -49,6 +49,15 @@ export interface IdentityApplicationRow{applicationId:string;userId:string;role:
 export interface IdentityApplicationDetail extends IdentityApplicationRow{events:IdentityApplicationEvent[]}
 export interface IdentityApplicationQuery{page?:number;pageSize?:number;role?:IdentityApplicationRole;status?:IdentityApplicationStatus}
 export interface IdentityApplicationAdminList{items:IdentityApplicationRow[];page:number;pageSize:number;total:number}
+
+export type StudentVerificationStatus='pending'|'approved'|'rejected'|'cancelled'
+export type StudentVerificationEventType='submitted'|'resubmitted'|'approved'|'rejected'|'cancel_requested'|'cancel_approved'
+export interface StudentVerificationProof{assetId:string;url:string;expiresAt:string}
+export interface StudentVerificationEvent{eventId:string;eventType:StudentVerificationEventType;actorUserId:string;status:StudentVerificationStatus;reason:string;createdAt:string}
+export interface StudentVerificationRow{applicationId:string;userId:string;status:StudentVerificationStatus;realName:string;studentNo:string;college:string;assetIds:string[];proofs?:StudentVerificationProof[];reviewReason:string;reviewerUserId?:string;cancelRequested:boolean;cancelRequestedAt?:string;submittedAt:string;reviewedAt?:string;rowVersion:number}
+export interface StudentVerificationDetail extends StudentVerificationRow{events:StudentVerificationEvent[]}
+export interface StudentVerificationQuery{page?:number;pageSize?:number;status?:StudentVerificationStatus}
+export interface StudentVerificationAdminList{items:StudentVerificationRow[];page:number;pageSize:number;total:number}
 
 export interface MediaQuery{page?:number;pageSize?:number;assetId?:string;keyword?:string;status?:string;reviewStatus?:string;purpose?:string;taskId?:string;operation?:string;kind?:string;from?:string;to?:string}
 export interface MediaSummary{assets:number;pendingReview:number;consumerDeadletters:number;gcDeadletters:number}

@@ -543,6 +543,9 @@ func projectStatus(fact StatusFact) AssetStatus {
 		if fact.Purpose == coremedia.PurposeIdentityApplication {
 			message = "证明材料已上传，提交申请后由管理员人工核验"
 		}
+			if fact.Purpose == coremedia.PurposeStudentVerification {
+			message = "学生证照片已上传，提交后由管理员人工核验"
+			}
 	case fact.Projection != nil && *fact.Projection == coremedia.ProjectionApproved:
 		state, message, recovery, canUse = StateApproved, "图片审核通过，可以使用", RecoveryNone, true
 	case fact.Projection != nil && *fact.Projection == coremedia.ProjectionRejected:
