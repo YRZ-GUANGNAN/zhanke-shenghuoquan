@@ -10,7 +10,8 @@ import {
 } from '../../services/media'
 import './index.scss'
 
-const purposeLabel: Record<MediaStatus['purpose'], string> = { post: '帖子图片', product: '商品图片', avatar: '用户头像', profile_cover: '个人封面', identity_application: '身份申请材料', dish: '菜品图片', merchant_logo: '商家标志', delivery_proof: '配送凭证', delivery_im: '配送沟通图片', feedback: '反馈截图' }
+const purposeLabel: Record<MediaStatus['purpose'], string> = { post: '帖子图片', product: '商品图片', avatar: '用户头像', profile_cover: '个人封面', identity_application: '身份申请材料',
+  student_verification: '学生认证', dish: '菜品图片', merchant_logo: '商家标志', delivery_proof: '配送凭证', delivery_im: '配送沟通图片', feedback: '反馈截图' }
 
 export default function MediaHistoryPage() {
   const [items, setItems] = useState<MediaStatus[]>([])

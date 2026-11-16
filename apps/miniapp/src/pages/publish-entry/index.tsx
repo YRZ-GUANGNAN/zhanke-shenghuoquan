@@ -68,6 +68,7 @@ function PublishEntryPage() {
     <View className='publish-entry-page'>
       <CapsulePageHeader
         title='发布'
+        divider={false}
         left={
           <AppIconButton
             name='back'

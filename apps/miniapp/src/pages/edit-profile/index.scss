@@ -296,3 +296,215 @@
   padding: 0;
   color: $text-strong;
 }
+
+/* —— 首页显示：首页背景图偏好（本地保存，立即生效） —— */
+.edit-profile-home-panel__label {
+  display: block;
+  margin: 30rpx 0 14rpx 8rpx;
+  color: $text-muted;
+  font-size: 24rpx;
+  line-height: 1.2;
+}
+
+.edit-profile-home-card {
+  overflow: hidden;
+  border-radius: 24rpx;
+  background: $bg-screen;
+}
+
+.edit-profile-home-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  min-height: 104rpx;
+  padding: 18rpx 28rpx;
+  box-sizing: border-box;
+}
+
+.edit-profile-home-row:not(:last-child)::after {
+  position: absolute;
+  right: 28rpx;
+  bottom: 0;
+  left: 28rpx;
+  height: 1rpx;
+  background: $divider-nav;
+  content: '';
+}
+
+.edit-profile-home-row__main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+  min-width: 0;
+}
+
+.edit-profile-home-row__title {
+  color: $text-strong;
+  font-size: 28rpx;
+  font-weight: 500;
+  line-height: 40rpx;
+}
+
+.edit-profile-home-row__subtitle {
+  color: $text-muted;
+  font-size: 23rpx;
+  line-height: 34rpx;
+}
+
+.edit-profile-home-row__right {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.edit-profile-home-row__value {
+  color: $text-muted;
+  font-size: 25rpx;
+}
+
+.edit-profile-home-row__arrow {
+  width: 26rpx;
+  height: 26rpx;
+  opacity: .45;
+}
+
+.edit-profile-home-switch-target {
+  @include ref.touch;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.edit-profile-home-switch-target:active {
+  opacity: .72;
+}
+
+.edit-profile-home-switch {
+  position: relative;
+  width: 78rpx;
+  height: 44rpx;
+  border-radius: 999rpx;
+  background: $text-faint;
+  transition: background .16s ease;
+}
+
+.edit-profile-home-switch__knob {
+  position: absolute;
+  top: 4rpx;
+  left: 4rpx;
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 50%;
+  background: $bg-surface;
+  box-shadow: $shadow-card;
+  transition: transform .16s ease;
+}
+
+.edit-profile-home-switch--on {
+  background: $brand-primary;
+}
+
+.edit-profile-home-switch--on .edit-profile-home-switch__knob {
+  transform: translateX(34rpx);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .edit-profile-home-switch, .edit-profile-home-switch__knob { transition: none; }
+}
+
+/* 微信头像：官方 chooseAvatar 通道，一键导入微信头像 */
+.edit-profile-avatar-wechat {
+  @include ref.touch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: max-content;
+  min-height: 56rpx;
+  margin: 14rpx 0 0;
+  padding: 0 22rpx;
+  border: 1rpx solid rgba($brand-primary-static, .24);
+  border-radius: 999rpx;
+  background: rgba($brand-primary-static, .06);
+  color: $brand-primary-strong;
+  font-size: 24rpx;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.edit-profile-avatar-wechat::after { border: 0; }
+
+/* 学生验证（预留）：照片缩略图与行内输入 */
+.edit-profile-verify-thumb {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96rpx;
+  height: 96rpx;
+  overflow: hidden;
+  border: 2rpx dashed $border-default;
+  border-radius: 16rpx;
+  background: $bg-surface;
+  color: $text-muted;
+  font-size: 20rpx;
+}
+
+.edit-profile-verify-thumb--filled {
+  border-style: solid;
+  border-color: $divider-nav;
+}
+
+.edit-profile-verify-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rpx;
+}
+
+.edit-profile-verify-empty__plus {
+  color: $brand-primary;
+  font-size: 34rpx;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.edit-profile-verify-empty__text {
+  color: $text-muted;
+  font-size: 20rpx;
+  line-height: 1.2;
+}
+
+.edit-profile-verify-thumb image {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* 行内操作按钮不允许被挤压折行 */
+.edit-profile-home-card .app-button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.edit-profile-home-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 56rpx;
+  min-height: 56rpx;
+  margin-left: 24rpx;
+  padding: 0;
+  color: $text-strong;
+  font-size: 26rpx;
+  line-height: 56rpx;
+  text-align: right;
+}
+
+/* 显示与验证入口 */
+.edit-profile-entry-card {
+  margin-top: 22rpx;
+}

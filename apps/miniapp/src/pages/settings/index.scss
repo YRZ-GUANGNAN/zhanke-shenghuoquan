@@ -204,7 +204,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 16rpx;
   flex: 0 0 auto;
   min-height: 44px;
 }
@@ -214,14 +214,16 @@
   display: flex;
   align-items: center;
   margin: 0;
-  padding: 0 14px;
-  border: 1px solid rgba(47, 111, 168, 0.24);
-  border-radius: 999px;
+  padding: 0 28rpx;
+  min-width: 0;
+  min-height: 60rpx;
+  border: 1rpx solid rgba(47, 111, 168, 0.24);
+  border-radius: 999rpx;
   background: transparent;
   color: $brand-primary-static;
-  font-size: 13px;
+  font-size: 26rpx;
   font-weight: 600;
-  line-height: 32px;
+  line-height: 1;
 }
 
 .student-settings-phone-rebind::after {
@@ -232,13 +234,15 @@
   @include ref.touch;
   display: flex;
   align-items: center;
-  padding: 0 14px;
-  border: 1px solid rgba(196, 61, 75, 0.28);
-  border-radius: 999px;
+  padding: 0 28rpx;
+  min-width: 0;
+  min-height: 60rpx;
+  border: 1rpx solid rgba(196, 61, 75, 0.28);
+  border-radius: 999rpx;
   color: $danger-static;
-  font-size: 13px;
+  font-size: 26rpx;
   font-weight: 600;
-  line-height: 32px;
+  line-height: 1;
 }
 
 .student-settings-close {

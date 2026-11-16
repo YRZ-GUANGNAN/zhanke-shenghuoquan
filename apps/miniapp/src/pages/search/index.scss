@@ -116,17 +116,26 @@
   white-space: nowrap;
 }
 
+/* 筛选：方形图标按钮，与排序分段控件同高 */
 .student-search-filter-toggle {
   flex: 0 0 auto;
-  min-width: 88rpx;
-  min-height: 44PX;
+  width: 68rpx;
+  height: 68rpx;
+  min-width: 68rpx;
+  min-height: 68rpx;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 12rpx;
+  justify-content: center;
+  border: 1rpx solid $divider-nav;
+  border-radius: 20rpx;
+  background: $bg-screen;
   color: $text-secondary;
-  font-size: 25rpx;
-  font-weight: 500;
+  box-sizing: border-box;
+}
+.student-search-filter-toggle--active {
+  color: $brand-primary;
+  border-color: transparent;
+  background: $brand-tint;
 }
 
 .student-search-filter-summary__scroll {
@@ -155,24 +164,61 @@
   color: $text-secondary;
 }
 
-.student-search-sort-options { display: flex; gap: 40rpx; }
+/* 排序：轻分段控件（综合 / 最新），与二手分类同一语言 */
+.student-search-sort-options {
+  display: inline-flex;
+  align-items: center;
+  gap: 4rpx;
+  height: 68rpx;
+  padding: 6rpx;
+  border: 1rpx solid $divider-nav;
+  border-radius: 999rpx;
+  background: $bg-screen;
+  box-sizing: border-box;
+}
 .student-search-sort {
   display: flex;
   align-items: center;
-  min-height: 44PX;
-  min-width: 44PX;
-  font-size: 27rpx;
+  justify-content: center;
+  min-width: 108rpx;
+  height: 56rpx;
+  min-height: 56rpx;
+  padding: 0 24rpx;
+  border-radius: 999rpx;
+  font-size: 26rpx;
   font-weight: 500;
+  line-height: 1;
   color: $text-secondary;
+  box-sizing: border-box;
 }
-.student-search-sort--active,
-.student-search-filter-toggle--active { color: $brand-primary; font-weight: 600; }
+.student-search-sort--active {
+  background: $bg-surface;
+  color: $text-strong;
+  font-weight: 700;
+  box-shadow: 0 4rpx 14rpx rgba(31, 56, 88, .13), 0 2rpx 4rpx rgba(31, 56, 88, .07);
+}
 .student-search-filter-toggle__icon {
-  width: 12rpx;
-  height: 12rpx;
-  border-right: 2rpx solid currentColor;
-  border-bottom: 2rpx solid currentColor;
-  transform: translateY(-4rpx) rotate(45deg);
+  position: relative;
+  width: 26rpx;
+  height: 22rpx;
+}
+.student-search-filter-toggle__icon::before,
+.student-search-filter-toggle__icon::after {
+  position: absolute;
+  left: 0;
+  width: 26rpx;
+  height: 3rpx;
+  border-radius: 3rpx;
+  background: currentColor;
+  content: '';
+}
+.student-search-filter-toggle__icon::before {
+  top: 4rpx;
+  box-shadow: 0 7rpx 0 currentColor;
+}
+.student-search-filter-toggle__icon::after {
+  top: 18rpx;
+  width: 16rpx;
 }
 
 .student-search-filter-layer {

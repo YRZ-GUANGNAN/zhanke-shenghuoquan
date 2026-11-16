@@ -199,33 +199,6 @@
   min-width: 0;
 }
 
-.student-takeout-tip {
-  display: flex;
-  align-items: flex-start;
-  gap: 12rpx;
-  margin: 18rpx 24rpx 0;
-  padding: 18rpx 20rpx;
-  border: 1rpx solid rgba($brand-primary-static, .08);
-  border-radius: 16rpx;
-  background: $info-tint;
-  box-sizing: border-box;
-}
-
-.student-takeout-tip__icon {
-  flex: 0 0 auto;
-  width: 30rpx;
-  height: 30rpx;
-  margin-top: 1rpx;
-  color: $brand-primary;
-}
-
-.student-takeout-tip__text {
-  @include ref.type(meta);
-  @include ref.wrap;
-  flex: 1;
-  color: $text-tertiary;
-}
-
 .student-takeout-list {
   margin: 20rpx 24rpx 0;
   overflow: hidden;

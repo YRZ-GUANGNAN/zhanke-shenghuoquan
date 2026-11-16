@@ -7,6 +7,18 @@
 .app-state__title { color: $text-strong; font-size: 30rpx; font-weight: 600; line-height: 1.5; }
 .app-state__description { max-width: 520rpx; margin-top: 12rpx; color: $text-secondary; font-size: 26rpx; line-height: 1.7; }
 .app-state .app-button { min-height: 44PX; margin-top: $space-4; }
+// 空态/错误态的操作按钮需要一点分量：用与主按钮一致的实色语言，
+// 但比对话框主按钮更克制；对话框等其它 secondary 按钮不受影响。
+.app-state .app-button--secondary {
+  min-width: 208rpx;
+  border-radius: $radius-control;
+  border-color: rgba($brand-primary-static, .16);
+  background: linear-gradient(180deg, rgba($brand-primary-static, .09), rgba($brand-primary-static, .16));
+  color: $brand-primary-strong;
+  font-weight: 600;
+  box-shadow: 0 8rpx 20rpx -14rpx rgba($brand-primary-static, .35);
+}
+.app-state .app-button--secondary:active { background: rgba($brand-primary-static, .18); }
 
 // Keep the existing inline state footprint. Authentication never waits for this animation.
 .app-state--welcome { color: var(--text-strong, #1A2B3C); }

@@ -13,6 +13,24 @@ import type { IdentityRoleKey, IdentitySummary, UserProfile } from '../types'
 
 const TOKEN_KEY = 'domainA.token'
 
+// 新用户首次登录后引导到编辑资料：微信已不允许静默获取头像昵称，
+// 由页面里的「用微信头像」按钮与昵称联想完成导入；每台设备仅引导一次。
+const PROFILE_IMPORT_PROMPT_KEY = 'onboarding.profileImportPrompted'
+function maybePromptProfileImport(profile: UserProfile) {
+  try {
+    if (Taro.getStorageSync(PROFILE_IMPORT_PROMPT_KEY)) return
+    const looksFresh = !profile.avatar && (!profile.nickname || profile.nickname === '校园用户')
+    if (!looksFresh) return
+    Taro.setStorageSync(PROFILE_IMPORT_PROMPT_KEY, '1')
+    setTimeout(() => {
+      void Taro.showToast({ title: '欢迎，先完善头像和昵称', icon: 'none' }).catch(() => undefined)
+      void Taro.navigateTo({ url: '/pages/edit-profile/index' }).catch(() => undefined)
+    }, 800)
+  } catch {
+    // 引导失败不影响登录本身。
+  }
+}
+
 export type SessionStatus = 'idle' | 'booting' | 'authenticated' | 'anonymous' | 'error'
 
 interface SessionState {
@@ -130,6 +148,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
         identity,
         error: ''
       })
+      maybePromptProfileImport(session.profile)
     } catch (error) {
       if (!isCurrent()) return
       if (isApiError(error) && error.status === 401) {

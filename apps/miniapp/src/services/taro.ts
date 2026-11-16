@@ -80,6 +80,7 @@ interface TaroFacade {
 	hideLoading(): Promise<unknown>
   hideKeyboard(): Promise<unknown>
 	showModal(options: ModalOptions): Promise<{ confirm: boolean; cancel: boolean }>
+	showActionSheet(options: { itemList: string[]; itemColor?: string }): Promise<{ tapIndex: number }>
 	makePhoneCall(options: { phoneNumber: string }): Promise<unknown>
 	setClipboardData(options: { data: string }): Promise<unknown>
 	getClipboardData(): Promise<{ data: string }>
@@ -104,7 +105,11 @@ interface TaroFacade {
   getImageInfo(options: { src: string }): Promise<{ width: number; height: number; type: string; path: string }>
   compressImage(options: { src: string; quality: number; compressedWidth?: number; compressedHeight?: number; format?: 'webp' }): Promise<{ tempFilePath: string }>
   getFileInfo(options: { filePath: string; digestAlgorithm?: 'md5' | 'sha1' }): Promise<{ size: number; digest: string }>
-  getFileSystemManager(): { readFileSync(filePath: string): ArrayBuffer | ArrayBufferView | string }
+  getFileSystemManager(): {
+    readFileSync(filePath: string): ArrayBuffer | ArrayBufferView | string
+    saveFile(options: { tempFilePath: string; success?: (result: { savedFilePath: string }) => void; fail?: (error: unknown) => void }): void
+    removeSavedFile(options: { filePath: string; success?: () => void; fail?: (error: unknown) => void }): void
+  }
 	requestPayment(options: RequestPaymentOptions): Promise<unknown>
 	getUpdateManager(): {
 		onCheckForUpdate(callback: (value: { hasUpdate: boolean }) => void): void

@@ -34,6 +34,7 @@ import { useSessionStore } from '../../stores/session'
 import { postBodyWithoutTitle } from '../../utils/post-presentation'
 import { navigateToPublicProfile } from '../../utils/navigation'
 import { conversationPeer, uniquePeerConversations } from '../../utils/conversation-presentation'
+import { readHomeHeaderBackdrop, readHomeHeaderBackdropImage } from '../../utils/ui-preferences'
 import './index.scss'
 
 type HomeTab = 'discover' | 'secondhand' | 'tools' | 'messages'
@@ -157,6 +158,9 @@ function HomeContent() {
   // Keep this page's entry mode when a pushed page becomes the current router.
   const [isMessagesPage] = useState(() => Taro.getCurrentInstance().router?.params.tab === 'messages')
   const [activeTab, setActiveTab] = useState<HomeTab>(isMessagesPage ? 'messages' : 'discover')
+  const [headerBackdropFailed, setHeaderBackdropFailed] = useState(false)
+  const [headerBackdropEnabled, setHeaderBackdropEnabled] = useState(readHomeHeaderBackdrop)
+  const [headerBackdropImage, setHeaderBackdropImage] = useState(readHomeHeaderBackdropImage)
   const [marketVisited, setMarketVisited] = useState(false)
   const channelInteraction = useChannelInteraction()
   const [postCards, setPostCards] = useState<DiscoverCard[]>([])
@@ -197,6 +201,8 @@ function HomeContent() {
   const currentUserId = useSessionStore((state) => state.profile.id)
   const currentSessionKey = useSessionStore((state) => `${state.token}:${state.profile.id}`)
   const motionPreview = usePostMotionPreview(activeTab === 'discover' && identityAllowed && visibility.forum, currentSessionKey)
+  // 默认不显示任何背景图（纯白）；用户在编辑资料里选了自定义图片后才显示。
+  const headerBackdropSrc = headerBackdropImage
   const visibleTabs = useMemo(() => {
     if (!visibility) return []
     if (isMessagesPage) return visibility.messages
@@ -454,6 +460,8 @@ function HomeContent() {
 
   useDidShow(() => {
     visibleForNotifications.current = true
+    setHeaderBackdropEnabled(readHomeHeaderBackdrop())
+    setHeaderBackdropImage(readHomeHeaderBackdropImage())
     if (activeTab === 'messages' && visibility.messages) void loadConversations(currentSessionKey)
   })
   useEffect(() => {
@@ -463,6 +471,11 @@ function HomeContent() {
     }, 800)
     return () => clearTimeout(timer)
   }, [notifications.messageRevision, activeTab, visibility.messages, loadConversations, currentSessionKey])
+
+  // 用户更换背景图后，之前那张图的加载失败状态需要重置。
+  useEffect(() => {
+    setHeaderBackdropFailed(false)
+  }, [headerBackdropSrc])
 
   const openSearch = () => {
     if (!channelInteraction.canActivate()) return
@@ -572,11 +585,35 @@ function HomeContent() {
 
   if (!identityAllowed) return <View className='student-home-page' />
 
+  // 头图是可选展示（编辑资料 → 首页显示，默认关闭 = 纯白）；
+  // 私信入口页始终纯白，图片加载失败或没有可用图片时自动回退纯白。
+  const showHeaderBackdrop = headerBackdropEnabled && !isMessagesPage && !headerBackdropFailed && Boolean(headerBackdropSrc)
+
   return (
     <View className='page student-home-page'>
       <CapsulePageHeader
         variant={isMessagesPage ? 'standard' : 'tabs'}
-        className='student-home-header'
+        divider={false}
+        className={`student-home-header${showHeaderBackdrop ? ' student-home-header--media' : ''}`}
+        backdrop={showHeaderBackdrop ? (
+          <View className='student-home-header__backdrop'>
+            <Image
+              className='student-home-header__backdrop-image'
+              src={headerBackdropSrc}
+              mode='aspectFill'
+              onError={() => setHeaderBackdropFailed(true)}
+            />
+            <View className='student-home-header__blur'>
+              <Image
+                className='student-home-header__backdrop-image student-home-header__backdrop-image--blur'
+                src={headerBackdropSrc}
+                mode='aspectFill'
+              />
+            </View>
+            <View className='student-home-header__glass' />
+            <View className='student-home-header__veil' />
+          </View>
+        ) : undefined}
         center={isMessagesPage ? <Text className='student-home-header__title'>私信</Text> :
           <View className='student-home-header__tabs'>
             {visibleTabs.map((tab) => (

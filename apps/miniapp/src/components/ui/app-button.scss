@@ -22,8 +22,15 @@
 .app-button--small { min-width: 112rpx; height: 72rpx; padding: 0 $space-3; font-size: 25rpx; }
 .app-button--primary { background: $brand-primary; color: $text-on-color; box-shadow: 0 12rpx 24rpx -12rpx rgba($brand-primary-static, .65); }
 .app-button--primary:active { background: $brand-primary-pressed; }
-.app-button--secondary { border-color: rgba($brand-primary-static, .22); background: $brand-tint; color: $brand-primary-strong; }
-.app-button--secondary:active { background: #D8EAF9; }
+.app-button--secondary {
+  min-width: 160rpx;
+  padding: 0 $space-5;
+  border-color: rgba($brand-primary-static, .18);
+  background: $brand-tint;
+  color: $brand-primary-strong;
+  font-weight: 600;
+}
+.app-button--secondary:active { background: rgba($brand-primary-static, .2); }
 .app-button--ghost { border-color: $border-default; background: $bg-surface; color: $text-primary; }
 .app-button--ghost:active { background: $bg-surface-subtle; }
 .app-button--danger { background: $danger; color: $text-on-color; box-shadow: 0 12rpx 24rpx -12rpx rgba($danger-static, .55); }

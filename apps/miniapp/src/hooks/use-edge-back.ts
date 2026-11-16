@@ -23,7 +23,7 @@ function hasNativeBack() {
   // pop a second page after the system finishes its gesture.
   let platform = ''
   try { platform = Taro.getDeviceInfo().platform } catch {
-    try { platform = Taro.getSystemInfoSync().platform } catch { return false }
+    try { platform = Taro.getDeviceInfo().platform } catch { return false }
   }
   if (platform !== 'ios') return false
   try { return Taro.getCurrentPages().length > 1 } catch { return true }

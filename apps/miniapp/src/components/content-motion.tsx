@@ -60,7 +60,7 @@ export function ExpandableText({ text, className = '', lines = 6, reveal = false
   const foldable = Boolean(measure && measure.full > measure.closed + 1)
   return <View className={`content-fold${ready ? ' content-fold--ready' : ''} ${className}`}>
     <View className='content-fold__viewport' style={measure && measure.full > 0 ? { height: `${expanded || !foldable ? measure.full : measure.closed}px` } : undefined}>
-      <Text id={`${id}-body`} className='content-fold__text' selectable>{text}</Text>
+      <Text id={`${id}-body`} className='content-fold__text' userSelect>{text}</Text>
     </View>
     <Text id={`${id}-line`} className='content-fold__probe' aria-hidden>行</Text>
     {foldable && <View className='content-fold__toggle' role='button' aria-expanded={expanded} aria-disabled={disabled}

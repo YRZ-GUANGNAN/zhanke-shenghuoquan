@@ -19,6 +19,29 @@
   border-bottom: 1rpx solid $divider-nav;
 }
 
+/* 可选背景层：绝对定位在头部内容之下，由调用页传入具体图层。 */
+.capsule-page-header__backdrop {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* 背景层在场时，把位于普通流的头部行抬到背景层之上。 */
+.capsule-page-header--backdrop .capsule-page-header__system-row,
+.capsule-page-header--backdrop .capsule-page-header__business-row {
+  position: relative;
+  z-index: 2;
+}
+
+.capsule-page-header--backdrop .capsule-page-header__title {
+  z-index: 2;
+}
+
 .capsule-page-header__business-row {
   position: relative;
   display: flex;

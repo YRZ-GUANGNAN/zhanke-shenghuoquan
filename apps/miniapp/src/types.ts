@@ -42,6 +42,33 @@ export interface IdentityApplicationSubmitInput {
   merchantAddress: string
   assetIds: string[]
   expectedRowVersion: number
+}
+
+export type StudentVerificationStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
+
+export interface StudentVerificationView {
+  applicationId: string
+  userId: string
+  status: StudentVerificationStatus
+  realName: string
+  studentNo: string
+  college: string
+  assetIds: string[]
+  reviewReason: string
+  reviewerUserId?: string
+  cancelRequested: boolean
+  cancelRequestedAt?: string
+  submittedAt: string
+  reviewedAt?: string
+  rowVersion: number
+}
+
+export interface StudentVerificationSubmitInput {
+  realName: string
+  studentNo: string
+  college: string
+  assetIds: string[]
+  expectedRowVersion: number
 }
 
 // A: UserProfile; B: CommunityPost; C: Product; D: ToolLink.

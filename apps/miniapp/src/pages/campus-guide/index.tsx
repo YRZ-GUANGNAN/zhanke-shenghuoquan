@@ -46,12 +46,12 @@ function GuideContent() {
         <Text className='campus-guide-summary'>{guide.summary}</Text>
         {guide.sections.map((section, index) => <View className='campus-guide-section' key={section.title}>
           <View className='campus-guide-section__heading'><Text className='campus-guide-section__number'>{String(index + 1).padStart(2, '0')}</Text><Text>{section.title}</Text></View>
-          {section.paragraphs.map((paragraph, paragraphIndex) => <Text selectable className='campus-guide-paragraph' key={paragraphIndex}>{paragraph}</Text>)}
+          {section.paragraphs.map((paragraph, paragraphIndex) => <Text userSelect className='campus-guide-paragraph' key={paragraphIndex}>{paragraph}</Text>)}
         </View>)}
         <View className='campus-guide-source'>
           <Text className='campus-guide-source__label'>资料来源</Text>
           <Text>{guide.sourceName}</Text>
-          <Text selectable className='campus-guide-source__url'>{guide.sourceUrl}</Text>
+          <Text userSelect className='campus-guide-source__url'>{guide.sourceUrl}</Text>
           <Button className='campus-info-text-button' onClick={copySource}>复制官方来源链接</Button>
           <Text>本应用非学校官方应用，提供公开信息的阅读指引，不代办借阅或预约。服务安排以馆方最新通知为准。</Text>
         </View>

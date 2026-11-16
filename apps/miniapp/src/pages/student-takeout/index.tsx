@@ -28,11 +28,17 @@ function StudentTakeoutPage() {
   usePageShare({ kind: 'services', enabled: visibility.takeout })
   const merchantRequestVersion = useRef(0)
   const jumpingRef = useRef<string | null>(null)
+  const lastRequestAt = useRef(0)
 
   const load = useCallback(async () => {
+    // 首次进入页面时 useDidShow 与可见性 effect 会在同一时刻各触发一次，做短防抖去重。
+    const now = Date.now()
+    if (now - lastRequestAt.current < 300) return
+    lastRequestAt.current = now
     const version = merchantRequestVersion.current + 1
     merchantRequestVersion.current = version
-    setStatus('loading')
+    // 已有内容时静默刷新，不再整页闪烁加载骨架。
+    setStatus((current) => current === 'ready' || current === 'empty' ? current : 'loading')
     try {
       const values = await listExternalTakeoutMerchants()
       if (version !== merchantRequestVersion.current) return
@@ -41,8 +47,8 @@ function StudentTakeoutPage() {
     } catch (error) {
       console.error('load external takeout directory failed', error)
       if (version !== merchantRequestVersion.current) return
-      setMerchants([])
-      setStatus('error')
+      // 刷新失败保留已展示的列表，仅首次加载失败才进入错误态。
+      setStatus((current) => current === 'ready' ? current : 'error')
     }
   }, [])
 
@@ -104,18 +110,6 @@ function StudentTakeoutPage() {
       </View>
 
       <View className='student-takeout-scroll'>
-        {visibility?.takeout && <View className='student-takeout-directory'>
-          <View className='student-takeout-directory__copy'>
-            <Text className='student-takeout-directory__title'>合作商家</Text>
-            <Text className='student-takeout-directory__desc'>商品、订单与售后由商家小程序提供</Text>
-          </View>
-        </View>}
-
-        {visibility?.takeout && <View className='student-takeout-tip'>
-          <AppIcon name='info' className='student-takeout-tip__icon' />
-          <Text className='student-takeout-tip__text'>点击后将前往商家小程序，下单与售后由商家提供。</Text>
-        </View>}
-
         {visibility?.takeout && status === 'loading' && (
           <AppSkeleton rows={3} />
         )}

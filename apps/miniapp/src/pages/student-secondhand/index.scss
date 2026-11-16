@@ -23,7 +23,6 @@
   z-index: 6;
   flex: 0 0 auto;
   background: $bg-surface;
-  border-bottom: 1rpx solid $divider-nav;
 }
 .student-secondhand-header__title-row {
   box-shadow: none;
@@ -80,66 +79,50 @@
   background: $divider-nav;
 }
 .student-secondhand-categories {
-  white-space: nowrap;
+  margin: 12rpx 32rpx 16rpx;
+  padding: 6rpx;
+  border: 1rpx solid $border-default;
+  border-radius: 999rpx;
+  background: $bg-screen;
+  box-sizing: border-box;
 }
 .student-secondhand-categories__inner {
-  display: inline-flex;
-  gap: 36rpx;
-  padding: 0 32rpx;
+  display: flex;
+  gap: 4rpx;
+  padding: 0;
+  width: 100%;
 }
 .student-secondhand-category {
   @include ref.touch;
-  @include ref.type(label);
   position: relative;
+  flex: 1 1 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 88rpx;
+  height: 60rpx;
+  min-width: 0;
+  min-height: 60rpx;
+  padding: 0 8rpx;
+  border-radius: 999rpx;
   color: $text-secondary;
-  transition: color $duration-fast $ease-standard;
+  font-size: 26rpx;
+  font-weight: 500;
+  line-height: 1;
+  box-sizing: border-box;
+  transition: color $duration-fast $ease-standard, background-color $duration-fast $ease-standard;
   text { transition: opacity $duration-fast $ease-standard; }
   &:active text { opacity: .6; }
 }
 .student-secondhand-category--active {
-  color: $brand-primary;
+  background: $bg-surface;
+  color: $text-strong;
   font-weight: 700;
-}
-.student-secondhand-category::after {
-  position: absolute;
-  right: 18%;
-  bottom: 8rpx;
-  left: 18%;
-  height: 4rpx;
-  border-radius: 4rpx;
-  background: $brand-primary;
-  content: '';
-  transform: scaleX(0);
-  opacity: 0;
-  transition: transform $duration-standard $ease-standard, opacity $duration-fast $ease-standard;
-}
-.student-secondhand-category--active::after {
-  transform: scaleX(1);
-  opacity: 1;
+  box-shadow: 0 4rpx 14rpx rgba(31, 56, 88, .13), 0 2rpx 4rpx rgba(31, 56, 88, .07);
 }
 .student-secondhand-scroll {
   flex: 1 1 auto;
   height: 0;
   min-height: 0;
-}
-.student-secondhand-notice {
-  @include ref.type(meta);
-  @include ref.wrap;
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  margin: 0 24rpx;
-  padding: 20rpx 0;
-  color: $text-secondary;
-}
-.student-secondhand-notice__icon {
-  flex: 0 0 auto;
-  width: 28rpx;
-  height: 28rpx;
 }
 .student-secondhand-grid {
   display: grid;
@@ -302,9 +285,8 @@
 // Based on available space, not hardware pixel density. Search owns its own grid.
 @media (min-width: 600PX) {
   .student-secondhand-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24PX 16PX; padding: 0 24PX; max-width: 960PX; margin: 0 auto; }
-  .student-secondhand-notice { max-width: 960PX; margin: 0 auto; padding: 16PX 24PX; font-size: 12PX; line-height: 18PX; }
-  .student-secondhand-categories__inner { gap: 24PX; padding: 0 24PX; }
-  .student-secondhand-category { height: 48PX; font-size: 15PX; line-height: 22PX; }
+  .student-secondhand-categories { max-width: 912PX; margin: 12PX auto 16PX; }
+  .student-secondhand-category { height: 32PX; min-height: 32PX; font-size: 13PX; }
   .secondhand-card__media { border-radius: 8PX; }
   .secondhand-card__body { padding: 8PX 2PX 0; }
   .secondhand-card__title { height: 44PX; font-size: 15PX; line-height: 22PX; }
@@ -327,7 +309,6 @@
   .student-secondhand-scroll { animation: none; }
   .student-secondhand-category,
   .student-secondhand-category text,
-  .student-secondhand-category::after,
   .secondhand-card__media,
   .secondhand-card__body { transition: none; }
   .secondhand-card--pressed .secondhand-card__media { transform: none; }

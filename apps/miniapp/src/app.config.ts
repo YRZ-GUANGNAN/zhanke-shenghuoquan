@@ -17,7 +17,9 @@ export default defineAppConfig({
     'pages/legal/index',
     'pages/merchant-messages/index',
     'pages/rider-messages/index',
-    'pages/delivery-profile/index'
+    'pages/delivery-profile/index',
+    'pages/appearance/index',
+    'pages/student-verify/index'
   ],
   subPackages: [
     // Keep public URLs unchanged. Ordinary subpackages retain access to shared

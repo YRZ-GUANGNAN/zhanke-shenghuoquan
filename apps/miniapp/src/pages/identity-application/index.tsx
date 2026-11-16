@@ -415,7 +415,7 @@ function IdentityApplicationContent() {
               <AppField label={role === 'merchant' ? '负责人姓名' : '真实姓名'} value={realName} placeholder='填写证件上的真实姓名' maxLength={64} disabled={fieldsLocked} error={errors?.realName} onInput={setRealName} />
               <AppField label='联系电话' value={phone} inputType='number' placeholder='填写 11 位手机号码' maxLength={11} disabled={fieldsLocked} error={errors?.phone} onInput={setPhone} />
               {role === 'merchant' && <AppField label='经营地址' value={merchantAddress} multiline placeholder='填写校内经营地址、楼栋与店铺位置' maxLength={240} disabled={fieldsLocked} error={errors?.merchantAddress} onInput={setMerchantAddress} />}
-            </View> : <View className='identity-application-details'>{details.map(item => <View className='identity-application-detail' key={item.label}><Text className='identity-application-detail__label'>{item.label}</Text><Text className='identity-application-detail__value' selectable>{item.value || '未填写'}</Text></View>)}</View>}
+            </View> : <View className='identity-application-details'>{details.map(item => <View className='identity-application-detail' key={item.label}><Text className='identity-application-detail__label'>{item.label}</Text><Text className='identity-application-detail__value' userSelect>{item.value || '未填写'}</Text></View>)}</View>}
           </View>
 
           <View className='identity-application-card identity-application-proofs'>

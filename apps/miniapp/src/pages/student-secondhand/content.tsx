@@ -1,7 +1,7 @@
 import ProductPrice from '../../components/product-price'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDidShow } from '@tarojs/taro'
-import { Image, ScrollView, Text, View } from '@tarojs/components'
+import { Image, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import AppIcon from '../../components/app-icon'
 import { AppState } from '../../components/ui'
@@ -12,6 +12,7 @@ import { getProductsPage } from '../../services/c-trade'
 import Taro from '../../services/taro'
 import type { Product } from '../../types'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
+import { useHorizontalNavigation } from '../../hooks/use-horizontal-navigation'
 import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
 import { useSessionStore } from '../../stores/session'
 import { navigateToPublicProfile } from '../../utils/navigation'
@@ -225,6 +226,15 @@ export default function StudentSecondhandContent({ embedded = false, active = tr
     setFailedImages((current) => new Set(current).add(key))
   }
 
+  const switchCategoryBy = (direction: -1 | 1) => {
+    if (!active || !visibility.secondhand || (interaction && !interaction.canActivate())) return
+    const next = categories[categories.indexOf(activeCategory) + direction]
+    if (next) setActiveCategory(next)
+  }
+
+  // 内容区左右滑动切换相邻分类；方向与频道滑动一致（左滑看下一个）。
+  const categorySwipe = useHorizontalNavigation(switchCategoryBy, active && visibility.secondhand)
+
   const renderCard = (item: Product) => {
     const imageUrl = item.images.find((src) => src.trim())
     const imageKey = item.id + ':' + imageUrl
@@ -278,7 +288,7 @@ export default function StudentSecondhandContent({ embedded = false, active = tr
           </View> : undefined}
           divider={false}
         />}
-        <ScrollView className='student-secondhand-categories' scrollX enhanced showScrollbar={false}>
+        <View className='student-secondhand-categories'>
           <View className='student-secondhand-categories__inner'>
             {categories.map((item) => (
               <View key={item} className={'student-secondhand-category' + (activeCategory === item ? ' student-secondhand-category--active' : '')} onClick={() => {
@@ -288,18 +298,15 @@ export default function StudentSecondhandContent({ embedded = false, active = tr
               </View>
             ))}
           </View>
-        </ScrollView>
+        </View>
       </View>
       <RefreshScrollView key={`${ownerKey}:${activeCategory}`} className='student-secondhand-scroll' scrollY enhanced showScrollbar={false}
         enabled={active && visibility.secondhand} busy={status === 'loading' || loadingMore || refreshing}
         refreshKey={`${ownerKey}:${activeCategory}`} onRefresh={refreshProducts}
         scrollTop={restoreScrollTop} onScroll={event => { scrollPosition.current = Math.max(0, event.detail.scrollTop) }}
-        lowerThreshold={120} onScrollToLower={loadMoreProducts}>
+        lowerThreshold={120} onScrollToLower={loadMoreProducts}
+        {...categorySwipe.handlers}>
         {!visibility.secondhand ? <AppState kind='empty' title='二手市场暂未开放' /> : <>
-          <View className='student-secondhand-notice'>
-            <AppIcon name='info' className='student-secondhand-notice__icon' />
-            <Text>平台仅展示信息，请当面验货后付款。</Text>
-          </View>
           {status === 'empty' || status === 'error' ? (
             <AppState kind={status} title={status === 'empty' ? '该分类暂无在售宝贝' : '商品加载失败'} description={status === 'empty' ? '可以看看其他分类。' : '请检查网络后重试。'} actionText={status === 'error' ? '重新加载' : undefined} onAction={status === 'error' ? retryCurrentCategory : undefined} />
           ) : <View className='student-secondhand-grid'>

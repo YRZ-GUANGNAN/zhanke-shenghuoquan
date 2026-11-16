@@ -22,11 +22,6 @@ export default function ToolDirectory({ tools, status, jumpingId, refreshError, 
     groups.get(key)!.items.push(tool)
   })
   return <View className={`tool-directory${compact ? ' tool-directory--compact' : ''}`}>
-    <View className='tool-directory__heading'>
-      <Text className='tool-directory__eyebrow'>校园服务</Text>
-      <Text className='tool-directory__title'>{compact ? '常用服务' : '校园工具'}</Text>
-      <Text className='tool-directory__description'>需要的服务，从这里出发</Text>
-    </View>
     {status === 'idle' || status === 'loading' ? <AppSkeleton rows={3} /> : status === 'error' ?
       <AppState kind='error' title='工具加载失败' description='请检查网络后重新加载。' actionText='重新加载' onAction={onRetry} /> : status === 'empty' ?
       <AppState kind='empty' title='暂无可用工具' description='新的校园服务接入后，会显示在这里。' actionText='刷新看看' onAction={onRetry} /> :
@@ -42,7 +37,6 @@ export default function ToolDirectory({ tools, status, jumpingId, refreshError, 
           {jumpingId === tool.id ? <StatusGlyph kind='loading' small /> : <AppIcon name='chevron-right' className='tool-entry__arrow' />}
         </View>)}
       </View>)}
-      {refreshError && <View className='tool-directory__retry' ariaRole='button' onClick={onRetry}><Text>更新失败，已保留当前工具 · 重试</Text></View>}
-      <Text className='tool-directory__footer'>点击工具后，将打开对应的服务小程序</Text></>}
+      {refreshError && <View className='tool-directory__retry' ariaRole='button' onClick={onRetry}><Text>更新失败，已保留当前工具 · 重试</Text></View>}</>}
   </View>
 }

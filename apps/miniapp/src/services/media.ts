@@ -1,7 +1,7 @@
 import Taro from './taro'
 import { isApiError, request } from './api'
 
-export type MediaPurpose = 'post_image' | 'product_image' | 'avatar' | 'profile_cover' | 'dish' | 'merchant_logo' | 'delivery_proof' | 'delivery_im' | 'feedback' | 'identity_application'
+export type MediaPurpose = 'post_image' | 'product_image' | 'avatar' | 'profile_cover' | 'dish' | 'merchant_logo' | 'delivery_proof' | 'delivery_im' | 'feedback' | 'identity_application' | 'student_verification'
 export type MediaClientState =
   | 'waiting_upload'
   | 'processing'
@@ -17,7 +17,7 @@ export type MediaClientState =
 export interface MediaStatus {
   assetId: string
   ticketId: string
-  purpose: 'post' | 'product' | 'avatar' | 'profile_cover' | 'dish' | 'merchant_logo' | 'delivery_proof' | 'delivery_im' | 'feedback' | 'identity_application'
+  purpose: 'post' | 'product' | 'avatar' | 'profile_cover' | 'dish' | 'merchant_logo' | 'delivery_proof' | 'delivery_im' | 'feedback' | 'identity_application' | 'student_verification'
   state: MediaClientState
   technicalStatus: string
   reviewStatus: string
@@ -236,7 +236,8 @@ const MAX_EDGE: Record<MediaPurpose, number> = {
   delivery_proof: 1920,
   delivery_im: 1920,
   feedback: 1920,
-  identity_application: 1920
+  identity_application: 1920,
+  student_verification: 1080
 }
 const DELIVERY_PROOF_MAX_BYTES = 5 * 1024 * 1024
 
@@ -277,6 +278,17 @@ export async function chooseAndUploadImagesSettled(
   })
 }
 
+// chooseAvatar（微信头像选择器）返回的是临时文件路径，直接走与相册选图相同的上传管线。
+export async function uploadPickedImage(
+  tempFilePath: string,
+  purpose: MediaPurpose,
+  onProgress?: (percent: number, stage: UploadProgress['stage'], message: string) => void,
+  shouldContinue?: () => boolean
+): Promise<UploadedMedia> {
+  assertUploadActive(shouldContinue)
+  return uploadImage(tempFilePath, purpose, onProgress || (() => undefined), shouldContinue)
+}
+
 export async function getMediaStatus(assetId: string): Promise<MediaStatus> {
   return request<MediaStatus>(`/miniapp/media/assets/${assetId}`, { url: '', timeout: 10000 })
 }
@@ -295,14 +307,14 @@ export function isMediaUsable(status: MediaStatus): boolean {
   if (!status.canUse) return false
   if (status.state === 'approved') return true
   return status.state === 'ready' && status.reviewStatus === 'not_required' &&
-    ['avatar', 'profile_cover', 'identity_application', 'dish', 'merchant_logo'].includes(status.purpose)
+    ['avatar', 'profile_cover', 'identity_application', 'student_verification', 'dish', 'merchant_logo'].includes(status.purpose)
 }
 
 // Direct-use uploads finish their technical checks in the completion request.
 // Do not start a 90-second content-review spinner for profile or takeout media.
 export async function confirmDirectUpload(uploaded: UploadedMedia, shouldContinue?: () => boolean): Promise<MediaStatus> {
   assertUploadActive(shouldContinue)
-  if (!['avatar', 'profile_cover', 'identity_application', 'dish', 'merchant_logo'].includes(uploaded.purpose)) {
+  if (!['avatar', 'profile_cover', 'identity_application', 'student_verification', 'dish', 'merchant_logo'].includes(uploaded.purpose)) {
     throw new Error('此类图片仍需内容审核')
   }
   const status = isMediaUsable(uploaded) ? uploaded : await getMediaStatus(uploaded.assetId)
@@ -393,7 +405,7 @@ async function uploadImage(
   progress(35, 'uploading', '正在直传腾讯云 COS')
   await putSignedObject(session, bytes)
   assertUploadActive(shouldContinue)
-  progress(85, 'completing', ['avatar', 'profile_cover', 'identity_application', 'dish', 'merchant_logo'].includes(purpose)
+  progress(85, 'completing', ['avatar', 'profile_cover', 'identity_application', 'student_verification', 'dish', 'merchant_logo'].includes(purpose)
     ? '正在确认图片上传' : '正在校验图片并提交自动审核')
   const status = await retryUploadCompletion(session.ticketId)
   assertUploadActive(shouldContinue)
@@ -477,6 +489,7 @@ function domainPurpose(value: MediaPurpose): MediaStatus['purpose'] {
   if (value === 'delivery_im') return 'delivery_im'
   if (value === 'feedback') return 'feedback'
   if (value === 'identity_application') return 'identity_application'
+  if (value === 'student_verification') return 'student_verification'
   return 'avatar'
 }
 

@@ -48,7 +48,7 @@ export function ApplicationSummary({ role, application, compact = false }: {
     {!application && <Text className='application-summary__benefit'>{applicationRoleCopy[role].description}</Text>}
     {application && <View className='application-summary__reference'>
       <Text className='application-summary__reference-label'>申请编号</Text>
-      <Text className='application-summary__reference-id' selectable>{application.applicationId}</Text>
+      <Text className='application-summary__reference-id' userSelect>{application.applicationId}</Text>
     </View>}
   </View>
 }

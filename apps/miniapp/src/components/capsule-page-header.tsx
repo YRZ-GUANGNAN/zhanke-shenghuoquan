@@ -17,6 +17,7 @@ interface CapsulePageHeaderProps {
   center?: ReactNode
   right?: ReactNode
   divider?: boolean
+  backdrop?: ReactNode
 }
 
 function addSlotContentClass(content: ReactNode) {
@@ -43,13 +44,15 @@ export default function CapsulePageHeader({
   center,
   right,
   divider = true,
+  backdrop,
 }: CapsulePageHeaderProps) {
   const safeStyle = useViewportRefresh()
   return (
     <View
-      className={`capsule-page-header ${divider ? 'capsule-page-header--divider' : ''} ${className}`.trim()}
+      className={`capsule-page-header ${divider ? 'capsule-page-header--divider' : ''} ${backdrop ? 'capsule-page-header--backdrop' : ''} ${className}`.trim()}
       style={safeStyle}
     >
+      {backdrop ? <View className='capsule-page-header__backdrop'>{backdrop}</View> : null}
       <View className='capsule-page-header__system-row' />
       <View className={`capsule-page-header__business-row capsule-page-header__business-row--${variant}`}>
         {left ? <View className='capsule-page-header__slot capsule-page-header__slot--left'>{addSlotContentClass(left)}</View> : null}

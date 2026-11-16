@@ -419,8 +419,13 @@ function SearchContent() {
               onClick={() => applyFilters({ ...appliedFilters, sort: item.value })}
             >{item.label}</View>)}
           </View>
-          <View className={`student-search-filter-toggle${searchFilterLabels(scope, appliedFilters).length ? ' student-search-filter-toggle--active' : ''}`} role='button' hoverClass='student-search-control--pressed' onClick={openFilters}>
-            <Text>筛选{searchFilterLabels(scope, appliedFilters).length ? ` ${searchFilterLabels(scope, appliedFilters).length}` : ''}</Text>
+          <View
+            className={`student-search-filter-toggle${searchFilterLabels(scope, appliedFilters).length ? ' student-search-filter-toggle--active' : ''}`}
+            role='button'
+            hoverClass='student-search-control--pressed'
+            onClick={openFilters}
+            ariaLabel={`筛选${searchFilterLabels(scope, appliedFilters).length ? `，已选 ${searchFilterLabels(scope, appliedFilters).length} 项` : ''}`}
+          >
             <View className='student-search-filter-toggle__icon' />
           </View>
         </View>

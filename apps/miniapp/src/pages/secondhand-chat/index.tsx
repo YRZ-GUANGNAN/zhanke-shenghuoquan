@@ -468,7 +468,7 @@ function SecondhandChatPage() {
                     </View>
                   )}
                   <View className={`secondhand-chat-bubble ${mine ? 'secondhand-chat-bubble--me' : 'secondhand-chat-bubble--seller'}`}>
-                    <Text className='secondhand-chat-bubble__text' selectable>{pending ? pending.text : messageDisplayText(message!)}</Text>
+                    <Text className='secondhand-chat-bubble__text' userSelect>{pending ? pending.text : messageDisplayText(message!)}</Text>
                     {pending?.state === 'failed' ? <View className='secondhand-chat-bubble__retry' role='button' aria-label={`发送失败：${pending.error || '请重试'}`} onClick={() => retryPending(pending)}><Text>发送失败 · 重试</Text><Text className='secondhand-chat-bubble__reason'>{pending.error}</Text></View> : null}
                     <Text className='secondhand-chat-bubble__time'>{pending?.state === 'sending' ? '发送中' : formatTime(time)}</Text>
                   </View>
