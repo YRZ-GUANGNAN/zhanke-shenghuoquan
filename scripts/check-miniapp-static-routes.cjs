@@ -21,6 +21,8 @@ const expectedRoutes = [
   'pages/user-profile/index',
   'pages/my-content/index',
   'pages/edit-profile/index',
+  'pages/appearance/index',
+  'pages/student-verify/index',
   'pages/settings/index',
   'pages/official-account-bind/index',
   'pages/notifications/index',

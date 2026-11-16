@@ -70,6 +70,10 @@ async function pageBehavior() {
       }
       if (id.endsWith('/stores/session')) return { useSessionStore: (selector) => selector({ token: options.token || 'test-token', profile: { id: 'test-user' } }) }
       if (id.endsWith('/session-recovery')) return { requestWithSingleSessionRecovery: (run) => run() }
+      if (id.endsWith('/ui-preferences')) return {
+        readHomeHeaderBackdrop: () => false,
+        readHomeHeaderBackdropImage: () => '',
+      }
       if (id.endsWith('/use-page-share')) return { usePageShare: () => {} }
       if (id.endsWith('/share-model')) return { publicShareId: (id) => id || '' }
       if (id.endsWith('/capsule-page-header')) return { default: (props) => React.createElement(View, { className: 'test-header' }, props.left, props.center, props.right) }
