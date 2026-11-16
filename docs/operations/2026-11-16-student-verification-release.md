@@ -1,6 +1,6 @@
-# 2026-11-16 学生认证闭环上线（发布准备）
+# 2026-11-16 学生认证闭环上线（发布记录）
 
-本记录为上线准备稿：代码、迁移与验证已完成，生产部署尚未执行；执行后在本文件追加实际发布身份与验证结果。
+代码、迁移与验证已完成，生产部署已于 2026-11-16 执行（版本 `2026.11.16.candidate.1`，commit `997efc1e38d1`）；实际发布身份与线上验证结果见文末「生产部署记录」。
 
 ## 本次内容
 
@@ -33,17 +33,17 @@
 - 编辑资料：新增「用微信头像」（chooseAvatar 官方通道）与微信昵称联想输入；新用户首次登录自动引导到编辑资料一次。
 - 清理：`wx.saveFile/removeSavedFile` 改为 FileSystemManager；`getSystemInfoSync` 换 `getDeviceInfo`；`selectable` 换 `userSelect`；背景图压缩限宽 1080。
 
-## 部署步骤（待执行）
+## 部署步骤（已于 2026-11-16 执行）
 
-1. **备份生产库**（沿用既有备份路径规范，如 `/var/backups/campus-circle/`）。
+1. **备份生产库**：备份位于 `/var/backups/campus-circle/pre-migration-063-20261116T152226Z.sql.gz`（gzip 校验通过，含 107 张表，不含学生认证表，为迁移前状态）。
 2. **执行迁移**：
    ```bash
    mysql <生产库> < backend/migrations/063_student_verification.sql
    ```
-   迁移为幂等建表 + 约束替换；回滚脚本见上。
-3. **部署后端**：构建并切换 release，重启 `campus-api`（沿用既有发布目录与软链规范）。
-4. **发布管理后台静态**（本次包含新菜单「学生认证」）。
-5. **小程序发版**：上传体验版→真机验收→提交审核（界面改动 + 学生验证页）。
+   运维注意：应用库账号 `campus_app` 无 DDL 权限（ALTER 被拒），迁移需用服务器 MySQL 维护账号执行：`sudo mysql --defaults-file=/etc/mysql/debian.cnf campus_circle < 063_student_verification.sql`。回滚脚本见上。
+3. **部署后端**：新 release `/opt/campus-circle/releases/20261116a-student-verify-997efc1`，`/opt/campus-circle/current` 已原子切换并重启 `campus-api`。
+4. **发布管理后台静态**：新 release `/var/www/campus-admin/releases/admin-20261116-997efc1`，`/var/www/campus-admin/current` 已切换。
+5. **小程序发版**：上传体验版→真机验收→提交审核（界面改动 + 学生验证页）——**未执行，待人工完成**。
 6. **平台侧检查（人工）**：上线前确认小程序后台《用户隐私保护指引》覆盖相册/头像选择等接口；如账号已开启隐私检查，需补 `__usePrivacyCheck__` 与隐私授权回调（本次未包含，属独立上线门槛）。
 
 ## 验证清单（部署后执行并记录）
@@ -75,6 +75,20 @@
 
 ## 仍未验收
 
-- 生产库迁移与部署未执行（本文档为准备稿）。
 - 学生认证全流程及照片裁剪未在真机验收。
+- 管理后台「学生认证」页的真实管理员会话操作（列表/详情/驳回/解除）尚未人工点验。
+- 小程序未发版：界面改动 + 学生验证页仍在待审核版本中。
 - 隐私保护指引与隐私授权回调未配置（上线前独立检查项）。
+
+## 生产部署记录（2026-11-16）
+
+- **版本**：`2026.11.16.candidate.1`，commit `997efc1e38d1`，构建时间 `2026-11-16T15:21:21Z`（`/version` 线上返回一致）。
+- **后端 release**：`/opt/campus-circle/releases/20261116a-student-verify-997efc1`（`bin/campus-api`，SHA256 `bdfc874d7605dc70392b51a35d57aa18cda015fe466fecf993f41469d081da2f`，linux/amd64，ldflags 注入版本）；`/opt/campus-circle/current` 已切换并 `systemctl restart campus-api`（ActiveState=active，重启后无 warning 日志）。
+- **后台静态 release**：`/var/www/campus-admin/releases/admin-20261116-997efc1`（含 `assets/index-CI5Np5fs.js`、`assets/index-DAxdGI3n.css`、`images/`）；`/var/www/campus-admin/current` 已切换，首页已引用新资源。
+- **数据库迁移**：`063_student_verification.sql` 已用维护账号（debian-sys-maint）在生产库 `campus_circle` 执行；验证三张新表存在，`chk_media_asset_purpose` 与 `chk_media_reference_type` 均包含 `student_verification` 且保留 `profile_cover`。迁移前备份见上（执行时曾误将回滚脚本以同名文件覆盖上传导致一次 ALTER 被拒，未执行任何语句，库结构无变化；以区分文件名重新上传并核对 SHA256 后正式执行）。
+- **线上验证（2026-11-16）**：
+  - `GET https://zhanduiwang.top/healthz` → 200 `{"code":0,"message":"ok","data":{"status":"ok"}}`。
+  - `GET https://zhanduiwang.top/version` → `{"version":"2026.11.16.candidate.1","commit":"997efc1e38d1",...}`。
+  - 未登录 `GET /api/v1/auth/student-verification` → 401；`GET /api/v1/admin/student-verifications` → 401。
+  - 管理后台首页 200，`/assets/index-CI5Np5fs.js` 200 且包含 `student-verifications` 导航定义。
+- **回滚目标（上一版）**：后端 `20261115j-console-2454382`，后台 `admin-20261116-4e6914c`；数据库回滚脚本 `backend/migrations/rollback/063_student_verification.sql`（学生认证为纯新增，回滚代码时也可暂不撤销表结构）。
