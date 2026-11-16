@@ -15,6 +15,7 @@ export default defineConfig(async (merge) => {
     outputRoot: 'dist',
     copy: { patterns: [
       { from: 'src/assets/share/default-share.png', to: 'dist/assets/share/default-share.png' },
+      { from: 'src/assets/brand/logo.png', to: 'dist/assets/brand/logo.png' },
       { from: 'src/theme.json', to: 'dist/theme.json' }
     ] },
     framework: 'react',
