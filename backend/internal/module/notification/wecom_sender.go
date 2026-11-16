@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -159,6 +160,11 @@ func (s *WeComGroupSender) Send(ctx context.Context, message WecomGroupSnapshot)
 	return SendStatusRejected, ErrWecomPayload
 }
 
+var (
+	wecomMiniAppIDPattern       = regexp.MustCompile(`^wx[0-9A-Za-z]{16}$`)
+	wecomMiniAppPagePathPattern = regexp.MustCompile(`^pages/[A-Za-z0-9_-]+/index(\?[A-Za-z0-9_=&%.\-]*)?$`)
+)
+
 // marshalWecomTemplateCard builds a text_notice template card payload. Lengths
 // are clamped to the values accepted by the group robot API.
 func marshalWecomTemplateCard(card WecomTemplateCard, occurredAt time.Time) ([]byte, error) {
@@ -194,6 +200,18 @@ func marshalWecomTemplateCard(card WecomTemplateCard, occurredAt time.Time) ([]b
 	if actionURL == "" {
 		actionURL = "https://zhanduiwang.top/"
 	}
+	cardAction := map[string]any{"type": 1, "url": actionURL}
+	// 小程序跳转：appid+pagepath 合法时优先，桌面端用 URL 兜底。
+	if appID := strings.TrimSpace(card.ActionAppID); wecomMiniAppIDPattern.MatchString(appID) {
+		if pagePath := strings.TrimSpace(card.ActionPagePath); wecomMiniAppPagePathPattern.MatchString(pagePath) {
+			cardAction = map[string]any{
+				"type":     2,
+				"url":      actionURL,
+				"appid":    appID,
+				"pagepath": pagePath,
+			}
+		}
+	}
 	template := map[string]any{
 		"card_type": "text_notice",
 		"source": map[string]any{
@@ -205,10 +223,7 @@ func marshalWecomTemplateCard(card WecomTemplateCard, occurredAt time.Time) ([]b
 			"desc":  card.Desc,
 		},
 		"horizontal_content_list": items,
-		"card_action": map[string]any{
-			"type": 1,
-			"url":  actionURL,
-		},
+		"card_action":             cardAction,
 	}
 	if card.EmphasisTitle != "" {
 		template["emphasis_content"] = map[string]any{

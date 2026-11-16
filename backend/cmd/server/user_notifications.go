@@ -178,6 +178,7 @@ func newUserNotificationRuntime(cfg config.Config, db *gorm.DB, users *user.Serv
 				db,
 				func() bool { return groupSender.Enabled("merchant_ops") },
 				func() bool { return groupSender.Enabled("rider_ops") },
+				cfg.WechatAppID,
 			),
 		))
 		wecomSender = groupSender

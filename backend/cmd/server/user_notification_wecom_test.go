@@ -21,7 +21,8 @@ func TestDeliveryWecomFormatterRoutesOrderMetadataByGroup(t *testing.T) {
 		AggregateType: "delivery_order", AggregatePublicID: notificationTestOrderID,
 		AggregateVersion: 3, PayloadVersion: 1, Payload: payload, OccurredAt: now,
 	}
-	format := deliveryWecomGroupFormatter(nil, func() bool { return true }, func() bool { return true })
+	const miniAppID = "wx0123456789abcdef"
+	format := deliveryWecomGroupFormatter(nil, func() bool { return true }, func() bool { return true }, miniAppID)
 	groups, err := format(event)
 	if err != nil || len(groups) != 2 || groups[0].GroupKey != "merchant_ops" || groups[1].GroupKey != "rider_ops" {
 		t.Fatalf("routing groups=%+v err=%v", groups, err)
@@ -31,8 +32,18 @@ func TestDeliveryWecomFormatterRoutesOrderMetadataByGroup(t *testing.T) {
 			!strings.Contains(group.Title, "骑手正在前往取货") {
 			t.Fatalf("unsafe or incorrect group message: %+v", group)
 		}
+		if group.Card == nil || group.Card.ActionAppID != miniAppID || group.Card.ActionURL != wecomOrderActionURL {
+			t.Fatalf("group card must carry miniapp jump: %+v", group.Card)
+		}
+		wantPage := wecomMerchantOrderPagePath
+		if group.GroupKey == "rider_ops" {
+			wantPage = wecomRiderOrderPagePath
+		}
+		if group.Card.ActionPagePath != wantPage {
+			t.Fatalf("group %s pagepath=%q want %q", group.GroupKey, group.Card.ActionPagePath, wantPage)
+		}
 	}
-	merchantOnly, err := deliveryWecomGroupFormatter(nil, func() bool { return true }, func() bool { return false })(event)
+	merchantOnly, err := deliveryWecomGroupFormatter(nil, func() bool { return true }, func() bool { return false }, "")(event)
 	if err != nil || len(merchantOnly) != 1 || merchantOnly[0].GroupKey != "merchant_ops" {
 		t.Fatalf("merchant-only routing=%+v err=%v", merchantOnly, err)
 	}
@@ -51,7 +62,7 @@ func TestDeliveryWecomFormatterRejectsUnknownPayloads(t *testing.T) {
 	} {
 		event := notification.Event{EventType: delivery.EventOrderStatusChanged, AggregateType: "delivery_order",
 			AggregatePublicID: notificationTestOrderID, PayloadVersion: 1, Payload: payload, OccurredAt: now}
-		if groups, err := deliveryWecomGroupFormatter(nil, func() bool { return true }, func() bool { return true })(event); err == nil || len(groups) != 0 {
+		if groups, err := deliveryWecomGroupFormatter(nil, func() bool { return true }, func() bool { return true }, "")(event); err == nil || len(groups) != 0 {
 			t.Fatalf("invalid payload accepted: groups=%+v err=%v", groups, err)
 		}
 	}

@@ -15,7 +15,7 @@ import (
 	"campus-circle/backend/internal/module/notification"
 )
 
-func deliveryWecomGroupFormatter(db *gorm.DB, merchantEnabled, riderEnabled func() bool) notification.WecomGroupFormatter {
+func deliveryWecomGroupFormatter(db *gorm.DB, merchantEnabled, riderEnabled func() bool, miniAppID string) notification.WecomGroupFormatter {
 	labels := map[delivery.Status]string{
 		delivery.StatusPaymentFailed: "配送费支付失败",
 		delivery.StatusReadyForClaim: "配送单等待接单",
@@ -85,13 +85,15 @@ func deliveryWecomGroupFormatter(db *gorm.DB, merchantEnabled, riderEnabled func
 				Title:    "商家订单 · " + label,
 				Summary:  label,
 				Card: &notification.WecomTemplateCard{
-					SourceDesc:    "湛科生活圈 · " + platform,
-					Title:         "新订单通知",
-					Desc:          platform + " · " + label,
-					EmphasisTitle: yuanLabel(fact.DeliveryFeeCents),
-					EmphasisDesc:  "配送费",
-					Items:         items,
-					ActionURL:     wecomOrderActionURL,
+					SourceDesc:     "湛科生活圈 · " + platform,
+					Title:          "新订单通知",
+					Desc:           platform + " · " + label,
+					EmphasisTitle:  yuanLabel(fact.DeliveryFeeCents),
+					EmphasisDesc:   "配送费",
+					Items:          items,
+					ActionURL:      wecomOrderActionURL,
+					ActionAppID:    miniAppID,
+					ActionPagePath: wecomMerchantOrderPagePath,
 				},
 			})
 		}
@@ -101,13 +103,15 @@ func deliveryWecomGroupFormatter(db *gorm.DB, merchantEnabled, riderEnabled func
 				Title:    "骑手调度 · " + label,
 				Summary:  label,
 				Card: &notification.WecomTemplateCard{
-					SourceDesc:    "湛科生活圈 · " + platform,
-					Title:         "新订单通知",
-					Desc:          platform + " · " + label,
-					EmphasisTitle: yuanLabel(fact.RiderFeeCents),
-					EmphasisDesc:  "赏金",
-					Items:         items,
-					ActionURL:     wecomOrderActionURL,
+					SourceDesc:     "湛科生活圈 · " + platform,
+					Title:          "新订单通知",
+					Desc:           platform + " · " + label,
+					EmphasisTitle:  yuanLabel(fact.RiderFeeCents),
+					EmphasisDesc:   "赏金",
+					Items:          items,
+					ActionURL:      wecomOrderActionURL,
+					ActionAppID:    miniAppID,
+					ActionPagePath: wecomRiderOrderPagePath,
 				},
 			})
 		}
@@ -115,8 +119,13 @@ func deliveryWecomGroupFormatter(db *gorm.DB, merchantEnabled, riderEnabled func
 	}
 }
 
-// 企微卡片底部动作跳转；暂指向站点，小程序接单页 scheme 就绪后替换。
+// 企微卡片底部动作：优先跳转小程序（card_action type 2），桌面端回退站点 URL。
 const wecomOrderActionURL = "https://zhanduiwang.top/"
+
+const (
+	wecomMerchantOrderPagePath = "pages/merchant-home/index"
+	wecomRiderOrderPagePath    = "pages/delivery-rider/index"
+)
 
 func sourcePlatformCardLabel(platform string) string {
 	switch platform {

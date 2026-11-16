@@ -203,7 +203,7 @@ func (e *Expander) build(event Event, recipients []Recipient, now time.Time) ([]
 			}
 			snapshot, err := json.Marshal(WecomGroupSnapshot{
 				Version: 1, GroupKey: group.GroupKey, Title: group.Title, Summary: group.Summary,
-				Card: group.Card,
+				Card:          group.Card,
 				AggregateType: event.AggregateType, AggregatePublicID: event.AggregatePublicID,
 				AggregateVersion: event.AggregateVersion, OccurredAt: event.OccurredAt,
 			})
@@ -250,6 +250,9 @@ type WecomTemplateCard struct {
 	EmphasisDesc  string          `json:"emphasisDesc,omitempty"`
 	Items         []WecomCardItem `json:"items,omitempty"`
 	ActionURL     string          `json:"actionUrl,omitempty"`
+	// ActionAppID/ActionPagePath，当两者合法时卡片跳转小程序（type 2）；否则退回 URL（type 1）。
+	ActionAppID    string `json:"actionAppId,omitempty"`
+	ActionPagePath string `json:"actionPagePath,omitempty"`
 }
 
 type WecomGroupSnapshot struct {
@@ -258,10 +261,10 @@ type WecomGroupSnapshot struct {
 	Title             string             `json:"title"`
 	Summary           string             `json:"summary"`
 	Card              *WecomTemplateCard `json:"card,omitempty"`
-	AggregateType     string    `json:"aggregateType"`
-	AggregatePublicID string    `json:"aggregatePublicId"`
-	AggregateVersion  uint64    `json:"aggregateVersion"`
-	OccurredAt        time.Time `json:"occurredAt"`
+	AggregateType     string             `json:"aggregateType"`
+	AggregatePublicID string             `json:"aggregatePublicId"`
+	AggregateVersion  uint64             `json:"aggregateVersion"`
+	OccurredAt        time.Time          `json:"occurredAt"`
 }
 
 type WecomGroupFormatter func(Event) ([]WecomGroupMessage, error)
