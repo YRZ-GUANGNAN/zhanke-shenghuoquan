@@ -21,6 +21,7 @@ import {
   Button,
   Drawer,
   EmptyState,
+  ErrorNote,
   Modal,
   PageHeader,
   Pagination,
@@ -459,7 +460,7 @@ function MediaAssetsTab({ filter, onFilter, refreshTick }: { filter: MediaFilter
         ]} />
       </div>}
     >
-      {list.error && <div className="preview-form-error" role="alert">{list.error}</div>}
+      <ErrorNote message={list.error} onRetry={() => list.reload()} />
       {!list.data && list.loading
         ? <EmptyState title="正在读取素材" description="素材数据加载完成后会自动显示。" />
         : items.length === 0 && !list.error
@@ -580,7 +581,7 @@ function MediaDecisionsTab() {
   const list = useRemotePage<MediaDecisionRow>((page, pageSize) => adminAPI.mediaDecisions({ page, pageSize }))
   const items = list.data?.items ?? []
   return <Panel eyebrow="REVIEW DECISION" title="审核记录" description="审核投影收到的每次结论都会留下不可修改的版本记录。">
-    {list.error && <div className="preview-form-error" role="alert">{list.error}</div>}
+    <ErrorNote message={list.error} onRetry={() => list.reload()} />
     {list.error
       ? null
       : !list.data && list.loading
@@ -606,7 +607,7 @@ function MediaEventsTab() {
   const list = useRemotePage<MediaEventRow>((page, pageSize) => adminAPI.mediaEvents({ page, pageSize }))
   const items = list.data?.items ?? []
   return <Panel eyebrow="PROCESS EVENT" title="处理记录" description="上传、转码、投影等处理动作的消费结果。">
-    {list.error && <div className="preview-form-error" role="alert">{list.error}</div>}
+    <ErrorNote message={list.error} onRetry={() => list.reload()} />
     {list.error
       ? null
       : !list.data && list.loading
@@ -632,7 +633,7 @@ function MediaGCJobsTab() {
   const list = useRemotePage<MediaGCJobRow>((page, pageSize) => adminAPI.mediaGCJobs({ page, pageSize }))
   const items = list.data?.items ?? []
   return <Panel eyebrow="CLEANUP JOB" title="清理记录" description="删除素材后由后台异步清理对象存储，失败会重试。">
-    {list.error && <div className="preview-form-error" role="alert">{list.error}</div>}
+    <ErrorNote message={list.error} onRetry={() => list.reload()} />
     {list.error
       ? null
       : !list.data && list.loading
@@ -685,7 +686,7 @@ function MediaDeadlettersTab() {
   const empty = consumer.length === 0 && gc.length === 0
 
   return <Panel eyebrow="DEAD LETTER" title="异常记录" description="失败且已停止重试的消费与清理任务，需要人工介入。">
-    {error && <div className="preview-form-error" role="alert">{error}</div>}
+    <ErrorNote message={error} onRetry={() => setVersion(current => current + 1)} />
     <div className="preview-toolbar">
       <span className="preview-toolbar__hint">
         消费异常 {data?.consumer.total ?? '—'} 条 · 清理异常 {data?.gc.total ?? '—'} 条{loading ? ' · 刷新中…' : ''}
@@ -900,7 +901,7 @@ function ReviewOperations() {
       description="通过、拒绝与改判都必须填写依据；状态筛选由接口返回，搜索仅过滤当前页。"
       actions={<SearchBox value={search} onChange={setSearch} placeholder="搜索任务编号、对象或风险备注" />}
     >
-      {(actionError || list.error) && <div className="preview-form-error" role="alert">{actionError || list.error}</div>}
+      <ErrorNote message={actionError || list.error} onRetry={reloadAll} />
       <div className="preview-toolbar">
         <Segmented value={status} onChange={changeStatus} options={[
           { value: 'submitted', label: '待审核' },
@@ -1083,9 +1084,9 @@ function CommunityOperations() {
       <StatCard label="本页已下架" value={pageItems.filter(item => item.reviewStatus === 'taken_down').length} meta="当前页统计" tone="ink" />
     </section>
     <Panel eyebrow="COMMUNITY FEED" title="社区内容" description="审核状态来自统一审核流；下架需要填写原因并写入处理记录。" actions={<SearchBox value={query} onChange={setQuery} placeholder="搜索标题、作者或话题" />}>
-      {list.error && <div className="preview-form-error" role="alert">{list.error}</div>}
+      <ErrorNote message={list.error} onRetry={() => list.reload()} />
       <div className="preview-toolbar">
-        <Segmented value={status} onChange={setStatus} options={[
+        <Segmented value={status} onChange={value => { setStatus(value as CommunityFilter); list.setPage(1) }} options={[
           { value: '全部', label: '全部' },
           { value: '已公开', label: '已公开' },
           { value: '待审核', label: '待审核' },
@@ -1236,9 +1237,9 @@ function TradeOperations() {
       <StatCard label="在售金额（本页）" value={money(sellingItems.reduce((sum, item) => sum + item.price, 0))} meta="当前页出售中商品标价合计" tone="ink" />
     </section>
     <Panel eyebrow="SECONDHAND MARKET" title="商品工作队列" description="审核状态与业务状态分离；下架需要填写原因，只影响展示。" actions={<SearchBox value={query} onChange={setQuery} placeholder="搜索商品、卖家或分类" />}>
-      {list.error && <div className="preview-form-error" role="alert">{list.error}</div>}
+      <ErrorNote message={list.error} onRetry={() => list.reload()} />
       <div className="preview-toolbar">
-        <Segmented value={status} onChange={setStatus} options={[
+        <Segmented value={status} onChange={value => { setStatus(value as TradeFilter); list.setPage(1) }} options={[
           { value: '全部', label: '全部' },
           { value: '出售中', label: '出售中' },
           { value: '已预留', label: '已预留' },
@@ -1351,9 +1352,9 @@ function ReportOperations() {
       <StatCard label="本页已结案" value={pageItems.filter(item => item.reviewStatus === 'approved' || item.reviewStatus === 'rejected').length} meta="含通过或拒绝结论" tone="mint" />
     </section>
     <Panel eyebrow="SAFETY QUEUE" title="举报处理" description="举报处置沿用统一审核流；本页只读查看举报内容与最终结论。">
-      {list.error && <div className="preview-form-error" role="alert">{list.error}</div>}
+      <ErrorNote message={list.error} onRetry={() => list.reload()} />
       <div className="preview-toolbar">
-        <Segmented value={filter} onChange={setFilter} options={[
+        <Segmented value={filter} onChange={value => { setFilter(value as ReportFilter); list.setPage(1) }} options={[
           { value: '全部', label: '全部' },
           { value: 'submitted', label: '待审核' },
           { value: 'reviewing', label: '审核中' },

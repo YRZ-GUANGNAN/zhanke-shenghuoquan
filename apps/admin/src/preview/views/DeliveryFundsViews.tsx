@@ -24,6 +24,8 @@ import {
   earningStatusTone,
   feeStatusLabel,
   feeStatusTone,
+  conflictMessage,
+  isDeliveryConflict,
   formatDateTime,
   formatMoney,
   ledgerDirectionLabel,
@@ -1104,7 +1106,14 @@ function DefaultFeePanel() {
       notify('默认配送费已保存，仅影响之后新建的订单')
       await feeState.reload()
     } catch (reason) {
-      setError(deliveryErrorMessage(reason))
+      if (isDeliveryConflict(reason)) {
+        // 冲突说明行版本已过期：重新载入配置（同步输入框），用 toast 保留提示，
+        // 因为 [config] 变化时表单 effect 会清空局部 error。
+        await feeState.reload()
+        notify(conflictMessage + '，已载入最新配置', 'danger')
+      } else {
+        setError(deliveryErrorMessage(reason))
+      }
     } finally {
       setSaving(false)
     }
@@ -1227,7 +1236,14 @@ function MerchantOverridePanel() {
       setDisableTarget(null)
       await overridesState.reload()
     } catch (cause) {
-      setDisableError(deliveryErrorMessage(cause))
+      if (isDeliveryConflict(cause)) {
+        // 弹窗里的行版本已失效：关闭弹窗、刷新列表，让用户基于最新数据重新操作。
+        setDisableTarget(null)
+        await overridesState.reload()
+        notify('该专属费率已被他人修改，列表已刷新，请重新打开停用', 'danger')
+      } else {
+        setDisableError(deliveryErrorMessage(cause))
+      }
     } finally {
       setDisableBusy(false)
     }

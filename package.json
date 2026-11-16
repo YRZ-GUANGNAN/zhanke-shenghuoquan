@@ -93,6 +93,7 @@
     "build:miniapp": "npm --workspace apps/miniapp run build:weapp",
     "postbuild:miniapp": "node scripts/check-miniapp-ux-artifact.cjs && node scripts/check-delivery-pager-layout.cjs --artifact && node scripts/check-rider-wallet-disabled-style.cjs --dist && node scripts/check-miniapp-package-size.cjs",
     "dev:admin": "npm --workspace apps/admin run dev",
+    "dev:local": "node scripts/dev-local.mjs",
     "build:admin": "npm --workspace apps/admin run build",
     "build": "npm run build:miniapp && npm run build:admin",
     "typecheck": "npm --workspace apps/admin run typecheck && npm --workspace apps/miniapp run typecheck",

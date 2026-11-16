@@ -2313,3 +2313,11 @@ button.preview-media-card__visual:focus-visible {
     flex: 1 0 100%;
   }
 }
+
+/* 错误横幅带「重新加载」按钮时的两端布局。 */
+.preview-form-error--action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}

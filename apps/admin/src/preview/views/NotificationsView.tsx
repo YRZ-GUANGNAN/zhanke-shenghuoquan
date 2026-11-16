@@ -22,6 +22,7 @@ import {
   Segmented,
   StatCard,
   StatusPill,
+  ErrorNote,
   usePreviewToast
 } from '../ui'
 
@@ -492,7 +493,7 @@ export function NotificationsView() {
               : '尚未读取发送记录'}
         </span>
       </div>
-      {deliveriesError && deliveries && <div className="preview-form-error">{deliveriesError}</div>}
+      {deliveriesError && deliveries && <ErrorNote message={deliveriesError} onRetry={() => void loadDeliveries()} />}
       {!deliveries
         ? deliveriesLoading
           ? <EmptyState title="正在读取发送记录" description="最近的通知投递结果加载完成后会自动显示。" />

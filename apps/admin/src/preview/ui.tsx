@@ -302,6 +302,15 @@ export function Toggle({
   return <Switch checked={checked} onChange={onChange} aria-label={label} />
 }
 
+export function ErrorNote({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  // 空消息不渲染：调用方无需再写 message && 守卫。
+  if (!message) return null
+  return <div className="preview-form-error preview-form-error--action" role="alert">
+    <span>{message}</span>
+    {onRetry && <Button size="sm" onClick={onRetry}>重新加载</Button>}
+  </div>
+}
+
 export function EmptyState({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
   return <Empty className="preview-empty" description={<div className="preview-empty__text"><strong>{title}</strong>{description && <span>{description}</span>}</div>}>
     {action}

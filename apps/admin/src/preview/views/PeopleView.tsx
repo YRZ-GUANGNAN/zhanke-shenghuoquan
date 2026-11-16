@@ -18,6 +18,7 @@ import {
   Button,
   Drawer,
   EmptyState,
+  ErrorNote,
   Field,
   Modal,
   PageHeader,
@@ -305,7 +306,7 @@ function IdentityPeople() {
         />
         <Button size="sm" variant="ghost" disabled={loading} onClick={() => { void loadList(); void loadCounts() }}>{loading ? '加载中…' : '刷新'}</Button>
       </div>
-      {listError && <div className="preview-form-error" role="alert">{listError}</div>}
+      <ErrorNote message={listError} onRetry={() => { void loadList(); void loadCounts() }} />
       {listError
         ? null
         : loading && list.items.length === 0
@@ -558,7 +559,7 @@ function FeedbackPeople() {
         />
         <Button size="sm" variant="ghost" disabled={loading} onClick={() => { void loadList(); void loadCounts() }}>{loading ? '加载中…' : '刷新'}</Button>
       </div>
-      {listError && <div className="preview-form-error" role="alert">{listError}</div>}
+      <ErrorNote message={listError} onRetry={() => { void loadList(); void loadCounts() }} />
       {listError
         ? null
         : loading && data.items.length === 0
@@ -916,7 +917,7 @@ function UserPeople() {
         <SearchBox value={query} onChange={setQuery} placeholder="搜索当前页姓名、手机号或编号" />
         <Segmented value={role} onChange={setRole} options={roleOptions} />
       </div>
-      {listError && <div className="preview-form-error" role="alert">{listError}</div>}
+      <ErrorNote message={listError} onRetry={() => { void loadUsers(); void loadAllUsers(); void loadCredentials() }} />
       {allUsersError && <div className="preview-form-error" role="alert">账号统计加载失败：{allUsersError}</div>}
       {listError
         ? null

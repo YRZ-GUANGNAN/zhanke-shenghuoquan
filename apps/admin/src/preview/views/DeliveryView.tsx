@@ -38,6 +38,7 @@ import {
   Button,
   Drawer,
   EmptyState,
+  ErrorNote,
   Field,
   Modal,
   PageHeader,
@@ -347,7 +348,7 @@ export function DeliveryView() {
     </section>
 
     {summaryMeta && <div className="preview-toolbar"><span className="preview-toolbar__hint">{summaryMeta}</span></div>}
-    {summaryState.error && <div className="preview-form-error" role="alert">{summaryState.error}</div>}
+    {summaryState.error && <ErrorNote message={summaryState.error} onRetry={() => summaryState.reload()} />}
 
     <Panel
       eyebrow="ORDER FLOW"
@@ -364,7 +365,7 @@ export function DeliveryView() {
         </span>
       </div>
 
-      {ordersState.error && <div className="preview-form-error" role="alert">{ordersState.error}</div>}
+      {ordersState.error && <ErrorNote message={ordersState.error} onRetry={() => ordersState.reload()} />}
 
       {selectedIds.length > 0 && <div className="preview-batch-bar">
         <span>已选 {selectedIds.length} 笔订单</span>
