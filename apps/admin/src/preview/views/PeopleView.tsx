@@ -873,7 +873,7 @@ function UserPeople() {
       eyebrow="账号与权限"
       title="用户与权限"
       description="账号状态直接影响用户能否互动和进入业务角色，操作前需要明确影响范围。"
-      actions={<Button variant="primary" onClick={() => { setRole('admin'); setQuery('') }}>查看管理员</Button>}
+      actions={<Button variant="primary" onClick={() => { setRole('admin'); setQuery(''); setPage(1) }}>查看管理员</Button>}
     />
     <section className="preview-stat-grid">
       <StatCard label="账号总数" value={total ?? '—'} meta="真实注册账号" tone="accent" />

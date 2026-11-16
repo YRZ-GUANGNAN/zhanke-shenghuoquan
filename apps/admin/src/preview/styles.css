@@ -4,7 +4,7 @@
   --preview-border: #e8edf3;
   --preview-text: #303133;
   --preview-text-secondary: #606266;
-  --preview-text-muted: #909399;
+  --preview-text-muted: #6b7280;
   --preview-blue: #4a90d9;
   --preview-blue-light: #e8f3ff;
   --preview-radius: 6px;
@@ -564,6 +564,9 @@ body {
   display: grid;
   gap: 4px;
   margin-top: 12px;
+  /* 结果随命中数增长时弹窗不能高于视口：超出后内部滚动。 */
+  max-height: min(60vh, 480px);
+  overflow-y: auto;
 }
 
 .preview-search-results .ant-btn {
@@ -1642,10 +1645,15 @@ body {
   }
 }
 
-@media (max-width: 640px) {
+/* 与 App.tsx 的 narrow 判定（max-width: 900px）保持一致：
+   641–900px 之间不能同时出现常驻搜索框和 ⌕ 按钮。 */
+@media (max-width: 900px) {
   .preview-topbar__search {
     display: none;
   }
+}
+
+@media (max-width: 640px) {
 
   .preview-content {
     padding: 12px;
@@ -2285,4 +2293,23 @@ button.preview-media-card__visual:focus-visible {
 .preview-topbar .account-panel > div {
   min-width: 0;
   text-align: right;
+}
+
+/* 窄屏：服务入口卡片改为两行（图标+文案、操作独占一行），避免文案列被压成逐字换行。 */
+@media (max-width: 640px) {
+  .preview-service-grid article {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+  .preview-service-grid__controls {
+    grid-column: 1 / -1;
+    flex-wrap: wrap;
+  }
+  /* 素材中心等面板的操作区（搜索+分段筛选）在窄屏换行到标题下方。 */
+  .preview-panel .ant-card-head-wrapper {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .preview-panel .ant-card-head-title {
+    flex: 1 0 100%;
+  }
 }

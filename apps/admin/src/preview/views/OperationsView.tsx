@@ -1075,7 +1075,7 @@ function CommunityOperations() {
   }
 
   return <div>
-    <PageHeader eyebrow={metaBySection.community.eyebrow} title={metaBySection.community.title} description={metaBySection.community.description} actions={<Button variant="primary" onClick={() => setStatus('待审核')}>查看待审内容</Button>} />
+    <PageHeader eyebrow={metaBySection.community.eyebrow} title={metaBySection.community.title} description={metaBySection.community.description} actions={<Button variant="primary" onClick={() => { setStatus('待审核'); list.setPage(1) }}>查看待审内容</Button>} />
     <section className="preview-stat-grid">
       <StatCard label="帖子总数" value={stats?.totals.posts ?? '—'} meta="社区全部内容" tone="accent" />
       <StatCard label="今日新增" value={stats?.today.posts ?? '—'} meta="今天提交的内容" tone="mint" />
@@ -1228,7 +1228,7 @@ function TradeOperations() {
   }
 
   return <div>
-    <PageHeader eyebrow={metaBySection.trade.eyebrow} title={metaBySection.trade.title} description={metaBySection.trade.description} actions={<Button variant="primary" onClick={() => setStatus('出售中')}>查看出售中商品</Button>} />
+    <PageHeader eyebrow={metaBySection.trade.eyebrow} title={metaBySection.trade.title} description={metaBySection.trade.description} actions={<Button variant="primary" onClick={() => { setStatus('出售中'); list.setPage(1) }}>查看出售中商品</Button>} />
     <section className="preview-stat-grid">
       <StatCard label="商品总数" value={stats?.totals.products ?? '—'} meta="二手市场全部商品" tone="accent" />
       <StatCard label="本页出售中" value={sellingItems.length} meta="当前页统计" tone="mint" />
@@ -1343,7 +1343,7 @@ function ReportOperations() {
   const visible = pageItems.filter(item => filter === '全部' || item.reviewStatus === filter)
 
   return <div>
-    <PageHeader eyebrow={metaBySection.reports.eyebrow} title={metaBySection.reports.title} description={metaBySection.reports.description} actions={<Button variant="primary" onClick={() => setFilter('submitted')}>处理待办举报</Button>} />
+    <PageHeader eyebrow={metaBySection.reports.eyebrow} title={metaBySection.reports.title} description={metaBySection.reports.description} actions={<Button variant="primary" onClick={() => { setFilter('submitted'); list.setPage(1) }}>处理待办举报</Button>} />
     <section className="preview-stat-grid">
       <StatCard label="举报总数" value={list.data?.total ?? '—'} meta="全部举报记录" tone="accent" />
       <StatCard label="本页待审核" value={pageItems.filter(item => item.reviewStatus === 'submitted').length} meta="当前页统计" tone="rose" />

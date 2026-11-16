@@ -153,10 +153,16 @@ function ConsoleShell() {
   }, [query])
 
   const setSearchTarget = useAdminStore(state => state.setSearchTarget)
-  const navigate = (next: PreviewSection) => {
-    setSection(next)
+  // 关闭搜索时一并清空关键字与旧结果，避免下次打开显示过期数据。
+  const closeSearch = () => {
     setSearchOpen(false)
     setQuery('')
+    setHits([])
+    setHitsError('')
+  }
+  const navigate = (next: PreviewSection) => {
+    setSection(next)
+    closeSearch()
   }
   const openSearchHit = (hit: AdminSearchHit) => {
     const target: AdminSearchTarget = { section: hit.section as AdminSection }
@@ -286,7 +292,7 @@ function ConsoleShell() {
     <Modal
       open={searchOpen}
       title="搜索"
-      onClose={() => setSearchOpen(false)}
+      onClose={closeSearch}
       width="md"
     >
       <Input

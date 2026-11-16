@@ -141,6 +141,17 @@ export function DeliveryView() {
   const visibleOrders = orders
 
   const selectableOnPage = visibleOrders.filter(order => selectableOrderStatuses.has(order.status))
+
+  // 订单状态变化（取消/改派刷新）后，剔除已不可勾选的残留选择，
+  // 避免批量栏显示已选数量但提交时全部报「当前状态不可操作」。
+  useEffect(() => {
+    if (orders.length === 0) return
+    setSelectedIds(current => {
+      const next = current.filter(id => orders.some(order =>
+        order.deliveryOrderPublicId === id && selectableOrderStatuses.has(order.status)))
+      return next.length === current.length ? current : next
+    })
+  }, [orders])
   const allOnPageSelected = selectableOnPage.length > 0
     && selectableOnPage.every(order => selectedIds.includes(order.deliveryOrderPublicId))
 
@@ -173,7 +184,12 @@ export function DeliveryView() {
     setDetailError('')
   }
 
-  const openBatch = (action: BatchAction, ids: string[]) => {
+  // 订单详情抽屉里的单笔改派/取消会临时占用 selectedIds；关闭弹窗时恢复用户原有勾选。
+  const selectionBeforeBatch = useRef<string[] | null>(null)
+  const openBatch = (action: BatchAction, ids: string[], fromDetail = false) => {
+    if (fromDetail && selectionBeforeBatch.current === null) {
+      selectionBeforeBatch.current = selectedIds
+    }
     setSelectedIds(ids)
     setBatchRider(candidates[0] ? String(candidates[0].riderUserId) : '')
     setBatchReason('')
@@ -183,14 +199,26 @@ export function DeliveryView() {
     setBatchAction(action)
   }
 
-  const refreshAfterWrite = async () => {
+  const closeBatch = () => {
+    setBatchAction(null)
+    setBatchError('')
+    if (selectionBeforeBatch.current !== null) {
+      setSelectedIds(selectionBeforeBatch.current)
+      selectionBeforeBatch.current = null
+    }
+  }
+
+  const refreshAfterWrite = async (options?: { skipDetail?: boolean }) => {
+    // 进入刷新前记下 epoch：刷新窗口内用户若打开了别的订单详情，
+    // 这里的旧订单回写必须被丢弃，否则抽屉标题与内容会错配。
+    const detailVersion = detailEpoch.current
     await ordersState.reload()
     await summaryState.reload()
     await ridersState.reload()
-    if (detailId) {
+    if (!options?.skipDetail && detailId) {
       try {
         const value = await deliveryAdminAPI.orderFunds(detailId)
-        setDetail(value)
+        if (detailEpoch.current === detailVersion) setDetail(value)
       } catch {
         // 详情刷新失败不覆盖列表结果，用户可重新打开详情。
       }
@@ -242,7 +270,12 @@ export function DeliveryView() {
     if (failures.length === 0) {
       setBatchAction(null)
       setBatchError('')
-      resetSelection()
+      if (selectionBeforeBatch.current !== null) {
+        setSelectedIds(selectionBeforeBatch.current)
+        selectionBeforeBatch.current = null
+      } else {
+        resetSelection()
+      }
       await refreshAfterWrite()
       setBatchBusy(false)
       notify(batchAction === 'reassign'
@@ -410,9 +443,9 @@ export function DeliveryView() {
       open={Boolean(batchAction)}
       title={batchAction === 'reassign' ? `改派 ${selectedIds.length} 笔订单` : `取消 ${selectedIds.length} 笔订单`}
       description={batchAction === 'reassign' ? '改派后原骑手不再负责该订单，新骑手会收到提醒。仅已接单及之后的在途订单可以改派。' : '取消后订单不再履约，用户会看到取消原因。只有未支付配送费的订单可以直接取消；已支付订单请在订单详情发起退款。'}
-      onClose={() => { if (!batchBusy) { setBatchAction(null); setBatchError('') } }}
+      onClose={() => { if (!batchBusy) closeBatch() }}
       footer={<>
-        <Button disabled={batchBusy} onClick={() => { setBatchAction(null); setBatchError('') }}>返回</Button>
+        <Button disabled={batchBusy} onClick={() => { if (!batchBusy) closeBatch() }}>返回</Button>
         <Button
           variant={batchAction === 'cancel' ? 'danger' : 'primary'}
           disabled={batchBusy}
@@ -449,11 +482,11 @@ export function DeliveryView() {
         <Button onClick={closeDetail}>关闭</Button>
         {reassignableOrderStatuses.has(detail.order.status) && <Button variant="primary" onClick={() => {
           closeDetail()
-          openBatch('reassign', [detail.order.deliveryOrderPublicId])
+          openBatch('reassign', [detail.order.deliveryOrderPublicId], true)
         }}>改派骑手</Button>}
         {cancellableOrderStatuses.has(detail.order.status) && <Button variant="danger" onClick={() => {
           closeDetail()
-          openBatch('cancel', [detail.order.deliveryOrderPublicId])
+          openBatch('cancel', [detail.order.deliveryOrderPublicId], true)
         }}>取消订单</Button>}
         {refundableOrderStatuses.has(detail.order.status) && <Button variant="danger" onClick={() => {
           refundKeyRef.current = newOperationKey()
@@ -478,7 +511,7 @@ export function DeliveryView() {
               notify(`配送单 ${shortId(refundTarget.deliveryOrderPublicId)} 已发起退款并取消订单`)
               setRefundTarget(null)
               closeDetail()
-              await ordersState.reload()
+              await refreshAfterWrite({ skipDetail: true })
             } catch (cause) {
               setRefundError(isDeliveryConflict(cause) ? conflictMessage : errorText(cause))
             } finally {

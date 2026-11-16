@@ -311,6 +311,9 @@ function MerchantOrderList({ merchantUserId }: { merchantUserId: number }) {
   }, [merchantUserId, page])
   const candidatesState = useRemoteData(() => deliveryAdminAPI.riders({ status: 'active', pageSize: 100 }), [])
   const orders = ordersState.data?.items ?? []
+  // 与骑手面板一致：候选需账号有效且身份授权有效，否则提交必被后端拒绝。
+  const eligibleCandidates = (candidatesState.data?.items ?? []).filter(
+    row => row.grantActive !== false && (row.accountStatus ?? 'active') === 'active')
   return <>
     {ordersState.error && <div className="preview-form-error" role="alert">{ordersState.error}</div>}
     <p className="preview-toolbar__hint">
@@ -320,7 +323,7 @@ function MerchantOrderList({ merchantUserId }: { merchantUserId: number }) {
       ? <EmptyState title="该商家没有订单" description="确认商家用户 ID 是否正确，或更换筛选条件。" />
       : <OrderActionsTable
         orders={orders}
-        candidates={candidatesState.data?.items ?? []}
+        candidates={eligibleCandidates}
         onChanged={() => ordersState.reload()}
       />}
     <Pagination

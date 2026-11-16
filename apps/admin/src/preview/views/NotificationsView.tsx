@@ -395,12 +395,14 @@ export function NotificationsView() {
         <div className="preview-wecom-form">
           <Field
             label="商家值班群 Webhook"
+            disabled={wecomSaving}
             value={wecomMerchantInput}
             onChange={event => { setWecomMerchantInput(event.target.value); setWecomError('') }}
             placeholder={merchantConfigured ? '已配置，留空保持不变；粘贴新地址可替换' : '粘贴企业微信商家值班群机器人 Webhook（留空沿用服务器配置）'}
           />
           <Field
             label="骑手值班群 Webhook"
+            disabled={wecomSaving}
             value={wecomRiderInput}
             onChange={event => { setWecomRiderInput(event.target.value); setWecomError('') }}
             placeholder={riderConfigured ? '已配置，留空保持不变；粘贴新地址可替换' : '粘贴企业微信骑手值班群机器人 Webhook（留空沿用服务器配置）'}
