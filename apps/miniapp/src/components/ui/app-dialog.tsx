@@ -69,7 +69,7 @@ export function AppDialog({
   }
   return (
     <View className={`app-dialog-layer app-dialog-layer--${phase}${className ? ` ${className}` : ''}`} onClick={(event) => event.stopPropagation()}>
-      <View className='app-dialog-layer__mask' onClick={handleCancel} />
+      <View className='app-dialog-layer__mask' onClick={handleCancel} catchMove />
       <View className={`app-dialog app-dialog--${phase}`} role='dialog' aria-modal>
         <Text className='app-dialog__title'>{title}</Text>
         {description ? <Text className='app-dialog__description'>{description}</Text> : null}

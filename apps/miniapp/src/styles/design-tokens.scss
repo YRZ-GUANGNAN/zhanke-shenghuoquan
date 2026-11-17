@@ -38,13 +38,15 @@ $text-strong-static: #1A2B3C;
 $text-strong: var(--cc);
 $text-primary-static: #2A3A4A;
 $text-primary: var(--cd);
-$text-secondary-static: #6B7C8F;
+// 弱化文字分级（浅色对白底实测）：secondary ≥5.0:1 用于所有易读辅助文字；
+// tertiary ≈4.05:1 用于大字号或次要元信息；muted/faint 仅限装饰与非文本元素，不得用于小字正文。
+$text-secondary-static: #5F7183;
 $text-secondary: var(--ce);
-$text-tertiary-static: #93A2B4;
+$text-tertiary-static: #6E8095;
 $text-tertiary: var(--cf);
-$text-muted-static: #9DB2C8;
+$text-muted-static: #7D8FA2;
 $text-muted: var(--cg);
-$text-faint-static: #B0BECD;
+$text-faint-static: #8A9AAD;
 $text-faint: var(--ch);
 $text-on-color-static: #FFFFFF;
 $text-on-color: var(--ci);
@@ -115,5 +117,5 @@ $shadow-dialog: var(--s3);
 
 $placeholder-stripe-static: repeating-linear-gradient(135deg, rgba(30, 60, 100, .03) 0 20rpx, transparent 20rpx 40rpx);
 $placeholder-stripe: var(--p0);
-$placeholder-label-static: rgba(30, 50, 80, .38);
+$placeholder-label-static: rgba(30, 50, 80, .66);
 $placeholder-label: var(--cv);

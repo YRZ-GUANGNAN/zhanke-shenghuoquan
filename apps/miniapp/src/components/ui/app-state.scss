@@ -28,7 +28,7 @@
 .app-state__identity .chat-avatar__initial { font-size: 36rpx; }
 .app-state--welcome .app-state__title { max-width: 100%; animation: session-welcome-arrive 440ms 60ms $ease-standard both; }
 .app-state--welcome .app-state__description { animation: session-welcome-arrive 440ms 120ms $ease-standard both; }
-.app-state__connection { display: flex; align-items: center; justify-content: center; gap: 12rpx; margin-top: 24rpx; color: var(--text-secondary, #6B7C8F); font-size: 22rpx; line-height: 1.5; animation: session-welcome-arrive 440ms 160ms $ease-standard both; }
+.app-state__connection { display: flex; align-items: center; justify-content: center; gap: 12rpx; margin-top: 24rpx; color: var(--text-secondary, #5F7183); font-size: 22rpx; line-height: 1.5; animation: session-welcome-arrive 440ms 160ms $ease-standard both; }
 .app-state__connection-dot { width: 8rpx; height: 8rpx; border-radius: 50%; background: currentColor; animation: session-welcome-pulse 1600ms ease-in-out infinite; }
 @keyframes session-welcome-arrive { from { opacity: 0; transform: translateY(8rpx); } to { opacity: 1; transform: translateY(0); } }
 @keyframes session-welcome-pulse { 0%, 100% { opacity: .35; } 50% { opacity: .85; } }

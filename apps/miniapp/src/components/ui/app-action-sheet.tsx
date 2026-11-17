@@ -29,7 +29,7 @@ export function AppActionSheet({ visible, title, description, children, loading 
   if (!mounted) return null
   return (
     <View className={`app-action-sheet-layer app-action-sheet-layer--${phase}`} onClick={(event) => event.stopPropagation()}>
-      <View className='app-action-sheet-layer__mask' onClick={handleClose} />
+      <View className='app-action-sheet-layer__mask' onClick={handleClose} catchMove />
       <View
         className={`app-action-sheet app-action-sheet--${phase}${phase === 'open' && drag.dragging ? ' app-action-sheet--dragging' : ''}`}
         // Do not let the gesture's inline transform override the presence
