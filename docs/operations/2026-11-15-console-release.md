@@ -257,6 +257,6 @@
 - 标题 text-wrap: balance、段落 pretty；长列表自第 3/5 项起 content-visibility: auto。
 - 滚动条 scrollbar-color/width + @supports 内 WebKit 回退（对比度 ≥3:1）。
 - 新增 CLAUDE.md（浏览器支持策略 + modern-web-guidance 用法）。
-- 静态 release 更新为 `/var/www/campus-admin/releases/admin-20261117-6547ded`（含 scrollbar-gutter: stable 补丁，supersedes 6a65950）。
+- 静态 release 更新为 `/var/www/campus-admin/releases/admin-20261117-16b6659`（审查回归修复：弹层网格媒体查询回退、滚动条变量入 :root、gutter 只保留在 html、懒加载错误边界；supersedes 6547ded）。
 
 后端无变化（沿用 candidate.10）。
