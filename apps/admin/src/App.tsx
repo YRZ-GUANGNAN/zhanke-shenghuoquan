@@ -8,6 +8,7 @@ import { DeliveryConsole } from './DeliveryConsole'
 import { NotificationConsole } from './NotificationConsole'
 import { TakeoutConsole } from './TakeoutConsole'
 import { ExternalTakeoutMerchants } from './ExternalTakeoutMerchants'
+import { CampusMakerEntries } from './CampusMakerEntries'
 import { FeaturePolicyConsole } from './FeaturePolicyConsole'
 import { ShareSettingsConsole } from './ShareSettingsConsole'
 import { IdentityApplications } from './IdentityApplications'
@@ -570,6 +571,7 @@ function Navigation(){
 	}
 	return <div className="navigation-console">
 		<ExternalTakeoutMerchants/>
+		<CampusMakerEntries/>
 		<AdminPanel title="校园工具" description="维护小程序工具页的分类、用途说明与真实服务入口。保存后，小程序刷新工具页即可读取。" actions={<><AdminButton tone="ghost" loading={loading} onClick={()=>void load()}>刷新</AdminButton><AdminButton tone="primary" loading={busy==='category-new'} onClick={()=>void createCategory()}>新增分类</AdminButton></>}>
 			<AdminNotice>接入已有服务小程序，请向服务方获取正式 AppID 和页面路径。格式正确不代表一定能打开，启用前请用手机实际点一次。这里只配置小程序跳转，不支持接入网站或第三方业务。</AdminNotice>
 			{error&&<AdminNotice tone="danger" title="导航操作失败">{error}</AdminNotice>}{notice&&<AdminNotice tone="success">{notice}</AdminNotice>}

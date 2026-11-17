@@ -191,7 +191,7 @@ async function run() {
     let session = { token: 'test-token-a', profile: { id: 'test-user-a' } }
     let routeParams = {}
     const shareOptions = []
-    const requests = { posts: [], products: [], messages: [], tools: [] }
+    const requests = { posts: [], products: [], messages: [], tools: [], makers: [] }
     const navigate = []
     const queued = (kind, query) => { const task = deferred(); requests[kind].push({ ...task, query }); return task.promise }
     const homePath = path.join(root, 'apps/miniapp/src/pages/home/index.tsx')
@@ -217,7 +217,7 @@ async function run() {
       '../../services/b-community': { getCommunityPostsPage: (query) => queued('posts', query) },
       '../../services/c-trade': { getProductsPage: (query) => queued('products', query), getProduct: async () => null },
       '../../services/e-im': { listIMConversations: () => queued('messages') },
-      '../../services/d-navigation': { listNavigationItems: () => queued('tools') },
+      '../../services/d-navigation': { listNavigationItems: () => queued('tools'), listCampusMakerItems: () => queued('makers') },
       '../../services/session-recovery': { requestWithSingleSessionRecovery: (callback) => callback() },
       '../../services/taro': { default: { getCurrentInstance: () => ({ router: { params: routeParams } }), navigateTo: async (value) => navigate.push(value.url), showToast: async () => {} } },
       '../../utils/post-presentation': { postBodyWithoutTitle: (_, body) => body },
@@ -226,7 +226,7 @@ async function run() {
     const homeSwiper = () => home.props('[data-component="Swiper"]')
     const channel = (key) => home.props(`[data-item-id="${key}"] .student-home-content`)
     const clickTab = async (index) => home.event(() => home.all('.student-home-header__tab')[index].onClick())
-    assert.deepEqual(Array.from(home.container.querySelectorAll('.student-home-header__tab'), node => node.textContent), ['发现', '二手', '工具'])
+    assert.deepEqual(Array.from(home.container.querySelectorAll('.student-home-header__tab'), node => node.textContent), ['发现', '二手', '工具', '众创'])
     assert.equal(homeSwiper().current, 0, '首页默认从发现开始')
     assert.equal(requests.posts.length, 1)
     assert.equal(requests.products.length, 1)

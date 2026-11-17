@@ -24,7 +24,7 @@ import { isApiError } from '../../services/api'
 import { getCommunityPostsPage, type PageResult } from '../../services/b-community'
 import { getProduct, getProductsPage, type IMConversationContext, type ProductPageResult } from '../../services/c-trade'
 import { listIMConversations } from '../../services/e-im'
-import { listNavigationItems } from '../../services/d-navigation'
+import { listCampusMakerItems, listNavigationItems } from '../../services/d-navigation'
 import { requestWithSingleSessionRecovery } from '../../services/session-recovery'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import { usePageShare } from '../../hooks/use-page-share'
@@ -37,7 +37,7 @@ import { conversationPeer, uniquePeerConversations } from '../../utils/conversat
 import { readHomeHeaderBackdrop, readHomeHeaderBackdropImage } from '../../utils/ui-preferences'
 import './index.scss'
 
-type HomeTab = 'discover' | 'secondhand' | 'tools' | 'messages'
+type HomeTab = 'discover' | 'secondhand' | 'tools' | 'maker' | 'messages'
 
 type DiscoverCard = {
   id: string
@@ -63,7 +63,8 @@ type SettledResult<T> =
 const tabs: Array<{ key: HomeTab; label: string }> = [
   { key: 'discover', label: '发现' },
   { key: 'secondhand', label: '二手' },
-  { key: 'tools', label: '工具' }
+  { key: 'tools', label: '工具' },
+  { key: 'maker', label: '众创' }
 ]
 
 function settle<T>(promise: Promise<T>): Promise<SettledResult<T>> {
@@ -172,9 +173,12 @@ function HomeContent() {
   const [conversationItems, setConversationItems] = useState<ConversationItem[]>([])
   const [conversationStatus, setConversationStatus] = useState<ConversationStatus>('idle')
   const [tools, setTools] = useState<ToolLink[]>([])
+  const [makers, setMakers] = useState<ToolLink[]>([])
   const [toolRefreshError, setToolRefreshError] = useState(false)
+  const [makerRefreshError, setMakerRefreshError] = useState(false)
   const [conversationRefreshError, setConversationRefreshError] = useState(false)
   const [toolBusy, setToolBusy] = useState(false)
+  const [makerBusy, setMakerBusy] = useState(false)
   const [conversationBusy, setConversationBusy] = useState(false)
   const [jumpingTool, setJumpingTool] = useState<string | null>(null)
   const toolJumpLock = useRef(false)
@@ -182,6 +186,7 @@ function HomeContent() {
   const visibility = useFeatureVisibility()
   usePageShare({ kind: activeTab === 'secondhand' ? 'secondhand' : 'home', enabled: visibility.available && !isMessagesPage })
   const [toolStatus, setToolStatus] = useState<ToolStatus>('idle')
+  const [makerStatus, setMakerStatus] = useState<ToolStatus>('idle')
   const sourceRef = useRef({ communityPage: 0, tradePage: 0, communityTotal: 0, tradeTotal: 0 })
   const loadingRef = useRef(false)
   const mountedRef = useRef(true)
@@ -191,7 +196,9 @@ function HomeContent() {
   const conversationOwnerRef = useRef('')
   const toolLoadingRef = useRef(false)
   const toolRequestVersion = useRef(0)
-  const tabScrollPositions = useRef<Record<HomeTab, number>>({ discover: 0, secondhand: 0, messages: 0, 'tools': 0 })
+  const makerLoadingRef = useRef(false)
+  const makerRequestVersion = useRef(0)
+  const tabScrollPositions = useRef<Record<HomeTab, number>>({ discover: 0, secondhand: 0, messages: 0, 'tools': 0, maker: 0 })
   const cards = useMemo(
     () => interleaveCards(visibility.forum ? postCards : [], visibility.secondhand ? productCards : []),
     [postCards, productCards, visibility.forum, visibility.secondhand]
@@ -390,6 +397,32 @@ function HomeContent() {
     }
   }, [])
 
+  const loadMakers = useCallback(async () => {
+    if (!mountedRef.current || makerLoadingRef.current) return false
+    makerLoadingRef.current = true
+    setMakerBusy(true)
+    const version = ++makerRequestVersion.current
+    setMakerRefreshError(false)
+    setMakerStatus(current => current === 'ready' || current === 'empty' ? current : 'loading')
+    try {
+      const entries = await listCampusMakerItems()
+      if (!mountedRef.current || makerRequestVersion.current !== version) return false
+      setMakers(entries)
+      setMakerStatus(entries.length > 0 ? 'ready' : 'empty')
+      return true
+    } catch {
+      if (!mountedRef.current || makerRequestVersion.current !== version) return false
+      setMakerRefreshError(true)
+      setMakerStatus(current => current === 'ready' || current === 'empty' ? current : 'error')
+      return false
+    } finally {
+      if (makerRequestVersion.current === version) {
+        makerLoadingRef.current = false
+        if (mountedRef.current) setMakerBusy(false)
+      }
+    }
+  }, [])
+
   useEffect(() => {
     mountedRef.current = true
     return () => {
@@ -400,6 +433,8 @@ function HomeContent() {
       conversationLoadingRef.current = false
       toolRequestVersion.current += 1
       toolLoadingRef.current = false
+      makerRequestVersion.current += 1
+      makerLoadingRef.current = false
     }
   }, [])
 
@@ -446,6 +481,12 @@ function HomeContent() {
     setToolStatus('idle')
     setToolRefreshError(false)
     setToolBusy(false)
+    makerRequestVersion.current += 1
+    makerLoadingRef.current = false
+    setMakers([])
+    setMakerStatus('idle')
+    setMakerRefreshError(false)
+    setMakerBusy(false)
   }, [currentSessionKey, visibility.campus_tools])
 
   useEffect(() => {
@@ -457,6 +498,10 @@ function HomeContent() {
   useEffect(() => {
     if (activeTab === 'tools' && toolStatus === 'idle' && visibility?.campus_tools) void loadTools()
   }, [activeTab, loadTools, toolStatus, visibility?.campus_tools])
+
+  useEffect(() => {
+    if (activeTab === 'maker' && makerStatus === 'idle' && visibility?.campus_tools) void loadMakers()
+  }, [activeTab, loadMakers, makerStatus, visibility?.campus_tools])
 
   useDidShow(() => {
     visibleForNotifications.current = true
@@ -669,9 +714,9 @@ function HomeContent() {
       <RefreshScrollView
         key={channel}
         enabled={channel === activeTab}
-        busy={channel === 'discover' ? loadingMore || initialStatus === 'loading' : channel === 'messages' ? conversationBusy : toolBusy}
+        busy={channel === 'discover' ? loadingMore || initialStatus === 'loading' : channel === 'messages' ? conversationBusy : channel === 'maker' ? makerBusy : toolBusy}
         refreshKey={`${currentSessionKey}:${channel}:${visibility.forum}:${visibility.secondhand}`}
-        onRefresh={() => channel === 'discover' ? loadDiscover(true) : channel === 'messages' ? loadConversations(currentSessionKey) : loadTools()}
+        onRefresh={() => channel === 'discover' ? loadDiscover(true) : channel === 'messages' ? loadConversations(currentSessionKey) : channel === 'maker' ? loadMakers() : loadTools()}
         className='student-home-content'
         scrollY
         scrollTop={tabScrollPositions.current[channel]}
@@ -772,10 +817,16 @@ function HomeContent() {
           )
         )}
 
-        {visibility.campus_tools && <>{channel === 'tools' && (
-          <ToolDirectory tools={tools} status={toolStatus} jumpingId={jumpingTool} refreshError={toolRefreshError}
-            onOpen={tool => void openTool(tool)} onRetry={() => { if (channelInteraction.canActivate()) void loadTools() }} />
-        )}</>}
+        {visibility.campus_tools && <>
+          {channel === 'tools' && (
+            <ToolDirectory tools={tools} status={toolStatus} jumpingId={jumpingTool} refreshError={toolRefreshError}
+              onOpen={tool => void openTool(tool)} onRetry={() => { if (channelInteraction.canActivate()) void loadTools() }} />
+          )}
+          {channel === 'maker' && (
+            <ToolDirectory kind='maker' tools={makers} status={makerStatus} jumpingId={jumpingTool} refreshError={makerRefreshError}
+              onOpen={tool => void openTool(tool)} onRetry={() => { if (channelInteraction.canActivate()) void loadMakers() }} />
+          )}
+        </>}
 
       </RefreshScrollView>
         )}

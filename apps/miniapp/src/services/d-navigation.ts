@@ -9,17 +9,28 @@ export interface ExternalTakeoutSearchPage{items:ExternalTakeoutMerchantLink[];p
 interface BackendItem{id:number|string;title:string;subtitle:string;iconText:string;appId:string;path:string;color:string;sort:number}
 interface BackendCategory{id:number|string;name:string;systemKey?:string;sort:number;items:BackendItem[]}
 const externalTakeoutSystemKey='external_takeout_merchants' as const
+const campusMakerSystemKey='campus_maker' as const
 
 function isRealTool(item:BackendItem):boolean{
 	return validMiniProgramAppID(item.appId)&&validMiniProgramPath(item.path)
+}
+
+function mapToolItems(category:BackendCategory):ToolLink[]{
+	return category.items.filter(isRealTool).map((item)=>({id:String(item.id),categoryId:String(category.id),categoryName:category.name,title:item.title,subtitle:item.subtitle,iconText:item.iconText,appId:item.appId.trim(),path:item.path.trim(),color:item.color}))
 }
 
 export function listNavigationCategories():Promise<BackendCategory[]>{return request<BackendCategory[]>('/navigation/categories')}
 export async function listNavigationItems():Promise<ToolLink[]>{
 	const categories=await listNavigationCategories()
 	return categories
-		.filter((category)=>category.systemKey!==externalTakeoutSystemKey)
-		.reduce<ToolLink[]>((all,category)=>all.concat(category.items.filter(isRealTool).map((item)=>({id:String(item.id),categoryId:String(category.id),categoryName:category.name,title:item.title,subtitle:item.subtitle,iconText:item.iconText,appId:item.appId.trim(),path:item.path.trim(),color:item.color}))),[])
+		.filter((category)=>category.systemKey!==externalTakeoutSystemKey&&category.systemKey!==campusMakerSystemKey)
+		.reduce<ToolLink[]>((all,category)=>all.concat(mapToolItems(category)),[])
+}
+// 首页「众创」频道：只取 campus_maker 系统分类下的外接小程序入口。
+export async function listCampusMakerItems():Promise<ToolLink[]>{
+	const categories=await listNavigationCategories()
+	const category=categories.find((value)=>value.systemKey===campusMakerSystemKey)
+	return category?mapToolItems(category):[]
 }
 export async function listExternalTakeoutMerchants():Promise<ExternalTakeoutMerchantLink[]>{
 	const categories=await listNavigationCategories()

@@ -185,6 +185,7 @@ function NavigationSettings() {
   }, [loadNavigation, loadExternal])
 
   const generalCategories = (categories || []).filter(category => !category.systemKey)
+  const makerCategory = (categories || []).find(category => category.systemKey === 'campus_maker')
   const generalItems = generalCategories.flatMap(category => category.items || [])
   const configIssues = [
     ...generalItems.filter(item => !/^wx[0-9A-Za-z]{16}$/.test(item.appId)).map(item => `「${item.title}」AppID 格式不正确`),
@@ -537,6 +538,35 @@ function NavigationSettings() {
               </article>)}
             </div>}
         </Panel>)}
+
+    {makerCategory ? (
+      <Panel
+        eyebrow="CAMPUS MAKER"
+        title="众创入口"
+        description={`学生端首页「众创」频道 · ${(makerCategory.items || []).length} 个入口 · ${makerCategory.enabled ? '分类已启用，学生端可见' : '分类已停用，学生端不展示'}`}
+        actions={<Button size="sm" variant="primary" disabled={Boolean(busy) || formSaving} onClick={() => openItemCreate(makerCategory)}>新增入口</Button>}
+      >
+        {(makerCategory.items || []).length === 0
+          ? <EmptyState title="还没有众创入口" description="新增入口后会在小程序首页「众创」频道展示。" action={<Button variant="primary" onClick={() => openItemCreate(makerCategory)}>新增入口</Button>} />
+          : <div className="preview-service-grid">
+            {(makerCategory.items || []).toSorted((a, b) => a.sort - b.sort).map(item => <article key={item.id} className={!item.enabled ? 'is-disabled' : ''}>
+              <span className="preview-service-grid__icon" style={{ background: item.color || '#684091' }}>{item.iconText || item.title.slice(0, 1)}</span>
+              <div className="preview-service-grid__copy">
+                <strong>{item.title}</strong>
+                {item.subtitle && <p>{item.subtitle}</p>}
+                <code>{item.path}</code>
+                <code className="preview-service-grid__appid">{item.appId}</code>
+              </div>
+              <div className="preview-service-grid__controls">
+                <StatusPill>{item.enabled ? '已启用' : '已停用'}</StatusPill>
+                <Toggle checked={item.enabled} label={`${item.title}启用状态`} onChange={checked => toggleItem(item, checked)} />
+                <Button size="sm" variant="quiet" disabled={Boolean(busy) || formSaving} onClick={() => openItemEdit(item)}>编辑</Button>
+                <Button size="sm" variant="quiet" disabled={Boolean(busy) || formSaving} onClick={() => askDeleteItem(item)}>删除</Button>
+              </div>
+            </article>)}
+          </div>}
+      </Panel>
+    ) : null}
 
     <Panel
       eyebrow="EXTERNAL TAKEOUT"
