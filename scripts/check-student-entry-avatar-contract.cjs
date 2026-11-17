@@ -59,9 +59,8 @@ assert.match(userHandler, /media\.PurposeAvatar/)
 assert.match(userHandler, /h\.media\.Commit/)
 
 assert.match(profile, /profile\.avatar/)
-// 身份徽章已从用户卡移除，改为断言用户卡主体结构仍在。
+// 身份徽章与用户号已从用户卡移除，改为断言用户卡主体结构仍在。
 assert.match(profile, /student-profile-user__name/)
-assert.match(profile, /student-profile-user__details/)
 assert.match(profileStyle, /border-radius:\s*50%/)
 
 console.log('student entry and avatar contract: ok')

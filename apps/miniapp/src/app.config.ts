@@ -13,6 +13,7 @@ export default defineAppConfig({
     'pages/profile/index',
     'pages/blacklist/index',
     'pages/feedback/index',
+    'pages/feature-board/index',
     'pages/about/index',
     'pages/legal/index',
     'pages/merchant-messages/index',

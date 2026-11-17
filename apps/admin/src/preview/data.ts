@@ -9,6 +9,7 @@ export type PreviewSection =
   | 'reports'
   | 'identities'
   | 'feedbacks'
+  | 'feature-board'
   | 'users'
   | 'navigation'
   | 'share-settings'

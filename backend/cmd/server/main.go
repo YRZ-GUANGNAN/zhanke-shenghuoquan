@@ -51,6 +51,7 @@ import (
 	"campus-circle/backend/internal/module/navigation"
 	"campus-circle/backend/internal/module/sharesettings"
 	"campus-circle/backend/internal/module/studentverification"
+	"campus-circle/backend/internal/module/featureboard"
 	"campus-circle/backend/internal/module/takeout"
 	"campus-circle/backend/internal/module/trade"
 	"campus-circle/backend/internal/module/user"
@@ -181,6 +182,7 @@ func main() {
 		log.Fatalf("configure student verification proof media: %v", err)
 	}
 	studentVerificationService := studentverification.NewService(studentVerificationRepository, studentVerificationMedia, nil)
+	featureBoardService := featureboard.NewService(featureboard.NewRepository(db), nil)
 	feedbackMedia, err := user.NewCoreFeedbackMedia(bindingService)
 	if err != nil {
 		log.Fatalf("configure feedback media binding: %v", err)
@@ -546,6 +548,15 @@ func main() {
 			adminAuth:       adminAuthRequired,
 		},
 	)
+	registerFeatureBoardRoutes(
+		api, authRoutes, featureboard.NewHandler(featureBoardService),
+		identityRoutePolicies{
+			authRequired:    userService.AuthRequired(),
+			unmutedRequired: user.UnmutedRequired(),
+			adminRequired:   user.AdminRequired(),
+			adminAuth:       adminAuthRequired,
+		},
+	)
 	legacymedia.NewHandler(mediaService, cfg.WechatCallbackToken, userService.AuthRequired(), user.UnmutedRequired(), func(c *gin.Context) (uint, string) {
 		value := user.CurrentUser(c)
 		return value.ID, value.OpenID
@@ -692,6 +703,21 @@ func registerStudentVerificationRoutes(
 		adminAuthentication = policies.adminAuth
 	}
 	handler.RegisterAdmin(api.Group("/admin/student-verifications", adminAuthentication, policies.adminRequired))
+}
+
+func registerFeatureBoardRoutes(
+	api *gin.RouterGroup,
+	authRoutes *gin.RouterGroup,
+	handler *featureboard.Handler,
+	policies identityRoutePolicies,
+) {
+	handler.RegisterUserReads(authRoutes.Group("", policies.authRequired))
+	handler.RegisterUserWrites(authRoutes.Group("", policies.authRequired, policies.unmutedRequired))
+	adminAuthentication := policies.authRequired
+	if policies.adminAuth != nil {
+		adminAuthentication = policies.adminAuth
+	}
+	handler.RegisterAdmin(api.Group("/admin/feature-board", adminAuthentication, policies.adminRequired))
 }
 
 func newRouter(loggerOutput io.Writer, recoveryOutput io.Writer) *gin.Engine {

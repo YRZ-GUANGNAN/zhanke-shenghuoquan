@@ -1,5 +1,5 @@
 // Domain F client: management and the unified review workflow only.
-import type { ExternalTakeoutMerchant, ExternalTakeoutMerchantDirectory, ExternalTakeoutMerchantInput, FeaturePolicy, FeaturePolicyKey, FeedbackRow, IdentityApplicationAdminList, IdentityApplicationDetail, IdentityApplicationQuery, IdentityApplicationRow, MediaAssetDetail, MediaAssetRow, MediaDeadletters, MediaDecisionRow, MediaEventRow, MediaGCJobRow, MediaQuery, MediaSummary, NavigationCategory, NavigationCategoryInput, NavigationItem, NavigationItemInput, Page, PageQuery, PostRow, ProductRow, ReportRow, ReviewTask, Stats, UserRow, ReportDetail, StudentVerificationAdminList, StudentVerificationDetail, StudentVerificationQuery, StudentVerificationRow} from '../types'
+import type { AdminFeatureSuggestion, AdminFeatureSuggestionPage, AuthorNoteRow, ExternalTakeoutMerchant, ExternalTakeoutMerchantDirectory, ExternalTakeoutMerchantInput, FeaturePolicy, FeaturePolicyKey, FeatureSuggestionStatus, FeedbackRow, IdentityApplicationAdminList, IdentityApplicationDetail, IdentityApplicationQuery, IdentityApplicationRow, MediaAssetDetail, MediaAssetRow, MediaDeadletters, MediaDecisionRow, MediaEventRow, MediaGCJobRow, MediaQuery, MediaSummary, NavigationCategory, NavigationCategoryInput, NavigationItem, NavigationItemInput, Page, PageQuery, PostRow, ProductRow, ReportRow, ReviewTask, Stats, UserRow, ReportDetail, StudentVerificationAdminList, StudentVerificationDetail, StudentVerificationQuery, StudentVerificationRow} from '../types'
 import { adminRequest } from './http'
 type ReviewQuery={status?:ReviewTask['status']|'';page?:number;pageSize?:number}
 export class AdminAPIError extends Error {
@@ -45,6 +45,11 @@ export const adminAPI={
 	feedbacks:(query:PageQuery&{status?:string}={})=>api<Page<FeedbackRow>>(`/admin/feedbacks${feedbackQueryString(query)}`),
 	updateFeedback:(id:string,status:string,note:string)=>api<{updated:boolean}>(`/admin/feedbacks/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify({status,note})}),
 	navigation:()=>api<NavigationCategory[]>('/admin/navigation'),
+	featureSuggestions:(query:{status?:FeatureSuggestionStatus|'';page?:number;pageSize?:number}={})=>api<AdminFeatureSuggestionPage>(`/admin/feature-board/suggestions${feedbackQueryString(query)}`),
+	setFeatureSuggestionStatus:(id:string,status:FeatureSuggestionStatus)=>api<AdminFeatureSuggestion>(`/admin/feature-board/suggestions/${id}/status`,{method:'POST',body:JSON.stringify({status})}),
+	authorNotes:()=>api<AuthorNoteRow[]>('/admin/feature-board/notes'),
+	createAuthorNote:(content:string)=>api<AuthorNoteRow>('/admin/feature-board/notes',{method:'POST',body:JSON.stringify({content})}),
+	deleteAuthorNote:(id:string)=>api<{deleted:boolean}>(`/admin/feature-board/notes/${id}`,{method:'DELETE'}),
 	createNavigationCategory:(input:NavigationCategoryInput)=>api<NavigationCategory>('/admin/navigation/categories',{method:'POST',body:JSON.stringify(input)}),
 	updateNavigationCategory:(id:number,input:NavigationCategoryInput)=>api<{updated:boolean}>(`/admin/navigation/categories/${id}`,{method:'PUT',body:JSON.stringify(input)}),
 	deleteNavigationCategory:(id:number)=>api<{deleted:boolean}>(`/admin/navigation/categories/${id}`,{method:'DELETE'}),

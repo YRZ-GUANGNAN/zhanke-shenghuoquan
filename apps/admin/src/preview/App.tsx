@@ -13,6 +13,7 @@ import {
   AppstoreOutlined,
   AuditOutlined,
   BellOutlined,
+  BulbOutlined,
   CommentOutlined,
   DashboardOutlined,
   FileImageOutlined,
@@ -72,6 +73,7 @@ const NotificationsView = lazy(() => import('./views/NotificationsView').then(mo
 const OperationsView = lazy(() => import('./views/OperationsView').then(module => ({ default: module.OperationsView })))
 const PeopleView = lazy(() => import('./views/PeopleView').then(module => ({ default: module.PeopleView })))
 const SettingsView = lazy(() => import('./views/SettingsView').then(module => ({ default: module.SettingsView })))
+const FeatureBoardView = lazy(() => import('./views/FeatureBoardView').then(module => ({ default: module.FeatureBoardView })))
 const LegacyTakeoutView = lazy(() => import('./views/LegacyTakeoutView').then(module => ({ default: module.LegacyTakeoutView })))
 import { Login } from '../Login'
 import { AccountPanel } from '../AccountPanel'
@@ -100,6 +102,7 @@ const navigation: NavigationItem[] = [
   { key: 'reports', label: '举报处理', icon: <WarningOutlined />, group: '内容与用户' },
   { key: 'identities', label: '商家骑手认证', icon: <IdcardOutlined />, group: '内容与用户' },
   { key: 'feedbacks', label: '意见反馈', icon: <MessageOutlined />, group: '内容与用户' },
+  { key: 'feature-board', label: '功能建议', icon: <BulbOutlined />, group: '内容与用户' },
   { key: 'users', label: '用户与权限', icon: <UserOutlined />, group: '平台设置' },
   { key: 'navigation', label: '服务入口', icon: <AppstoreOutlined />, group: '平台设置' },
   { key: 'share-settings', label: '分享设置', icon: <ShareAltOutlined />, group: '平台设置' },
@@ -233,6 +236,8 @@ function ConsoleShell() {
       case 'share-settings':
       case 'feature-policy':
         return <SettingsView section={section} />
+      case 'feature-board':
+        return <FeatureBoardView />
       case 'takeout':
         return <LegacyTakeoutView />
     }

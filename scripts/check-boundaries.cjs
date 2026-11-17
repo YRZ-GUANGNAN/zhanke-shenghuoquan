@@ -16,6 +16,7 @@ const allowedDomains = new Set([
   'adminauth',
   'identityapplication',
   'studentverification',
+  'featureboard',
   'featureflags',
   'sharesettings',
   'campusinfo',

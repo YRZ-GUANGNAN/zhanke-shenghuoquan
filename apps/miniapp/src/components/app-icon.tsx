@@ -34,6 +34,7 @@ import actionOrder from '../assets/icons/action-order.svg'
 import actionSettings from '../assets/icons/action-settings.svg'
 import actionDocument from '../assets/icons/action-document.svg'
 import actionFeedback from '../assets/icons/action-feedback.svg'
+import actionMaker from '../assets/icons/action-maker.svg'
 import actionInfo from '../assets/icons/action-info.svg'
 import './app-icon.scss'
 
@@ -62,6 +63,7 @@ export type AppIconName =
   | 'settings'
   | 'document'
   | 'feedback'
+  | 'maker'
   | 'info'
 
 const sources: Record<AppIconName, { normal: string; active: string }> = {
@@ -89,6 +91,7 @@ const sources: Record<AppIconName, { normal: string; active: string }> = {
   settings: { normal: actionSettings, active: actionSettings },
   document: { normal: actionDocument, active: actionDocument },
   feedback: { normal: actionFeedback, active: actionFeedback },
+  maker: { normal: actionMaker, active: actionMaker },
   info: { normal: actionInfo, active: actionInfo }
 }
 

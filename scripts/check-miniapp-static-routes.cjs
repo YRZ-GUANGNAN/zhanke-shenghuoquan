@@ -28,6 +28,7 @@ const expectedRoutes = [
   'pages/notifications/index',
   'pages/blacklist/index',
   'pages/feedback/index',
+  'pages/feature-board/index',
   'pages/my-feedback/index',
   'pages/about/index',
   'pages/legal/index',

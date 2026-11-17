@@ -1,0 +1,196 @@
+@use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
+
+.feature-board-page {
+  @include ref.page-foundation;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: $bg-app;
+  color: $text-primary;
+}
+
+.feature-board-nav__back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44PX;
+  height: 44PX;
+}
+
+.feature-board-content {
+  box-sizing: border-box;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 0;
+  padding: 24rpx 32rpx calc(48rpx + env(safe-area-inset-bottom));
+}
+
+.feature-board-compose {
+  padding: 24rpx;
+  border-radius: $radius-card;
+  background: $bg-surface;
+  box-shadow: $shadow-card;
+}
+
+.feature-board-compose__input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 160rpx;
+  font-size: 28rpx;
+  line-height: 1.5;
+  color: $text-primary;
+}
+
+.feature-board-compose__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-top: 16rpx;
+}
+
+.feature-board-compose__count {
+  @include ref.type(meta);
+  color: $text-tertiary;
+}
+
+.feature-board-sort {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin: 28rpx 4rpx 20rpx;
+}
+
+.feature-board-sort__item {
+  @include ref.touch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 132rpx;
+  min-height: 56rpx;
+  padding: 0 24rpx;
+  border-radius: 999rpx;
+  background: $bg-screen;
+  color: $text-secondary;
+  font-size: 26rpx;
+  font-weight: 500;
+}
+
+.feature-board-sort__item--active {
+  background: $bg-surface;
+  color: $text-strong;
+  font-weight: 700;
+  box-shadow: 0 4rpx 14rpx rgba(31, 56, 88, .13), 0 2rpx 4rpx rgba(31, 56, 88, .07);
+}
+
+.feature-board-sort__total {
+  @include ref.type(meta);
+  margin-left: auto;
+  color: $text-tertiary;
+}
+
+.feature-board-card {
+  padding: 24rpx;
+  border-radius: $radius-card;
+  background: $bg-surface;
+  box-shadow: $shadow-card;
+}
+
+.feature-board-card + .feature-board-card {
+  margin-top: 20rpx;
+}
+
+.feature-board-card__content {
+  @include ref.type(body);
+  @include ref.wrap;
+  display: block;
+  color: $text-primary;
+}
+
+.feature-board-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-top: 16rpx;
+}
+
+.feature-board-card__date {
+  @include ref.type(meta);
+  color: $text-tertiary;
+}
+
+.feature-board-card__badge {
+  padding: 2rpx 12rpx;
+  border-radius: 8rpx;
+  background: $success-tint;
+  color: $success;
+  font-size: 22rpx;
+  font-weight: 600;
+}
+
+.feature-board-card__support {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  margin-left: auto;
+  min-width: 88rpx;
+  min-height: 44PX;
+  justify-content: flex-end;
+  color: $text-tertiary;
+  font-size: 24rpx;
+}
+
+.feature-board-card__support--active {
+  color: $like-active;
+  font-weight: 700;
+}
+
+.feature-board-card__support-icon {
+  width: 36rpx;
+  height: 36rpx;
+}
+
+.feature-board-more {
+  @include ref.type(meta);
+  display: block;
+  padding: 24rpx 0;
+  color: $text-tertiary;
+  text-align: center;
+}
+
+.feature-board-notes {
+  margin-top: 40rpx;
+}
+
+.feature-board-notes__title {
+  @include ref.type(label);
+  display: block;
+  margin: 0 4rpx 16rpx;
+  color: $text-strong;
+  font-weight: 700;
+}
+
+.feature-board-note {
+  padding: 24rpx;
+  border-radius: $radius-card;
+  background: $brand-tint;
+}
+
+.feature-board-note + .feature-board-note {
+  margin-top: 16rpx;
+}
+
+.feature-board-note__content {
+  @include ref.type(body);
+  @include ref.wrap;
+  display: block;
+  color: $text-primary;
+}
+
+.feature-board-note__date {
+  @include ref.type(meta);
+  display: block;
+  margin-top: 10rpx;
+  color: $text-secondary;
+}

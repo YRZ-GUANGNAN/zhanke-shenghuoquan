@@ -45,7 +45,7 @@ const roles: RoleOption[] = [
 
 const settings: SettingItem[] = [
   { key: 'settings', title: '设置', description: '隐私、通知与账号管理', icon: 'settings', arrow: true },
-  { key: 'maker-apply', title: '众创申请', description: '联系众创空间，申请入驻或合作', icon: 'star', arrow: true },
+  { key: 'maker-apply', title: '众创申请', description: '联系众创空间，申请入驻或合作', icon: 'maker', arrow: true },
   { key: 'feature-feedback', title: '功能意见与需求', description: '提交想要的功能与改进建议', icon: 'feedback', arrow: true },
   { key: 'about', title: '关于湛科生活圈', description: '产品信息与服务说明', icon: 'info', arrow: true }
 ]
@@ -64,7 +64,7 @@ function handleSettingClick(item: SettingItem, navigate: (url: string) => void) 
   }
 
   if (item.key === 'feature-feedback') {
-    navigate('/pages/feedback/index?category=suggestion')
+    navigate('/pages/feature-board/index')
     return
   }
 
@@ -285,9 +285,6 @@ function ProfileContent() {
           <View className='student-profile-user__main' onClick={openProfileEditor} ariaRole='button' ariaLabel='编辑个人资料'>
             <View className='student-profile-user__title-row'>
               <Text className='student-profile-user__name'>{profile.nickname || '校园用户'}</Text>
-            </View>
-            <View className='student-profile-user__details'>
-              <Text className='student-profile-user__meta'>用户号 {profile.id || '--'}</Text>
             </View>
           </View>
         </View>

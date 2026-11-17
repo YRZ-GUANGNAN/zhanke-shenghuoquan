@@ -87,6 +87,7 @@ const standardPages = [
   'campus-guide',
   'blacklist',
   'feedback',
+  'feature-board',
   'edit-profile',
   'legal',
   'settings',
@@ -151,7 +152,7 @@ const customNavigationPages = fs.readdirSync(miniappPagesRoot, { withFileTypes: 
     return fs.existsSync(configPath) && /navigationStyle:\s*'custom'/.test(fs.readFileSync(configPath, 'utf8'))
   })
 
-assert.equal(customNavigationPages.length, 33, 'custom navigation page inventory changed')
+assert.equal(customNavigationPages.length, 34, 'custom navigation page inventory changed')
 
 for (const pageName of customNavigationPages) {
   const sourcePath = path.join(miniappPagesRoot, pageName, 'index.tsx')

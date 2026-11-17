@@ -1,5 +1,5 @@
 // Domain F presentation contracts. Admin never queries domain databases directly.
-export type AdminSection = 'dashboard' | 'users' | 'identities' | 'student-verifications' | 'moderation' | 'media' | 'delivery' | 'notifications' | 'takeout' | 'community' | 'trade' | 'reports' | 'feedbacks' | 'navigation' | 'feature-policy' | 'share-settings'
+export type AdminSection = 'dashboard' | 'users' | 'identities' | 'student-verifications' | 'moderation' | 'media' | 'delivery' | 'notifications' | 'takeout' | 'community' | 'trade' | 'reports' | 'feedbacks' | 'feature-board' | 'navigation' | 'feature-policy' | 'share-settings'
 export interface AdminUser{id:number;nickname:string;role:'admin'|'superadmin'}
 export interface AdminSession{user:AdminUser;csrfToken:string;expiresAt:string}
 export interface Page<T>{items:T[];page:number;pageSize:number;total:number}
@@ -91,3 +91,8 @@ export interface FeeConfigRow{riderFeeCents:number;platformCutCents:number;rowVe
 export interface RiderConfigRow{maxInFlightPerRider:number;rowVersion:number;updatedAt:string}
 export interface SettlementRow{riderUserId:number;pendingCount:number;riderFeeCents:number;platformCutCents:number}
 export interface WithdrawRow{withdrawPublicId:string;riderUserId:number;amountCents:number;status:WithdrawStatus;note:string;paidAt?:string;rowVersion:number;createdAt:string;updatedAt:string}
+
+export type FeatureSuggestionStatus = 'open' | 'accepted' | 'closed'
+export interface AdminFeatureSuggestion { id: string; userId: number; content: string; status: FeatureSuggestionStatus; supportCount: number; createdAt: string }
+export interface AdminFeatureSuggestionPage { items: AdminFeatureSuggestion[]; page: number; pageSize: number; total: number }
+export interface AuthorNoteRow { id: string; content: string; createdAt: string }
