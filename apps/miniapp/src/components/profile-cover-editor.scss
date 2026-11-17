@@ -7,7 +7,6 @@
 }
 .profile-cover-editor__heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16rpx; }
 .profile-cover-editor__title { color: $text-primary; font-size: 30rpx; font-weight: 600; line-height: 44rpx; }
-.profile-cover-editor__scope { color: $text-secondary; font-size: 22rpx; line-height: 32rpx; }
 .profile-cover-editor__preview {
   @include cover.frame;
   @include cover.surface;

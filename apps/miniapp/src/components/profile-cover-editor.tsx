@@ -85,7 +85,7 @@ export default function ProfileCoverEditor({ disabled = false, isProfileBusy, on
 
   return (
     <View className='profile-cover-editor' id='profile-cover-editor'>
-      <View className='profile-cover-editor__heading'><Text className='profile-cover-editor__title'>主页背景</Text><Text className='profile-cover-editor__scope'>独立保存</Text></View>
+      <View className='profile-cover-editor__heading'><Text className='profile-cover-editor__title'>主页背景</Text></View>
       <View className='profile-cover-editor__preview'>
         {source && source !== failedSource
           ? <Image className='profile-cover-editor__image' src={source} mode='aspectFill' ariaLabel='个人封面预览' onError={() => setFailedSource(source)} />
