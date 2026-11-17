@@ -29,13 +29,14 @@ for (const value of [
 ]) includes(appearance, value, 'appearance page')
 excludes(appearance, 'readStudentVerification', 'appearance page')
 excludes(appearance, '预留', 'appearance page')
-for (const value of ['appearance-preview__blur', 'appearance-preview__veil', 'appearance-switch--on', 'appearance-preview__veil--plain', 'appearance-effect__item--active']) {
+for (const value of ['appearance-preview__blur', 'appearance-preview__veil', 'appearance-switch--on', 'appearance-preview__veil--plain', 'appearance-effect-option--active', 'appearance-effect-track']) {
   includes(appearanceStyle, value, 'appearance style')
 }
-// 首页必须按所选效果渲染：毛玻璃三层或原图直显 + 顶部柔光。
+// 首页必须按所选效果渲染：毛玻璃三层，或原图直显（仅底部淡出，顶部保留原图）。
 includes(home, 'readHomeHeaderBackdropEffect', 'home header effect')
-includes(home, 'student-home-header__plain-glow', 'home header effect')
-includes(homeStyle, 'student-home-header__plain-glow', 'home header effect style')
+includes(home, 'student-home-header__veil--plain', 'home header effect')
+includes(homeStyle, 'student-home-header__veil--plain', 'home header effect style')
+if (homeStyle.includes('plain-glow')) throw new Error('home header effect: plain mode must not soften the top of the photo')
 
 // 学生验证模块：本机保存、可裁剪、可清除；不触碰首页背景偏好。
 for (const value of [

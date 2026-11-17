@@ -111,7 +111,7 @@ export default function AppearancePage() {
               <View className={`appearance-switch ${enabled ? 'appearance-switch--on' : ''}`}><View className='appearance-switch__knob' /></View>
             </View>
           </View>
-          <View className='appearance-row' onClick={() => void pickImage()}>
+          <View className='appearance-row appearance-row--last' onClick={() => void pickImage()}>
             <View className='appearance-row__main'>
               <Text className='appearance-row__title'>背景图片</Text>
               <Text className='appearance-row__subtitle'>选择后可拖动裁剪范围；建议约 2.9:1 的横图（如 1170×408）</Text>
@@ -122,29 +122,25 @@ export default function AppearancePage() {
               <AppIcon name='chevron-right' className='appearance-row__arrow app-icon--chevron' />
             </View>
           </View>
-          <View className='appearance-row appearance-row--last'>
-            <View className='appearance-row__main'>
-              <Text className='appearance-row__title'>展示效果</Text>
-              <Text className='appearance-row__subtitle'>{effect === 'plain' ? '原图直显：照片保持清晰，顶部柔光保证图标可读，底部自然淡出' : '毛玻璃淡化：向下逐渐虚化并入白色，过渡更柔和'}</Text>
-            </View>
-            <View className='appearance-effect'>
-              <View
-                className={`appearance-effect__item${effect === 'glass' ? ' appearance-effect__item--active' : ''}`}
-                ariaRole='button'
-                ariaLabel={`毛玻璃淡化${effect === 'glass' ? '，已选中' : ''}`}
-                onClick={() => chooseEffect('glass')}
-              >
-                <Text>毛玻璃</Text>
-              </View>
-              <View
-                className={`appearance-effect__item${effect === 'plain' ? ' appearance-effect__item--active' : ''}`}
-                ariaRole='button'
-                ariaLabel={`原图直显${effect === 'plain' ? '，已选中' : ''}`}
-                onClick={() => chooseEffect('plain')}
-              >
-                <Text>原图直显</Text>
-              </View>
-            </View>
+        </View>
+
+        <Text className='appearance-label'>展示效果</Text>
+        <View className='appearance-effect-track'>
+          <View
+            className={`appearance-effect-option${effect === 'glass' ? ' appearance-effect-option--active' : ''}`}
+            ariaRole='button'
+            ariaLabel={`毛玻璃淡化${effect === 'glass' ? '，已选中' : ''}`}
+            onClick={() => chooseEffect('glass')}
+          >
+            <Text>毛玻璃淡化</Text>
+          </View>
+          <View
+            className={`appearance-effect-option${effect === 'plain' ? ' appearance-effect-option--active' : ''}`}
+            ariaRole='button'
+            ariaLabel={`原图直显${effect === 'plain' ? '，已选中' : ''}`}
+            onClick={() => chooseEffect('plain')}
+          >
+            <Text>原图直显</Text>
           </View>
         </View>
 
@@ -171,11 +167,6 @@ export default function AppearancePage() {
               <View className='appearance-preview__search' />
             </View>
           </View>
-          <Text className='appearance-preview__hint'>
-            {effect === 'plain'
-              ? '照片原样直显：顶部一层柔光让图标清晰，底部自然淡出到页面底色'
-              : '首页顶部示意：照片在上方保持清晰，向下渐入毛玻璃并淡出为白色'}{enabled ? '' : '（当前未开启，开启后生效）'}。
-          </Text>
         </View>
       </View>
     </View>

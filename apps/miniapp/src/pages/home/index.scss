@@ -163,14 +163,9 @@
     linear-gradient(180deg, rgba(var(--home-header-surface-rgb), 0) 0%, rgba(var(--home-header-surface-rgb), 0) 26%, rgba(var(--home-header-surface-rgb), .02) 35%, rgba(var(--home-header-surface-rgb), .06) 44%, rgba(var(--home-header-surface-rgb), .115) 52%, rgba(var(--home-header-surface-rgb), .19) 60%, rgba(var(--home-header-surface-rgb), .285) 68%, rgba(var(--home-header-surface-rgb), .4) 76%, rgba(var(--home-header-surface-rgb), .53) 83%, rgba(var(--home-header-surface-rgb), .67) 89%, rgba(var(--home-header-surface-rgb), .81) 94%, rgba(var(--home-header-surface-rgb), .93) 97%, rgb(var(--home-header-surface-rgb)) 100%);
 }
 
-/* 原图直显模式：照片保持清晰，仅顶部叠一层柔光保证深色图标与文字可读。 */
-.student-home-header__plain-glow {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  background: linear-gradient(180deg, rgba(var(--home-header-surface-rgb), .42) 0%, rgba(var(--home-header-surface-rgb), .26) 16%, rgba(var(--home-header-surface-rgb), .12) 30%, rgba(var(--home-header-surface-rgb), 0) 46%);
+/* 原图直显模式：顶部完全保留原图，只把底部淡出到页面底色，与内容区无缝衔接。 */
+.student-home-header__veil--plain {
+  background: linear-gradient(180deg, rgba(var(--home-header-surface-rgb), 0) 0%, rgba(var(--home-header-surface-rgb), 0) 26%, rgba(var(--home-header-surface-rgb), .02) 35%, rgba(var(--home-header-surface-rgb), .06) 44%, rgba(var(--home-header-surface-rgb), .115) 52%, rgba(var(--home-header-surface-rgb), .19) 60%, rgba(var(--home-header-surface-rgb), .285) 68%, rgba(var(--home-header-surface-rgb), .4) 76%, rgba(var(--home-header-surface-rgb), .53) 83%, rgba(var(--home-header-surface-rgb), .67) 89%, rgba(var(--home-header-surface-rgb), .81) 94%, rgba(var(--home-header-surface-rgb), .93) 97%, rgb(var(--home-header-surface-rgb)) 100%);
 }
 
 /* 头图上的选项卡加深并加轻阴影，任意亮暗照片下都能读清。 */

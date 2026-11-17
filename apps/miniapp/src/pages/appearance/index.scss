@@ -285,14 +285,6 @@
   font-size: 24rpx;
 }
 
-.appearance-preview__hint {
-  @include ref.wrap;
-  display: block;
-  margin-top: 12rpx;
-  color: $text-muted;
-  font-size: 22rpx;
-  line-height: 1.6;
-}
 
 @media (prefers-color-scheme: dark) {
   .appearance-preview {
@@ -304,34 +296,40 @@
   .appearance-switch, .appearance-switch__knob { transition: none; }
 }
 
-.appearance-effect {
-  flex: 0 0 auto;
+/* 展示效果：通栏分段控件（灰底轨道 + 白色选中胶囊），与站内同类控件一致。 */
+.appearance-effect-track {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
-  gap: 8rpx;
+  gap: 6rpx;
+  width: 100%;
+  height: 76rpx;
+  padding: 8rpx;
+  border-radius: 999rpx;
+  background: $bg-screen;
 }
 
-.appearance-effect__item {
+.appearance-effect-option {
+  flex: 1 1 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 56rpx;
-  padding: 0 20rpx;
+  height: 60rpx;
   border-radius: 999rpx;
-  background: $bg-screen;
   color: $text-secondary;
-  font-size: 24rpx;
+  font-size: 27rpx;
   font-weight: 500;
 }
 
-.appearance-effect__item--active {
-  background: $brand-tint;
-  color: $brand-primary-strong;
+.appearance-effect-option--active {
+  background: $bg-surface;
+  color: $text-strong;
   font-weight: 700;
+  box-shadow: 0 4rpx 14rpx rgba(31, 56, 88, .13), 0 2rpx 4rpx rgba(31, 56, 88, .07);
 }
 
 .appearance-preview__veil--plain {
+  /* 原图直显：顶部完全保留原图，仅底部淡出到页面底色。 */
   background:
-    linear-gradient(180deg, rgba(var(--appearance-surface-rgb), .42) 0%, rgba(var(--appearance-surface-rgb), .26) 16%, rgba(var(--appearance-surface-rgb), .12) 30%, rgba(var(--appearance-surface-rgb), 0) 46%),
     linear-gradient(180deg, rgba(var(--appearance-surface-rgb), 0) 0%, rgba(var(--appearance-surface-rgb), 0) 26%, rgba(var(--appearance-surface-rgb), .06) 44%, rgba(var(--appearance-surface-rgb), .115) 52%, rgba(var(--appearance-surface-rgb), .19) 60%, rgba(var(--appearance-surface-rgb), .285) 68%, rgba(var(--appearance-surface-rgb), .4) 76%, rgba(var(--appearance-surface-rgb), .53) 83%, rgba(var(--appearance-surface-rgb), .67) 89%, rgba(var(--appearance-surface-rgb), .81) 94%, rgba(var(--appearance-surface-rgb), .93) 97%, rgb(var(--appearance-surface-rgb)) 100%);
 }

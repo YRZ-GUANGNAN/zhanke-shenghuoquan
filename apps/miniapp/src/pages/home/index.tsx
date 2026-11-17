@@ -663,10 +663,7 @@ function HomeContent() {
                 <View className='student-home-header__veil' />
               </>
             ) : (
-              <>
-                <View className='student-home-header__veil' />
-                <View className='student-home-header__plain-glow' />
-              </>
+              <View className='student-home-header__veil student-home-header__veil--plain' />
             )}
           </View>
         ) : undefined}
