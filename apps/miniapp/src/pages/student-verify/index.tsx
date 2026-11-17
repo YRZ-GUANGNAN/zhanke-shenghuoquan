@@ -301,7 +301,7 @@ export default function StudentVerifyPage() {
               </>) : (
                 <View className='student-verify-row student-verify-row--last'>
                   <View className='student-verify-row__main'>
-                    <Text className='student-verify-row__subtitle'>提交学生证照片和在校信息，审核通过后获得学生认证标识。</Text>
+                    <Text className='student-verify-row__subtitle'>提交学生证照片和在校信息，经管理员人工核验通过后获得学生认证标识。</Text>
                   </View>
                 </View>
               )}
@@ -338,10 +338,7 @@ export default function StudentVerifyPage() {
                 </>
               ) : null}
               {!editing && !application ? (
-                <>
-                  <Text className='student-verify-pending-hint'>提交后由管理员人工核验，审核结果会显示在本页。</Text>
-                  <AppButton variant='primary' block onClick={startReapply}>开始认证</AppButton>
-                </>
+                <AppButton variant='primary' block onClick={startReapply}>开始认证</AppButton>
               ) : null}
               {!editing && application?.status === 'pending' ? (
                 <Text className='student-verify-pending-hint'>照片与信息已提交，等待后台审核；审核结果会显示在本页。</Text>

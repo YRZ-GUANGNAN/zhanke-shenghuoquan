@@ -45,7 +45,6 @@ const roles: RoleOption[] = [
 
 const settings: SettingItem[] = [
   { key: 'settings', title: '设置', description: '隐私、通知与账号管理', icon: 'settings', arrow: true },
-  { key: 'student-verify', title: '学生认证', description: '学生证照片与身份信息', icon: 'student', arrow: true },
   { key: 'maker-apply', title: '众创申请', description: '联系众创空间，申请入驻或合作', icon: 'maker', arrow: true },
   { key: 'feature-feedback', title: '功能意见与需求', description: '提交想要的功能与改进建议', icon: 'feedback', arrow: true },
   { key: 'about', title: '关于湛科生活圈', description: '产品信息与服务说明', icon: 'info', arrow: true }
@@ -61,11 +60,6 @@ function showPlaceholder(title: string) {
 function handleSettingClick(item: SettingItem, navigate: (url: string) => void) {
   if (item.key === 'settings') {
     navigate('/pages/settings/index')
-    return
-  }
-
-  if (item.key === 'student-verify') {
-    navigate('/pages/student-verify/index')
     return
   }
 

@@ -168,15 +168,27 @@
   background: linear-gradient(180deg, rgba(var(--home-header-surface-rgb), 0) 0%, rgba(var(--home-header-surface-rgb), 0) 40%, rgba(var(--home-header-surface-rgb), .03) 46%, rgba(var(--home-header-surface-rgb), .09) 54%, rgba(var(--home-header-surface-rgb), .18) 62%, rgba(var(--home-header-surface-rgb), .3) 70%, rgba(var(--home-header-surface-rgb), .45) 78%, rgba(var(--home-header-surface-rgb), .6) 85%, rgba(var(--home-header-surface-rgb), .74) 91%, rgba(var(--home-header-surface-rgb), .86) 95%, rgba(var(--home-header-surface-rgb), .95) 98%, rgb(var(--home-header-surface-rgb)) 100%);
 }
 
-/* 头图上的选项卡：照片上统一用白字 + 柔和暗影（照片场景的主流做法），干净且清晰。 */
+/* 头图上的选项卡：白字 + 贴实的轻暗影（无散影，不发灰），选中下划线同为白色。 */
 .student-home-header--media .student-home-header__tab {
-  color: rgba(255, 255, 255, .93);
-  text-shadow: 0 1px 3px rgba(10, 22, 36, .55), 0 0 8px rgba(10, 22, 36, .38);
+  color: rgba(255, 255, 255, .85);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .38);
 }
 
 .student-home-header--media .student-home-header__tab--active {
   color: #fff;
-  text-shadow: 0 1px 3px rgba(10, 22, 36, .62), 0 0 8px rgba(10, 22, 36, .42);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .42);
+}
+
+.student-home-header--media .student-home-header__tab--active::after {
+  background: var(--home-header-tab-underline, #fff);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .4);
+}
+
+/* 头图模式下搜索图标同步为白色，避免白字配深图标的错位感。 */
+.student-home-header--media .student-home-header__search-icon {
+  filter: brightness(0) invert(1);
+  -webkit-filter: brightness(0) invert(1);
+  filter: brightness(0) invert(1) drop-shadow(0 1px 2px rgba(0, 0, 0, .45));
 }
 
 @media (max-width: 360px) {
