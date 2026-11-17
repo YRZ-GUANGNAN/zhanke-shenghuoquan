@@ -152,6 +152,13 @@ body {
 .preview-content {
   padding: 16px;
   overflow: auto;
+  /* 内容区宽度随窗口与侧栏变化：以此为容器做组件级响应式。 */
+  container-type: inline-size;
+  container-name: preview-content;
+  --preview-scrollbar-thumb: #6b7280;
+  --preview-scrollbar-track: #e8edf3;
+  scrollbar-color: var(--preview-scrollbar-thumb) var(--preview-scrollbar-track);
+  scrollbar-width: thin;
 }
 
 .preview-page-header {
@@ -1620,7 +1627,7 @@ body {
   font-size: 12px;
 }
 
-@media (max-width: 1100px) {
+@container preview-content (max-width: 860px) {
   .preview-stat-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1654,10 +1661,12 @@ body {
 }
 
 @media (max-width: 640px) {
-
   .preview-content {
     padding: 12px;
   }
+}
+
+@container preview-content (max-width: 620px) {
 
   .preview-page-header {
     align-items: flex-start;
@@ -1710,7 +1719,7 @@ body {
   .preview-content { padding: 12px; }
 }
 
-@media (max-width: 640px) {
+@container preview-content (max-width: 620px) {
   .preview-scene-list > div {
     grid-template-columns: 30px minmax(0, 1fr);
     align-items: start;
@@ -2296,7 +2305,7 @@ button.preview-media-card__visual:focus-visible {
 }
 
 /* 窄屏：服务入口卡片改为两行（图标+文案、操作独占一行），避免文案列被压成逐字换行。 */
-@media (max-width: 640px) {
+@container preview-content (max-width: 620px) {
   .preview-service-grid article {
     grid-template-columns: 38px minmax(0, 1fr);
   }
@@ -2320,4 +2329,77 @@ button.preview-media-card__visual:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+/* ---- 现代文本排版（Baseline 2024+，渐进增强，不支持则退回默认断行） ---- */
+.preview-page-header h1,
+.preview-panel__head strong,
+.preview-overlay-head strong,
+.preview-stat-grid strong {
+  /* 短标题均衡断行，避免末行孤字；6 行以内效果最好。 */
+  text-wrap: balance;
+}
+
+p,
+li,
+.preview-page-header__desc,
+.preview-panel__head span,
+.preview-toolbar__hint,
+.preview-empty__text span {
+  /* 长段落避免末行孤词。 */
+  text-wrap: pretty;
+}
+
+/* ---- 长列表延迟渲染（跳过首屏已渲染的前几项，其余接近视口时再布局） ---- */
+.preview-review-row:nth-child(n + 5) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 108px;
+}
+
+.preview-feedback-list > article:nth-child(n + 5) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 88px;
+}
+
+.preview-media-card:nth-child(n + 3) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 260px;
+}
+
+/* ---- 滚动条：标准属性 + WebKit 回退（回退放在 @supports not 内避免冲突） ---- */
+.preview-search-results {
+  scrollbar-color: var(--preview-scrollbar-thumb) var(--preview-scrollbar-track);
+  scrollbar-width: thin;
+}
+
+html {
+  scrollbar-color: var(--preview-scrollbar-thumb) var(--preview-scrollbar-track);
+  scrollbar-width: thin;
+}
+
+@supports not (scrollbar-color: auto) {
+  .preview-content,
+  .preview-search-results,
+  html {
+    scrollbar-width: auto;
+  }
+
+  .preview-content::-webkit-scrollbar,
+  .preview-search-results::-webkit-scrollbar,
+  html::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+
+  .preview-content::-webkit-scrollbar-thumb,
+  .preview-search-results::-webkit-scrollbar-thumb,
+  html::-webkit-scrollbar-thumb {
+    background: var(--preview-scrollbar-thumb);
+  }
+
+  .preview-content::-webkit-scrollbar-track,
+  .preview-search-results::-webkit-scrollbar-track,
+  html::-webkit-scrollbar-track {
+    background: var(--preview-scrollbar-track);
+  }
 }

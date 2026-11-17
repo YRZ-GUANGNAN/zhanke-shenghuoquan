@@ -25,16 +25,17 @@ import {
   UserOutlined,
   WarningOutlined
 } from '@ant-design/icons'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import type { PreviewSection } from './data'
 import { Modal, ToastProvider, usePreviewToast } from './ui'
-import { DashboardView } from './views/DashboardView'
-import { DeliveryView } from './views/DeliveryView'
-import { NotificationsView } from './views/NotificationsView'
-import { OperationsView } from './views/OperationsView'
-import { PeopleView } from './views/PeopleView'
-import { SettingsView } from './views/SettingsView'
-import { LegacyTakeoutView } from './views/LegacyTakeoutView'
+// 各业务分区按需加载：首次进入分区时才下载对应代码块，减小首屏 bundle。
+const DashboardView = lazy(() => import('./views/DashboardView').then(module => ({ default: module.DashboardView })))
+const DeliveryView = lazy(() => import('./views/DeliveryView').then(module => ({ default: module.DeliveryView })))
+const NotificationsView = lazy(() => import('./views/NotificationsView').then(module => ({ default: module.NotificationsView })))
+const OperationsView = lazy(() => import('./views/OperationsView').then(module => ({ default: module.OperationsView })))
+const PeopleView = lazy(() => import('./views/PeopleView').then(module => ({ default: module.PeopleView })))
+const SettingsView = lazy(() => import('./views/SettingsView').then(module => ({ default: module.SettingsView })))
+const LegacyTakeoutView = lazy(() => import('./views/LegacyTakeoutView').then(module => ({ default: module.LegacyTakeoutView })))
 import { Login } from '../Login'
 import { AccountPanel } from '../AccountPanel'
 import { useAdminStore, type AdminSearchTarget } from '../store'
@@ -284,7 +285,9 @@ function ConsoleShell() {
           </div>
         </header>
         <Layout.Content className="preview-content">
-          {content}
+          <Suspense fallback={<div className="preview-toolbar__hint">正在加载…</div>}>
+            {content}
+          </Suspense>
         </Layout.Content>
       </Layout>
     </Layout>
