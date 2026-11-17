@@ -159,6 +159,8 @@ body {
   --preview-scrollbar-track: #e8edf3;
   scrollbar-color: var(--preview-scrollbar-thumb) var(--preview-scrollbar-track);
   scrollbar-width: thin;
+  /* 滚动条出现/消失时保留空间，避免内容横向跳动。 */
+  scrollbar-gutter: stable;
 }
 
 .preview-page-header {
@@ -2375,6 +2377,7 @@ li,
 html {
   scrollbar-color: var(--preview-scrollbar-thumb) var(--preview-scrollbar-track);
   scrollbar-width: thin;
+  scrollbar-gutter: stable;
 }
 
 @supports not (scrollbar-color: auto) {
