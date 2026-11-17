@@ -72,6 +72,7 @@ async function pageBehavior() {
       if (id.endsWith('/session-recovery')) return { requestWithSingleSessionRecovery: (run) => run() }
       if (id.endsWith('/ui-preferences')) return {
         readHomeHeaderBackdrop: () => false,
+        readHomeHeaderBackdropEffect: () => 'glass',
         readHomeHeaderBackdropImage: () => '',
       }
       if (id.endsWith('/use-page-share')) return { usePageShare: () => {} }

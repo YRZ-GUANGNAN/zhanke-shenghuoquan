@@ -3,6 +3,7 @@ import { removeLocalFile, saveLocalFile } from './local-file'
 
 const HOME_HEADER_BACKDROP_KEY = 'ui.homeHeaderBackdrop'
 const HOME_HEADER_IMAGE_KEY = 'ui.homeHeaderBackdropImage'
+const HOME_HEADER_EFFECT_KEY = 'ui.homeHeaderBackdropEffect'
 
 // 首页头图是纯本地展示偏好：默认关闭（纯白头部），在设置页开启。
 export function readHomeHeaderBackdrop(): boolean {
@@ -18,6 +19,25 @@ export function writeHomeHeaderBackdrop(enabled: boolean) {
     Taro.setStorageSync(HOME_HEADER_BACKDROP_KEY, enabled ? '1' : '0')
   } catch {
     // 存储失败不应阻断开关的即时生效（本次会话内仍按内存状态显示）。
+  }
+}
+
+// 背景展示效果：glass = 预模糊 + 白色磨砂淡化（默认）；plain = 原图直显 + 顶部柔光与底部淡出。
+export type HomeHeaderBackdropEffect = 'glass' | 'plain'
+
+export function readHomeHeaderBackdropEffect(): HomeHeaderBackdropEffect {
+  try {
+    return Taro.getStorageSync(HOME_HEADER_EFFECT_KEY) === 'plain' ? 'plain' : 'glass'
+  } catch {
+    return 'glass'
+  }
+}
+
+export function writeHomeHeaderBackdropEffect(effect: HomeHeaderBackdropEffect) {
+  try {
+    Taro.setStorageSync(HOME_HEADER_EFFECT_KEY, effect)
+  } catch {
+    // 同上：存储失败不影响本次会话内的即时预览。
   }
 }
 

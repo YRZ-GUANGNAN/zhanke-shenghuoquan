@@ -5,6 +5,8 @@ const root = path.resolve(__dirname, '..')
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8')
 
 const appearance = read('apps', 'miniapp', 'src', 'pages', 'appearance', 'index.tsx')
+const home = read('apps', 'miniapp', 'src', 'pages', 'home', 'index.tsx')
+const homeStyle = read('apps', 'miniapp', 'src', 'pages', 'home', 'index.scss')
 const appearanceStyle = read('apps', 'miniapp', 'src', 'pages', 'appearance', 'index.scss')
 const verify = read('apps', 'miniapp', 'src', 'pages', 'student-verify', 'index.tsx')
 const verifyStyle = read('apps', 'miniapp', 'src', 'pages', 'student-verify', 'index.scss')
@@ -22,13 +24,18 @@ function excludes(source, value, label) {
 // 首页背景模块：本地偏好 + 可裁剪 + 效果预览；不包含学生验证内容。
 for (const value of [
   'readHomeHeaderBackdrop', 'writeHomeHeaderBackdrop', 'saveHomeHeaderBackdropImage',
-  'resetHomeHeaderBackdropImage', 'cropImageWithWechatEditor', '效果预览'
+  'resetHomeHeaderBackdropImage', 'cropImageWithWechatEditor', '效果预览',
+  'readHomeHeaderBackdropEffect', 'writeHomeHeaderBackdropEffect', '原图直显'
 ]) includes(appearance, value, 'appearance page')
 excludes(appearance, 'readStudentVerification', 'appearance page')
 excludes(appearance, '预留', 'appearance page')
-for (const value of ['appearance-preview__blur', 'appearance-preview__veil', 'appearance-switch--on']) {
+for (const value of ['appearance-preview__blur', 'appearance-preview__veil', 'appearance-switch--on', 'appearance-preview__veil--plain', 'appearance-effect__item--active']) {
   includes(appearanceStyle, value, 'appearance style')
 }
+// 首页必须按所选效果渲染：毛玻璃三层或原图直显 + 顶部柔光。
+includes(home, 'readHomeHeaderBackdropEffect', 'home header effect')
+includes(home, 'student-home-header__plain-glow', 'home header effect')
+includes(homeStyle, 'student-home-header__plain-glow', 'home header effect style')
 
 // 学生验证模块：本机保存、可裁剪、可清除；不触碰首页背景偏好。
 for (const value of [

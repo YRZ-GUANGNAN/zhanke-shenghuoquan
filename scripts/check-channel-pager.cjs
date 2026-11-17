@@ -65,6 +65,7 @@ async function run() {
       if (id.endsWith('/utils/ui-preferences')) {
         return {
           readHomeHeaderBackdrop: () => false,
+          readHomeHeaderBackdropEffect: () => 'glass',
           readHomeHeaderBackdropImage: () => '',
         }
       }

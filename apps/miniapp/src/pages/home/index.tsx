@@ -34,7 +34,7 @@ import { useSessionStore } from '../../stores/session'
 import { postBodyWithoutTitle } from '../../utils/post-presentation'
 import { navigateToPublicProfile } from '../../utils/navigation'
 import { conversationPeer, uniquePeerConversations } from '../../utils/conversation-presentation'
-import { readHomeHeaderBackdrop, readHomeHeaderBackdropImage } from '../../utils/ui-preferences'
+import { readHomeHeaderBackdrop, readHomeHeaderBackdropEffect, readHomeHeaderBackdropImage, type HomeHeaderBackdropEffect } from '../../utils/ui-preferences'
 import './index.scss'
 
 type HomeTab = 'discover' | 'secondhand' | 'tools' | 'maker' | 'messages'
@@ -162,6 +162,7 @@ function HomeContent() {
   const [headerBackdropFailed, setHeaderBackdropFailed] = useState(false)
   const [headerBackdropEnabled, setHeaderBackdropEnabled] = useState(readHomeHeaderBackdrop)
   const [headerBackdropImage, setHeaderBackdropImage] = useState(readHomeHeaderBackdropImage)
+  const [headerBackdropEffect, setHeaderBackdropEffectState] = useState<HomeHeaderBackdropEffect>(readHomeHeaderBackdropEffect)
   const [marketVisited, setMarketVisited] = useState(false)
   const channelInteraction = useChannelInteraction()
   const [postCards, setPostCards] = useState<DiscoverCard[]>([])
@@ -507,6 +508,7 @@ function HomeContent() {
     visibleForNotifications.current = true
     setHeaderBackdropEnabled(readHomeHeaderBackdrop())
     setHeaderBackdropImage(readHomeHeaderBackdropImage())
+    setHeaderBackdropEffectState(readHomeHeaderBackdropEffect())
     if (activeTab === 'messages' && visibility.messages) void loadConversations(currentSessionKey)
   })
   useEffect(() => {
@@ -648,15 +650,24 @@ function HomeContent() {
               mode='aspectFill'
               onError={() => setHeaderBackdropFailed(true)}
             />
-            <View className='student-home-header__blur'>
-              <Image
-                className='student-home-header__backdrop-image student-home-header__backdrop-image--blur'
-                src={headerBackdropSrc}
-                mode='aspectFill'
-              />
-            </View>
-            <View className='student-home-header__glass' />
-            <View className='student-home-header__veil' />
+            {headerBackdropEffect === 'glass' ? (
+              <>
+                <View className='student-home-header__blur'>
+                  <Image
+                    className='student-home-header__backdrop-image student-home-header__backdrop-image--blur'
+                    src={headerBackdropSrc}
+                    mode='aspectFill'
+                  />
+                </View>
+                <View className='student-home-header__glass' />
+                <View className='student-home-header__veil' />
+              </>
+            ) : (
+              <>
+                <View className='student-home-header__veil' />
+                <View className='student-home-header__plain-glow' />
+              </>
+            )}
           </View>
         ) : undefined}
         center={isMessagesPage ? <Text className='student-home-header__title'>私信</Text> :
