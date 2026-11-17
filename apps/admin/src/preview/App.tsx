@@ -25,9 +25,46 @@ import {
   UserOutlined,
   WarningOutlined
 } from '@ant-design/icons'
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { PreviewSection } from './data'
 import { Modal, ToastProvider, usePreviewToast } from './ui'
+// 懒加载分区的错误边界：发版后旧页面引用已删除的 chunk，或网络故障时，
+// 未捕获的渲染错误会让 React 卸载整棵树（白屏）。这里兜住并给出一键恢复。
+const CHUNK_RELOAD_KEY = 'preview-chunk-reload-at'
+
+class ContentErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null }
+
+  static getDerivedStateFromError(error: Error) {
+    return { error }
+  }
+
+  componentDidCatch(error: Error) {
+    const chunkFailure = /dynamically imported module|Importing a module script failed|Loading chunk/i.test(String(error?.message || ''))
+    if (!chunkFailure) return
+    // 版本更新后旧 chunk 已不存在：自动刷新一次拿新资源；30 秒节流避免死循环。
+    try {
+      const last = Number(window.sessionStorage.getItem(CHUNK_RELOAD_KEY) || 0)
+      if (Date.now() - last > 30_000) {
+        window.sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()))
+        window.location.reload()
+      }
+    } catch {
+      // sessionStorage 不可用时仅展示恢复按钮。
+    }
+  }
+
+  render() {
+    if (this.state.error) {
+      return <div className="preview-form-error preview-form-error--action" role="alert">
+        <span>页面加载失败，可能是版本已更新或网络中断。</span>
+        <Button size="sm" onClick={() => window.location.reload()}>刷新页面</Button>
+      </div>
+    }
+    return this.props.children
+  }
+}
+
 // 各业务分区按需加载：首次进入分区时才下载对应代码块，减小首屏 bundle。
 const DashboardView = lazy(() => import('./views/DashboardView').then(module => ({ default: module.DashboardView })))
 const DeliveryView = lazy(() => import('./views/DeliveryView').then(module => ({ default: module.DeliveryView })))
@@ -40,6 +77,7 @@ import { Login } from '../Login'
 import { AccountPanel } from '../AccountPanel'
 import { useAdminStore, type AdminSearchTarget } from '../store'
 import type { AdminSection } from '../types'
+import { Button } from './ui'
 import { adminAuthAPI } from '../services/admin-auth'
 import { adminAPI, type AdminSearchHit } from '../services/f-admin'
 import { legacyTakeoutEnabled } from '../feature-flags'
@@ -285,9 +323,11 @@ function ConsoleShell() {
           </div>
         </header>
         <Layout.Content className="preview-content">
-          <Suspense fallback={<div className="preview-toolbar__hint">正在加载…</div>}>
-            {content}
-          </Suspense>
+          <ContentErrorBoundary>
+            <Suspense fallback={<div className="preview-toolbar__hint">正在加载…</div>}>
+              {content}
+            </Suspense>
+          </ContentErrorBoundary>
         </Layout.Content>
       </Layout>
     </Layout>

@@ -155,12 +155,8 @@ body {
   /* 内容区宽度随窗口与侧栏变化：以此为容器做组件级响应式。 */
   container-type: inline-size;
   container-name: preview-content;
-  --preview-scrollbar-thumb: #6b7280;
-  --preview-scrollbar-track: #e8edf3;
   scrollbar-color: var(--preview-scrollbar-thumb) var(--preview-scrollbar-track);
   scrollbar-width: thin;
-  /* 滚动条出现/消失时保留空间，避免内容横向跳动。 */
-  scrollbar-gutter: stable;
 }
 
 .preview-page-header {
@@ -2374,9 +2370,15 @@ li,
   scrollbar-width: thin;
 }
 
+:root {
+  --preview-scrollbar-thumb: #6b7280;
+  --preview-scrollbar-track: #e8edf3;
+}
+
 html {
   scrollbar-color: var(--preview-scrollbar-thumb) var(--preview-scrollbar-track);
   scrollbar-width: thin;
+  /* 页面滚动在 html 上：滚动条出现/消失时保留槽位。 */
   scrollbar-gutter: stable;
 }
 
@@ -2404,5 +2406,14 @@ html {
   .preview-search-results::-webkit-scrollbar-track,
   html::-webkit-scrollbar-track {
     background: var(--preview-scrollbar-track);
+  }
+}
+
+/* antd Drawer/Modal 的内容 portal 到 body，不在 .preview-content 容器子树内，
+   容器查询对弹层永远不匹配；这两个网格的窄屏单列必须按视口判定。 */
+@media (max-width: 640px) {
+  .preview-form-grid,
+  .preview-kv-grid {
+    grid-template-columns: 1fr;
   }
 }
