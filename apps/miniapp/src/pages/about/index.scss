@@ -15,3 +15,41 @@
 .about-row + .about-row::before { position: absolute; top: 0; right: 30rpx; left: 30rpx; height: 1rpx; background: $divider-hairline; content: ''; }
 .about-row text:last-child { color: $text-muted; font-size: 38rpx; }
 .about-footer { @include ref.type(meta); display: block; margin-top: 64rpx; color: $text-faint; text-align: center; }
+
+.about-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 14rpx;
+  margin-bottom: 40rpx;
+  padding: 24rpx;
+  border-radius: 26rpx;
+  background: $brand-tint;
+}
+
+.about-notes__title {
+  @include ref.type(label);
+  display: block;
+  margin-bottom: 4rpx;
+  color: $text-strong;
+  font-weight: 700;
+}
+
+.about-note {
+  padding: 16rpx 20rpx;
+  border-radius: 16rpx;
+  background: $bg-surface;
+}
+
+.about-note__content {
+  @include ref.type(body);
+  @include ref.wrap;
+  display: block;
+  color: $text-primary;
+}
+
+.about-note__date {
+  @include ref.type(meta);
+  display: block;
+  margin-top: 8rpx;
+  color: $text-tertiary;
+}
