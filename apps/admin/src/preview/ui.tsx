@@ -302,6 +302,17 @@ export function Toggle({
   return <Switch checked={checked} onChange={onChange} aria-label={label} />
 }
 
+// Enter 提交时的 IME 组合态检查：中文/日文/韩文输入法按 Enter 是确认候选词，
+// 不能当成提交动作（Safari 的 keydown 中 isComposing 可能已复位，需再查 keyCode 229）。
+export function isImeComposing(event: {
+  isComposing?: boolean
+  keyCode?: number
+  nativeEvent?: { isComposing?: boolean; keyCode?: number }
+}): boolean {
+  const native = event.nativeEvent ?? event
+  return native.isComposing === true || native.keyCode === 229
+}
+
 export function ErrorNote({ message, onRetry }: { message: string; onRetry?: () => void }) {
   // 空消息不渲染：调用方无需再写 message && 守卫。
   if (!message) return null

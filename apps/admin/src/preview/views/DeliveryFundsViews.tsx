@@ -44,7 +44,7 @@ import {
   withdrawalStatusLabel,
   withdrawalStatusTone
 } from '../delivery-hooks'
-import { Button, Drawer, EmptyState, Field, Modal, Panel, Pagination, SelectField, StatusPill, usePreviewToast } from '../ui'
+import { Button, Drawer, EmptyState, Field, Modal, Panel, Pagination, SelectField, StatusPill, isImeComposing, usePreviewToast } from '../ui'
 
 export type FundView = 'merchant' | 'rider' | 'earnings' | 'payout' | 'withdrawals' | 'refunds' | 'funding'
 export type FeeView = 'default' | 'override'
@@ -173,7 +173,7 @@ function MerchantWalletsPanel() {
           inputMode="numeric"
           onChange={event => { setFilterInput(event.target.value); setFilterError('') }}
           placeholder="按商家用户 ID 筛选"
-          onKeyDown={event => { if (event.key === 'Enter') applyFilter() }}
+          onKeyDown={event => { if (event.key === 'Enter' && !isImeComposing(event)) applyFilter() }}
         />
         <Button variant="primary" onClick={applyFilter}>查询</Button>
         <Button onClick={() => { setFilterInput(''); setFilter(''); setFilterError(''); setPage(1) }}>清空</Button>
@@ -273,7 +273,7 @@ function RiderWalletsPanel() {
           inputMode="numeric"
           onChange={event => { setFilterInput(event.target.value); setFilterError('') }}
           placeholder="按骑手用户 ID 筛选"
-          onKeyDown={event => { if (event.key === 'Enter') applyFilter() }}
+          onKeyDown={event => { if (event.key === 'Enter' && !isImeComposing(event)) applyFilter() }}
         />
         <Button variant="primary" onClick={applyFilter}>查询</Button>
         <Button onClick={() => { setFilterInput(''); setFilter(''); setFilterError(''); setPage(1) }}>清空</Button>
@@ -388,7 +388,7 @@ function EarningsPanel() {
           inputMode="numeric"
           onChange={event => { setRiderInput(event.target.value); setFilterError('') }}
           placeholder="按骑手用户 ID 筛选"
-          onKeyDown={event => { if (event.key === 'Enter') applyRiderFilter() }}
+          onKeyDown={event => { if (event.key === 'Enter' && !isImeComposing(event)) applyRiderFilter() }}
         />
         <Button variant="primary" onClick={applyRiderFilter}>查询</Button>
         <span className="preview-toolbar__hint">{earningsState.loading ? '正在加载…' : `共 ${earningsState.data?.total ?? 0} 条报酬记录`}</span>
@@ -647,7 +647,7 @@ function WithdrawalsPanel() {
           inputMode="numeric"
           onChange={event => { setRiderInput(event.target.value); setFilterError('') }}
           placeholder="按骑手用户 ID 筛选"
-          onKeyDown={event => { if (event.key === 'Enter') applyRiderFilter() }}
+          onKeyDown={event => { if (event.key === 'Enter' && !isImeComposing(event)) applyRiderFilter() }}
         />
         <Button variant="primary" onClick={applyRiderFilter}>查询</Button>
         <span className="preview-toolbar__hint">{withdrawalsState.loading ? '正在加载…' : `共 ${withdrawalsState.data?.total ?? 0} 条提现申请`}</span>
@@ -948,7 +948,7 @@ function RefundsPanel() {
           inputMode="numeric"
           onChange={event => { setMerchantInput(event.target.value); setFilterError('') }}
           placeholder="按商家用户 ID 筛选"
-          onKeyDown={event => { if (event.key === 'Enter') applyMerchantFilter() }}
+          onKeyDown={event => { if (event.key === 'Enter' && !isImeComposing(event)) applyMerchantFilter() }}
         />
         <Button variant="primary" onClick={applyMerchantFilter}>查询</Button>
         <span className="preview-toolbar__hint">{refundsState.loading ? '正在加载…' : `共 ${refundsState.data?.total ?? 0} 条退款记录`}</span>

@@ -520,7 +520,7 @@ function NavigationSettings() {
           {(category.items || []).length === 0
             ? <EmptyState title="该分类下还没有入口" description="新增入口后会在小程序服务页展示。" action={<Button onClick={() => openItemCreate(category)}>新增入口</Button>} />
             : <div className="preview-service-grid">
-              {[...(category.items || [])].sort((a, b) => a.sort - b.sort).map(item => <article key={item.id} className={!item.enabled ? 'is-disabled' : ''}>
+              {(category.items || []).toSorted((a, b) => a.sort - b.sort).map(item => <article key={item.id} className={!item.enabled ? 'is-disabled' : ''}>
                 <span className="preview-service-grid__icon" style={{ background: item.color || '#684091' }}>{item.iconText || item.title.slice(0, 1)}</span>
                 <div className="preview-service-grid__copy">
                   <strong>{item.title}</strong>
@@ -559,7 +559,7 @@ function NavigationSettings() {
         : (directory.items || []).length === 0
           ? <EmptyState title="还没有外部商家" description="新增后会在学生端外卖入口展示。" action={<Button variant="primary" onClick={openMerchantCreate}>新增商家</Button>} />
           : <div className="preview-service-grid">
-            {[...(directory.items || [])].sort((a, b) => a.sort - b.sort).map(merchant => <article key={merchant.id} className={!merchant.enabled ? 'is-disabled' : ''}>
+            {(directory.items || []).toSorted((a, b) => a.sort - b.sort).map(merchant => <article key={merchant.id} className={!merchant.enabled ? 'is-disabled' : ''}>
               <span className="preview-service-grid__icon" style={{ background: merchant.color || '#684091' }}>{merchant.iconText || merchant.title.slice(0, 1)}</span>
               <div className="preview-service-grid__copy">
                 <strong>{merchant.title}</strong>

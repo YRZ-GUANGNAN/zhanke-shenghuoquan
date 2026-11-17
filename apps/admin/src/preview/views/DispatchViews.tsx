@@ -36,6 +36,7 @@ import {
   Segmented,
   SelectField,
   StatusPill,
+  isImeComposing,
   usePreviewToast
 } from '../ui'
 
@@ -287,7 +288,7 @@ function MerchantsPanel() {
           inputMode="numeric"
           onChange={event => { setInput(event.target.value); setInputError('') }}
           placeholder="例如：1001"
-          onKeyDown={event => { if (event.key === 'Enter') apply() }}
+          onKeyDown={event => { if (event.key === 'Enter' && !isImeComposing(event)) apply() }}
         />
         <Button variant="primary" onClick={apply}>查询订单</Button>
         <span className="preview-toolbar__hint">{applied ? `当前筛选：商家 #${applied}` : '输入用户 ID 后查询'}</span>

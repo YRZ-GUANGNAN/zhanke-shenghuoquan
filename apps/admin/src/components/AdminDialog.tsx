@@ -14,7 +14,7 @@ export function AdminDialog({ open, title, description, confirmLabel, cancelLabe
     const timer = window.setTimeout(() => (inputRef.current || confirmRef.current)?.focus(), 0)
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !busy) onCancel()
-      if (event.key === 'Enter' && !busy && event.target instanceof HTMLInputElement) onConfirm()
+      if (event.key === 'Enter' && !event.isComposing && event.keyCode !== 229 && !busy && event.target instanceof HTMLInputElement) onConfirm()
     }
     document.addEventListener('keydown', handleKey)
     return () => { window.clearTimeout(timer); document.removeEventListener('keydown', handleKey) }
