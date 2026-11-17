@@ -155,6 +155,7 @@ export default function AppearancePage() {
                     <View className='appearance-preview__blur'>
                       <Image className='appearance-preview__image appearance-preview__image--blur' src={image} mode='aspectFill' />
                     </View>
+                    <View className='appearance-preview__glass' />
                     <View className='appearance-preview__veil' />
                   </>
                 ) : <View className='appearance-preview__veil appearance-preview__veil--plain' />}

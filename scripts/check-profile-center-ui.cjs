@@ -24,6 +24,7 @@ for (const tab of ['favorites', 'posts', 'comments', 'items']) {
 for (const route of [
   '/pages/edit-profile/index',
   '/pages/settings/index',
+  '/pages/student-verify/index',
   '/pages/feature-board/index',
   '/pages/about/index',
 ]) {

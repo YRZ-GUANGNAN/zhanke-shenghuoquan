@@ -188,8 +188,8 @@
   bottom: 0;
   left: 0;
   overflow: hidden;
-  -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, .04) 40%, rgba(0, 0, 0, .12) 50%, rgba(0, 0, 0, .25) 60%, rgba(0, 0, 0, .42) 70%, rgba(0, 0, 0, .6) 80%, rgba(0, 0, 0, .78) 88%, rgba(0, 0, 0, .92) 95%, #000 100%);
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, .04) 40%, rgba(0, 0, 0, .12) 50%, rgba(0, 0, 0, .25) 60%, rgba(0, 0, 0, .42) 70%, rgba(0, 0, 0, .6) 80%, rgba(0, 0, 0, .78) 88%, rgba(0, 0, 0, .92) 95%, #000 100%);
+  -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0) 20%, rgba(0, 0, 0, .05) 30%, rgba(0, 0, 0, .13) 40%, rgba(0, 0, 0, .24) 50%, rgba(0, 0, 0, .37) 60%, rgba(0, 0, 0, .52) 70%, rgba(0, 0, 0, .66) 80%, rgba(0, 0, 0, .79) 88%, rgba(0, 0, 0, .9) 94%, #000 100%);
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0) 20%, rgba(0, 0, 0, .05) 30%, rgba(0, 0, 0, .13) 40%, rgba(0, 0, 0, .24) 50%, rgba(0, 0, 0, .37) 60%, rgba(0, 0, 0, .52) 70%, rgba(0, 0, 0, .66) 80%, rgba(0, 0, 0, .79) 88%, rgba(0, 0, 0, .9) 94%, #000 100%);
 }
 
 .appearance-preview__image--blur {
@@ -199,8 +199,19 @@
   right: -24rpx;
   width: calc(100% + 48rpx);
   height: calc(100% + 48rpx);
-  -webkit-filter: blur(16PX) saturate(150%);
-  filter: blur(16PX) saturate(150%);
+  -webkit-filter: blur(18PX) saturate(155%);
+  filter: blur(18PX) saturate(155%);
+}
+
+.appearance-preview__glass {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: rgba(var(--appearance-surface-rgb), .48);
+  -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0) 20%, rgba(0, 0, 0, .05) 30%, rgba(0, 0, 0, .13) 40%, rgba(0, 0, 0, .24) 50%, rgba(0, 0, 0, .37) 60%, rgba(0, 0, 0, .52) 70%, rgba(0, 0, 0, .66) 80%, rgba(0, 0, 0, .79) 88%, rgba(0, 0, 0, .9) 94%, #000 100%);
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0) 20%, rgba(0, 0, 0, .05) 30%, rgba(0, 0, 0, .13) 40%, rgba(0, 0, 0, .24) 50%, rgba(0, 0, 0, .37) 60%, rgba(0, 0, 0, .52) 70%, rgba(0, 0, 0, .66) 80%, rgba(0, 0, 0, .79) 88%, rgba(0, 0, 0, .9) 94%, #000 100%);
 }
 
 .appearance-preview__veil {
@@ -209,8 +220,7 @@
   right: 0;
   bottom: 0;
   left: 0;
-  background:
-    linear-gradient(180deg, rgba(var(--appearance-surface-rgb), 0) 0%, rgba(var(--appearance-surface-rgb), 0) 26%, rgba(var(--appearance-surface-rgb), .06) 44%, rgba(var(--appearance-surface-rgb), .115) 52%, rgba(var(--appearance-surface-rgb), .19) 60%, rgba(var(--appearance-surface-rgb), .285) 68%, rgba(var(--appearance-surface-rgb), .4) 76%, rgba(var(--appearance-surface-rgb), .53) 83%, rgba(var(--appearance-surface-rgb), .67) 89%, rgba(var(--appearance-surface-rgb), .81) 94%, rgba(var(--appearance-surface-rgb), .93) 97%, rgb(var(--appearance-surface-rgb)) 100%);
+  background: linear-gradient(180deg, rgba(var(--appearance-surface-rgb), 0) 0%, rgba(var(--appearance-surface-rgb), 0) 40%, rgba(var(--appearance-surface-rgb), .03) 46%, rgba(var(--appearance-surface-rgb), .09) 54%, rgba(var(--appearance-surface-rgb), .18) 62%, rgba(var(--appearance-surface-rgb), .3) 70%, rgba(var(--appearance-surface-rgb), .45) 78%, rgba(var(--appearance-surface-rgb), .6) 85%, rgba(var(--appearance-surface-rgb), .74) 91%, rgba(var(--appearance-surface-rgb), .86) 95%, rgba(var(--appearance-surface-rgb), .95) 98%, rgb(var(--appearance-surface-rgb)) 100%);
 }
 
 .appearance-preview__tabs {
@@ -330,6 +340,5 @@
 
 .appearance-preview__veil--plain {
   /* 原图直显：顶部完全保留原图，仅底部淡出到页面底色。 */
-  background:
-    linear-gradient(180deg, rgba(var(--appearance-surface-rgb), 0) 0%, rgba(var(--appearance-surface-rgb), 0) 26%, rgba(var(--appearance-surface-rgb), .06) 44%, rgba(var(--appearance-surface-rgb), .115) 52%, rgba(var(--appearance-surface-rgb), .19) 60%, rgba(var(--appearance-surface-rgb), .285) 68%, rgba(var(--appearance-surface-rgb), .4) 76%, rgba(var(--appearance-surface-rgb), .53) 83%, rgba(var(--appearance-surface-rgb), .67) 89%, rgba(var(--appearance-surface-rgb), .81) 94%, rgba(var(--appearance-surface-rgb), .93) 97%, rgb(var(--appearance-surface-rgb)) 100%);
+  background: linear-gradient(180deg, rgba(var(--appearance-surface-rgb), 0) 0%, rgba(var(--appearance-surface-rgb), 0) 40%, rgba(var(--appearance-surface-rgb), .03) 46%, rgba(var(--appearance-surface-rgb), .09) 54%, rgba(var(--appearance-surface-rgb), .18) 62%, rgba(var(--appearance-surface-rgb), .3) 70%, rgba(var(--appearance-surface-rgb), .45) 78%, rgba(var(--appearance-surface-rgb), .6) 85%, rgba(var(--appearance-surface-rgb), .74) 91%, rgba(var(--appearance-surface-rgb), .86) 95%, rgba(var(--appearance-surface-rgb), .95) 98%, rgb(var(--appearance-surface-rgb)) 100%);
 }
