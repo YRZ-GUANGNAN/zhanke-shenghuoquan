@@ -228,7 +228,6 @@ export default function StudentVerifyPage() {
   }
 
   const statusCopy = applicationStatusCopy(application)
-  const readonly = !editing && Boolean(application)
 
   return (
     <View className='student-verify-page'>
@@ -253,6 +252,7 @@ export default function StudentVerifyPage() {
                   <Text>{statusCopy.text}</Text>
                 </View>
               </View>
+              {(editing || application) ? (<>
               <View className='student-verify-row'>
                 <View className='student-verify-row__main'>
                   <Text className='student-verify-row__title'>学生证照片</Text>
@@ -298,6 +298,13 @@ export default function StudentVerifyPage() {
                   ? <Input className='student-verify-input' value={college} maxlength={30} placeholder='请输入学院（选填）' onInput={(event) => setCollege(String(event.detail.value ?? ''))} />
                   : <Text className='student-verify-value'>{college || '未填写'}</Text>}
               </View>
+              </>) : (
+                <View className='student-verify-row student-verify-row--last'>
+                  <View className='student-verify-row__main'>
+                    <Text className='student-verify-row__subtitle'>提交学生证照片和在校信息，审核通过后获得学生认证标识。</Text>
+                  </View>
+                </View>
+              )}
             </View>
 
             {application?.status === 'rejected' && application.reviewReason ? (
@@ -321,11 +328,19 @@ export default function StudentVerifyPage() {
                   <AppButton variant='primary' block loading={submitting} onClick={() => void submit()}>
                     {application ? '重新提交认证' : '提交认证'}
                   </AppButton>
-                  {application ? (
-                    <View className='student-verify-link' onClick={() => { if (!submitting && !uploadBusy) applyApplication(application) }}>
-                      <Text>取消修改</Text>
-                    </View>
-                  ) : null}
+                  <View className='student-verify-link' onClick={() => {
+                    if (submitting || uploadBusy) return
+                    if (application) applyApplication(application)
+                    else setEditing(false)
+                  }}>
+                    <Text>{application ? '取消修改' : '取消'}</Text>
+                  </View>
+                </>
+              ) : null}
+              {!editing && !application ? (
+                <>
+                  <Text className='student-verify-pending-hint'>提交后由管理员人工核验，审核结果会显示在本页。</Text>
+                  <AppButton variant='primary' block onClick={startReapply}>开始认证</AppButton>
                 </>
               ) : null}
               {!editing && application?.status === 'pending' ? (

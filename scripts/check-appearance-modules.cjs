@@ -41,7 +41,7 @@ if (homeStyle.includes('plain-glow')) throw new Error('home header effect: plain
 // 学生验证模块：本机保存、可裁剪、可清除；不触碰首页背景偏好。
 for (const value of [
   'getStudentVerification', 'submitStudentVerification', 'requestStudentVerificationCancel',
-  'uploadPickedImage', 'cropImageWithWechatEditor', 'requestCancel', '待审核', '已认证'
+  'uploadPickedImage', 'cropImageWithWechatEditor', 'requestCancel', '待审核', '已认证', '开始认证'
 ]) includes(verify, value, 'student verify page')
 for (const value of ['readStudentVerification', 'writeStudentVerification', 'saveLocalFile', '保存到本机', '本机']) {
   excludes(verify, value, 'student verify page')
