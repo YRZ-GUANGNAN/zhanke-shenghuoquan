@@ -4,7 +4,7 @@
   position: fixed;
   right: 8PX;
   // 悬浮胶囊整体上浮避开 Home Indicator；安全区不并入胶囊高度，各机型块高一致。
-  bottom: calc(8PX + env(safe-area-inset-bottom, 0px));
+  bottom: calc(8PX + env(safe-area-inset-bottom, 0px) * .5);
   left: 8PX;
   z-index: $z-sticky;
   display: grid;

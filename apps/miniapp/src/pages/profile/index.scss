@@ -139,12 +139,6 @@ page {
   min-width: 0;
 }
 
-.student-profile-user__identity {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-}
-
 .student-profile-user__name {
   flex: 0 1 auto;
   min-width: 0;
@@ -155,17 +149,6 @@ page {
   line-height: 56rpx;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.student-profile-user__badge {
-  flex: 0 0 auto;
-  padding: 4rpx 8rpx;
-  border-radius: 6rpx;
-  color: $brand-primary-strong;
-  font-size: 20rpx;
-  font-weight: 600;
-  line-height: 28rpx;
-  background: $profile-accent-soft;
 }
 
 .student-profile-user__details {

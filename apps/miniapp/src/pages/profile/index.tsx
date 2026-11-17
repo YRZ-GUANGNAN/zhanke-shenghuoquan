@@ -7,6 +7,7 @@ import IdentityApplicationEntryModal from '../../components/IdentityApplicationE
 import AppIcon, { type AppIconName } from '../../components/app-icon'
 import RuntimeSessionGate from '../../components/runtime-session-gate'
 import StudentBottomNav from '../../components/student-bottom-nav'
+import { AppDialog } from '../../components/ui'
 import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
 import Taro from '../../services/taro'
 import { getMyCommunitySummary } from '../../services/b-community'
@@ -44,10 +45,13 @@ const roles: RoleOption[] = [
 
 const settings: SettingItem[] = [
   { key: 'settings', title: '设置', description: '隐私、通知与账号管理', icon: 'settings', arrow: true },
-  { key: 'privacy', title: '用户协议与隐私政策', description: '了解平台规则与数据使用方式', icon: 'document', arrow: true },
-  { key: 'feedback', title: '意见反馈', description: '提交问题与改进建议', icon: 'feedback', arrow: true },
+  { key: 'maker-apply', title: '众创申请', description: '联系众创空间，申请入驻或合作', icon: 'star', arrow: true },
+  { key: 'feature-feedback', title: '功能意见与需求', description: '提交想要的功能与改进建议', icon: 'feedback', arrow: true },
   { key: 'about', title: '关于湛科生活圈', description: '产品信息与服务说明', icon: 'info', arrow: true }
 ]
+
+// 预留占位：上线前替换为众创空间对外联系的微信号。
+const MAKER_CONTACT_WECHAT = 'zhanke-zhongchuang'
 
 function showPlaceholder(title: string) {
   void Taro.showToast({ title, icon: 'none', duration: 1400 })
@@ -59,20 +63,15 @@ function handleSettingClick(item: SettingItem, navigate: (url: string) => void) 
     return
   }
 
-  if (item.key === 'privacy') {
-    navigate('/pages/legal/index')
+  if (item.key === 'feature-feedback') {
+    navigate('/pages/feedback/index?category=suggestion')
     return
   }
 
-	if (item.key === 'feedback') {
-		navigate('/pages/feedback/index')
-		return
-	}
-
-	if (item.key === 'about') {
-		navigate('/pages/about/index')
-		return
-	}
+  if (item.key === 'about') {
+    navigate('/pages/about/index')
+    return
+  }
 
   showPlaceholder(item.title)
 }
@@ -148,6 +147,7 @@ function ProfileContent() {
   const visibility = useFeatureVisibility()
   const [pendingRole, setPendingRole] = useState<RoleKey | null>(null)
   const [applicationRole, setApplicationRole] = useState<IdentityApplicationRole | null>(null)
+  const [makerContactVisible, setMakerContactVisible] = useState(false)
   const [switching, setSwitching] = useState(false)
   const [switchError, setSwitchError] = useState('')
   const [failedAvatar, setFailedAvatar] = useState('')
@@ -161,7 +161,6 @@ function ProfileContent() {
   const refreshIdentity = useSessionStore((state) => state.refreshIdentity)
   const switchIdentity = useSessionStore((state) => state.switchIdentity)
   const activeRole = identity?.currentIdentity ?? 'student'
-  const roleName = roles.find((role) => role.key === activeRole)?.title ?? '学生'
   const identityAllowed = useIdentityGuard('student')
   const communityCount = useProfileCount(identityAllowed && visibility.forum, getMyCommunitySummary)
   const itemCount = useProfileCount(identityAllowed && visibility.secondhand, getMyItemCount)
@@ -193,6 +192,16 @@ function ProfileContent() {
       profileNavigationLockRef.current = false
       showPlaceholder('页面打开失败，请重试')
     })
+  }
+
+  const copyMakerContact = async () => {
+    setMakerContactVisible(false)
+    try {
+      await Taro.setClipboardData({ data: MAKER_CONTACT_WECHAT })
+      void Taro.showToast({ title: '微信号已复制', icon: 'success' })
+    } catch {
+      showPlaceholder('复制失败，请手动记下微信号')
+    }
   }
 
   const handleRoleClick = (role: RoleOption) => {
@@ -276,9 +285,6 @@ function ProfileContent() {
           <View className='student-profile-user__main' onClick={openProfileEditor} ariaRole='button' ariaLabel='编辑个人资料'>
             <View className='student-profile-user__title-row'>
               <Text className='student-profile-user__name'>{profile.nickname || '校园用户'}</Text>
-              <View className='student-profile-user__identity'>
-                <Text className='student-profile-user__badge'>{roleName}</Text>
-              </View>
             </View>
             <View className='student-profile-user__details'>
               <Text className='student-profile-user__meta'>用户号 {profile.id || '--'}</Text>
@@ -363,7 +369,13 @@ function ProfileContent() {
             <View
               key={item.key}
               className='student-profile-setting'
-              onClick={() => handleSettingClick(item, navigateProfile)}
+              onClick={() => {
+                if (item.key === 'maker-apply') {
+                  setMakerContactVisible(true)
+                  return
+                }
+                handleSettingClick(item, navigateProfile)
+              }}
               ariaRole='button'
               ariaLabel={item.title}
             >
@@ -393,6 +405,16 @@ function ProfileContent() {
         onConfirm={() => void confirmRoleSwitch()}
         confirming={switching}
         error={switchError}
+      />
+
+      <AppDialog
+        visible={makerContactVisible}
+        title='众创申请'
+        description={`众创空间入驻与合作请联系微信：${MAKER_CONTACT_WECHAT}，添加时请备注「众创申请」。`}
+        confirmText='复制微信号'
+        cancelText='关闭'
+        onConfirm={() => void copyMakerContact()}
+        onCancel={() => setMakerContactVisible(false)}
       />
     </View>
   )

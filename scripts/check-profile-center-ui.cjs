@@ -24,12 +24,17 @@ for (const tab of ['favorites', 'posts', 'comments', 'items']) {
 for (const route of [
   '/pages/edit-profile/index',
   '/pages/settings/index',
-  '/pages/legal/index',
   '/pages/feedback/index',
   '/pages/about/index',
 ]) {
   assert.ok(profilePage.includes(route), `${route} must remain available`)
 }
+// 用户协议与隐私政策入口已收敛到「关于」页，不再要求在「我的」页重复出现。
+const aboutPage = fs.readFileSync(
+  path.join(root, 'apps', 'miniapp', 'src', 'pages', 'about', 'index.tsx'),
+  'utf8',
+)
+assert.ok(aboutPage.includes('/pages/legal/index'), 'about page must keep the legal entries')
 
 for (const label of ['当前使用', '已通过', '审核中', '去申请', '需完善', '暂不可用']) {
   assert.ok(profilePage.includes(label), `${label} identity state is required`)

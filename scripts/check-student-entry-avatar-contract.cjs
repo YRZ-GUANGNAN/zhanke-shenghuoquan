@@ -59,7 +59,8 @@ assert.match(userHandler, /media\.PurposeAvatar/)
 assert.match(userHandler, /h\.media\.Commit/)
 
 assert.match(profile, /profile\.avatar/)
-assert.match(profile, /student-profile-user__identity/)
+// 身份徽章已从用户卡移除，改为断言用户卡主体结构仍在。
+assert.match(profile, /student-profile-user__name/)
 assert.match(profile, /student-profile-user__details/)
 assert.match(profileStyle, /border-radius:\s*50%/)
 
