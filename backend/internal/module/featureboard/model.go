@@ -47,10 +47,12 @@ type AuthorNote struct {
 
 func (AuthorNote) TableName() string { return "author_notes" }
 
-// SuggestionRecord pairs a suggestion row with the viewer's support flag.
+// SuggestionRecord pairs a suggestion row with the viewer's support flag and
+// the conversation size.
 type SuggestionRecord struct {
-	Suggestion `gorm:"embedded"`
-	Supported  bool
+	Suggestion   `gorm:"embedded"`
+	Supported    bool
+	CommentCount int64
 }
 
 type SuggestionView struct {
@@ -59,6 +61,7 @@ type SuggestionView struct {
 	Status       SuggestionStatus `json:"status"`
 	SupportCount uint32           `json:"supportCount"`
 	Supported    bool             `json:"supported"`
+	CommentCount int64            `json:"commentCount"`
 	CreatedAt    time.Time        `json:"createdAt"`
 }
 
@@ -89,4 +92,32 @@ type NoteView struct {
 	ID        string    `json:"id"`
 	Content   string    `json:"content"`
 	CreatedAt time.Time `json:"createdAt"`
+}
+
+// Comment is one message in a suggestion's conversation. Maintainer replies
+// carry is_maintainer so the wall can label them as 作者.
+type Comment struct {
+	ID           uint64    `gorm:"primaryKey"`
+	PublicID     string    `gorm:"column:public_id;size:26"`
+	SuggestionID uint64    `gorm:"column:suggestion_id"`
+	UserID       uint64    `gorm:"column:user_id"`
+	IsMaintainer bool      `gorm:"column:is_maintainer"`
+	Content      string    `gorm:"size:300"`
+	CreatedAt    time.Time `gorm:"column:created_at"`
+}
+
+func (Comment) TableName() string { return "feature_suggestion_comments" }
+
+type CommentView struct {
+	ID           string    `json:"id"`
+	Content      string    `json:"content"`
+	IsMaintainer bool      `json:"isMaintainer"`
+	CreatedAt    time.Time `json:"createdAt"`
+}
+
+type CommentListView struct {
+	Items    []CommentView `json:"items"`
+	Page     int           `json:"page"`
+	PageSize int           `json:"pageSize"`
+	Total    int64         `json:"total"`
 }

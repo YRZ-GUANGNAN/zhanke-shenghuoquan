@@ -9,6 +9,7 @@ import RuntimeSessionGate from '../../components/runtime-session-gate'
 import StudentBottomNav from '../../components/student-bottom-nav'
 import { AppDialog } from '../../components/ui'
 import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
+import { getContactSettings, type ContactSettings } from '../../services/contact-settings'
 import Taro from '../../services/taro'
 import { getMyCommunitySummary } from '../../services/b-community'
 import { getMyProductsPage } from '../../services/c-trade'
@@ -49,9 +50,6 @@ const settings: SettingItem[] = [
   { key: 'feature-feedback', title: '功能意见与需求', description: '提交想要的功能与改进建议', icon: 'feedback', arrow: true },
   { key: 'about', title: '关于湛科生活圈', description: '产品信息与服务说明', icon: 'info', arrow: true }
 ]
-
-// 预留占位：上线前替换为众创空间对外联系的微信号。
-const MAKER_CONTACT_WECHAT = 'zhanke-zhongchuang'
 
 function showPlaceholder(title: string) {
   void Taro.showToast({ title, icon: 'none', duration: 1400 })
@@ -148,10 +146,14 @@ function ProfileContent() {
   const [pendingRole, setPendingRole] = useState<RoleKey | null>(null)
   const [applicationRole, setApplicationRole] = useState<IdentityApplicationRole | null>(null)
   const [makerContactVisible, setMakerContactVisible] = useState(false)
+  const [makerContact, setMakerContact] = useState<ContactSettings | null>(null)
+  const [makerContactBusy, setMakerContactBusy] = useState(false)
   const [switching, setSwitching] = useState(false)
   const [switchError, setSwitchError] = useState('')
   const [failedAvatar, setFailedAvatar] = useState('')
   const [failedCover, setFailedCover] = useState('')
+  const mountedRefProfile = useRef(true)
+  useEffect(() => () => { mountedRefProfile.current = false }, [])
   const profileNavigationLockRef = useRef(false)
   const roleSwitchLockRef = useRef(false)
   const didShowOnce = useRef(false)
@@ -194,10 +196,28 @@ function ProfileContent() {
     })
   }
 
+  const openMakerContact = async () => {
+    setMakerContactVisible(true)
+    if (makerContact || makerContactBusy) return
+    setMakerContactBusy(true)
+    try {
+      const value = await getContactSettings()
+      if (mountedRefProfile.current) setMakerContact(value)
+    } catch {
+      showPlaceholder('联系信息加载失败，请稍后重试')
+    } finally {
+      if (mountedRefProfile.current) setMakerContactBusy(false)
+    }
+  }
+
   const copyMakerContact = async () => {
+    if (!makerContact?.makerWechat) {
+      showPlaceholder('联系信息暂不可用，请稍后再试')
+      return
+    }
     setMakerContactVisible(false)
     try {
-      await Taro.setClipboardData({ data: MAKER_CONTACT_WECHAT })
+      await Taro.setClipboardData({ data: makerContact.makerWechat })
       void Taro.showToast({ title: '微信号已复制', icon: 'success' })
     } catch {
       showPlaceholder('复制失败，请手动记下微信号')
@@ -368,7 +388,7 @@ function ProfileContent() {
               className='student-profile-setting'
               onClick={() => {
                 if (item.key === 'maker-apply') {
-                  setMakerContactVisible(true)
+                  void openMakerContact()
                   return
                 }
                 handleSettingClick(item, navigateProfile)
@@ -407,12 +427,24 @@ function ProfileContent() {
       <AppDialog
         visible={makerContactVisible}
         title='众创申请'
-        description={`众创空间入驻与合作请联系微信：${MAKER_CONTACT_WECHAT}，添加时请备注「众创申请」。`}
         confirmText='复制微信号'
         cancelText='关闭'
         onConfirm={() => void copyMakerContact()}
         onCancel={() => setMakerContactVisible(false)}
-      />
+      >
+        <View className='maker-contact'>
+          {makerContact ? (
+            <>
+              <Text className='maker-contact__intro'>{makerContact.makerIntro}</Text>
+              <View className='maker-contact__wechat-box'>
+                <Text className='maker-contact__wechat'>{makerContact.makerWechat}</Text>
+              </View>
+            </>
+          ) : (
+            <Text className='maker-contact__intro'>{makerContactBusy ? '正在加载联系信息…' : '联系信息暂不可用，请稍后再试'}</Text>
+          )}
+        </View>
+      </AppDialog>
     </View>
   )
 }

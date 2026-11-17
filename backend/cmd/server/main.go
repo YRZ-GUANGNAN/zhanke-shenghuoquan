@@ -50,6 +50,7 @@ import (
 	"campus-circle/backend/internal/module/media/miniappflow"
 	"campus-circle/backend/internal/module/navigation"
 	"campus-circle/backend/internal/module/sharesettings"
+	"campus-circle/backend/internal/module/contactsettings"
 	"campus-circle/backend/internal/module/studentverification"
 	"campus-circle/backend/internal/module/featureboard"
 	"campus-circle/backend/internal/module/takeout"
@@ -578,6 +579,7 @@ func main() {
 	api.GET("/features", featureflags.PublicHandler)
 	campusGuides.Register(api)
 	sharesettings.NewHandler(shareStore).WithCoverStorage(cfg.ShareCoverDir, cfg.MediaPublicBaseURL).Register(api, adminAuthRequired)
+	contactsettings.NewHandler(contactsettings.NewService(contactsettings.NewRepository(db), nil)).Register(api, adminAuthRequired)
 	tradeRoutes := api.Group("/trade")
 	trade.NewHandler(tradeService, userService, safety).Register(tradeRoutes)
 	trade.NewProductCommentHandler(tradeCommentService, userService, safety).Register(tradeRoutes)

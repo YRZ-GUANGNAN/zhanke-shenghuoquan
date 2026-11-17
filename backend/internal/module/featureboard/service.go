@@ -23,6 +23,7 @@ const (
 	minContentRunes = 2
 	maxContentRunes = 500
 	maxNoteRunes    = 1000
+	maxCommentRunes = 300
 	defaultPageSize = 10
 	maxPageSize     = 20
 	notesLimit      = 10
@@ -62,8 +63,13 @@ func toView(record SuggestionRecord) SuggestionView {
 		Status:       record.Status,
 		SupportCount: record.SupportCount,
 		Supported:    record.Supported,
+		CommentCount: record.CommentCount,
 		CreatedAt:    record.CreatedAt,
 	}
+}
+
+func toCommentView(comment Comment) CommentView {
+	return CommentView{ID: comment.PublicID, Content: comment.Content, IsMaintainer: comment.IsMaintainer, CreatedAt: comment.CreatedAt}
 }
 
 func toAdminView(record SuggestionRecord) AdminSuggestionView {
@@ -270,4 +276,57 @@ func newULIDAt(at time.Time, randomness io.Reader) (string, error) {
 		encoded[index] = ulidAlphabet[remainder.Int64()]
 	}
 	return string(encoded), nil
+}
+
+// SubmitComment appends one message to a suggestion's conversation. Maintainer
+// replies are created through the same path with maintainer=true.
+func (s *Service) SubmitComment(ctx context.Context, userID uint64, publicID, content string, maintainer bool) (CommentView, error) {
+	publicID = strings.TrimSpace(publicID)
+	content = strings.TrimSpace(content)
+	length := utf8.RuneCountInString(content)
+	if userID == 0 || !validULID(publicID) || length < 1 || length > maxCommentRunes {
+		return CommentView{}, ErrInvalidInput
+	}
+	suggestion, err := s.repo.FindSuggestionByPublicID(ctx, publicID)
+	if err != nil {
+		return CommentView{}, normalizeRepoError(err)
+	}
+	if suggestion.Status == StatusClosed {
+		return CommentView{}, ErrClosed
+	}
+	at := s.now().UTC()
+	commentID, err := newULIDAt(at, s.rand)
+	if err != nil {
+		return CommentView{}, err
+	}
+	comment := &Comment{
+		PublicID: commentID, SuggestionID: suggestion.ID, UserID: userID,
+		IsMaintainer: maintainer, Content: content, CreatedAt: at,
+	}
+	if err := s.repo.CreateComment(ctx, comment); err != nil {
+		return CommentView{}, err
+	}
+	return toCommentView(*comment), nil
+}
+
+// ListComments returns the conversation of one suggestion, oldest first.
+func (s *Service) ListComments(ctx context.Context, publicID string, page, pageSize int) (CommentListView, error) {
+	publicID = strings.TrimSpace(publicID)
+	if !validULID(publicID) {
+		return CommentListView{}, ErrInvalidInput
+	}
+	suggestion, err := s.repo.FindSuggestionByPublicID(ctx, publicID)
+	if err != nil {
+		return CommentListView{}, normalizeRepoError(err)
+	}
+	page, pageSize = normalizePage(page, pageSize)
+	rows, total, err := s.repo.ListComments(ctx, suggestion.ID, (page-1)*pageSize, pageSize)
+	if err != nil {
+		return CommentListView{}, err
+	}
+	items := make([]CommentView, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, toCommentView(row))
+	}
+	return CommentListView{Items: items, Page: page, PageSize: pageSize, Total: total}, nil
 }

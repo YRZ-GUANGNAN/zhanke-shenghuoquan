@@ -22,6 +22,8 @@ type userService interface {
 	Submit(context.Context, uint64, string) (SuggestionView, error)
 	SetSupport(context.Context, uint64, string, bool) (SuggestionView, error)
 	Notes(context.Context) ([]NoteView, error)
+	ListComments(context.Context, string, int, int) (CommentListView, error)
+	SubmitComment(context.Context, uint64, string, string, bool) (CommentView, error)
 }
 
 type adminService interface {
@@ -52,6 +54,7 @@ func NewHandler(service userService, resolvers ...currentUserIDResolver) *Handle
 // RegisterUserReads expects rg to enforce user authentication only.
 func (h *Handler) RegisterUserReads(rg *gin.RouterGroup) {
 	rg.GET("/feature-suggestions", h.list)
+	rg.GET("/feature-suggestions/:suggestionId/comments", h.comments)
 	rg.GET("/author-notes", h.notes)
 }
 
@@ -60,11 +63,14 @@ func (h *Handler) RegisterUserReads(rg *gin.RouterGroup) {
 func (h *Handler) RegisterUserWrites(rg *gin.RouterGroup) {
 	rg.POST("/feature-suggestions", h.submit)
 	rg.POST("/feature-suggestions/:suggestionId/support", h.support)
+	rg.POST("/feature-suggestions/:suggestionId/comments", h.submitComment)
 }
 
 // RegisterAdmin expects rg to enforce the admin session and admin rights.
 func (h *Handler) RegisterAdmin(rg *gin.RouterGroup) {
 	rg.GET("/suggestions", h.adminList)
+	rg.GET("/suggestions/:suggestionId/comments", h.adminComments)
+	rg.POST("/suggestions/:suggestionId/comments", h.adminReply)
 	rg.POST("/suggestions/:suggestionId/status", h.adminSetStatus)
 	rg.GET("/notes", h.adminNotes)
 	rg.POST("/notes", h.adminCreateNote)
@@ -212,4 +218,39 @@ func (h *Handler) adminDeleteNote(c *gin.Context) {
 		return
 	}
 	response.OK(c, gin.H{"deleted": true})
+}
+
+func (h *Handler) comments(c *gin.Context) {
+	page, pageSize := pageQuery(c)
+	view, err := h.service.ListComments(c.Request.Context(), c.Param("suggestionId"), page, pageSize)
+	if err != nil {
+		writeServiceError(c, err)
+		return
+	}
+	response.OK(c, view)
+}
+
+func (h *Handler) submitComment(c *gin.Context) {
+	h.writeComment(c, false)
+}
+
+func (h *Handler) adminComments(c *gin.Context) {
+	h.comments(c)
+}
+
+func (h *Handler) adminReply(c *gin.Context) {
+	h.writeComment(c, true)
+}
+
+func (h *Handler) writeComment(c *gin.Context, maintainer bool) {
+	var payload contentRequest
+	if !decodeBody(c, &payload) {
+		return
+	}
+	view, err := h.service.SubmitComment(c.Request.Context(), h.currentUserID(c), c.Param("suggestionId"), payload.Content, maintainer)
+	if err != nil {
+		writeServiceError(c, err)
+		return
+	}
+	response.OK(c, view)
 }

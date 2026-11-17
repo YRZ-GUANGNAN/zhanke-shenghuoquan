@@ -16,6 +16,9 @@ type Repository interface {
 	ListAdmin(ctx context.Context, status string, offset, limit int) ([]SuggestionRecord, int64, error)
 	CreateSuggestion(ctx context.Context, value *Suggestion) error
 	SetSupport(ctx context.Context, publicID string, userID uint64, supported bool, at time.Time) (Suggestion, error)
+	FindSuggestionByPublicID(ctx context.Context, publicID string) (Suggestion, error)
+	CreateComment(ctx context.Context, value *Comment) error
+	ListComments(ctx context.Context, suggestionID uint64, offset, limit int) ([]Comment, int64, error)
 	ListNotes(ctx context.Context, limit int) ([]AuthorNote, error)
 	CreateNote(ctx context.Context, value *AuthorNote) error
 	DeleteNote(ctx context.Context, publicID string) (bool, error)
@@ -43,7 +46,7 @@ func (r *GormRepository) ListUser(ctx context.Context, sort string, offset, limi
 	}
 	rows := make([]SuggestionRecord, 0, limit)
 	err := r.db.WithContext(ctx).Model(&Suggestion{}).
-		Select("feature_suggestions.*, EXISTS(SELECT 1 FROM feature_suggestion_supports s WHERE s.suggestion_id = feature_suggestions.id AND s.user_id = ?) AS supported", viewerID).
+		Select("feature_suggestions.*, EXISTS(SELECT 1 FROM feature_suggestion_supports s WHERE s.suggestion_id = feature_suggestions.id AND s.user_id = ?) AS supported, (SELECT COUNT(*) FROM feature_suggestion_comments c WHERE c.suggestion_id = feature_suggestions.id) AS comment_count", viewerID).
 		Where("status IN ?", visibleSuggestionStatuses()).
 		Order(order).Offset(offset).Limit(limit).Find(&rows).Error
 	return rows, total, err
@@ -62,7 +65,8 @@ func (r *GormRepository) ListAdmin(ctx context.Context, status string, offset, l
 		return nil, 0, err
 	}
 	rows := make([]SuggestionRecord, 0, limit)
-	err := base().Order("id DESC").Offset(offset).Limit(limit).Find(&rows).Error
+	err := base().Select("feature_suggestions.*, (SELECT COUNT(*) FROM feature_suggestion_comments c WHERE c.suggestion_id = feature_suggestions.id) AS comment_count").
+		Order("id DESC").Offset(offset).Limit(limit).Find(&rows).Error
 	return rows, total, err
 }
 
@@ -155,4 +159,28 @@ func (r *GormRepository) SetStatus(ctx context.Context, publicID string, status 
 		return Suggestion{}, err
 	}
 	return suggestion, nil
+}
+
+func (r *GormRepository) FindSuggestionByPublicID(ctx context.Context, publicID string) (Suggestion, error) {
+	var suggestion Suggestion
+	if err := r.db.WithContext(ctx).Where("public_id = ?", publicID).First(&suggestion).Error; err != nil {
+		return Suggestion{}, err
+	}
+	return suggestion, nil
+}
+
+func (r *GormRepository) CreateComment(ctx context.Context, value *Comment) error {
+	return r.db.WithContext(ctx).Create(value).Error
+}
+
+func (r *GormRepository) ListComments(ctx context.Context, suggestionID uint64, offset, limit int) ([]Comment, int64, error) {
+	var total int64
+	if err := r.db.WithContext(ctx).Model(&Comment{}).
+		Where("suggestion_id = ?", suggestionID).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	rows := make([]Comment, 0, limit)
+	err := r.db.WithContext(ctx).Where("suggestion_id = ?", suggestionID).
+		Order("id ASC").Offset(offset).Limit(limit).Find(&rows).Error
+	return rows, total, err
 }

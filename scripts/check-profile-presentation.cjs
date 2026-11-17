@@ -78,6 +78,7 @@ async function run() {
         if (id.endsWith('/services/a-user')) return options.user || {}
         if (id.endsWith('/services/taro')) return { default: taro }
         if (id.endsWith('/services/b-community')) return options.community || {}
+        if (id.endsWith('/services/contact-settings')) return { getContactSettings: options.contactSettings || (async () => ({ makerWechat: 'test-maker', makerIntro: '测试弹窗文案' })) }
         if (id.endsWith('/services/c-trade')) return options.trade || {}
         if (id.endsWith('/post-presentation')) return loadSource(path.resolve(__dirname, '../apps/miniapp/src/utils/post-presentation.ts'))
         if (id.endsWith('/product-price')) return loadSource(path.resolve(__dirname, '../apps/miniapp/src/components/product-price.tsx'))

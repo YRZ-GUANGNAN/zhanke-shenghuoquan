@@ -19,6 +19,7 @@ const allowedDomains = new Set([
   'featureboard',
   'featureflags',
   'sharesettings',
+  'contactsettings',
   'campusinfo',
   'notification',
 ])

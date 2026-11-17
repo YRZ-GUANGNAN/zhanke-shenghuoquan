@@ -129,11 +129,31 @@
   font-weight: 600;
 }
 
-.feature-board-card__support {
+.feature-board-card__thread-toggle {
   display: flex;
   align-items: center;
   gap: 6rpx;
   margin-left: auto;
+  min-height: 44PX;
+  color: $text-tertiary;
+  font-size: 24rpx;
+}
+
+.feature-board-card__thread-toggle--open {
+  color: $text-strong;
+  font-weight: 600;
+}
+
+.feature-board-card__thread-icon {
+  width: 32rpx;
+  height: 32rpx;
+}
+
+.feature-board-card__support {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  margin-left: 18rpx;
   min-width: 88rpx;
   min-height: 44PX;
   justify-content: flex-end;
@@ -193,4 +213,82 @@
   display: block;
   margin-top: 10rpx;
   color: $text-secondary;
+}
+
+.feature-board-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 14rpx;
+  margin-top: 18rpx;
+  padding: 18rpx;
+  border-radius: 16rpx;
+  background: $bg-screen;
+}
+
+.feature-board-thread__hint {
+  @include ref.type(meta);
+  display: block;
+  color: $text-tertiary;
+  text-align: center;
+  padding: 8rpx 0;
+}
+
+.feature-board-comment {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+  padding: 12rpx 16rpx;
+  border-radius: 12rpx;
+  background: $bg-surface;
+}
+
+.feature-board-comment--maintainer {
+  background: $brand-tint;
+}
+
+.feature-board-comment__head {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.feature-board-comment__author {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: $text-secondary;
+}
+
+.feature-board-comment--maintainer .feature-board-comment__author {
+  color: $brand-primary-strong;
+}
+
+.feature-board-comment__date {
+  font-size: 22rpx;
+  color: $text-tertiary;
+}
+
+.feature-board-comment__content {
+  @include ref.type(body);
+  @include ref.wrap;
+  display: block;
+  color: $text-primary;
+}
+
+.feature-board-thread__compose {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-top: 4rpx;
+}
+
+.feature-board-thread__input {
+  box-sizing: border-box;
+  flex: 1;
+  min-width: 0;
+  height: 72rpx;
+  padding: 0 20rpx;
+  border-radius: 12rpx;
+  background: $bg-surface;
+  color: $text-primary;
+  font-size: 26rpx;
 }

@@ -93,6 +93,10 @@ export interface SettlementRow{riderUserId:number;pendingCount:number;riderFeeCe
 export interface WithdrawRow{withdrawPublicId:string;riderUserId:number;amountCents:number;status:WithdrawStatus;note:string;paidAt?:string;rowVersion:number;createdAt:string;updatedAt:string}
 
 export type FeatureSuggestionStatus = 'open' | 'accepted' | 'closed'
-export interface AdminFeatureSuggestion { id: string; userId: number; content: string; status: FeatureSuggestionStatus; supportCount: number; createdAt: string }
+export interface AdminFeatureSuggestion { id: string; userId: number; content: string; status: FeatureSuggestionStatus; supportCount: number; commentCount: number; createdAt: string }
+export interface FeatureCommentRow { id: string; content: string; isMaintainer: boolean; createdAt: string }
+export interface FeatureCommentPage { items: FeatureCommentRow[]; page: number; pageSize: number; total: number }
 export interface AdminFeatureSuggestionPage { items: AdminFeatureSuggestion[]; page: number; pageSize: number; total: number }
 export interface AuthorNoteRow { id: string; content: string; createdAt: string }
+
+export interface ContactSettings { makerWechat: string; makerIntro: string; rowVersion: number; updatedAt: string }

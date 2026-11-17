@@ -522,3 +522,38 @@ page {
 }
 
 // Shared bottom navigation styles are owned by StudentBottomNav.
+
+.maker-contact {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18rpx;
+  padding: 4rpx 0 8rpx;
+}
+
+.maker-contact__intro {
+  @include ref.type(meta);
+  display: block;
+  color: $text-secondary;
+  line-height: 1.7;
+  text-align: center;
+  white-space: pre-wrap;
+}
+
+.maker-contact__wechat-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 22rpx 24rpx;
+  border-radius: 16rpx;
+  background: $bg-screen;
+  box-sizing: border-box;
+}
+
+.maker-contact__wechat {
+  color: $text-strong;
+  font-size: 32rpx;
+  font-weight: 700;
+  letter-spacing: 1rpx;
+}

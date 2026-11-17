@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ScrollView, Text, Textarea, View } from '@tarojs/components'
+import { Input, ScrollView, Text, Textarea, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import AppIcon from '../../components/app-icon'
 import { AppButton, AppIconButton, AppSkeleton, AppState } from '../../components/ui'
 import Taro from '../../services/taro'
 import {
   listAuthorNotes,
+  listFeatureComments,
   listFeatureSuggestions,
   setFeatureSuggestionSupport,
+  submitFeatureComment,
   submitFeatureSuggestion,
   type AuthorNote,
+  type FeatureComment,
   type FeatureSuggestion
 } from '../../services/featureboard'
 import { formatPostDate } from '../../utils/post-presentation'
@@ -37,6 +40,11 @@ export default function FeatureBoardPage() {
   const [draft, setDraft] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [supportBusyId, setSupportBusyId] = useState('')
+  const [openThreadId, setOpenThreadId] = useState('')
+  const [comments, setComments] = useState<FeatureComment[]>([])
+  const [commentsLoading, setCommentsLoading] = useState(false)
+  const [commentDraft, setCommentDraft] = useState('')
+  const [commentSending, setCommentSending] = useState(false)
   const mountedRef = useRef(true)
   const requestVersion = useRef(0)
   const loadMoreLock = useRef(false)
@@ -147,6 +155,47 @@ export default function FeatureBoardPage() {
     }
   }
 
+  const toggleThread = async (item: FeatureSuggestion) => {
+    if (openThreadId === item.id) {
+      setOpenThreadId('')
+      setComments([])
+      setCommentDraft('')
+      return
+    }
+    setOpenThreadId(item.id)
+    setComments([])
+    setCommentDraft('')
+    setCommentsLoading(true)
+    try {
+      const page = await listFeatureComments(item.id)
+      if (mountedRef.current) setComments(page.items)
+    } catch {
+      if (mountedRef.current) void Taro.showToast({ title: '对话加载失败，请重试', icon: 'none' })
+    } finally {
+      if (mountedRef.current) setCommentsLoading(false)
+    }
+  }
+
+  const sendComment = async () => {
+    const content = commentDraft.trim()
+    if (!openThreadId || commentSending) return
+    if (!content) return
+    setCommentSending(true)
+    try {
+      const comment = await submitFeatureComment(openThreadId, content)
+      if (!mountedRef.current) return
+      setComments((current) => [...current, comment])
+      setItems((current) => current.map((value) => value.id === openThreadId ? { ...value, commentCount: value.commentCount + 1 } : value))
+      setCommentDraft('')
+    } catch (error) {
+      if (mountedRef.current) {
+        void Taro.showToast({ title: error instanceof Error ? error.message : '发送失败，请重试', icon: 'none' })
+      }
+    } finally {
+      if (mountedRef.current) setCommentSending(false)
+    }
+  }
+
   return (
     <View className='feature-board-page'>
       <CapsulePageHeader
@@ -206,15 +255,53 @@ export default function FeatureBoardPage() {
                   <Text className='feature-board-card__date'>{formatPostDate(item.createdAt)}</Text>
                   {item.status === 'accepted' && <Text className='feature-board-card__badge'>已采纳</Text>}
                   <View
+                    className={`feature-board-card__thread-toggle${openThreadId === item.id ? ' feature-board-card__thread-toggle--open' : ''}`}
+                    role='button'
+                    ariaLabel={`${openThreadId === item.id ? '收起' : '展开'}对话，当前 ${item.commentCount} 条`}
+                    onClick={() => void toggleThread(item)}
+                  >
+                    <AppIcon name='comment' className='feature-board-card__thread-icon' />
+                    <Text>对话 {item.commentCount}</Text>
+                  </View>
+                  <View
                     className={`feature-board-card__support${item.supported ? ' feature-board-card__support--active' : ''}`}
                     role='button'
                     ariaLabel={`${item.supported ? '取消支持' : '支持'}，当前 ${item.supportCount} 人支持`}
                     onClick={() => void toggleSupport(item)}
                   >
-                    <AppIcon name={item.supported ? 'heart' : 'heart'} active={item.supported} className='feature-board-card__support-icon' />
+                    <AppIcon name='heart' active={item.supported} className='feature-board-card__support-icon' />
                     <Text>{item.supportCount}</Text>
                   </View>
                 </View>
+                {openThreadId === item.id && (
+                  <View className='feature-board-thread'>
+                    {commentsLoading ? (
+                      <Text className='feature-board-thread__hint'>正在加载对话…</Text>
+                    ) : comments.length === 0 ? (
+                      <Text className='feature-board-thread__hint'>还没有对话，来说两句。</Text>
+                    ) : comments.map((comment) => (
+                      <View key={comment.id} className={`feature-board-comment${comment.isMaintainer ? ' feature-board-comment--maintainer' : ''}`}>
+                        <View className='feature-board-comment__head'>
+                          <Text className='feature-board-comment__author'>{comment.isMaintainer ? '作者' : '用户'}</Text>
+                          <Text className='feature-board-comment__date'>{formatPostDate(comment.createdAt)}</Text>
+                        </View>
+                        <Text className='feature-board-comment__content'>{comment.content}</Text>
+                      </View>
+                    ))}
+                    <View className='feature-board-thread__compose'>
+                      <Input
+                        className='feature-board-thread__input'
+                        value={commentDraft}
+                        maxlength={300}
+                        placeholder='参与讨论…'
+                        confirmType='send'
+                        onInput={(event) => setCommentDraft(String(event.detail.value ?? ''))}
+                        onConfirm={() => void sendComment()}
+                      />
+                      <AppButton variant='primary' size='small' loading={commentSending} onClick={() => void sendComment()}>发送</AppButton>
+                    </View>
+                  </View>
+                )}
               </View>
             ))}
             {loadingMore && <Text className='feature-board-more'>正在加载更多…</Text>}

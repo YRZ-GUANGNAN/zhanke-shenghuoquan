@@ -9,7 +9,22 @@ export interface FeatureSuggestion {
   status: FeatureSuggestionStatus
   supportCount: number
   supported: boolean
+  commentCount: number
   createdAt: string
+}
+
+export interface FeatureComment {
+  id: string
+  content: string
+  isMaintainer: boolean
+  createdAt: string
+}
+
+export interface FeatureCommentPage {
+  items: FeatureComment[]
+  page: number
+  pageSize: number
+  total: number
 }
 
 export interface FeatureSuggestionPage {
@@ -57,4 +72,22 @@ export async function setFeatureSuggestionSupport(
 
 export async function listAuthorNotes(): Promise<AuthorNote[]> {
   return request<AuthorNote[]>('/auth/author-notes', { url: '', timeout: 12000 })
+}
+
+export async function listFeatureComments(
+  suggestionId: string,
+  page = 1,
+  pageSize = 50
+): Promise<FeatureCommentPage> {
+  return request<FeatureCommentPage>(
+    `/auth/feature-suggestions/${encodeURIComponent(suggestionId)}/comments?page=${page}&pageSize=${pageSize}`,
+    { url: '', timeout: 12000 }
+  )
+}
+
+export async function submitFeatureComment(suggestionId: string, content: string): Promise<FeatureComment> {
+  return request<FeatureComment>(
+    `/auth/feature-suggestions/${encodeURIComponent(suggestionId)}/comments`,
+    { url: '', method: 'POST', data: { content }, timeout: 15000 }
+  )
 }

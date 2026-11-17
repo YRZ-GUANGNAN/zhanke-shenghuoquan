@@ -11,6 +11,7 @@ import {
   SelectField,
   StatCard,
   StatusPill,
+  TextAreaField,
   Toggle,
   usePreviewToast
 } from '../ui'
@@ -20,6 +21,7 @@ import { navigationItemError } from '../../services/navigation-validation'
 import { cardFields, coverError, shareSettingsAPI, type ShareCards, type ShareSettings } from '../../services/share-settings'
 import { useAdminStore } from '../../store'
 import type {
+  ContactSettings,
   ExternalTakeoutMerchant,
   ExternalTakeoutMerchantDirectory,
   ExternalTakeoutMerchantInput,
@@ -175,14 +177,28 @@ function NavigationSettings() {
     }
   }, [])
 
+  const [contact, setContact] = useState<ContactSettings | null>(null)
+  const [contactDraft, setContactDraft] = useState({ makerWechat: '', makerIntro: '' })
+  const [contactError, setContactError] = useState('')
+  const loadContact = useCallback(async () => {
+    try {
+      const value = await adminAPI.contactSettings()
+      setContact(value)
+      setContactDraft({ makerWechat: value.makerWechat, makerIntro: value.makerIntro })
+      setContactError('')
+    } catch (reason) {
+      setContactError(requestError(reason).message)
+    }
+  }, [])
+
   useEffect(() => {
     let active = true
     setLoading(true)
-    void Promise.all([loadNavigation(), loadExternal()]).finally(() => {
+    void Promise.all([loadNavigation(), loadExternal(), loadContact()]).finally(() => {
       if (active) setLoading(false)
     })
     return () => { active = false }
-  }, [loadNavigation, loadExternal])
+  }, [loadNavigation, loadExternal, loadContact])
 
   const generalCategories = (categories || []).filter(category => !category.systemKey)
   const makerCategory = (categories || []).find(category => category.systemKey === 'campus_maker')
@@ -402,6 +418,15 @@ function NavigationSettings() {
     void perform(`item-${item.id}`, () => adminAPI.updateNavigationItem(item.id, input), enabled ? `「${item.title}」已启用` : `「${item.title}」已停用`, loadNavigation, setNavError)
   }
 
+  const saveContact = () => {
+    if (!contact || Boolean(busy) || formSaving) return
+    void perform('contact', () => adminAPI.updateContactSettings({
+      makerWechat: contactDraft.makerWechat.trim(),
+      makerIntro: contactDraft.makerIntro.trim(),
+      expectedRowVersion: contact.rowVersion,
+    }), '众创申请弹窗配置已更新', loadContact, setContactError)
+  }
+
   const toggleExternalCategory = () => {
     if (!directory || busy) return
     const next = !directory.categoryEnabled
@@ -568,6 +593,22 @@ function NavigationSettings() {
       </Panel>
     ) : null}
 
+    <Panel
+      eyebrow="MAKER CONTACT"
+      title="众创申请弹窗"
+      description="小程序「我的 → 众创申请」弹窗的微信号与说明文案，保存后立即生效。"
+      actions={<Button variant="primary" disabled={!contact || Boolean(busy) || formSaving} onClick={saveContact}>保存</Button>}
+    >
+      {contactError && <div className="preview-form-error">{contactError}</div>}
+      {!contact
+        ? loading
+          ? <EmptyState title="正在读取众创申请配置" description="加载完成后会自动显示。" />
+          : <EmptyState title="暂时无法读取配置" description={contactError || '请稍后重试。'} action={<Button onClick={() => void loadContact()}>重新加载</Button>} />
+        : <div className="preview-form-stack">
+          <Field label="联系微信号" required value={contactDraft.makerWechat} maxLength={40} onChange={(event) => setContactDraft({ ...contactDraft, makerWechat: event.target.value })} />
+          <TextAreaField label="弹窗文案" rows={3} maxLength={500} hint="显示在微信号上方，可写多行；小程序端会原样展示。" value={contactDraft.makerIntro} onChange={(event) => setContactDraft({ ...contactDraft, makerIntro: event.target.value })} />
+        </div>}
+    </Panel>
     <Panel
       eyebrow="EXTERNAL TAKEOUT"
       title="外部商家入口"

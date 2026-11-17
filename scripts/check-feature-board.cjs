@@ -31,6 +31,10 @@ for (const fragment of [
   'rg.GET("/author-notes", h.notes)',
   'rg.GET("/suggestions", h.adminList)',
   'rg.POST("/suggestions/:suggestionId/status", h.adminSetStatus)',
+  'rg.GET("/feature-suggestions/:suggestionId/comments", h.comments)',
+  'rg.POST("/feature-suggestions/:suggestionId/comments", h.submitComment)',
+  'rg.GET("/suggestions/:suggestionId/comments", h.adminComments)',
+  'rg.POST("/suggestions/:suggestionId/comments", h.adminReply)',
   'rg.POST("/notes", h.adminCreateNote)',
   'rg.DELETE("/notes/:noteId", h.adminDeleteNote)',
 ]) {
@@ -59,6 +63,9 @@ for (const fragment of [
   '最受欢迎',
   '已采纳',
   'onScrollToLower',
+  'toggleThread',
+  'submitFeatureComment',
+  '对话',
 ]) {
   if (!page.includes(fragment)) throw new Error(`feature board page is missing ${fragment}`)
 }
@@ -74,6 +81,8 @@ for (const fragment of [
   'adminAPI.setFeatureSuggestionStatus',
   'adminAPI.createAuthorNote',
   'adminAPI.deleteAuthorNote',
+  'adminAPI.featureSuggestionComments',
+  'adminAPI.replyFeatureSuggestion',
 ]) {
   if (!adminView.includes(fragment)) throw new Error(`admin feature board view is missing ${fragment}`)
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { AdminFeatureSuggestion, AuthorNoteRow, FeatureSuggestionStatus } from '../../types'
+import type { AdminFeatureSuggestion, AuthorNoteRow, FeatureCommentRow, FeatureSuggestionStatus } from '../../types'
 import { adminAPI } from '../../services/f-admin'
 import {
   Button,
@@ -44,6 +44,11 @@ export function FeatureBoardView() {
   const [notes, setNotes] = useState<AuthorNoteRow[] | null>(null)
   const [noteDraft, setNoteDraft] = useState('')
   const [noteBusy, setNoteBusy] = useState(false)
+  const [threadId, setThreadId] = useState('')
+  const [threadComments, setThreadComments] = useState<FeatureCommentRow[]>([])
+  const [threadLoading, setThreadLoading] = useState(false)
+  const [replyDraft, setReplyDraft] = useState('')
+  const [replyBusy, setReplyBusy] = useState(false)
 
   const load = useCallback(async (nextFilter: StatusFilter, nextPage: number) => {
     setLoading(true)
@@ -81,6 +86,44 @@ export function FeatureBoardView() {
       notify(reason instanceof Error ? reason.message : '操作失败', 'danger')
     } finally {
       setBusy('')
+    }
+  }
+
+  const toggleThread = async (item: AdminFeatureSuggestion) => {
+    if (threadId === item.id) {
+      setThreadId('')
+      setThreadComments([])
+      setReplyDraft('')
+      return
+    }
+    setThreadId(item.id)
+    setThreadComments([])
+    setReplyDraft('')
+    setThreadLoading(true)
+    try {
+      const page = await adminAPI.featureSuggestionComments(item.id)
+      setThreadComments(page.items)
+    } catch (reason) {
+      notify(reason instanceof Error ? reason.message : '对话加载失败', 'danger')
+    } finally {
+      setThreadLoading(false)
+    }
+  }
+
+  const sendReply = async (item: AdminFeatureSuggestion) => {
+    const content = replyDraft.trim()
+    if (!content || replyBusy) return
+    setReplyBusy(true)
+    try {
+      const comment = await adminAPI.replyFeatureSuggestion(item.id, content)
+      setThreadComments((current) => [...current, comment])
+      setItems((current) => current.map((value) => value.id === item.id ? { ...value, commentCount: value.commentCount + 1 } : value))
+      setReplyDraft('')
+      notify('回复已发送')
+    } catch (reason) {
+      notify(reason instanceof Error ? reason.message : '回复失败', 'danger')
+    } finally {
+      setReplyBusy(false)
     }
   }
 
@@ -136,10 +179,21 @@ export function FeatureBoardView() {
             </div>
             <p>{item.content}</p>
             <div className="preview-feedback-list__footer" style={{ justifyContent: 'flex-end', gap: 8 }}>
+              <Button size="sm" variant="quiet" onClick={() => void toggleThread(item)}>{threadId === item.id ? '收起对话' : `对话 ${item.commentCount}`}</Button>
               {item.status !== 'accepted' && <Button size="sm" disabled={Boolean(busy)} onClick={() => void changeStatus(item, 'accepted')}>采纳</Button>}
               {item.status !== 'closed' && <Button size="sm" variant="quiet" disabled={Boolean(busy)} onClick={() => void changeStatus(item, 'closed')}>关闭</Button>}
               {item.status !== 'open' && <Button size="sm" variant="quiet" disabled={Boolean(busy)} onClick={() => void changeStatus(item, 'open')}>重新打开</Button>}
             </div>
+            {threadId === item.id && <div className="preview-form-stack" style={{ marginTop: 12 }}>
+              {threadLoading ? <p>正在加载对话…</p>
+                : threadComments.length === 0 ? <p>还没有对话。</p>
+                : threadComments.map((comment) => <div key={comment.id} style={{ padding: '8px 10px', borderRadius: 8, background: comment.isMaintainer ? '#e6f1fb' : '#f7f8fa' }}>
+                  <div><strong style={{ fontSize: 12 }}>{comment.isMaintainer ? '作者' : '用户'}</strong><span style={{ fontSize: 12, color: '#93a2b4', marginLeft: 8 }}>{formatDate(comment.createdAt)}</span></div>
+                  <p style={{ margin: '4px 0 0' }}>{comment.content}</p>
+                </div>)}
+              <TextAreaField label="作者回复" rows={2} maxLength={300} value={replyDraft} placeholder="以作者身份回复这条建议…" onChange={(event) => setReplyDraft(event.target.value)} />
+              <div><Button size="sm" variant="primary" disabled={replyBusy} onClick={() => void sendReply(item)}>{replyBusy ? '发送中…' : '发送回复'}</Button></div>
+            </div>}
           </article>)}
         </div>}
       <Pagination page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} label="建议分页" />

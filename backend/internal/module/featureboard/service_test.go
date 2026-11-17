@@ -30,6 +30,11 @@ type stubRepository struct {
 		status   SuggestionStatus
 	}
 	statusErr error
+	commentSuggestion Suggestion
+	commentErr        error
+	createdComment    *Comment
+	commentRows       []Comment
+	commentTotal      int64
 }
 
 func (s *stubRepository) ListUser(_ context.Context, _ string, _, _ int, _ uint64) ([]SuggestionRecord, int64, error) {
@@ -67,6 +72,26 @@ func (s *stubRepository) CreateNote(_ context.Context, value *AuthorNote) error 
 func (s *stubRepository) DeleteNote(_ context.Context, publicID string) (bool, error) {
 	s.deletedNotes = append(s.deletedNotes, publicID)
 	return true, nil
+}
+
+func (s *stubRepository) FindSuggestionByPublicID(_ context.Context, publicID string) (Suggestion, error) {
+	if s.commentErr != nil {
+		return Suggestion{}, s.commentErr
+	}
+	suggestion := s.commentSuggestion
+	if suggestion.PublicID == "" {
+		suggestion = Suggestion{ID: 42, PublicID: publicID, Content: "想要夜间模式", Status: StatusOpen}
+	}
+	return suggestion, nil
+}
+
+func (s *stubRepository) CreateComment(_ context.Context, value *Comment) error {
+	s.createdComment = value
+	return nil
+}
+
+func (s *stubRepository) ListComments(_ context.Context, _ uint64, _, _ int) ([]Comment, int64, error) {
+	return s.commentRows, s.commentTotal, nil
 }
 
 func (s *stubRepository) SetStatus(_ context.Context, publicID string, status SuggestionStatus, _ time.Time) (Suggestion, error) {
@@ -187,5 +212,58 @@ func TestNotesAndAdminOperations(t *testing.T) {
 	}
 	if len(repo.deletedNotes) != 1 || repo.deletedNotes[0] != note.ID {
 		t.Fatalf("unexpected deleted notes: %v", repo.deletedNotes)
+	}
+}
+
+func TestSubmitCommentValidatesAndPersists(t *testing.T) {
+	repo := &stubRepository{}
+	service := newTestService(repo)
+	ctx := context.Background()
+	suggestionID := "01J8Z3Q4M5K6N7P8R9S0T1V2W3"
+
+	if _, err := service.SubmitComment(ctx, 7, suggestionID, " ", false); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("blank comment must be rejected, got %v", err)
+	}
+	if _, err := service.SubmitComment(ctx, 7, suggestionID, strings.Repeat("长", maxCommentRunes+1), false); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("oversized comment must be rejected, got %v", err)
+	}
+
+	view, err := service.SubmitComment(ctx, 7, suggestionID, " 支持这个想法 ", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ulidPattern.MatchString(view.ID) || view.Content != "支持这个想法" || view.IsMaintainer {
+		t.Fatalf("unexpected comment view: %+v", view)
+	}
+	if repo.createdComment == nil || repo.createdComment.SuggestionID == 0 || repo.createdComment.UserID != 7 {
+		t.Fatalf("unexpected created comment: %+v", repo.createdComment)
+	}
+
+	reply, err := service.SubmitComment(ctx, 99, suggestionID, "已排入计划", true)
+	if err != nil || !reply.IsMaintainer {
+		t.Fatalf("maintainer reply must carry the flag: %+v err=%v", reply, err)
+	}
+}
+
+func TestSubmitCommentRejectsClosedSuggestion(t *testing.T) {
+	repo := &stubRepository{commentSuggestion: Suggestion{PublicID: "01J8Z3Q4M5K6N7P8R9S0T1V2W3", Status: StatusClosed}}
+	service := newTestService(repo)
+	if _, err := service.SubmitComment(context.Background(), 7, "01J8Z3Q4M5K6N7P8R9S0T1V2W3", "还能说话吗", false); !errors.Is(err, ErrClosed) {
+		t.Fatalf("closed suggestion must reject comments, got %v", err)
+	}
+}
+
+func TestListCommentsMapsMissingSuggestion(t *testing.T) {
+	repo := &stubRepository{commentErr: gorm.ErrRecordNotFound}
+	service := newTestService(repo)
+	if _, err := service.ListComments(context.Background(), "01J8Z3Q4M5K6N7P8R9S0T1V2W3", 1, 20); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("missing suggestion must map to ErrNotFound, got %v", err)
+	}
+	repo.commentErr = nil
+	repo.commentRows = []Comment{{PublicID: "01J8Z3Q4M5K6N7P8R9S0T1V2W4", Content: "第一个", IsMaintainer: true}}
+	repo.commentTotal = 1
+	view, err := service.ListComments(context.Background(), "01J8Z3Q4M5K6N7P8R9S0T1V2W3", 1, 20)
+	if err != nil || view.Total != 1 || len(view.Items) != 1 || !view.Items[0].IsMaintainer {
+		t.Fatalf("unexpected comment list: %+v err=%v", view, err)
 	}
 }
