@@ -3,14 +3,15 @@
 .student-bottom-nav {
   position: fixed;
   right: 8PX;
-  bottom: 8PX;
+  // 悬浮胶囊整体上浮避开 Home Indicator；安全区不并入胶囊高度，各机型块高一致。
+  bottom: calc(8PX + env(safe-area-inset-bottom, 0px));
   left: 8PX;
   z-index: $z-sticky;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   align-items: end;
   min-height: 96rpx;
-  padding: 8rpx 10rpx calc(12rpx + env(safe-area-inset-bottom));
+  padding: 8rpx 10rpx 12rpx;
   border: 1rpx solid var(--glass-nav-border, rgba(255, 255, 255, .62));
   background: var(--glass-nav, rgba(255, 255, 255, .72));
   -webkit-backdrop-filter: blur(24rpx);
