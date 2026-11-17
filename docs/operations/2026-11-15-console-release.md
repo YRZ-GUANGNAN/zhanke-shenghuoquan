@@ -240,3 +240,12 @@
 - 本批改动经两轮审查工作流对抗核实；`apps/miniapp` 存在他人未提交的进行中改动，暗色主题产物已按脚本重新生成，小程序改动未纳入本次提交。
 
 后端无变化（沿用 candidate.10）。
+
+## 补充发布：2026-11-17 Modern Web Guidance 审查修复（静态，commit b264e1d）
+
+- 安装 GoogleChrome/modern-web-guidance 技能（`.agents/skills` + Claude Code 符号链接）。
+- legacy-scan 发现 9 处：7 处 Enter 提交未做 IME 组合态检查（中文输入法确认候选词会误触发查询/提交）、2 处浅拷贝排序。
+- 已修复：新增 isImeComposing() 并接入全部 Enter 提交点（含 AdminDialog）；排序改用 toSorted；tsconfig lib 升 ES2023。
+- 静态 release 更新为 `/var/www/campus-admin/releases/admin-20261117-b264e1d`。
+
+后端无变化（沿用 candidate.10）。
