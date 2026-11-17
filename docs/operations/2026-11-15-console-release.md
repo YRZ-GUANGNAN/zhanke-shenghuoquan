@@ -249,3 +249,14 @@
 - 静态 release 更新为 `/var/www/campus-admin/releases/admin-20261117-b264e1d`。
 
 后端无变化（沿用 candidate.10）。
+
+## 补充发布：2026-11-17 容器查询与按需分包（静态，commit 6a65950）
+
+- 内容区改为查询容器，标题/工具栏/表格/卡片断点改 @container（860px/620px）；外壳级规则保留媒体查询。
+- 分区视图 React.lazy：主包 791KB→545KB（gzip 234→177KB），分区 chunk 首次进入时加载。
+- 标题 text-wrap: balance、段落 pretty；长列表自第 3/5 项起 content-visibility: auto。
+- 滚动条 scrollbar-color/width + @supports 内 WebKit 回退（对比度 ≥3:1）。
+- 新增 CLAUDE.md（浏览器支持策略 + modern-web-guidance 用法）。
+- 静态 release 更新为 `/var/www/campus-admin/releases/admin-20261117-6a65950`。
+
+后端无变化（沿用 candidate.10）。
