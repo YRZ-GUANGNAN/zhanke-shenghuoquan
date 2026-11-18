@@ -1,40 +1,82 @@
 # 湛科生活圈 · Campus Circle
 
-> 面向高校的一站式校园服务平台。社区、二手交易、校园导航、即时通讯、外卖配送与管理后台，统一在一套域边界清晰的架构下运行。
+> 面向高校的一站式校园生活平台。学生在一个微信小程序里逛社区、淘二手、点外卖、用校园服务；商家和骑手在同一小程序内以身份切换接单履约；运营团队在 Web 后台完成审核、用户管理、资金结算与平台配置。
 
-## 最新更新
-
-- 2026-10-19：骑手工作台新增真实的“今日单量 / 今日收入”（按北京时间当日 earning 记录聚合，统计不可用时保持工作台可用）；私信支持先输入与失败原位重试，商家与骑手工作台支持订单分组横滑，外部订单收件与小程序模块能力探测接通。
-- 2026-10-14：修复分享帖子返回首页的问题，新增独立校园资讯模块和后台展示模式切换，并保留原版业务配置。完整变更与验证记录见 [本次更新说明](docs/updates/2026-10-14.md)。
-
-**Go 1.25** · **Gin** · **Gorm** · **MySQL 8** · **Meilisearch** · **Taro 4 + React 18**（小程序） · **React 18 + Vite**（后台） · **Docker** · **腾讯云 COS / IM**
+**微信小程序（Taro 4 + React 18）** · **Web 运营后台（React 18 + Vite）** · **Go 后端（Gin + Gorm）** · **MySQL 8** · **Meilisearch** · **腾讯云 COS / IM** · **Docker**
 
 ---
 
-## 项目概览
+## 平台形态
 
-| 项 | 数值 |
+| 端 | 使用者 | 主要能力 |
+| --- | --- | --- |
+| 微信小程序 | 学生 / 普通用户 | 社区、二手交易、外卖与跑腿下单、校园服务、私信 |
+| 微信小程序 | 商家 | 店铺与菜品、发跑腿单、订单处理、钱包与结算 |
+| 微信小程序 | 骑手 | 抢单配送、履约进度、收入与提现 |
+| Web 后台 | 运营 / 管理员 | 经营总览、内容审核、用户与认证管理、通知与素材、资金对账、平台配置 |
+
+商家与骑手身份在审核通过后就地切换工作台，不需要另装应用。
+
+---
+
+## 功能地图
+
+### 社区
+
+- 图文帖子发布与编辑，支持多图
+- 评论、点赞、收藏、关注
+- 信息流浏览与全文搜索（Meilisearch）
+- 个人内容管理与媒体历史
+- 发帖、评论、点赞、收藏、关注、通知等行为可按功能开关独立启停
+
+### 二手市场
+
+- 商品发布与编辑、多图展示、分类浏览
+- 全文搜索、收藏
+- 商品留言、联系卖家私信会话
+- 商品状态流转（在售 / 下架 / 已售），与审核状态联动
+
+### 外卖与跑腿
+
+- **外卖**：商家目录、菜品、购物车、下单与微信支付、订单跟踪
+- **跑腿配送**：商家发单 → 骑手抢单 → 取货 → 送达 → 确认的完整履约链路，支持外部订单接入
+- **商家侧**：接单、出餐与配送管理、店铺与菜品维护、钱包
+- **骑手侧**：抢单台、今日单量与收入、钱包与提现
+- **平台结算**：商家钱包、骑手钱包与报酬、待打款队列、提现处理、退款记录、资金核对
+
+### 校园服务
+
+- 校园服务入口：分类与导航项（`appid + path` 跳转，不内嵌第三方页面）
+- 校园资讯与常用工具
+- 分享设置：小程序卡片样式与分享入口配置
+
+### 消息与通知
+
+- 一对一私信（接入腾讯云 IM，平台只保存用户映射与会话关系，不落消息本体）
+- 站内互动通知
+- 多通道通知投递：小程序内通知、微信订阅消息、服务号、企业微信群
+- 通知工作台：投递状态、失败重试、通道健康度
+
+### 身份与账号
+
+- 微信登录，学生 / 商家 / 骑手 / 管理员多角色权限
+- 学生认证、商家与骑手身份申请（材料上传 → 审核 → 启用）
+- 资料编辑、外观设置、黑名单
+- 意见反馈、功能建议（均可在后台跟进处理）
+- 隐私政策与法务页、官方公众号绑定
+
+### 运营后台
+
+| 分组 | 模块 |
 | --- | --- |
-| 后端代码 | **约 11.8 万行 Go**（624 个文件，含测试；业务代码约 6.0 万行） |
-| 前端代码 | 约 2.9 万行 TypeScript（小程序 + 后台，352 个文件） |
-| 业务域 | **7 个**，边界由自动化脚本强制 |
-| 数据库迁移 | 59 个，其中 40 个附带回滚脚本 |
-| 端 | 微信小程序（用户/商家/骑手）+ Web 管理后台 |
+| 工作台 | 经营总览：今日订单与收入、待审核积压、通知异常、配送流程分布 |
+| 业务运营 | 配送与结算（订单、钱包、报酬、打款、提现、退款、资金核对）、消息通知、素材中心 |
+| 内容与用户 | 审核中心（统一审核队列）、社区内容、二手商品、举报处理、商家骑手认证、意见反馈、功能建议 |
+| 平台设置 | 用户与权限、服务入口、分享设置、功能开关、旧版外卖 |
 
-> 📷 **截图占位**：首页信息流 / 二手商品详情 / 外卖下单 / 骑手抢单台 / 后台统一审核台
-> *（面试前请补上 3~5 张真实截图，这是评审最先看的部分）*
+**审核中心**把帖子、评论、商品、商家、菜品、举报等不同类型内容收进同一个队列，按「提交 → 审核中 → 通过 / 驳回」流转，驳回可填理由并通知作者。
 
-## 功能一览
-
-| 域 | 能力 |
-| --- | --- |
-| **A 用户** | 微信登录、JWT、用户资料、权限中间件（多角色：学生 / 商家 / 骑手 / 管理员） |
-| **B 社区** | 帖子、多图、评论、点赞、收藏、Feed 流、全文搜索 |
-| **C 交易** | 二手商品发布、图片、搜索、收藏、**商品状态机**、联系卖家 |
-| **D 导航** | 校园服务分类与导航项，只保存 `appid + path` 跳转数据 |
-| **E IM** | 对接腾讯云 IM，**只保存用户映射与会话关系，不保存消息** |
-| **F 后台** | 用户 / 帖子 / 商品 / 举报管理、统计、**统一审核流** |
-| **G 外卖** | 商家入驻、菜品、订单、支付、**配送抢单**（骑手端） |
+**功能开关**支持按模块灰度：单个功能可在不影响既有订单、身份和数据的前提下关闭入口。
 
 ---
 
@@ -43,20 +85,21 @@
 ```mermaid
 flowchart TB
     subgraph Client["客户端"]
-        MP["微信小程序<br/>Taro + React"]
-        AD["管理后台<br/>React + Vite"]
+        MP["微信小程序<br/>学生 / 商家 / 骑手"]
+        AD["Web 运营后台"]
     end
 
     subgraph Backend["Go 后端 · Gin"]
-        MW["中间件<br/>CORS / JWT / 权限"]
-        subgraph Domains["业务域（internal/module）"]
-            A["A 用户"]
-            B["B 社区"]
-            C["C 交易"]
-            D["D 导航"]
-            E["E IM"]
-            F["F 后台"]
-            G["G 外卖"]
+        MW["中间件<br/>CORS / 认证 / 权限"]
+        subgraph Domains["业务域"]
+            A["用户与身份"]
+            B["社区"]
+            C["二手交易"]
+            D["校园服务"]
+            E["消息"]
+            F["运营后台"]
+            G["外卖与配送"]
+            H["媒体与通知"]
         end
         RV["统一审核流<br/>review_tasks"]
     end
@@ -80,109 +123,14 @@ flowchart TB
     A & B & C & G -.注册审核目标.-> RV
 ```
 
-**分层职责**：handler 只做输入输出 → service 承载状态机、权限与审核规则 → repository 独占数据访问。
+后端按业务域划分模块，handler 负责输入输出，service 承载状态机、权限与审核规则，repository 独占数据访问。
 
----
+### 工程约束
 
-## 技术难点与设计决策
-
-### 1️⃣ 用自动化脚本把架构规则变成 CI 门禁
-
-架构约定最容易在项目变大后失效——文档写着"不许跨域访问"，实际代码里到处都是。
-
-项目用 [`scripts/check-boundaries.cjs`](scripts/check-boundaries.cjs) 静态扫描 Go 源码，**把每条架构规则变成会失败的检查**：
-
-| 规则 | 检查方式 |
-| --- | --- |
-| 业务域必须登记 | `internal/module/` 下出现白名单外的目录 → 失败 |
-| 数据库访问只能在仓储层 | 非 `*_repository.go` / `repository.go` 文件里出现 `*gorm.DB` 或 `.WithContext(` → 失败 |
-| D 域不得依赖任何业务域 | 源码中出现 `internal/module/{user,community,...}` → 失败 |
-| **E 域不得存储消息** | 源码中出现 `type Message` / `message_content` / `messages` → 失败 |
-| G 域核心不得引入 HTTP 或其他业务域 | 同上模式 |
-| 各传输适配器不得越域 | `admin/deliverymerchant` 等目录单独校验 |
-
-`npm run verify` 会执行这套检查，**规则不通过就无法提交**。这让"域边界"从口头约定变成了可执行的约束。
-
-### 2️⃣ 统一审核流 + 领域服务注册（依赖倒置）
-
-平台上有六类内容需要审核：帖子、评论、商品、商家、菜品、举报。
-
-如果让后台域直接改这些表，F 域会变成依赖所有业务域的中心节点——**改任何一域都要动后台**。
-
-实际做法：所有内容创建时统一登记到 `review_tasks`，业务域通过 `RegisterTarget` **把自己的回写逻辑注册给审核流**。F 域只驱动状态流转，通过接口回调，**不直接访问业务表**。
-
-```text
-submitted → reviewing → approved（允许展示）
-                     ↘ rejected（不展示）
-```
-
-同一套机制支撑六类内容，新增一类只需注册一个 target。社区 Feed 与商品列表只查询 `approved`。
-
-### 3️⃣ 生产级数据库迁移
-
-59 个迁移，其中 40 个附带回滚脚本（`migrations/rollback/`）。`npm run check:migrations` 会校验**新增迁移**必须同时提供回滚脚本，早期 19 个迁移在建立该规则前就已合并，暂未补齐。
-
-关键迁移（如 [`037_report_idempotency.sql`](backend/migrations/037_report_idempotency.sql)）使用 MySQL 存储过程 + `GET_LOCK` 实现**迁移互斥**，并在 `EXIT HANDLER` 中释放锁——避免多实例并发执行迁移。
-
-### 4️⃣ IM 不自建消息存储
-
-即时通讯自研成本极高（消息序、离线补偿、多端同步）。项目选择只保存**用户映射与会话关系**，消息本体交给腾讯云 IM。
-
-C 域（联系卖家）与 G 域（买家↔商家/骑手）都通过 E 域暴露的 `ConversationGateway` 建立会话，**不各自造一套消息系统**。上面第 1 条的脚本会用静态检查守住这条边界。
-
-### 5️⃣ 生产环境拒绝不可追溯的构建
-
-`deploy` 通过 `-ldflags` 注入 `buildVersion` / `buildCommit` / `buildTime`。当 `APP_ENV=prod` 时，若版本为 `dev`、提交号非法或标记为 `-dirty`，**服务直接拒绝启动**。
-
-避免"线上跑的到底是哪个版本"这类事故。
-
-### 6️⃣ 媒体资源引用与可见性门禁
-
-媒体资源不直接在业务表里存 URL，而是通过 `media_asset_references` 引用。对外展示统一经过 MediaGateway，**只放行 `final + approved` 状态的资源**——未审核完成的图片不会泄漏到前台。
-
----
-
-## 工程实践
-
-| 实践 | 说明 |
-| --- | --- |
-| **域边界自动化** | 架构规则由脚本强制，进 CI |
-| **契约检查** | 20+ 个 `check:*` 脚本校验小程序页面、后台 UI、身份契约、发布流程等 |
-| **统一校验入口** | `npm run verify` 串联边界、契约、类型检查与后端测试 |
-| **迁移可回滚** | 每个迁移都有 rollback 与测试 |
-| **多端一致** | 小程序与后台共享 TS 类型契约 |
-| **原生部署可校验** | `check:native-deployment` 校验 systemd 单元与构建参数 |
-
-`npm run verify` 覆盖：
-
-```text
-域边界 · 小程序静态路由 · 业务闭环 · 无假页面 · 二次编辑契约
-身份应用契约 · 商家/骑手工作台 · 主页真实工具 · 发布契约
-原生部署 · 微信密钥卫生 · TypeScript 类型检查 · 后端测试
-```
-
----
-
-## 目录结构
-
-```text
-apps/
-  miniapp/        微信小程序（Taro 4 + React 18 + Zustand + 腾讯云 IM SDK）
-  admin/          管理后台（React 18 + Vite + TypeScript）
-backend/
-  cmd/            可执行入口：server、admin-credential、audit-mock-users、cos-review-probe
-  internal/       业务代码
-    module/       按业务域划分（user / community / trade / navigation / im / admin / takeout / delivery / media ...）
-    middleware/   CORS、认证、权限
-    pkg/          通用工具与响应协议
-  migrations/     SQL 迁移 + rollback/
-deploy/
-  docker-compose.yml   本地与演示栈
-  nginx/               反向代理
-  native/              systemd 单元与生产 Nginx 配置
-docs/             架构（ARCHITECTURE.md）、ADR、验收报告、运维手册
-scripts/          开发、校验、演示脚本
-```
+- **域边界可执行**：`scripts/check-boundaries.cjs` 静态扫描源码，跨域访问、越权取数、消息落库等违反架构约定的写法会让校验失败
+- **媒体可见性门禁**：媒体资源经引用表登记，对外展示只放行「终态 + 已审核」的资源，未审核图片不会泄漏到前台
+- **生产构建可追溯**：构建版本、提交号、构建时间注入二进制；生产环境拒绝启动不可追溯的构建
+- **统一校验入口**：`npm run verify` 串联边界检查、多端契约检查、类型检查与后端测试
 
 ---
 
@@ -202,6 +150,12 @@ npm run dev:miniapp    # 小程序监听构建，产物在 apps/miniapp/dist
 
 小程序产物用**微信开发者工具**打开 `apps/miniapp/dist` 预览。
 
+一键拉起本地开发环境（Meilisearch + 后端 + 管理后台）：
+
+```powershell
+npm run dev:local
+```
+
 一次性拉起完整容器栈：
 
 ```powershell
@@ -212,7 +166,7 @@ npm run dev:stack
 
 > 完整栈要求 `.env` 中已填好 compose 声明的必填变量（`MEILI_MASTER_KEY`、`COS_SECRET_ID`、`COS_SECRET_KEY` 等）。
 
-## 环境要求
+### 环境要求
 
 | 依赖 | 版本 |
 | --- | --- |
@@ -220,6 +174,31 @@ npm run dev:stack
 | Node.js | `^20.19.0` 或 `>=22.12.0` |
 | Docker Desktop | MySQL 与 Meilisearch |
 | 微信开发者工具 | 调试小程序 |
+
+---
+
+## 目录结构
+
+```text
+apps/
+  miniapp/        微信小程序（学生 / 商家 / 骑手三身份）
+  admin/          Web 运营后台
+backend/
+  cmd/            可执行入口：server、admin-credential、audit-mock-users 等
+  internal/       业务代码
+    module/       按业务域划分（user / community / trade / takeout / delivery / media / notification ...）
+    middleware/   CORS、认证、权限
+    pkg/          通用工具与响应协议
+  migrations/     SQL 迁移 + rollback/
+deploy/
+  docker-compose.yml   本地与演示栈
+  nginx/               反向代理
+  native/              systemd 单元与生产 Nginx 配置
+docs/             架构（ARCHITECTURE.md）、ADR、验收报告、运维手册
+scripts/          开发、校验、演示脚本
+```
+
+---
 
 ## 接口概览
 
@@ -230,11 +209,14 @@ npm run dev:stack
 | `GET /healthz` · `GET /readyz` · `GET /version` | 存活 / 就绪 / 版本（含提交号与构建时间） |
 | `/api/v1/auth` · `/api/v1/admin-auth` | 用户端与管理端登录 |
 | `/api/v1/community` | 社区：帖子、评论、Feed、搜索 |
-| `/api/v1/trade` | 二手交易：商品、评论、搜索 |
-| `/api/v1/navigation` | 校园导航 |
-| `/api/v1/im` | 会话关系与用户映射 |
+| `/api/v1/trade` | 二手交易：商品、留言、搜索 |
+| `/api/v1/takeout` · `/api/v1/delivery` | 外卖、跑腿配送与资金 |
+| `/api/v1/navigation` · `/api/v1/campus-info` | 校园服务入口与资讯 |
+| `/api/v1/im` · `/api/v1/notification` | 会话关系、用户映射与通知投递 |
 | `/api/v1/admin` | 后台管理与统一审核流 |
 | `/api/v1/media` · `/api/v1/miniapp/media` | 媒体资源与微信回调 |
+
+---
 
 ## 部署
 
@@ -256,5 +238,5 @@ npm run dev:stack
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 域边界、代码归属与依赖规则 |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) · [DEVELOPMENT_DISCIPLINE.md](docs/DEVELOPMENT_DISCIPLINE.md) | 开发流程与纪律 |
 | [docs/adr/](docs/adr/) | 架构决策记录 |
-| [docs/evidence/](docs/evidence/) | 验收证据 |
+| [docs/updates/](docs/updates/) | 更新记录 |
 | [docs/runbooks/](docs/runbooks/) | 运维手册 |
