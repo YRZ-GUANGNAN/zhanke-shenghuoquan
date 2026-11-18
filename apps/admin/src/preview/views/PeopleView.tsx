@@ -633,6 +633,8 @@ interface CredentialDraft {
   nickname: string
   username: string
   password: string
+  role: 'admin' | 'superadmin'
+  query: string
 }
 
 function UserPeople() {
@@ -777,7 +779,7 @@ function UserPeople() {
   }
 
   const openAssignCredential = () => {
-    setCredentialDraft({ mode: 'assign', userId: null, nickname: '', username: '', password: '' })
+    setCredentialDraft({ mode: 'assign', userId: null, nickname: '', username: '', password: '', role: 'admin', query: '' })
     setCredentialFormError('')
   }
 
@@ -787,7 +789,9 @@ function UserPeople() {
       userId: credential.userId,
       nickname: credential.nickname,
       username: credential.username,
-      password: ''
+      password: '',
+      role: credential.role === 'superadmin' ? 'superadmin' : 'admin',
+      query: ''
     })
     setCredentialFormError('')
   }
@@ -812,6 +816,11 @@ function UserPeople() {
     setCredentialBusy(true)
     setCredentialFormError('')
     try {
+      const target = allUsers?.find(user => user.id === userId)
+      // 一步添加管理员：所选用户还不是目标角色时先调整角色，再分配登录账号。
+      if (credentialDraft.mode === 'assign' && target && target.role !== credentialDraft.role) {
+        await adminAPI.updateUserRole(userId, credentialDraft.role)
+      }
       await adminAuthAPI.saveCredential(userId, username, credentialDraft.password)
       setCredentialDraft(null)
       notify(credentialDraft.mode === 'assign' ? '登录账号已分配' : '登录密码已重置，旧会话将失效', credentialDraft.mode === 'assign' ? 'success' : 'info')
@@ -841,8 +850,13 @@ function UserPeople() {
 
   const credentialUserIds = useMemo(() => new Set(credentials.map(item => item.userId)), [credentials])
   const credentialCandidates = useMemo(() => (allUsers ?? []).filter(user =>
-    (user.role === 'admin' || user.role === 'superadmin') && user.status === 'active' && !credentialUserIds.has(user.id)
+    user.status === 'active' && !credentialUserIds.has(user.id)
   ), [allUsers, credentialUserIds])
+  const credentialMatches = useMemo(() => {
+    const keyword = (credentialDraft?.query ?? '').trim().toLowerCase().replace(/^#/, '')
+    if (!keyword) return credentialCandidates
+    return credentialCandidates.filter(user => `${user.nickname} #${user.id}`.toLowerCase().includes(keyword))
+  }, [credentialCandidates, credentialDraft?.query])
   const statistics = useMemo(() => {
     if (!allUsers) return null
     return {
@@ -964,7 +978,7 @@ function UserPeople() {
       title={credentialDraft?.mode === 'reset' ? '重置登录密码' : '分配后台登录账号'}
       description={credentialDraft?.mode === 'reset'
         ? `管理员：${credentialDraft.nickname || `用户 #${credentialDraft.userId}`}`
-        : '从管理员用户中选择对象并设置登录凭据。'}
+        : '选择一个小程序用户，设置角色与后台登录凭据。'}
       onClose={() => { if (!credentialBusy) { setCredentialDraft(null); setCredentialFormError('') } }}
       footer={<>
         <Button onClick={() => { setCredentialDraft(null); setCredentialFormError('') }} disabled={credentialBusy}>取消</Button>
@@ -973,21 +987,41 @@ function UserPeople() {
     >
       {credentialDraft && <div className="preview-form-stack">
         {credentialDraft.mode === 'assign'
-          ? <SelectField
-            label="管理员用户"
-            required
-            value={credentialDraft.userId === null ? '' : String(credentialDraft.userId)}
-            disabled={credentialBusy}
-            onChange={event => {
-              const user = credentialCandidates.find(entry => String(entry.id) === event.target.value)
-              setCredentialDraft(current => current ? { ...current, userId: user?.id ?? null, nickname: user?.nickname ?? '' } : current)
-            }}
-          >
-            <option value="">请选择管理员用户</option>
-            {credentialCandidates.map(user => <option key={user.id} value={user.id}>#{user.id} {user.nickname || '未命名用户'}</option>)}
-          </SelectField>
+          ? <>
+            <Field
+              label="搜索用户"
+              value={credentialDraft.query}
+              onChange={event => setCredentialDraft(current => current ? { ...current, query: event.target.value } : current)}
+              placeholder="输入昵称或 #用户编号过滤"
+              hint="可在此一步把目标用户设为管理员（或超级管理员）并分配后台登录账号"
+              disabled={credentialBusy}
+            />
+            <SelectField
+              label="目标用户"
+              required
+              value={credentialDraft.userId === null ? '' : String(credentialDraft.userId)}
+              disabled={credentialBusy}
+              onChange={event => {
+                const user = credentialMatches.find(entry => String(entry.id) === event.target.value)
+                setCredentialDraft(current => current ? { ...current, userId: user?.id ?? null, nickname: user?.nickname ?? '' } : current)
+              }}
+            >
+              <option value="">请选择用户</option>
+              {credentialMatches.map(user => <option key={user.id} value={user.id}>#{user.id} {user.nickname || '未命名用户'}（{userRoleLabel[user.role]}）</option>)}
+            </SelectField>
+            <SelectField
+              label="授予角色"
+              value={credentialDraft.role}
+              disabled={credentialBusy}
+              onChange={event => setCredentialDraft(current => current ? { ...current, role: event.target.value as CredentialDraft['role'] } : current)}
+            >
+              <option value="admin">管理员</option>
+              <option value="superadmin">超级管理员</option>
+            </SelectField>
+            <div className="preview-policy-note">保存时若该用户还不是所选角色，会先调整角色（其现有登录会话将失效），再分配后台登录账号。</div>
+          </>
           : <Field label="管理员" value={credentialDraft.nickname || `用户 #${credentialDraft.userId}`} readOnly disabled />}
-        {credentialDraft.mode === 'assign' && credentialCandidates.length === 0 && <div className="preview-policy-note">暂无可分配登录账号的管理员用户。请先在用户列表将目标用户角色调整为管理员或超级管理员。</div>}
+        {credentialDraft.mode === 'assign' && credentialCandidates.length === 0 && <div className="preview-policy-note">暂无可分配的用户（需账号状态正常且尚未分配登录账号）。</div>}
         <Field
           label="登录用户名"
           required

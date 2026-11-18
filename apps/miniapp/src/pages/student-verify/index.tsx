@@ -253,28 +253,41 @@ export default function StudentVerifyPage() {
                 </View>
               </View>
               {(editing || application) ? (<>
-              <View className='student-verify-row'>
+              <View className='student-verify-row student-verify-row--media'>
                 <View className='student-verify-row__main'>
                   <Text className='student-verify-row__title'>学生证照片</Text>
                   <Text className='student-verify-row__subtitle'>
                     {editing
-                      ? (uploadBusy ? (progress || '正在处理照片…') : `已上传 ${proofs.length}/${MAX_PROOFS} 张，可裁剪范围`)
+                      ? (uploadBusy ? (progress || '正在处理照片…') : `已上传 ${proofs.length}/${MAX_PROOFS} 张，点击照片可放大预览`)
                       : `已提交 ${proofs.length} 张`}
                   </Text>
                 </View>
                 {editing ? (
                   <View className='student-verify-proofs'>
                     {proofs.map((proof) => (
-                      <View key={proof.assetId} className='student-verify-proof' onClick={() => removeProof(proof.assetId)}>
-                        {proof.previewPath ? <Image src={proof.previewPath} mode='aspectFill' /> : <Text>已上传</Text>}
+                      <View key={proof.assetId} className='student-verify-proof'>
+                        {proof.previewPath ? (
+                          <Image
+                            className='student-verify-proof__image'
+                            src={proof.previewPath}
+                            mode='aspectFill'
+                            onClick={() => void Taro.previewImage({
+                              urls: proofs.map((item) => item.previewPath).filter(Boolean),
+                              current: proof.previewPath
+                            })}
+                          />
+                        ) : (
+                          <View className='student-verify-proof__placeholder'><Text>已上传</Text></View>
+                        )}
+                        <View className='student-verify-proof__remove' onClick={() => removeProof(proof.assetId)}>
+                          <Text>×</Text>
+                        </View>
                       </View>
                     ))}
                     {proofs.length < MAX_PROOFS && (
-                      <View className='student-verify-thumb' onClick={() => void pickProofs()}>
-                        <View className='student-verify-thumb__empty'>
-                          <Text className='student-verify-thumb__plus'>+</Text>
-                          <Text className='student-verify-thumb__text'>上传</Text>
-                        </View>
+                      <View className='student-verify-proof student-verify-proof--add' onClick={() => void pickProofs()}>
+                        <Text className='student-verify-thumb__plus'>+</Text>
+                        <Text className='student-verify-thumb__text'>上传学生证</Text>
                       </View>
                     )}
                   </View>
