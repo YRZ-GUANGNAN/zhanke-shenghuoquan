@@ -149,7 +149,7 @@ func (r *GormRepository) Reject(ctx context.Context, input DecisionInput) (Appli
 }
 
 func (r *GormRepository) decide(ctx context.Context, input DecisionInput, status Status, eventType EventType) (Application, error) {
-	if r == nil || r.db == nil || input.ReviewerUserID == 0 || !validULID(input.ApplicationPublicID) ||
+	if r == nil || r.db == nil || input.ReviewerAdminID == 0 || !validULID(input.ApplicationPublicID) ||
 		input.ExpectedRowVersion == 0 || input.DecidedAt.IsZero() ||
 		(status != StatusApproved && status != StatusRejected) ||
 		(eventType != EventApproved && eventType != EventRejected) {
@@ -165,9 +165,6 @@ func (r *GormRepository) decide(ctx context.Context, input DecisionInput, status
 			}
 			return err
 		}
-		if result.UserID == input.ReviewerUserID {
-			return ErrSelfReview
-		}
 		if result.RowVersion != input.ExpectedRowVersion {
 			return ErrDecisionConflict
 		}
@@ -181,7 +178,7 @@ func (r *GormRepository) decide(ctx context.Context, input DecisionInput, status
 			Where("id = ? AND status = ? AND row_version = ?", result.ID, previousStatus, input.ExpectedRowVersion).
 			Updates(map[string]any{
 				"status": status, "review_reason": input.Reason,
-				"reviewer_user_id": input.ReviewerUserID, "reviewed_at": input.DecidedAt,
+				"reviewer_admin_id": input.ReviewerAdminID, "reviewed_at": input.DecidedAt,
 				"row_version": nextVersion, "updated_at": input.DecidedAt,
 			})
 		if update.Error != nil {
@@ -190,8 +187,8 @@ func (r *GormRepository) decide(ctx context.Context, input DecisionInput, status
 		if update.RowsAffected != 1 {
 			return ErrDecisionConflict
 		}
-		applyDecision(&result, status, input.Reason, input.ReviewerUserID, input.DecidedAt, nextVersion)
-		return r.appendEvent(tx, &result, input.ReviewerUserID, eventType, status, input.Reason, input.DecidedAt)
+		applyDecision(&result, status, input.Reason, input.ReviewerAdminID, input.DecidedAt, nextVersion)
+		return r.appendEvent(tx, &result, 0, &input.ReviewerAdminID, eventType, status, input.Reason, input.DecidedAt)
 	})
 	return result, err
 }
@@ -236,13 +233,13 @@ func (r *GormRepository) RequestCancel(ctx context.Context, userID uint64, expec
 		result.CancelRequestedAt = &requestedAt
 		result.RowVersion = nextVersion
 		result.UpdatedAt = requestedAt
-		return r.appendEvent(tx, &result, userID, EventCancelRequested, StatusApproved, "", requestedAt)
+		return r.appendEvent(tx, &result, userID, nil, EventCancelRequested, StatusApproved, "", requestedAt)
 	})
 	return result, err
 }
 
 func (r *GormRepository) ApproveCancel(ctx context.Context, input DecisionInput) (Application, error) {
-	if r == nil || r.db == nil || input.ReviewerUserID == 0 || !validULID(input.ApplicationPublicID) ||
+	if r == nil || r.db == nil || input.ReviewerAdminID == 0 || !validULID(input.ApplicationPublicID) ||
 		input.ExpectedRowVersion == 0 || input.DecidedAt.IsZero() {
 		return Application{}, ErrInvalidInput
 	}
@@ -256,9 +253,6 @@ func (r *GormRepository) ApproveCancel(ctx context.Context, input DecisionInput)
 			}
 			return err
 		}
-		if result.UserID == input.ReviewerUserID {
-			return ErrSelfReview
-		}
 		if result.Status != StatusApproved || result.CancelRequestedAt == nil {
 			return ErrDecisionConflict
 		}
@@ -270,7 +264,7 @@ func (r *GormRepository) ApproveCancel(ctx context.Context, input DecisionInput)
 			Where("id = ? AND status = ? AND row_version = ?", result.ID, StatusApproved, input.ExpectedRowVersion).
 			Updates(map[string]any{
 				"status": StatusCancelled, "review_reason": input.Reason,
-				"reviewer_user_id": input.ReviewerUserID, "reviewed_at": input.DecidedAt,
+				"reviewer_admin_id": input.ReviewerAdminID, "reviewed_at": input.DecidedAt,
 				"row_version": nextVersion, "updated_at": input.DecidedAt,
 			})
 		if update.Error != nil {
@@ -279,24 +273,24 @@ func (r *GormRepository) ApproveCancel(ctx context.Context, input DecisionInput)
 		if update.RowsAffected != 1 {
 			return ErrDecisionConflict
 		}
-		applyDecision(&result, StatusCancelled, input.Reason, input.ReviewerUserID, input.DecidedAt, nextVersion)
-		return r.appendEvent(tx, &result, input.ReviewerUserID, EventCancelApproved, StatusCancelled, input.Reason, input.DecidedAt)
+		applyDecision(&result, StatusCancelled, input.Reason, input.ReviewerAdminID, input.DecidedAt, nextVersion)
+		return r.appendEvent(tx, &result, 0, &input.ReviewerAdminID, EventCancelApproved, StatusCancelled, input.Reason, input.DecidedAt)
 	})
 	return result, err
 }
 
-func applyDecision(value *Application, status Status, reason string, reviewerUserID uint64, decidedAt time.Time, nextVersion uint64) {
+func applyDecision(value *Application, status Status, reason string, reviewerAdminID uint64, decidedAt time.Time, nextVersion uint64) {
 	value.Status = status
 	value.ReviewReason = reason
-	reviewerID := reviewerUserID
-	value.ReviewerUserID = &reviewerID
+	reviewerID := reviewerAdminID
+	value.ReviewerAdminID = &reviewerID
 	reviewedAt := decidedAt
 	value.ReviewedAt = &reviewedAt
 	value.RowVersion = nextVersion
 	value.UpdatedAt = decidedAt
 }
 
-func (r *GormRepository) appendEvent(tx *gorm.DB, value *Application, actorUserID uint64, eventType EventType, status Status, reason string, at time.Time) error {
+func (r *GormRepository) appendEvent(tx *gorm.DB, value *Application, actorUserID uint64, actorAdminID *uint64, eventType EventType, status Status, reason string, at time.Time) error {
 	snapshot, err := json.Marshal(snapshotApplication(*value, applicationAssetPublicIDs(value.Assets)))
 	if err != nil {
 		return err
@@ -309,6 +303,7 @@ func (r *GormRepository) appendEvent(tx *gorm.DB, value *Application, actorUserI
 		EventPublicID:  eventID,
 		VerificationID: value.ID,
 		ActorUserID:    actorUserID,
+		ActorAdminID:   actorAdminID,
 		EventType:      eventType,
 		Status:         status,
 		Reason:         reason,
@@ -324,6 +319,11 @@ func snapshotApplication(value Application, assetIDs []string) verificationSnaps
 		formatted := strconv.FormatUint(*value.ReviewerUserID, 10)
 		reviewerUserID = &formatted
 	}
+	var reviewerAdminID *string
+	if value.ReviewerAdminID != nil {
+		formatted := strconv.FormatUint(*value.ReviewerAdminID, 10)
+		reviewerAdminID = &formatted
+	}
 	return verificationSnapshot{
 		ApplicationPublicID: value.ApplicationPublicID,
 		UserID:              strconv.FormatUint(value.UserID, 10),
@@ -334,6 +334,7 @@ func snapshotApplication(value Application, assetIDs []string) verificationSnaps
 		AssetPublicIDs:      append([]string(nil), assetIDs...),
 		ReviewReason:        value.ReviewReason,
 		ReviewerUserID:      reviewerUserID,
+		ReviewerAdminID:     reviewerAdminID,
 		ReviewedAt:          value.ReviewedAt,
 		CancelRequestedAt:   value.CancelRequestedAt,
 		RowVersion:          value.RowVersion,
@@ -396,9 +397,15 @@ func (r *GormRepository) FindDetail(ctx context.Context, applicationPublicID str
 	}
 	eventViews := make([]VerificationEventView, len(events))
 	for index := range events {
+		var actorAdminID *string
+		if events[index].ActorAdminID != nil {
+			formatted := strconv.FormatUint(*events[index].ActorAdminID, 10)
+			actorAdminID = &formatted
+		}
 		eventViews[index] = VerificationEventView{
 			EventPublicID: events[index].EventPublicID,
 			ActorUserID:   strconv.FormatUint(events[index].ActorUserID, 10),
+			ActorAdminID:  actorAdminID,
 			EventType:     events[index].EventType,
 			Status:        events[index].Status,
 			Reason:        events[index].Reason,

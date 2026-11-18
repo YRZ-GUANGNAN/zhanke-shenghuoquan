@@ -44,7 +44,7 @@ type SubmitInput struct {
 }
 
 type DecisionInput struct {
-	ReviewerUserID      uint64
+	ReviewerAdminID     uint64
 	ApplicationPublicID string
 	ExpectedRowVersion  uint64
 	Reason              string
@@ -61,6 +61,7 @@ type Application struct {
 	College             string             `gorm:"column:college;size:120;not null;default:''"`
 	ReviewReason        string             `gorm:"column:review_reason;size:500;not null;default:''"`
 	ReviewerUserID      *uint64            `gorm:"column:reviewer_user_id"`
+	ReviewerAdminID     *uint64            `gorm:"column:reviewer_admin_id"`
 	ReviewedAt          *time.Time         `gorm:"column:reviewed_at;type:datetime(3)"`
 	CancelRequestedAt   *time.Time         `gorm:"column:cancel_requested_at;type:datetime(3)"`
 	SubmittedAt         time.Time          `gorm:"column:submitted_at;type:datetime(3);not null;index:idx_student_verification_status_submitted,priority:2"`
@@ -87,6 +88,7 @@ type ApplicationEvent struct {
 	EventPublicID  string          `gorm:"column:event_public_id;type:char(26);not null;uniqueIndex:uq_student_verification_event_public_id"`
 	VerificationID uint64          `gorm:"column:verification_id;not null;index:idx_student_verification_event_verification,priority:1"`
 	ActorUserID    uint64          `gorm:"column:actor_user_id;not null"`
+	ActorAdminID   *uint64         `gorm:"column:actor_admin_id"`
 	EventType      EventType       `gorm:"column:event_type;type:varchar(24);not null"`
 	Status         Status          `gorm:"column:status;type:varchar(16);not null"`
 	Reason         string          `gorm:"column:reason;size:500;not null;default:''"`
@@ -108,6 +110,7 @@ type VerificationView struct {
 	Proofs              []ProofAssetView `json:"proofs,omitempty"`
 	ReviewReason        string           `json:"reviewReason"`
 	ReviewerUserID      *string          `json:"reviewerUserId,omitempty"`
+	ReviewerAdminID     *string          `json:"reviewerAdminId,omitempty"`
 	CancelRequested     bool             `json:"cancelRequested"`
 	CancelRequestedAt   *time.Time       `json:"cancelRequestedAt,omitempty"`
 	SubmittedAt         time.Time        `json:"submittedAt"`
@@ -124,6 +127,7 @@ type ProofAssetView struct {
 type VerificationEventView struct {
 	EventPublicID string    `json:"eventId"`
 	ActorUserID   string    `json:"actorUserId"`
+	ActorAdminID  *string   `json:"actorAdminId,omitempty"`
 	EventType     EventType `json:"eventType"`
 	Status        Status    `json:"status"`
 	Reason        string    `json:"reason"`
@@ -158,6 +162,7 @@ type verificationSnapshot struct {
 	AssetPublicIDs      []string   `json:"assetIds"`
 	ReviewReason        string     `json:"reviewReason"`
 	ReviewerUserID      *string    `json:"reviewerUserId,omitempty"`
+	ReviewerAdminID     *string    `json:"reviewerAdminId,omitempty"`
 	ReviewedAt          *time.Time `json:"reviewedAt,omitempty"`
 	CancelRequestedAt   *time.Time `json:"cancelRequestedAt,omitempty"`
 	RowVersion          uint64     `json:"rowVersion"`
@@ -173,6 +178,11 @@ func toVerificationView(value Application) VerificationView {
 		formatted := strconv.FormatUint(*value.ReviewerUserID, 10)
 		reviewerUserID = &formatted
 	}
+	var reviewerAdminID *string
+	if value.ReviewerAdminID != nil {
+		formatted := strconv.FormatUint(*value.ReviewerAdminID, 10)
+		reviewerAdminID = &formatted
+	}
 	return VerificationView{
 		ID:                  value.ID,
 		ApplicationPublicID: value.ApplicationPublicID,
@@ -184,6 +194,7 @@ func toVerificationView(value Application) VerificationView {
 		AssetPublicIDs:      assetIDs,
 		ReviewReason:        value.ReviewReason,
 		ReviewerUserID:      reviewerUserID,
+		ReviewerAdminID:     reviewerAdminID,
 		CancelRequested:     value.CancelRequestedAt != nil,
 		CancelRequestedAt:   value.CancelRequestedAt,
 		SubmittedAt:         value.SubmittedAt,

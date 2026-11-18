@@ -200,7 +200,7 @@ func normalizeDecisionInput(
 		now = time.Now
 	}
 	return DecisionInput{
-		ReviewerUserID: reviewerUserID, ApplicationPublicID: applicationPublicID,
+		ReviewerAdminID: reviewerUserID, ApplicationPublicID: applicationPublicID,
 		ExpectedRowVersion: expectedRowVersion, Reason: reason, DecidedAt: now().UTC(),
 	}, nil
 }
@@ -314,6 +314,7 @@ func (s *Service) Submit(ctx context.Context, userID uint64, role Role, input Su
 		current.MerchantAddress = normalized.MerchantAddress
 		current.ReviewReason = ""
 		current.ReviewerUserID = nil
+		current.ReviewerAdminID = nil
 		current.ReviewedAt = nil
 		current.SubmittedAt = now
 		current.RowVersion++

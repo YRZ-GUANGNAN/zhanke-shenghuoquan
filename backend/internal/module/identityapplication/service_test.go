@@ -186,9 +186,6 @@ func (r *memoryRepository) decideInternal(ctx context.Context, input DecisionInp
 	if !found {
 		return Application{}, ErrApplicationNotFound
 	}
-	if value.UserID == input.ReviewerUserID {
-		return Application{}, ErrSelfReview
-	}
 	if value.RowVersion != input.ExpectedRowVersion {
 		return Application{}, ErrDecisionConflict
 	}
@@ -230,8 +227,8 @@ func (r *memoryRepository) decideInternal(ctx context.Context, input DecisionInp
 	}
 	value.Status = status
 	value.ReviewReason = input.Reason
-	reviewerID := input.ReviewerUserID
-	value.ReviewerUserID = &reviewerID
+	reviewerID := input.ReviewerAdminID
+	value.ReviewerAdminID = &reviewerID
 	reviewedAt := input.DecidedAt
 	value.ReviewedAt = &reviewedAt
 	value.RowVersion++
@@ -239,7 +236,7 @@ func (r *memoryRepository) decideInternal(ctx context.Context, input DecisionInp
 	r.applications[key] = cloneApplication(value)
 	r.events = append(r.events, ApplicationEvent{
 		ID: uint64(len(r.events) + 1), ApplicationID: value.ID,
-		ActorUserID: input.ReviewerUserID, EventType: eventType,
+		ActorUserID: 0, ActorAdminID: &reviewerID, EventType: eventType,
 		Status: status, Reason: input.Reason, CreatedAt: input.DecidedAt,
 	})
 	return value, nil
@@ -260,7 +257,7 @@ func (r *memoryRepository) reject(userID uint64, role Role, reviewerID uint64, r
 	value := r.applications[key]
 	value.Status = StatusRejected
 	value.ReviewReason = reason
-	value.ReviewerUserID = &reviewerID
+	value.ReviewerAdminID = &reviewerID
 	reviewedAt := fixedTime.Add(time.Hour)
 	value.ReviewedAt = &reviewedAt
 	value.RowVersion++
@@ -842,7 +839,7 @@ func (p *approvalProvisionerStub) ProvisionApproved(_ context.Context, _ *gorm.D
 	return p.err
 }
 
-func TestApproveForbidsSelfReviewAndProvisionFailureIsAtomic(t *testing.T) {
+func TestApproveProvisionFailureIsAtomic(t *testing.T) {
 	repo := newMemoryRepository()
 	provisioner := &approvalProvisionerStub{}
 	service := NewService(repo, &submissionMediaStub{}, fixedClock, provisioner)
@@ -851,23 +848,30 @@ func TestApproveForbidsSelfReviewAndProvisionFailureIsAtomic(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := service.Approve(context.Background(), 41, pending.ApplicationPublicID, pending.RowVersion, ""); !errors.Is(err, ErrSelfReview) {
-		t.Fatalf("self review err=%v", err)
+	// 管理员账号与小程序用户是独立 id 空间：同号不再构成“自审”，审批应正常通过。
+	approved, err := service.Approve(context.Background(), 41, pending.ApplicationPublicID, pending.RowVersion, "")
+	if err != nil {
+		t.Fatalf("independent admin decision rejected: %v", err)
 	}
-	current, _, _ := repo.FindCurrent(context.Background(), 41, RoleRider)
-	if current.Status != StatusPending || current.RowVersion != 1 {
-		t.Fatalf("self review mutated application: %+v", current)
+	if approved.Status != StatusApproved {
+		t.Fatalf("approved=%+v", approved)
 	}
 
+	// 另一份骑手申请用于验证审批失败时的原子性（只有骑手审批会触发下发）。
+	second, err := service.Submit(context.Background(), 43, RoleRider, validRiderInput())
+	if err != nil {
+		t.Fatal(err)
+	}
 	provisioner.err = errors.New("rider provisioning failed")
-	if _, err := service.Approve(context.Background(), 7, pending.ApplicationPublicID, pending.RowVersion, ""); err == nil {
+	eventsBefore := len(repo.events)
+	if _, err := service.Approve(context.Background(), 7, second.ApplicationPublicID, second.RowVersion, ""); err == nil {
 		t.Fatal("provision failure was accepted")
 	}
-	current, _, _ = repo.FindCurrent(context.Background(), 41, RoleRider)
-	if current.Status != StatusPending || current.RowVersion != 1 || repo.hasGrant(41, RoleRider) {
+	current, _, _ := repo.FindCurrent(context.Background(), 43, RoleRider)
+	if current.Status != StatusPending || current.RowVersion != 1 || repo.hasGrant(43, RoleRider) {
 		t.Fatalf("failed approval left partial state: app=%+v grants=%+v", current, repo.grants)
 	}
-	if len(repo.events) != 1 || repo.events[0].EventType != EventSubmitted {
+	if len(repo.events) != eventsBefore {
 		t.Fatalf("failed approval left event: %+v", repo.events)
 	}
 }
@@ -893,7 +897,7 @@ func TestApproveRiderAndMerchantWritesGrantAndImmutableEvent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if approvedRider.Status != StatusApproved || approvedRider.RowVersion != 2 || approvedRider.ReviewerUserID == nil || *approvedRider.ReviewerUserID != "7" {
+	if approvedRider.Status != StatusApproved || approvedRider.RowVersion != 2 || approvedRider.ReviewerAdminID == nil || *approvedRider.ReviewerAdminID != "7" {
 		t.Fatalf("approved rider=%+v", approvedRider)
 	}
 	if len(provisioner.calls) != 1 || provisioner.calls[0].UserID != 41 || provisioner.calls[0].Role != RoleRider {
@@ -913,7 +917,7 @@ func TestApproveRiderAndMerchantWritesGrantAndImmutableEvent(t *testing.T) {
 	if grant, ok := repo.grant(42, RoleMerchant); !ok || grant.Status != GrantActive || grant.SourceApplicationID == nil || *grant.SourceApplicationID != merchant.ID {
 		t.Fatalf("merchant grant=%+v found=%v", grant, ok)
 	}
-	if len(repo.events) != 4 || repo.events[2].EventType != EventApproved || repo.events[2].ActorUserID != 7 || repo.events[3].EventType != EventApproved {
+	if len(repo.events) != 4 || repo.events[2].EventType != EventApproved || repo.events[2].ActorAdminID == nil || *repo.events[2].ActorAdminID != 7 || repo.events[3].EventType != EventApproved {
 		t.Fatalf("decision events=%+v", repo.events)
 	}
 }
@@ -939,7 +943,7 @@ func TestRejectRequiresReasonAndDecisionConflictsAreRecognizable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rejected.Status != StatusRejected || rejected.ReviewReason != "资料不清晰" || rejected.RowVersion != 2 || rejected.ReviewerUserID == nil || *rejected.ReviewerUserID != "7" {
+	if rejected.Status != StatusRejected || rejected.ReviewReason != "资料不清晰" || rejected.RowVersion != 2 || rejected.ReviewerAdminID == nil || *rejected.ReviewerAdminID != "7" {
 		t.Fatalf("rejected=%+v", rejected)
 	}
 	if _, err := service.Reject(context.Background(), 8, pending.ApplicationPublicID, pending.RowVersion, "重复处理"); !errors.Is(err, ErrDecisionConflict) {

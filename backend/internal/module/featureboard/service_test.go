@@ -243,7 +243,7 @@ func TestSubmitCommentValidatesAndPersists(t *testing.T) {
 	if !ulidPattern.MatchString(view.ID) || view.Content != "支持这个想法" || view.IsMaintainer {
 		t.Fatalf("unexpected comment view: %+v", view)
 	}
-	if repo.createdComment == nil || repo.createdComment.SuggestionID != 42 || repo.createdComment.UserID != 7 {
+	if repo.createdComment == nil || repo.createdComment.SuggestionID != 42 || repo.createdComment.UserID == nil || *repo.createdComment.UserID != 7 {
 		t.Fatalf("unexpected created comment: %+v", repo.createdComment)
 	}
 

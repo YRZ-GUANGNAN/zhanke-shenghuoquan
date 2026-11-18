@@ -144,6 +144,7 @@ func (r *GormRiderAdmin) SetRiderStatus(ctx context.Context, riderUserID uint64,
 		if err := tx.Table("delivery_rider_admin_actions").Create(map[string]any{
 			"rider_user_id": riderUserID,
 			"actor_user_id": actor,
+			"actor_admin_id": actor,
 			"from_status":   rider.Status,
 			"to_status":     status,
 			"reason":        reason,

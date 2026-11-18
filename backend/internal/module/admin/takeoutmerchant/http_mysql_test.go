@@ -131,10 +131,10 @@ func TestTakeoutMerchantAPIRealHTTPMySQLAuthOnboardingOwnerScopeAndMediaBinding(
 	assertMediaReference(t, db, logoAsset.ID, coremedia.PurposeMerchantLogo, onboarded.Merchant.MerchantPublicID)
 	assertMediaNotVisible(t, db, coremedia.PurposeMerchantLogo, onboarded.Merchant.MerchantPublicID, logoAsset.AssetPublicID)
 
-	if _, err := reviews.Start(ctx, onboarded.Review.TaskID, adminUser.User.ID); err != nil {
+	if _, err := reviews.Start(ctx, onboarded.Review.TaskID, uint64(adminUser.User.ID)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := reviews.Decide(ctx, onboarded.Review.TaskID, adminUser.User.ID, review.StatusApproved, "verified"); err != nil {
+	if _, err := reviews.Decide(ctx, onboarded.Review.TaskID, uint64(adminUser.User.ID), review.StatusApproved, "verified"); err != nil {
 		t.Fatal(err)
 	}
 	status, body = httpJSON(t, server.Client(), http.MethodGet, server.URL+"/api/v1/takeout/merchant/me", merchantAUser.Token, nil)

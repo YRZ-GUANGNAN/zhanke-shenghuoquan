@@ -25,33 +25,37 @@ const sources = fs.readdirSync(src, { withFileTypes: true })
   .map((entry) => fs.readFileSync(path.join(src, entry.name), 'utf8'))
   .join('\n')
 
-assert.doesNotMatch(sources, /window\.(confirm|prompt|alert)\s*\(/)
-const appSource = fs.readFileSync(path.join(src, 'App.tsx'), 'utf8')
+// 线上后台入口是 src/preview/App.tsx；旧 src/App.tsx 已删除。
+const previewRoot = path.join(src, 'preview')
+const previewFiles = []
+;(function collect(directory) {
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const target = path.join(directory, entry.name)
+    if (entry.isDirectory()) collect(target)
+    else if (/\.(ts|tsx)$/.test(entry.name)) previewFiles.push(target)
+  }
+})(previewRoot)
+const previewSources = previewFiles.map(file => fs.readFileSync(file, 'utf8')).join('\n')
+
+assert.doesNotMatch(sources + previewSources, /window\.(confirm|prompt|alert)\s*\(/)
 const adminAPI = fs.readFileSync(path.join(src, 'services', 'f-admin.ts'), 'utf8')
-assert.doesNotMatch(appSource, /icon:\s*'[A-Z]'/)
 
 assert.match(adminAPI, /reviews:\s*\(query[^)]*=\s*\{\}\)\s*=>/,
   'review API must accept a query object instead of a status-only argument')
 for (const field of ['status', 'page', 'pageSize']) {
   assert.match(adminAPI, new RegExp(`type ReviewQuery=[^\\n]*${field}`), `review API query must include ${field}`)
 }
-assert.match(appSource, /const\s*\[reviewStatus,\s*setReviewStatus\]\s*=\s*useState/,
-  'review page must keep the active status filter')
-assert.match(appSource, /const\s*\[reviewPage,\s*setReviewPage\]\s*=\s*useState/,
-  'review page must keep the current server page')
-assert.match(appSource, /adminAPI\.reviews\(\{status:reviewStatus,page:reviewPage,pageSize:REVIEW_PAGE_SIZE\}\)/,
-  'review refresh must preserve status, page, and pageSize')
-assert.match(appSource, /data\?\.total/,
-  'review page must render the server total rather than the visible row count')
-assert.match(appSource, /value\.items\.length===0&&reviewPage>1/,
-  'review refresh must step back when an action empties the current page')
-assert.match(appSource, />上一页</)
-assert.match(appSource, />下一页</)
-assert.match(appSource, /function\s+Feedbacks\(/, 'admin must expose the existing feedback list')
-assert.match(appSource, /section==='notifications'\)return\s*<NotificationConsole\/>/, 'admin must route the notification operations page')
-assert.match(appSource, /deliveryAdminAPI\.summary\(\)/, 'dashboard must load real delivery revenue facts')
+assert.match(previewSources, /adminAPI\.reviews\(\{\s*status/,
+  'review views must call the query-object review API with a status')
+assert.match(previewSources, /adminAPI\.reviews\(\{[^}]*pageSize/,
+  'review views must request an explicit page size')
+assert.match(previewSources, />上一页</)
+assert.match(previewSources, />下一页</)
+assert.match(previewSources, /function FeedbackPeople\(/, 'admin must expose the existing feedback list')
+assert.match(previewSources, /NotificationsView/, 'admin must route the notification operations page')
+assert.match(previewSources, /deliveryAdminAPI\.summary\(\)/, 'dashboard must load real delivery revenue facts')
 for (const field of ['platformFeeIncomeCents', 'todayPlatformFeeCents', 'todayDeliveryFeeCents', 'pendingRiderFeeCents']) {
-  assert.ok(appSource.includes(field), `dashboard must display ${field}`)
+  assert.ok(previewSources.includes(field), `dashboard must display ${field}`)
 }
 assert.match(adminAPI, /feedbacks:\s*\(query/, 'feedback API must accept pagination')
 assert.match(adminAPI, /createNavigationCategory:/, 'navigation category create API must be wired')

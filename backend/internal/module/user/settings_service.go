@@ -309,25 +309,21 @@ func (s *Service) AdminFeedbacks(ctx context.Context, page, size int, status str
 var feedbackStatuses = map[string]bool{"open": true, "in_progress": true, "resolved": true, "ignored": true}
 
 // 管理员处理用户反馈：记录状态、处理人、时间和说明，供后续追溯。
-func (s *Service) AdminUpdateFeedback(ctx context.Context, actorID uint, publicID, status, note string) error {
+func (s *Service) AdminUpdateFeedback(ctx context.Context, adminID uint64, publicID, status, note string) error {
 	if !feedbackStatuses[status] {
 		return errors.New("invalid feedback status")
 	}
 	if utf8.RuneCountInString(note) > 500 {
 		return errors.New("feedback note is too long")
 	}
-	actor, err := s.repo.FindByID(ctx, actorID)
-	if err != nil {
-		return err
-	}
-	if actor.Status != StatusActive || (actor.Role != RoleAdmin && actor.Role != RoleSuperAdmin) {
+	if adminID == 0 {
 		return ErrForbidden
 	}
 	repo, ok := s.repo.(feedbackRepository)
 	if !ok {
 		return ErrSettingsUnavailable
 	}
-	return repo.UpdateFeedbackHandling(ctx, publicID, status, strings.TrimSpace(note), actorID, time.Now().UTC())
+	return repo.UpdateFeedbackHandling(ctx, publicID, status, strings.TrimSpace(note), adminID, time.Now().UTC())
 }
 
 func (s *Service) CloseAccount(ctx context.Context, userID uint) error {

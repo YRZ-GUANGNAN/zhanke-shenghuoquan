@@ -93,16 +93,13 @@ func (r *memoryRepo) decide(input DecisionInput, status Status) (Application, er
 	if r.value == nil || r.value.ApplicationPublicID != input.ApplicationPublicID {
 		return Application{}, ErrApplicationNotFound
 	}
-	if r.value.UserID == input.ReviewerUserID {
-		return Application{}, ErrSelfReview
-	}
 	if r.value.Status != StatusPending || r.value.RowVersion != input.ExpectedRowVersion {
 		return Application{}, ErrDecisionConflict
 	}
 	r.value.Status = status
 	r.value.ReviewReason = input.Reason
-	reviewerID := input.ReviewerUserID
-	r.value.ReviewerUserID = &reviewerID
+	reviewerID := input.ReviewerAdminID
+	r.value.ReviewerAdminID = &reviewerID
 	reviewedAt := input.DecidedAt
 	r.value.ReviewedAt = &reviewedAt
 	r.value.RowVersion++
@@ -149,16 +146,13 @@ func (r *memoryRepo) ApproveCancel(_ context.Context, input DecisionInput) (Appl
 	if r.value == nil || r.value.ApplicationPublicID != input.ApplicationPublicID {
 		return Application{}, ErrApplicationNotFound
 	}
-	if r.value.UserID == input.ReviewerUserID {
-		return Application{}, ErrSelfReview
-	}
 	if r.value.Status != StatusApproved || r.value.CancelRequestedAt == nil || r.value.RowVersion != input.ExpectedRowVersion {
 		return Application{}, ErrDecisionConflict
 	}
 	r.value.Status = StatusCancelled
 	r.value.ReviewReason = input.Reason
-	reviewerID := input.ReviewerUserID
-	r.value.ReviewerUserID = &reviewerID
+	reviewerID := input.ReviewerAdminID
+	r.value.ReviewerAdminID = &reviewerID
 	reviewedAt := input.DecidedAt
 	r.value.ReviewedAt = &reviewedAt
 	r.value.RowVersion++
@@ -337,7 +331,8 @@ func TestCancelRequestFlow(t *testing.T) {
 	}
 }
 
-func TestSelfReviewForbidden(t *testing.T) {
+// 后台管理员账号与小程序用户是两个独立 id 空间；同号不再构成“自审”。
+func TestDecisionUsesIndependentAdminIdentity(t *testing.T) {
 	service, _ := newServiceForTest()
 	view, err := service.Submit(context.Background(), 7, SubmitInput{
 		RealName: "张三", StudentNo: "20260001", AssetPublicIDs: []string{mustULID()},
@@ -345,8 +340,12 @@ func TestSelfReviewForbidden(t *testing.T) {
 	if err != nil {
 		t.Fatalf("submit: %v", err)
 	}
-	if _, err := service.Approve(context.Background(), 7, view.ApplicationPublicID, view.RowVersion); !errors.Is(err, ErrSelfReview) {
-		t.Fatalf("expected ErrSelfReview, got %v", err)
+	approved, err := service.Approve(context.Background(), 7, view.ApplicationPublicID, view.RowVersion)
+	if err != nil {
+		t.Fatalf("admin decision rejected: %v", err)
+	}
+	if approved.Status != StatusApproved {
+		t.Fatalf("approved=%+v", approved)
 	}
 }
 

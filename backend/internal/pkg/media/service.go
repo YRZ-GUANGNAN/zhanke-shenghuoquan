@@ -43,8 +43,8 @@ type SafetyChecker interface {
 
 type ReviewFlow interface {
 	Submit(context.Context, review.Submission) (review.Task, error)
-	Start(context.Context, uint, uint) (review.Task, error)
-	Decide(context.Context, uint, uint, review.Status, string) (review.Task, error)
+	Start(context.Context, uint, uint64) (review.Task, error)
+	Decide(context.Context, uint, uint64, review.Status, string) (review.Task, error)
 }
 
 type Gateway interface {

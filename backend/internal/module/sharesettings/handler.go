@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 
-	"campus-circle/backend/internal/module/user"
+	"campus-circle/backend/internal/module/adminauth"
 	"campus-circle/backend/internal/pkg/response"
 	"github.com/gin-gonic/gin"
 )
@@ -23,7 +23,7 @@ func NewHandler(store Store) *Handler { return &Handler{store: store} }
 func (h *Handler) Register(api *gin.RouterGroup, adminAuth gin.HandlerFunc) {
 	api.GET("/share-settings", h.get)
 	api.GET("/share-covers/:name", h.serveCover)
-	secured := api.Group("/admin/share-settings", adminAuth, user.AdminRequired())
+	secured := api.Group("/admin/share-settings", adminAuth, adminauth.AdminRequired())
 	secured.GET("", h.get)
 	secured.PUT("", h.update)
 	secured.POST("/cover", h.uploadCover)
@@ -61,7 +61,7 @@ func (h *Handler) update(c *gin.Context) {
 		response.Fail(c, 400, err.Error())
 		return
 	}
-	value, err := h.store.Save(c.Request.Context(), user.CurrentUserID(c), input)
+	value, err := h.store.Save(c.Request.Context(), adminauth.CurrentAccountID(c), input)
 	switch {
 	case errors.Is(err, ErrConflict):
 		response.Fail(c, 409, err.Error())

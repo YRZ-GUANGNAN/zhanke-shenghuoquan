@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 
-	"campus-circle/backend/internal/module/user"
+	"campus-circle/backend/internal/module/adminauth"
 	"campus-circle/backend/internal/pkg/response"
 	"github.com/gin-gonic/gin"
 )
@@ -41,8 +41,8 @@ func AdminUpdateHandler(c *gin.Context) {
 		response.Fail(c, http.StatusServiceUnavailable, "功能配置服务未启用")
 		return
 	}
-	actor := user.CurrentUser(c)
-	if actor.Role != user.RoleSuperAdmin || actor.Status != user.StatusActive {
+	actor, ok := adminauth.CurrentAccount(c)
+	if !ok || actor.Role != adminauth.RoleSuperAdmin || actor.Status != adminauth.StatusActive {
 		response.Fail(c, http.StatusForbidden, "仅启用中的超级管理员可修改功能配置")
 		return
 	}
@@ -57,7 +57,7 @@ func AdminUpdateHandler(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, "invalid feature policy")
 		return
 	}
-	value, err := UpdateContext(c.Request.Context(), user.CurrentUserID(c), input)
+	value, err := UpdateContext(c.Request.Context(), adminauth.CurrentAccountID(c), input)
 	switch {
 	case errors.Is(err, ErrVersionConflict):
 		response.Fail(c, http.StatusConflict, err.Error())

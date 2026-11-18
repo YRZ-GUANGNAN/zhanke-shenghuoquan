@@ -103,6 +103,7 @@ type Feedback struct {
 	Status           string          `json:"status" gorm:"size:24;not null;default:open"`
 	AdminNote        string          `json:"adminNote" gorm:"size:500;not null;default:''"`
 	HandledBy        *uint           `json:"handledBy,omitempty"`
+	HandledByAdminID *uint64         `json:"handledByAdminId,omitempty"`
 	HandledAt        *time.Time      `json:"handledAt,omitempty"`
 	Images           []FeedbackImage `json:"images,omitempty" gorm:"foreignKey:FeedbackID"`
 	CreatedAt        time.Time       `json:"createdAt"`

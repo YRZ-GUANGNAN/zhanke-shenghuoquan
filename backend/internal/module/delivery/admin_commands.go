@@ -33,6 +33,7 @@ type AdminOrderAction struct {
 	DeliveryOrderPublicID string    `gorm:"column:delivery_order_public_id;size:26;not null"`
 	Action                string    `gorm:"column:action;size:24;not null"`
 	ActorUserID           uint64    `gorm:"column:actor_user_id;not null"`
+	ActorAdminID          *uint64   `gorm:"column:actor_admin_id"`
 	FromRiderUserID       *uint64   `gorm:"column:from_rider_user_id"`
 	ToRiderUserID         *uint64   `gorm:"column:to_rider_user_id"`
 	FromStatus            Status    `gorm:"column:from_status;size:24;not null"`

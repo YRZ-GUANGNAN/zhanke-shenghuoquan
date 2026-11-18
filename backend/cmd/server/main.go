@@ -100,11 +100,14 @@ func main() {
 		user.WithIdentityEligibility(newDeliveryIdentityEligibility(cfg.EnableDelivery, identityRiders, identityApplicationRepository)),
 	)
 	userService.SetAccountClosureCoordinator(accountclosure.New(db))
-	adminAuthService, err := adminauth.NewService(adminauth.NewRepository(db), userService)
+	if err := adminauth.EnsureSchema(db); err != nil {
+		log.Fatalf("administrator account schema: %v", err)
+	}
+	adminAuthService, err := adminauth.NewService(adminauth.NewRepository(db))
 	if err != nil {
 		log.Fatalf("configure administrator authentication: %v", err)
 	}
-	adminAuthMiddleware := adminauth.NewMiddleware(adminAuthService, userService)
+	adminAuthMiddleware := adminauth.NewMiddleware(adminAuthService)
 	adminAuthRequired := adminAuthMiddleware.Required()
 	shareStore := sharesettings.NewGormStore(db)
 	if err := shareStore.Ensure(context.Background()); err != nil {
@@ -390,7 +393,7 @@ func main() {
 		},
 		userNotifications.wecomSender,
 		time.Now,
-	).WithWeComSettings(wecomSettingsStore, nil, func(c *gin.Context) uint64 { return uint64(user.CurrentUserID(c)) })
+	).WithWeComSettings(wecomSettingsStore, nil, adminauth.CurrentAccountID)
 	if userNotifications.consumer != nil {
 		notificationContext, cancelNotifications := context.WithCancel(context.Background())
 		defer cancelNotifications()
@@ -536,7 +539,7 @@ func main() {
 		identityRoutePolicies{
 			authRequired:    userService.AuthRequired(),
 			unmutedRequired: user.UnmutedRequired(),
-			adminRequired:   user.AdminRequired(),
+			adminRequired:   adminauth.AdminRequired(),
 			adminAuth:       adminAuthRequired,
 		},
 	)
@@ -545,7 +548,7 @@ func main() {
 		identityRoutePolicies{
 			authRequired:    userService.AuthRequired(),
 			unmutedRequired: user.UnmutedRequired(),
-			adminRequired:   user.AdminRequired(),
+			adminRequired:   adminauth.AdminRequired(),
 			adminAuth:       adminAuthRequired,
 		},
 	)
@@ -554,7 +557,7 @@ func main() {
 		identityRoutePolicies{
 			authRequired:    userService.AuthRequired(),
 			unmutedRequired: user.UnmutedRequired(),
-			adminRequired:   user.AdminRequired(),
+			adminRequired:   adminauth.AdminRequired(),
 			adminAuth:       adminAuthRequired,
 		},
 	)
@@ -591,7 +594,7 @@ func main() {
 	navigationRoutes := api.Group("/navigation")
 	navigationHandler := navigation.NewHandler(navigationService).WithIconStorage(cfg.NavigationIconDir, cfg.MediaPublicBaseURL)
 	navigationHandler.Register(navigationRoutes)
-	navigationHandler.RegisterAdminIcons(api.Group("/admin/navigation", adminAuthRequired, user.AdminRequired()))
+	navigationHandler.RegisterAdminIcons(api.Group("/admin/navigation", adminAuthRequired, adminauth.AdminRequired()))
 	navigation.NewSearchHandler(navigationService, userService.AuthRequired(), user.CurrentUserID, navigationMetrics).
 		WithIconStorage(cfg.NavigationIconDir, cfg.MediaPublicBaseURL).Register(navigationRoutes)
 	im.NewHandler(imService, userService).Register(api.Group("/im"))
@@ -599,12 +602,12 @@ func main() {
 	if userNotifications.officialAccount != nil {
 		userNotifications.officialAccount.Register(api, userService.AuthRequired())
 	}
-	notificationChannelConsole.Register(api.Group("/admin/delivery", adminAuthRequired, user.AdminRequired()))
+	notificationChannelConsole.Register(api.Group("/admin/delivery", adminAuthRequired, adminauth.AdminRequired()))
 	if userNotifications.imCallback != nil {
 		userNotifications.imCallback.Register(api.Group("/notification/tencent-im"))
 	}
 	admin.NewHandler(adminService, reviewService, userService, communityService, tradeService, navigationService, adminAuthRequired).Register(api)
-	mediaAdminRoutes := api.Group("/admin/media", adminAuthRequired, user.AdminRequired())
+	mediaAdminRoutes := api.Group("/admin/media", adminAuthRequired, adminauth.AdminRequired())
 	mediaconsole.NewHandler(mediaAdminQuery).WithObjectSigner(completionStore).Register(mediaAdminRoutes)
 	registerLegacyTakeoutRoutes(legacyTakeout, api, userService, reviewService, coreMediaService, adminAuthRequired)
 	catalog, err := takeout.NewBuyerQueryService(takeout.NewRepository(db))
@@ -1022,13 +1025,13 @@ func registerDeliveryRoutes(runtime *deliveryRuntime, api *gin.RouterGroup, user
 	if len(adminAuth) > 0 {
 		adminAuthentication = adminAuth[0]
 	}
-	adminRoutes := api.Group("/admin/delivery", adminAuthentication, user.AdminRequired())
+	adminRoutes := api.Group("/admin/delivery", adminAuthentication, adminauth.AdminRequired())
 	riderHandler.RegisterAdmin(adminRoutes)
 	if paymentHandler != nil {
 		paymentHandler.RegisterAdmin(adminRoutes)
 	}
 	deliveryconsole.NewHandler(
-		runtime.consoleQueries, runtime.fees, runtime.riderWallets, currentUserID, nil,
+		runtime.consoleQueries, runtime.fees, runtime.riderWallets, adminauth.CurrentAccountID, nil,
 	).WithPayoutQueue(func() delivery.RiderPayoutQueueRepository {
 		value, _ := any(runtime.riderWallets).(delivery.RiderPayoutQueueRepository)
 		return value
@@ -1158,7 +1161,7 @@ func registerLegacyTakeoutRoutes(
 	if len(adminAuth) > 0 {
 		adminAuthentication = adminAuth[0]
 	}
-	takeoutAdminRoutes := api.Group("/admin/takeout", adminAuthentication, user.AdminRequired())
+	takeoutAdminRoutes := api.Group("/admin/takeout", adminAuthentication, adminauth.AdminRequired())
 	takeoutconsole.NewHandler(runtime.merchantService, runtime.catalogService, runtime.orderService, runtime.riderService, runtime.adminQuery, runtime.withdrawService).Register(takeoutAdminRoutes)
 	takeoutMerchantRoutes := api.Group("/takeout/merchant", userService.AuthRequired())
 	takeoutmerchant.NewHandler(runtime.merchantIdentity, runtime.merchantService, runtime.catalogService, runtime.orderService, runtime.adminQuery, reviewService, coreMediaService, func(c *gin.Context) uint64 {

@@ -324,8 +324,15 @@ func (s *Service) SubmitComment(ctx context.Context, userID uint64, publicID, co
 		return CommentView{}, err
 	}
 	comment := &Comment{
-		PublicID: commentID, UserID: userID,
+		PublicID: commentID,
 		IsMaintainer: maintainer, Content: content, CreatedAt: at,
+	}
+	if maintainer {
+		adminID := userID
+		comment.AdminAccountID = &adminID
+	} else {
+		senderID := userID
+		comment.UserID = &senderID
 	}
 	if err := s.repo.SubmitComment(ctx, publicID, comment); err != nil {
 		return CommentView{}, normalizeRepoError(err)

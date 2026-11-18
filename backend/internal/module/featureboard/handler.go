@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"campus-circle/backend/internal/module/adminauth"
 	"campus-circle/backend/internal/module/user"
 	"campus-circle/backend/internal/pkg/response"
 )
@@ -248,7 +249,7 @@ func (h *Handler) writeComment(c *gin.Context, maintainer bool) {
 	if !decodeBody(c, &payload) {
 		return
 	}
-	view, err := h.service.SubmitComment(c.Request.Context(), h.currentUserID(c), c.Param("suggestionId"), payload.Content, maintainer)
+	view, err := h.service.SubmitComment(c.Request.Context(), adminauth.CurrentAccountID(c), c.Param("suggestionId"), payload.Content, maintainer)
 	if err != nil {
 		writeServiceError(c, err)
 		return

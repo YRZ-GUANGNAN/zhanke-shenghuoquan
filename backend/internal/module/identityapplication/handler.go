@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"campus-circle/backend/internal/module/adminauth"
 	"campus-circle/backend/internal/module/user"
 	"campus-circle/backend/internal/pkg/response"
 )
@@ -122,7 +123,7 @@ func (h *Handler) approve(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, "invalid identity application decision")
 		return
 	}
-	value, err := h.adminService.Approve(c, h.currentUserID(c), c.Param("applicationId"), request.ExpectedRowVersion, request.Reason)
+	value, err := h.adminService.Approve(c, adminauth.CurrentAccountID(c), c.Param("applicationId"), request.ExpectedRowVersion, request.Reason)
 	if err != nil {
 		writeAdminApplicationError(c, err)
 		return
@@ -140,7 +141,7 @@ func (h *Handler) overrideDecision(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, "invalid identity application decision")
 		return
 	}
-	value, err := h.adminService.Override(c, h.currentUserID(c), c.Param("applicationId"), request.ExpectedRowVersion, request.Status, request.Reason)
+	value, err := h.adminService.Override(c, adminauth.CurrentAccountID(c), c.Param("applicationId"), request.ExpectedRowVersion, request.Status, request.Reason)
 	if err != nil {
 		writeAdminApplicationError(c, err)
 		return
@@ -154,7 +155,7 @@ func (h *Handler) reject(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, "invalid identity application decision")
 		return
 	}
-	value, err := h.adminService.Reject(c, h.currentUserID(c), c.Param("applicationId"), request.ExpectedRowVersion, request.Reason)
+	value, err := h.adminService.Reject(c, adminauth.CurrentAccountID(c), c.Param("applicationId"), request.ExpectedRowVersion, request.Reason)
 	if err != nil {
 		writeAdminApplicationError(c, err)
 		return

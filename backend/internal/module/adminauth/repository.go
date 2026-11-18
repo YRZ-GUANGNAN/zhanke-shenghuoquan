@@ -3,23 +3,25 @@ package adminauth
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
-var ErrCredentialNotFound = errors.New("admin credential not found")
+var ErrCredentialNotFound = errors.New("admin account not found")
 var ErrUsernameTaken = errors.New("admin username already taken")
+var ErrLastActiveSuperAdmin = errors.New("cannot disable or demote the last active superadmin")
 
 type Repository interface {
-	FindCredential(context.Context, string) (Credential, error)
-	FindCredentialByID(context.Context, uint64) (Credential, error)
-	FindCredentialByUserID(context.Context, uint) (Credential, error)
-	ListCredentials(context.Context) ([]Credential, error)
-	UpsertCredential(context.Context, uint, string, string, time.Time) (Credential, error)
-	UpsertCredentialForUser(context.Context, uint, string, string, time.Time) (Credential, error)
-	DeleteCredentialByUserID(context.Context, uint) error
+	FindAccountByUsername(context.Context, string) (Account, error)
+	FindAccountByID(context.Context, uint64) (Account, error)
+	ListAccounts(context.Context) ([]Account, error)
+	CreateAccount(context.Context, Account) (Account, error)
+	UpdateAccount(context.Context, uint64, string, Role, time.Time) (Account, error)
+	SetAccountStatus(context.Context, uint64, Status, time.Time) (Account, error)
+	ResetAccountPassword(context.Context, uint64, string, time.Time) error
 	RecordFailure(context.Context, uint64, uint16, *time.Time) error
 	ResetFailures(context.Context, uint64) error
 	CreateSession(context.Context, *WebSession) error
@@ -27,7 +29,6 @@ type Repository interface {
 	TouchSession(context.Context, uint64, time.Time, time.Time) error
 	RevokeSession(context.Context, uint64, time.Time) error
 	RevokeCredentialSessions(context.Context, uint64, time.Time) error
-	UpdatePasswordAndRevoke(context.Context, uint64, string, time.Time) error
 	CountRecentFailures(context.Context, string, []byte, time.Time) (int64, error)
 	CreateAudit(context.Context, AuditLog) error
 }
@@ -36,114 +37,173 @@ type GormRepository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *GormRepository { return &GormRepository{db: db} }
 
-func (r *GormRepository) FindCredential(ctx context.Context, username string) (Credential, error) {
-	var value Credential
+// EnsureSchema 校验独立管理员账号所需列已由迁移 069 建立；缺失时拒绝启动，
+// 避免线上以旧结构运行后出现难以定位的登录/审计失败。
+func EnsureSchema(db *gorm.DB) error {
+	if db == nil {
+		return errors.New("administrator account schema requires a database")
+	}
+	migrator := db.Migrator()
+	if !migrator.HasTable(&Account{}) || !migrator.HasTable(&WebSession{}) || !migrator.HasTable(&AuditLog{}) {
+		return errors.New("administrator authentication tables missing; apply migrations 035 and 069")
+	}
+	for _, column := range []string{"role", "status", "display_name", "legacy_user_id"} {
+		if !migrator.HasColumn(&Account{}, column) {
+			return fmt.Errorf("administrator account column %s missing; apply migration 069", column)
+		}
+	}
+	if !migrator.HasColumn(&AuditLog{}, "actor_credential_id") {
+		return errors.New("administrator audit actor column missing; apply migration 069")
+	}
+	return nil
+}
+
+func (r *GormRepository) FindAccountByUsername(ctx context.Context, username string) (Account, error) {
+	var value Account
 	err := r.db.WithContext(ctx).Where("username = ?", username).First(&value).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return Credential{}, ErrCredentialNotFound
+		return Account{}, ErrCredentialNotFound
 	}
 	return value, err
 }
 
-func (r *GormRepository) FindCredentialByID(ctx context.Context, id uint64) (Credential, error) {
-	var value Credential
+func (r *GormRepository) FindAccountByID(ctx context.Context, id uint64) (Account, error) {
+	var value Account
 	err := r.db.WithContext(ctx).Where("id = ?", id).First(&value).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return Credential{}, ErrCredentialNotFound
+		return Account{}, ErrCredentialNotFound
 	}
 	return value, err
 }
 
-func (r *GormRepository) FindCredentialByUserID(ctx context.Context, userID uint) (Credential, error) {
-	var value Credential
-	err := r.db.WithContext(ctx).Where("user_id = ?", userID).First(&value).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return Credential{}, ErrCredentialNotFound
-	}
-	return value, err
-}
-
-func (r *GormRepository) ListCredentials(ctx context.Context) ([]Credential, error) {
-	values := make([]Credential, 0)
+func (r *GormRepository) ListAccounts(ctx context.Context) ([]Account, error) {
+	values := make([]Account, 0)
 	err := r.db.WithContext(ctx).Order("id").Find(&values).Error
 	return values, err
 }
 
-// 按用户维度建立登录账号：同一用户只保留一条凭据，用户名全表唯一。
-func (r *GormRepository) UpsertCredentialForUser(ctx context.Context, userID uint, username, passwordHash string, now time.Time) (Credential, error) {
-	value := Credential{
-		Username: username, UserID: userID, PasswordHash: passwordHash,
-		PasswordChangedAt: now, RowVersion: 1, CreatedAt: now, UpdatedAt: now,
-	}
+func (r *GormRepository) CreateAccount(ctx context.Context, value Account) (Account, error) {
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var existing Credential
-		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("user_id = ?", userID).First(&existing).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			var taken Credential
-			if err := tx.Where("username = ?", username).First(&taken).Error; err == nil {
-				return ErrUsernameTaken
-			} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		var existing Account
+		err := tx.Where("username = ?", value.Username).First(&existing).Error
+		if err == nil {
+			return ErrUsernameTaken
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		return tx.Create(&value).Error
+	})
+	return value, err
+}
+
+// lockActiveSuperAdmins 在事务内锁住所有启用中的超级管理员行，用于最后一名超管保护。
+func lockActiveSuperAdmins(tx *gorm.DB) (int, error) {
+	ids := make([]uint64, 0, 4)
+	err := tx.Model(&Account{}).Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("role = ? AND status = ?", RoleSuperAdmin, StatusActive).Pluck("id", &ids).Error
+	return len(ids), err
+}
+
+func (r *GormRepository) UpdateAccount(ctx context.Context, id uint64, displayName string, role Role, now time.Time) (Account, error) {
+	var result Account
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var current Account
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", id).First(&current).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrCredentialNotFound
+			}
+			return err
+		}
+		if current.Role == RoleSuperAdmin && role != RoleSuperAdmin && current.Status == StatusActive {
+			count, err := lockActiveSuperAdmins(tx)
+			if err != nil {
 				return err
 			}
-			return tx.Create(&value).Error
+			if count <= 1 {
+				return ErrLastActiveSuperAdmin
+			}
 		}
-		if err != nil {
-			return err
-		}
-		var taken Credential
-		if err := tx.Where("username = ? AND id <> ?", username, existing.ID).First(&taken).Error; err == nil {
-			return ErrUsernameTaken
-		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
-		}
-		value.ID = existing.ID
-		value.RowVersion = existing.RowVersion + 1
-		return tx.Model(&Credential{}).Where("id = ?", existing.ID).Updates(map[string]any{
-			"username": username, "password_hash": passwordHash, "failed_attempts": 0,
-			"locked_until": nil, "password_changed_at": now,
+		if err := tx.Model(&Account{}).Where("id = ?", id).Updates(map[string]any{
+			"display_name": displayName, "role": role,
 			"row_version": gorm.Expr("row_version + 1"), "updated_at": now,
-		}).Error
+		}).Error; err != nil {
+			return err
+		}
+		result = current
+		result.DisplayName, result.Role = displayName, role
+		result.RowVersion++
+		result.UpdatedAt = now
+		return nil
 	})
-	return value, err
+	return result, err
 }
 
-func (r *GormRepository) DeleteCredentialByUserID(ctx context.Context, userID uint) error {
-	return r.db.WithContext(ctx).Where("user_id = ?", userID).Delete(&Credential{}).Error
-}
-
-func (r *GormRepository) UpsertCredential(ctx context.Context, userID uint, username, passwordHash string, now time.Time) (Credential, error) {
-	value := Credential{
-		Username: username, UserID: userID, PasswordHash: passwordHash,
-		PasswordChangedAt: now, RowVersion: 1, CreatedAt: now, UpdatedAt: now,
-	}
+func (r *GormRepository) SetAccountStatus(ctx context.Context, id uint64, status Status, now time.Time) (Account, error) {
+	var result Account
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var existing Credential
-		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("username = ?", username).First(&existing).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return tx.Create(&value).Error
-		}
-		if err != nil {
+		var current Account
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", id).First(&current).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrCredentialNotFound
+			}
 			return err
 		}
-		value.ID = existing.ID
-		value.RowVersion = existing.RowVersion + 1
-		return tx.Model(&Credential{}).Where("id = ?", existing.ID).Updates(map[string]any{
-			"user_id": userID, "password_hash": passwordHash, "failed_attempts": 0,
-			"locked_until": nil, "password_changed_at": now,
-			"row_version": gorm.Expr("row_version + 1"), "updated_at": now,
-		}).Error
+		if current.Status == status {
+			result = current
+			return nil
+		}
+		if current.Role == RoleSuperAdmin && current.Status == StatusActive && status == StatusDisabled {
+			count, err := lockActiveSuperAdmins(tx)
+			if err != nil {
+				return err
+			}
+			if count <= 1 {
+				return ErrLastActiveSuperAdmin
+			}
+		}
+		if err := tx.Model(&Account{}).Where("id = ?", id).Updates(map[string]any{
+			"status": status, "row_version": gorm.Expr("row_version + 1"), "updated_at": now,
+		}).Error; err != nil {
+			return err
+		}
+		if status == StatusDisabled {
+			if err := tx.Model(&WebSession{}).Where("credential_id = ? AND revoked_at IS NULL", id).
+				Updates(map[string]any{"revoked_at": now, "updated_at": now}).Error; err != nil {
+				return err
+			}
+		}
+		result = current
+		result.Status = status
+		result.RowVersion++
+		result.UpdatedAt = now
+		return nil
 	})
-	return value, err
+	return result, err
+}
+
+func (r *GormRepository) ResetAccountPassword(ctx context.Context, id uint64, passwordHash string, now time.Time) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&Account{}).Where("id = ?", id).Updates(map[string]any{
+			"password_hash": passwordHash, "password_changed_at": now,
+			"failed_attempts": 0, "locked_until": nil,
+			"row_version": gorm.Expr("row_version + 1"), "updated_at": now,
+		}).Error; err != nil {
+			return err
+		}
+		return tx.Model(&WebSession{}).Where("credential_id = ? AND revoked_at IS NULL", id).
+			Updates(map[string]any{"revoked_at": now, "updated_at": now}).Error
+	})
 }
 
 func (r *GormRepository) RecordFailure(ctx context.Context, id uint64, attempts uint16, lockedUntil *time.Time) error {
-	return r.db.WithContext(ctx).Model(&Credential{}).Where("id = ?", id).Updates(map[string]any{
+	return r.db.WithContext(ctx).Model(&Account{}).Where("id = ?", id).Updates(map[string]any{
 		"failed_attempts": attempts, "locked_until": lockedUntil, "updated_at": time.Now().UTC(),
 	}).Error
 }
 
 func (r *GormRepository) ResetFailures(ctx context.Context, id uint64) error {
-	return r.db.WithContext(ctx).Model(&Credential{}).Where("id = ?", id).
+	return r.db.WithContext(ctx).Model(&Account{}).Where("id = ?", id).
 		Updates(map[string]any{"failed_attempts": 0, "locked_until": nil, "updated_at": time.Now().UTC()}).Error
 }
 
@@ -173,20 +233,6 @@ func (r *GormRepository) RevokeSession(ctx context.Context, id uint64, now time.
 func (r *GormRepository) RevokeCredentialSessions(ctx context.Context, credentialID uint64, now time.Time) error {
 	return r.db.WithContext(ctx).Model(&WebSession{}).Where("credential_id = ? AND revoked_at IS NULL", credentialID).
 		Updates(map[string]any{"revoked_at": now, "updated_at": now}).Error
-}
-
-func (r *GormRepository) UpdatePasswordAndRevoke(ctx context.Context, credentialID uint64, passwordHash string, now time.Time) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&Credential{}).Where("id = ?", credentialID).Updates(map[string]any{
-			"password_hash": passwordHash, "password_changed_at": now,
-			"failed_attempts": 0, "locked_until": nil,
-			"row_version": gorm.Expr("row_version + 1"), "updated_at": now,
-		}).Error; err != nil {
-			return err
-		}
-		return tx.Model(&WebSession{}).Where("credential_id = ? AND revoked_at IS NULL", credentialID).
-			Updates(map[string]any{"revoked_at": now, "updated_at": now}).Error
-	})
 }
 
 func (r *GormRepository) CountRecentFailures(ctx context.Context, username string, ipHash []byte, since time.Time) (int64, error) {

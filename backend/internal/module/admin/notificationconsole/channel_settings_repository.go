@@ -40,20 +40,21 @@ func (s *GormWeComSettingsStore) LoadWeComSettings(ctx context.Context) (WeComSe
 		return result, nil
 	}
 	var row struct {
-		MerchantWebhook string
-		RiderWebhook    string
-		RowVersion      uint64
-		UpdatedBy       *uint64
-		UpdatedAt       time.Time
+		MerchantWebhook  string
+		RiderWebhook     string
+		RowVersion       uint64
+		UpdatedBy        *uint64
+		UpdatedByAdminID *uint64
+		UpdatedAt        time.Time
 	}
-	if err := s.db.WithContext(ctx).Raw(`SELECT wecom_merchant_webhook AS merchant_webhook, wecom_rider_webhook AS rider_webhook, row_version, updated_by, updated_at FROM notification_channel_settings WHERE id = 1`).Scan(&row).Error; err != nil {
+	if err := s.db.WithContext(ctx).Raw(`SELECT wecom_merchant_webhook AS merchant_webhook, wecom_rider_webhook AS rider_webhook, row_version, updated_by, updated_by_admin_id, updated_at FROM notification_channel_settings WHERE id = 1`).Scan(&row).Error; err != nil {
 		return WeComSettings{}, err
 	}
 	return WeComSettings{
 		MerchantWebhook: row.MerchantWebhook,
 		RiderWebhook:    row.RiderWebhook,
 		RowVersion:      row.RowVersion,
-		Saved:           row.UpdatedBy != nil,
+		Saved:           row.UpdatedBy != nil || row.UpdatedByAdminID != nil,
 		UpdatedAt:       row.UpdatedAt,
 	}, nil
 }
@@ -79,7 +80,7 @@ func (s *GormWeComSettingsStore) SaveWeComSettings(ctx context.Context, merchant
 				"wecom_merchant_webhook": merchant,
 				"wecom_rider_webhook":    rider,
 				"row_version":            gorm.Expr("row_version + 1"),
-				"updated_by":             actor,
+				"updated_by_admin_id":    actor,
 				"updated_at":             now.UTC(),
 			}).Error; err != nil {
 			return err

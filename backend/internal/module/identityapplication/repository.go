@@ -199,7 +199,7 @@ func (r *GormRepository) decide(
 	commit ApprovalCommit,
 	allowTerminal bool,
 ) (Application, error) {
-	if r == nil || r.db == nil || input.ReviewerUserID == 0 || !validULID(input.ApplicationPublicID) ||
+	if r == nil || r.db == nil || input.ReviewerAdminID == 0 || !validULID(input.ApplicationPublicID) ||
 		input.ExpectedRowVersion == 0 || input.DecidedAt.IsZero() ||
 		(status != StatusApproved && status != StatusRejected) ||
 		(eventType != EventApproved && eventType != EventRejected) {
@@ -214,9 +214,6 @@ func (r *GormRepository) decide(
 				return ErrApplicationNotFound
 			}
 			return err
-		}
-		if result.UserID == input.ReviewerUserID {
-			return ErrSelfReview
 		}
 		if result.RowVersion != input.ExpectedRowVersion {
 			return ErrDecisionConflict
@@ -273,7 +270,7 @@ func (r *GormRepository) decide(
 			Where("id = ? AND status = ? AND row_version = ?", result.ID, previousStatus, input.ExpectedRowVersion).
 			Updates(map[string]any{
 				"status": status, "review_reason": input.Reason,
-				"reviewer_user_id": input.ReviewerUserID, "reviewed_at": input.DecidedAt,
+				"reviewer_admin_id": input.ReviewerAdminID, "reviewed_at": input.DecidedAt,
 				"row_version": nextVersion, "updated_at": input.DecidedAt,
 			})
 		if update.Error != nil {
@@ -284,8 +281,8 @@ func (r *GormRepository) decide(
 		}
 		result.Status = status
 		result.ReviewReason = input.Reason
-		reviewerID := input.ReviewerUserID
-		result.ReviewerUserID = &reviewerID
+		reviewerAdminID := input.ReviewerAdminID
+		result.ReviewerAdminID = &reviewerAdminID
 		reviewedAt := input.DecidedAt
 		result.ReviewedAt = &reviewedAt
 		result.RowVersion = nextVersion
@@ -301,7 +298,7 @@ func (r *GormRepository) decide(
 		}
 		event := ApplicationEvent{
 			EventPublicID: eventID, ApplicationID: result.ID,
-			ActorUserID: input.ReviewerUserID, EventType: eventType,
+			ActorUserID: 0, ActorAdminID: &reviewerAdminID, EventType: eventType,
 			Status: status, Reason: input.Reason, SnapshotJSON: snapshot,
 			CreatedAt: input.DecidedAt,
 		}
@@ -316,6 +313,11 @@ func snapshotApplication(value Application, assetIDs []string) applicationSnapsh
 		formatted := strconv.FormatUint(*value.ReviewerUserID, 10)
 		reviewerUserID = &formatted
 	}
+	var reviewerAdminID *string
+	if value.ReviewerAdminID != nil {
+		formatted := strconv.FormatUint(*value.ReviewerAdminID, 10)
+		reviewerAdminID = &formatted
+	}
 	return applicationSnapshot{
 		ApplicationPublicID: value.ApplicationPublicID,
 		UserID:              strconv.FormatUint(value.UserID, 10),
@@ -328,6 +330,7 @@ func snapshotApplication(value Application, assetIDs []string) applicationSnapsh
 		AssetPublicIDs:      append([]string(nil), assetIDs...),
 		ReviewReason:        value.ReviewReason,
 		ReviewerUserID:      reviewerUserID,
+		ReviewerAdminID:     reviewerAdminID,
 		ReviewedAt:          value.ReviewedAt,
 		RowVersion:          value.RowVersion,
 	}
@@ -392,9 +395,15 @@ func (r *GormRepository) FindDetail(ctx context.Context, applicationPublicID str
 	}
 	eventViews := make([]ApplicationEventView, len(events))
 	for index := range events {
+		var actorAdminID *string
+		if events[index].ActorAdminID != nil {
+			formatted := strconv.FormatUint(*events[index].ActorAdminID, 10)
+			actorAdminID = &formatted
+		}
 		eventViews[index] = ApplicationEventView{
 			EventPublicID: events[index].EventPublicID,
 			ActorUserID:   strconv.FormatUint(events[index].ActorUserID, 10),
+			ActorAdminID:  actorAdminID,
 			EventType:     events[index].EventType,
 			Status:        events[index].Status,
 			Reason:        events[index].Reason,

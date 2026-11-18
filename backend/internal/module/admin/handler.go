@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"campus-circle/backend/internal/module/admin/review"
+	"campus-circle/backend/internal/module/adminauth"
 	"campus-circle/backend/internal/module/community"
 	"campus-circle/backend/internal/module/featureflags"
 	"campus-circle/backend/internal/module/navigation"
@@ -44,7 +45,7 @@ func (h *Handler) Register(api *gin.RouterGroup) {
 	if h.adminAuth != nil {
 		authRequired = h.adminAuth
 	}
-	secured := api.Group("/admin", authRequired, user.AdminRequired())
+	secured := api.Group("/admin", authRequired, adminauth.AdminRequired())
 	secured.GET("/stats", h.stats)
 	secured.GET("/search", h.globalSearch)
 	secured.GET("/reviews", h.reviewList)
@@ -59,7 +60,7 @@ func (h *Handler) Register(api *gin.RouterGroup) {
 	secured.PATCH("/feedbacks/:id", h.updateFeedback)
 	secured.PATCH("/users/:id/status", h.userStatus)
 	secured.DELETE("/users/:id/phone", h.userPhoneRemove)
-	secured.PATCH("/users/:id/role", user.SuperAdminRequired(), h.userRole)
+	secured.PATCH("/users/:id/role", adminauth.SuperAdminRequired(), h.userRole)
 	secured.GET("/posts", h.posts)
 	secured.PATCH("/community/posts/:id/takedown", h.takedownPost)
 	secured.GET("/products", h.products)
@@ -67,7 +68,7 @@ func (h *Handler) Register(api *gin.RouterGroup) {
 	secured.GET("/navigation", h.navigationTree)
 	if featureflags.LabEnabled() {
 		secured.GET("/feature-policy", featureflags.AdminGetHandler)
-		secured.PATCH("/feature-policy", user.SuperAdminRequired(), featureflags.AdminUpdateHandler)
+		secured.PATCH("/feature-policy", adminauth.SuperAdminRequired(), featureflags.AdminUpdateHandler)
 		// Kept as a read-only compatibility alias for the earlier local draft.
 		secured.GET("/feature-flags", featureflags.AdminGetHandler)
 	}
@@ -109,7 +110,7 @@ func (h *Handler) updateFeedback(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, "invalid feedback update")
 		return
 	}
-	err := h.users.AdminUpdateFeedback(c, user.CurrentUserID(c), publicID, req.Status, req.Note)
+	err := h.users.AdminUpdateFeedback(c, adminauth.CurrentAccountID(c), publicID, req.Status, req.Note)
 	if err != nil {
 		if errors.Is(err, user.ErrForbidden) {
 			response.Fail(c, http.StatusForbidden, "只有管理员可以处理用户反馈")
@@ -210,7 +211,7 @@ func (h *Handler) startReview(c *gin.Context) {
 	if !ok {
 		return
 	}
-	value, err := h.reviews.Start(c, id, user.CurrentUserID(c))
+	value, err := h.reviews.Start(c, id, adminauth.CurrentAccountID(c))
 	write(c, value, err)
 }
 func (h *Handler) approve(c *gin.Context) { h.decide(c, review.StatusApproved) }
@@ -227,7 +228,7 @@ func (h *Handler) decide(c *gin.Context, status review.Status) {
 		response.Fail(c, http.StatusBadRequest, "invalid review decision")
 		return
 	}
-	value, err := h.reviews.Decide(c, id, user.CurrentUserID(c), status, req.Reason)
+	value, err := h.reviews.Decide(c, id, adminauth.CurrentAccountID(c), status, req.Reason)
 	write(c, value, err)
 }
 func (h *Handler) overrideReview(c *gin.Context) {
@@ -245,7 +246,7 @@ func (h *Handler) overrideReview(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, "invalid review override")
 		return
 	}
-	value, err := h.reviews.Override(c, id, user.CurrentUserID(c), req.Status, req.Reason)
+	value, err := h.reviews.Override(c, id, adminauth.CurrentAccountID(c), req.Status, req.Reason)
 	if errors.Is(err, review.ErrNotFound) {
 		response.Fail(c, http.StatusNotFound, err.Error())
 		return
@@ -322,7 +323,7 @@ func (h *Handler) userStatus(c *gin.Context) {
 		response.Fail(c, 400, "invalid status")
 		return
 	}
-	err := h.users.AdminUpdateStatus(c, user.CurrentUserID(c), id, req.Status)
+	err := h.users.AdminUpdateStatus(c, adminauth.CurrentAccountRole(c) == adminauth.RoleSuperAdmin, id, req.Status)
 	write(c, gin.H{"updated": err == nil}, err)
 }
 func (h *Handler) userPhoneRemove(c *gin.Context) {
@@ -330,7 +331,7 @@ func (h *Handler) userPhoneRemove(c *gin.Context) {
 	if !ok {
 		return
 	}
-	err := h.users.AdminClearPhone(c, user.CurrentUserID(c), id)
+	err := h.users.AdminClearPhone(c, id)
 	write(c, gin.H{"removed": err == nil}, err)
 }
 func (h *Handler) userRole(c *gin.Context) {
@@ -345,7 +346,7 @@ func (h *Handler) userRole(c *gin.Context) {
 		response.Fail(c, 400, "invalid role")
 		return
 	}
-	err := h.users.AdminUpdateRole(c, user.CurrentUserID(c), id, req.Role)
+	err := h.users.AdminUpdateRole(c, id, req.Role)
 	write(c, gin.H{"updated": err == nil}, err)
 }
 func (h *Handler) posts(c *gin.Context) {
@@ -371,7 +372,7 @@ func (h *Handler) takedownPost(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, "invalid takedown request")
 		return
 	}
-	err := h.community.AdminTakedown(c, id, user.CurrentUserID(c), req.Reason)
+	err := h.community.AdminTakedown(c, id, uint(adminauth.CurrentAccountID(c)), req.Reason)
 	writeTakedown(c, gin.H{"updated": err == nil}, err)
 }
 
@@ -387,7 +388,7 @@ func (h *Handler) takedownProduct(c *gin.Context) {
 		response.Fail(c, http.StatusBadRequest, "invalid takedown request")
 		return
 	}
-	err := h.trade.AdminTakedown(c, id, user.CurrentUserID(c), req.Reason)
+	err := h.trade.AdminTakedown(c, id, uint(adminauth.CurrentAccountID(c)), req.Reason)
 	writeTakedown(c, gin.H{"updated": err == nil}, err)
 }
 

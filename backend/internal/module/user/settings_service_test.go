@@ -124,14 +124,14 @@ func (r *domainARepositoryStub) ListFeedbacksByUser(_ context.Context, userID ui
 	return values, int64(len(values)), nil
 }
 
-func (r *domainARepositoryStub) UpdateFeedbackHandling(_ context.Context, publicID, status, note string, actorID uint, now time.Time) error {
+func (r *domainARepositoryStub) UpdateFeedbackHandling(_ context.Context, publicID, status, note string, adminID uint64, now time.Time) error {
 	for index, value := range r.feedbacks {
 		if value.FeedbackPublicID != publicID {
 			continue
 		}
 		r.feedbacks[index].Status = status
 		r.feedbacks[index].AdminNote = note
-		r.feedbacks[index].HandledBy = &actorID
+		r.feedbacks[index].HandledByAdminID = &adminID
 		r.feedbacks[index].HandledAt = &now
 		return nil
 	}

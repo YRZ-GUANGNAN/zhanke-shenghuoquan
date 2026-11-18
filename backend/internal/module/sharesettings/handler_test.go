@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"campus-circle/backend/internal/module/adminauth"
 	"campus-circle/backend/internal/module/user"
 	"github.com/gin-gonic/gin"
 )
@@ -19,7 +20,7 @@ type memoryStore struct {
 }
 
 func (s *memoryStore) Load(context.Context) (Settings, error) { return s.value, s.err }
-func (s *memoryStore) Save(_ context.Context, _ uint, input UpdateInput) (Settings, error) {
+func (s *memoryStore) Save(_ context.Context, _ uint64, input UpdateInput) (Settings, error) {
 	if s.err != nil {
 		return Settings{}, s.err
 	}
@@ -65,7 +66,14 @@ func TestHTTPPermissionsStrictInputConflictAndPublicProjection(t *testing.T) {
 			c.AbortWithStatus(401)
 			return
 		}
-		user.SetCurrentUser(c, user.User{ID: 42, Role: user.Role(role), Status: user.StatusActive})
+		switch user.Role(role) {
+		case user.RoleAdmin:
+			adminauth.SetCurrentAccount(c, adminauth.Account{ID: 42, Role: adminauth.RoleAdmin, Status: adminauth.StatusActive})
+		case user.RoleSuperAdmin:
+			adminauth.SetCurrentAccount(c, adminauth.Account{ID: 42, Role: adminauth.RoleSuperAdmin, Status: adminauth.StatusActive})
+		default:
+			// 普通用户没有后台管理员上下文，AdminRequired 将返回 403。
+		}
 	})
 	input, _ := json.Marshal(UpdateInput{Cards: Defaults(), ExpectedRowVersion: 1})
 	request := func(method, path, role, body string, expected int) string {

@@ -316,14 +316,14 @@ func (f *fakeReviews) Submit(_ context.Context, _ review.Submission) (review.Tas
 	f.tasks[f.next] = review.StatusSubmitted
 	return review.Task{ID: f.next, Status: review.StatusSubmitted}, nil
 }
-func (f *fakeReviews) Start(ctx context.Context, id, operator uint) (review.Task, error) {
+func (f *fakeReviews) Start(ctx context.Context, id uint, operator uint64) (review.Task, error) {
 	f.tasks[id] = review.StatusReviewing
 	if err := f.target.SetReviewStatus(ctx, id, review.StatusReviewing); err != nil {
 		return review.Task{}, err
 	}
-	return review.Task{ID: id, Status: review.StatusReviewing, OperatorID: operator}, nil
+	return review.Task{ID: id, Status: review.StatusReviewing, OperatorAdminID: operatorPtr(operator)}, nil
 }
-func (f *fakeReviews) Decide(ctx context.Context, id, operator uint, status review.Status, reason string) (review.Task, error) {
+func (f *fakeReviews) Decide(ctx context.Context, id uint, operator uint64, status review.Status, reason string) (review.Task, error) {
 	if f.tasks[id] != review.StatusReviewing {
 		return review.Task{}, errors.New("not reviewing")
 	}
@@ -331,7 +331,14 @@ func (f *fakeReviews) Decide(ctx context.Context, id, operator uint, status revi
 		return review.Task{}, err
 	}
 	f.tasks[id] = status
-	return review.Task{ID: id, Status: status, OperatorID: operator, Reason: reason}, nil
+	return review.Task{ID: id, Status: status, OperatorAdminID: operatorPtr(operator), Reason: reason}, nil
+}
+
+func operatorPtr(value uint64) *uint64 {
+	if value == 0 {
+		return nil
+	}
+	return &value
 }
 
 func newTestService() (*Service, *memoryRepo, *fakeStorage, *fakeReviews, *fakeSafety) {

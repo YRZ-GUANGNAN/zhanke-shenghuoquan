@@ -29,6 +29,7 @@ type ConfigRow struct {
 	PresentationMode  string    `gorm:"size:24;not null;default:standard"`
 	RowVersion        uint64    `gorm:"not null"`
 	UpdatedBy         uint      `gorm:"not null"`
+	UpdatedByAdminID  *uint64   `gorm:"column:updated_by_admin_id"`
 	UpdatedAt         time.Time `gorm:"not null"`
 	CreatedAt         time.Time `gorm:"not null"`
 }
@@ -36,11 +37,12 @@ type ConfigRow struct {
 func (ConfigRow) TableName() string { return "feature_policy_configs" }
 
 type AuditRow struct {
-	ID         uint      `gorm:"primaryKey"`
-	ActorID    uint      `gorm:"not null;index"`
-	BeforeJSON string    `gorm:"type:json;not null"`
-	AfterJSON  string    `gorm:"type:json;not null"`
-	CreatedAt  time.Time `gorm:"not null;index"`
+	ID           uint      `gorm:"primaryKey"`
+	ActorID      uint      `gorm:"not null;index"`
+	ActorAdminID *uint64   `gorm:"column:actor_admin_id"`
+	BeforeJSON   string    `gorm:"type:json;not null"`
+	AfterJSON    string    `gorm:"type:json;not null"`
+	CreatedAt    time.Time `gorm:"not null;index"`
 }
 
 func (AuditRow) TableName() string { return "feature_policy_audit_logs" }
@@ -92,7 +94,7 @@ func (s *GormStore) Save(ctx context.Context, before, after Policy) error {
 			"campus_tools": after.Flags[KeyCampusTools], "delivery": after.Flags[KeyDelivery],
 			"merchant": after.Flags[KeyMerchant], "rider": after.Flags[KeyRider], "messages": after.Flags[KeyMessages],
 			"following": after.Flags[KeyFollowing], "posting_mode": after.PostingMode, "row_version": after.RowVersion,
-			"updated_by": after.UpdatedBy, "updated_at": after.UpdatedAt,
+			"updated_by_admin_id": after.UpdatedByAdminID, "updated_at": after.UpdatedAt,
 			"extra_flags":       extraFlagsJSON(after),
 			"presentation_mode": after.PresentationMode,
 		})
@@ -104,16 +106,16 @@ func (s *GormStore) Save(ctx context.Context, before, after Policy) error {
 		}
 		beforeJSON, _ := json.Marshal(before)
 		afterJSON, _ := json.Marshal(after)
-		return tx.Create(&AuditRow{ActorID: after.UpdatedBy, BeforeJSON: string(beforeJSON), AfterJSON: string(afterJSON), CreatedAt: after.UpdatedAt}).Error
+		return tx.Create(&AuditRow{ActorAdminID: after.UpdatedByAdminID, BeforeJSON: string(beforeJSON), AfterJSON: string(afterJSON), CreatedAt: after.UpdatedAt}).Error
 	})
 }
 
 func policyRow(value Policy) ConfigRow {
-	return ConfigRow{ID: 1, Forum: value.Flags[KeyForum], Post: value.Flags[KeyPost], Comment: value.Flags[KeyComment], Secondhand: value.Flags[KeySecondhand], SecondhandPublish: value.Flags[KeySecondhandPublish], SecondhandChat: value.Flags[KeySecondhandChat], Takeout: value.Flags[KeyTakeout], CampusTools: value.Flags[KeyCampusTools], Delivery: value.Flags[KeyDelivery], Merchant: value.Flags[KeyMerchant], Rider: value.Flags[KeyRider], Messages: value.Flags[KeyMessages], Following: value.Flags[KeyFollowing], PostingMode: value.PostingMode, PresentationMode: value.PresentationMode, RowVersion: value.RowVersion, UpdatedBy: value.UpdatedBy, UpdatedAt: value.UpdatedAt, CreatedAt: time.Now().UTC()}
+	return ConfigRow{ID: 1, Forum: value.Flags[KeyForum], Post: value.Flags[KeyPost], Comment: value.Flags[KeyComment], Secondhand: value.Flags[KeySecondhand], SecondhandPublish: value.Flags[KeySecondhandPublish], SecondhandChat: value.Flags[KeySecondhandChat], Takeout: value.Flags[KeyTakeout], CampusTools: value.Flags[KeyCampusTools], Delivery: value.Flags[KeyDelivery], Merchant: value.Flags[KeyMerchant], Rider: value.Flags[KeyRider], Messages: value.Flags[KeyMessages], Following: value.Flags[KeyFollowing], PostingMode: value.PostingMode, PresentationMode: value.PresentationMode, RowVersion: value.RowVersion, UpdatedBy: value.UpdatedBy, UpdatedByAdminID: value.UpdatedByAdminID, UpdatedAt: value.UpdatedAt, CreatedAt: time.Now().UTC()}
 }
 
 func rowPolicy(row ConfigRow) Policy {
-	return Policy{Flags: map[string]bool{KeyForum: row.Forum, KeyPost: row.Post, KeyComment: row.Comment, KeySecondhand: row.Secondhand, KeySecondhandPublish: row.SecondhandPublish, KeySecondhandChat: row.SecondhandChat, KeyTakeout: row.Takeout, KeyCampusTools: row.CampusTools, KeyDelivery: row.Delivery, KeyMerchant: row.Merchant, KeyRider: row.Rider, KeyMessages: row.Messages, KeyFollowing: row.Following}, PostingMode: row.PostingMode, PresentationMode: row.PresentationMode, RowVersion: row.RowVersion, UpdatedBy: row.UpdatedBy, UpdatedAt: row.UpdatedAt, LabEnabled: true}
+	return Policy{Flags: map[string]bool{KeyForum: row.Forum, KeyPost: row.Post, KeyComment: row.Comment, KeySecondhand: row.Secondhand, KeySecondhandPublish: row.SecondhandPublish, KeySecondhandChat: row.SecondhandChat, KeyTakeout: row.Takeout, KeyCampusTools: row.CampusTools, KeyDelivery: row.Delivery, KeyMerchant: row.Merchant, KeyRider: row.Rider, KeyMessages: row.Messages, KeyFollowing: row.Following}, PostingMode: row.PostingMode, PresentationMode: row.PresentationMode, RowVersion: row.RowVersion, UpdatedBy: row.UpdatedBy, UpdatedByAdminID: row.UpdatedByAdminID, UpdatedAt: row.UpdatedAt, LabEnabled: true}
 }
 
 func extraFlagsJSON(value Policy) string {

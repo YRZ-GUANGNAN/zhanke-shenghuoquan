@@ -29,8 +29,9 @@ type Task struct {
 	Status         Status         `json:"status" gorm:"size:24;index;default:submitted"`
 	DecisionSource DecisionSource `json:"decisionSource" gorm:"size:24;default:manual"`
 	Reason         string         `json:"reason" gorm:"size:240"`
-	OperatorID     uint           `json:"operatorId" gorm:"index"`
-	CreatedAt      time.Time      `json:"createdAt"`
+	OperatorID      uint           `json:"operatorId" gorm:"index"`
+	OperatorAdminID *uint64        `json:"operatorAdminId,omitempty" gorm:"index"`
+	CreatedAt       time.Time      `json:"createdAt"`
 	UpdatedAt      time.Time      `json:"updatedAt"`
 }
 

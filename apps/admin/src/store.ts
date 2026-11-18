@@ -30,7 +30,7 @@ export const useAdminStore = create<AdminState>((set) => ({
   setSection: (section) => set({ section }),
   setAuthenticated: (session) => set({
     authStatus: 'authenticated',
-    user: session.user,
+    user: session.account,
     csrfToken: session.csrfToken
   }),
   setUnauthenticated: () => set({

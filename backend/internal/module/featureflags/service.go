@@ -55,6 +55,7 @@ type Policy struct {
 	PostingMode      string          `json:"postingMode"`
 	RowVersion       uint64          `json:"rowVersion"`
 	UpdatedBy        uint            `json:"updatedBy"`
+	UpdatedByAdminID *uint64         `json:"updatedByAdminId,omitempty"`
 	UpdatedAt        time.Time       `json:"updatedAt"`
 	LabEnabled       bool            `json:"labEnabled"`
 	Enabled          bool            `json:"enabled"`
@@ -172,11 +173,11 @@ func ReadPolicy(force bool) (Policy, error) {
 	return clonePolicy(state.policy), nil
 }
 
-func Update(actorID uint, input UpdateInput) (Policy, error) {
+func Update(actorID uint64, input UpdateInput) (Policy, error) {
 	return UpdateContext(context.Background(), actorID, input)
 }
 
-func UpdateContext(ctx context.Context, actorID uint, input UpdateInput) (Policy, error) {
+func UpdateContext(ctx context.Context, actorID uint64, input UpdateInput) (Policy, error) {
 	refresh(true)
 	state.Lock()
 	defer state.Unlock()
@@ -215,7 +216,8 @@ func UpdateContext(ctx context.Context, actorID uint, input UpdateInput) (Policy
 	next.PostingMode = mode
 	next.PresentationMode = presentation
 	next.RowVersion++
-	next.UpdatedBy = actorID
+	adminID := actorID
+	next.UpdatedByAdminID = &adminID
 	next.UpdatedAt = time.Now().UTC()
 	if state.store != nil {
 		if err := state.store.Save(ctx, clonePolicy(state.policy), next); err != nil {

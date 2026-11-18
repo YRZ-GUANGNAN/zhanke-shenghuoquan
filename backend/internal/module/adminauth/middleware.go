@@ -1,7 +1,6 @@
 package adminauth
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"net/url"
@@ -9,54 +8,30 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"campus-circle/backend/internal/module/user"
 	"campus-circle/backend/internal/pkg/response"
 )
 
 const (
 	contextAuthKind = "adminauth.kind"
 	contextSession  = "adminauth.session"
-	authKindBearer  = "bearer"
+	contextAccount  = "adminauth.account"
 	authKindCookie  = "cookie"
 )
 
-type BearerAuthenticator interface {
-	Authenticate(context.Context, string) (user.User, error)
-}
-
 type Middleware struct {
 	sessions *Service
-	bearer   BearerAuthenticator
 }
 
-func NewMiddleware(sessions *Service, bearer BearerAuthenticator) *Middleware {
-	return &Middleware{sessions: sessions, bearer: bearer}
+func NewMiddleware(sessions *Service) *Middleware {
+	return &Middleware{sessions: sessions}
 }
 
+// Required 只接受后台管理员会话 Cookie（__Host- 前缀 + HttpOnly + Secure + SameSite=Strict）。
+// 小程序登录态（Authorization: Bearer）不再被后台 API 接受。
 func (m *Middleware) Required() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		header := strings.TrimSpace(c.GetHeader("Authorization"))
 		cookie, cookieErr := c.Cookie(CookieName)
-		hasCookie := cookieErr == nil && cookie != ""
-		hasBearer := strings.HasPrefix(header, "Bearer ") && strings.TrimSpace(strings.TrimPrefix(header, "Bearer ")) != ""
-		if hasCookie && hasBearer {
-			response.Fail(c, http.StatusBadRequest, "ambiguous administrator authentication")
-			c.Abort()
-			return
-		}
-		if hasBearer {
-			value, err := m.bearer.Authenticate(c, strings.TrimSpace(strings.TrimPrefix(header, "Bearer ")))
-			if err != nil {
-				response.Fail(c, http.StatusUnauthorized, "authentication required")
-				c.Abort()
-				return
-			}
-			user.SetCurrentUser(c, value)
-			c.Set(contextAuthKind, authKindBearer)
-			c.Next()
-			return
-		}
-		if !hasCookie {
+		if cookieErr != nil || strings.TrimSpace(cookie) == "" {
 			response.Fail(c, http.StatusUnauthorized, "authentication required")
 			c.Abort()
 			return
@@ -74,9 +49,35 @@ func (m *Middleware) Required() gin.HandlerFunc {
 				return
 			}
 		}
-		user.SetCurrentUser(c, authenticated.User)
-		c.Set(contextAuthKind, authKindCookie)
+		c.Set(contextAccount, authenticated.Account)
 		c.Set(contextSession, authenticated)
+		c.Set(contextAuthKind, authKindCookie)
+		c.Next()
+	}
+}
+
+// AdminRequired 校验管理员账号处于启用状态且角色合法（admin/superadmin）。
+func AdminRequired() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		account, ok := CurrentAccount(c)
+		if !ok || account.Status != StatusActive || !account.Role.Valid() {
+			response.Fail(c, http.StatusForbidden, "admin required")
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// SuperAdminRequired 校验管理员账号是启用中的超级管理员。
+func SuperAdminRequired() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		account, ok := CurrentAccount(c)
+		if !ok || account.Status != StatusActive || account.Role != RoleSuperAdmin {
+			response.Fail(c, http.StatusForbidden, "superadmin required")
+			c.Abort()
+			return
+		}
 		c.Next()
 	}
 }
@@ -106,6 +107,43 @@ func sameOrigin(request *http.Request) bool {
 		}
 	}
 	return strings.EqualFold(parsed.Scheme, proto)
+}
+
+// CurrentAccount 返回当前请求的管理员账号（仅后台会话路由可用）。
+func CurrentAccount(c *gin.Context) (Account, bool) {
+	value, exists := c.Get(contextAccount)
+	if !exists {
+		return Account{}, false
+	}
+	account, ok := value.(Account)
+	if !ok {
+		return Account{}, false
+	}
+	return account, true
+}
+
+// SetCurrentAccount 写入管理员账号上下文。生产路径由 Required 中间件调用；
+// 测试夹具也用它模拟已认证的管理员。
+func SetCurrentAccount(c *gin.Context, account Account) {
+	c.Set(contextAccount, account)
+}
+
+// CurrentAccountID 返回当前管理员账号 id；无管理员上下文时返回 0。
+func CurrentAccountID(c *gin.Context) uint64 {
+	account, ok := CurrentAccount(c)
+	if !ok {
+		return 0
+	}
+	return account.ID
+}
+
+// CurrentAccountRole 返回当前管理员角色；无管理员上下文时返回空。
+func CurrentAccountRole(c *gin.Context) Role {
+	account, ok := CurrentAccount(c)
+	if !ok {
+		return ""
+	}
+	return account.Role
 }
 
 func AuthenticatedFromContext(c *gin.Context) (AuthenticatedSession, error) {

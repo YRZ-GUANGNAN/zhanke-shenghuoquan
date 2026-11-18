@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"campus-circle/backend/internal/module/admin/review"
+	"campus-circle/backend/internal/module/adminauth"
 	"campus-circle/backend/internal/module/user"
 	"github.com/gin-gonic/gin"
 )
@@ -85,7 +86,7 @@ func newOverrideReviewFixture(t *testing.T, status review.Status) *overrideRevie
 	auth := func(c *gin.Context) {
 		switch c.GetHeader("X-Test-Role") {
 		case "admin":
-			user.SetCurrentUser(c, user.User{ID: 7, Role: user.RoleAdmin, Status: user.StatusActive})
+			adminauth.SetCurrentAccount(c, adminauth.Account{ID: 7, Role: adminauth.RoleAdmin, Status: adminauth.StatusActive})
 		case "ordinary":
 			user.SetCurrentUser(c, user.User{ID: 8, Role: user.RoleUser, Status: user.StatusActive})
 		default:
@@ -158,7 +159,7 @@ func TestReviewOverrideHandler(t *testing.T) {
 		}
 		if fixture.repo.task.Status != review.StatusApproved ||
 			fixture.repo.task.DecisionSource != review.DecisionSourceManualOverride ||
-			fixture.repo.task.OperatorID != 7 ||
+			fixture.repo.task.OperatorAdminID == nil || *fixture.repo.task.OperatorAdminID != 7 ||
 			fixture.repo.task.Reason != "人工复核确认无违规" {
 			t.Fatalf("stored task=%#v", fixture.repo.task)
 		}

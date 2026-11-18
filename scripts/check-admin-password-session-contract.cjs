@@ -28,7 +28,8 @@ const required = [
   ["'/admin-auth/session'", 'session restore endpoint'],
   ["'/admin-auth/logout'", 'logout endpoint'],
   ["'/admin-auth/password/change'", 'password change endpoint'],
-  ['<IdentityApplications/>', 'identity applications page']
+  ['/admin-auth/accounts', 'administrator account management endpoints'],
+  ['IdentityPeople', 'identity applications page']
 ]
 
 for (const [token, description] of required) {

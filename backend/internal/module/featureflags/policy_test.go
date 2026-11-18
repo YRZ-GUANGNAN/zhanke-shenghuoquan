@@ -2,6 +2,7 @@ package featureflags
 
 import (
 	"bytes"
+	"campus-circle/backend/internal/module/adminauth"
 	"campus-circle/backend/internal/module/user"
 	"context"
 	"encoding/json"
@@ -45,7 +46,7 @@ func TestPolicyDurabilityRefreshAndFailClosed(t *testing.T) {
 	p := Snapshot()
 	p.Flags[KeyTakeout] = false
 	saved, err := Update(7, UpdateInput{p.Flags, "admin_only", p.RowVersion, nil})
-	if err != nil || saved.UpdatedBy != 7 || store.audits != 1 {
+	if err != nil || saved.UpdatedByAdminID == nil || *saved.UpdatedByAdminID != 7 || store.audits != 1 {
 		t.Fatalf("save: %+v %v", saved, err)
 	}
 	if err := ConfigureStore(context.Background(), true, store); err != nil {
@@ -174,7 +175,14 @@ func TestAdminAuthorizationAndPublicPayload(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	for _, role := range []user.Role{user.RoleUser, user.RoleAdmin, user.RoleSuperAdmin} {
 		router := gin.New()
-		router.Use(func(c *gin.Context) { user.SetCurrentUser(c, user.User{ID: 3, Role: role, Status: user.StatusActive}) })
+		router.Use(func(c *gin.Context) {
+			switch role {
+			case user.RoleAdmin:
+				adminauth.SetCurrentAccount(c, adminauth.Account{ID: 3, Role: adminauth.RoleAdmin, Status: adminauth.StatusActive})
+			case user.RoleSuperAdmin:
+				adminauth.SetCurrentAccount(c, adminauth.Account{ID: 3, Role: adminauth.RoleSuperAdmin, Status: adminauth.StatusActive})
+			}
+		})
 		router.PATCH("/policy", AdminUpdateHandler)
 		p := Snapshot()
 		data, _ := json.Marshal(UpdateInput{p.Flags, "all_users", p.RowVersion, nil})

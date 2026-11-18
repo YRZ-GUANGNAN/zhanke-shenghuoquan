@@ -274,10 +274,7 @@ func (s *Service) AdminList(ctx context.Context, page, size int) ([]AdminUserVie
 }
 
 // 客服运营手段：号码被错误账号占用时，由管理员解除绑定。
-func (s *Service) AdminClearPhone(ctx context.Context, actorID, targetID uint) error {
-	if _, _, err := s.adminActorAndTarget(ctx, actorID, targetID); err != nil {
-		return err
-	}
+func (s *Service) AdminClearPhone(ctx context.Context, targetID uint) error {
 	repo, ok := s.repo.(settingsRepository)
 	if !ok {
 		return ErrSettingsUnavailable
@@ -287,52 +284,32 @@ func (s *Service) AdminClearPhone(ctx context.Context, actorID, targetID uint) e
 	}
 	return nil
 }
-func (s *Service) AdminUpdateStatus(ctx context.Context, actorID, id uint, status Status) error {
+func (s *Service) AdminUpdateStatus(ctx context.Context, actorIsSuperAdmin bool, id uint, status Status) error {
 	if status != StatusActive && status != StatusMuted && status != StatusBanned {
 		return errors.New("invalid user status")
 	}
-	actor, target, err := s.adminActorAndTarget(ctx, actorID, id)
+	target, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return err
 	}
-	if actor.ID == target.ID {
-		return ErrCannotModifySelf
-	}
-	if actor.Role == RoleAdmin && target.Role != RoleUser {
+	// 普通后台管理员不能处置拥有社区管理角色的用户（与旧规则保持一致）。
+	if !actorIsSuperAdmin && target.Role != RoleUser {
 		return ErrForbidden
 	}
 	protectLast := target.Role == RoleSuperAdmin && target.Status == StatusActive && status != StatusActive
 	return s.repo.UpdateStatusAndRevoke(ctx, id, status, protectLast)
 }
 
-func (s *Service) AdminUpdateRole(ctx context.Context, actorID, id uint, role Role) error {
+func (s *Service) AdminUpdateRole(ctx context.Context, id uint, role Role) error {
 	if role != RoleUser && role != RoleAdmin && role != RoleSuperAdmin {
 		return errors.New("invalid user role")
 	}
-	actor, target, err := s.adminActorAndTarget(ctx, actorID, id)
+	target, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return err
 	}
-	if actor.Role != RoleSuperAdmin {
-		return ErrForbidden
-	}
-	if actor.ID == target.ID {
-		return ErrCannotModifySelf
-	}
 	protectLast := target.Role == RoleSuperAdmin && target.Status == StatusActive && role != RoleSuperAdmin
 	return s.repo.UpdateRoleAndRevoke(ctx, id, role, protectLast)
-}
-
-func (s *Service) adminActorAndTarget(ctx context.Context, actorID, targetID uint) (User, User, error) {
-	actor, err := s.repo.FindByID(ctx, actorID)
-	if err != nil {
-		return User{}, User{}, err
-	}
-	if actor.Status != StatusActive || (actor.Role != RoleAdmin && actor.Role != RoleSuperAdmin) {
-		return User{}, User{}, ErrForbidden
-	}
-	target, err := s.repo.FindByID(ctx, targetID)
-	return actor, target, err
 }
 
 func (s *Service) Stats(ctx context.Context) (int64, int64, error) { return s.repo.Count(ctx) }

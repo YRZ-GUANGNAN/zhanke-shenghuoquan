@@ -332,7 +332,7 @@ func TestOverrideAutomaticDecision(t *testing.T) {
 	}
 	if overridden.Status != StatusApproved ||
 		overridden.DecisionSource != DecisionSourceManualOverride ||
-		overridden.OperatorID != 27 ||
+		overridden.OperatorAdminID == nil || *overridden.OperatorAdminID != 27 ||
 		overridden.Reason != "人工复核确认无违规" {
 		t.Fatalf("overridden=%#v", overridden)
 	}
@@ -345,7 +345,7 @@ func TestOverrideRequiresTerminalTaskOperatorAndReason(t *testing.T) {
 	tests := []struct {
 		name       string
 		task       Task
-		operatorID uint
+		operatorID uint64
 		status     Status
 		reason     string
 	}{

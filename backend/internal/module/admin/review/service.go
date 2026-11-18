@@ -86,6 +86,7 @@ func (s *Service) applyAutomaticDecision(ctx context.Context, task Task) (Task, 
 		current.DecisionSource = DecisionSourceAutomatic
 		current.Reason = currentDecision.Reason
 		current.OperatorID = 0
+		current.OperatorAdminID = nil
 		return txRepo.Save(txCtx, current)
 	})
 }
@@ -98,7 +99,7 @@ func validStatus(status Status) bool {
 		return false
 	}
 }
-func (s *Service) Start(ctx context.Context, id, operatorID uint) (Task, error) {
+func (s *Service) Start(ctx context.Context, id uint, operatorAdminID uint64) (Task, error) {
 	return s.mutateTask(ctx, id, func(txCtx context.Context, txRepo Repository, value *Task) error {
 		if value.Status != StatusSubmitted {
 			return errors.New("only submitted tasks can enter review")
@@ -106,11 +107,13 @@ func (s *Service) Start(ctx context.Context, id, operatorID uint) (Task, error) 
 		if err := s.setTarget(txCtx, *value, StatusReviewing); err != nil {
 			return err
 		}
-		value.Status, value.OperatorID, value.DecisionSource = StatusReviewing, operatorID, DecisionSourceManual
+		value.Status, value.DecisionSource = StatusReviewing, DecisionSourceManual
+		value.OperatorID = 0
+		value.OperatorAdminID = &operatorAdminID
 		return txRepo.Save(txCtx, value)
 	})
 }
-func (s *Service) Decide(ctx context.Context, id, operatorID uint, status Status, reason string) (Task, error) {
+func (s *Service) Decide(ctx context.Context, id uint, operatorAdminID uint64, status Status, reason string) (Task, error) {
 	reason = strings.TrimSpace(reason)
 	if status != StatusApproved && status != StatusRejected {
 		return Task{}, errors.New("invalid review decision")
@@ -128,17 +131,22 @@ func (s *Service) Decide(ctx context.Context, id, operatorID uint, status Status
 		if err := s.setTarget(txCtx, *value, status); err != nil {
 			return err
 		}
-		value.Status, value.OperatorID, value.Reason, value.DecisionSource = status, operatorID, reason, DecisionSourceManual
+		value.Status, value.Reason, value.DecisionSource = status, reason, DecisionSourceManual
+		value.OperatorID = 0
+		value.OperatorAdminID = nil
+		if operatorAdminID != 0 {
+			value.OperatorAdminID = &operatorAdminID
+		}
 		return txRepo.Save(txCtx, value)
 	})
 }
 
-func (s *Service) Override(ctx context.Context, id, operatorID uint, status Status, reason string) (Task, error) {
+func (s *Service) Override(ctx context.Context, id uint, operatorAdminID uint64, status Status, reason string) (Task, error) {
 	reason = strings.TrimSpace(reason)
 	if status != StatusApproved && status != StatusRejected {
 		return Task{}, errors.New("invalid review decision")
 	}
-	if operatorID == 0 {
+	if operatorAdminID == 0 {
 		return Task{}, errors.New("review override requires an operator")
 	}
 	if reason == "" {
@@ -155,7 +163,8 @@ func (s *Service) Override(ctx context.Context, id, operatorID uint, status Stat
 			return err
 		}
 		value.Status = status
-		value.OperatorID = operatorID
+		value.OperatorID = 0
+		value.OperatorAdminID = &operatorAdminID
 		value.Reason = reason
 		value.DecisionSource = DecisionSourceManualOverride
 		return txRepo.Save(txCtx, value)

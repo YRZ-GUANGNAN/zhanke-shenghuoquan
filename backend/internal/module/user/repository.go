@@ -37,7 +37,7 @@ type feedbackRepository interface {
 	DeleteFeedback(context.Context, uint, uint) error
 	ListFeedbacks(context.Context, int, int, string) ([]Feedback, int64, error)
 	ListFeedbacksByUser(context.Context, uint, int, int) ([]Feedback, int64, error)
-	UpdateFeedbackHandling(context.Context, string, string, string, uint, time.Time) error
+	UpdateFeedbackHandling(context.Context, string, string, string, uint64, time.Time) error
 }
 
 type Repository interface {
@@ -400,9 +400,9 @@ func (r *GormRepository) ListFeedbacksByUser(ctx context.Context, userID uint, p
 	return values, total, err
 }
 
-func (r *GormRepository) UpdateFeedbackHandling(ctx context.Context, publicID, status, note string, actorID uint, now time.Time) error {
+func (r *GormRepository) UpdateFeedbackHandling(ctx context.Context, publicID, status, note string, adminID uint64, now time.Time) error {
 	result := r.db.WithContext(ctx).Model(&Feedback{}).Where("feedback_public_id = ?", publicID).Updates(map[string]any{
-		"status": status, "admin_note": note, "handled_by": actorID, "handled_at": now, "updated_at": now,
+		"status": status, "admin_note": note, "handled_by_admin_id": adminID, "handled_at": now, "updated_at": now,
 	})
 	if result.Error != nil {
 		return result.Error

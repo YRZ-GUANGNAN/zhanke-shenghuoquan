@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"campus-circle/backend/internal/module/adminauth"
 	"campus-circle/backend/internal/module/delivery"
 	"campus-circle/backend/internal/pkg/response"
 	"github.com/gin-gonic/gin"
@@ -34,7 +35,7 @@ func (h *Handler) withdrawalProcessing(c *gin.Context) {
 		return
 	}
 	status, claimKey := "unclaimed", ""
-	owned := claim.ID != 0 && h.currentUserID != nil && claim.OperatorUserID == h.currentUserID(c)
+	owned := claim.ID != 0 && claim.OperatorUserID == adminauth.CurrentAccountID(c)
 	if claim.ID != 0 {
 		status = string(claim.Status)
 	}
@@ -51,11 +52,11 @@ func (h *Handler) processWithdrawal(c *gin.Context, kind string) {
 		return
 	}
 	processor, ok := h.withdrawals.(delivery.RiderWithdrawalProcessingRepository)
-	if !ok || h.currentUserID == nil {
+	if !ok {
 		response.Fail(c, http.StatusServiceUnavailable, "提现处理暂不可用")
 		return
 	}
-	operator := h.currentUserID(c)
+	operator := adminauth.CurrentAccountID(c)
 	if operator == 0 {
 		response.Fail(c, http.StatusUnauthorized, "authentication required")
 		return

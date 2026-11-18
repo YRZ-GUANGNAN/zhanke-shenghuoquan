@@ -7,14 +7,13 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strconv"
+	"strings"
 
 	"golang.org/x/term"
 
 	"campus-circle/backend/internal/config"
 	"campus-circle/backend/internal/database"
 	"campus-circle/backend/internal/module/adminauth"
-	"campus-circle/backend/internal/module/user"
 )
 
 func main() {
@@ -25,21 +24,24 @@ func main() {
 
 func run(args []string) error {
 	if len(args) == 0 || (args[0] != "bootstrap" && args[0] != "reset") {
-		return errors.New("usage: admin-credential <bootstrap|reset> --user-id <id>")
+		return errors.New("usage: admin-credential <bootstrap|reset> --username <name> [--role superadmin] [--display-name <name>]")
 	}
 	operation := args[0]
 	flags := flag.NewFlagSet(operation, flag.ContinueOnError)
 	flags.SetOutput(os.Stderr)
-	userIDValue := flags.String("user-id", "", "existing active superadmin user ID")
+	usernameValue := flags.String("username", "", "administrator login username (3-64 letters, digits, dot or underscore)")
+	roleValue := flags.String("role", "superadmin", "administrator role: admin or superadmin")
+	displayNameValue := flags.String("display-name", "", "administrator display name (defaults to username)")
 	if err := flags.Parse(args[1:]); err != nil {
 		return err
 	}
-	if flags.NArg() != 0 || *userIDValue == "" {
-		return errors.New("--user-id is required and no password argument is accepted")
+	username := strings.TrimSpace(*usernameValue)
+	if flags.NArg() != 0 || username == "" {
+		return errors.New("--username is required and no password argument is accepted")
 	}
-	parsed, err := strconv.ParseUint(*userIDValue, 10, 32)
-	if err != nil || parsed == 0 {
-		return errors.New("--user-id must be a positive integer")
+	role := adminauth.Role(strings.TrimSpace(*roleValue))
+	if !role.Valid() {
+		return errors.New("--role must be admin or superadmin")
 	}
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
 		return errors.New("password input requires an interactive TTY")
@@ -68,18 +70,17 @@ func run(args []string) error {
 	if err != nil {
 		return errors.New("open database failed")
 	}
-	users := user.NewService(user.NewRepository(db), cfg.JWTSecret, cfg.WechatAppID, cfg.WechatAppSecret, cfg.AllowMockWechat)
-	service, err := adminauth.NewService(adminauth.NewRepository(db), users)
+	service, err := adminauth.NewService(adminauth.NewRepository(db))
 	if err != nil {
-		return errors.New("initialize credential service failed")
+		return errors.New("initialize administrator account service failed")
 	}
 	eventType := "credential_bootstrap"
 	if operation == "reset" {
 		eventType = "credential_reset"
 	}
-	if err := service.Bootstrap(context.Background(), uint(parsed), string(first), eventType); err != nil {
-		return fmt.Errorf("%s administrator credential: %w", operation, err)
+	if err := service.Bootstrap(context.Background(), username, strings.TrimSpace(*displayNameValue), role, string(first), eventType); err != nil {
+		return fmt.Errorf("%s administrator account: %w", operation, err)
 	}
-	fmt.Fprintln(os.Stdout, "管理员凭据已安全更新，现有 Web 管理会话已按操作策略处理。")
+	fmt.Fprintln(os.Stdout, "管理员账号已安全更新，现有 Web 管理会话已按操作策略处理。")
 	return nil
 }

@@ -12,7 +12,7 @@ import type {
   UserRow
 } from '../../types'
 import { adminAPI } from '../../services/f-admin'
-import { adminAuthAPI, type AdminCredential } from '../../services/admin-auth'
+import { adminAuthAPI, type AdminAccount } from '../../services/admin-auth'
 import type { PreviewSection } from '../data'
 import {
   Button,
@@ -67,17 +67,16 @@ const displayTime = (value?: string | null) => {
 // 后端错误信息以英文为主，这里把常见约束翻译成可直接展示的提示。
 const errorTranslations: Record<string, string> = {
   forbidden: '当前账号无权执行该操作',
-  'cannot modify own administrative account': '不能修改自己的管理员账号',
+  'cannot disable or demote yourself': '不能停用或降级自己的账号',
   'cannot disable or demote the last active superadmin': '不能停用或降级最后一个超级管理员',
-  'only a super administrator can manage administrator accounts': '仅超级管理员可以管理后台登录账号',
-  'cannot remove your own administrator credential': '不能移除自己的登录账号',
-  'target user is not an active administrator': '目标用户不是启用状态的管理员',
+  'only a super administrator can manage administrator accounts': '仅超级管理员可以管理管理员账号',
   'admin username must be 3-64 characters of letters, digits, dot or underscore': '用户名需为 3–64 位字母、数字、点或下划线',
+  'administrator display name must be at most 64 characters': '显示名不能超过 64 个字符',
   'this administrator username is already in use': '该登录用户名已被使用',
   'password must contain 14 to 72 characters': '密码需为 14–72 位',
-  'administrator accounts unavailable': '后台登录账号暂时无法读取',
-  'save administrator account failed': '保存后台登录账号失败',
-  'remove administrator account failed': '移除后台登录账号失败'
+  'administrator account not found': '管理员账号不存在',
+  'administrator accounts unavailable': '管理员账号暂时无法读取',
+  'administrator account operation failed': '管理员账号操作失败'
 }
 
 function errorStatus(reason: unknown): number | undefined {
@@ -627,14 +626,13 @@ function FeedbackPeople() {
   </div>
 }
 
-interface CredentialDraft {
-  mode: 'assign' | 'reset'
-  userId: number | null
-  nickname: string
+interface AccountDraft {
+  mode: 'create' | 'edit'
+  id: number | null
   username: string
-  password: string
+  displayName: string
   role: 'admin' | 'superadmin'
-  query: string
+  password: string
 }
 
 function UserPeople() {
@@ -648,13 +646,15 @@ function UserPeople() {
   const [role, setRole] = useState<'全部' | UserRow['role']>('全部')
   const [allUsers, setAllUsers] = useState<UserRow[] | null>(null)
   const [allUsersError, setAllUsersError] = useState('')
-  const [credentials, setCredentials] = useState<AdminCredential[]>([])
-  const [credentialsLoading, setCredentialsLoading] = useState(false)
-  const [credentialsError, setCredentialsError] = useState('')
-  const [credentialDraft, setCredentialDraft] = useState<CredentialDraft | null>(null)
-  const [credentialFormError, setCredentialFormError] = useState('')
-  const [credentialBusy, setCredentialBusy] = useState(false)
-  const [pendingCredential, setPendingCredential] = useState<AdminCredential | null>(null)
+  const [accounts, setAccounts] = useState<AdminAccount[]>([])
+  const [accountsLoading, setAccountsLoading] = useState(false)
+  const [accountsError, setAccountsError] = useState('')
+  const [accountDraft, setAccountDraft] = useState<AccountDraft | null>(null)
+  const [accountFormError, setAccountFormError] = useState('')
+  const [accountBusy, setAccountBusy] = useState(false)
+  const [pendingAccountStatus, setPendingAccountStatus] = useState<AdminAccount | null>(null)
+  const [pendingAccountPassword, setPendingAccountPassword] = useState<AdminAccount | null>(null)
+  const [passwordDraft, setPasswordDraft] = useState('')
   const [pendingStatus, setPendingStatus] = useState<{ user: UserRow; status: UserRow['status'] } | null>(null)
   const [pendingRole, setPendingRole] = useState<{ user: UserRow; role: UserRow['role'] } | null>(null)
   const [pendingPhone, setPendingPhone] = useState<UserRow | null>(null)
@@ -662,7 +662,7 @@ function UserPeople() {
   const [actionBusy, setActionBusy] = useState(false)
   const usersRequestRef = useRef(0)
   const allUsersRequestRef = useRef(0)
-  const credentialsRequestRef = useRef(0)
+  const accountsRequestRef = useRef(0)
 
   const loadUsers = useCallback(async () => {
     const requestId = ++usersRequestRef.current
@@ -692,28 +692,28 @@ function UserPeople() {
     }
   }, [])
 
-  const loadCredentials = useCallback(async () => {
-    const requestId = ++credentialsRequestRef.current
-    setCredentialsLoading(true)
-    setCredentialsError('')
+  const loadAccounts = useCallback(async () => {
+    const requestId = ++accountsRequestRef.current
+    setAccountsLoading(true)
+    setAccountsError('')
     try {
-      const result = await adminAuthAPI.credentials()
-      if (requestId !== credentialsRequestRef.current) return
-      setCredentials(result.items)
+      const result = await adminAuthAPI.accounts()
+      if (requestId !== accountsRequestRef.current) return
+      setAccounts(result.items)
     } catch (error) {
-      if (requestId !== credentialsRequestRef.current) return
-      setCredentialsError(errorStatus(error) === 403 ? '仅超级管理员可以管理后台登录账号' : friendlyError(error))
+      if (requestId !== accountsRequestRef.current) return
+      setAccountsError(errorStatus(error) === 403 ? '仅超级管理员可以管理管理员账号' : friendlyError(error))
     } finally {
-      if (requestId === credentialsRequestRef.current) setCredentialsLoading(false)
+      if (requestId === accountsRequestRef.current) setAccountsLoading(false)
     }
   }, [])
 
   useEffect(() => { void loadUsers() }, [loadUsers])
   useEffect(() => { void loadAllUsers() }, [loadAllUsers])
-  useEffect(() => { void loadCredentials() }, [loadCredentials])
+  useEffect(() => { void loadAccounts() }, [loadAccounts])
 
   const refreshUsers = async () => {
-    await Promise.all([loadUsers(), loadAllUsers(), loadCredentials()])
+    await Promise.all([loadUsers(), loadAllUsers(), loadAccounts()])
   }
 
   const openStatus = (user: UserRow, status: UserRow['status']) => {
@@ -778,69 +778,69 @@ function UserPeople() {
     }
   }
 
-  const openAssignCredential = () => {
-    setCredentialDraft({ mode: 'assign', userId: null, nickname: '', username: '', password: '', role: 'admin', query: '' })
-    setCredentialFormError('')
+  const openCreateAccount = () => {
+    setAccountDraft({ mode: 'create', id: null, username: '', displayName: '', role: 'admin', password: '' })
+    setAccountFormError('')
   }
 
-  const openResetCredential = (credential: AdminCredential) => {
-    setCredentialDraft({
-      mode: 'reset',
-      userId: credential.userId,
-      nickname: credential.nickname,
-      username: credential.username,
-      password: '',
-      role: credential.role === 'superadmin' ? 'superadmin' : 'admin',
-      query: ''
-    })
-    setCredentialFormError('')
+  const openEditAccount = (account: AdminAccount) => {
+    setAccountDraft({ mode: 'edit', id: account.id, username: account.username, displayName: account.displayName, role: account.role, password: '' })
+    setAccountFormError('')
   }
 
-  const submitCredential = async () => {
-    if (!credentialDraft) return
-    const userId = credentialDraft.userId
-    if (userId === null) {
-      setCredentialFormError('请选择要分配登录账号的管理员用户')
+  const submitAccount = async () => {
+    if (!accountDraft) return
+    const displayName = accountDraft.displayName.trim()
+    if ([...displayName].length > 64) {
+      setAccountFormError('显示名不能超过 64 个字符')
       return
     }
-    const username = credentialDraft.username.trim()
-    if (!/^[A-Za-z0-9._]{3,64}$/.test(username)) {
-      setCredentialFormError('用户名需为 3–64 位字母、数字、点或下划线')
-      return
-    }
-    const passwordLength = [...credentialDraft.password].length
-    if (passwordLength < 14 || passwordLength > 72) {
-      setCredentialFormError('密码需为 14–72 位')
-      return
-    }
-    setCredentialBusy(true)
-    setCredentialFormError('')
-    try {
-      const target = allUsers?.find(user => user.id === userId)
-      // 一步添加管理员：所选用户还不是目标角色时先调整角色，再分配登录账号。
-      if (credentialDraft.mode === 'assign' && target && target.role !== credentialDraft.role) {
-        await adminAPI.updateUserRole(userId, credentialDraft.role)
+    if (accountDraft.mode === 'create') {
+      const username = accountDraft.username.trim()
+      if (!/^[A-Za-z0-9._]{3,64}$/.test(username)) {
+        setAccountFormError('用户名需为 3–64 位字母、数字、点或下划线')
+        return
       }
-      await adminAuthAPI.saveCredential(userId, username, credentialDraft.password)
-      setCredentialDraft(null)
-      notify(credentialDraft.mode === 'assign' ? '登录账号已分配' : '登录密码已重置，旧会话将失效', credentialDraft.mode === 'assign' ? 'success' : 'info')
-      await loadCredentials()
+      const passwordLength = [...accountDraft.password].length
+      if (passwordLength < 14 || passwordLength > 72) {
+        setAccountFormError('初始密码需为 14–72 位')
+        return
+      }
+    }
+    setAccountBusy(true)
+    setAccountFormError('')
+    try {
+      if (accountDraft.mode === 'create') {
+        await adminAuthAPI.createAccount({
+          username: accountDraft.username.trim(),
+          displayName,
+          password: accountDraft.password,
+          role: accountDraft.role
+        })
+        notify('管理员账号已创建', 'success')
+      } else if (accountDraft.id !== null) {
+        await adminAuthAPI.updateAccount(accountDraft.id, displayName, accountDraft.role)
+        notify('管理员账号已更新', 'success')
+      }
+      setAccountDraft(null)
+      await loadAccounts()
     } catch (error) {
-      setCredentialFormError(friendlyError(error))
+      setAccountFormError(friendlyError(error))
     } finally {
-      setCredentialBusy(false)
+      setAccountBusy(false)
     }
   }
 
-  const submitCredentialRemoval = async () => {
-    if (!pendingCredential) return
+  const submitAccountStatus = async () => {
+    if (!pendingAccountStatus) return
+    const nextStatus = pendingAccountStatus.status === 'active' ? 'disabled' : 'active'
     setActionBusy(true)
     setActionError('')
     try {
-      await adminAuthAPI.removeCredential(pendingCredential.userId)
-      notify('已移除该登录账号，对方将无法登录', 'info')
-      setPendingCredential(null)
-      await loadCredentials()
+      await adminAuthAPI.setAccountStatus(pendingAccountStatus.id, nextStatus)
+      notify(nextStatus === 'disabled' ? '管理员账号已停用，其现有会话已失效' : '管理员账号已启用', 'info')
+      setPendingAccountStatus(null)
+      await loadAccounts()
     } catch (error) {
       setActionError(friendlyError(error))
     } finally {
@@ -848,23 +848,36 @@ function UserPeople() {
     }
   }
 
-  const credentialUserIds = useMemo(() => new Set(credentials.map(item => item.userId)), [credentials])
-  const credentialCandidates = useMemo(() => (allUsers ?? []).filter(user =>
-    user.status === 'active' && !credentialUserIds.has(user.id)
-  ), [allUsers, credentialUserIds])
-  const credentialMatches = useMemo(() => {
-    const keyword = (credentialDraft?.query ?? '').trim().toLowerCase().replace(/^#/, '')
-    if (!keyword) return credentialCandidates
-    return credentialCandidates.filter(user => `${user.nickname} #${user.id}`.toLowerCase().includes(keyword))
-  }, [credentialCandidates, credentialDraft?.query])
+  const submitAccountPassword = async () => {
+    if (!pendingAccountPassword) return
+    const length = [...passwordDraft].length
+    if (length < 14 || length > 72) {
+      setAccountFormError('新密码需为 14–72 位')
+      return
+    }
+    setAccountBusy(true)
+    setAccountFormError('')
+    try {
+      await adminAuthAPI.resetAccountPassword(pendingAccountPassword.id, passwordDraft)
+      notify('登录密码已重置，该账号现有会话已失效', 'info')
+      setPendingAccountPassword(null)
+      setPasswordDraft('')
+      await loadAccounts()
+    } catch (error) {
+      setAccountFormError(friendlyError(error))
+    } finally {
+      setAccountBusy(false)
+    }
+  }
+
   const statistics = useMemo(() => {
     if (!allUsers) return null
     return {
       normalUsers: allUsers.filter(user => user.role === 'user').length,
-      admins: allUsers.filter(user => user.role === 'admin' || user.role === 'superadmin').length,
+      admins: accounts.length,
       restricted: allUsers.filter(user => user.status !== 'active').length
     }
-  }, [allUsers])
+  }, [allUsers, accounts])
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase()
@@ -897,26 +910,29 @@ function UserPeople() {
       <StatCard label="受限账号" value={statistics ? statistics.restricted : '—'} meta="禁言或停用" tone="rose" />
     </section>
     <Panel
-      eyebrow="ADMIN CREDENTIAL"
-      title="后台登录账号"
-      description="只有被授予登录账号的管理员才能进入本后台；超级管理员可分配、重置或移除。"
-      actions={<Button variant="primary" disabled={!allUsers || credentialsLoading || Boolean(credentialsError)} onClick={openAssignCredential}>分配登录账号</Button>}
+      eyebrow="ADMIN ACCOUNTS"
+      title="管理员账号"
+      description="后台账号与小程序用户完全独立：直接创建用户名、密码与角色，不需要小程序注册，也不会影响任何用户账号。仅超级管理员可管理。"
+      actions={<Button variant="primary" disabled={accountsLoading || Boolean(accountsError)} onClick={openCreateAccount}>新建管理员账号</Button>}
     >
-      {credentialsError && <div className="preview-form-error" role="alert">{credentialsError}</div>}
-      {credentialsLoading && credentials.length === 0 && !credentialsError && <div className="preview-policy-note">正在加载后台登录账号…</div>}
-      {!credentialsLoading && !credentialsError && credentials.length === 0
-        ? <EmptyState title="暂无后台登录账号" description="可从管理员用户中分配登录账号。" />
-        : credentials.length > 0 && <div className="preview-table-wrap"><table className="preview-table" aria-label="后台登录账号列表">
-          <thead><tr><th>登录用户名</th><th>管理员</th><th>角色</th><th>状态</th><th>密码更新时间</th><th /></tr></thead>
-          <tbody>{credentials.map(item => <tr key={item.credentialId}>
-            <td><strong>{item.username}</strong><span>#{item.userId}</span></td>
-            <td>{item.nickname || `用户 #${item.userId}`}</td>
+      {accountsError && <div className="preview-form-error" role="alert">{accountsError}</div>}
+      {accountsLoading && accounts.length === 0 && !accountsError && <div className="preview-policy-note">正在加载管理员账号…</div>}
+      {!accountsLoading && !accountsError && accounts.length === 0
+        ? <EmptyState title="暂无管理员账号" description="新建第一个后台登录账号。" />
+        : accounts.length > 0 && <div className="preview-table-wrap"><table className="preview-table" aria-label="管理员账号列表">
+          <thead><tr><th>登录用户名</th><th>显示名</th><th>角色</th><th>状态</th><th>密码更新时间</th><th /></tr></thead>
+          <tbody>{accounts.map(item => <tr key={item.id}>
+            <td><strong>{item.username}</strong><span>{item.legacyUserId ? `历史用户 #${item.legacyUserId}` : `#${item.id}`}</span></td>
+            <td>{item.displayName || '未设置'}</td>
             <td>{userRoleText(item.role)}</td>
-            <td><StatusPill tone={item.locked ? 'danger' : 'success'}>{item.locked ? '已锁定' : '正常'}</StatusPill></td>
+            <td><StatusPill tone={item.locked ? 'danger' : item.status === 'active' ? 'success' : 'neutral'}>{item.locked ? '已锁定' : item.status === 'active' ? '正常' : '已停用'}</StatusPill></td>
             <td>{displayTime(item.passwordSetAt)}</td>
             <td><div className="preview-row-actions">
-              <Button size="sm" variant="ghost" onClick={() => openResetCredential(item)}>重置</Button>
-              <Button size="sm" variant="danger" onClick={() => { setActionError(''); setPendingCredential(item) }}>移除</Button>
+              <Button size="sm" variant="ghost" onClick={() => openEditAccount(item)}>编辑</Button>
+              <Button size="sm" variant="ghost" onClick={() => { setPasswordDraft(''); setAccountFormError(''); setPendingAccountPassword(item) }}>重置密码</Button>
+              {item.status === 'active'
+                ? <Button size="sm" variant="danger" onClick={() => { setActionError(''); setPendingAccountStatus(item) }}>停用</Button>
+                : <Button size="sm" variant="ghost" onClick={() => { setActionError(''); setPendingAccountStatus(item) }}>启用</Button>}
             </div></td>
           </tr>)}</tbody>
         </table></div>}
@@ -931,7 +947,7 @@ function UserPeople() {
         <SearchBox value={query} onChange={setQuery} placeholder="搜索当前页姓名、手机号或编号" />
         <Segmented value={role} onChange={setRole} options={roleOptions} />
       </div>
-      <ErrorNote message={listError} onRetry={() => { void loadUsers(); void loadAllUsers(); void loadCredentials() }} />
+      <ErrorNote message={listError} onRetry={() => { void loadUsers(); void loadAllUsers(); void loadAccounts() }} />
       {allUsersError && <div className="preview-form-error" role="alert">账号统计加载失败：{allUsersError}</div>}
       {listError
         ? null
@@ -969,80 +985,103 @@ function UserPeople() {
       <Pagination page={data.page} pageSize={data.pageSize} total={data.total} onChange={setPage} label="用户列表分页" />
       <div className="preview-policy-note">
         <span>权限说明</span>
-        <p>账号状态与角色变更会立即写入真实账号，并让该用户现有登录会话失效；仅超级管理员可以调整角色与后台登录账号。</p>
+        <p>管理员账号与小程序用户完全独立；下方用户列表中的“角色”只影响小程序站内权限（如仅管理员可发帖），不会授予后台登录权限。用户状态与角色变更会让该用户的登录会话失效。</p>
       </div>
     </Panel>
 
     <Modal
-      open={Boolean(credentialDraft)}
-      title={credentialDraft?.mode === 'reset' ? '重置登录密码' : '分配后台登录账号'}
-      description={credentialDraft?.mode === 'reset'
-        ? `管理员：${credentialDraft.nickname || `用户 #${credentialDraft.userId}`}`
-        : '选择一个小程序用户，设置角色与后台登录凭据。'}
-      onClose={() => { if (!credentialBusy) { setCredentialDraft(null); setCredentialFormError('') } }}
+      open={Boolean(accountDraft)}
+      title={accountDraft?.mode === 'edit' ? `编辑管理员账号 ${accountDraft?.username ?? ''}` : '新建管理员账号'}
+      description={accountDraft?.mode === 'edit' ? '显示名与角色可调整；角色变更会立即影响该账号的后台权限。' : '后台账号独立于小程序用户，创建后即可用于登录本后台。'}
+      onClose={() => { if (!accountBusy) { setAccountDraft(null); setAccountFormError('') } }}
       footer={<>
-        <Button onClick={() => { setCredentialDraft(null); setCredentialFormError('') }} disabled={credentialBusy}>取消</Button>
-        <Button variant="primary" onClick={() => void submitCredential()} disabled={credentialBusy}>{credentialBusy ? '保存中…' : '保存登录账号'}</Button>
+        <Button onClick={() => { setAccountDraft(null); setAccountFormError('') }} disabled={accountBusy}>取消</Button>
+        <Button variant="primary" onClick={() => void submitAccount()} disabled={accountBusy}>{accountBusy ? '保存中…' : '保存'}</Button>
       </>}
     >
-      {credentialDraft && <div className="preview-form-stack">
-        {credentialDraft.mode === 'assign'
-          ? <>
-            <Field
-              label="搜索用户"
-              value={credentialDraft.query}
-              onChange={event => setCredentialDraft(current => current ? { ...current, query: event.target.value } : current)}
-              placeholder="输入昵称或 #用户编号过滤"
-              hint="可在此一步把目标用户设为管理员（或超级管理员）并分配后台登录账号"
-              disabled={credentialBusy}
-            />
-            <SelectField
-              label="目标用户"
-              required
-              value={credentialDraft.userId === null ? '' : String(credentialDraft.userId)}
-              disabled={credentialBusy}
-              onChange={event => {
-                const user = credentialMatches.find(entry => String(entry.id) === event.target.value)
-                setCredentialDraft(current => current ? { ...current, userId: user?.id ?? null, nickname: user?.nickname ?? '' } : current)
-              }}
-            >
-              <option value="">请选择用户</option>
-              {credentialMatches.map(user => <option key={user.id} value={user.id}>#{user.id} {user.nickname || '未命名用户'}（{userRoleLabel[user.role]}）</option>)}
-            </SelectField>
-            <SelectField
-              label="授予角色"
-              value={credentialDraft.role}
-              disabled={credentialBusy}
-              onChange={event => setCredentialDraft(current => current ? { ...current, role: event.target.value as CredentialDraft['role'] } : current)}
-            >
-              <option value="admin">管理员</option>
-              <option value="superadmin">超级管理员</option>
-            </SelectField>
-            <div className="preview-policy-note">保存时若该用户还不是所选角色，会先调整角色（其现有登录会话将失效），再分配后台登录账号。</div>
-          </>
-          : <Field label="管理员" value={credentialDraft.nickname || `用户 #${credentialDraft.userId}`} readOnly disabled />}
-        {credentialDraft.mode === 'assign' && credentialCandidates.length === 0 && <div className="preview-policy-note">暂无可分配的用户（需账号状态正常且尚未分配登录账号）。</div>}
+      {accountDraft && <div className="preview-form-stack">
         <Field
           label="登录用户名"
           required
-          value={credentialDraft.username}
-          onChange={event => setCredentialDraft(current => current ? { ...current, username: event.target.value } : current)}
+          value={accountDraft.username}
+          onChange={event => setAccountDraft(current => current ? { ...current, username: event.target.value } : current)}
           placeholder="例如：ops.zhang"
-          hint="3–64 位字母、数字、点或下划线"
-          disabled={credentialBusy}
+          hint={accountDraft.mode === 'edit' ? '登录用户名创建后不可修改' : '3–64 位字母、数字、点或下划线'}
+          disabled={accountBusy || accountDraft.mode === 'edit'}
         />
         <Field
-          label={credentialDraft.mode === 'assign' ? '初始密码' : '新密码'}
+          label="显示名"
+          value={accountDraft.displayName}
+          onChange={event => setAccountDraft(current => current ? { ...current, displayName: event.target.value } : current)}
+          placeholder="例如：运营小张"
+          hint="后台右上角与操作记录展示用；留空则使用用户名"
+          disabled={accountBusy}
+        />
+        <SelectField
+          label="角色"
+          value={accountDraft.role}
+          disabled={accountBusy}
+          onChange={event => setAccountDraft(current => current ? { ...current, role: event.target.value as AccountDraft['role'] } : current)}
+        >
+          <option value="admin">管理员</option>
+          <option value="superadmin">超级管理员</option>
+        </SelectField>
+        {accountDraft.mode === 'create' && <Field
+          label="初始密码"
           required
           type="password"
-          value={credentialDraft.password}
-          onChange={event => setCredentialDraft(current => current ? { ...current, password: event.target.value } : current)}
+          value={accountDraft.password}
+          onChange={event => setAccountDraft(current => current ? { ...current, password: event.target.value } : current)}
           placeholder="14–72 位"
           hint="14–72 位字符"
-          disabled={credentialBusy}
-        />
-        {credentialFormError && <div className="preview-form-error">{credentialFormError}</div>}
+          disabled={accountBusy}
+        />}
+        {accountFormError && <div className="preview-form-error">{accountFormError}</div>}
       </div>}
+    </Modal>
+
+    <Modal
+      open={Boolean(pendingAccountPassword)}
+      title={pendingAccountPassword ? `重置密码：${pendingAccountPassword.username}` : ''}
+      description="重置后该账号现有后台会话全部失效，需要用新密码重新登录。"
+      onClose={() => { if (!accountBusy) { setPendingAccountPassword(null); setAccountFormError('') } }}
+      footer={<>
+        <Button onClick={() => { setPendingAccountPassword(null); setAccountFormError('') }} disabled={accountBusy}>取消</Button>
+        <Button variant="primary" onClick={() => void submitAccountPassword()} disabled={accountBusy}>{accountBusy ? '保存中…' : '重置密码'}</Button>
+      </>}
+    >
+      <div className="preview-form-stack">
+        <Field
+          label="新密码"
+          required
+          type="password"
+          value={passwordDraft}
+          onChange={event => setPasswordDraft(event.target.value)}
+          placeholder="14–72 位"
+          hint="14–72 位字符"
+          disabled={accountBusy}
+        />
+        {accountFormError && <div className="preview-form-error">{accountFormError}</div>}
+      </div>
+    </Modal>
+
+    <Modal
+      open={Boolean(pendingAccountStatus)}
+      title={pendingAccountStatus ? (pendingAccountStatus.status === 'active' ? `停用管理员账号 ${pendingAccountStatus.username}` : `启用管理员账号 ${pendingAccountStatus.username}`) : ''}
+      description="停用会立即吊销该账号的全部后台会话；启用后可重新登录。系统会保护最后一名启用中的超级管理员。"
+      onClose={() => { if (!actionBusy) setPendingAccountStatus(null) }}
+      footer={<>
+        <Button onClick={() => setPendingAccountStatus(null)} disabled={actionBusy}>取消</Button>
+        <Button variant={pendingAccountStatus?.status === 'active' ? 'danger' : 'primary'} onClick={() => void submitAccountStatus()} disabled={actionBusy}>{actionBusy ? '提交中…' : '确认'}</Button>
+      </>}
+    >
+      <div className="preview-form-stack">
+        <div className="preview-warning-box">
+          <strong>{pendingAccountStatus?.status === 'active' ? '停用后该管理员立即失去后台访问权限' : '启用后该管理员可以重新登录后台'}</strong>
+          <p>管理员账号与小程序用户账号互不影响。</p>
+        </div>
+        {actionError && <div className="preview-form-error">{actionError}</div>}
+      </div>
     </Modal>
 
     <Modal
@@ -1075,14 +1114,14 @@ function UserPeople() {
       </>}
     >
       {pendingRole && <div className="preview-form-stack">
-        <SelectField label="新角色" value={pendingRole.role} onChange={event => setPendingRole({ ...pendingRole, role: event.target.value as UserRow['role'] })}>
+        <SelectField label="新社区角色" value={pendingRole.role} onChange={event => setPendingRole({ ...pendingRole, role: event.target.value as UserRow['role'] })}>
           <option value="user">普通用户</option>
           <option value="admin">管理员</option>
           <option value="superadmin">超级管理员</option>
         </SelectField>
         <div className="preview-warning-box">
-          <strong>角色变更会立即生效</strong>
-          <p>调整角色会让该用户现有登录会话失效；仅超级管理员可以执行此操作。</p>
+          <strong>社区角色变更会立即生效</strong>
+          <p>该角色只影响小程序站内权限（如仅管理员可发帖），不授予后台登录权限；调整后会吊销该用户现有登录会话。</p>
         </div>
         {actionError && <div className="preview-form-error">{actionError}</div>}
       </div>}
@@ -1102,25 +1141,6 @@ function UserPeople() {
         <div className="preview-warning-box">
           <strong>解除后该手机号将不再关联此账号</strong>
           <p>用户需要重新绑定手机号后才能使用短信登录或找回账号。</p>
-        </div>
-        {actionError && <div className="preview-form-error">{actionError}</div>}
-      </div>
-    </Modal>
-
-    <Modal
-      open={Boolean(pendingCredential)}
-      title="移除登录账号"
-      description={pendingCredential ? `账号：${pendingCredential.username} · ${pendingCredential.nickname || `用户 #${pendingCredential.userId}`}` : ''}
-      onClose={() => { if (!actionBusy) setPendingCredential(null) }}
-      footer={<>
-        <Button onClick={() => setPendingCredential(null)} disabled={actionBusy}>取消</Button>
-        <Button variant="danger" onClick={() => void submitCredentialRemoval()} disabled={actionBusy}>{actionBusy ? '提交中…' : '确认移除'}</Button>
-      </>}
-    >
-      <div className="preview-form-stack">
-        <div className="preview-warning-box">
-          <strong>移除后该管理员将立即失去后台访问权限</strong>
-          <p>操作会吊销该账号的全部后台会话。</p>
         </div>
         {actionError && <div className="preview-form-error">{actionError}</div>}
       </div>

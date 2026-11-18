@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"testing"
 
+	"campus-circle/backend/internal/module/adminauth"
 	"campus-circle/backend/internal/module/user"
 	"github.com/gin-gonic/gin"
 )
@@ -143,7 +144,20 @@ func TestPresentationModeRequiresActiveSuperAdmin(t *testing.T) {
 		p := Snapshot()
 		body, _ := json.Marshal(UpdateInput{p.Flags, p.PostingMode, p.RowVersion, modePointer(PresentationCampusInfo)})
 		router := gin.New()
-		router.Use(func(c *gin.Context) { user.SetCurrentUser(c, user.User{ID: 9, Role: test.role, Status: test.status}) })
+		router.Use(func(c *gin.Context) {
+			adminRole := adminauth.RoleAdmin
+			if test.role == user.RoleSuperAdmin {
+				adminRole = adminauth.RoleSuperAdmin
+			}
+			adminStatus := adminauth.StatusActive
+			if test.status != user.StatusActive {
+				adminStatus = adminauth.StatusDisabled
+			}
+			if test.role == user.RoleUser {
+				return
+			}
+			adminauth.SetCurrentAccount(c, adminauth.Account{ID: 9, Role: adminRole, Status: adminStatus})
+		})
 		router.PATCH("/policy", AdminUpdateHandler)
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, httptest.NewRequest("PATCH", "/policy", bytes.NewReader(body)))

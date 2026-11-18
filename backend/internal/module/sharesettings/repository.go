@@ -10,28 +10,30 @@ import (
 )
 
 type ConfigRow struct {
-	ID         uint `gorm:"primaryKey"`
-	Cards      `gorm:"embedded"`
-	RowVersion uint64
-	UpdatedBy  uint
-	UpdatedAt  time.Time
+	ID               uint `gorm:"primaryKey"`
+	Cards            `gorm:"embedded"`
+	RowVersion       uint64
+	UpdatedBy        uint
+	UpdatedByAdminID *uint64 `gorm:"column:updated_by_admin_id"`
+	UpdatedAt        time.Time
 }
 
 func (ConfigRow) TableName() string { return "share_settings" }
 
 type AuditRow struct {
-	ID         uint `gorm:"primaryKey"`
-	ActorID    uint
-	BeforeJSON string
-	AfterJSON  string
-	CreatedAt  time.Time
+	ID           uint `gorm:"primaryKey"`
+	ActorID      uint
+	ActorAdminID *uint64 `gorm:"column:actor_admin_id"`
+	BeforeJSON   string
+	AfterJSON    string
+	CreatedAt    time.Time
 }
 
 func (AuditRow) TableName() string { return "share_settings_audit_logs" }
 
 type Store interface {
 	Load(context.Context) (Settings, error)
-	Save(context.Context, uint, UpdateInput) (Settings, error)
+	Save(context.Context, uint64, UpdateInput) (Settings, error)
 }
 
 type GormStore struct{ db *gorm.DB }
@@ -55,7 +57,7 @@ func (s *GormStore) Load(ctx context.Context) (Settings, error) {
 	return Settings{Cards: row.Cards, RowVersion: row.RowVersion, UpdatedAt: row.UpdatedAt}, nil
 }
 
-func (s *GormStore) Save(ctx context.Context, actor uint, input UpdateInput) (Settings, error) {
+func (s *GormStore) Save(ctx context.Context, actor uint64, input UpdateInput) (Settings, error) {
 	var saved Settings
 	if actor == 0 || input.ExpectedRowVersion == 0 {
 		return saved, ErrInvalid
@@ -75,7 +77,7 @@ func (s *GormStore) Save(ctx context.Context, actor uint, input UpdateInput) (Se
 		result := tx.Model(&ConfigRow{}).Where("id = 1 AND row_version = ?", before.RowVersion).Updates(map[string]any{
 			"home_title": saved.HomeTitle, "secondhand_title": saved.SecondhandTitle, "services_title": saved.ServicesTitle,
 			"default_image_url": saved.DefaultImageURL, "detail_title_suffix": saved.DetailTitleSuffix, "prefer_content_image": saved.PreferContentImage,
-			"row_version": saved.RowVersion, "updated_by": actor, "updated_at": saved.UpdatedAt,
+			"row_version": saved.RowVersion, "updated_by_admin_id": actor, "updated_at": saved.UpdatedAt,
 		})
 		if result.Error != nil {
 			return result.Error
@@ -85,7 +87,7 @@ func (s *GormStore) Save(ctx context.Context, actor uint, input UpdateInput) (Se
 		}
 		beforeJSON, _ := json.Marshal(before)
 		afterJSON, _ := json.Marshal(saved)
-		return tx.Create(&AuditRow{ActorID: actor, BeforeJSON: string(beforeJSON), AfterJSON: string(afterJSON), CreatedAt: saved.UpdatedAt}).Error
+		return tx.Create(&AuditRow{ActorAdminID: &actor, BeforeJSON: string(beforeJSON), AfterJSON: string(afterJSON), CreatedAt: saved.UpdatedAt}).Error
 	})
 	return saved, err
 }

@@ -633,22 +633,16 @@ func TestAdministrativeAccountBoundariesAndImmediateRevocation(t *testing.T) {
 	service := NewService(repo, testSecret, "", "", true)
 	userToken, _ := generateToken(testSecret, 3, 1, time.Minute)
 
-	if err := service.AdminUpdateStatus(context.Background(), 2, 1, StatusBanned); !errors.Is(err, ErrForbidden) {
-		t.Fatalf("admin changed superadmin status: %v", err)
+	if err := service.AdminUpdateStatus(context.Background(), false, 1, StatusBanned); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("plain admin changed superadmin community role status: %v", err)
 	}
-	if err := service.AdminUpdateStatus(context.Background(), 2, 2, StatusBanned); !errors.Is(err, ErrCannotModifySelf) {
-		t.Fatalf("admin changed own status: %v", err)
-	}
-	if err := service.AdminUpdateStatus(context.Background(), 2, 3, StatusMuted); err != nil {
+	if err := service.AdminUpdateStatus(context.Background(), false, 3, StatusMuted); err != nil {
 		t.Fatalf("admin could not moderate user: %v", err)
 	}
 	if _, err := service.Authenticate(context.Background(), userToken); !errors.Is(err, ErrTokenRevoked) {
 		t.Fatalf("status change did not revoke prior token: %v", err)
 	}
-	if err := service.AdminUpdateRole(context.Background(), 2, 3, RoleAdmin); !errors.Is(err, ErrForbidden) {
-		t.Fatalf("admin promoted a user: %v", err)
-	}
-	if err := service.AdminUpdateRole(context.Background(), 1, 3, RoleAdmin); err != nil {
+	if err := service.AdminUpdateRole(context.Background(), 3, RoleAdmin); err != nil {
 		t.Fatalf("superadmin could not promote user: %v", err)
 	}
 }

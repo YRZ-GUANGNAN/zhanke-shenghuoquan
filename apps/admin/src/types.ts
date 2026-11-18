@@ -1,7 +1,7 @@
 // Domain F presentation contracts. Admin never queries domain databases directly.
 export type AdminSection = 'dashboard' | 'users' | 'identities' | 'student-verifications' | 'moderation' | 'media' | 'delivery' | 'notifications' | 'takeout' | 'community' | 'trade' | 'reports' | 'feedbacks' | 'feature-board' | 'navigation' | 'feature-policy' | 'share-settings'
-export interface AdminUser{id:number;nickname:string;role:'admin'|'superadmin'}
-export interface AdminSession{user:AdminUser;csrfToken:string;expiresAt:string}
+export interface AdminUser{id:number;username:string;displayName:string;role:'admin'|'superadmin';status:'active'|'disabled';legacyUserId?:number}
+export interface AdminSession{account:AdminUser;csrfToken:string;expiresAt:string}
 export interface Page<T>{items:T[];page:number;pageSize:number;total:number}
 export interface PageQuery{page?:number;pageSize?:number}
 export type ReviewDecisionSource='manual'|'automatic'|'manual_override'

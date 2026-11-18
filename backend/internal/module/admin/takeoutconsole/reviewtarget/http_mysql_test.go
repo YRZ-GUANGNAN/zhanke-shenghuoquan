@@ -204,10 +204,10 @@ func TestTakeoutReviewTargetsAgainstRealHTTPAndMySQL84(t *testing.T) {
 	assertMerchantStatus(t, ctx, merchants, merchantApproved.MerchantPublicID, takeout.MerchantActive)
 	assertReviewTask(t, ctx, reviewRepository, tasks["merchant-approved"].ID, review.StatusApproved, "")
 	assertReviewTargetMediaVisible(t, ctx, mediaGateway, coremedia.PurposeMerchantLogo, merchantApproved.MerchantPublicID, logoAsset.AssetPublicID)
-	if _, err := rollbackReviews.Start(ctx, tasks["merchant-logo-rollback"].ID, administrator.User.ID); err != nil {
+	if _, err := rollbackReviews.Start(ctx, tasks["merchant-logo-rollback"].ID, uint64(administrator.User.ID)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := rollbackReviews.Decide(ctx, tasks["merchant-logo-rollback"].ID, administrator.User.ID, review.StatusApproved, ""); !errors.Is(err, errForcedApprovedTaskSave) {
+	if _, err := rollbackReviews.Decide(ctx, tasks["merchant-logo-rollback"].ID, uint64(administrator.User.ID), review.StatusApproved, ""); !errors.Is(err, errForcedApprovedTaskSave) {
 		t.Fatalf("approved task save failure=%v want=%v", err, errForcedApprovedTaskSave)
 	}
 	assertMerchantStatus(t, ctx, merchants, merchantLogoRollback.MerchantPublicID, takeout.MerchantPendingReview)

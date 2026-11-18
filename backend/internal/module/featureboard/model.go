@@ -98,13 +98,14 @@ type NoteView struct {
 // Comment is one message in a suggestion's conversation. Maintainer replies
 // carry is_maintainer so the wall can label them as 作者.
 type Comment struct {
-	ID           uint64    `gorm:"primaryKey"`
-	PublicID     string    `gorm:"column:public_id;size:26"`
-	SuggestionID uint64    `gorm:"column:suggestion_id"`
-	UserID       uint64    `gorm:"column:user_id"`
-	IsMaintainer bool      `gorm:"column:is_maintainer"`
-	Content      string    `gorm:"size:300"`
-	CreatedAt    time.Time `gorm:"column:created_at"`
+	ID             uint64    `gorm:"primaryKey"`
+	PublicID       string    `gorm:"column:public_id;size:26"`
+	SuggestionID   uint64    `gorm:"column:suggestion_id"`
+	UserID         *uint64   `gorm:"column:user_id"`
+	AdminAccountID *uint64   `gorm:"column:admin_account_id"`
+	IsMaintainer   bool      `gorm:"column:is_maintainer"`
+	Content        string    `gorm:"size:300"`
+	CreatedAt      time.Time `gorm:"column:created_at"`
 }
 
 func (Comment) TableName() string { return "feature_suggestion_comments" }

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"campus-circle/backend/internal/module/adminauth"
 	"campus-circle/backend/internal/module/delivery"
 	"campus-circle/backend/internal/module/takeout"
 	"github.com/gin-gonic/gin"
@@ -90,7 +91,11 @@ func withdrawalTestRouter(stub *withdrawalRepositoryStub, enabled bool, status t
 	handler.identity = todayStatsIdentityStub{rider: takeout.Rider{RiderUserID: 77, Status: status}}
 	router := gin.New()
 	handler.Register(router.Group("/rider"))
-	handler.RegisterAdmin(router.Group("/admin"))
+	adminGroup := router.Group("/admin")
+	adminGroup.Use(func(c *gin.Context) {
+		adminauth.SetCurrentAccount(c, adminauth.Account{ID: 77, Role: adminauth.RoleAdmin, Status: adminauth.StatusActive})
+	})
+	handler.RegisterAdmin(adminGroup)
 	return router
 }
 func withdrawalRequest(router *gin.Engine, method, path, body string) *httptest.ResponseRecorder {

@@ -50,10 +50,10 @@ export function AccountPanel() {
   return <>
     <div className="account-panel">
       <div className="account-panel__identity">
-        <span className="account-panel__avatar" aria-hidden="true">{(user?.nickname || '管').slice(0, 1)}</span>
+        <span className="account-panel__avatar" aria-hidden="true">{(user?.displayName || user?.username || '管').slice(0, 1)}</span>
         <div>
-        <strong>{user?.nickname || '超级管理员'}</strong>
-        <span>{user?.role === 'superadmin' ? '超级管理员' : '管理员'} · 编号 #{user?.id}</span>
+        <strong>{user?.displayName || '管理员'}</strong>
+        <span>{user?.role === 'superadmin' ? '超级管理员' : '管理员'} · {user?.username || '—'} · 编号 #{user?.id}</span>
         {error && <small role="alert">{error}</small>}
         </div>
       </div>

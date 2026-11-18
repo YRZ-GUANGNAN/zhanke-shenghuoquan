@@ -13,7 +13,7 @@ function greeting() {
 }
 
 export function Login() {
-  const [username, setUsername] = useState('administrator')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)

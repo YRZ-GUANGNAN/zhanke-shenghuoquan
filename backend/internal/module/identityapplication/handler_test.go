@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"campus-circle/backend/internal/module/adminauth"
 	"campus-circle/backend/internal/module/user"
 	"campus-circle/backend/internal/pkg/response"
 )
@@ -389,16 +390,23 @@ func newAdminIdentityApplicationRouter(service *userApplicationHTTPServiceStub) 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	auth := func(c *gin.Context) {
-		role := user.Role(c.GetHeader("X-Test-Role"))
+		role := c.GetHeader("X-Test-Role")
 		if role == "" {
 			response.Fail(c, http.StatusUnauthorized, "authentication required")
 			c.Abort()
 			return
 		}
-		c.Set("domainA.user", user.User{ID: 7, Role: role, Status: user.StatusActive})
+		switch user.Role(role) {
+		case user.RoleAdmin:
+			adminauth.SetCurrentAccount(c, adminauth.Account{ID: 7, Role: adminauth.RoleAdmin, Status: adminauth.StatusActive})
+		case user.RoleSuperAdmin:
+			adminauth.SetCurrentAccount(c, adminauth.Account{ID: 7, Role: adminauth.RoleSuperAdmin, Status: adminauth.StatusActive})
+		default:
+			// 普通小程序用户没有后台管理员上下文，后续 AdminRequired 返回 403。
+		}
 		c.Next()
 	}
-	group := router.Group("/api/v1/admin/identity-applications", auth, user.AdminRequired())
+	group := router.Group("/api/v1/admin/identity-applications", auth, adminauth.AdminRequired())
 	NewHandler(service).RegisterAdmin(group)
 	return router
 }

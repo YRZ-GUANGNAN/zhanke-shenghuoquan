@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"campus-circle/backend/internal/module/adminauth"
 	"campus-circle/backend/internal/module/navigation"
 	"campus-circle/backend/internal/module/user"
 )
@@ -428,7 +429,31 @@ func newAdminNavigationFixture(t *testing.T) *adminNavigationFixture {
 	ordinaryCategory := navigationRepository.seedCategory(navigation.Category{Name: "普通导航", Sort: 30, Enabled: true})
 	navigationService := navigation.NewService(navigationRepository)
 	router := gin.New()
-	NewHandler(nil, nil, users, nil, nil, navigationService).Register(router.Group("/api/v1"))
+	adminAuth := func(c *gin.Context) {
+		header := c.GetHeader("Authorization")
+		if !strings.HasPrefix(header, "Bearer ") {
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+		value, err := users.Authenticate(c, strings.TrimSpace(strings.TrimPrefix(header, "Bearer ")))
+		if err != nil {
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+		user.SetCurrentUser(c, value)
+		adminRole := adminauth.RoleAdmin
+		switch value.Role {
+		case user.RoleAdmin:
+			adminRole = adminauth.RoleAdmin
+		case user.RoleSuperAdmin:
+			adminRole = adminauth.RoleSuperAdmin
+		default:
+			c.AbortWithStatus(http.StatusForbidden)
+			return
+		}
+		adminauth.SetCurrentAccount(c, adminauth.Account{ID: uint64(value.ID), Role: adminRole, Status: adminauth.StatusActive})
+	}
+	NewHandler(nil, nil, users, nil, nil, navigationService, adminAuth).Register(router.Group("/api/v1"))
 	return &adminNavigationFixture{
 		router: router, tokens: tokens, navigation: navigationRepository,
 		systemCategoryID: systemCategory.ID, ordinaryCategoryID: ordinaryCategory.ID,

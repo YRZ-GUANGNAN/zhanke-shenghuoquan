@@ -51,7 +51,7 @@ type SubmitInput struct {
 }
 
 type DecisionInput struct {
-	ReviewerUserID      uint64
+	ReviewerAdminID     uint64
 	ApplicationPublicID string
 	ExpectedRowVersion  uint64
 	Reason              string
@@ -77,6 +77,7 @@ type Application struct {
 	MerchantAddress     string             `gorm:"column:merchant_address;size:240;not null;default:''"`
 	ReviewReason        string             `gorm:"column:review_reason;size:500;not null;default:''"`
 	ReviewerUserID      *uint64            `gorm:"column:reviewer_user_id"`
+	ReviewerAdminID     *uint64            `gorm:"column:reviewer_admin_id"`
 	ReviewedAt          *time.Time         `gorm:"column:reviewed_at;type:datetime(3)"`
 	SubmittedAt         time.Time          `gorm:"column:submitted_at;type:datetime(3);not null;index:idx_identity_application_status_submitted,priority:2"`
 	RowVersion          uint64             `gorm:"column:row_version;not null;default:1"`
@@ -102,6 +103,7 @@ type ApplicationEvent struct {
 	EventPublicID string          `gorm:"column:event_public_id;type:char(26);not null;uniqueIndex:uq_identity_application_event_public_id"`
 	ApplicationID uint64          `gorm:"column:application_id;not null;index:idx_identity_application_event_application,priority:1"`
 	ActorUserID   uint64          `gorm:"column:actor_user_id;not null"`
+	ActorAdminID  *uint64         `gorm:"column:actor_admin_id"`
 	EventType     EventType       `gorm:"column:event_type;type:varchar(16);not null"`
 	Status        Status          `gorm:"column:status;type:varchar(16);not null"`
 	Reason        string          `gorm:"column:reason;size:500;not null;default:''"`
@@ -139,6 +141,7 @@ type ApplicationView struct {
 	Proofs              []ProofAssetView `json:"proofs,omitempty"`
 	ReviewReason        string           `json:"reviewReason"`
 	ReviewerUserID      *string          `json:"reviewerUserId,omitempty"`
+	ReviewerAdminID     *string          `json:"reviewerAdminId,omitempty"`
 	SubmittedAt         time.Time        `json:"submittedAt"`
 	ReviewedAt          *time.Time       `json:"reviewedAt,omitempty"`
 	RowVersion          uint64           `json:"rowVersion"`
@@ -153,6 +156,7 @@ type ProofAssetView struct {
 type ApplicationEventView struct {
 	EventPublicID string    `json:"eventId"`
 	ActorUserID   string    `json:"actorUserId"`
+	ActorAdminID  *string   `json:"actorAdminId,omitempty"`
 	EventType     EventType `json:"eventType"`
 	Status        Status    `json:"status"`
 	Reason        string    `json:"reason"`
@@ -190,6 +194,7 @@ type applicationSnapshot struct {
 	AssetPublicIDs      []string   `json:"assetIds"`
 	ReviewReason        string     `json:"reviewReason"`
 	ReviewerUserID      *string    `json:"reviewerUserId,omitempty"`
+	ReviewerAdminID     *string    `json:"reviewerAdminId,omitempty"`
 	ReviewedAt          *time.Time `json:"reviewedAt,omitempty"`
 	RowVersion          uint64     `json:"rowVersion"`
 }
@@ -204,6 +209,11 @@ func toApplicationView(value Application) ApplicationView {
 		formatted := strconv.FormatUint(*value.ReviewerUserID, 10)
 		reviewerUserID = &formatted
 	}
+	var reviewerAdminID *string
+	if value.ReviewerAdminID != nil {
+		formatted := strconv.FormatUint(*value.ReviewerAdminID, 10)
+		reviewerAdminID = &formatted
+	}
 	return ApplicationView{
 		ID:                  value.ID,
 		ApplicationPublicID: value.ApplicationPublicID,
@@ -217,6 +227,7 @@ func toApplicationView(value Application) ApplicationView {
 		AssetPublicIDs:      assetIDs,
 		ReviewReason:        value.ReviewReason,
 		ReviewerUserID:      reviewerUserID,
+		ReviewerAdminID:     reviewerAdminID,
 		SubmittedAt:         value.SubmittedAt,
 		ReviewedAt:          value.ReviewedAt,
 		RowVersion:          value.RowVersion,
