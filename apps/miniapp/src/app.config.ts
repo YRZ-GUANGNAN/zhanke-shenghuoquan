@@ -1,4 +1,6 @@
 export default defineAppConfig({
+  // 按需注入：页面创建时只注入它实际用到的组件，降低每次切页的固定成本。
+  lazyCodeLoading: 'requiredComponents',
   darkmode: true,
   themeLocation: 'theme.json',
   pages: [

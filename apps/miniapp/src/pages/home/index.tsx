@@ -68,6 +68,21 @@ const tabs: Array<{ key: HomeTab; label: string }> = [
   { key: 'maker', label: '众创' }
 ]
 
+// 发现频道的数据缓存：页面销毁后仍保留在 JS 模块里，切页回来先渲染旧内容再静默刷新。
+// 缓存严格绑定登录会话，换账号自动作废旧数据，避免串号。
+interface DiscoverCacheEntry {
+  sessionKey: string
+  posts: DiscoverCard[]
+  products: DiscoverCard[]
+  source: { communityPage: number; tradePage: number; communityTotal: number; tradeTotal: number }
+}
+let discoverCache: DiscoverCacheEntry | null = null
+
+function readDiscoverCache(currentKey: string): DiscoverCacheEntry | null {
+  if (!discoverCache || discoverCache.sessionKey !== currentKey) return null
+  return discoverCache
+}
+
 function settle<T>(promise: Promise<T>): Promise<SettledResult<T>> {
   return promise.then(
     (value) => ({ status: 'fulfilled', value }),
@@ -166,9 +181,14 @@ function HomeContent() {
   const [headerBackdropEffect, setHeaderBackdropEffectState] = useState<HomeHeaderBackdropEffect>(readHomeHeaderBackdropEffect)
   const [marketVisited, setMarketVisited] = useState(false)
   const channelInteraction = useChannelInteraction()
-  const [postCards, setPostCards] = useState<DiscoverCard[]>([])
-  const [productCards, setProductCards] = useState<DiscoverCard[]>([])
-  const [initialStatus, setInitialStatus] = useState<'loading' | 'ready' | 'empty' | 'error'>('loading')
+  const currentSessionKey = useSessionStore((state) => `${state.token}:${state.profile.id}`)
+  const [restoredDiscover] = useState(() => readDiscoverCache(currentSessionKey))
+  const [postCards, setPostCards] = useState<DiscoverCard[]>(() => restoredDiscover?.posts ?? [])
+  const [productCards, setProductCards] = useState<DiscoverCard[]>(() => restoredDiscover?.products ?? [])
+  const [initialStatus, setInitialStatus] = useState<'loading' | 'ready' | 'empty' | 'error'>(() => {
+    if (!restoredDiscover) return 'loading'
+    return restoredDiscover.posts.length === 0 && restoredDiscover.products.length === 0 ? 'empty' : 'ready'
+  })
   const [loadingMore, setLoadingMore] = useState(false)
   const [sourceError, setSourceError] = useState({ community: false, trade: false })
   const [failedImageKeys, setFailedImageKeys] = useState<Set<string>>(() => new Set())
@@ -189,7 +209,9 @@ function HomeContent() {
   usePageShare({ kind: activeTab === 'secondhand' ? 'secondhand' : 'home', enabled: visibility.available && !isMessagesPage })
   const [toolStatus, setToolStatus] = useState<ToolStatus>('idle')
   const [makerStatus, setMakerStatus] = useState<ToolStatus>('idle')
-  const sourceRef = useRef({ communityPage: 0, tradePage: 0, communityTotal: 0, tradeTotal: 0 })
+  const sourceRef = useRef(restoredDiscover
+    ? { ...restoredDiscover.source }
+    : { communityPage: 0, tradePage: 0, communityTotal: 0, tradeTotal: 0 })
   const loadingRef = useRef(false)
   const mountedRef = useRef(true)
   const discoverRequestVersion = useRef(0)
@@ -208,7 +230,6 @@ function HomeContent() {
   const columns = useMemo(() => splitCards(cards), [cards])
   const identityAllowed = useIdentityGuard('student')
   const currentUserId = useSessionStore((state) => state.profile.id)
-  const currentSessionKey = useSessionStore((state) => `${state.token}:${state.profile.id}`)
   const motionPreview = usePostMotionPreview(activeTab === 'discover' && identityAllowed && visibility.forum, currentSessionKey)
   // 默认不显示任何背景图（纯白）；用户在编辑资料里选了自定义图片后才显示。
   const headerBackdropSrc = headerBackdropImage
@@ -230,14 +251,15 @@ function HomeContent() {
 
   const loadDiscover = useCallback(async (
     reset = false,
-    sources = { community: visibility.forum, trade: visibility.secondhand }
+    sources = { community: visibility.forum, trade: visibility.secondhand },
+    options: { silent?: boolean } = {}
   ) => {
     if (!mountedRef.current || loadingRef.current) return false
     loadingRef.current = true
     const version = discoverRequestVersion.current + 1
     discoverRequestVersion.current = version
     if (reset && sourceRef.current.communityPage === 0 && sourceRef.current.tradePage === 0) setInitialStatus('loading')
-    else setLoadingMore(true)
+    else if (!options.silent) setLoadingMore(true)
     try {
       const state = sourceRef.current
       const resetCommunity = reset || failedRefresh.current.community
@@ -440,7 +462,15 @@ function HomeContent() {
     }
   }, [])
 
+  const skipDiscoverResetRef = useRef(Boolean(restoredDiscover))
+  const sessionCacheKeyRef = useRef(currentSessionKey)
+  useEffect(() => { sessionCacheKeyRef.current = currentSessionKey }, [currentSessionKey])
   useEffect(() => {
+    if (skipDiscoverResetRef.current) {
+      // 首次挂载命中了同会话缓存：保留恢复的内容，后续的静默刷新会校正数据。
+      skipDiscoverResetRef.current = false
+      return
+    }
     discoverRequestVersion.current += 1
     loadingRef.current = false
     sourceRef.current = { communityPage: 0, tradePage: 0, communityTotal: 0, tradeTotal: 0 }
@@ -453,6 +483,26 @@ function HomeContent() {
     setSourceError({ community: false, trade: false })
     failedRefresh.current = { community: false, trade: false }
   }, [currentSessionKey, visibility.forum, visibility.secondhand])
+
+  // 每次数据变化时同步写回缓存（会话切换后先被上面的重置 effect 清空，再写空缓存，语义正确）。
+  useEffect(() => {
+    discoverCache = {
+      sessionKey: sessionCacheKeyRef.current,
+      posts: postCards,
+      products: productCards,
+      source: { ...sourceRef.current }
+    }
+  }, [postCards, productCards])
+
+  // 命中缓存时静默刷新一次：用户先看到旧内容，数据回来再无缝替换。
+  const restoredRefreshRef = useRef(Boolean(restoredDiscover))
+  useEffect(() => {
+    if (!restoredRefreshRef.current) return
+    restoredRefreshRef.current = false
+    if (visibility.forum || visibility.secondhand) {
+      void loadDiscover(true, { community: visibility.forum, trade: visibility.secondhand }, { silent: true })
+    }
+  }, [loadDiscover, visibility.forum, visibility.secondhand])
 
   useEffect(() => {
     if (activeTab === 'discover' && initialStatus === 'loading' && (visibility.forum || visibility.secondhand)) {

@@ -19,10 +19,13 @@ import './index.scss'
 
 type DirectoryStatus = 'loading' | 'empty' | 'ready' | 'error'
 
+// 商家目录是公共配置（非用户数据），缓存跨页面保留，回到本页先显示上次的目录。
+let merchantDirectoryCache: ExternalTakeoutMerchantLink[] | null = null
+
 function StudentTakeoutPage() {
   const capsuleStyle = useViewportRefresh()
-  const [merchants, setMerchants] = useState<ExternalTakeoutMerchantLink[]>([])
-  const [status, setStatus] = useState<DirectoryStatus>('loading')
+  const [merchants, setMerchants] = useState<ExternalTakeoutMerchantLink[]>(merchantDirectoryCache ?? [])
+  const [status, setStatus] = useState<DirectoryStatus>(merchantDirectoryCache ? (merchantDirectoryCache.length > 0 ? 'ready' : 'empty') : 'loading')
   const [jumpingTarget, setJumpingTarget] = useState<string | null>(null)
   const [failedMerchantIcons, setFailedMerchantIcons] = useState<Set<string>>(() => new Set())
   const visibility = useFeatureVisibility()
@@ -43,6 +46,7 @@ function StudentTakeoutPage() {
     try {
       const values = await listExternalTakeoutMerchants()
       if (version !== merchantRequestVersion.current) return
+      merchantDirectoryCache = values
       setMerchants(values)
       setStatus(values.length > 0 ? 'ready' : 'empty')
     } catch (error) {
@@ -59,7 +63,7 @@ function StudentTakeoutPage() {
 
   useEffect(() => {
     if (visibility.takeout) void load()
-    else { merchantRequestVersion.current += 1; setMerchants([]) }
+    else { merchantRequestVersion.current += 1; merchantDirectoryCache = null; setMerchants([]) }
   }, [visibility.takeout, load])
 
   useEffect(() => () => {
