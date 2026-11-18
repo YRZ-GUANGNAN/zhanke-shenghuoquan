@@ -1,0 +1,94 @@
+@use '../../styles/design-tokens.scss' as *;
+@use '../../styles/reference-layout.scss' as ref;
+
+.update-log-page {
+  @include ref.page-foundation;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: $bg-app;
+  color: $text-primary;
+}
+
+.update-log-nav__back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44PX;
+  height: 44PX;
+}
+
+.update-log-content {
+  box-sizing: border-box;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 0;
+  padding: 24rpx 32rpx calc(48rpx + env(safe-area-inset-bottom));
+}
+
+.update-log-entry {
+  display: flex;
+  align-items: stretch;
+  gap: 16rpx;
+}
+
+.update-log-entry__timeline {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 14rpx;
+}
+
+.update-log-entry__dot {
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 50%;
+  background: $brand-primary;
+}
+
+.update-log-entry__line {
+  flex: 1;
+  width: 2rpx;
+  margin-top: 8rpx;
+  background: $divider-nav;
+}
+
+.update-log-entry:last-of-type .update-log-entry__line {
+  background: transparent;
+}
+
+.update-log-entry__body {
+  flex: 1;
+  min-width: 0;
+  padding-bottom: 28rpx;
+}
+
+.update-log-entry__date {
+  @include ref.type(meta);
+  display: block;
+  margin-bottom: 10rpx;
+  color: $text-tertiary;
+}
+
+.update-log-entry__card {
+  padding: 22rpx 24rpx;
+  border-radius: 20rpx;
+  background: $bg-surface;
+  box-shadow: $shadow-card;
+}
+
+.update-log-entry__content {
+  @include ref.type(body);
+  @include ref.wrap;
+  display: block;
+  color: $text-primary;
+}
+
+.update-log-more {
+  @include ref.type(meta);
+  display: block;
+  padding: 16rpx 0;
+  color: $text-tertiary;
+  text-align: center;
+}

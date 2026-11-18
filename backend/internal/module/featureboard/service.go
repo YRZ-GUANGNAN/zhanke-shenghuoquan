@@ -28,7 +28,9 @@ const (
 	maxCommentPageSize     = 50
 	defaultPageSize = 10
 	maxPageSize     = 20
-	notesLimit      = 10
+	notesLimit             = 10
+	updateLogDefaultSize   = 20
+	updateLogMaxSize       = 50
 	ulidAlphabet    = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 )
 
@@ -161,16 +163,27 @@ func (s *Service) SetSupport(ctx context.Context, userID uint64, publicID string
 	}, nil
 }
 
-func (s *Service) Notes(ctx context.Context) ([]NoteView, error) {
-	notes, err := s.repo.ListNotes(ctx, notesLimit)
+// Notes lists the update log newest-first with pagination (the about page's
+// 更新日记 second-level page loads it page by page).
+func (s *Service) Notes(ctx context.Context, page, pageSize int) (NoteListView, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = updateLogDefaultSize
+	}
+	if pageSize > updateLogMaxSize {
+		pageSize = updateLogMaxSize
+	}
+	notes, total, err := s.repo.ListNotes(ctx, (page-1)*pageSize, pageSize)
 	if err != nil {
-		return nil, err
+		return NoteListView{}, err
 	}
 	views := make([]NoteView, 0, len(notes))
 	for _, note := range notes {
 		views = append(views, toNoteView(note))
 	}
-	return views, nil
+	return NoteListView{Items: views, Page: page, PageSize: pageSize, Total: total}, nil
 }
 
 func (s *Service) ListAdmin(ctx context.Context, status string, page, pageSize int) (AdminListView, error) {
@@ -222,7 +235,7 @@ func (s *Service) CreateNote(ctx context.Context, content string) (NoteView, err
 }
 
 func (s *Service) ListNotesAdmin(ctx context.Context) ([]NoteView, error) {
-	notes, err := s.repo.ListNotes(ctx, notesLimit)
+	notes, _, err := s.repo.ListNotes(ctx, 0, notesLimit)
 	if err != nil {
 		return nil, err
 	}

@@ -19,7 +19,7 @@ type Repository interface {
 	FindSuggestionByPublicID(ctx context.Context, publicID string) (Suggestion, error)
 	SubmitComment(ctx context.Context, publicID string, value *Comment) error
 	ListComments(ctx context.Context, suggestionID uint64, offset, limit int) ([]Comment, int64, error)
-	ListNotes(ctx context.Context, limit int) ([]AuthorNote, error)
+	ListNotes(ctx context.Context, offset, limit int) ([]AuthorNote, int64, error)
 	CreateNote(ctx context.Context, value *AuthorNote) error
 	DeleteNote(ctx context.Context, publicID string) (bool, error)
 	SetStatus(ctx context.Context, publicID string, status SuggestionStatus, at time.Time) (Suggestion, error)
@@ -132,10 +132,14 @@ func (r *GormRepository) SetSupport(ctx context.Context, publicID string, userID
 	return result, nil
 }
 
-func (r *GormRepository) ListNotes(ctx context.Context, limit int) ([]AuthorNote, error) {
+func (r *GormRepository) ListNotes(ctx context.Context, offset, limit int) ([]AuthorNote, int64, error) {
+	var total int64
+	if err := r.db.WithContext(ctx).Model(&AuthorNote{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
 	notes := make([]AuthorNote, 0, limit)
-	err := r.db.WithContext(ctx).Model(&AuthorNote{}).Order("id DESC").Limit(limit).Find(&notes).Error
-	return notes, err
+	err := r.db.WithContext(ctx).Model(&AuthorNote{}).Order("id DESC").Offset(offset).Limit(limit).Find(&notes).Error
+	return notes, total, err
 }
 
 func (r *GormRepository) CreateNote(ctx context.Context, value *AuthorNote) error {

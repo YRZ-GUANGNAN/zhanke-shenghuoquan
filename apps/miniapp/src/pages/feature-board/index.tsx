@@ -64,8 +64,8 @@ export default function FeatureBoardPage() {
 
   const loadNotes = useCallback(async () => {
     try {
-      const values = await listAuthorNotes()
-      if (mountedRef.current) setNotes(values)
+      const page = await listAuthorNotes(1, 10)
+      if (mountedRef.current) setNotes(page.items)
     } catch {
       if (mountedRef.current) setNotes([])
     }

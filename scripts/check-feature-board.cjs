@@ -61,7 +61,7 @@ for (const fragment of [
   "'/auth/feature-suggestions'",
   '`/auth/feature-suggestions?sort=',
   '/support`',
-  "'/auth/author-notes'",
+  "author-notes",
 ]) {
   if (!client.includes(fragment)) throw new Error(`miniapp feature board client is missing ${fragment}`)
 }

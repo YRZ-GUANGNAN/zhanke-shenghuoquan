@@ -84,6 +84,7 @@ assert.match(styleSource, /pointer-events:\s*none/)
 const miniappPagesRoot = path.join(__dirname, '..', 'apps', 'miniapp', 'src', 'pages')
 const standardPages = [
   'about',
+  'update-log',
   'campus-guide',
   'blacklist',
   'feedback',
@@ -152,7 +153,7 @@ const customNavigationPages = fs.readdirSync(miniappPagesRoot, { withFileTypes: 
     return fs.existsSync(configPath) && /navigationStyle:\s*'custom'/.test(fs.readFileSync(configPath, 'utf8'))
   })
 
-assert.equal(customNavigationPages.length, 34, 'custom navigation page inventory changed')
+assert.equal(customNavigationPages.length, 35, 'custom navigation page inventory changed')
 
 for (const pageName of customNavigationPages) {
   const sourcePath = path.join(miniappPagesRoot, pageName, 'index.tsx')

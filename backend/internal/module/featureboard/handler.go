@@ -21,7 +21,7 @@ type userService interface {
 	ListUser(context.Context, uint64, string, int, int) (ListView, error)
 	Submit(context.Context, uint64, string) (SuggestionView, error)
 	SetSupport(context.Context, uint64, string, bool) (SuggestionView, error)
-	Notes(context.Context) ([]NoteView, error)
+	Notes(context.Context, int, int) (NoteListView, error)
 	ListComments(context.Context, string, int, int) (CommentListView, error)
 	SubmitComment(context.Context, uint64, string, string, bool) (CommentView, error)
 }
@@ -159,12 +159,13 @@ func (h *Handler) support(c *gin.Context) {
 }
 
 func (h *Handler) notes(c *gin.Context) {
-	views, err := h.service.Notes(c.Request.Context())
+	page, pageSize := pageQuery(c)
+	view, err := h.service.Notes(c.Request.Context(), page, pageSize)
 	if err != nil {
 		writeServiceError(c, err)
 		return
 	}
-	response.OK(c, views)
+	response.OK(c, view)
 }
 
 func (h *Handler) adminList(c *gin.Context) {

@@ -122,3 +122,10 @@ type CommentListView struct {
 	PageSize int           `json:"pageSize"`
 	Total    int64         `json:"total"`
 }
+
+type NoteListView struct {
+	Items    []NoteView `json:"items"`
+	Page     int        `json:"page"`
+	PageSize int        `json:"pageSize"`
+	Total    int64      `json:"total"`
+}

@@ -40,6 +40,13 @@ export interface AuthorNote {
   createdAt: string
 }
 
+export interface AuthorNotePage {
+  items: AuthorNote[]
+  page: number
+  pageSize: number
+  total: number
+}
+
 export async function listFeatureSuggestions(
   sort: 'supports' | 'latest',
   page = 1,
@@ -70,8 +77,8 @@ export async function setFeatureSuggestionSupport(
   )
 }
 
-export async function listAuthorNotes(): Promise<AuthorNote[]> {
-  return request<AuthorNote[]>('/auth/author-notes', { url: '', timeout: 12000 })
+export async function listAuthorNotes(page = 1, pageSize = 20): Promise<AuthorNotePage> {
+  return request<AuthorNotePage>(`/auth/author-notes?page=${page}&pageSize=${pageSize}`, { url: '', timeout: 12000 })
 }
 
 export async function listFeatureComments(

@@ -15,6 +15,7 @@ export default defineAppConfig({
     'pages/feedback/index',
     'pages/feature-board/index',
     'pages/about/index',
+    'pages/update-log/index',
     'pages/legal/index',
     'pages/merchant-messages/index',
     'pages/rider-messages/index',

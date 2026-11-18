@@ -156,7 +156,7 @@ export function FeatureBoardView() {
     try {
       await adminAPI.createAuthorNote(content)
       setNoteDraft('')
-      notify('作者的话已发布')
+      notify('更新日记已发布')
       await loadNotes()
     } catch (reason) {
       notify(reason instanceof Error ? reason.message : '发布失败', 'danger')
@@ -216,7 +216,7 @@ export function FeatureBoardView() {
         </div>}
       <Pagination page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} label="建议分页" />
     </Panel>
-    <Panel title="作者的话" description="发布后展示在小程序「功能意见与需求」页底部，最新一条在最上面。">
+    <Panel title="更新日记" description="发布后展示在小程序「关于 → 更新日记」页（以及建议墙底部），最新一条在最上面。">
       <div className="preview-form-stack">
         <TextAreaField
           label="内容"
@@ -228,8 +228,8 @@ export function FeatureBoardView() {
         />
         <div><Button variant="primary" disabled={noteBusy} onClick={() => void publishNote()}>{noteBusy ? '发布中…' : '发布'}</Button></div>
       </div>
-      {notes === null ? <EmptyState title="正在读取作者的话" description="加载完成后会自动显示。" />
-        : notes.length === 0 ? <EmptyState title="还没有发布过作者的话" description="发布后会出现在小程序建议墙底部。" />
+      {notes === null ? <EmptyState title="正在读取更新日记" description="加载完成后会自动显示。" />
+        : notes.length === 0 ? <EmptyState title="还没有发布过更新日记" description="发布后会出现在小程序「关于 → 更新日记」页。" />
         : <div className="preview-feedback-list">
           {notes.map((note) => <article key={note.id}>
             <div className="preview-feedback-list__meta">

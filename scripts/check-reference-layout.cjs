@@ -27,7 +27,7 @@ const reviewedRoutes = new Set([
   'my-feedback',
 ])
 const compiled = new Map()
-assert.equal(routes.length, 37, '路由变化需要显式复审覆盖表，不得顺带开启历史页面')
+assert.equal(routes.length, 38, '路由变化需要显式复审覆盖表，不得顺带开启历史页面')
 for (const route of reviewedRoutes) {
   assert.ok(routes.includes(route), `${route} 必须纳入显式复审覆盖表`)
 }

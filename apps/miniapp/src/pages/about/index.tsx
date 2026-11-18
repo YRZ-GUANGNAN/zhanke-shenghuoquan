@@ -1,12 +1,10 @@
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { Image, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import { AppIconButton } from '../../components/ui'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import Taro from '../../services/taro'
 import { navigateBackOrHome } from '../../utils/navigation'
-import { listAuthorNotes, type AuthorNote } from '../../services/featureboard'
-import { formatPostDate } from '../../utils/post-presentation'
 import './index.scss'
 
 function versionLabel(): string {
@@ -20,35 +18,14 @@ function versionLabel(): string {
 
 export default function AboutPage() {
   const visibility = useFeatureVisibility()
-  const [notes, setNotes] = useState<AuthorNote[]>([])
-  const [notesReady, setNotesReady] = useState(false)
-  useEffect(() => {
-    let active = true
-    listAuthorNotes()
-      .then((values) => {
-        if (!active) return
-        setNotes(values.slice(0, 3))
-        setNotesReady(true)
-      })
-      .catch(() => { /* 未登录或网络失败时隐藏作者留言区块 */ })
-    return () => { active = false }
-  }, [])
   return (
     <View className='about-page'>
       <CapsulePageHeader title='关于' left={<AppIconButton name='back' label='返回' className='about-nav__back' onClick={() => void navigateBackOrHome()} />} />
       <View className='about-content'>
         <View className='about-brand'><View className='about-brand__mark'><Image className='about-brand__logo' src='/assets/brand/logo.png' mode='aspectFit' /></View><Text className='about-brand__name'>湛科生活圈</Text><Text className='about-brand__version'>{versionLabel()}</Text></View>
         <Text className='about-description'>{visibility.presentationMode === 'campus_info' ? '当前提供校园指南阅读、个人资料与私密意见反馈。指南附公开来源和核验日期，本应用独立运营，非学校官方应用，具体安排以学校和馆方最新通知为准。' : '面向湛科校园的帖子、二手交易、配送与生活服务入口。让校内信息更清楚，让每一次连接更可靠。具体可用功能以当前开放的入口为准。'}</Text>
-        {notesReady && <View className='about-notes'>
-          <Text className='about-notes__title'>作者的留言</Text>
-          {notes.length === 0
-            ? <Text className='about-note__empty'>作者还没有留言</Text>
-            : notes.map((note) => <View key={note.id} className='about-note'>
-              <Text className='about-note__content'>{note.content}</Text>
-              <Text className='about-note__date'>{formatPostDate(note.createdAt)}</Text>
-            </View>)}
-        </View>}
         <View className='about-card'>
+          <View className='about-row' onClick={() => void Taro.navigateTo({ url: '/pages/update-log/index' })}><Text>更新日记</Text><AppIconButton name='chevron-right' label='查看更新日记' size='small' /></View>
           <View className='about-row' onClick={() => void Taro.navigateTo({ url: '/pages/legal/index?tab=agreement' })}><Text>用户协议</Text><AppIconButton name='chevron-right' label='查看用户协议' size='small' /></View>
           <View className='about-row' onClick={() => void Taro.navigateTo({ url: '/pages/legal/index?tab=privacy' })}><Text>隐私政策</Text><AppIconButton name='chevron-right' label='查看隐私政策' size='small' /></View>
           <View className='about-row' onClick={() => void Taro.navigateTo({ url: '/pages/feedback/index' })}><Text>意见反馈</Text><AppIconButton name='chevron-right' label='进入意见反馈' size='small' /></View>

@@ -60,8 +60,8 @@ func (s *stubRepository) SetSupport(_ context.Context, publicID string, userID u
 	return Suggestion{PublicID: publicID, Content: "想要夜间模式", Status: StatusOpen, SupportCount: 3}, nil
 }
 
-func (s *stubRepository) ListNotes(_ context.Context, _ int) ([]AuthorNote, error) {
-	return s.notes, nil
+func (s *stubRepository) ListNotes(_ context.Context, _, _ int) ([]AuthorNote, int64, error) {
+	return s.notes, int64(len(s.notes)), nil
 }
 
 func (s *stubRepository) CreateNote(_ context.Context, value *AuthorNote) error {

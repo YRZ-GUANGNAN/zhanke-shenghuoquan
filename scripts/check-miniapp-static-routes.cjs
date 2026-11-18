@@ -31,6 +31,7 @@ const expectedRoutes = [
   'pages/feature-board/index',
   'pages/my-feedback/index',
   'pages/about/index',
+  'pages/update-log/index',
   'pages/legal/index',
   'pages/merchant-home/index',
   'pages/merchant-publish/index',
