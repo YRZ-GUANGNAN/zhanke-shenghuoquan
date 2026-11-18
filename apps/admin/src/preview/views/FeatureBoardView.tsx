@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AdminFeatureSuggestion, AuthorNoteRow, FeatureCommentRow, FeatureSuggestionStatus } from '../../types'
 import { adminAPI } from '../../services/f-admin'
 import {
@@ -49,18 +49,29 @@ export function FeatureBoardView() {
   const [threadLoading, setThreadLoading] = useState(false)
   const [replyDraft, setReplyDraft] = useState('')
   const [replyBusy, setReplyBusy] = useState(false)
+  const listSeq = useRef(0)
+  const threadSeq = useRef(0)
+  const threadIdRef = useRef('')
 
   const load = useCallback(async (nextFilter: StatusFilter, nextPage: number) => {
+    const seq = ++listSeq.current
     setLoading(true)
     try {
       const result = await adminAPI.featureSuggestions({ status: nextFilter === 'all' ? '' : nextFilter, page: nextPage, pageSize: PAGE_SIZE })
+      if (listSeq.current !== seq) return
+      if (result.items.length === 0 && nextPage > 1 && result.total > 0) {
+        // 当前页已空（数据被处理或状态迁移），回到第一页重新加载。
+        setPage(1)
+        return
+      }
       setItems(result.items)
       setTotal(result.total)
       setError('')
     } catch (reason) {
+      if (listSeq.current !== seq) return
       setError(reason instanceof Error ? reason.message : '功能建议加载失败')
     } finally {
-      setLoading(false)
+      if (listSeq.current === seq) setLoading(false)
     }
   }, [])
 
@@ -91,22 +102,27 @@ export function FeatureBoardView() {
 
   const toggleThread = async (item: AdminFeatureSuggestion) => {
     if (threadId === item.id) {
+      threadSeq.current += 1
+      threadIdRef.current = ''
       setThreadId('')
       setThreadComments([])
       setReplyDraft('')
       return
     }
+    threadIdRef.current = item.id
     setThreadId(item.id)
     setThreadComments([])
     setReplyDraft('')
+    const seq = ++threadSeq.current
     setThreadLoading(true)
     try {
       const page = await adminAPI.featureSuggestionComments(item.id)
+      if (threadSeq.current !== seq) return
       setThreadComments(page.items)
     } catch (reason) {
-      notify(reason instanceof Error ? reason.message : '对话加载失败', 'danger')
+      if (threadSeq.current === seq) notify(reason instanceof Error ? reason.message : '对话加载失败', 'danger')
     } finally {
-      setThreadLoading(false)
+      if (threadSeq.current === seq) setThreadLoading(false)
     }
   }
 
@@ -116,9 +132,11 @@ export function FeatureBoardView() {
     setReplyBusy(true)
     try {
       const comment = await adminAPI.replyFeatureSuggestion(item.id, content)
-      setThreadComments((current) => [...current, comment])
       setItems((current) => current.map((value) => value.id === item.id ? { ...value, commentCount: value.commentCount + 1 } : value))
-      setReplyDraft('')
+      if (threadIdRef.current === item.id) {
+        setThreadComments((current) => [...current, comment])
+        setReplyDraft('')
+      }
       notify('回复已发送')
     } catch (reason) {
       notify(reason instanceof Error ? reason.message : '回复失败', 'danger')

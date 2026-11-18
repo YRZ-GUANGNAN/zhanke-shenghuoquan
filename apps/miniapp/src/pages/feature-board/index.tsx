@@ -16,6 +16,7 @@ import {
   type FeatureSuggestion
 } from '../../services/featureboard'
 import { formatPostDate } from '../../utils/post-presentation'
+import { isApiError } from '../../services/api'
 import './index.scss'
 
 type SortKey = 'supports' | 'latest'
@@ -43,8 +44,12 @@ export default function FeatureBoardPage() {
   const [openThreadId, setOpenThreadId] = useState('')
   const [comments, setComments] = useState<FeatureComment[]>([])
   const [commentsLoading, setCommentsLoading] = useState(false)
+  const [commentsError, setCommentsError] = useState(false)
+  const [commentsTotal, setCommentsTotal] = useState(0)
   const [commentDraft, setCommentDraft] = useState('')
   const [commentSending, setCommentSending] = useState(false)
+  const threadSeq = useRef(0)
+  const openThreadRef = useRef('')
   const mountedRef = useRef(true)
   const requestVersion = useRef(0)
   const loadMoreLock = useRef(false)
@@ -155,42 +160,67 @@ export default function FeatureBoardPage() {
     }
   }
 
-  const toggleThread = async (item: FeatureSuggestion) => {
-    if (openThreadId === item.id) {
-      setOpenThreadId('')
-      setComments([])
-      setCommentDraft('')
-      return
-    }
-    setOpenThreadId(item.id)
+  const loadThread = async (suggestionId: string) => {
+    const seq = ++threadSeq.current
     setComments([])
-    setCommentDraft('')
+    setCommentsError(false)
     setCommentsLoading(true)
+    setCommentsTotal(0)
     try {
-      const page = await listFeatureComments(item.id)
-      if (mountedRef.current) setComments(page.items)
+      const page = await listFeatureComments(suggestionId)
+      if (!mountedRef.current || threadSeq.current !== seq) return
+      setComments(page.items)
+      setCommentsTotal(page.total)
     } catch {
-      if (mountedRef.current) void Taro.showToast({ title: '对话加载失败，请重试', icon: 'none' })
+      if (!mountedRef.current || threadSeq.current !== seq) return
+      setCommentsError(true)
     } finally {
-      if (mountedRef.current) setCommentsLoading(false)
+      if (mountedRef.current && threadSeq.current === seq) setCommentsLoading(false)
     }
   }
 
+  const toggleThread = (item: FeatureSuggestion) => {
+    if (openThreadId === item.id) {
+      threadSeq.current += 1
+      openThreadRef.current = ''
+      setOpenThreadId('')
+      setComments([])
+      setCommentsError(false)
+      setCommentDraft('')
+      return
+    }
+    openThreadRef.current = item.id
+    setOpenThreadId(item.id)
+    setCommentDraft('')
+    void loadThread(item.id)
+  }
+
+  const commentErrorMessage = (error: unknown): string => {
+    if (isApiError(error)) {
+      if (error.status === 401) return '登录已过期，请重新进入'
+      if (error.status === 403) return '账号已被禁言，暂时无法发言'
+      if (error.status === 404) return '这条建议不存在或已被移除'
+      if (error.status === 409) return '该建议已关闭，暂时无法发言'
+    }
+    return error instanceof Error ? error.message : '发送失败，请重试'
+  }
+
   const sendComment = async () => {
+    const targetId = openThreadId
     const content = commentDraft.trim()
-    if (!openThreadId || commentSending) return
-    if (!content) return
+    if (!targetId || commentSending || !content) return
     setCommentSending(true)
     try {
-      const comment = await submitFeatureComment(openThreadId, content)
+      const comment = await submitFeatureComment(targetId, content)
       if (!mountedRef.current) return
-      setComments((current) => [...current, comment])
-      setItems((current) => current.map((value) => value.id === openThreadId ? { ...value, commentCount: value.commentCount + 1 } : value))
-      setCommentDraft('')
-    } catch (error) {
-      if (mountedRef.current) {
-        void Taro.showToast({ title: error instanceof Error ? error.message : '发送失败，请重试', icon: 'none' })
+      setItems((current) => current.map((value) => value.id === targetId ? { ...value, commentCount: value.commentCount + 1 } : value))
+      if (openThreadRef.current === targetId) {
+        setComments((current) => [...current, comment])
+        setCommentsTotal((current) => current + 1)
+        setCommentDraft('')
       }
+    } catch (error) {
+      if (mountedRef.current) void Taro.showToast({ title: commentErrorMessage(error), icon: 'none' })
     } finally {
       if (mountedRef.current) setCommentSending(false)
     }
@@ -277,6 +307,8 @@ export default function FeatureBoardPage() {
                   <View className='feature-board-thread'>
                     {commentsLoading ? (
                       <Text className='feature-board-thread__hint'>正在加载对话…</Text>
+                    ) : commentsError ? (
+                      <Text className='feature-board-thread__hint' onClick={() => void loadThread(item.id)}>对话加载失败，点击重试</Text>
                     ) : comments.length === 0 ? (
                       <Text className='feature-board-thread__hint'>还没有对话，来说两句。</Text>
                     ) : comments.map((comment) => (
@@ -288,6 +320,9 @@ export default function FeatureBoardPage() {
                         <Text className='feature-board-comment__content'>{comment.content}</Text>
                       </View>
                     ))}
+                    {comments.length > 0 && comments.length < commentsTotal && (
+                      <Text className='feature-board-thread__hint'>仅显示最近 {comments.length} 条对话</Text>
+                    )}
                     <View className='feature-board-thread__compose'>
                       <Input
                         className='feature-board-thread__input'

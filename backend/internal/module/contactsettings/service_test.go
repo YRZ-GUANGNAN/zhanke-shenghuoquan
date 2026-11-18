@@ -14,6 +14,8 @@ type stubRepository struct {
 	update   UpdateInput
 }
 
+func (s *stubRepository) Ensure(context.Context, time.Time) error { return nil }
+
 func (s *stubRepository) Get(context.Context) (Settings, error) { return s.current, nil }
 
 func (s *stubRepository) Update(_ context.Context, input UpdateInput, _ time.Time) (Settings, error) {

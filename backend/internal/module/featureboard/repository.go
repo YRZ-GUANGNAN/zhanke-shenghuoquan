@@ -17,7 +17,7 @@ type Repository interface {
 	CreateSuggestion(ctx context.Context, value *Suggestion) error
 	SetSupport(ctx context.Context, publicID string, userID uint64, supported bool, at time.Time) (Suggestion, error)
 	FindSuggestionByPublicID(ctx context.Context, publicID string) (Suggestion, error)
-	CreateComment(ctx context.Context, value *Comment) error
+	SubmitComment(ctx context.Context, publicID string, value *Comment) error
 	ListComments(ctx context.Context, suggestionID uint64, offset, limit int) ([]Comment, int64, error)
 	ListNotes(ctx context.Context, limit int) ([]AuthorNote, error)
 	CreateNote(ctx context.Context, value *AuthorNote) error
@@ -169,8 +169,21 @@ func (r *GormRepository) FindSuggestionByPublicID(ctx context.Context, publicID 
 	return suggestion, nil
 }
 
-func (r *GormRepository) CreateComment(ctx context.Context, value *Comment) error {
-	return r.db.WithContext(ctx).Create(value).Error
+// SubmitComment locks the suggestion row, re-checks its state and inserts the
+// comment in the same transaction so a concurrent close cannot be bypassed.
+func (r *GormRepository) SubmitComment(ctx context.Context, publicID string, value *Comment) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var suggestion Suggestion
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("public_id = ?", publicID).First(&suggestion).Error; err != nil {
+			return err
+		}
+		if suggestion.Status == StatusClosed {
+			return ErrClosed
+		}
+		value.SuggestionID = suggestion.ID
+		return tx.Create(value).Error
+	})
 }
 
 func (r *GormRepository) ListComments(ctx context.Context, suggestionID uint64, offset, limit int) ([]Comment, int64, error) {
@@ -181,6 +194,6 @@ func (r *GormRepository) ListComments(ctx context.Context, suggestionID uint64, 
 	}
 	rows := make([]Comment, 0, limit)
 	err := r.db.WithContext(ctx).Where("suggestion_id = ?", suggestionID).
-		Order("id ASC").Offset(offset).Limit(limit).Find(&rows).Error
+		Order("id DESC").Offset(offset).Limit(limit).Find(&rows).Error
 	return rows, total, err
 }

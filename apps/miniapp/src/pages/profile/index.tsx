@@ -198,13 +198,14 @@ function ProfileContent() {
 
   const openMakerContact = async () => {
     setMakerContactVisible(true)
-    if (makerContact || makerContactBusy) return
+    if (makerContactBusy) return
     setMakerContactBusy(true)
     try {
+      // 每次打开都静默刷新，后台改了微信号后无需重启小程序即可生效。
       const value = await getContactSettings()
       if (mountedRefProfile.current) setMakerContact(value)
     } catch {
-      showPlaceholder('联系信息加载失败，请稍后重试')
+      if (!makerContact) showPlaceholder('联系信息加载失败，请稍后重试')
     } finally {
       if (mountedRefProfile.current) setMakerContactBusy(false)
     }

@@ -44,6 +44,14 @@ for (const fragment of [
 if (!repository.includes('Transaction(func') || !repository.includes('support_count + 1')) {
   throw new Error('support toggling must run in a transaction with relative count updates')
 }
+// 发言必须在行锁事务内复查建议状态；管理员视图必须带对话数。
+if (!repository.includes('SubmitComment') || !repository.includes('Locking{Strength: "UPDATE"}')) {
+  throw new Error('comment submission must re-check the suggestion state under a row lock')
+}
+const model = read('backend', 'internal', 'module', 'featureboard', 'model.go')
+if (!/type AdminSuggestionView struct \{[^}]*CommentCount int64/m.test(model)) {
+  throw new Error('AdminSuggestionView must expose commentCount')
+}
 if (!service.includes('maxContentRunes = 500') || !service.includes('utf8.RuneCountInString')) {
   throw new Error('suggestion content limits must be enforced by rune count')
 }
@@ -66,6 +74,8 @@ for (const fragment of [
   'toggleThread',
   'submitFeatureComment',
   '对话',
+  'loadThread',
+  'threadSeq',
 ]) {
   if (!page.includes(fragment)) throw new Error(`feature board page is missing ${fragment}`)
 }
@@ -83,6 +93,8 @@ for (const fragment of [
   'adminAPI.deleteAuthorNote',
   'adminAPI.featureSuggestionComments',
   'adminAPI.replyFeatureSuggestion',
+  'threadSeq',
+  'threadIdRef',
 ]) {
   if (!adminView.includes(fragment)) throw new Error(`admin feature board view is missing ${fragment}`)
 }

@@ -5,9 +5,11 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type Repository interface {
+	Ensure(ctx context.Context, at time.Time) error
 	Get(ctx context.Context) (Settings, error)
 	Update(ctx context.Context, input UpdateInput, at time.Time) (Settings, error)
 }
@@ -15,6 +17,13 @@ type Repository interface {
 type GormRepository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) Repository { return &GormRepository{db: db} }
+
+// Ensure creates the single configuration row when a deployment missed the
+// migration, so the public read never dead-ends.
+func (r *GormRepository) Ensure(ctx context.Context, at time.Time) error {
+	row := Row{ID: 1, MakerWechat: DefaultMakerWechat, MakerIntro: DefaultMakerIntro, RowVersion: 1, UpdatedAt: at}
+	return r.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&row).Error
+}
 
 func (r *GormRepository) Get(ctx context.Context) (Settings, error) {
 	var row Row

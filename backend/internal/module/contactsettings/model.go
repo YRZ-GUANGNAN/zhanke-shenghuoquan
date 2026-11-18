@@ -28,10 +28,18 @@ type UpdateInput struct {
 	ExpectedRowVersion uint64 `json:"expectedRowVersion"`
 }
 
+const (
+	DefaultMakerWechat = "zhanke-zhongchuang"
+	DefaultMakerIntro  = "众创空间入驻与合作，请添加微信，添加时请备注「众创申请」。"
+)
+
 func newlineAllowed(r rune) bool { return r == '\n' }
 
 func (v *UpdateInput) Validate() error {
 	v.MakerWechat = strings.TrimSpace(v.MakerWechat)
+	if utf8.RuneCountInString(v.MakerWechat) == 0 {
+		return errors.New("微信号不能为空")
+	}
 	if !utf8.ValidString(v.MakerWechat) || utf8.RuneCountInString(v.MakerWechat) > 40 ||
 		strings.IndexFunc(v.MakerWechat, func(r rune) bool { return unicode.IsControl(r) || unicode.IsSpace(r) }) >= 0 {
 		return errors.New("微信号限 40 个字符，不能包含空格或控制字符")

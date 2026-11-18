@@ -579,7 +579,11 @@ func main() {
 	api.GET("/features", featureflags.PublicHandler)
 	campusGuides.Register(api)
 	sharesettings.NewHandler(shareStore).WithCoverStorage(cfg.ShareCoverDir, cfg.MediaPublicBaseURL).Register(api, adminAuthRequired)
-	contactsettings.NewHandler(contactsettings.NewService(contactsettings.NewRepository(db), nil)).Register(api, adminAuthRequired)
+	contactSettingsService := contactsettings.NewService(contactsettings.NewRepository(db), nil)
+	if err := contactSettingsService.Ensure(context.Background()); err != nil {
+		log.Fatalf("ensure contact settings row: %v", err)
+	}
+	contactsettings.NewHandler(contactSettingsService).Register(api, adminAuthRequired)
 	tradeRoutes := api.Group("/trade")
 	trade.NewHandler(tradeService, userService, safety).Register(tradeRoutes)
 	trade.NewProductCommentHandler(tradeCommentService, userService, safety).Register(tradeRoutes)

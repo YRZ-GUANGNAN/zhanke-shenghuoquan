@@ -45,7 +45,7 @@ export const adminAPI={
 	feedbacks:(query:PageQuery&{status?:string}={})=>api<Page<FeedbackRow>>(`/admin/feedbacks${feedbackQueryString(query)}`),
 	updateFeedback:(id:string,status:string,note:string)=>api<{updated:boolean}>(`/admin/feedbacks/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify({status,note})}),
 	navigation:()=>api<NavigationCategory[]>('/admin/navigation'),
-	featureSuggestionComments:(id:string)=>api<FeatureCommentPage>(`/admin/feature-board/suggestions/${id}/comments`),
+	featureSuggestionComments:(id:string)=>api<FeatureCommentPage>(`/admin/feature-board/suggestions/${id}/comments?page=1&pageSize=50`),
 	replyFeatureSuggestion:(id:string,content:string)=>api<FeatureCommentRow>(`/admin/feature-board/suggestions/${id}/comments`,{method:'POST',body:JSON.stringify({content})}),
 	contactSettings:()=>api<ContactSettings>('/admin/contact-settings'),
 	updateContactSettings:(input:{makerWechat:string;makerIntro:string;expectedRowVersion:number})=>api<ContactSettings>('/admin/contact-settings',{method:'PUT',body:JSON.stringify(input)}),

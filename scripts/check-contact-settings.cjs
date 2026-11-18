@@ -20,9 +20,14 @@ const adminClient = read('apps', 'admin', 'src', 'services', 'f-admin.ts')
 for (const fragment of ['contactsettings.NewService', 'contactsettings.NewHandler']) {
   includes(mainGo, fragment, 'main.go')
 }
-for (const fragment of ['api.GET("/contact-settings"', '"/admin/contact-settings"']) {
+for (const fragment of ['api.GET("/contact-settings"', '"/admin/contact-settings"', 'secured.GET("", h.get)']) {
   includes(handler, fragment, 'contact settings handler')
 }
+// 单行配置必须在启动时自愈，避免漏迁移导致 500。
+const repository = read('backend', 'internal', 'module', 'contactsettings', 'repository.go')
+includes(repository, 'OnConflict{DoNothing: true}', 'contact settings repository')
+const mainGoEnsure = 'contactSettingsService.Ensure(context.Background())'
+includes(mainGo, mainGoEnsure, 'main.go')
 
 // 小程序：弹窗内容来自接口，不得再硬编码微信号。
 for (const fragment of ["'/contact-settings'", 'getContactSettings']) {

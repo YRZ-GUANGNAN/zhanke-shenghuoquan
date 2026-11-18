@@ -23,6 +23,7 @@ func NewHandler(service *Service) *Handler { return &Handler{service: service} }
 func (h *Handler) Register(api *gin.RouterGroup, adminAuth gin.HandlerFunc) {
 	api.GET("/contact-settings", h.get)
 	secured := api.Group("/admin/contact-settings", adminAuth, user.AdminRequired())
+	secured.GET("", h.get)
 	secured.PUT("", h.update)
 }
 

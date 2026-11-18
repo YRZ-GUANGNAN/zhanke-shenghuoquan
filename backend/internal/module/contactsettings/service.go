@@ -19,6 +19,11 @@ func NewService(repo Repository, now func() time.Time) *Service {
 	return &Service{repo: repo, now: now}
 }
 
+// Ensure guarantees the single row exists (called once at composition time).
+func (s *Service) Ensure(ctx context.Context) error {
+	return s.repo.Ensure(ctx, s.now().UTC())
+}
+
 func (s *Service) Get(ctx context.Context) (Settings, error) {
 	return s.repo.Get(ctx)
 }

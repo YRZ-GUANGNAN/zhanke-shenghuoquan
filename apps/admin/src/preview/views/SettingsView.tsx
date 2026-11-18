@@ -418,13 +418,35 @@ function NavigationSettings() {
     void perform(`item-${item.id}`, () => adminAPI.updateNavigationItem(item.id, input), enabled ? `「${item.title}」已启用` : `「${item.title}」已停用`, loadNavigation, setNavError)
   }
 
-  const saveContact = () => {
+  const saveContact = async () => {
     if (!contact || Boolean(busy) || formSaving) return
-    void perform('contact', () => adminAPI.updateContactSettings({
-      makerWechat: contactDraft.makerWechat.trim(),
-      makerIntro: contactDraft.makerIntro.trim(),
-      expectedRowVersion: contact.rowVersion,
-    }), '众创申请弹窗配置已更新', loadContact, setContactError)
+    const makerWechat = contactDraft.makerWechat.trim()
+    if (!makerWechat) {
+      notify('请先填写联系微信号', 'danger')
+      return
+    }
+    setBusy('contact')
+    setContactError('')
+    try {
+      await adminAPI.updateContactSettings({
+        makerWechat,
+        makerIntro: contactDraft.makerIntro.trim(),
+        expectedRowVersion: contact.rowVersion,
+      })
+      notify('众创申请弹窗配置已更新')
+      await loadContact()
+    } catch (reason) {
+      const failure = requestError(reason)
+      if (failure.conflict) {
+        // 版本过期：自动刷新到最新配置，避免连续 409。
+        notify('配置已被其他管理员更新，已刷新为最新内容', 'danger')
+        await loadContact()
+      } else {
+        setContactError(failure.message)
+      }
+    } finally {
+      setBusy('')
+    }
   }
 
   const toggleExternalCategory = () => {

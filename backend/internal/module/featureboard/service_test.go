@@ -85,7 +85,15 @@ func (s *stubRepository) FindSuggestionByPublicID(_ context.Context, publicID st
 	return suggestion, nil
 }
 
-func (s *stubRepository) CreateComment(_ context.Context, value *Comment) error {
+func (s *stubRepository) SubmitComment(_ context.Context, publicID string, value *Comment) error {
+	if s.commentErr != nil {
+		return s.commentErr
+	}
+	if s.commentSuggestion.Status == StatusClosed {
+		return ErrClosed
+	}
+	value.SuggestionID = 42
+	_ = publicID
 	s.createdComment = value
 	return nil
 }
@@ -235,7 +243,7 @@ func TestSubmitCommentValidatesAndPersists(t *testing.T) {
 	if !ulidPattern.MatchString(view.ID) || view.Content != "支持这个想法" || view.IsMaintainer {
 		t.Fatalf("unexpected comment view: %+v", view)
 	}
-	if repo.createdComment == nil || repo.createdComment.SuggestionID == 0 || repo.createdComment.UserID != 7 {
+	if repo.createdComment == nil || repo.createdComment.SuggestionID != 42 || repo.createdComment.UserID != 7 {
 		t.Fatalf("unexpected created comment: %+v", repo.createdComment)
 	}
 

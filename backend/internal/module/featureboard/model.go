@@ -71,6 +71,7 @@ type AdminSuggestionView struct {
 	Content      string           `json:"content"`
 	Status       SuggestionStatus `json:"status"`
 	SupportCount uint32           `json:"supportCount"`
+	CommentCount int64            `json:"commentCount"`
 	CreatedAt    time.Time        `json:"createdAt"`
 }
 

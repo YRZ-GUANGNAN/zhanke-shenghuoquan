@@ -22,8 +22,10 @@ var (
 const (
 	minContentRunes = 2
 	maxContentRunes = 500
-	maxNoteRunes    = 1000
-	maxCommentRunes = 300
+	maxNoteRunes           = 1000
+	maxCommentRunes        = 300
+	defaultCommentPageSize = 30
+	maxCommentPageSize     = 50
 	defaultPageSize = 10
 	maxPageSize     = 20
 	notesLimit      = 10
@@ -41,6 +43,19 @@ func NewService(repo Repository, now func() time.Time) *Service {
 		now = time.Now
 	}
 	return &Service{repo: repo, now: now, rand: rand.Reader}
+}
+
+func normalizeCommentPage(page, pageSize int) (int, int) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = defaultCommentPageSize
+	}
+	if pageSize > maxCommentPageSize {
+		pageSize = maxCommentPageSize
+	}
+	return page, pageSize
 }
 
 func normalizePage(page, pageSize int) (int, int) {
@@ -79,6 +94,7 @@ func toAdminView(record SuggestionRecord) AdminSuggestionView {
 		Content:      record.Content,
 		Status:       record.Status,
 		SupportCount: record.SupportCount,
+		CommentCount: record.CommentCount,
 		CreatedAt:    record.CreatedAt,
 	}
 }
@@ -278,8 +294,10 @@ func newULIDAt(at time.Time, randomness io.Reader) (string, error) {
 	return string(encoded), nil
 }
 
-// SubmitComment appends one message to a suggestion's conversation. Maintainer
-// replies are created through the same path with maintainer=true.
+// SubmitComment appends one message to a suggestion's conversation. The
+// repository re-checks the suggestion state inside a row-locked transaction,
+// so a concurrent close cannot let the comment through. Maintainer replies
+// use the same path with maintainer=true.
 func (s *Service) SubmitComment(ctx context.Context, userID uint64, publicID, content string, maintainer bool) (CommentView, error) {
 	publicID = strings.TrimSpace(publicID)
 	content = strings.TrimSpace(content)
@@ -287,24 +305,17 @@ func (s *Service) SubmitComment(ctx context.Context, userID uint64, publicID, co
 	if userID == 0 || !validULID(publicID) || length < 1 || length > maxCommentRunes {
 		return CommentView{}, ErrInvalidInput
 	}
-	suggestion, err := s.repo.FindSuggestionByPublicID(ctx, publicID)
-	if err != nil {
-		return CommentView{}, normalizeRepoError(err)
-	}
-	if suggestion.Status == StatusClosed {
-		return CommentView{}, ErrClosed
-	}
 	at := s.now().UTC()
 	commentID, err := newULIDAt(at, s.rand)
 	if err != nil {
 		return CommentView{}, err
 	}
 	comment := &Comment{
-		PublicID: commentID, SuggestionID: suggestion.ID, UserID: userID,
+		PublicID: commentID, UserID: userID,
 		IsMaintainer: maintainer, Content: content, CreatedAt: at,
 	}
-	if err := s.repo.CreateComment(ctx, comment); err != nil {
-		return CommentView{}, err
+	if err := s.repo.SubmitComment(ctx, publicID, comment); err != nil {
+		return CommentView{}, normalizeRepoError(err)
 	}
 	return toCommentView(*comment), nil
 }
@@ -319,14 +330,16 @@ func (s *Service) ListComments(ctx context.Context, publicID string, page, pageS
 	if err != nil {
 		return CommentListView{}, normalizeRepoError(err)
 	}
-	page, pageSize = normalizePage(page, pageSize)
+	page, pageSize = normalizeCommentPage(page, pageSize)
 	rows, total, err := s.repo.ListComments(ctx, suggestion.ID, (page-1)*pageSize, pageSize)
 	if err != nil {
 		return CommentListView{}, err
 	}
+	// The repository returns newest-first so page 1 holds the latest messages;
+	// present them in reading order.
 	items := make([]CommentView, 0, len(rows))
-	for _, row := range rows {
-		items = append(items, toCommentView(row))
+	for index := len(rows) - 1; index >= 0; index-- {
+		items = append(items, toCommentView(rows[index]))
 	}
 	return CommentListView{Items: items, Page: page, PageSize: pageSize, Total: total}, nil
 }
