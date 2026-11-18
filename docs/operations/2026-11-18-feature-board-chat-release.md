@@ -40,3 +40,4 @@
 - **后台静态**：`/var/www/campus-admin/releases/admin-20261118c-f72676d`（首页 `index-D50fsbwA.js`）。
 - **线上验证**：`/version` 返回 candidate.3；未登录 `POST /api/v1/admin/navigation/items/1/icon` 401（上传路由已注册）；`/api/v1/navigation/categories` 200；`/api/v1/navigation-icons/<不存在文件>` 404。
 - **回滚目标（上一版）**：后端 `20261118b-review-fixes-d745aa7`，后台 `admin-20261118b-d745aa7`；数据库回滚脚本 `rollback/068_navigation_item_icon.sql`。
+- **（candidate.4）更新日记二级页**：`GET /api/v1/auth/author-notes` 改为分页对象（items/page/pageSize/total，默认 20、上限 50）；后端版本 `2026.11.18.candidate.4`（commit `f38568f6bb15`），release `/opt/campus-circle/releases/20261118d-update-log-f38568f`，二进制 SHA256 `b6a3e768e92e2092383b5f8a9522bfb8f5ede86d9d79626dcc54eaf7e3a9add1`；后台静态 `/var/www/campus-admin/releases/admin-20261118d-f38568f`。旧版小程序未调用该接口（作者的话功能尚未发版），接口结构变更无兼容风险。线上验证：`/version` 返回 candidate.4、`/healthz` 200、未登录 author-notes 401。回滚目标：后端 `20261118c-nav-icons-f72676d`，后台 `admin-20261118c-f72676d`。
