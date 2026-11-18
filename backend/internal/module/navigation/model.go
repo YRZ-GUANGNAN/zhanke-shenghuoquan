@@ -7,6 +7,7 @@ type OperatingStatus string
 
 const (
 	SystemKeyExternalTakeoutMerchants                 = "external_takeout_merchants"
+	SystemKeyCampusMaker                              = "campus_maker"
 	OperatingStatusOpen               OperatingStatus = "open"
 	OperatingStatusResting            OperatingStatus = "resting"
 )
@@ -30,6 +31,7 @@ type Item struct {
 	AppID           string          `json:"appId" gorm:"size:80"`
 	Path            string          `json:"path" gorm:"size:240"`
 	Color           string          `json:"color" gorm:"size:24"`
+	IconPath        string          `json:"iconPath" gorm:"column:icon_path;size:255"`
 	Sort            int             `json:"sort" gorm:"index"`
 	Enabled         bool            `json:"enabled" gorm:"default:true"`
 	OperatingStatus OperatingStatus `json:"operatingStatus" gorm:"type:varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin;size:16;not null;default:open"`

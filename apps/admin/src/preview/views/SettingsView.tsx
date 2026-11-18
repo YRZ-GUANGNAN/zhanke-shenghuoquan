@@ -108,6 +108,7 @@ interface ItemDraft {
   title: string
   subtitle: string
   iconText: string
+  iconPath: string
   appId: string
   path: string
   color: string
@@ -120,6 +121,7 @@ interface MerchantDraft {
   title: string
   subtitle: string
   iconText: string
+  iconPath: string
   appId: string
   path: string
   color: string
@@ -260,6 +262,7 @@ function NavigationSettings() {
       title: '',
       subtitle: '',
       iconText: '',
+      iconPath: '',
       appId: '',
       path: '',
       color: '#684091',
@@ -276,6 +279,7 @@ function NavigationSettings() {
       title: item.title,
       subtitle: item.subtitle,
       iconText: item.iconText,
+      iconPath: item.iconPath || '',
       appId: item.appId,
       path: item.path,
       color: item.color || '#684091',
@@ -287,7 +291,7 @@ function NavigationSettings() {
   const openMerchantCreate = () => {
     const nextSort = (directory?.items || []).reduce((max, item) => Math.max(max, item.sort), 0) + 10
     setFormError('')
-    setMerchantDraft({ id: null, title: '', subtitle: '', iconText: '', appId: '', path: '', color: '#684091', sort: String(nextSort) })
+    setMerchantDraft({ id: null, title: '', subtitle: '', iconText: '', iconPath: '', appId: '', path: '', color: '#684091', sort: String(nextSort) })
   }
 
   const openMerchantEdit = (merchant: ExternalTakeoutMerchant) => {
@@ -297,6 +301,7 @@ function NavigationSettings() {
       title: merchant.title,
       subtitle: merchant.subtitle,
       iconText: merchant.iconText,
+      iconPath: merchant.iconPath || '',
       appId: merchant.appId,
       path: merchant.path,
       color: merchant.color || '#684091',
@@ -448,6 +453,67 @@ function NavigationSettings() {
       setBusy('')
     }
   }
+
+  const uploadEntryIcon = async (
+    entryId: number,
+    event: { target: { files?: FileList | null; value: string } },
+    apply: (iconPath: string) => void,
+    reload: () => Promise<void>,
+  ) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || busy === 'entry-icon') return
+    const form = new FormData()
+    form.append('file', file)
+    setBusy('entry-icon')
+    setFormError('')
+    try {
+      const result = await adminAPI.uploadNavigationItemIcon(entryId, form)
+      apply(result.iconPath)
+      notify('入口图标已更新')
+      await reload()
+    } catch (reason) {
+      setFormError(requestError(reason).message)
+    } finally {
+      setBusy('')
+    }
+  }
+
+  const removeEntryIcon = async (entryId: number, apply: (iconPath: string) => void, reload: () => Promise<void>) => {
+    if (busy === 'entry-icon' || formSaving) return
+    setBusy('entry-icon')
+    setFormError('')
+    try {
+      await adminAPI.removeNavigationItemIcon(entryId)
+      apply('')
+      notify('入口图标已移除')
+      await reload()
+    } catch (reason) {
+      setFormError(requestError(reason).message)
+    } finally {
+      setBusy('')
+    }
+  }
+
+
+  const entryIconField = (
+    entryId: number | null,
+    iconPath: string,
+    apply: (iconPath: string) => void,
+    reload: () => Promise<void>,
+  ) => entryId === null ? null : (
+    <div className="preview-field">
+      <span>图标图片</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        {iconPath
+          ? <img src={`/api/v1/navigation-icons/${iconPath}`} alt="入口图标" style={{ width: 40, height: 40, borderRadius: 10, objectFit: 'cover', border: '1px solid #e5eaf2', background: '#fff' }} />
+          : <span style={{ fontSize: 12, color: '#93a2b4' }}>未上传，小程序将显示文字图标</span>}
+        <input type="file" accept="image/png,image/jpeg" disabled={busy === 'entry-icon'} onChange={(event) => void uploadEntryIcon(entryId, event, apply, reload)} />
+        {iconPath && <Button size="sm" variant="quiet" disabled={busy === 'entry-icon'} onClick={() => void removeEntryIcon(entryId, apply, reload)}>移除图标</Button>}
+      </div>
+      <small style={{ color: '#93a2b4' }}>JPG/PNG，1MB 内，建议正方形；保存后工具、众创与服务列表立即显示。</small>
+    </div>
+  )
 
   const toggleExternalCategory = () => {
     if (!directory || busy) return
@@ -708,6 +774,7 @@ function NavigationSettings() {
         <Field label="小程序 AppID" required value={itemDraft.appId} onChange={event => setItemDraft({ ...itemDraft, appId: event.target.value })} placeholder="wx0dacef976daa8e55" hint="wx 开头加 16 位字母或数字。" />
         <Field label="页面路径" required value={itemDraft.path} onChange={event => setItemDraft({ ...itemDraft, path: event.target.value })} placeholder="pages/service/index" hint="小程序内部路径，不要以 / 开头。" />
         <Field label="图标颜色" type="color" value={itemDraft.color} onChange={event => setItemDraft({ ...itemDraft, color: event.target.value })} />
+        {entryIconField(itemDraft.id, itemDraft.iconPath, (path) => setItemDraft(current => current ? { ...current, iconPath: path } : current), loadNavigation)}
         <Field label="排序" type="number" value={itemDraft.sort} onChange={event => setItemDraft({ ...itemDraft, sort: event.target.value })} hint="整数，数值越小越靠前。" />
         <label className="preview-field"><span>启用状态</span><div><Toggle checked={itemDraft.enabled} label="入口启用状态" onChange={checked => setItemDraft({ ...itemDraft, enabled: checked })} /></div></label>
         {formError && <div className="preview-form-error">{formError}</div>}
@@ -731,6 +798,7 @@ function NavigationSettings() {
         <Field label="小程序 AppID" required value={merchantDraft.appId} onChange={event => setMerchantDraft({ ...merchantDraft, appId: event.target.value })} placeholder="wx1234567890ABCDEF" hint="wx 开头加 16 位字母或数字。" />
         <Field label="页面路径" required value={merchantDraft.path} onChange={event => setMerchantDraft({ ...merchantDraft, path: event.target.value })} placeholder="pages/index/index" hint="小程序内部路径，不要以 / 开头。" />
         <Field label="主题颜色" type="color" value={merchantDraft.color} onChange={event => setMerchantDraft({ ...merchantDraft, color: event.target.value })} />
+        {entryIconField(merchantDraft.id, merchantDraft.iconPath, (path) => setMerchantDraft(current => current ? { ...current, iconPath: path } : current), loadExternal)}
         <Field label="排序" type="number" value={merchantDraft.sort} onChange={event => setMerchantDraft({ ...merchantDraft, sort: event.target.value })} hint="0 至 10000 的整数，数值越小越靠前。" />
         {formError && <div className="preview-form-error">{formError}</div>}
       </div>}

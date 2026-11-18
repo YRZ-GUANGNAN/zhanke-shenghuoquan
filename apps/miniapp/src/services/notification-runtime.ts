@@ -33,6 +33,8 @@ export function createNotificationRuntime(ports: NotificationRuntimePorts) {
   let stopListener: (() => void) | undefined
   let poll: ReturnType<typeof setInterval> | undefined
   let debounce: ReturnType<typeof setTimeout> | undefined
+  let pollInterval = 30000
+  let countFailures = 0
   let state: NotificationRuntimeState = { ownerKey: '', userId: '', role: '', unread: createUnreadSnapshot(), inboxUnread: null, inboxRevision: '', messageRevision: 0 }
   const listeners = new Set<() => void>()
   const emit = () => { for (const notify of listeners) notify() }
@@ -49,7 +51,13 @@ export function createNotificationRuntime(ports: NotificationRuntimePorts) {
       ports.loadInbox().then(value => ({ value }), () => ({ value: null }))
     ])
     if (!current(epoch, target.key) || version !== requestVersion) { busy = false; return }
-    if (counts.value === null) { stopListener?.(); stopListener = undefined }
+    if (counts.value === null) {
+      stopListener?.(); stopListener = undefined
+      countFailures += 1
+    } else {
+      countFailures = 0
+    }
+    adjustPoll()
     const unread = counts.value === null ? createUnreadSnapshot(epoch)
       : mergeUnreadSnapshot(state.unread, { generation: epoch, confirmed: true, conversations: counts.value })
     const inboxRevision = inbox.value ? inbox.value.items.map(item => `${item.id}:${item.read}`).join('|') : state.inboxRevision
@@ -60,6 +68,16 @@ export function createNotificationRuntime(ports: NotificationRuntimePorts) {
     emit()
     bindListener(target, epoch)
     if (dirty) { dirty = false; schedule() }
+  }
+  // 会话计数连续失败（例如私信服务未配置返回 503）时退避到 5 分钟一轮，恢复后自动回到 30 秒。
+  const adjustPoll = () => {
+    const nextInterval = countFailures >= 3 ? 300000 : 30000
+    if (nextInterval === pollInterval) return
+    pollInterval = nextInterval
+    if (poll) {
+      clearInterval(poll)
+      poll = setInterval(() => { void refresh() }, pollInterval)
+    }
   }
   const schedule = () => {
     if (!visible || !owner || debounce) return
@@ -78,6 +96,8 @@ export function createNotificationRuntime(ports: NotificationRuntimePorts) {
     if (debounce) clearTimeout(debounce)
     poll = undefined
     debounce = undefined
+    pollInterval = 30000
+    countFailures = 0
     state = { ownerKey: '', userId: '', role: '', unread: createUnreadSnapshot(generation), inboxUnread: null, inboxRevision: '', messageRevision: 0 }
     emit()
   }
@@ -104,7 +124,7 @@ export function createNotificationRuntime(ports: NotificationRuntimePorts) {
     emit()
     void refresh()
     bindListener(next, epoch)
-    poll = setInterval(() => { void refresh() }, 30000)
+    poll = setInterval(() => { void refresh() }, pollInterval)
   }
   return {
     start, stop, refresh,

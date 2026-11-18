@@ -37,6 +37,7 @@ type Config struct {
 	COSAppID            string
 	MediaPublicBaseURL  string
 	ShareCoverDir       string
+	NavigationIconDir   string
 	WechatCallbackToken string
 	WechatAPIBase       string
 	EnablePostVideo     bool
@@ -205,6 +206,7 @@ func Load() (Config, error) {
 		COSAppID:            env("COS_APP_ID", ""),
 		MediaPublicBaseURL:  env("MEDIA_PUBLIC_BASE_URL", ""),
 		ShareCoverDir:       env("SHARE_COVER_DIR", ""),
+		NavigationIconDir:   env("NAVIGATION_ICON_DIR", ""),
 		WechatCallbackToken: env("WECHAT_CALLBACK_TOKEN", ""),
 		WechatAPIBase:       env("WECHAT_API_BASE", "https://api.weixin.qq.com"),
 		EnablePostVideo:     enablePostVideo,

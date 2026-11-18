@@ -42,8 +42,10 @@ export interface IdentityApplicationSubmitInput {
   merchantAddress: string
   assetIds: string[]
   expectedRowVersion: number
-}
-
+}
+
+
+
 export type StudentVerificationStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
 
 export interface StudentVerificationView {
@@ -195,6 +197,7 @@ export interface ToolLink {
   title: string
   subtitle: string
   iconText: string
+  iconUrl?: string
   appId?: string
   path?: string
   color: string

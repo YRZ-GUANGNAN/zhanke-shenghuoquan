@@ -99,10 +99,26 @@ type SearchHandler struct {
 	authRequired  gin.HandlerFunc
 	currentUserID func(*gin.Context) uint
 	metrics       searchmetrics.Metrics
+	iconDir       string
+	publicBase    string
 }
 
 func NewSearchHandler(service *Service, authRequired gin.HandlerFunc, currentUserID func(*gin.Context) uint, metrics searchmetrics.Metrics) *SearchHandler {
 	return &SearchHandler{service: service, authRequired: authRequired, currentUserID: currentUserID, metrics: metrics}
+}
+
+// WithIconStorage enables merchant icon URLs in search results.
+func (h *SearchHandler) WithIconStorage(dir, publicBase string) *SearchHandler {
+	h.iconDir = strings.TrimSpace(dir)
+	h.publicBase = strings.TrimRight(strings.TrimSpace(publicBase), "/")
+	return h
+}
+
+func (h *SearchHandler) publicIconURL(iconPath string) string {
+	if iconPath == "" || h.iconDir == "" || h.publicBase == "" {
+		return ""
+	}
+	return h.publicBase + "/api/v1/navigation-icons/" + iconPath
 }
 
 func (h *SearchHandler) Register(group *gin.RouterGroup) {
@@ -140,6 +156,12 @@ func (h *SearchHandler) search(c *gin.Context) {
 	if err != nil {
 		response.Fail(c, http.StatusInternalServerError, "search external takeout failed")
 		return
+	}
+	for index := range value.Items {
+		item := &value.Items[index]
+		if item.IconPath != "" {
+			item.IconURL = h.publicIconURL(item.IconPath)
+		}
 	}
 	response.OK(c, value)
 }

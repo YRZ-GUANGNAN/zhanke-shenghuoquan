@@ -589,8 +589,11 @@ func main() {
 	trade.NewProductCommentHandler(tradeCommentService, userService, safety).Register(tradeRoutes)
 	trade.NewSearchHandler(tradeService, userService, tradeMetrics).Register(tradeRoutes)
 	navigationRoutes := api.Group("/navigation")
-	navigation.NewHandler(navigationService).Register(navigationRoutes)
-	navigation.NewSearchHandler(navigationService, userService.AuthRequired(), user.CurrentUserID, navigationMetrics).Register(navigationRoutes)
+	navigationHandler := navigation.NewHandler(navigationService).WithIconStorage(cfg.NavigationIconDir, cfg.MediaPublicBaseURL)
+	navigationHandler.Register(navigationRoutes)
+	navigationHandler.RegisterAdminIcons(api.Group("/admin/navigation", adminAuthRequired, user.AdminRequired()))
+	navigation.NewSearchHandler(navigationService, userService.AuthRequired(), user.CurrentUserID, navigationMetrics).
+		WithIconStorage(cfg.NavigationIconDir, cfg.MediaPublicBaseURL).Register(navigationRoutes)
 	im.NewHandler(imService, userService).Register(api.Group("/im"))
 	userNotifications.handler.Register(api.Group("", userService.AuthRequired()))
 	if userNotifications.officialAccount != nil {

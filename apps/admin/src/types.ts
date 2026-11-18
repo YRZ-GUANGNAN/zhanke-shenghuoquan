@@ -16,11 +16,11 @@ export interface ReportRow{id:number;reporterId?:number;targetType:string;target
 export interface ReportDetail{report:ReportRow;review?:ReviewTask}
 export interface FeedbackImage{assetId:string;slot:number}
 export interface FeedbackRow{id?:string;userId:number;category:string;content:string;status:string;adminNote?:string;handledBy?:number;handledAt?:string;images?:FeedbackImage[];createdAt:string;updatedAt:string}
-export interface NavigationItem{id:number;categoryId:number;title:string;subtitle:string;iconText:string;appId:string;path:string;color:string;sort:number;enabled:boolean}
+export interface NavigationItem{id:number;categoryId:number;title:string;subtitle:string;iconText:string;iconPath?:string;appId:string;path:string;color:string;sort:number;enabled:boolean}
 export interface NavigationCategory{id:number;name:string;systemKey?:string;sort:number;enabled:boolean;items:NavigationItem[]}
 export interface NavigationCategoryInput{name:string;sort:number;enabled:boolean}
 export interface NavigationItemInput{categoryId:number;title:string;subtitle:string;iconText:string;appId:string;path:string;color:string;sort:number;enabled:boolean}
-export interface ExternalTakeoutMerchant{id:number;title:string;subtitle:string;iconText:string;appId:string;path:string;color:string;sort:number;enabled:boolean}
+export interface ExternalTakeoutMerchant{id:number;title:string;subtitle:string;iconText:string;iconPath?:string;appId:string;path:string;color:string;sort:number;enabled:boolean}
 export interface ExternalTakeoutMerchantDirectory{categoryEnabled:boolean;items:ExternalTakeoutMerchant[]}
 export interface ExternalTakeoutMerchantInput{title:string;subtitle:string;iconText:string;appId:string;path:string;color:string;sort:number}
 export interface Stats{totals:{users:number;posts:number;products:number;pendingReview:number};today:{users:number;posts:number;products:number}}

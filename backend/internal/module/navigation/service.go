@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -12,6 +13,8 @@ var (
 	ErrInvalidExternalTakeoutInput = errors.New("invalid external takeout merchant")
 	ErrSystemManaged               = errors.New("navigation entry is system managed")
 )
+
+var iconPathPattern = regexp.MustCompile(`^[a-f0-9]{32}\.(jpg|png)$`)
 
 type Service struct{ repo Repository }
 
@@ -91,7 +94,7 @@ func (s *Service) CreateItem(ctx context.Context, value Item) (Item, error) {
 	if !found {
 		return Item{}, ErrNotFound
 	}
-	if systemManagedCategory(targetCategory) {
+	if itemCategoryLocked(targetCategory) {
 		return Item{}, ErrSystemManaged
 	}
 	value.ID = 0
@@ -123,7 +126,7 @@ func (s *Service) UpdateItem(ctx context.Context, value Item) error {
 	if !found {
 		return ErrNotFound
 	}
-	if systemManagedCategory(existingCategory) {
+	if itemCategoryLocked(existingCategory) {
 		return ErrSystemManaged
 	}
 	targetCategory, found, err := s.repo.FindCategory(ctx, value.CategoryID)
@@ -133,7 +136,7 @@ func (s *Service) UpdateItem(ctx context.Context, value Item) error {
 	if !found {
 		return ErrNotFound
 	}
-	if systemManagedCategory(targetCategory) {
+	if itemCategoryLocked(targetCategory) {
 		return ErrSystemManaged
 	}
 	return s.repo.UpdateItem(ctx, value.ID, map[string]any{
@@ -147,6 +150,30 @@ func (s *Service) UpdateItem(ctx context.Context, value Item) error {
 		"sort":        value.Sort,
 		"enabled":     value.Enabled,
 	})
+}
+
+// SetItemIconPath binds (or clears when empty) the custom icon of one item.
+// Icon files themselves are managed by the upload endpoints.
+func (s *Service) SetItemIconPath(ctx context.Context, id uint, iconPath string) (Item, error) {
+	if id == 0 {
+		return Item{}, invalidNavigationInput("item id is required")
+	}
+	iconPath = strings.TrimSpace(iconPath)
+	if iconPath != "" && !iconPathPattern.MatchString(iconPath) {
+		return Item{}, invalidNavigationInput("invalid icon path")
+	}
+	existing, found, err := s.repo.FindItem(ctx, id)
+	if err != nil {
+		return Item{}, err
+	}
+	if !found {
+		return Item{}, ErrNotFound
+	}
+	if err := s.repo.UpdateItem(ctx, id, map[string]any{"icon_path": iconPath}); err != nil {
+		return Item{}, err
+	}
+	existing.IconPath = iconPath
+	return existing, nil
 }
 
 func (s *Service) DeleteItem(ctx context.Context, id uint) error {
@@ -167,7 +194,7 @@ func (s *Service) DeleteItem(ctx context.Context, id uint) error {
 	if !found {
 		return ErrNotFound
 	}
-	if systemManagedCategory(category) {
+	if itemCategoryLocked(category) {
 		return ErrSystemManaged
 	}
 	return s.repo.DeleteItemInCategory(ctx, id, existing.CategoryID)
@@ -376,7 +403,7 @@ func toPublicCategories(values []Category) []PublicCategory {
 			items = append(items, PublicItem{
 				ID: item.ID, Title: item.Title, Subtitle: item.Subtitle, IconText: item.IconText,
 				AppID: item.AppID, Path: item.Path, Color: item.Color, Sort: item.Sort,
-				OperatingStatus: status,
+				OperatingStatus: status, IconPath: item.IconPath,
 			})
 		}
 		var systemKey *string
@@ -392,6 +419,13 @@ func toPublicCategories(values []Category) []PublicCategory {
 }
 
 func systemManagedCategory(value Category) bool { return value.SystemKey != nil }
+
+// itemCategoryLocked blocks generic item writes for system categories except
+// the campus_maker channel, whose entries are maintained through the same
+// admin API as ordinary categories.
+func itemCategoryLocked(value Category) bool {
+	return value.SystemKey != nil && *value.SystemKey != SystemKeyCampusMaker
+}
 
 func invalidNavigationInput(detail string) error {
 	return fmt.Errorf("%w: %s", ErrInvalidNavigationInput, detail)

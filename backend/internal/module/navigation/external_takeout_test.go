@@ -362,7 +362,7 @@ func TestExternalTakeoutDTOFieldBoundaries(t *testing.T) {
 	})
 	assertFields(t, ExternalTakeoutDirectory{}, []string{"CategoryEnabled", "Items"})
 	assertFields(t, PublicItem{}, []string{
-		"ID", "Title", "Subtitle", "IconText", "AppID", "Path", "Color", "Sort", "OperatingStatus",
+		"ID", "Title", "Subtitle", "IconText", "IconURL", "IconPath", "AppID", "Path", "Color", "Sort", "OperatingStatus",
 	})
 	assertFields(t, PublicCategory{}, []string{"ID", "Name", "SystemKey", "Sort", "Items"})
 

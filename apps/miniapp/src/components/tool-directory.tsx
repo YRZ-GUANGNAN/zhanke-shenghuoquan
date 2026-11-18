@@ -1,4 +1,5 @@
-import { Text, View } from '@tarojs/components'
+import { useState } from 'react'
+import { Image, Text, View } from '@tarojs/components'
 import type { ToolLink } from '../types'
 import AppIcon from './app-icon'
 import { AppSkeleton, AppState } from './ui'
@@ -16,6 +17,7 @@ export interface ToolDirectoryProps {
   onRetry: () => void
 }
 export default function ToolDirectory({ tools, status, jumpingId, refreshError, compact, kind = 'tool', onOpen, onRetry }: ToolDirectoryProps) {
+  const [failedIcons, setFailedIcons] = useState<Set<string>>(() => new Set())
   const groups = new Map<string, { name: string; items: ToolLink[] }>()
   tools.forEach(tool => {
     const key = tool.categoryId || ''
@@ -33,8 +35,11 @@ export default function ToolDirectory({ tools, status, jumpingId, refreshError, 
         <View className='tool-directory__group-heading'><Text>{group.name}</Text><Text className='tool-directory__count'>{group.items.length} 项</Text></View>
         {group.items.map(tool => <View key={tool.id} className='tool-entry' hoverClass='tool-entry--pressed'
           ariaRole='button' ariaLabel={`打开${tool.title}`} onClick={() => onOpen(tool)}>
-          <View className='tool-entry__mark' style={/^#[0-9a-f]{6}$/i.test(tool.color) ? { color: tool.color } : undefined}>
-            {tool.iconText.trim() ? <Text>{[...tool.iconText.trim()].slice(0, 2).join('')}</Text> : <AppIcon name='document' />}
+          <View className='tool-entry__mark' style={/^#[0-9a-f]{6}$/i.test(tool.color) && !tool.iconUrl ? { color: tool.color } : undefined}>
+            {tool.iconUrl && !failedIcons.has(tool.id)
+              ? <Image className='tool-entry__mark-image' src={tool.iconUrl} mode='aspectFit'
+                  onError={() => setFailedIcons((current) => new Set(current).add(tool.id))} />
+              : tool.iconText.trim() ? <Text>{[...tool.iconText.trim()].slice(0, 2).join('')}</Text> : <AppIcon name='document' />}
           </View>
           <View className='tool-entry__body'><Text className='tool-entry__title'>{tool.title}</Text>
             <Text className='tool-entry__description'>{tool.subtitle || copy.entryFallback}</Text></View>

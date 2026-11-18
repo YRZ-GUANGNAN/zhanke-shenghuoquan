@@ -55,6 +55,8 @@ type PublicItem struct {
 	Title           string          `json:"title"`
 	Subtitle        string          `json:"subtitle"`
 	IconText        string          `json:"iconText"`
+	IconURL         string          `json:"iconUrl,omitempty"`
+	IconPath        string          `json:"-"`
 	AppID           string          `json:"appId"`
 	Path            string          `json:"path"`
 	Color           string          `json:"color"`

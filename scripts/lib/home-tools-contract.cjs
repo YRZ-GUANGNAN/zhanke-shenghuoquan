@@ -1,6 +1,6 @@
 const { parse } = require('@babel/parser')
 
-const toolFields = new Set(['id', 'title', 'subtitle', 'iconText', 'appId', 'path', 'color'])
+const toolFields = new Set(['id', 'title', 'subtitle', 'iconText', 'iconUrl', 'appId', 'path', 'color'])
 const ignoredASTKeys = new Set([
   'type', 'start', 'end', 'loc', 'extra', 'errors',
   'leadingComments', 'innerComments', 'trailingComments'

@@ -1,7 +1,7 @@
 import { withFeaturePage } from '../../components/feature-page-gate'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDidShow } from '@tarojs/taro'
-import { Text, View } from '@tarojs/components'
+import { Image, Text, View } from '@tarojs/components'
 import CapsulePageHeader from '../../components/capsule-page-header'
 import AppIcon from '../../components/app-icon'
 import { AppSkeleton, AppState } from '../../components/ui'
@@ -24,6 +24,7 @@ function StudentTakeoutPage() {
   const [merchants, setMerchants] = useState<ExternalTakeoutMerchantLink[]>([])
   const [status, setStatus] = useState<DirectoryStatus>('loading')
   const [jumpingTarget, setJumpingTarget] = useState<string | null>(null)
+  const [failedMerchantIcons, setFailedMerchantIcons] = useState<Set<string>>(() => new Set())
   const visibility = useFeatureVisibility()
   usePageShare({ kind: 'services', enabled: visibility.takeout })
   const merchantRequestVersion = useRef(0)
@@ -130,8 +131,11 @@ function StudentTakeoutPage() {
                   hoverClass='student-takeout-merchant--pressed'
                   onClick={() => void openMerchant(merchant)}
                 >
-                  <View className='student-takeout-merchant__avatar' style={{ color: merchant.color }}>
-                    <Text>{merchant.iconText}</Text>
+                  <View className='student-takeout-merchant__avatar' style={merchant.iconUrl ? undefined : { color: merchant.color }}>
+                    {merchant.iconUrl && !failedMerchantIcons.has(merchant.id)
+                      ? <Image className='student-takeout-merchant__avatar-image' src={merchant.iconUrl} mode='aspectFit'
+                          onError={() => setFailedMerchantIcons((current) => new Set(current).add(merchant.id))} />
+                      : <Text>{merchant.iconText}</Text>}
                   </View>
                   <View className='student-takeout-merchant__main'>
                     <View className='student-takeout-merchant__headline'>
