@@ -47,6 +47,13 @@
   color: $text-primary;
 }
 
+.about-note__empty {
+  @include ref.type(meta);
+  display: block;
+  padding: 8rpx 4rpx;
+  color: $text-secondary;
+}
+
 .about-note__date {
   @include ref.type(meta);
   display: block;
