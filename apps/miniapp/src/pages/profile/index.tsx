@@ -19,6 +19,7 @@ import type { IdentityApplicationRole, IdentityAvailability, IdentityRoleKey } f
 import './index.scss'
 import { useFeatureVisibility } from '../../hooks/use-feature-visibility'
 import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
+import { useCachedResource } from '../../hooks/use-cached-resource'
 
 type RoleKey = IdentityRoleKey
 type MyContentTabKey = 'favorites' | 'posts' | 'comments' | 'items'
@@ -105,46 +106,7 @@ async function getMyItemCount() {
   return (await getMyProductsPage(1, 1)).total
 }
 
-// 统计数字缓存：切页回来先显示上次的数字，同时静默刷新。
-// 按「会话 + 指标」区分，换账号自动失效。
-const profileCountCache = new Map<string, { scope: string; data: unknown }>()
-
 // Each domain owns its failure/loading state. An unread value is not zero.
-function useProfileCount<T>(enabled: boolean, read: () => Promise<T>, cacheKey: string, scope: string) {
-  const cacheEntry = profileCountCache.get(cacheKey)
-  const cached = cacheEntry && cacheEntry.scope === scope ? cacheEntry.data as T : null
-  const [state, setState] = useState<{ data: T | null; loading: boolean; error: boolean }>({ data: cached, loading: enabled && cached === null, error: false })
-  const versionRef = useRef(0)
-  const busyRef = useRef(false)
-  const enabledRef = useRef(enabled)
-  enabledRef.current = enabled
-
-  const reload = useCallback(async () => {
-    if (!enabledRef.current || busyRef.current) return
-    busyRef.current = true
-    const version = ++versionRef.current
-    setState((current) => ({ ...current, loading: true, error: false }))
-    try {
-      const data = await read()
-      if (version === versionRef.current && enabledRef.current) {
-        profileCountCache.set(cacheKey, { scope, data })
-        setState({ data, loading: false, error: false })
-      }
-    } catch {
-      if (version === versionRef.current && enabledRef.current) setState((current) => ({ ...current, loading: false, error: true }))
-    } finally {
-      if (version === versionRef.current) busyRef.current = false
-    }
-  }, [read])
-
-  useEffect(() => {
-    if (enabled) void reload()
-    else setState({ data: null, loading: false, error: false })
-    return () => { versionRef.current += 1; busyRef.current = false }
-  }, [enabled, reload])
-
-  return { ...state, reload }
-}
 
 function countValue(value: number | null | undefined): string {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? String(value) : '—'
@@ -175,8 +137,18 @@ function ProfileContent() {
   const activeRole = identity?.currentIdentity ?? 'student'
   const identityAllowed = useIdentityGuard('student')
   const sessionScope = useSessionStore((state) => `${state.token}:${state.profile.id}`)
-  const communityCount = useProfileCount(identityAllowed && visibility.forum, getMyCommunitySummary, 'community-summary', sessionScope)
-  const itemCount = useProfileCount(identityAllowed && visibility.secondhand, getMyItemCount, 'item-count', sessionScope)
+  const communityCount = useCachedResource({
+    key: 'profile-community-summary',
+    scope: sessionScope,
+    enabled: identityAllowed && visibility.forum,
+    read: getMyCommunitySummary
+  })
+  const itemCount = useCachedResource({
+    key: 'profile-item-count',
+    scope: sessionScope,
+    enabled: identityAllowed && visibility.secondhand,
+    read: getMyItemCount
+  })
   const countsLoading = visibility.forum && communityCount.loading || visibility.secondhand && itemCount.loading
   const countsError = visibility.forum && communityCount.error || visibility.secondhand && itemCount.error
 

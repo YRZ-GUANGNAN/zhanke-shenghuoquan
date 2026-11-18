@@ -73,6 +73,7 @@ async function run() {
         if (id.endsWith('/IdentityApplicationEntryModal')) return { default: (props) => React.createElement(View, { ...props, className: 'test-application-modal' }) }
         if (id.endsWith('/capsule-page-header')) return { CapsuleSystemRow: View, default: (props) => React.createElement(View, { className: 'test-header' }, props.left, props.right) }
         if (id.endsWith('/use-viewport-refresh')) return { useViewportRefresh: () => ({}) }
+        if (id.endsWith('/hooks/use-cached-resource')) return loadSource(path.resolve(__dirname, '../apps/miniapp/src/hooks/use-cached-resource.ts'))
         if (id.endsWith('/capsule-safe')) return { getCapsuleSafeStyle: () => ({}) }
         if (id.endsWith('/components/ui')) return { AppIconButton: View, AppActionSheet: (props) => props.visible ? React.createElement(View, props) : null, AppDialog: (props) => props.visible ? React.createElement(View, { ...props, className: 'test-dialog' }) : null }
         if (id.endsWith('/use-page-share')) return { usePageShare: () => true }
