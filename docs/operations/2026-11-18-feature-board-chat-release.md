@@ -35,3 +35,8 @@
 线上验证：`/version` 返回 `2026.11.18.candidate.2`；未登录 `GET /api/v1/admin/contact-settings` 由修复前 404 变为 401（路由已注册）；公开联系设置 200；后台首页新资源正常。
 
 回滚目标（上一版）：后端 `20261118a-feature-board-chat-e19422a`，后台 `admin-20261118-e19422a`。
+- **迁移 068** 已执行（debian-sys-maint）：`navigation_items.icon_path` 列存在；备份 `/var/backups/campus-circle/pre-migration-068-20261118T045121Z.sql.gz`。
+- **后端**：版本 `2026.11.18.candidate.3`（commit `f72676dc4938`），release `/opt/campus-circle/releases/20261118c-nav-icons-f72676d`，二进制 SHA256 `70b72b13dfde999078a449a191bdbd47677fe875b8eaf726773a46c067220a20`；服务端已配置 `NAVIGATION_ICON_DIR=/opt/campus-circle/shared/navigation-icons`（campus 属主）并重启。
+- **后台静态**：`/var/www/campus-admin/releases/admin-20261118c-f72676d`（首页 `index-D50fsbwA.js`）。
+- **线上验证**：`/version` 返回 candidate.3；未登录 `POST /api/v1/admin/navigation/items/1/icon` 401（上传路由已注册）；`/api/v1/navigation/categories` 200；`/api/v1/navigation-icons/<不存在文件>` 404。
+- **回滚目标（上一版）**：后端 `20261118b-review-fixes-d745aa7`，后台 `admin-20261118b-d745aa7`；数据库回滚脚本 `rollback/068_navigation_item_icon.sql`。
