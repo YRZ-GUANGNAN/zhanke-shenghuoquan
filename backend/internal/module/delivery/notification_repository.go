@@ -7,8 +7,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// NotificationEvent is a metadata-only fact. It carries no address, phone,
-// customer name, message text or payment-provider credentials.
+// NotificationEvent is a metadata-only fact. Payloads may carry pickup/delivery
+// addresses for the internal duty-group cards (product-approved); phone numbers,
+// customer names, message text and payment-provider credentials never enter events.
 type NotificationEvent struct {
 	EventPublicID     string
 	EventType         string
@@ -162,8 +163,8 @@ type OrderNotificationPayload struct {
 	RiderFeeCents       uint64  `json:"riderFeeCents,omitempty"`
 	SourcePlatform      string  `json:"sourcePlatform,omitempty"`
 	// 取送地址仅用于内部值班群卡片（产品确认）；电话与备注仍然禁止进入事件。
-	PickupAddress       string  `json:"pickupAddress,omitempty"`
-	DeliveryAddress     string  `json:"deliveryAddress,omitempty"`
+	PickupAddress   string `json:"pickupAddress,omitempty"`
+	DeliveryAddress string `json:"deliveryAddress,omitempty"`
 }
 
 func orderNotification(before, after Order, now time.Time) (NotificationEvent, error) {
@@ -211,7 +212,8 @@ func appendReassignNotificationTx(tx *gorm.DB, appender NotificationEventAppende
 		return nil
 	}
 	if tx == nil || !ValidULID(after.DeliveryOrderPublicID) || after.MerchantUserID == 0 ||
-		after.RowVersion != before.RowVersion+1 || before.Status != after.Status || now.IsZero() {
+		after.RowVersion != before.RowVersion+1 || before.Status != after.Status || now.IsZero() ||
+		before.RiderUserID == nil || after.RiderUserID == nil || *before.RiderUserID == *after.RiderUserID {
 		return ErrInvalidRecord
 	}
 	id, err := NewULID()
@@ -223,6 +225,7 @@ func appendReassignNotificationTx(tx *gorm.DB, appender NotificationEventAppende
 		RiderUserID: after.RiderUserID, PreviousRiderUserID: before.RiderUserID,
 		From: before.Status, To: after.Status, DeliveryFeeCents: after.DeliveryFeeCents,
 		RiderFeeCents: after.RiderFeeCents, SourcePlatform: string(after.SourcePlatform.Effective()),
+		PickupAddress: after.PickupAddress, DeliveryAddress: after.DeliveryAddress,
 	})
 	if err != nil {
 		return err

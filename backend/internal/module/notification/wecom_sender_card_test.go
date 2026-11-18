@@ -9,9 +9,9 @@ import (
 
 func TestMarshalWecomTemplateCardStructure(t *testing.T) {
 	body, err := marshalWecomTemplateCard(WecomTemplateCard{
-		SourceDesc: "湛科生活圈 · 京东订单", Title: "新订单通知", Desc: "京东订单 · 配送单等待接单",
+		SourceDesc: "湛科生活圈 · 京东订单", Title: "骑手已接单", Desc: "京东订单 · 单号 01M7F1…X8SF",
 		EmphasisTitle: "2元", EmphasisDesc: "赏金",
-		Items:     []WecomCardItem{{Key: "单号", Value: "01M7F1YAG2S54TQK57G3MXX8SF"}, {Key: "状态", Value: "配送单等待接单"}},
+		Items:     []WecomCardItem{{Key: "单号", Value: "01M7F1YAG2S54TQK57G3MXX8SF"}, {Key: "时间", Value: "11-15 15:32"}},
 		ActionURL: "https://zhanduiwang.top/",
 	}, time.Date(2026, 11, 15, 7, 32, 0, 0, time.UTC))
 	if err != nil {
@@ -40,7 +40,7 @@ func TestMarshalWecomTemplateCardStructure(t *testing.T) {
 		t.Fatalf("wrong type: %s %s", payload.MsgType, payload.TemplateCard.CardType)
 	}
 	if payload.TemplateCard.Source.Desc != "湛科生活圈 · 京东订单" ||
-		payload.TemplateCard.MainTitle.Title != "新订单通知" ||
+		payload.TemplateCard.MainTitle.Title != "骑手已接单" ||
 		payload.TemplateCard.Emphasis.Title != "2元" || payload.TemplateCard.Emphasis.Desc != "赏金" {
 		t.Fatalf("wrong card head: %+v", payload.TemplateCard)
 	}
@@ -57,7 +57,7 @@ func TestMarshalWecomTemplateCardStructure(t *testing.T) {
 
 func TestMarshalWecomTemplateCardMiniAppAction(t *testing.T) {
 	body, err := marshalWecomTemplateCard(WecomTemplateCard{
-		SourceDesc: "湛科生活圈 · 京东订单", Title: "新订单通知", Desc: "京东订单 · 配送单等待接单",
+		SourceDesc: "湛科生活圈 · 京东订单", Title: "骑手已接单", Desc: "京东订单 · 单号 01M7F1…X8SF",
 		Items:          []WecomCardItem{{Key: "单号", Value: "01M7F1YAG2S54TQK57G3MXX8SF"}},
 		ActionURL:      "https://zhanduiwang.top/",
 		ActionAppID:    "wx0123456789abcdef",

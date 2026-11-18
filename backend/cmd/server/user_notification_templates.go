@@ -281,6 +281,8 @@ func orderNotificationStatusPhrase(title string) (string, error) {
 		return "已送达", nil
 	case "配送单已取消":
 		return "已取消", nil
+	case "订单已改派":
+		return "已改派", nil
 	default:
 		return "", notification.ErrSubscribePayload
 	}

@@ -40,6 +40,53 @@ func TestOrderNotificationSnapshotContainsNoContactData(t *testing.T) {
 	}
 }
 
+func TestReassignNotificationCarriesRiderSwapAndAddresses(t *testing.T) {
+	previous, next := uint64(61), uint64(62)
+	before := Order{DeliveryOrderPublicID: "01J00000000000000000000811", MerchantUserID: 42,
+		RowVersion: 7, Status: StatusDelivering, RiderUserID: &previous,
+		PickupAddress: "东门菜鸟驿站", DeliveryAddress: "12栋305",
+		RecipientPhone: "private-phone", Remark: "private-note"}
+	after := before
+	after.RowVersion, after.RiderUserID = 8, &next
+	var captured NotificationEvent
+	appendEvent := func(_ *gorm.DB, event NotificationEvent) error {
+		captured = event
+		return nil
+	}
+	if err := appendReassignNotificationTx(&gorm.DB{}, appendEvent, before, after, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if captured.EventType != EventOrderReassigned || captured.AggregateVersion != 8 {
+		t.Fatalf("invalid reassign event: %+v", captured)
+	}
+	var payload OrderNotificationPayload
+	if err := json.Unmarshal(captured.Payload, &payload); err != nil {
+		t.Fatal(err)
+	}
+	// 改派事件状态不变，但必须携带新旧骑手与取送地址（内部值班群卡片依赖）。
+	if payload.From != payload.To || payload.RiderUserID == nil || *payload.RiderUserID != next ||
+		payload.PreviousRiderUserID == nil || *payload.PreviousRiderUserID != previous ||
+		payload.PickupAddress != "东门菜鸟驿站" || payload.DeliveryAddress != "12栋305" {
+		t.Fatalf("wrong reassign payload: %+v", payload)
+	}
+	// 改派事件与状态事件同一隐私契约：电话与备注永远不得进入事件负载。
+	for _, value := range []string{"private-phone", "private-note"} {
+		if strings.Contains(string(captured.Payload), value) {
+			t.Fatal("contact data leaked into reassign event")
+		}
+	}
+	statusChanged := after
+	statusChanged.Status = StatusPickedUp
+	if err := appendReassignNotificationTx(&gorm.DB{}, appendEvent, before, statusChanged, time.Now()); !errors.Is(err, ErrInvalidRecord) {
+		t.Fatal("status change accepted as reassign")
+	}
+	sameRider := before
+	sameRider.RowVersion = 8
+	if err := appendReassignNotificationTx(&gorm.DB{}, appendEvent, before, sameRider, time.Now()); !errors.Is(err, ErrInvalidRecord) {
+		t.Fatal("unchanged rider accepted as reassign")
+	}
+}
+
 func TestOrderNotificationPortPreservesTransactionAndFailure(t *testing.T) {
 	before := Order{DeliveryOrderPublicID: "01J00000000000000000000811", MerchantUserID: 42, RowVersion: 1, Status: StatusPendingFeePayment}
 	after := before

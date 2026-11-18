@@ -300,11 +300,21 @@ func (r *orderNotificationRecipients) resolveRecipients(ctx context.Context, eve
 	if event.EventType == delivery.EventRiderPoolOpened {
 		return r.resolveRiderPoolRecipients(ctx, event, recipientID)
 	}
-	if event.EventType != delivery.EventOrderStatusChanged {
+	reassigned := event.EventType == delivery.EventOrderReassigned
+	if event.EventType != delivery.EventOrderStatusChanged && !reassigned {
 		return nil, notification.ErrInvalidRecord
 	}
 	var fact delivery.OrderNotificationPayload
-	if err := json.Unmarshal(event.Payload, &fact); err != nil || fact.OrderPublicID != event.AggregatePublicID || fact.MerchantUserID == 0 || !delivery.CanTransition(fact.From, fact.To) {
+	if err := json.Unmarshal(event.Payload, &fact); err != nil || fact.OrderPublicID != event.AggregatePublicID || fact.MerchantUserID == 0 {
+		return nil, notification.ErrInvalidRecord
+	}
+	if reassigned {
+		// 改派不改状态（From==To），但必须真的换了骑手。
+		if fact.From != fact.To || fact.RiderUserID == nil || fact.PreviousRiderUserID == nil ||
+			*fact.RiderUserID == *fact.PreviousRiderUserID {
+			return nil, notification.ErrInvalidRecord
+		}
+	} else if !delivery.CanTransition(fact.From, fact.To) {
 		return nil, notification.ErrInvalidRecord
 	}
 	current, err := r.orders.Find(ctx, event.AggregatePublicID)
@@ -317,8 +327,16 @@ func (r *orderNotificationRecipients) resolveRecipients(ctx context.Context, eve
 	if current.MerchantUserID != fact.MerchantUserID || current.RowVersion < event.AggregateVersion {
 		return nil, notification.ErrInvalidRecord
 	}
-	// A delayed state notification must not announce a now-obsolete state.
-	if current.Status != fact.To {
+	// 改派事件的 From==To，状态比对发现不了「又被改派」；当前骑手不一致时静默跳过。
+	if reassigned && (current.RiderUserID == nil || fact.RiderUserID == nil || *current.RiderUserID != *fact.RiderUserID) {
+		return nil, nil
+	}
+	// 延迟的状态通知不能播报过期状态；改派事件播报的是骑手变更，
+	// 订单后续推进不影响它的有效性，只拦已终结的订单。
+	if reassigned && (current.Status == delivery.StatusCancelled || current.Status == delivery.StatusDelivered) {
+		return nil, nil
+	}
+	if !reassigned && current.Status != fact.To {
 		return nil, nil
 	}
 	label, ok := map[delivery.Status]string{
@@ -327,6 +345,9 @@ func (r *orderNotificationRecipients) resolveRecipients(ctx context.Context, eve
 		delivery.StatusPickedUp: "骑手已取货", delivery.StatusDelivering: "配送中",
 		delivery.StatusDelivered: "配送已完成", delivery.StatusCancelled: "配送单已取消",
 	}[fact.To]
+	if reassigned {
+		label, ok = "订单已改派", true
+	}
 	if !ok {
 		return nil, nil
 	}

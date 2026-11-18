@@ -40,6 +40,68 @@ func (s notificationUsersStub) Settings(_ context.Context, id uint) (user.Settin
 	return user.SettingsView{OrderNotice: uint64(id) != s.optedOut}, nil
 }
 
+func TestOrderNotificationRecipientsAcceptReassign(t *testing.T) {
+	previous, next := uint64(2), uint64(3)
+	fact := delivery.OrderNotificationPayload{OrderPublicID: notificationTestOrderID, MerchantUserID: 1,
+		RiderUserID: &next, PreviousRiderUserID: &previous,
+		From: delivery.StatusDelivering, To: delivery.StatusDelivering}
+	payload, _ := json.Marshal(fact)
+	event := notification.Event{EventType: delivery.EventOrderReassigned, AggregateType: "delivery_order",
+		AggregatePublicID: notificationTestOrderID, AggregateVersion: 6, PayloadVersion: 1, Payload: payload}
+	order := delivery.Order{MerchantUserID: 1, RiderUserID: &next, Status: delivery.StatusDelivering, RowVersion: 6}
+	resolver := orderNotificationRecipients{orders: notificationOrdersStub{order}, users: notificationUsersStub{},
+		template: &orderNotificationTemplate{id: "reviewed-order-status-template",
+			fields: map[string]string{"phrase3": "status", "thing5": "status"},
+			users:  map[uint64]bool{1: true, 2: true, 3: true}}}
+	recipients, err := resolver.ResolveRecipients(context.Background(), event)
+	if err != nil || len(recipients) != 3 {
+		t.Fatalf("reassign recipients len=%d err=%v", len(recipients), err)
+	}
+	for _, recipient := range recipients {
+		if recipient.Title != "订单已改派" {
+			t.Fatalf("reassign title=%q", recipient.Title)
+		}
+		snapshot, err := notification.DecodeSubscribeSnapshot(recipient.WechatTemplateSnapshot)
+		if err != nil || snapshot.Data["phrase3"].Value != "已改派" || snapshot.Data["thing5"].Value != "订单已改派" {
+			t.Fatalf("reassign snapshot: %+v err=%v", snapshot.Data, err)
+		}
+	}
+	// 又被改派（当前骑手已不是事件里的新骑手）→ 旧事件静默跳过。
+	other := uint64(4)
+	order.RiderUserID = &other
+	resolver.orders = notificationOrdersStub{order}
+	if got, err := resolver.ResolveRecipients(context.Background(), event); err != nil || len(got) != 0 {
+		t.Fatal("stale reassign event was emitted")
+	}
+	// 订单只是推进了状态（骑手没变）→ 改派通知仍然有效。
+	advanced := delivery.Order{MerchantUserID: 1, RiderUserID: &next, Status: delivery.StatusToPickup, RowVersion: 7}
+	resolver.orders = notificationOrdersStub{advanced}
+	if got, err := resolver.ResolveRecipients(context.Background(), event); err != nil || len(got) != 3 {
+		t.Fatalf("reassign after state advance must still notify: len=%d err=%v", len(got), err)
+	}
+	// 订单已终结（取消/送达）→ 改派通知失去意义，跳过。
+	advanced.Status, advanced.RowVersion = delivery.StatusCancelled, 8
+	resolver.orders = notificationOrdersStub{advanced}
+	if got, err := resolver.ResolveRecipients(context.Background(), event); err != nil || len(got) != 0 {
+		t.Fatal("reassign on terminal order was emitted")
+	}
+	// From!=To、骑手未变或缺骑手都属于非法载荷，必须拒绝。
+	for _, mutate := range []func(*delivery.OrderNotificationPayload){
+		func(f *delivery.OrderNotificationPayload) { f.To = delivery.StatusPickedUp },
+		func(f *delivery.OrderNotificationPayload) { f.PreviousRiderUserID = &next },
+		func(f *delivery.OrderNotificationPayload) { f.RiderUserID = nil },
+	} {
+		bad := fact
+		mutate(&bad)
+		badPayload, _ := json.Marshal(bad)
+		badEvent := event
+		badEvent.Payload = badPayload
+		if got, err := resolver.ResolveRecipients(context.Background(), badEvent); err == nil || len(got) != 0 {
+			t.Fatal("invalid reassign payload was accepted")
+		}
+	}
+}
+
 func TestNotificationRolloutDisabledDoesNotRequireDatabase(t *testing.T) {
 	appender, err := newDeliveryNotificationAppender(config.Config{}, nil)
 	if err != nil || appender != nil {

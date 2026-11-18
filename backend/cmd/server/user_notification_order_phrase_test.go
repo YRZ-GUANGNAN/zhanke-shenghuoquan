@@ -89,6 +89,12 @@ func TestOrderNotificationPhraseCoversEveryNotifiableTransition(t *testing.T) {
 	}
 }
 
+func TestOrderNotificationPhraseCoversReassign(t *testing.T) {
+	if got, err := orderNotificationStatusPhrase("订单已改派"); err != nil || got != "已改派" {
+		t.Fatalf("reassign phrase=%q err=%v", got, err)
+	}
+}
+
 func TestOrderNotificationPhraseRejectsUnknownTitlesWithoutTruncation(t *testing.T) {
 	template := &orderNotificationTemplate{id: "reviewed-order-status-template", fields: map[string]string{"phrase3": "status"}}
 	for _, title := range []string{"", "未知", "已接单", "骑手正在前往取货请稍候", "配送费支付失败未知", "收到新私信"} {
