@@ -64,6 +64,7 @@ async function run() {
         if (id.endsWith('.scss')) return {}
         if (id.endsWith('/use-feature-visibility')) return { useFeatureVisibility: () => options.visibility }
         if (id.endsWith('/stores/session')) return { useSessionStore: (selector) => selector(options.session) }
+        if (id.endsWith('/utils/user-initial')) return { userInitial: (value, fallback) => { const chars = [...((value || '').trim())]; return chars[0] || fallback } }
         if (id.endsWith('/use-identity-guard')) return { useIdentityGuard: () => true, identityRoute: (role) => `/pages/${role}/index` }
         if (id.endsWith('/runtime-session-gate')) return { default: View }
         if (id.endsWith('/feature-page-gate')) return { withFeaturePage: (pageComponent) => pageComponent }

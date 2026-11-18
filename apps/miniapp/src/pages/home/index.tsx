@@ -33,6 +33,7 @@ import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
 import { postBodyWithoutTitle } from '../../utils/post-presentation'
 import { navigateToPublicProfile } from '../../utils/navigation'
+import { userInitial } from '../../utils/user-initial'
 import { conversationPeer, uniquePeerConversations } from '../../utils/conversation-presentation'
 import { readHomeHeaderBackdrop, readHomeHeaderBackdropEffect, readHomeHeaderBackdropImage, type HomeHeaderBackdropEffect } from '../../utils/ui-preferences'
 import './index.scss'
@@ -109,7 +110,7 @@ function toProductCard(product: Product): DiscoverCard {
     summary: product.description,
     author: product.sellerName,
     authorId: product.sellerId,
-    avatar: product.sellerName.slice(0, 1) || '校',
+    avatar: userInitial(product.sellerName, '校'),
     avatarUrl: product.sellerAvatar,
     price: product.price,
     likes: product.favoriteCount

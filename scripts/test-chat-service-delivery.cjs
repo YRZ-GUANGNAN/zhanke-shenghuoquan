@@ -76,6 +76,7 @@ async function run() {
     },
     '../../services/media':{},'../../services/taro':{getCurrentInstance:()=>({router:{params:{orderId:'ORDER'}}})},
     '../../stores/session':{useSessionStore:store},'../../hooks/use-keyboard-inset':{useKeyboardInset:()=>({inset:0,reset})},
+    '../../utils/user-initial': { userInitial: (value, fallback) => { const chars = [...((value || '').trim())]; return chars[0] || fallback } },
     '../../hooks/use-visible-conversation-read':{useVisibleConversationRead:()=>{}},'./index.scss':{}
   },dr)
   dr.render();await dr.flush()

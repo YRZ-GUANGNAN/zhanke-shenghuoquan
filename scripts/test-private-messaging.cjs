@@ -61,6 +61,7 @@ function chatHarness(options = {}) {
     '../../services/session-recovery': { requestWithSingleSessionRecovery: fn => fn() },
     '../../services/taro': { getCurrentInstance: () => ({ router: { params } }), showToast: async ({ title }) => { toasts.push(title) }, navigateTo: async ({ url }) => { navigations.push(url) }, navigateBack: async () => {}, redirectTo: async () => {} },
     '../../stores/session': { useSessionStore },
+    '../../utils/user-initial': { userInitial: (value, fallback) => { const chars = [...((value || '').trim())]; return chars[0] || fallback } },
     '../../hooks/use-viewport-refresh': { useViewportRefresh: () => ({}) },
     '../../hooks/use-keyboard-inset': { useKeyboardInset: () => ({ inset: 0, onFocus: focus, onKeyboardHeightChange: height, reset }) },
     '../../hooks/use-visible-conversation-read': { useVisibleConversationRead: () => {} },

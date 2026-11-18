@@ -54,6 +54,7 @@ function publishHarness(options = {}) {
       setClipboardData: async () => {}, getClipboardData: options.getClipboard || (async () => ({ data: options.clipboard || '' })),
     },
     '../../stores/session': { useSessionStore: store },
+    '../../utils/user-initial': { userInitial: (value, fallback) => { const chars = [...((value || '').trim())]; return chars[0] || fallback } },
     '../../utils/delivery-order-clipboard': { deliveryClipboardTemplate: '', parseDeliveryOrderClipboard: options.parseClipboard || (() => ({ values: {}, recognizedFields: [] })) },
     '../../utils/delivery-order-source': { deliverySourceLabel: (platform) => ({ local: '校内配送', taobao: '淘宝闪购', jd: '京东外卖', meituan: '美团外卖' }[platform] || '校内配送') },
     './index.scss': {},

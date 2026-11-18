@@ -18,6 +18,7 @@ import {
 import { getPublicUserProducts } from '../../services/c-trade'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
+import { userInitial } from '../../utils/user-initial'
 import type { CommunityPost, Product } from '../../types'
 import { useViewportRefresh } from '../../hooks/use-viewport-refresh'
 import ChannelPager, { useChannelInteraction } from '../../components/channel-pager'
@@ -346,7 +347,7 @@ function UserProfilePage() {
         <View className='public-profile-user'>
           <View className='public-profile-user__top'>
             <View className='public-profile-user__avatar'>
-              {hasAvatar ? <Image className='public-profile-user__avatar-image' src={value.avatar} mode='aspectFill' onError={() => setFailedAvatar(value.avatar)} /> : <Text>{value.nickname.slice(0, 1) || '校'}</Text>}
+              {hasAvatar ? <Image className='public-profile-user__avatar-image' src={value.avatar} mode='aspectFill' onError={() => setFailedAvatar(value.avatar)} /> : <Text>{userInitial(value.nickname, '校')}</Text>}
             </View>
             <View className='public-profile-actions'>
               {(isSelf || visibility.following) && <View className={`public-profile-action public-profile-action--primary ${following && !isSelf ? 'public-profile-action--active' : ''}`} ariaRole='button' onClick={isSelf ? () => openContent('/pages/edit-profile/index') : () => { if (interaction.canActivate()) void toggleFollow() }}>

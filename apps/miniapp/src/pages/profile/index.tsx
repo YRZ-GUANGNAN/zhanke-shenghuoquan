@@ -10,6 +10,7 @@ import StudentBottomNav from '../../components/student-bottom-nav'
 import { AppDialog } from '../../components/ui'
 import { identityRoute, useIdentityGuard } from '../../hooks/use-identity-guard'
 import { getContactSettings, type ContactSettings } from '../../services/contact-settings'
+import { userInitial } from '../../utils/user-initial'
 import Taro from '../../services/taro'
 import { getMyCommunitySummary } from '../../services/b-community'
 import { getMyProductsPage } from '../../services/c-trade'
@@ -295,7 +296,7 @@ function ProfileContent() {
               {profile.avatar && profile.avatar !== failedAvatar ? (
                 <Image className='student-profile-user__avatar-image' src={profile.avatar} mode='aspectFill' onError={() => setFailedAvatar(profile.avatar)} />
               ) : (
-                <Text>{profile.nickname.trim().slice(0, 1) || '同'}</Text>
+                <Text>{userInitial(profile.nickname, '同')}</Text>
               )}
             </View>
             <View className='student-profile-user__top-spacer' />

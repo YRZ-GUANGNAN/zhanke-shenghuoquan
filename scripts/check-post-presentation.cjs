@@ -69,6 +69,7 @@ async function pageBehavior() {
         notificationBadgeLabel: () => '',
       }
       if (id.endsWith('/stores/session')) return { useSessionStore: (selector) => selector({ token: options.token || 'test-token', profile: { id: 'test-user' } }) }
+      if (id.endsWith('/utils/user-initial')) return { userInitial: (value, fallback) => { const chars = [...((value || '').trim())]; return chars[0] || fallback } }
       if (id.endsWith('/session-recovery')) return { requestWithSingleSessionRecovery: (run) => run() }
       if (id.endsWith('/ui-preferences')) return {
         readHomeHeaderBackdrop: () => false,

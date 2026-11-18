@@ -117,6 +117,7 @@ function profileHarness(options = {}) {
       navigateTo: async (value) => { calls.navigate.push(value) }, showToast: async () => {},
     },
     '../../stores/session': { useSessionStore: session.useSessionStore },
+    '../../utils/user-initial': { userInitial: (value, fallback) => { const chars = [...((value || '').trim())]; return chars[0] || fallback } },
     '../../utils/bottom-nav-motion': { useBottomNavScroll: () => () => {} },
     './index.scss': {},
   }
@@ -164,6 +165,7 @@ function messagesHarness(options = {}) {
     },
     '../../hooks/use-identity-guard': { useIdentityGuard: (role) => { calls.guards.push(role); return allowed } },
     '../../stores/session': { useSessionStore: session.useSessionStore },
+    '../../utils/user-initial': { userInitial: (value, fallback) => { const chars = [...((value || '').trim())]; return chars[0] || fallback } },
     '../../utils/bottom-nav-motion': { useBottomNavScroll: () => () => {} },
     '../../services/delivery-im': {
       listDeliveryConversations: async (...args) => { calls.lists.push(args); return options.list?.(...args) || { items: [conversation('A')], total: 1 } },

@@ -6,6 +6,7 @@ import { AppIconButton } from '../../components/ui'
 import { AppDialog } from '../../components/ui'
 import { listBlockedUsers, removeBlockedUser, type BlockedUserView } from '../../services/a-user'
 import Taro from '../../services/taro'
+import { userInitial } from '../../utils/user-initial'
 import './index.scss'
 
 function blockedAt(value: string): string {
@@ -64,7 +65,7 @@ export default function BlacklistPage() {
           ) : blockedUsers.length > 0 ? (
             blockedUsers.map((user) => (
               <View key={user.userId} className='student-blacklist-user'>
-                <View className='student-blacklist-user__avatar student-blacklist-user__avatar--muted'><Text>{user.nickname.trim().slice(0, 1) || '匿'}</Text></View>
+                <View className='student-blacklist-user__avatar student-blacklist-user__avatar--muted'><Text>{userInitial(user.nickname, '匿')}</Text></View>
                 <View className='student-blacklist-user__body'>
                   <Text className='student-blacklist-user__name'>{user.nickname || '匿名用户'}</Text>
                   <Text className='student-blacklist-user__meta'>{blockedAt(user.createdAt)}</Text>

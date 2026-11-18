@@ -88,6 +88,7 @@ async function run() {
       '../../components/app-icon': { default: View },
       '../../utils/capsule-safe': { getCapsuleSafeStyle: () => ({}) },
       '../../stores/session': { useSessionStore: (selector) => selector(state) },
+      '../../utils/user-initial': { userInitial: (value, fallback) => { const chars = [...((value || '').trim())]; return chars[0] || fallback } },
       '../../services/taro': { default: taro },
       '../../services/b-community': { searchCommunityPosts: search, listCommunityHotSearches: async () => [], listCommunitySearchHistory: async () => [], clearCommunitySearchHistory: async () => {} },
       '../../services/c-trade': { searchTradeProducts: search, listTradeHotSearches: async () => [], listTradeSearchHistory: async () => [], clearTradeSearchHistory: async () => {} },

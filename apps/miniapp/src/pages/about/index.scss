@@ -19,11 +19,12 @@
 .about-notes {
   display: flex;
   flex-direction: column;
-  gap: 14rpx;
+  gap: 10rpx;
   margin-bottom: 40rpx;
   padding: 24rpx;
   border-radius: 26rpx;
-  background: $brand-tint;
+  background: $bg-surface;
+  box-shadow: $shadow-card;
 }
 
 .about-notes__title {
@@ -35,9 +36,7 @@
 }
 
 .about-note {
-  padding: 16rpx 20rpx;
-  border-radius: 16rpx;
-  background: $bg-surface;
+  padding: 12rpx 4rpx;
 }
 
 .about-note__content {

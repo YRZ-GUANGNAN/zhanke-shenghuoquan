@@ -46,6 +46,7 @@ function riderWalletHarness(services = {}, storage = new Map()) {
     './withdrawal-state': withdrawalState(storage),
     '../../services/taro': { navigateBack: async () => {}, showToast: async () => {} },
     '../../stores/session': { useSessionStore: store }, './index.scss': {},
+    '../../utils/user-initial': { userInitial: (value, fallback) => { const chars = [...((value || '').trim())]; return chars[0] || fallback } },
   }, renderer)
   return {
     ...renderer, get tree() { return renderer.tree },
@@ -144,6 +145,7 @@ function merchantEarningsBoundaryHarness(paymentEnabled) {
     },
     '../../services/taro': { navigateBack: async () => {}, showToast: async () => {} },
     '../../stores/session': { useSessionStore: store },
+    '../../utils/user-initial': { userInitial: (value, fallback) => { const chars = [...((value || '').trim())]; return chars[0] || fallback } },
     '../../services/delivery-merchant': { createDeliveryClientRequestId: () => 'TEST-REQUEST' },
     './wallet-state': {
       readPendingWalletRecharge: () => null,

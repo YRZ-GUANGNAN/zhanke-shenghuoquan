@@ -52,6 +52,7 @@ function fixture(communityOverride = {}) {
     },
     '../../services/notification-runtime': { notificationRuntime: { refresh: async () => { refreshes.push(true) } } },
     '../../stores/session': { useSessionStore: sessionStore },
+    '../../utils/user-initial': { userInitial: (value, fallback) => { const chars = [...((value || '').trim())]; return chars[0] || fallback } },
     '../../services/taro': { default: {
       navigateTo: async value => { navigations.push(value) },
       showToast: async value => { toasts.push(value) },

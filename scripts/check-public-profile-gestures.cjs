@@ -55,6 +55,7 @@ async function run() {
       if (id.endsWith('/capsule-page-header')) return { CapsuleSystemRow: components.View }
       if (id.endsWith('/use-viewport-refresh')) return { useViewportRefresh: () => ({}) }
       if (id.endsWith('/stores/session')) return { useSessionStore: select => select({ profile: { id: viewerId } }) }
+      if (id.endsWith('/utils/user-initial')) return { userInitial: (value, fallback) => { const chars = [...((value || '').trim())]; return chars[0] || fallback } }
       if (id.endsWith('/components/ui')) return { AppActionSheet: () => null, AppDialog: () => null }
       if (id.endsWith('/channel-pager')) return load('components/channel-pager.tsx')
       if (id === './use-profile-pager-layout') return load('pages/user-profile/use-profile-pager-layout.ts')

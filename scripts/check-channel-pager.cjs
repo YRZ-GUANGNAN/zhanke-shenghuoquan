@@ -214,6 +214,7 @@ async function run() {
       '../../hooks/use-feature-visibility': { useFeatureVisibility: () => visibility },
       '../../hooks/use-page-share': { usePageShare: (options) => shareOptions.push(options) },
       '../../stores/session': { useSessionStore: (selector) => selector(session) },
+      '../../utils/user-initial': { userInitial: (value, fallback) => { const chars = [...((value || '').trim())]; return chars[0] || fallback } },
       '../../services/api': { isApiError: () => false },
       '../../services/b-community': { getCommunityPostsPage: (query) => queued('posts', query) },
       '../../services/c-trade': { getProductsPage: (query) => queued('products', query), getProduct: async () => null },

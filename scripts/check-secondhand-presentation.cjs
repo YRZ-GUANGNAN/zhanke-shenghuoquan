@@ -71,6 +71,7 @@ async function main() {
         if (id.endsWith('/services/media')) return options.media || {}
         if (id.endsWith('/client-request-id')) return { createClientRequestId: () => 'test-request-' + (++sequence) }
         if (id.endsWith('/stores/session')) return { useSessionStore: (selector) => selector({ token: options.token || 'test-token', profile: { id: options.userId || 'viewer' } }) }
+        if (id.endsWith('/utils/user-initial')) return { userInitial: (value, fallback) => { const chars = [...((value || '').trim())]; return chars[0] || fallback } }
         if (id.endsWith('/post-presentation')) return load('utils/post-presentation.ts')
         if (id.endsWith('/product-price')) return load('components/product-price.tsx')
         if (id.endsWith('/product-presentation')) return load('utils/product-presentation.ts')

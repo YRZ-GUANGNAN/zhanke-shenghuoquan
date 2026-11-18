@@ -8,6 +8,7 @@ import { currentUser, updateProfile } from '../../services/a-user'
 import { chooseAndUploadImages, confirmDirectUpload, uploadPickedImage, type UploadedMedia } from '../../services/media'
 import Taro from '../../services/taro'
 import { useSessionStore } from '../../stores/session'
+import { userInitial } from '../../utils/user-initial'
 import './index.scss'
 
 function EditProfileContent() {
@@ -185,4 +186,4 @@ export default function EditProfilePage() {
   return <RuntimeSessionGate><EditProfileContent key={accountScope} /></RuntimeSessionGate>
 }
 
-function nameInitial(value: string): string { return value.trim().slice(0, 1) || '湛' }
+function nameInitial(value: string): string { return userInitial(value, '湛') }

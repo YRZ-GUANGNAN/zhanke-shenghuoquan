@@ -56,6 +56,7 @@ async function run() {
     if (id.endsWith('.scss')) return {}
     if (id === './app-icon') return { default: component('Icon') }
     if (id.endsWith('/stores/session')) return { useSessionStore: store }
+    if (id.endsWith('/utils/user-initial')) return { userInitial: (value, fallback) => { const chars = [...((value || '').trim())]; return chars[0] || fallback } }
     if (id.endsWith('/services/taro')) return { default: { showModal: () => { const value = deferred(); modals.push(value); return value.promise } } }
     if (id.endsWith('/services/a-user')) return { updateProfileCover: assetId => { const value = { ...deferred(), assetId }; requests.push(value); return value.promise } }
     if (id.endsWith('/services/api')) return apiModule.exports

@@ -50,6 +50,7 @@ function harness(kind = 'page', options = {}) {
       if (id.endsWith('/services/media')) return media
       if (id.endsWith('/services/taro')) return taro
       if (id.endsWith('/stores/session')) return { useSessionStore: sessionStore }
+      if (id.endsWith('/utils/user-initial')) return { userInitial: (value, fallback) => { const chars = [...((value || '').trim())]; return chars[0] || fallback } }
       if (id.endsWith('/components/runtime-session-gate')) return ({ children }) => children
       if (id.endsWith('/components/feature-page-gate')) return { withFeaturePage: page => page }
       if (id.endsWith('/components/capsule-page-header')) {

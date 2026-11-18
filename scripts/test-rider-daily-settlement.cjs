@@ -133,6 +133,7 @@ function riderWalletHarness() {
     './withdrawal-state': { clearPendingRiderWithdrawal: () => {}, parseWithdrawalCents: () => null, readPendingRiderWithdrawal: () => null, savePendingRiderWithdrawal: () => {} },
     '../../services/taro': { navigateBack: async () => {}, showToast: async () => {} },
     '../../stores/session': { useSessionStore: store },
+    '../../utils/user-initial': { userInitial: (value, fallback) => { const chars = [...((value || '').trim())]; return chars[0] || fallback } },
     './index.scss': {},
   }, renderer)
   return { renderer, async mount() { renderer.render(); show?.(); await renderer.flush() } }
