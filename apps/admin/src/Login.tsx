@@ -1,16 +1,7 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { adminAuthAPI } from './services/admin-auth'
 import { useAdminStore } from './store'
 import { AdminButton, AdminField, AdminNotice } from './components'
-
-function greeting() {
-  const hour = new Date().getHours()
-  if (hour < 6) return '夜深了'
-  if (hour < 11) return '早上好'
-  if (hour < 14) return '中午好'
-  if (hour < 18) return '下午好'
-  return '晚上好'
-}
 
 export function Login() {
   const [username, setUsername] = useState('')
@@ -18,6 +9,12 @@ export function Login() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const setAuthenticated = useAdminStore(state => state.setAuthenticated)
+
+  // 后台控制台整体按桌面宽度设计（body min-width），登录页允许窄屏使用。
+  useEffect(() => {
+    document.body.classList.add('login-mode')
+    return () => document.body.classList.remove('login-mode')
+  }, [])
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -43,16 +40,15 @@ export function Login() {
   }
 
   return <main className="login-page">
-    <div className="login-shell">
-      <section className="login-brand" aria-hidden="true">
-        <div className="login-brand__top">
-          <div className="login-brand__mark"><img className="brand-logo-img" src="/images/brand-logo.png" alt="湛科万事通" /></div>
-          <div className="login-brand__name"><strong>湛科生活圈</strong><span>经营与运营工作台</span></div>
+    <div className="login-stage">
+      <header className="login-hero">
+        <span className="login-hero__mark"><img src="/images/brand-logo.png" alt="湛科万事通" /></span>
+        <div className="login-hero__name">
+          <strong>湛科生活圈</strong>
+          <span>经营与运营工作台</span>
+          <p className="login-hero__desc">校园社区 · 二手交易 · 校园配送 · 服务入口</p>
         </div>
-        <div className="login-brand__body">
-          <h2 className="login-brand__word">{greeting()}</h2>
-        </div>
-      </section>
+      </header>
 
       <section className="login-form" aria-labelledby="admin-login-title">
         <div className="login-form__head">
@@ -68,6 +64,8 @@ export function Login() {
         </form>
         <p className="login-form__security">管理员会话受独立权限校验保护，请勿在公共设备保存密码。</p>
       </section>
+
+      <p className="login-page__foot">湛科生活圈 · 校园生活服务平台</p>
     </div>
   </main>
 }
