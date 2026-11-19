@@ -46,7 +46,6 @@ export function Login() {
         <div className="login-hero__name">
           <strong>湛科生活圈</strong>
           <span>经营与运营工作台</span>
-          <p className="login-hero__desc">校园社区 · 二手交易 · 校园配送 · 服务入口</p>
         </div>
       </header>
 
