@@ -45,7 +45,11 @@ func accountJSON(account Account) gin.H {
 	return result
 }
 
+const maxAuthBodyBytes int64 = 16 << 10
+
 func (h *Handler) login(c *gin.Context) {
+	// 密码长度不设策略上限；这里只做请求体大小保护，避免超长输入拖慢 Argon2。
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxAuthBodyBytes)
 	var request struct {
 		Username string `json:"username"`
 		Password string `json:"password"`

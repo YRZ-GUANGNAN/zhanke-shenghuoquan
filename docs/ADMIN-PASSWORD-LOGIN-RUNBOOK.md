@@ -64,7 +64,7 @@ sudo -u campus /opt/campus-circle/current/bin/admin-credential bootstrap --usern
 sudo -u campus /opt/campus-circle/current/bin/admin-credential reset --username administrator
 ```
 
-操作者在本机隐藏输入两次密码。密码长度为 14–72 个字符，用户名为 3–64 位字母、数字、点或下划线。重置密码会撤销该账号已有的管理网页会话。后续新增管理员一律在后台「管理员账号」面板完成。
+操作者在本机隐藏输入两次密码。密码不限制长度（不能为空，建议使用足够复杂的口令），用户名为 3–64 位字母、数字、点或下划线。重置密码会撤销该账号已有的管理网页会话。后续新增管理员一律在后台「管理员账号」面板完成。
 
 ## 上线验收
 

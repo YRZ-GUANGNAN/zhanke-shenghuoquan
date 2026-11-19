@@ -65,10 +65,10 @@ export function AccountPanel() {
     {changeOpen && <div className="password-dialog" role="dialog" aria-modal="true" aria-labelledby="password-dialog-title">
       <form onSubmit={event => { event.preventDefault(); void changePassword() }}>
         <h2 id="password-dialog-title">修改管理员密码</h2>
-        <p>新密码需为 14–72 个字符。修改成功后，所有管理网页会话都会退出。</p>
+        <p>密码不限制长度（建议使用足够复杂的口令），不能为空。修改成功后，所有管理网页会话都会退出。</p>
         <AdminField label="当前密码" type="password" value={oldPassword} onChange={event => setOldPassword(event.target.value)} autoComplete="current-password" required autoFocus />
-        <AdminField label="新密码" type="password" value={newPassword} onChange={event => setNewPassword(event.target.value)} minLength={14} maxLength={72} autoComplete="new-password" description="14–72 个字符" required />
-        <AdminField label="确认新密码" type="password" value={confirmation} onChange={event => setConfirmation(event.target.value)} minLength={14} maxLength={72} autoComplete="new-password" required />
+        <AdminField label="新密码" type="password" value={newPassword} onChange={event => setNewPassword(event.target.value)} autoComplete="new-password" required />
+        <AdminField label="确认新密码" type="password" value={confirmation} onChange={event => setConfirmation(event.target.value)} autoComplete="new-password" required />
         {error && <AdminNotice tone="danger">{error}</AdminNotice>}
         <div className="password-dialog__actions">
           <AdminButton tone="secondary" disabled={changing} onClick={() => setChangeOpen(false)}>取消</AdminButton>

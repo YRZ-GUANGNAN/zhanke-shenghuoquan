@@ -7,9 +7,14 @@ import (
 )
 
 func TestPasswordPolicyAndArgon2id(t *testing.T) {
-	for _, value := range []string{strings.Repeat("a", 13), strings.Repeat("a", 73)} {
-		if _, err := hashPassword(value); !errors.Is(err, ErrPasswordPolicy) {
-			t.Fatalf("hashPassword(%d runes) error=%v", len([]rune(value)), err)
+	if _, err := hashPassword(""); !errors.Is(err, ErrPasswordPolicy) {
+		t.Fatalf("empty password must be rejected: %v", err)
+	}
+	// 长度不设限制：极短与超长口令都能正常哈希与验证。
+	for _, value := range []string{"a", strings.Repeat("a", 200)} {
+		encoded, err := hashPassword(value)
+		if err != nil || !verifyPassword(encoded, value) {
+			t.Fatalf("hashPassword(%d runes) err=%v", len([]rune(value)), err)
 		}
 	}
 	password := "a-correct-password-14"

@@ -54,9 +54,9 @@ export function Login() {
         </div>
         <form onSubmit={event => void submit(event)}>
           <AdminField label="管理员用户名" value={username} onChange={event => setUsername(event.target.value)} autoComplete="username" required />
-          <AdminField label="密码" type="password" value={password} onChange={event => setPassword(event.target.value)} minLength={14} maxLength={72} autoComplete="current-password" autoFocus required description={password.length < 14 ? `至少 14 位字符，当前 ${password.length} 位` : undefined} />
+          <AdminField label="密码" type="password" value={password} onChange={event => setPassword(event.target.value)} autoComplete="current-password" autoFocus required />
           {error && <AdminNotice tone="danger" title="登录失败">{error}</AdminNotice>}
-          <AdminButton type="submit" tone="primary" loading={busy} disabled={password.length < 14}>登录</AdminButton>
+          <AdminButton type="submit" tone="primary" loading={busy} disabled={!password}>登录</AdminButton>
         </form>
         <p className="login-form__security">管理员会话受独立权限校验保护，请勿在公共设备保存密码。</p>
       </section>

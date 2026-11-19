@@ -73,7 +73,7 @@ const errorTranslations: Record<string, string> = {
   'admin username must be 3-64 characters of letters, digits, dot or underscore': '用户名需为 3–64 位字母、数字、点或下划线',
   'administrator display name must be at most 64 characters': '显示名不能超过 64 个字符',
   'this administrator username is already in use': '该登录用户名已被使用',
-  'password must contain 14 to 72 characters': '密码需为 14–72 位',
+  'password must not be empty': '密码不能为空',
   'administrator account not found': '管理员账号不存在',
   'administrator accounts unavailable': '管理员账号暂时无法读取',
   'administrator account operation failed': '管理员账号操作失败'
@@ -801,9 +801,8 @@ function UserPeople() {
         setAccountFormError('用户名需为 3–64 位字母、数字、点或下划线')
         return
       }
-      const passwordLength = [...accountDraft.password].length
-      if (passwordLength < 14 || passwordLength > 72) {
-        setAccountFormError('初始密码需为 14–72 位')
+      if (accountDraft.password === '') {
+        setAccountFormError('初始密码不能为空')
         return
       }
     }
@@ -851,8 +850,8 @@ function UserPeople() {
   const submitAccountPassword = async () => {
     if (!pendingAccountPassword) return
     const length = [...passwordDraft].length
-    if (length < 14 || length > 72) {
-      setAccountFormError('新密码需为 14–72 位')
+    if (passwordDraft === "") {
+      setAccountFormError('新密码不能为空')
       return
     }
     setAccountBusy(true)
@@ -1032,8 +1031,8 @@ function UserPeople() {
           type="password"
           value={accountDraft.password}
           onChange={event => setAccountDraft(current => current ? { ...current, password: event.target.value } : current)}
-          placeholder="14–72 位"
-          hint="14–72 位字符"
+          placeholder="输入密码"
+          hint="密码不限制长度，但不能为空"
           disabled={accountBusy}
         />}
         {accountFormError && <div className="preview-form-error">{accountFormError}</div>}
@@ -1057,8 +1056,8 @@ function UserPeople() {
           type="password"
           value={passwordDraft}
           onChange={event => setPasswordDraft(event.target.value)}
-          placeholder="14–72 位"
-          hint="14–72 位字符"
+          placeholder="输入密码"
+          hint="密码不限制长度，但不能为空"
           disabled={accountBusy}
         />
         {accountFormError && <div className="preview-form-error">{accountFormError}</div>}

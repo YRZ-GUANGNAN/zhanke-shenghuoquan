@@ -18,15 +18,13 @@ const (
 	argonParallelism = 2
 	argonSaltLength  = 16
 	argonKeyLength   = 32
-	minPasswordRunes = 14
-	maxPasswordRunes = 72
 )
 
-var ErrPasswordPolicy = errors.New("password must contain 14 to 72 characters")
+// 密码长度不设限制：只要求非空。长度由使用方自行斟酌（建议使用足够复杂的口令）。
+var ErrPasswordPolicy = errors.New("password must not be empty")
 
 func validatePassword(password string) error {
-	length := len([]rune(password))
-	if length < minPasswordRunes || length > maxPasswordRunes {
+	if password == "" {
 		return ErrPasswordPolicy
 	}
 	return nil

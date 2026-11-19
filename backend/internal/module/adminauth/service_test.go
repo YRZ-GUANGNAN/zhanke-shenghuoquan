@@ -273,9 +273,9 @@ func TestAccountManagementGuardsAndRoleChecks(t *testing.T) {
 		t.Fatalf("invalid username err=%v", err)
 	}
 	if _, err := service.CreateAccount(context.Background(), super.ID, CreateAccountInput{
-		Username: "short.pw", DisplayName: "", Password: "short", Role: RoleAdmin,
+		Username: "short.pw", DisplayName: "", Password: "", Role: RoleAdmin,
 	}); err != ErrPasswordPolicy {
-		t.Fatalf("weak password err=%v", err)
+		t.Fatalf("empty password err=%v", err)
 	}
 	// 普通管理员不能管理账号。
 	daily := repo.byName["daily.admin"]
