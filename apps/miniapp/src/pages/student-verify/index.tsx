@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Image, Input, Text, View } from '@tarojs/components'
 import { useDidShow } from '@tarojs/taro'
 import CapsulePageHeader from '../../components/capsule-page-header'
+import AppIcon from '../../components/app-icon'
 import { AppButton, AppDialog, AppIconButton, AppSkeleton, AppState } from '../../components/ui'
 import Taro from '../../services/taro'
 import { cropImageWithWechatEditor } from '../../utils/crop-image'
@@ -242,7 +243,25 @@ export default function StudentVerifyPage() {
         {pageStatus === 'error' && (
           <AppState kind='error' title='学生认证加载失败' description='请检查网络后重试。' actionText='重新加载' onAction={() => void load()} />
         )}
-        {pageStatus === 'ready' && (
+        {pageStatus === 'ready' && !application && !editing && (
+          <View className='student-verify-hero'>
+            <View className='student-verify-hero__icon'>
+              <AppIcon name='student' className='student-verify-hero__icon-image' />
+            </View>
+            <Text className='student-verify-hero__title'>点亮学生标识</Text>
+            <Text className='student-verify-hero__desc'>提交学生证照片与在校信息，管理员人工核验通过后，你的主页与互动将展示学生标识。</Text>
+            <View className='student-verify-hero__points'>
+              <Text className='student-verify-hero__point'>认证信息仅用于身份核验，不会公开展示</Text>
+              <Text className='student-verify-hero__point'>审核进度与结果会在本页实时更新</Text>
+              <Text className='student-verify-hero__point'>认证通过后可随时申请取消</Text>
+            </View>
+            <View className='student-verify-hero__action'>
+              <AppButton variant='primary' block onClick={startReapply}>开始学生认证</AppButton>
+            </View>
+            <Text className='student-verify-hero__hint'>请准备学生证内页照片，确保姓名、学号清晰可见</Text>
+          </View>
+        )}
+        {pageStatus === 'ready' && (application || editing) && (
           <>
             <View className='student-verify-card'>
               <View className='student-verify-row'>
@@ -252,7 +271,7 @@ export default function StudentVerifyPage() {
                   <Text>{statusCopy.text}</Text>
                 </View>
               </View>
-              {(editing || application) ? (<>
+              <>
               <View className='student-verify-row student-verify-row--media'>
                 <View className='student-verify-row__main'>
                   <Text className='student-verify-row__title'>学生证照片</Text>
@@ -311,13 +330,7 @@ export default function StudentVerifyPage() {
                   ? <Input className='student-verify-input' value={college} maxlength={30} placeholder='请输入学院（选填）' onInput={(event) => setCollege(String(event.detail.value ?? ''))} />
                   : <Text className='student-verify-value'>{college || '未填写'}</Text>}
               </View>
-              </>) : (
-                <View className='student-verify-row student-verify-row--last'>
-                  <View className='student-verify-row__main'>
-                    <Text className='student-verify-row__subtitle'>提交学生证照片和在校信息，经管理员人工核验通过后获得学生认证标识。</Text>
-                  </View>
-                </View>
-              )}
+              </>
             </View>
 
             {application?.status === 'rejected' && application.reviewReason ? (
