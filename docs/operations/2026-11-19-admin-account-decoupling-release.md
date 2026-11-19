@@ -26,3 +26,9 @@
 - 新增管理员：后台「账号与权限 → 管理员账号 → 新建管理员账号」，填写用户名、显示名、角色与初始密码即可，无需小程序注册。
 - `users.role` 仅作为小程序社区角色保留（用于「仅管理员可发帖」等站内权限），不再授予后台访问。
 - 首个超级管理员由运维 CLI 创建，详见 `docs/runbooks/SUPERADMIN_BOOTSTRAP.md` 与 `docs/ADMIN-PASSWORD-LOGIN-RUNBOOK.md`。
+
+## 后续调整（2026-11-19，candidate.2）
+
+- **密码长度不再限制**：管理员密码只要求非空（去掉了 14–72 位限制），登录请求体保留 16KB 大小保护；后台登录页、修改密码、管理员账号面板与运行手册同步更新。
+- 版本 `2026.11.19.candidate.2`（commit `1c21451d750a`），release `/opt/campus-circle/releases/20261119b-password-policy-1c21451`，二进制 SHA256 `4342e50954813e4fab9f89602e879cc02681fcd56139d873dbcd03faed9ff964`；后台静态 `/var/www/campus-admin/releases/admin-20261119b-1c21451`（首页 `index-DVRUYX_h.js`）。线上验证：`/version` 返回 candidate.2、新 PeopleView 分包 200 且含新提示。
+- 同时补齐运维 CLI `/opt/campus-circle/current/bin/admin-credential`（构建脚本已改为随发布一并产出）；回滚目标同前。

@@ -50,6 +50,12 @@ try {
         if ($LASTEXITCODE -ne 0) {
             throw "Go release build failed."
         }
+        # 运维 CLI 随发布一起构建，保证 current/bin/admin-credential 始终可用。
+        $cliOutput = Join-Path $outputDirectory "admin-credential"
+        & go build -trimpath -ldflags "-s -w" -o $cliOutput ./cmd/admin-credential
+        if ($LASTEXITCODE -ne 0) {
+            throw "admin-credential release build failed."
+        }
     } finally {
         Pop-Location
     }
