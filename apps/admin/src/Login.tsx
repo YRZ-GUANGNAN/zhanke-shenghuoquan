@@ -64,8 +64,8 @@ export function Login() {
         </form>
         <p className="login-form__security">管理员会话受独立权限校验保护，请勿在公共设备保存密码。</p>
       </section>
-
-      <p className="login-page__foot">湛科生活圈 · 校园生活服务平台</p>
     </div>
+
+    <p className="login-page__foot">湛科生活圈 · 校园生活服务平台</p>
   </main>
 }
