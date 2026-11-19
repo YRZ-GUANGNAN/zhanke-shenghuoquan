@@ -50,7 +50,7 @@ try {
         if ($LASTEXITCODE -ne 0) {
             throw "Go release build failed."
         }
-        # 运维 CLI 随发布一起构建，保证 current/bin/admin-credential 始终可用。
+        # Build the ops CLI alongside the server so current/bin/admin-credential always ships.
         $cliOutput = Join-Path $outputDirectory "admin-credential"
         & go build -trimpath -ldflags "-s -w" -o $cliOutput ./cmd/admin-credential
         if ($LASTEXITCODE -ne 0) {
