@@ -33,15 +33,39 @@
 
 ## 待办（需要控制台/人工）
 
-1. **异地备份密钥**：主线 COS 密钥只能申请 STS，无法直接写对象。请在腾讯云创建一个专用子账号，仅授权 `campus-circle-backups/*` 的 `PutObject / GetObject / DeleteObject / ListBucket`，然后写入
-   `/etc/campus-circle/backup-cos.env`（权限 600）：
-   ```
-   BACKUP_COS_SECRET_ID=...
-   BACKUP_COS_SECRET_KEY=...
-   ```
-   随后执行 `sudo /usr/local/bin/campus-backup-offsite.sh` 并在 COS 控制台确认对象存在。
-2. **云硬盘快照**：控制台为系统盘开启每日快照、保留 7 天（整机损坏时的最快恢复手段）。
-3. **媒体桶版本控制**：为媒体 COS 桶开启版本控制，防止误删对象。
+> 已验证：服务器上的 `COS_SECRET_ID/KEY` 只能用于 COS 上传（STS + staging 前缀），调用 CBS（快照）与 CAM（子账号）接口均返回 `UnauthorizedOperation`；服务器与本机都没有腾讯云 API 凭证，因此以下三项必须由账号持有人在控制台完成。
+
+1. **创建备份子账号并启用异地同步**（约 3 分钟）：
+   - 访问管理 CAM → 用户 → 新建用户 → 自定义创建 → 勾选「编程访问」，不关联预设策略；
+   - 新建自定义策略（JSON，region/APPID/桶名按现有配置）：
+     ```json
+     {
+       "version": "2.0",
+       "statement": [
+         {
+           "effect": "allow",
+           "action": ["name/cos:PutObject", "name/cos:GetObject", "name/cos:DeleteObject", "name/cos:HeadObject"],
+           "resource": ["qcs::cos:ap-guangzhou:uid/1507095774:zkshq-1507095774/campus-circle-backups/*"]
+         },
+         {
+           "effect": "allow",
+           "action": ["name/cos:GetBucket"],
+           "resource": ["qcs::cos:ap-guangzhou:uid/1507095774:zkshq-1507095774/*"]
+         }
+       ]
+     }
+     ```
+   - 将策略关联到该用户，复制其 SecretId/SecretKey；
+   - 在服务器创建 `/etc/campus-circle/backup-cos.env`（权限 600）：
+     ```
+     BACKUP_COS_SECRET_ID=...
+     BACKUP_COS_SECRET_KEY=...
+     ```
+   - 执行 `sudo /usr/local/bin/campus-backup-offsite.sh`，在 COS 控制台确认 `campus-circle-backups/` 下有 `db-*`、`shared-*` 和 `binlog/`（binlog 已纳入异地同步，保证异地也能做时间点恢复）。
+2. **云硬盘快照**：CBS 控制台 → 快照策略 → 新建（建议每日 03:00、保留 7 天）→ 关联实例系统盘；整机损坏时分钟级回滚。
+3. **媒体桶版本控制**：对象存储 → 桶 `zkshq-1507095774` → 基础配置 → 版本控制 → 开启，并设置历史版本保留 30 天。
+
+如果希望由我代操作以上三项：可创建一把**临时 CAM 密钥**（具备 CAM/CBS/COS 相应权限，操作完成后可立即禁用），写入服务器 `/root/.tencent-provision.env`（600，不要发到聊天），我会完成配置与验证并告知你何时禁用。
 
 ## 常用运维命令
 

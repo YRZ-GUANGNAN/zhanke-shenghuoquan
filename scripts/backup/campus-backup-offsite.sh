@@ -53,6 +53,17 @@ for file in "$db_file" "$shared_file"; do
     --header-upload "x-cos-server-side-encryption: AES256" \
     --retries 3 --low-level-retries 5 --timeout 120s
 done
+
+# binlog 一并异地保存：没有 binlog，异地 dump 只能恢复到备份时点。
+datadir=$(mysql --defaults-file=/etc/mysql/debian.cnf -N -B -e "SHOW VARIABLES LIKE 'datadir'" | awk '{print $2}')
+if [ -n "$datadir" ] && [ -d "$datadir" ]; then
+  rclone copy "$datadir" "cos:$bucket/$prefix/binlog" \
+    --include "mysql-bin.*" --max-age 8d \
+    --header-upload "x-cos-server-side-encryption: AES256" \
+    --retries 3 --low-level-retries 5 --timeout 120s || true
+fi
+
+# COS 侧保留 90 天，避免无限增长
 rclone delete "cos:$bucket/$prefix" --min-age 90d >/dev/null 2>&1 || true
 
 date -Is > "$BACKUP_DIR/LAST_OFFSITE_SUCCESS"
