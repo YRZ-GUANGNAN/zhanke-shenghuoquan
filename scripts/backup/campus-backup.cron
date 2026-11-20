@@ -1,0 +1,9 @@
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# 每日 02:37 全量备份（DB + 本地上传资源 + 配置）
+37 2 * * * root /usr/local/bin/campus-backup.sh
+# 每周日 02:45 异地同步到 COS（未配置备份密钥时自动跳过）
+45 2 * * 7 root /usr/local/bin/campus-backup-offsite.sh
+# 每周日 03:20 恢复演练（临时库恢复并核对）
+20 3 * * 7 root /usr/local/bin/campus-restore-verify.sh
